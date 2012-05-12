@@ -1,0 +1,103 @@
+DEBUG=0
+
+ifeq ($(platform),)
+platform = unix
+ifeq ($(shell uname -a),)
+   platform = win
+else ifneq ($(findstring MINGW,$(shell uname -a)),)
+   platform = win
+else ifneq ($(findstring Darwin,$(shell uname -a)),)
+   platform = osx
+else ifneq ($(findstring win,$(shell uname -a)),)
+   platform = win
+endif
+endif
+
+CC         = gcc
+
+ifeq ($(platform), unix)
+   TARGET := rdatawad
+else ifeq ($(platform), osx)
+   TARGET := rdatawad
+else
+   TARGET := rdatawad.exe
+   CC = gcc
+   SHARED := -static-libgcc -static-libstdc++
+   CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__
+endif
+
+ifeq ($(DEBUG), 1)
+CFLAGS += -O0 -g
+else
+CFLAGS += -O3
+endif
+
+OBJECTS	   = data/rd_graphic.o data/rd_output.o data/rd_palette.o data/rd_sound.o data/rd_util.o data/rd_main.o
+
+INCLUDES   = -I. -I.. -Idata
+DEFINES    = -DHAVE_INTTYPES_H -D__LIBRETRO__ -DINLINE=inline
+
+WARNINGS_DEFINES = -Wall -W -Wno-unused-parameter
+CODE_DEFINES = -fomit-frame-pointer -std=gnu99
+
+COMMON_DEFINES += $(CODE_DEFINES) $(WARNINGS_DEFINES) -DNDEBUG=1 $(fpic)
+
+CFLAGS     += $(DEFINES) $(COMMON_DEFINES)
+
+all: $(TARGET)
+
+$(TARGET): $(OBJECTS)
+	$(CC) $(INCLUDES) $(CFLAGS) -o $@ $(OBJECTS) -lm
+
+%.o: %.c
+	$(CC) $(INCLUDES) $(CFLAGS) -c -o $@ $<
+
+clean:
+	rm -f $(OBJECTS) $(TARGET)
+
+PALETTE = data/palette.rgb
+LUMPS = data/lumps/switches.lmp data/lumps/animated.lmp data/lumps/crbrick.lmp \
+	data/lumps/crtan.lmp data/lumps/crgray.lmp data/lumps/crgreen.lmp \
+	data/lumps/crbrown.lmp data/lumps/crgold.lmp data/lumps/crred.lmp \
+	data/lumps/crblue.lmp data/lumps/crblue2.lmp data/lumps/crorange.lmp \
+	data/lumps/cryellow.lmp
+COLORMAPS = data/lumps/watermap.lmp
+TABLES = data/lumps/sinetabl.lmp data/lumps/tangtabl.lmp data/lumps/tantoang.lmp \
+	data/lumps/gammatbl.lmp
+GRAPHICS = data/graphics/dig0.ppm data/graphics/dig1.ppm data/graphics/dig2.ppm \
+	data/graphics/dig3.ppm data/graphics/dig4.ppm data/graphics/dig5.ppm \
+	data/graphics/dig6.ppm data/graphics/dig7.ppm data/graphics/dig8.ppm \
+	data/graphics/dig9.ppm data/graphics/diga.ppm data/graphics/digb.ppm \
+	data/graphics/digc.ppm data/graphics/digd.ppm data/graphics/dige.ppm \
+	data/graphics/digf.ppm data/graphics/digg.ppm data/graphics/digh.ppm \
+	data/graphics/digi.ppm data/graphics/digj.ppm data/graphics/digk.ppm \
+	data/graphics/digl.ppm data/graphics/digm.ppm data/graphics/dign.ppm \
+	data/graphics/digo.ppm data/graphics/digp.ppm data/graphics/digq.ppm \
+	data/graphics/digr.ppm data/graphics/digs.ppm data/graphics/digt.ppm \
+	data/graphics/digu.ppm data/graphics/digv.ppm data/graphics/digw.ppm \
+	data/graphics/digx.ppm data/graphics/digy.ppm data/graphics/digz.ppm \
+	data/graphics/dig45.ppm data/graphics/dig47.ppm data/graphics/dig58.ppm \
+	data/graphics/dig91.ppm data/graphics/dig93.ppm data/graphics/stbr123.ppm \
+	data/graphics/stbr124.ppm data/graphics/stbr125.ppm data/graphics/stbr126.ppm \
+	data/graphics/stbr127.ppm data/graphics/boxul.ppm data/graphics/boxuc.ppm \
+	data/graphics/boxur.ppm data/graphics/boxcl.ppm data/graphics/boxcc.ppm \
+	data/graphics/boxcr.ppm data/graphics/boxll.ppm data/graphics/boxlc.ppm \
+	data/graphics/boxlr.ppm data/graphics/stkeys6.ppm data/graphics/stkeys7.ppm \
+	data/graphics/stkeys8.ppm data/graphics/stcfn096.ppm \
+	data/graphics/m_butt1.ppm data/graphics/m_butt2.ppm \
+	data/graphics/m_colors.ppm data/graphics/m_palno.ppm \
+	data/graphics/m_palsel.ppm data/graphics/m_vbox.ppm \
+	data/graphics/m_generl.ppm data/graphics/m_setup.ppm \
+	data/graphics/m_auto.ppm data/graphics/m_keybnd.ppm \
+	data/graphics/m_compat.ppm data/graphics/m_enem.ppm \
+	data/graphics/m_mess.ppm data/graphics/m_stat.ppm \
+	data/graphics/m_weap.ppm data/graphics/m_horsen.ppm \
+	data/graphics/m_versen.ppm data/graphics/prboom.ppm
+SPRITES = data/sprites/tnt1a0.ppm
+SPRITEP = 0,0,data/sprites/tnt1a0.ppm
+WAD_CMDLINE = -palette $(PALETTE) -lumps $(LUMPS) -marker C_START -lumps $(COLORMAPS) -marker C_END -marker B_START -lumps $(TABLES) -marker B_END -graphics $(GRAPHICS) -marker SS_START -sprites $(SPRITEP) -marker SS_END
+
+make-prboomwad:
+	./rdatawad -I data $(WAD_CMDLINE) -o prboom.wad
+
+.PHONY: clean make-prboomwad

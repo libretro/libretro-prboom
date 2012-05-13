@@ -2769,13 +2769,13 @@ enum {
 #define G_YA3 (G_YA2+5*8)
 #define GF_X 76
 
-static const char *framerates[] = {"35fps", "60fps"};
+static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps"};
 
 setup_menu_t gen_settings1[] = { // General Settings screen1
 
   {"Video"       ,S_SKIP|S_TITLE, m_null, G_X, G_YA - 12},
 
-  {"Uncapped Framerate", S_CHOICE, m_null, G_X,
+  {"Framerate", S_CHOICE, m_null, G_X,
   G_YA + general_uncapped*8, {"uncapped_framerate"}, 0, 0, NULL, framerates},
 
 #if 0

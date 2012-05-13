@@ -29,6 +29,8 @@
 
 /* PS3 values for i_sound.h - check if correct for libretro */
 #define SAMPLECOUNT_35		((4 * 11025) / 35)
+#define SAMPLECOUNT_40		((4 * 11025) / 40)
+#define SAMPLECOUNT_50		((4 * 11025) / 50)
 #define SAMPLECOUNT_60		((4 * 11025) / 60)
 #define NUM_CHANNELS		32
 #define BUFMUL                  4
@@ -707,19 +709,15 @@ void I_StopSound (int handle)
 {
     int i;
     
-    //sys_lwmutex_lock (&chanmutex, 0);
-
     for (i=0; i<NUM_CHANNELS; i++)
     {
         if (channels[i].handle==handle)
         {
             I_SndMixResetChannel(i);
-            //sys_lwmutex_unlock (&chanmutex);
             return;
         }
     }
     
-    //sys_lwmutex_unlock (&chanmutex);
     return;
 }
 
@@ -750,8 +748,6 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     // this effect was not loaded.
     if (!S_sfx[id].data)
         return -1;
-
-    //sys_lwmutex_lock (&chanmutex, 0);
 
     // Loop all channels to find a free slot.
     slot = -1;
@@ -811,8 +807,6 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     //  e.g. for avoiding duplicates of chainsaw.
     channels[slot].sfxid = id;
 
-    //sys_lwmutex_unlock (&chanmutex);
-
     return currenthandle;
 }
 
@@ -821,18 +815,12 @@ boolean I_SoundIsPlaying (int handle)
 {
     int i;
     
-    //sys_lwmutex_lock (&chanmutex, 0);
-
     for (i=0; i<NUM_CHANNELS; i++)
     {
         if (channels[i].handle==handle)
-        {
-            //sys_lwmutex_unlock (&chanmutex);
             return 1;
-        }
     }
 
-    //sys_lwmutex_unlock (&chanmutex);
     return 0;
 }
 
@@ -873,7 +861,24 @@ void I_UpdateSound(void)
     rightout = mixbuffer+1;
     step = 2;
 
-    out_frames = movement_smooth ? SAMPLECOUNT_60 : SAMPLECOUNT_35;
+    switch(movement_smooth)
+    {
+       case 0:
+          out_frames = SAMPLECOUNT_35;
+          break;
+       case 1:
+          out_frames = SAMPLECOUNT_40;
+          break;
+       case 2:
+          out_frames = SAMPLECOUNT_50;
+          break;
+       case 3:
+          out_frames = SAMPLECOUNT_60;
+          break;
+       default:
+          out_frames = SAMPLECOUNT_35;
+          break;
+    }
 
     // Determine end, for left channel only (right channel is implicit).
     leftend = mixbuffer + out_frames * step;
@@ -941,54 +946,12 @@ void I_UpdateSound(void)
     return;
 }
 
-#if 0
-static uint32_t playOneBlock(u64 *readIndex, float *audioDataStart)
-{
-    static uint64_t audio_block_index=1;
-    uint64_t current_block = *readIndex;
-    float *buf;
-
-    if (audio_block_index == current_block)
-        return 0;
-
-    buf = audioDataStart + 2 /*channelcount*/ * AUDIO_BLOCK_SAMPLES * audio_block_index;
-
-    I_UpdateSound();
-
-    for (int i = 0; i < SAMPLECOUNT*2; i++)
-        buf[i] = (float)mixbuffer[i]/32767.0f;
-
-    audio_block_index = (audio_block_index + 1) % AUDIO_BLOCK_8;
-
-    return 1;
-}
-
-static void mix_thread_func (uint64_t arg)
-{
-    for (;;)
-    {
-        usleep (20);
-
-        sys_lwmutex_lock (&chanmutex, 0);
-
-        playOneBlock((u64*)(u64)ps3_audio_port_cfg.readIndex,
-                     (float*)(u64)ps3_audio_port_cfg.audioDataStart);
-
-        sys_lwmutex_unlock (&chanmutex);
-    }
- 
-    return;
-}
-#endif
-
 void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
 {
     int rightvol;
     int	leftvol;
     int i;
 
-    // sys_lwmutex_lock (&chanmutex, 0);
-    
     for (i=0; i<NUM_CHANNELS; i++)
     {
         if (channels[i].handle==handle)
@@ -1008,12 +971,10 @@ void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
             channels[i].leftvol = &vol_lookup[leftvol*256];
             channels[i].rightvol = &vol_lookup[rightvol*256];
 
-            //sys_lwmutex_unlock (&chanmutex);
             return;
         }
     }
  
-    //sys_lwmutex_unlock (&chanmutex);
     return;
 }
 

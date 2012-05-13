@@ -1466,8 +1466,9 @@ void D_DoomLoop(void)
 	  {
 		  // Update display, next frame, with current state.
 		  D_Display();
+        return;
 	  }
-  }while(!has_exited);
+  } while(!has_exited);
 }
 
 void D_DoomDeinit(void)

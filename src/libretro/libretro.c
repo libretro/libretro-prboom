@@ -210,7 +210,7 @@ bool retro_load_game(const struct retro_game_info *info)
 {
    int argc = 0;
    char vbuf[200];
-   char *argv[32] = {NULL};
+   static char *argv[32] = {NULL};
 
    extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
 

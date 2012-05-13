@@ -78,7 +78,9 @@ fixed_t  viewcos, viewsin;
 player_t *viewplayer;
 extern lighttable_t **walllights;
 
+#ifndef __LIBRETRO__
 static mobj_t *oviewer;
+#endif
 
 //
 // precalculated math tables
@@ -459,10 +461,13 @@ subsector_t *R_PointInSubsector(fixed_t x, fixed_t y)
 static void R_SetupFrame (player_t *player)
 {
   int cm;
+#ifndef __LIBRETRO__
   boolean NoInterpolate = paused || (menuactive && !demoplayback);
+#endif
 
   viewplayer = player;
 
+#ifndef __LIBRETRO__
   if (player->mo != oviewer || NoInterpolate)
   {
     R_ResetViewInterpolation ();
@@ -472,13 +477,18 @@ static void R_SetupFrame (player_t *player)
   if (NoInterpolate)
     tic_vars.frac = FRACUNIT;
   R_InterpolateView (player, tic_vars.frac);
+#else
+  R_InterpolateView (player);
+#endif
 
   extralight = player->extralight;
 
   viewsin = finesine[viewangle>>ANGLETOFINESHIFT];
   viewcos = finecosine[viewangle>>ANGLETOFINESHIFT];
 
+#ifndef __LIBRETRO__
   R_DoInterpolations(tic_vars.frac);
+#endif
 
   // killough 3/20/98, 4/4/98: select colormap based on player status
 
@@ -515,6 +525,7 @@ int autodetect_hom = 0;       // killough 2/7/98: HOM autodetection flag
 int rendered_visplanes, rendered_segs, rendered_vissprites;
 boolean rendering_stats;
 
+#ifndef __LIBRETRO__
 static void R_ShowStats(void)
 {
 //e6y
@@ -531,6 +542,7 @@ static void R_ShowStats(void)
   memmove(keeptime, keeptime+1, sizeof(keeptime[0]) * (KEEPTIMES-1));
   keeptime[KEEPTIMES-1] = now;
 }
+#endif
 
 //
 // R_RenderView
@@ -581,7 +593,9 @@ void R_RenderPlayerView (player_t* player)
   NetUpdate ();
 #endif
 
+#ifndef __LIBRETRO__
   if (rendering_stats) R_ShowStats();
 
   R_RestoreInterpolations();
+#endif
 }

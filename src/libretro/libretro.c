@@ -405,7 +405,6 @@ void I_SetRes(void)
 
 /* i_system - i_main */
 
-static struct timeval start;
 static boolean InDisplay = false;
 
 boolean I_StartDisplay(void)
@@ -420,67 +419,6 @@ boolean I_StartDisplay(void)
 void I_EndDisplay(void)
 {
   InDisplay = false;
-}
-
-static uint32_t GetTicks(void)
-{
-   uint32_t ticks;
-   struct timeval now;
-   gettimeofday(&now, NULL);
-   ticks = (now.tv_sec - start.tv_sec) * 1000 + (now.tv_usec - start.tv_usec) / 1000;
-   return (ticks);
-}
-
-static void Delay(uint32_t ms)
-{
-    int was_error;
-
-    struct timeval tv;
-    uint32_t then, now, elapsed;
-
-    /* Set the timeout interval */
-    then = GetTicks();
-    do {
-        errno = 0;
-
-        /* Calculate the time interval left (in case of interrupt) */
-        now = GetTicks();
-        elapsed = (now - then);
-        then = now;
-        if (elapsed >= ms) {
-            break;
-        }
-        ms -= elapsed;
-        tv.tv_sec = ms / 1000;
-        tv.tv_usec = (ms % 1000) * 1000;
-
-        was_error = select(0, NULL, NULL, NULL, &tv);
-    }
-    while (was_error && (errno == EINTR));
-}
-
-void I_uSleep(unsigned long usecs)
-{
-    Delay(usecs/1000);
-}
-
-static uint32_t StartTicks(void)
-{
-   gettimeofday(&start, NULL);
-}
-
-int I_GetTime_RealTime (void)
-{
-    struct timeval	tp;
-    struct timezone	tzp;
-    int			newtics;
-    static int		basetime=0;
-  
-    gettimeofday(&tp, &tzp);
-    if (!basetime)
-	basetime = tp.tv_sec;
-    newtics = (tp.tv_sec-basetime)*TICRATE + tp.tv_usec*TICRATE/1000000;
-    return newtics;
 }
 
 /*
@@ -526,36 +464,6 @@ const char* I_SigString(char* buf, size_t sz, int signum)
 }
 
 #else
-
-fixed_t I_GetTimeFrac (void)
-{
-  unsigned long now;
-  fixed_t frac;
-
-  now = GetTicks();
-
-  if (tic_vars.step == 0)
-    return FRACUNIT;
-  else
-  {
-    frac = (fixed_t)((now - tic_vars.start) * FRACUNIT / tic_vars.step);
-    if (frac < 0)
-      frac = 0;
-    if (frac > FRACUNIT)
-      frac = FRACUNIT;
-    return frac;
-  }
-}
-
-void I_GetTime_SaveMS(void)
-{
-  if (!movement_smooth)
-    return;
-
-  tic_vars.start = GetTicks();
-  tic_vars.next = (unsigned int) ((tic_vars.start * tic_vars.msec + 1.0f) / tic_vars.msec);
-  tic_vars.step = tic_vars.next - tic_vars.start;
-}
 
 const char *I_DoomExeDir(void)
 {
@@ -644,25 +552,17 @@ int I_Filelength(int handle)
   return fileinfo.st_size;
 }
 
-static int I_GetTime_Error(void)
-{
-  I_Error("I_GetTime_Error: GetTime() used before initialization");
-  return 0;
-}
-
-int (*I_GetTime)(void) = I_GetTime_Error;
-
 void I_Init(void)
 {
-  I_GetTime = I_GetTime_RealTime;
-
   {
     /* killough 2/21/98: avoid sound initialization if no sound & no music */
     if (!(nomusicparm && nosfxparm))
       I_InitSound();
   }
 
+#ifndef __LIBRETRO__
   R_InitInterpolation();
+#endif
 }
 
 // killough 2/22/98: Add support for ENDBOOM, which is PC-specific

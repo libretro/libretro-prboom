@@ -1011,6 +1011,7 @@ static void M_QuitResponse(int ch)
 {
   if (ch != 'y')
     return;
+#ifndef __LIBRETRO__
   if ((!netgame || demoplayback) // killough 12/98
       && !nosfxparm && snd_card) // avoid delay if no sound card
   {
@@ -1030,6 +1031,7 @@ static void M_QuitResponse(int ch)
       i--;
     }
   }
+#endif
   I_SafeExit(1);
 }
 

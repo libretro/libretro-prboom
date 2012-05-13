@@ -315,6 +315,7 @@ void P_PlayerThink (player_t* player)
   ticcmd_t*    cmd;
   weapontype_t newweapon;
 
+#ifndef __LIBRETRO__
   if (movement_smooth && &players[displayplayer] == player)
   {
     original_view_vars.viewx = player->mo->x;
@@ -322,6 +323,7 @@ void P_PlayerThink (player_t* player)
     original_view_vars.viewz = player->viewz;
     original_view_vars.viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
   }
+#endif
 
   // killough 2/8/98, 3/21/98:
   if (player->cheats & CF_NOCLIP)

@@ -298,9 +298,11 @@ void D_Display (void)
   I_EndDisplay();
 
   //e6y: don't thrash cpu during pausing
+#ifndef __LIBRETRO__
   if (paused) {
     I_uSleep(1000);
   }
+#endif
 }
 
 int has_exited;

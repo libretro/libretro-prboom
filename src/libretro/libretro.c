@@ -28,10 +28,11 @@
 #include <errno.h>
 
 /* PS3 values for i_sound.h - check if correct for libretro */
-#define SAMPLECOUNT		((4 * 11025) / 35)
+#define SAMPLECOUNT_35		((4 * 11025) / 35)
+#define SAMPLECOUNT_60		((4 * 11025) / 60)
 #define NUM_CHANNELS		32
 #define BUFMUL                  4
-#define MIXBUFFERSIZE		(SAMPLECOUNT*BUFMUL)
+#define MIXBUFFERSIZE		(SAMPLECOUNT_35*BUFMUL)
 #define MAX_CHANNELS    32
 
 //i_system
@@ -131,8 +132,8 @@ void retro_get_system_info(struct retro_system_info *info)
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    info->timing = (struct retro_system_timing) {
-      .fps = 35.0,
-      .sample_rate = 4 * 11025.0,
+      .fps = 60.0,
+      .sample_rate = 44100.0,
    };
 
    info->geometry = (struct retro_game_geometry) {
@@ -724,7 +725,7 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
     
     times = 48000.0f / (float)orig_rate;
     
-    padded_sfx_len = ((sfxlump_len*ceil(times) + (SAMPLECOUNT-1)) / SAMPLECOUNT) * SAMPLECOUNT;
+    padded_sfx_len = ((sfxlump_len*ceil(times) + (SAMPLECOUNT_35-1)) / SAMPLECOUNT_35) * SAMPLECOUNT_35;
     padded_sfx_data = (byte*)malloc(padded_sfx_len);
     
     for (i=0; i < padded_sfx_len; i++)
@@ -956,7 +957,7 @@ void I_UpdateSound(void)
     // Mix current sound data. Data, from raw sound, for right and left.
     byte sample;
     int dl, dr;
-    int frames;
+    int frames, out_frames;
 
     // Pointers in global mixbuffer, left, right, end.
     int16_t *leftout, *rightout, *leftend;
@@ -972,8 +973,10 @@ void I_UpdateSound(void)
     rightout = mixbuffer+1;
     step = 2;
 
+    out_frames = movement_smooth ? SAMPLECOUNT_60 : SAMPLECOUNT_35;
+
     // Determine end, for left channel only (right channel is implicit).
-    leftend = mixbuffer + SAMPLECOUNT*step;
+    leftend = mixbuffer + out_frames * step;
 
     // Mix sounds into the mixing buffer.
     // Loop over step*SAMPLECOUNT, that is 512 values for two channels.
@@ -1032,8 +1035,8 @@ void I_UpdateSound(void)
     }
 
     //fprintf(stderr, "AUDIO!\n");
-    for (frames = 0; frames < SAMPLECOUNT; )
-       frames += audio_batch_cb(mixbuffer + (frames << 1), SAMPLECOUNT - frames);
+    for (frames = 0; frames < out_frames; )
+       frames += audio_batch_cb(mixbuffer + (frames << 1), out_frames - frames);
 
     return;
 }

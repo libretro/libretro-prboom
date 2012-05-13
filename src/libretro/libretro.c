@@ -28,7 +28,7 @@
 #include <errno.h>
 
 /* PS3 values for i_sound.h - check if correct for libretro */
-#define SAMPLECOUNT		(4 * 11025 / 35)
+#define SAMPLECOUNT		((4 * 11025) / 35)
 #define NUM_CHANNELS		32
 #define BUFMUL                  4
 #define MIXBUFFERSIZE		(SAMPLECOUNT*BUFMUL)
@@ -463,13 +463,10 @@ void I_uSleep(unsigned long usecs)
     Delay(usecs/1000);
 }
 
-
 static uint32_t StartTicks(void)
 {
    gettimeofday(&start, NULL);
 }
-
-
 
 int I_GetTime_RealTime (void)
 {
@@ -1035,7 +1032,8 @@ void I_UpdateSound(void)
     }
 
     //fprintf(stderr, "AUDIO!\n");
-    audio_batch_cb(mixbuffer, SAMPLECOUNT);
+    for (frames = 0; frames < SAMPLECOUNT; )
+       frames += audio_batch_cb(mixbuffer + (frames << 1), SAMPLECOUNT - frames);
 
     return;
 }

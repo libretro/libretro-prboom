@@ -507,6 +507,7 @@ void D_InitNetGame (void)
   consoleplayer = displayplayer = doomcom->consoleplayer;
 }
 
+#if 0
 void D_BuildNewTiccmds(void)
 {
     static int lastmadetic;
@@ -520,7 +521,16 @@ void D_BuildNewTiccmds(void)
       maketic++;
     }
 }
+#else
+void D_BuildNewTiccmds(void)
+{
+   I_StartTic();
+   G_BuildTiccmd(&localcmds[maketic % BACKUPTICS]);
+   maketic++;
+}
+#endif
 
+#if 0
 void TryRunTics (void)
 {
   int runtics;
@@ -549,4 +559,19 @@ void TryRunTics (void)
   P_Checksum(gametic);
   gametic++;
 }
+#endif
+
+void TryRunTics(void)
+{
+  while (maketic <= gametic)
+     D_BuildNewTiccmds();
+
+  if (advancedemo)
+     D_DoAdvanceDemo ();
+  M_Ticker ();
+  G_Ticker ();
+  P_Checksum(gametic);
+  gametic++;
+}
+
 #endif

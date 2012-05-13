@@ -28,7 +28,7 @@
 #include <errno.h>
 
 /* PS3 values for i_sound.h - check if correct for libretro */
-#define SAMPLECOUNT		315
+#define SAMPLECOUNT		(32000 / 35)
 #define NUM_CHANNELS		32
 #define BUFMUL                  4
 #define MIXBUFFERSIZE		(SAMPLECOUNT*BUFMUL)
@@ -44,7 +44,7 @@ static unsigned char screen_buf[2 * 320 * 200];
 int 		lengths[NUMSFX];
 int snd_card = 1;
 int mus_card = 0;
-int snd_samplerate= 11025;
+int snd_samplerate= 32000;
 int use_doublebuffer = 1;
 
 typedef struct {
@@ -132,7 +132,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    info->timing = (struct retro_system_timing) {
       .fps = 35.0,
-      .sample_rate = 11025.0,
+      .sample_rate = 32000.0,
    };
 
    info->geometry = (struct retro_game_geometry) {

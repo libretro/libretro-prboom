@@ -417,6 +417,7 @@ void D_InitNetGame (void)
   if (!playeringame[consoleplayer]) I_Error("D_InitNetGame: consoleplayer not in game");
 }
 
+#if 0
 void TryRunTics (void)
 {
   int runtics;
@@ -467,6 +468,24 @@ void TryRunTics (void)
     NetUpdate(); // Keep sending our tics to avoid stalling remote nodes
   }
 }
+#else
+void TryRunTics(void) // Avoid sleeping/timer crap, just run it. (Themaister)
+{
+   int runtics = maketic - gametic;
+
+   while (runtics--)
+   {
+      if (advancedemo)
+         D_DoAdvanceDemo ();
+      M_Ticker ();
+      G_Ticker ();
+      P_Checksum(gametic);
+      gametic++;
+   }
+}
+#endif
+
+
 #else
 doomcom_t*      doomcom;
 

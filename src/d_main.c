@@ -163,18 +163,14 @@ void D_PostEvent(event_t *ev)
 // The screens to wipe between are already stored, this just does the timing
 // and screen updating
 
+// Make D_Wipe reentrant. We cannot stick around for an indefinite amount of time in this loop. (Themaister).
+static boolean in_d_wipe;
+
 static void D_Wipe(void)
 {
-  boolean done;
-
-  do
-    {
-      I_uSleep(20000); // CPhipps - don't thrash cpu in this loop
-      done = wipe_ScreenWipe(1);
-      M_Drawer();                   // menu is drawn even on top of wipes
-      I_FinishUpdate();             // page flip or blit buffer
-    }
-  while (!done);
+   in_d_wipe = !wipe_ScreenWipe(1);
+   M_Drawer();                   // menu is drawn even on top of wipes
+   I_FinishUpdate();             // page flip or blit buffer
 }
 
 //
@@ -189,6 +185,13 @@ extern int     showMessages;
 
 void D_Display (void)
 {
+  // Reentrancy.
+  if (in_d_wipe)
+  {
+     D_Wipe();
+     return;
+  }
+
   static boolean isborderstate        = false;
   static boolean borderwillneedredraw = false;
   static gamestate_t oldgamestate = -1;

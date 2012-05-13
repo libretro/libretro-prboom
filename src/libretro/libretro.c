@@ -28,7 +28,7 @@
 #include <errno.h>
 
 /* PS3 values for i_sound.h - check if correct for libretro */
-#define SAMPLECOUNT		256
+#define SAMPLECOUNT		315
 #define NUM_CHANNELS		32
 #define BUFMUL                  4
 #define MIXBUFFERSIZE		(SAMPLECOUNT*BUFMUL)
@@ -44,7 +44,7 @@ static unsigned char screen_buf[2 * 320 * 200];
 int 		lengths[NUMSFX];
 int snd_card = 1;
 int mus_card = 0;
-int snd_samplerate= 32000;
+int snd_samplerate= 11025;
 int use_doublebuffer = 1;
 
 typedef struct {
@@ -132,7 +132,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    info->timing = (struct retro_system_timing) {
       .fps = 35.0,
-      .sample_rate = 30000.0,
+      .sample_rate = 11025.0,
    };
 
    info->geometry = (struct retro_game_geometry) {
@@ -188,6 +188,7 @@ void retro_reset(void)
 void retro_run(void)
 {
    D_DoomLoop();
+   I_UpdateSound();
 }
 
 static void extract_directory(char *buf, const char *path, size_t size)
@@ -257,7 +258,7 @@ bool retro_load_game_special(unsigned type, const struct retro_game_info *info, 
 
 size_t retro_serialize_size(void)
 {
-   return 2;
+   return 0;
 }
 
 bool retro_serialize(void *data_, size_t size)
@@ -313,8 +314,8 @@ static int action_lut[] = {
 
 void I_StartTic (void)
 {
-   static bool old_input[12];
-   bool new_input[12];
+   static bool old_input[14];
+   bool new_input[14];
 
    input_poll_cb();
 
@@ -958,6 +959,7 @@ void I_UpdateSound(void)
     // Mix current sound data. Data, from raw sound, for right and left.
     byte sample;
     int dl, dr;
+    int frames;
 
     // Pointers in global mixbuffer, left, right, end.
     int16_t *leftout, *rightout, *leftend;
@@ -1031,6 +1033,9 @@ void I_UpdateSound(void)
 	leftout += step;
 	rightout += step;
     }
+
+    //fprintf(stderr, "AUDIO!\n");
+    audio_batch_cb(mixbuffer, SAMPLECOUNT);
 
     return;
 }

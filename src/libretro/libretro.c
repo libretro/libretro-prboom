@@ -1053,7 +1053,7 @@ static int	musicdies=-1;
 void I_PlaySong(int handle, int looping)
 {
   // UNUSED.
-  handle = looping = 0;
+  handle = 0;
   musicdies = gametic + TICRATE*30; // ?
 
   mp_player.play(music_handle, looping);

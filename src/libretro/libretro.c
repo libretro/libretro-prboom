@@ -21,6 +21,8 @@
 #include "m_swap.h"
 #include "w_wad.h"
 #include "r_draw.h"
+#include "musicplayer.h"
+#include "madplayer.h"
 
 #include <sys/time.h>
 #include <sys/stat.h>
@@ -105,10 +107,12 @@ extern int snd_MusicVolume;
 
 void retro_init(void)
 {
+   mp_player.init(44100);
 }
 
 void retro_deinit(void)
 {
+   mp_player.shutdown();
 }
 
 unsigned retro_api_version(void)
@@ -842,108 +846,114 @@ boolean I_SoundIsPlaying (int handle)
 
 void I_UpdateSound(void)
 {
-    // Mix current sound data. Data, from raw sound, for right and left.
-    byte sample;
-    int dl, dr;
-    int frames, out_frames;
+   // Mix current sound data. Data, from raw sound, for right and left.
+   byte sample;
+   int dl, dr;
+   int frames, out_frames;
+   int16_t mad_audio_buf[SAMPLECOUNT_35 * 2];
 
-    // Pointers in global mixbuffer, left, right, end.
-    int16_t *leftout, *rightout, *leftend;
+   // Pointers in global mixbuffer, left, right, end.
+   int16_t *leftout, *rightout, *leftend;
 
-    // Step in mixbuffer, left and right, thus two.
-    int step;
+   // Step in mixbuffer, left and right, thus two.
+   int step;
 
-    // Mixing channel index.
-    int chan;
+   // Mixing channel index.
+   int chan;
 
-    // Left and right channel are in global mixbuffer, alternating.
-    leftout = mixbuffer;
-    rightout = mixbuffer+1;
-    step = 2;
+   // Left and right channel are in global mixbuffer, alternating.
+   leftout = mixbuffer;
+   rightout = mixbuffer+1;
+   step = 2;
+   frames = 0;
 
-    switch(movement_smooth)
-    {
-       case 0:
-          out_frames = SAMPLECOUNT_35;
-          break;
-       case 1:
-          out_frames = SAMPLECOUNT_40;
-          break;
-       case 2:
-          out_frames = SAMPLECOUNT_50;
-          break;
-       case 3:
-          out_frames = SAMPLECOUNT_60;
-          break;
-       default:
-          out_frames = SAMPLECOUNT_35;
-          break;
-    }
-
-    // Determine end, for left channel only (right channel is implicit).
-    leftend = mixbuffer + out_frames * step;
-
-    // Mix sounds into the mixing buffer.
-    // Loop over step*SAMPLECOUNT, that is 512 values for two channels.
-
-    while (leftout <= leftend)
-    {
-        // Reset left/right value.
-	dl = 0;
-	dr = 0;
+   switch(movement_smooth)
+   {
+      case 0:
+         out_frames = SAMPLECOUNT_35;
+         break;
+      case 1:
+         out_frames = SAMPLECOUNT_40;
+         break;
+      case 2:
+         out_frames = SAMPLECOUNT_50;
+         break;
+      case 3:
+         out_frames = SAMPLECOUNT_60;
+         break;
+      default:
+         out_frames = SAMPLECOUNT_35;
+         break;
+   }
 
 
-	for (chan=0; chan<NUM_CHANNELS; chan++)
-	{
-            // Check channel, if active.
-            if (channels[chan].snd_start_ptr)
-            {
-                // Get the raw data from the channel. 
-                sample = *channels[chan].snd_start_ptr;
-                
-                // Add left and right part for this channel (sound) to the
-                // current data. Adjust volume accordingly.
-                dl += channels[chan].leftvol[sample];
-                dr += channels[chan].rightvol[sample];
+   mp_player.render(mad_audio_buf, out_frames);
 
-                channels[chan].snd_start_ptr++;
+   // Determine end, for left channel only (right channel is implicit).
+   leftend = mixbuffer + out_frames * step;
 
-                if (!(channels[chan].snd_start_ptr < channels[chan].snd_end_ptr))
-                    I_SndMixResetChannel (chan);
-	    }
-	}
-	
-	// Clamp to range. Left hardware channel.
-	// Has been char instead of short.
-	// if (dl > 127) *leftout = 127;
-	// else if (dl < -128) *leftout = -128;
-	// else *leftout = dl;
+   // Mix sounds into the mixing buffer.
+   // Loop over step*SAMPLECOUNT, that is 512 values for two channels.
 
-	if (dl > 0x7fff)
-	    *leftout = 0x7fff;
-	else if (dl < -0x8000)
-	    *leftout = -0x8000;
-	else
-	    *leftout = dl;
+   while (leftout <= leftend)
+   {
+      // Reset left/right value.
+      dl = mad_audio_buf[frames * 2 + 0];
+      dr = mad_audio_buf[frames * 2 + 1];
 
-	// Same for right hardware channel.
-	if (dr > 0x7fff)
-	    *rightout = 0x7fff;
-	else if (dr < -0x8000)
-	    *rightout = -0x8000;
-	else
-	    *rightout = dr;
 
-	// Increment current pointers in mixbuffer.
-	leftout += step;
-	rightout += step;
-    }
+      for (chan=0; chan<NUM_CHANNELS; chan++)
+      {
+         // Check channel, if active.
+         if (channels[chan].snd_start_ptr)
+         {
+            // Get the raw data from the channel. 
+            sample = *channels[chan].snd_start_ptr;
 
-    //fprintf(stderr, "AUDIO!\n");
-    for (frames = 0; frames < out_frames; )
-       frames += audio_batch_cb(mixbuffer + (frames << 1), out_frames - frames);
+            // Add left and right part for this channel (sound) to the
+            // current data. Adjust volume accordingly.
+            dl += channels[chan].leftvol[sample];
+            dr += channels[chan].rightvol[sample];
 
-    return;
+            channels[chan].snd_start_ptr++;
+
+            if (!(channels[chan].snd_start_ptr < channels[chan].snd_end_ptr))
+               I_SndMixResetChannel (chan);
+         }
+      }
+
+      // Clamp to range. Left hardware channel.
+      // Has been char instead of short.
+      // if (dl > 127) *leftout = 127;
+      // else if (dl < -128) *leftout = -128;
+      // else *leftout = dl;
+
+      if (dl > 0x7fff)
+         *leftout = 0x7fff;
+      else if (dl < -0x8000)
+         *leftout = -0x8000;
+      else
+         *leftout = dl;
+
+      // Same for right hardware channel.
+      if (dr > 0x7fff)
+         *rightout = 0x7fff;
+      else if (dr < -0x8000)
+         *rightout = -0x8000;
+      else
+         *rightout = dr;
+
+      // Increment current pointers in mixbuffer.
+      leftout += step;
+      rightout += step;
+      frames++;
+   }
+
+   //fprintf(stderr, "AUDIO!\n");
+   for (frames = 0; frames < out_frames; )
+      frames += audio_batch_cb(mixbuffer + (frames << 1), out_frames - frames);
+
+   return;
 }
 
 void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
@@ -1030,7 +1040,10 @@ boolean I_AnySoundStillPlaying(void)
 // MUSIC API.
 // Still no music done.
 // Remains. Dummies.
-//
+
+static const void *music_handle;
+static void *song_data;
+
 void I_InitMusic(void)		{ }
 void I_ShutdownMusic(void)	{ }
 
@@ -1041,19 +1054,26 @@ void I_PlaySong(int handle, int looping)
 {
   // UNUSED.
   handle = looping = 0;
-  musicdies = gametic + TICRATE*30;
+  musicdies = gametic + TICRATE*30; // ?
+
+  mp_player.play(music_handle, looping);
+  mp_player.setvolume(8);
 }
 
 void I_PauseSong (int handle)
 {
   // UNUSED.
   handle = 0;
+
+  mp_player.pause();
 }
 
 void I_ResumeSong (int handle)
 {
   // UNUSED.
   handle = 0;
+
+  mp_player.resume();
 }
 
 void I_StopSong(int handle)
@@ -1063,12 +1083,19 @@ void I_StopSong(int handle)
   
   looping = 0;
   musicdies = 0;
+
+  mp_player.stop();
 }
 
 void I_UnRegisterSong(int handle)
 {
   // UNUSED.
   handle = 0;
+
+  mp_player.unregistersong(music_handle);
+  music_handle = NULL;
+  free(song_data);
+  song_data = NULL;
 }
 
 int I_RegisterSong(const void* data, size_t len)
@@ -1084,7 +1111,76 @@ int I_QrySongPlaying(int handle)
   return looping || musicdies > gametic;
 }
 
+static int RegisterSong(const void *data, size_t len)
+{
+   music_handle = mp_player.registersong(data, len);
+   return !!music_handle;
+}
+
 int I_RegisterMusic( const char* filename, musicinfo_t *song )
 {
-  return 1;
+  int len;
+  fprintf(stderr, "RegisterMusic: %s\n", filename);
+
+  len = M_ReadFile(filename, (byte **) &song_data);
+  if (len == -1)
+  {
+     lprintf(LO_WARN, "Couldn't read %s\n", filename);
+     return 1;
+  }
+
+  if (!RegisterSong(song_data, len))
+  {
+     free(song_data);
+     song_data = NULL;
+     lprintf(LO_WARN, "Couldn't load music from %s\n", filename);
+     return 1;
+  }
+
+  song->data = 0;
+  song->handle = 0;
+  song->lumpnum = 0;
+  return 0;
 }
+
+// NSM helper routine for some of the streaming audio
+void I_ResampleStream (void *dest, unsigned nsamp, void (*proc) (void *dest, unsigned nsamp), unsigned sratein, unsigned srateout)
+{ // assumes 16 bit signed interleaved stereo
+  
+  unsigned i;
+  int j = 0;
+  
+  short *sout = dest;
+  
+  static short *sin = NULL;
+  static unsigned sinsamp = 0;
+
+  static unsigned remainder = 0;
+  unsigned step = (sratein << 16) / (unsigned) srateout;
+
+  unsigned nreq = (step * nsamp + remainder) >> 16;
+
+  if (nreq > sinsamp)
+  {
+    sin = realloc (sin, (nreq + 1) * 4);
+    if (!sinsamp) // avoid pop when first starting stream
+      sin[0] = sin[1] = 0;
+    sinsamp = nreq;
+  }
+
+  proc (sin + 2, nreq);
+
+  for (i = 0; i < nsamp; i++)
+  {
+    *sout++ = ((unsigned) sin[j + 0] * (0x10000 - remainder) +
+               (unsigned) sin[j + 2] * remainder) >> 16;
+    *sout++ = ((unsigned) sin[j + 1] * (0x10000 - remainder) +
+               (unsigned) sin[j + 3] * remainder) >> 16;
+    remainder += step;
+    j += remainder >> 16 << 1;
+    remainder &= 0xffff;
+  }
+  sin[0] = sin[nreq * 2];
+  sin[1] = sin[nreq * 2 + 1];
+}  
+

@@ -506,6 +506,7 @@ lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
   };
 
   int   i;
+  FILE *file = NULL;
   /* Precalculate a length we will need in the loop */
   size_t  pl = strlen(wfname) + strlen(ext) + 4;
 
@@ -524,10 +525,15 @@ lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
     sprintf(p, wfname);
     lprintf(LO_ALWAYS, "p: %s\n", p);
 
-    if (access(p,F_OK))
+    file = fopen(p, "rb");
+    if (!file)
+    {
       strcat(p, ext);
-    if (!access(p,F_OK)) {
+      file = fopen(p, "rb");
+    }
+    if (file) {
       lprintf(LO_INFO, " found %s\n", p);
+      fclose(file);
       return p;
     }
     free(p);

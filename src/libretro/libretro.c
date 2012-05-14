@@ -844,6 +844,9 @@ boolean I_SoundIsPlaying (int handle)
 // This function currently supports only 16bit.
 //
 
+static const void *music_handle;
+static void *song_data;
+
 void I_UpdateSound(void)
 {
    // Mix current sound data. Data, from raw sound, for right and left.
@@ -886,8 +889,10 @@ void I_UpdateSound(void)
          break;
    }
 
-
-   mp_player.render(mad_audio_buf, out_frames);
+   if (music_handle)
+      mp_player.render(mad_audio_buf, out_frames);
+   else
+      memset(mad_audio_buf, 0, out_frames * 4);
 
    // Determine end, for left channel only (right channel is implicit).
    leftend = mixbuffer + out_frames * step;
@@ -1040,9 +1045,6 @@ boolean I_AnySoundStillPlaying(void)
 // MUSIC API.
 // Still no music done.
 // Remains. Dummies.
-
-static const void *music_handle;
-static void *song_data;
 
 void I_InitMusic(void)		{ }
 void I_ShutdownMusic(void)	{ }

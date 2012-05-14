@@ -1057,7 +1057,7 @@ void I_PlaySong(int handle, int looping)
   musicdies = gametic + TICRATE*30; // ?
 
   mp_player.play(music_handle, looping);
-  mp_player.setvolume(8);
+  mp_player.setvolume(15);
 }
 
 void I_PauseSong (int handle)

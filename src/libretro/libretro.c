@@ -24,7 +24,6 @@
 #include "musicplayer.h"
 #include "madplayer.h"
 
-#include <sys/time.h>
 #include <sys/stat.h>
 #include <unistd.h>
 #include <errno.h>
@@ -430,15 +429,10 @@ void I_EndDisplay(void)
 /*
  * I_GetRandomTimeSeed
  *
- * CPhipps - extracted from G_ReloadDefaults because it is O/S based
  */
 unsigned long I_GetRandomTimeSeed(void)
 {
-  /* killough 3/26/98: shuffle random seed, use the clock */ 
-  struct timeval tv;
-  struct timezone tz;
-  gettimeofday(&tv,&tz);
-  return (tv.tv_sec*1000ul + tv.tv_usec/1000ul);
+	return 0;
 }
 
 /* cphipps - I_GetVersionString

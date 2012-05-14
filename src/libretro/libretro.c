@@ -92,6 +92,7 @@ int		vol_lookup[128*256];
 
 /* libretro */
 static char g_wad_dir[1024];
+static char g_basename[1024];
 
 //forward decls
 extern void D_DoomMainSetup(void);
@@ -197,6 +198,21 @@ void retro_run(void)
    I_UpdateSound();
 }
 
+static void extract_basename(char *buf, const char *path, size_t size)
+{
+   const char *base = strrchr(path, '/');
+   if (!base)
+      base = strrchr(path, '\\');
+   if (!base)
+      base = path;
+
+   if (*base == '\\' || *base == '/')
+      base++;
+
+   strncpy(buf, base, size - 1);
+   buf[size - 1] = '\0';
+}
+
 static void extract_directory(char *buf, const char *path, size_t size)
 {
    strncpy(buf, path, size - 1);
@@ -219,12 +235,13 @@ bool retro_load_game(const struct retro_game_info *info)
    static char *argv[32] = {NULL};
 
    extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
+   extract_basename(g_basename, info->path, sizeof(g_basename));
 
    argv[argc++] = strdup("prboom");
    if(info->path)
    {
       argv[argc++] = strdup("-iwad");
-      argv[argc++] = strdup(info->path);
+      argv[argc++] = strdup(g_basename);
    }
 
    myargc = argc;
@@ -522,7 +539,8 @@ lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
     s = search[i].sub;
 
     p = malloc((d ? strlen(d) : 0) + (s ? strlen(s) : 0) + pl);
-    sprintf(p, wfname);
+    fprintf(stderr, "%s/%s", d, wfname);
+    sprintf(p, "%s/%s", d, wfname);
     lprintf(LO_ALWAYS, "p: %s\n", p);
 
     file = fopen(p, "rb");

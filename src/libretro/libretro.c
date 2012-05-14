@@ -688,15 +688,13 @@ void I_SetChannels()
 void I_SetSfxVolume(int volume)
 {
     snd_SfxVolume = volume;
-    return;
 }
 
 void I_SetMusicVolume(int volume)
 {
     snd_MusicVolume = volume;
-    return;
+    mp_player.setvolume(volume);
 }
-
 
 //
 // Retrieve the raw data lump index
@@ -1059,7 +1057,7 @@ void I_PlaySong(int handle, int looping)
   musicdies = gametic + TICRATE*30; // ?
 
   mp_player.play(music_handle, looping);
-  mp_player.setvolume(15);
+  mp_player.setvolume(snd_MusicVolume);
 }
 
 void I_PauseSong (int handle)

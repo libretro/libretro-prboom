@@ -107,12 +107,17 @@ extern int snd_MusicVolume;
 
 void retro_init(void)
 {
+#ifdef MUSIC_SUPPORT
    mp_player.init(44100);
+#endif
 }
 
 void retro_deinit(void)
 {
+#ifdef MUSIC_SUPPORT
    mp_player.shutdown();
+#endif
+   D_DoomDeinit();
 }
 
 unsigned retro_api_version(void)
@@ -264,7 +269,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
 void retro_unload_game(void)
 {
-   D_DoomDeinit();
 }
 
 unsigned retro_get_region(void)
@@ -712,7 +716,7 @@ void I_SetSfxVolume(int volume)
 void I_SetMusicVolume(int volume)
 {
     snd_MusicVolume = volume;
-#ifndef __CELLOS_LV2__
+#ifdef MUSIC_SUPPORT
     mp_player.setvolume(volume);
 #endif
 }
@@ -908,9 +912,11 @@ void I_UpdateSound(void)
          break;
    }
 
+#ifdef MUSIC_SUPPORT
    if (music_handle)
       mp_player.render(mad_audio_buf, out_frames);
    else
+#endif
       memset(mad_audio_buf, 0, out_frames * 4);
 
    // Determine end, for left channel only (right channel is implicit).

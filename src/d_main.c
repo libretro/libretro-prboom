@@ -296,13 +296,6 @@ void D_Display (void)
   }
 
   I_EndDisplay();
-
-  //e6y: don't thrash cpu during pausing
-#ifndef __LIBRETRO__
-  if (paused) {
-    I_uSleep(1000);
-  }
-#endif
 }
 
 int has_exited;
@@ -470,7 +463,11 @@ void D_DoAdvanceDemo(void)
   pagetic = TICRATE * 11;         /* killough 11/98: default behavior */
   gamestate = GS_DEMOSCREEN;
 
+#ifdef HAVE_NET
   if (netgame && !demoplayback) {
+#else
+  if (!demoplayback) {
+#endif
     demosequence = 0;
   } else
    if (!demostates[++demosequence][gamemode].func)
@@ -712,17 +709,8 @@ static void IdentifyVersion (void)
 
   // set save path to -save parm or current dir
 
-  //jff 3/27/98 default to current dir
-  //V.Aguilar (5/30/99): In LiNUX, default to $HOME/.lxdoom
-  {
-    // CPhipps - use DOOMSAVEDIR if defined
-    char* p = getenv("DOOMSAVEDIR");
-
-    if (p != NULL)
-      if (strlen(p) > PATH_MAX-12) p = NULL;
-
-    strcpy(basesavegame,(p == NULL) ? I_DoomExeDir() : p);
-  }
+  strcpy(basesavegame,I_DoomExeDir());
+  lprintf(LO_ALWAYS, "IdentifyVersion: basesavegame: %s\n", basesavegame);
   if ((i=M_CheckParm("-save")) && i<myargc-1) //jff 3/24/98 if -save present
   {
     if (!stat(myargv[i+1],&sbuf) && S_ISDIR(sbuf.st_mode)) // and is a dir
@@ -1428,13 +1416,19 @@ void D_DoomMainSetup(void)
       P_RecordChecksum (myargv[p]);
     }
 
+#if 0
   if (slot && ++slot < myargc)
     {
       slot = atoi(myargv[slot]);        // killough 3/16/98: add slot info
       G_LoadGame(slot, true);           // killough 5/15/98: add command flag // cph - no filename
     }
   else
+#endif
+#ifdef HAVE_NET
       if (autostart || netgame)
+#else
+      if (autostart)
+#endif
   {
     // sets first map and first episode if unknown
     GetFirstMap(&startepisode, &startmap);

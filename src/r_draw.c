@@ -95,7 +95,7 @@ static const byte   *tempfuzzmap;
 //
 
 #define FUZZTABLE 50
-#define FUZZOFF (SCREENWIDTH)
+#define FUZZOFF 1
 
 static const int fuzzoffset_org[FUZZTABLE] = {
   FUZZOFF,-FUZZOFF,FUZZOFF,-FUZZOFF,FUZZOFF,FUZZOFF,-FUZZOFF,

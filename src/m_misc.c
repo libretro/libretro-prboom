@@ -155,7 +155,7 @@ default_t defaults[] =
    {-1},-1,MAX_COMPATIBILITY_LEVEL-1,
    def_int,ss_none}, // compatibility level" - CPhipps
   {"menu_background", {(int*)&menu_background}, {1}, 0, 1,
-   def_int,ss_none}, // do Boom fullscreen menus have backgrounds?
+   def_bool,ss_none}, // do Boom fullscreen menus have backgrounds?
   {"max_player_corpse", {&bodyquesize}, {32},-1,UL,   // killough 2/8/98
    def_int,ss_none}, // number of dead bodies in view supported (-1 = no limit)
   {"flashing_hom",{&flashing_hom},{0},0,1,

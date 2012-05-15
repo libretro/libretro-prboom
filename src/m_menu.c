@@ -2737,31 +2737,28 @@ void M_DrawEnemy(void)
 extern int usemouse, default_mus_card, default_snd_card;
 extern int detect_voices, tran_filter_pct;
 
-setup_menu_t gen_settings1[], gen_settings2[];
+setup_menu_t gen_settings1[], gen_settings2[], gen_settings3[];
 
 setup_menu_t* gen_settings[] =
 {
   gen_settings1,
   gen_settings2,
+  gen_settings3,
   NULL
 };
 
 enum {
+  general_trans,
+  general_transpct,
+//  general_pcx,
+//  general_diskicon,
   general_uncapped,
-  general_gamma,
-  blankspace,
-  general_filterwall,
-  general_filterfloor,
-  general_filtersprite,
-  general_filterpatch,
-  general_filterz,
-  general_filter_threshold,
-  general_spriteedges,
-  general_patchedges,
-  general_hom,
 };
 
 enum {
+//  general_sndcard,
+//  general_muscard,
+//  general_detvoices,
   general_sndchan,
   general_pitch
 };
@@ -2772,11 +2769,7 @@ enum {
 #define G_YA3 (G_YA2+5*8)
 #define GF_X 76
 
-static const char *renderfilters[] = {"none", "point", "linear", "rounded"};
-static const char *edgetypes[] = {"jagged", "sloped"};
-
 static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps"};
-static const char *gammalevels[] = {"0", "1", "2", "3", "4"};
 
 setup_menu_t gen_settings1[] = { // General Settings screen1
 
@@ -2785,34 +2778,27 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
   {"Framerate", S_CHOICE, m_null, G_X,
   G_YA + general_uncapped*8, {"uncapped_framerate"}, 0, 0, NULL, framerates},
 
-  {"Gamma", S_CHOICE, m_null, G_X,
-  G_YA + general_gamma*8, {"usegamma"}, 0, 0, NULL, gammalevels},
+#if 0
+  {"PCX instead of BMP for screenshots", S_YESNO, m_null, G_X,
+   G_YA + general_pcx*8, {"screenshot_pcx"}},
+#endif
 
-  {"Filter for walls", S_CHOICE, m_null, G_X,
-   G_YA + general_filterwall*8, {"filter_wall"}, 0, 0, NULL, renderfilters},
-
-  {"Filter for floors/ceilings", S_CHOICE, m_null, G_X,
-   G_YA + general_filterfloor*8, {"filter_floor"}, 0, 0, NULL, renderfilters},
-
-  {"Filter for sprites", S_CHOICE, m_null, G_X,
-   G_YA + general_filtersprite*8, {"filter_sprite"}, 0, 0, NULL, renderfilters},
-
-  {"Filter for patches", S_CHOICE, m_null, G_X,
-   G_YA + general_filterpatch*8, {"filter_patch"}, 0, 0, NULL, renderfilters},
-
-  {"Filter for lighting", S_CHOICE, m_null, G_X,
-   G_YA + general_filterz*8, {"filter_z"}, 0, 0, NULL, renderfilters},
-
-  {"Drawing of sprite edges", S_CHOICE, m_null, G_X,
-   G_YA + general_spriteedges*8, {"sprite_edges"}, 0, 0, NULL, edgetypes},
-
-  {"Drawing of patch edges", S_CHOICE, m_null, G_X,
-   G_YA + general_patchedges*8, {"patch_edges"}, 0, 0, NULL, edgetypes},
-
-  {"Flashing HOM indicator", S_YESNO, m_null, G_X,
-   G_YA + general_hom*8, {"flashing_hom"}},
+#if 0 // MBF
+  {"Flash Icon During Disk IO", S_YESNO, m_null, G_X,
+   G_YA + general_diskicon*8, {"disk_icon"}},
+#endif
 
   {"Sound & Music", S_SKIP|S_TITLE, m_null, G_X, G_YA3 - 12},
+#if 0 // MBF
+  {"Sound Card", S_NUM|S_PRGWARN, m_null, G_X,
+   G_YA2 + general_sndcard*8, {"sound_card"}},
+
+  {"Music Card", S_NUM|S_PRGWARN, m_null, G_X,
+   G_YA2 + general_muscard*8, {"music_card"}},
+
+  {"Autodetect Number of Voices", S_YESNO|S_PRGWARN, m_null, G_X,
+   G_YA2 + general_detvoices*8, {"detect_voices"}},
+#endif
 
   {"Number of Sound Channels", S_NUM|S_PRGWARN, m_null, G_X,
    G_YA3 + general_sndchan*8, {"snd_channels"}},
@@ -2834,6 +2820,13 @@ enum {
 };
 
 enum {
+  general_wad1,
+  general_wad2,
+  general_deh1,
+  general_deh2
+};
+
+enum {
   general_corpse,
   general_realtic,
   general_smooth,
@@ -2842,6 +2835,10 @@ enum {
   general_menubg,
 };
 
+#define G_YB  44
+#define G_YB1 (G_YB+44)
+#define G_YB2 (G_YB1+52)
+
 static const char *gen_skillstrings[] = {
   // Dummy first option because defaultskill is 1-based
   "", "ITYTD", "HNTR", "HMP", "UV", "NM", NULL
@@ -2849,24 +2846,89 @@ static const char *gen_skillstrings[] = {
 
 setup_menu_t gen_settings2[] = { // General Settings screen2
 
-  {"Miscellaneous"  ,S_SKIP|S_TITLE, m_null, G_X, G_YA - 12},
+  {"Files Preloaded at Game Startup",S_SKIP|S_TITLE, m_null, G_X,
+   G_YB1 - 12},
+
+  {"WAD # 1", S_FILE, m_null, GF_X, G_YB1 + general_wad1*8, {"wadfile_1"}},
+
+  {"WAD #2", S_FILE, m_null, GF_X, G_YB1 + general_wad2*8, {"wadfile_2"}},
+
+  {"DEH/BEX # 1", S_FILE, m_null, GF_X, G_YB1 + general_deh1*8, {"dehfile_1"}},
+
+  {"DEH/BEX #2", S_FILE, m_null, GF_X, G_YB1 + general_deh2*8, {"dehfile_2"}},
+
+  {"Miscellaneous"  ,S_SKIP|S_TITLE, m_null, G_X, G_YB2 - 12},
 
   {"Maximum number of player corpses", S_NUM|S_PRGWARN, m_null, G_X,
-   G_YA + general_corpse*8, {"max_player_corpse"}},
+   G_YB2 + general_corpse*8, {"max_player_corpse"}},
 
   {"Smooth Demo Playback", S_YESNO, m_null, G_X,
-   G_YA + general_smooth*8, {"demo_smoothturns"}, 0, 0, M_ChangeDemoSmoothTurns},
+   G_YB2 + general_smooth*8, {"demo_smoothturns"}, 0, 0, M_ChangeDemoSmoothTurns},
 
   {"Smooth Demo Playback Factor", S_NUM, m_null, G_X,
-   G_YA + general_smoothfactor*8, {"demo_smoothturnsfactor"}, 0, 0, M_ChangeDemoSmoothTurns},
+   G_YB2 + general_smoothfactor*8, {"demo_smoothturnsfactor"}, 0, 0, M_ChangeDemoSmoothTurns},
 
   {"Default skill level", S_CHOICE, m_null, G_X,
-    G_YA + general_defskill*8, {"default_skill"}, 0, 0, NULL, gen_skillstrings},
+    G_YB2 + general_defskill*8, {"default_skill"}, 0, 0, NULL, gen_skillstrings},
 
-  {"Fullscreen menu background", S_CHOICE, m_null, G_X,
-    G_YA + general_menubg*8, {"menu_background"}},
+  {"Fullscreen menu background", S_YESNO, m_null, G_X,
+    G_YB2 + general_menubg*8, {"menu_background"}},
 
   {"<- PREV",S_SKIP|S_PREV, m_null, KB_PREV, KB_Y+20*8, {gen_settings1}},
+
+  {"NEXT ->",S_SKIP|S_NEXT,m_null,KB_NEXT,KB_Y+20*8, {gen_settings3}},
+
+  // Final entry
+
+  {0,S_SKIP|S_END,m_null}
+};
+
+enum {
+  general_filterwall,
+  general_filterfloor,
+  general_filtersprite,
+  general_filterpatch,
+  general_filterz,
+  general_filter_threshold,
+  general_spriteedges,
+  general_patchedges,
+  general_hom,
+};
+
+#define G_YC  44
+
+static const char *renderfilters[] = {"none", "point", "linear", "rounded"};
+static const char *edgetypes[] = {"jagged", "sloped"};
+
+setup_menu_t gen_settings3[] = { // General Settings screen2
+
+  {"Renderer settings"     ,S_SKIP|S_TITLE, m_null, G_X, G_YB - 12},
+
+  {"Filter for walls", S_CHOICE, m_null, G_X,
+   G_YC + general_filterwall*8, {"filter_wall"}, 0, 0, NULL, renderfilters},
+
+  {"Filter for floors/ceilings", S_CHOICE, m_null, G_X,
+   G_YC + general_filterfloor*8, {"filter_floor"}, 0, 0, NULL, renderfilters},
+
+  {"Filter for sprites", S_CHOICE, m_null, G_X,
+   G_YC + general_filtersprite*8, {"filter_sprite"}, 0, 0, NULL, renderfilters},
+
+  {"Filter for patches", S_CHOICE, m_null, G_X,
+   G_YC + general_filterpatch*8, {"filter_patch"}, 0, 0, NULL, renderfilters},
+
+  {"Filter for lighting", S_CHOICE, m_null, G_X,
+   G_YC + general_filterz*8, {"filter_z"}, 0, 0, NULL, renderfilters},
+
+  {"Drawing of sprite edges", S_CHOICE, m_null, G_X,
+   G_YC + general_spriteedges*8, {"sprite_edges"}, 0, 0, NULL, edgetypes},
+
+  {"Drawing of patch edges", S_CHOICE, m_null, G_X,
+   G_YC + general_patchedges*8, {"patch_edges"}, 0, 0, NULL, edgetypes},
+
+  {"Flashing HOM indicator", S_YESNO, m_null, G_X,
+   G_YC + general_hom*8, {"flashing_hom"}},
+
+  {"<- PREV",S_SKIP|S_PREV, m_null, KB_PREV, KB_Y+20*8, {gen_settings2}},
 
   // Final entry
 
@@ -4067,6 +4129,7 @@ boolean M_Responder (event_t* ev) {
       if ((automapmode & am_active) || chat_on)
         return false;
       M_SizeDisplay(0);
+      S_StartSound(NULL,sfx_stnmov);
       return true;
       }
 
@@ -4075,6 +4138,7 @@ boolean M_Responder (event_t* ev) {
       if ((automapmode & am_active) || chat_on)     // allow
         return false;                   // key_hud==key_zoomin
       M_SizeDisplay(1);                                             //  ^
+      S_StartSound(NULL,sfx_stnmov);                                //  |
       return true;                                                  // phares
       }
 

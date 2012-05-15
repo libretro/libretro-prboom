@@ -36,13 +36,6 @@
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
-#ifdef _WIN32
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#endif
-#ifdef _MSC_VER
-#include <io.h>
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -50,9 +43,6 @@
 #include "lprintf.h"
 #include "i_main.h"
 #include "m_argv.h"
-
-int cons_error_mask = -1-LO_INFO; /* all but LO_INFO when redir'd */
-int cons_output_mask = -1;        /* all output enabled */
 
 /* cphipps - enlarged message buffer and made non-static
  * We still have to be careful here, this function can be called after exit
@@ -63,7 +53,6 @@ int lprintf(OutputLevels pri, const char *s, ...)
 {
   int r=0;
   char msg[MAX_MESSAGE_SIZE];
-  int lvl=pri;
 
   va_list v;
   va_start(v,s);
@@ -74,17 +63,7 @@ int lprintf(OutputLevels pri, const char *s, ...)
 #endif
   va_end(v);
 
-  if (lvl&cons_output_mask)               /* mask output as specified */
-  {
-    r=fprintf(stdout,"%s",msg);
-#ifdef _WIN32
-    I_ConPrintString(msg);
-#endif
-  }
-#if 0
-  if (!isatty(1) && lvl&cons_error_mask)  /* if stdout redirected     */
-    r=fprintf(stderr,"%s",msg);           /* select output at console */
-#endif
+  r=fprintf(stderr,"%s",msg);           /* select output at console */
 
   return r;
 }

@@ -545,10 +545,17 @@ static const char *D_dehout(void)
 // CPhipps - const char* for iwadname, made static
 static void CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
 {
-  if ( !access (iwadname,R_OK) )
+  int read_iwad = 0;
+  FILE* fp = fopen(iwadname, "rb");
+
+  if (fp != NULL)
+     read_iwad = 1;
+
+  fclose(fp);
+
+  if ( read_iwad )
   {
     int ud=0,rg=0,sw=0,cm=0,sc=0;
-    FILE* fp;
 
     // Identify IWAD correctly
     if ((fp = fopen(iwadname, "rb")))
@@ -711,6 +718,7 @@ static void IdentifyVersion (void)
 
   strcpy(basesavegame,I_DoomExeDir());
   lprintf(LO_ALWAYS, "IdentifyVersion: basesavegame: %s\n", basesavegame);
+#ifndef __CELLOS_LV2__
   if ((i=M_CheckParm("-save")) && i<myargc-1) //jff 3/24/98 if -save present
   {
     if (!stat(myargv[i+1],&sbuf) && S_ISDIR(sbuf.st_mode)) // and is a dir
@@ -721,6 +729,7 @@ static void IdentifyVersion (void)
     //jff 9/3/98 use logical output routine
     else lprintf(LO_ERROR,"Error: -save path does not exist, using %s\n", basesavegame);
   }
+#endif
 
   // locate the IWAD and determine game mode from it
 
@@ -1342,13 +1351,27 @@ void D_DoomMainSetup(void)
 
     while (++p != myargc && *myargv[p] != '-')
     {
+      int stillnotfound = 1;
+      FILE *fp;
       AddDefaultExtension(strcpy(file, myargv[p]), ".bex");
-      if (access(file, F_OK))  // nope
+      fp = fopen(file, "rb");
+
+      if (fp == NULL)
+         stillnotfound = 1;
+      else
+         stillnotfound = 0;
+
+      fclose(fp);
+
+      if (stillnotfound)  // nope
       {
         AddDefaultExtension(strcpy(file, myargv[p]), ".deh");
-        if (access(file, F_OK))  // still nope
+	fp = fopen(file, "rb");
+	
+        if (fp == NULL)  // still nope
           I_Error("D_DoomMainSetup: Cannot find .deh or .bex file named %s",
                   myargv[p]);
+        fclose(fp);
       }
       // during the beta we have debug output to dehout.txt
       ProcessDehFile(file,D_dehout(),0);

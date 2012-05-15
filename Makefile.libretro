@@ -22,7 +22,7 @@ ifeq ($(platform), unix)
    TARGET := libretro.so
    fpic := -fPIC
    SHARED := -shared -Wl,--version-script=src/libretro/link.T -Wl,-no-undefined
-   CFLAGS += -D_GNU_SOURCE=1 -DHAVE_LIBMAD
+   CFLAGS += -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT
 else ifeq ($(platform), osx)
    TARGET := libretro.dylib
    fpic := -fPIC
@@ -53,7 +53,7 @@ else
    fpic := -fPIC
    LD_FLAGS := -fPIC
    SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=src/libretro/link.T
-   CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__
+   CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__ -DMUSIC_SUPPORT
 endif
 
 ifeq ($(DEBUG), 1)

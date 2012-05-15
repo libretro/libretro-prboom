@@ -712,7 +712,9 @@ void I_SetSfxVolume(int volume)
 void I_SetMusicVolume(int volume)
 {
     snd_MusicVolume = volume;
+#ifndef __CELLOS_LV2__
     mp_player.setvolume(volume);
+#endif
 }
 
 //
@@ -1075,16 +1077,20 @@ void I_PlaySong(int handle, int looping)
   handle = 0;
   musicdies = gametic + TICRATE*30; // ?
 
+#ifdef MUSIC_SUPPORT
   mp_player.play(music_handle, looping);
   mp_player.setvolume(snd_MusicVolume);
+#endif
 }
 
 void I_PauseSong (int handle)
 {
   // UNUSED.
   handle = 0;
+#ifdef MUSIC_SUPPORT
 
   mp_player.pause();
+#endif
 }
 
 void I_ResumeSong (int handle)
@@ -1092,7 +1098,9 @@ void I_ResumeSong (int handle)
   // UNUSED.
   handle = 0;
 
+#ifdef MUSIC_SUPPORT
   mp_player.resume();
+#endif
 }
 
 void I_StopSong(int handle)
@@ -1103,7 +1111,9 @@ void I_StopSong(int handle)
   looping = 0;
   musicdies = 0;
 
+#ifdef MUSIC_SUPPORT
   mp_player.stop();
+#endif
 }
 
 void I_UnRegisterSong(int handle)
@@ -1111,10 +1121,12 @@ void I_UnRegisterSong(int handle)
   // UNUSED.
   handle = 0;
 
+#ifdef MUSIC_SUPPORT
   mp_player.unregistersong(music_handle);
   music_handle = NULL;
   free(song_data);
   song_data = NULL;
+#endif
 }
 
 int I_RegisterSong(const void* data, size_t len)
@@ -1130,15 +1142,19 @@ int I_QrySongPlaying(int handle)
   return looping || musicdies > gametic;
 }
 
+#ifdef MUSIC_SUPPORT
 static int RegisterSong(const void *data, size_t len)
 {
    music_handle = mp_player.registersong(data, len);
    return !!music_handle;
 }
+#endif
 
 int I_RegisterMusic( const char* filename, musicinfo_t *song )
 {
   int len;
+
+#ifdef MUSIC_SUPPORT
   fprintf(stderr, "RegisterMusic: %s\n", filename);
 
   len = M_ReadFile(filename, (byte **) &song_data);
@@ -1159,6 +1175,7 @@ int I_RegisterMusic( const char* filename, musicinfo_t *song )
   song->data = 0;
   song->handle = 0;
   song->lumpnum = 0;
+#endif
   return 0;
 }
 

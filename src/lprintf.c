@@ -81,8 +81,10 @@ int lprintf(OutputLevels pri, const char *s, ...)
     I_ConPrintString(msg);
 #endif
   }
+#if 0
   if (!isatty(1) && lvl&cons_error_mask)  /* if stdout redirected     */
     r=fprintf(stderr,"%s",msg);           /* select output at console */
+#endif
 
   return r;
 }

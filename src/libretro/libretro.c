@@ -196,6 +196,7 @@ void retro_set_video_refresh(retro_video_refresh_t cb)
 
 void retro_reset(void)
 {
+   M_EndGame(0);
 }
 
 void retro_run(void)

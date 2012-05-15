@@ -22,7 +22,12 @@
 # include <stdio.h>
 # include <unistd.h>
 # include <sys/stat.h>
+#ifdef __CELLOS_LV2__
+#define STDIN_FILENO 0
+#define PROT_READ 0x04
+#else
 # include <sys/mman.h>
+#endif
 
 # include "mad.h"
 

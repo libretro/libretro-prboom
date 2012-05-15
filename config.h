@@ -15,7 +15,9 @@
 #define SURFACE_PIXEL_DEPTH 2
 
 /* Define to 1 if you have the <asm/byteorder.h> header file. */
+#ifndef __CELLOS_LV2__
 #define HAVE_ASM_BYTEORDER_H 1
+#endif
 
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1

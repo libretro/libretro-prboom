@@ -31,7 +31,7 @@ else ifeq ($(platform), ps3)
    TARGET := libretro.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
    AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
-   CFLAGS += -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1
+   CFLAGS += -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT
 else ifeq ($(platform), sncps3)
    TARGET := libretro.a
    CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
@@ -68,7 +68,7 @@ LIBMADOBJECTS = ./$(LMADSRCDIR)/bit.o ./$(LMADSRCDIR)/decoder.o ./$(LMADSRCDIR)/
 
 OBJECTS    = ./$(DOOMSRC)/am_map.o ./$(DOOMSRC)/d_deh.o ./$(DOOMSRC)/d_items.o ./$(DOOMSRC)/d_main.o ./$(DOOMSRC)/doomstat.o ./$(DOOMSRC)/dstrings.o ./$(DOOMSRC)/f_finale.o ./$(DOOMSRC)/f_wipe.o ./$(DOOMSRC)/g_game.o ./$(DOOMSRC)/hu_lib.o ./$(DOOMSRC)/hu_stuff.o     ./$(DOOMSRC)/info.o ./$(DOOMSRC)/m_argv.o ./$(DOOMSRC)/m_bbox.o ./$(DOOMSRC)/m_cheat.o ./$(DOOMSRC)/m_menu.o ./$(DOOMSRC)/m_misc.o ./$(DOOMSRC)/m_random.o ./$(DOOMSRC)/p_ceilng.o ./$(DOOMSRC)/p_doors.o ./$(DOOMSRC)/p_enemy.o ./$(DOOMSRC)/p_floor.o ./$(DOOMSRC)/p_inter.o ./$(DOOMSRC)/p_lights.o ./$(DOOMSRC)/p_map.o ./$(DOOMSRC)/p_maputl.o ./$(DOOMSRC)/p_mobj.o ./$(DOOMSRC)/p_plats.o ./$(DOOMSRC)/p_pspr.o ./$(DOOMSRC)/p_saveg.o ./$(DOOMSRC)/p_setup.o ./$(DOOMSRC)/p_sight.o ./$(DOOMSRC)/p_spec.o ./$(DOOMSRC)/p_switch.o ./$(DOOMSRC)/p_telept.o ./$(DOOMSRC)/p_tick.o ./$(DOOMSRC)/p_user.o ./$(DOOMSRC)/r_bsp.o ./$(DOOMSRC)/r_data.o ./$(DOOMSRC)/r_draw.o ./$(DOOMSRC)/r_main.o ./$(DOOMSRC)/r_plane.o ./$(DOOMSRC)/r_segs.o ./$(DOOMSRC)/r_sky.o ./$(DOOMSRC)/r_things.o ./$(DOOMSRC)/r_patch.o ./$(DOOMSRC)/s_sound.o ./$(DOOMSRC)/sounds.o ./$(DOOMSRC)/st_lib.o ./$(DOOMSRC)/st_stuff.o ./$(DOOMSRC)/tables.o ./$(DOOMSRC)/v_video.o ./$(DOOMSRC)/w_wad.o ./$(DOOMSRC)/z_zone.o ./$(DOOMSRC)/w_memcache.o ./$(DOOMSRC)/libretro/r_fps.o ./$(DOOMSRC)/r_filter.o ./$(DOOMSRC)/p_genlin.o ./$(DOOMSRC)/r_demo.o ./$(DOOMSRC)/z_bmalloc.o ./$(DOOMSRC)/lprintf.o ./$(DOOMSRC)/wi_stuff.o ./$(DOOMSRC)/p_checksum.o ./$(DOOMSRC)/md5.o ./$(DOOMSRC)/version.o ./$(DOOMSRC)/d_client.o ./$(DOOMSRC)/mmus2mid.o $(PORTOBJECTS) $(DOOMSRC)/madplayer.o $(LIBMADOBJECTS)
 
-INCLUDES   = -I. -I.. -Isrc -Isrc/libretro
+INCLUDES   = -I. -I.. -Isrc -Isrc/libretro -Ilibmad
 DEFINES    = -DHAVE_INTTYPES_H -D__LIBRETRO__ -DHAVE_MEMORY_H -DINLINE=inline -DFPM_DEFAULT -DSIZEOF_INT=4 -DSIZEOF_LONG=4 -DSIZEOF_LONG_LONG=8
 
 ifeq ($(platform), sncps3)

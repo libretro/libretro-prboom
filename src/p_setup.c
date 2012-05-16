@@ -86,7 +86,7 @@ side_t   *sides;
 #define GL_VERT_OFFSET  4
 
 int     firstglvertex = 0;
-boolean forceOldBsp   = false;
+boolean forceOldBsp   = FALSE;
 
 int nodes_glbsp; // version of GLBSP nodes detected, or 0
 int nodes_zdbsp; // version of ZDBSP nodes detected, or 0
@@ -146,9 +146,9 @@ static boolean CheckForGLBSPLumps(int gl_lumpnum)
   for (i = 0, e = ML_GL_VERTS; e <= ML_GL_NODES; i++, e++)
     if (gl_lumpnum + e >= numlumps
         || strncasecmp(lumpinfo[gl_lumpnum + e].name, names[i], 8))
-      return false;
+      return FALSE;
 
-  return true;
+  return TRUE;
 }
 
 // check for existence of GL (glbsp) nodes and return their version
@@ -491,7 +491,7 @@ static void P_LoadSegs (int lump)
       li->v1 = &vertexes[v1];
       li->v2 = &vertexes[v2];
 
-      li->miniseg = false; // figgi -- there are no minisegs in classic BSP nodes
+      li->miniseg = FALSE; // figgi -- there are no minisegs in classic BSP nodes
       li->length  = GetDistance(li->v2->x - li->v1->x, li->v2->y - li->v1->y);
       li->angle = (SHORT(ml->angle))<<16;
       li->offset =(SHORT(ml->offset))<<16;
@@ -553,7 +553,7 @@ static void P_LoadGLSegs(int lump)
     {
       ldef = &lines[ml->linedef];
       segs[i].linedef = ldef;
-      segs[i].miniseg = false;
+      segs[i].miniseg = FALSE;
       segs[i].angle = R_PointToAngle2(segs[i].v1->x,segs[i].v1->y,segs[i].v2->x,segs[i].v2->y);
 
       segs[i].sidedef = &sides[ldef->sidenum[ml->side]];
@@ -571,7 +571,7 @@ static void P_LoadGLSegs(int lump)
     }
     else
     {
-      segs[i].miniseg = true;
+      segs[i].miniseg = TRUE;
       segs[i].angle  = 0;
       segs[i].offset  = 0;
       segs[i].length  = 0;
@@ -791,7 +791,7 @@ static void P_LoadXNOD(int lump)
 
     seg->v1 = vertexes + v1;
     seg->v2 = vertexes + v2;
-    seg->miniseg = false;
+    seg->miniseg = FALSE;
     seg->iSegID = i; // needed for OpenGL
     seg->length = GetDistance(seg->v2->x - seg->v1->x,
                               seg->v2->y - seg->v1->y);
@@ -1680,7 +1680,7 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
   {
     const line_t *l;
 
-    if (segs[i].miniseg == true)        //figgi -- skip minisegs
+    if (segs[i].miniseg == TRUE)        //figgi -- skip minisegs
       return;
 
     l = segs[i].linedef;            // The parent linedef

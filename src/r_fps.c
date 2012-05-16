@@ -39,7 +39,7 @@
 #include "r_demo.h"
 #include "r_fps.h"
 
-int movement_smooth = false;
+int movement_smooth = FALSE;
 
 typedef enum
 {

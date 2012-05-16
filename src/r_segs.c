@@ -145,7 +145,7 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
     texnum = texturetranslation[texnum];
 
   // killough 4/13/98: get correct lightlevel for 2s normal textures
-  rw_lightlevel = R_FakeFlat(frontsector, &tempsec, NULL, NULL, false) ->lightlevel;
+  rw_lightlevel = R_FakeFlat(frontsector, &tempsec, NULL, NULL, FALSE) ->lightlevel;
 
   maskedtexturecol = ds->maskedtexturecol;
 
@@ -218,7 +218,7 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
         // Originally, Doom did not construct complete columns for
         // multipatched textures, so there were no header or trailer
         // bytes in the column referred to below, which explains
-        // the Medusa effect. The fix is to construct true columns
+        // the Medusa effect. The fix is to construct TRUE columns
         // when forming multipatched textures (see r_data.c).
 
         // draw the texture
@@ -474,7 +474,7 @@ void R_StoreWallRange(const int start, const int stop)
       maxdrawsegs = newmax;
     }
 
-  if(curline->miniseg == false) // figgi -- skip minisegs
+  if(curline->miniseg == FALSE) // figgi -- skip minisegs
     curline->linedef->flags |= ML_MAPPED;
 
   sidedef = curline->sidedef;
@@ -561,7 +561,7 @@ void R_StoreWallRange(const int start, const int stop)
       midtexheight = (linedef->r_flags & RF_MID_TILE) ? 0 : textureheight[midtexture] >> FRACBITS;
 
       // a single sided line is terminal, so it must mark ends
-      markfloor = markceiling = true;
+      markfloor = markceiling = TRUE;
 
       if (linedef->flags & ML_DONTPEGBOTTOM)
         {         // bottom of texture at bottom
@@ -670,7 +670,7 @@ void R_StoreWallRange(const int start, const int stop)
 
       if (backsector->ceilingheight <= frontsector->floorheight
           || backsector->floorheight >= frontsector->ceilingheight)
-        markceiling = markfloor = true;   // closed door
+        markceiling = markfloor = TRUE;   // closed door
 
       if (worldhigh < worldtop)   // top texture
         {
@@ -693,7 +693,7 @@ void R_StoreWallRange(const int start, const int stop)
       // allocate space for masked texture tables
       if (sidedef->midtexture)    // masked midtexture
         {
-          maskedtexture = true;
+          maskedtexture = TRUE;
           ds_p->maskedtexturecol = maskedtexturecol = lastopening - rw_x;
           lastopening += rw_stopx - rw_x;
         }
@@ -726,10 +726,10 @@ void R_StoreWallRange(const int start, const int stop)
   if (frontsector->heightsec == -1)
     {
       if (frontsector->floorheight >= viewz)       // above view plane
-        markfloor = false;
+        markfloor = FALSE;
       if (frontsector->ceilingheight <= viewz &&
           frontsector->ceilingpic != skyflatnum)   // below view plane
-        markceiling = false;
+        markceiling = FALSE;
     }
 
   // calculate incremental stepping values for texture edges

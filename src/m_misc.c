@@ -127,7 +127,7 @@ int M_ReadFile(char const *name, byte **buffer)
 //
 
 int usemouse;
-boolean    precache = true; /* if true, load all graphics at start */
+boolean    precache = TRUE; /* if TRUE, load all graphics at start */
 
 extern int viewwidth;
 extern int viewheight;
@@ -854,7 +854,7 @@ void M_LoadDefaults (void)
     {
     while (!feof(f))
       {
-      isstring = false;
+      isstring = FALSE;
       if (fscanf (f, "%79s %[^\n]\n", def, strparm) == 2)
         {
 
@@ -866,7 +866,7 @@ void M_LoadDefaults (void)
         if (strparm[0] == '"') {
           // get a string default
 
-          isstring = true;
+          isstring = TRUE;
           len = strlen(strparm);
           newstring = (char *) malloc(len);
           strparm[len-1] = 0; // clears trailing double-quote mark

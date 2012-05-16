@@ -76,7 +76,7 @@ int ticdup = 1;
 static int xtratics = 0;
 int              wanted_player_number;
 
-static boolean isExtraDDisplay = false;
+static boolean isExtraDDisplay = FALSE;
 
 #ifdef HAVE_NET
 void D_CheckNetGame(void)
@@ -102,9 +102,9 @@ boolean D_NetGetWad(const char* name)
 #if defined(HAVE_WAIT_H)
   size_t psize = sizeof(packet_header_t) + strlen(name) + 500;
   packet_header_t *packet;
-  boolean done = false;
+  boolean done = FALSE;
 
-  if (!server || strchr(name, '/')) return false; // If it contains path info, reject
+  if (!server || strchr(name, '/')) return FALSE; // If it contains path info, reject
 
   do {
     // Send WAD request to remote
@@ -156,7 +156,7 @@ boolean D_NetGetWad(const char* name)
   }
   return done;
 #else /* HAVE_WAIT_H */
-  return false;
+  return FALSE;
 #endif
 }
 
@@ -201,8 +201,8 @@ void NetUpdate(void)
   {
     int j;
     for (j=0; j<MAXPLAYERS; j++)
-      if (j != consoleplayer) playeringame[j] = false;
-    server = false;
+      if (j != consoleplayer) playeringame[j] = FALSE;
+    server = FALSE;
     doom_printf("Server is down\nAll other players are no longer in the game\n");
   }
   break;
@@ -290,7 +290,7 @@ static void CheckQueuedPackets(void)
       case PKT_QUIT: // Player quit the game
   {
     int pn = *(byte*)(queuedpacket[i]+1);
-    playeringame[pn] = false;
+    playeringame[pn] = FALSE;
     doom_printf("Player %d left the game\n", pn);
   }
   break;
@@ -357,7 +357,7 @@ void D_InitNetGame (void)
   if (i && i < myargc-1) i++;
 
   if (!(netgame = server =  !!i)) {
-    playeringame[consoleplayer = 0] = true;
+    playeringame[consoleplayer = 0] = TRUE;
     // e6y
     // for play, recording or playback using "single-player coop" mode.
     // Equivalent to using prboom_server with -N 1
@@ -411,9 +411,9 @@ void D_InitNetGame (void)
   }
   localcmds = netcmds[displayplayer = consoleplayer];
   for (i=0; i<numplayers; i++)
-    playeringame[i] = true;
+    playeringame[i] = TRUE;
   for (; i<MAXPLAYERS; i++)
-    playeringame[i] = false;
+    playeringame[i] = FALSE;
   if (!playeringame[consoleplayer]) I_Error("D_InitNetGame: consoleplayer not in game");
 }
 
@@ -445,12 +445,12 @@ void TryRunTics (void)
         M_Ticker(); return;
       }
       {
-        WasRenderedInTryRunTics = true;
+        WasRenderedInTryRunTics = TRUE;
         if (movement_smooth && gamestate==wipegamestate)
         {
-          isExtraDDisplay = true;
+          isExtraDDisplay = TRUE;
           D_Display();
-          isExtraDDisplay = false;
+          isExtraDDisplay = FALSE;
         }
       }
     } else break;
@@ -500,9 +500,9 @@ void D_InitNetGame (void)
   netgame = (M_CheckParm("-solo-net") != 0) || (M_CheckParm("-net1") != 0);
 
   for (i=0; i<doomcom->numplayers; i++)
-    playeringame[i] = true;
+    playeringame[i] = TRUE;
   for (; i<MAXPLAYERS; i++)
-    playeringame[i] = false;
+    playeringame[i] = FALSE;
 
   consoleplayer = displayplayer = doomcom->consoleplayer;
 }
@@ -542,12 +542,12 @@ void TryRunTics (void)
     if (runtics)
       break;
 
-        WasRenderedInTryRunTics = true;
+        WasRenderedInTryRunTics = TRUE;
         if (movement_smooth && gamestate==wipegamestate)
         {
-          isExtraDDisplay = true;
+          isExtraDDisplay = TRUE;
           D_Display();
-          isExtraDDisplay = false;
+          isExtraDDisplay = FALSE;
         }
   }
 

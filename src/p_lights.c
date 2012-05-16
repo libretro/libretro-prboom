@@ -303,7 +303,7 @@ void P_SpawnGlowingLight(sector_t*  sector)
 // Start strobing lights (usually from a trigger)
 //
 // Passed the line that activated the strobing
-// Returns true
+// Returns TRUE
 //
 // jff 2/12/98 added int return value, fixed return
 //
@@ -332,7 +332,7 @@ int EV_StartLightStrobing(line_t* line)
 // Turn line's tagged sector's lights to min adjacent neighbor level
 //
 // Passed the line that activated the lights being turned off
-// Returns true
+// Returns TRUE
 //
 // jff 2/12/98 added int return value, fixed return
 //
@@ -364,7 +364,7 @@ int EV_TurnTagLightsOff(line_t* line)
 //
 // Passed the activating line, and a level to set the light to
 // If level passed is 0, the maximum neighbor lighting is used
-// Returns true
+// Returns TRUE
 //
 // jff 2/12/98 added int return value, fixed return
 //
@@ -408,7 +408,7 @@ int EV_LightTurnOn(line_t *line, int bright)
  * Sets the light to min on 0, max on 1, and interpolates in-between.
  * Used for doors with gradual lighting effects.
  *
- * Returns true
+ * Returns TRUE
  */
 
 int EV_LightTurnOnPartway(line_t *line, fixed_t level)

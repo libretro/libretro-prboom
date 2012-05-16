@@ -276,7 +276,7 @@ byte *translationtables;
 
 static R_DrawColumn_f drawcolumnfuncs[RDRAW_FILTER_MAXFILTERS][RDRAW_FILTER_MAXFILTERS][RDC_PIPELINE_MAXPIPELINES] = {
     {
-      {NULL, NULL, NULL, NULL,},
+      {NULL, NULL, NULL,},
       {R_DrawColumn15_PointUV,
        R_DrawTranslatedColumn15_PointUV,
        R_DrawFuzzColumn15_PointUV,},
@@ -288,7 +288,7 @@ static R_DrawColumn_f drawcolumnfuncs[RDRAW_FILTER_MAXFILTERS][RDRAW_FILTER_MAXF
        R_DrawFuzzColumn15_RoundedUV,},
     },
     {
-      {NULL, NULL, NULL, NULL,},
+      {NULL, NULL, NULL,},
       {R_DrawColumn15_PointUV_PointZ,
        R_DrawTranslatedColumn15_PointUV_PointZ,
        R_DrawFuzzColumn15_PointUV_PointZ,},
@@ -300,7 +300,7 @@ static R_DrawColumn_f drawcolumnfuncs[RDRAW_FILTER_MAXFILTERS][RDRAW_FILTER_MAXF
        R_DrawFuzzColumn15_RoundedUV_PointZ,},
     },
     {
-      {NULL, NULL, NULL, NULL,},
+      {NULL, NULL, NULL,},
       {R_DrawColumn15_PointUV_LinearZ,
        R_DrawTranslatedColumn15_PointUV_LinearZ,
        R_DrawFuzzColumn15_PointUV_LinearZ,},

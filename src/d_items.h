@@ -37,6 +37,11 @@
 
 #include "doomdef.h"
 
+#ifdef __GNUG__
+#pragma interface
+#endif
+
+
 /* Weapon info: sprite frames, ammunition use. */
 typedef struct
 {

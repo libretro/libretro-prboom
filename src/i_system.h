@@ -34,6 +34,10 @@
 #ifndef __I_SYSTEM__
 #define __I_SYSTEM__
 
+#ifdef __GNUG__
+#pragma interface
+#endif
+
 extern int ms_to_next_tick;
 boolean I_StartDisplay(void);
 void I_EndDisplay(void);

@@ -36,6 +36,10 @@
 
 #include "doomtype.h"
 
+#ifdef __GNUG__
+#pragma interface
+#endif
+
 /* The data sampled per tick (single player)
  * and transmitted to other peers (multiplayer).
  * Mainly movements/button commands per game tick,

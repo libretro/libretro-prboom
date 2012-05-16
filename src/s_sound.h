@@ -34,6 +34,10 @@
 #ifndef __S_SOUND__
 #define __S_SOUND__
 
+#ifdef __GNUG__
+#pragma interface
+#endif
+
 //
 // Initializes sound stuff, including volume
 // Sets channels, SFX and music volume,

@@ -45,6 +45,9 @@
 #include "p_pspr.h"
 #include "w_wad.h"
 
+#ifdef __GNUG__
+#pragma implementation "info.h"
+#endif
 #include "info.h"
 
 

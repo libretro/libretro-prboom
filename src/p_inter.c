@@ -45,6 +45,9 @@
 #include "p_inter.h"
 #include "p_enemy.h"
 
+#ifdef __GNUG__
+#pragma implementation "p_inter.h"
+#endif
 #include "p_inter.h"
 
 #define BONUSADD        6

@@ -36,6 +36,10 @@
 
 #include "r_defs.h"
 
+#ifdef __GNUG__
+#pragma interface
+#endif
+
 enum column_pipeline_e {
   RDC_PIPELINE_STANDARD,
   RDC_PIPELINE_TRANSLATED,

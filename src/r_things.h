@@ -34,6 +34,10 @@
 #ifndef __R_THINGS__
 #define __R_THINGS__
 
+#ifdef __GNUG__
+#pragma interface
+#endif
+
 #include "r_draw.h"
 
 /* Constant arrays used for psprite clipping and initializing clipping. */

@@ -32,6 +32,9 @@
  *-----------------------------------------------------------------------------
  */
 
+#ifdef __GNUG__
+#pragma implementation "dstrings.h"
+#endif
 #include "dstrings.h"
 
 

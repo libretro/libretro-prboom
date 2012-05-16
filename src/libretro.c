@@ -1,12 +1,10 @@
 #define LIBRETRO_CORE 1
-#include "config.h"
 #include "libretro.h"
 
 /* prboom includes */
 
 #include "d_main.h"
 #include "lprintf.h"
-#include "doomtype.h"
 #include "doomdef.h"
 #include "lprintf.h"
 #include "m_fixed.h"

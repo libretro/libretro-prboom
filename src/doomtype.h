@@ -41,12 +41,7 @@
 
 #ifndef __BYTEBOOL__
 #define __BYTEBOOL__
-typedef enum bool_e
-{
-  FALSE = 0,
-  TRUE = 1
-} boolean;
-
+#include "custombool.h"
 typedef unsigned char byte;
 #endif
 

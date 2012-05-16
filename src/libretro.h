@@ -10,8 +10,6 @@
 #define false 0
 #else
 #include <stdbool.h>
-#undef true
-#undef false
 #endif
 
 #define RETRO_API_VERSION         1

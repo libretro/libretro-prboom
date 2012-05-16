@@ -144,18 +144,13 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
-   info->timing = (struct retro_system_timing) {
-      .fps = 60.0,
-      .sample_rate = 44100.0,
-   };
-
-   info->geometry = (struct retro_game_geometry) {
-      .base_width   = 320,
-      .base_height  = 200,
-      .max_width    = 320,
-      .max_height   = 200,
-      .aspect_ratio = 4.0 / 3.0,
-   };
+   info->timing.fps = 60.0;
+   info->timing.sample_rate = 44100.0;
+   info->geometry.base_width = 320;
+   info->geometry.base_height = 200;
+   info->geometry.max_width = 320;
+   info->geometry.max_height = 200;
+   info->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
 static retro_video_refresh_t video_cb;
@@ -516,59 +511,41 @@ boolean HasTrailingSlash(const char* dn)
  *
  * cphipps 19/1999 - writen to unify the logic in FindIWADFile and the WAD
  *      autoloading code.
- * Searches the standard dirs for a named WAD file
- * The dirs are listed at the start of the function
+ * Searches g_wad_dir for a named WAD file
  */
 
 char* I_FindFile(const char* wfname, const char* ext)
 {
-lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
-  // lookup table of directories to search
-  static const struct {
-    const char *dir; // directory
-    const char *sub; // subdirectory
-    const char *env; // environment variable
-    const char *(*func)(void); // for I_DoomExeDir
-  } search[] = {
-    {g_wad_dir},
-  };
-
-  int   i;
   FILE *file;
   size_t pl;
-  
+  char  * p;
+
   /* Precalculate a length we will need in the loop */
   pl = strlen(wfname) + strlen(ext) + 4;
 
-  for (i = 0; i < sizeof(search)/sizeof(*search); i++) {
-    char  * p;
-    const char  * d = NULL;
-    const char  * s = NULL;
-    /* Each entry in the switch sets d to the directory to look in,
-     * and optionally s to a subdirectory of d */
-    // switch replaced with lookup table
-    d = g_wad_dir;
-    lprintf(LO_ALWAYS, "d: %s\n", d);
-    s = search[i].sub;
+  lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
+  lprintf(LO_ALWAYS, "g_wad_dir: %s\n", g_wad_dir);
 
-    p = malloc((d ? strlen(d) : 0) + (s ? strlen(s) : 0) + pl);
-    fprintf(stderr, "%s/%s", d, wfname);
-    sprintf(p, "%s/%s", d, wfname);
-    lprintf(LO_ALWAYS, "p: %s\n", p);
+  p = malloc(strlen(g_wad_dir) + pl);
+  fprintf(stderr, "%s/%s", g_wad_dir, wfname);
+  sprintf(p, "%s/%s", g_wad_dir, wfname);
+  lprintf(LO_ALWAYS, "p: %s\n", p);
 
-    file = fopen(p, "rb");
-    if (!file)
-    {
-      strcat(p, ext);
-      file = fopen(p, "rb");
-    }
-    if (file) {
-      lprintf(LO_INFO, " found %s\n", p);
-      fclose(file);
-      return p;
-    }
-    free(p);
+  file = fopen(p, "rb");
+  if (!file)
+  {
+	  strcat(p, ext);
+	  file = fopen(p, "rb");
   }
+
+  if (file)
+  {
+	  lprintf(LO_INFO, " found %s\n", p);
+	  fclose(file);
+	  return p;
+  }
+
+  free(p);
   return NULL;
 }
 
@@ -591,11 +568,9 @@ int I_Filelength(int handle)
 
 void I_Init(void)
 {
-  {
-    /* killough 2/21/98: avoid sound initialization if no sound & no music */
-    if (!(nomusicparm && nosfxparm))
-      I_InitSound();
-  }
+  /* killough 2/21/98: avoid sound initialization if no sound & no music */
+  if (!(nomusicparm && nosfxparm))
+    I_InitSound();
 
 #ifndef __LIBRETRO__
   R_InitInterpolation();
@@ -616,10 +591,7 @@ extern void D_Doom_Deinit(void);
 static void I_SndMixResetChannel (int channum)
 {
     memset (&channels[channum], 0, sizeof(channel_t));
-
-    return;
 }
-
 
 //
 // This function loads the sound data from the WAD lump
@@ -627,15 +599,11 @@ static void I_SndMixResetChannel (int channum)
 //
 static void* I_SndLoadSample (const char* sfxname, int* len)
 {
-    int i;
-    int sfxlump_num, sfxlump_len;
+    int i, x, padded_sfx_len, sfxlump_num, sfxlump_len;
     char sfxlump_name[20];
-    byte *sfxlump_data, *sfxlump_sound;
-    byte *padded_sfx_data;
+    byte *sfxlump_data, *sfxlump_sound, *padded_sfx_data;
     uint16_t orig_rate;
-    int padded_sfx_len;
     float times;
-    int x;
     
     sprintf (sfxlump_name, "DS%s", sfxname);
     
@@ -736,6 +704,7 @@ void I_SetMusicVolume(int volume)
 int I_GetSfxLumpNum(sfxinfo_t* sfx)
 {
     char namebuf[9];
+
     sprintf(namebuf, "ds%s", sfx->name);
     return W_GetNumForName(namebuf);
 }
@@ -772,13 +741,7 @@ static int currenthandle = 0;
 
 int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority)
 {
-    int	i;
-    
-    int	oldestslot, oldesttics;
-    int	slot;
-
-    int	rightvol;
-    int	leftvol;
+    int	i, oldestslot, oldesttics, slot, rightvol, leftvol;
 
     // this effect was not loaded.
     if (!S_sfx[id].data)
@@ -882,18 +845,11 @@ void I_UpdateSound(void)
 {
    // Mix current sound data. Data, from raw sound, for right and left.
    byte sample;
-   int dl, dr;
-   int frames, out_frames;
+   int dl, dr, frames, out_frames, step, chan;
    int16_t mad_audio_buf[SAMPLECOUNT_35 * 2];
 
    // Pointers in global mixbuffer, left, right, end.
    int16_t *leftout, *rightout, *leftend;
-
-   // Step in mixbuffer, left and right, thus two.
-   int step;
-
-   // Mixing channel index.
-   int chan;
 
    // Left and right channel are in global mixbuffer, alternating.
    leftout = mixbuffer;
@@ -996,9 +952,7 @@ void I_UpdateSound(void)
 
 void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
 {
-    int rightvol;
-    int	leftvol;
-    int i;
+    int rightvol, leftvol, i;
 
     for (i=0; i<NUM_CHANNELS; i++)
     {

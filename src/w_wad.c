@@ -47,9 +47,6 @@
 #include "doomtype.h"
 #include "i_system.h"
 
-#ifdef __GNUG__
-#pragma implementation "w_wad.h"
-#endif
 #include "w_wad.h"
 #include "lprintf.h"
 

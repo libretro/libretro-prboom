@@ -472,7 +472,7 @@ int R_FlatNumForName(const char *name)    // killough -- const added
 // killough 1/21/98, 1/31/98
 //
 
-int PUREFUNC R_CheckTextureNumForName(const char *name)
+int R_CheckTextureNumForName(const char *name)
 {
   int i = NO_TEXTURE;
   if (*name != '-')     // "NoTexture" marker.
@@ -490,7 +490,7 @@ int PUREFUNC R_CheckTextureNumForName(const char *name)
 //  aborts with error message.
 //
 
-int PUREFUNC R_TextureNumForName(const char *name)  // const added -- killough
+int R_TextureNumForName(const char *name)  // const added -- killough
 {
   int i = R_CheckTextureNumForName(name);
   if (i == -1)
@@ -501,7 +501,7 @@ int PUREFUNC R_TextureNumForName(const char *name)  // const added -- killough
 //
 // R_SafeTextureNumForName
 // Calls R_CheckTextureNumForName, and changes any error to NO_TEXTURE
-int PUREFUNC R_SafeTextureNumForName(const char *name, int snum)
+int R_SafeTextureNumForName(const char *name, int snum)
 {
   int i = R_CheckTextureNumForName(name);
   if (i == -1) {

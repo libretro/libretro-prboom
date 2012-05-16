@@ -957,7 +957,7 @@ boolean P_CanUnlockGenDoor
 // jff 2/23/98 added to prevent old demos from
 //  succeeding in starting multiple specials on one sector
 //
-boolean PUREFUNC P_SectorActive(special_e t, const sector_t *sec)
+boolean P_SectorActive(special_e t, const sector_t *sec)
 {
   if (demo_compatibility)  // return whether any thinker is active
     return sec->floordata != NULL || sec->ceilingdata != NULL || sec->lightingdata != NULL;
@@ -1066,7 +1066,7 @@ int P_CheckTag(line_t *line)
 // jff 3/14/98 added to simplify checks for whether sector is secret
 //  in automap and other places
 //
-boolean PUREFUNC P_IsSecret(const sector_t *sec)
+boolean P_IsSecret(const sector_t *sec)
 {
   return (sec->special==9 || (sec->special&SECRET_MASK));
 }
@@ -1081,7 +1081,7 @@ boolean PUREFUNC P_IsSecret(const sector_t *sec)
 // jff 3/14/98 added to simplify checks for whether sector is secret
 //  in automap and other places
 //
-boolean PUREFUNC P_WasSecret(const sector_t *sec)
+boolean P_WasSecret(const sector_t *sec)
 {
   return (sec->oldspecial==9 || (sec->oldspecial&SECRET_MASK));
 }

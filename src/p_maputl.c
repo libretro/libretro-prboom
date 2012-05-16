@@ -46,7 +46,7 @@
 // Gives an estimation of distance (not exact)
 //
 
-fixed_t CONSTFUNC P_AproxDistance(fixed_t dx, fixed_t dy)
+fixed_t P_AproxDistance(fixed_t dx, fixed_t dy)
 {
   dx = D_abs(dx);
   dy = D_abs(dy);
@@ -61,7 +61,7 @@ fixed_t CONSTFUNC P_AproxDistance(fixed_t dx, fixed_t dy)
 //
 // killough 5/3/98: reformatted, cleaned up
 
-int PUREFUNC P_PointOnLineSide(fixed_t x, fixed_t y, const line_t *line)
+int P_PointOnLineSide(fixed_t x, fixed_t y, const line_t *line)
 {
   return
     !line->dx ? x <= line->v1->x ? line->dy > 0 : line->dy < 0 :
@@ -77,7 +77,7 @@ int PUREFUNC P_PointOnLineSide(fixed_t x, fixed_t y, const line_t *line)
 //
 // killough 5/3/98: reformatted, cleaned up
 
-int PUREFUNC P_BoxOnLineSide(const fixed_t *tmbox, const line_t *ld)
+int P_BoxOnLineSide(const fixed_t *tmbox, const line_t *ld)
 {
   switch (ld->slopetype)
     {
@@ -108,7 +108,7 @@ int PUREFUNC P_BoxOnLineSide(const fixed_t *tmbox, const line_t *ld)
 //
 // killough 5/3/98: reformatted, cleaned up
 
-static int PUREFUNC P_PointOnDivlineSide(fixed_t x, fixed_t y, const divline_t *line)
+static int P_PointOnDivlineSide(fixed_t x, fixed_t y, const divline_t *line)
 {
   return
     !line->dx ? x <= line->x ? line->dy > 0 : line->dy < 0 :
@@ -140,7 +140,7 @@ static void P_MakeDivline(const line_t *li, divline_t *dl)
 /* cph - this is killough's 4/19/98 version of P_InterceptVector and
  *  P_InterceptVector2 (which were interchangeable). We still use this
  *  in compatibility mode. */
-fixed_t PUREFUNC P_InterceptVector2(const divline_t *v2, const divline_t *v1)
+fixed_t P_InterceptVector2(const divline_t *v2, const divline_t *v1)
 {
   fixed_t den;
   return (den = FixedMul(v1->dy>>8, v2->dx) - FixedMul(v1->dx>>8, v2->dy)) ?
@@ -148,7 +148,7 @@ fixed_t PUREFUNC P_InterceptVector2(const divline_t *v2, const divline_t *v1)
              FixedMul((v2->y - v1->y)>>8, v1->dx), den) : 0;
 }
 
-fixed_t PUREFUNC P_InterceptVector(const divline_t *v2, const divline_t *v1)
+fixed_t P_InterceptVector(const divline_t *v2, const divline_t *v1)
 {
   if (compatibility_level < prboom_4_compatibility)
     return P_InterceptVector2(v2, v1);

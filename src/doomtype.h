@@ -86,16 +86,6 @@ typedef unsigned __int64 uint_64_t;
 #define S_ISDIR(x) (((sbuf.st_mode & S_IFDIR)==S_IFDIR)?1:0)
 #endif
 
-#ifdef __GNUC__
-#define CONSTFUNC __attribute__((const))
-#define PUREFUNC __attribute__((pure))
-#define NORETURN __attribute__ ((noreturn))
-#else
-#define CONSTFUNC
-#define PUREFUNC
-#define NORETURN
-#endif
-
 /* CPhipps - use limits.h instead of depreciated values.h */
 #include <limits.h>
 

@@ -92,9 +92,9 @@ int R_FlatNumForName (const char* name);   // killough -- const added
 //  there is no texture (i.e. "-") specified.
 /* cph 2006/07/23 - defined value for no-texture marker (texture "-" in the WAD file) */
 #define NO_TEXTURE 0
-int PUREFUNC R_TextureNumForName (const char *name);    // killough -- const added; cph - now PUREFUNC
-int PUREFUNC R_SafeTextureNumForName (const char *name, int snum);
-int PUREFUNC R_CheckTextureNumForName (const char *name);
+int R_TextureNumForName (const char *name);    // killough -- const added; cph
+int R_SafeTextureNumForName (const char *name, int snum);
+int R_CheckTextureNumForName (const char *name);
 
 int R_ColormapNumForName(const char *name);      // killough 4/4/98
 /* cph 2001/11/17 - new func to do lighting calcs and get suitable colour map */

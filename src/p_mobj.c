@@ -950,7 +950,7 @@ void P_RemoveMobj (mobj_t* mobj)
  * killough 8/24/98: rewrote to use hashing
  */
 
-static PUREFUNC int P_FindDoomedNum(unsigned type)
+static int P_FindDoomedNum(unsigned type)
 {
   static struct { int first, next; } *hash;
   register int i;

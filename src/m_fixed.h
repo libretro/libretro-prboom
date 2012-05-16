@@ -53,7 +53,7 @@ typedef int fixed_t;
  * killough 9/05/98: better code seems to be gotten from using inlined C
  */
 
-static INLINE CONSTFUNC int D_abs(int x)
+static INLINE int D_abs(int x)
 {
   int _t = (x),_s;
   _s = _t >> (8*sizeof _t-1);
@@ -67,7 +67,7 @@ static INLINE CONSTFUNC int D_abs(int x)
 /* CPhipps - made __inline__ to inline, as specified in the gcc docs
  * Also made const */
 
-static INLINE CONSTFUNC int FixedMul(int a, int b)
+static INLINE int FixedMul(int a, int b)
 {
   return (int)((int_64_t) a*b >> FRACBITS);
 }
@@ -79,7 +79,7 @@ static INLINE CONSTFUNC int FixedMul(int a, int b)
 /* CPhipps - made __inline__ to inline, as specified in the gcc docs
  * Also made const */
 
-static INLINE CONSTFUNC int FixedDiv(int a, int b)
+static INLINE int FixedDiv(int a, int b)
 {
   return (D_abs(a)>>14) >= D_abs(b) ? ((a^b)>>31) ^ INT_MAX :
     (int)(((int_64_t) a << FRACBITS) / b);
@@ -90,7 +90,7 @@ static INLINE CONSTFUNC int FixedDiv(int a, int b)
  * (notice that the C standard for % does not guarantee this)
  */
 
-static INLINE CONSTFUNC int FixedMod(int a, int b)
+static INLINE int FixedMod(int a, int b)
 {
   if (b & (b-1)) {
     int r = a % b;

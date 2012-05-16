@@ -849,14 +849,14 @@ boolean P_CanUnlockGenDoor
 ( line_t* line,
   player_t* player);
 
-boolean PUREFUNC P_SectorActive
+boolean P_SectorActive
 ( special_e t,
   const sector_t* s );
 
-boolean PUREFUNC P_IsSecret
+boolean P_IsSecret
 ( const sector_t *sec );
 
-boolean PUREFUNC P_WasSecret
+boolean P_WasSecret
 ( const sector_t *sec );
 
 void P_ChangeSwitchTexture

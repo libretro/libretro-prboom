@@ -25,7 +25,10 @@
 #include "madplayer.h"
 
 #include <sys/stat.h>
+
+#ifdef HAVE_UNISTD_H
 #include <unistd.h>
+#endif
 #include <errno.h>
 
 /* PS3 values for i_sound.h - check if correct for libretro */
@@ -346,12 +349,13 @@ static int action_lut[] = {
 
 void I_StartTic (void)
 {
+   unsigned i;
    static bool old_input[14];
    bool new_input[14];
 
    input_poll_cb();
 
-   for(unsigned i = 0; i < 14; i++)
+   for(i = 0; i < 14; i++)
    {
       event_t event = {0};
       new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
@@ -532,7 +536,9 @@ lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
   };
 
   int   i;
-  FILE *file = NULL;
+  FILE *file;
+  size_t pl;
+  
   /* Precalculate a length we will need in the loop */
   size_t  pl = strlen(wfname) + strlen(ext) + 4;
 

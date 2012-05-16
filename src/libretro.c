@@ -517,7 +517,7 @@ char* I_FindFile(const char* wfname, const char* ext)
   lprintf(LO_ALWAYS, "%s\\%s\n", g_wad_dir, wfname);
   sprintf(p, "%s\\%s", g_wad_dir, wfname);
 #else
-  fprintf(LO_ALWAYS, "%s/%s\n", g_wad_dir, wfname);
+  lprintf(LO_ALWAYS, "%s/%s\n", g_wad_dir, wfname);
   sprintf(p, "%s/%s", g_wad_dir, wfname);
 #endif
   lprintf(LO_ALWAYS, "p: %s\n", p);

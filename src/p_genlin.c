@@ -52,7 +52,7 @@
 // Handle generalized floor types
 //
 // Passed the line activating the generalized floor function
-// Returns TRUE if a thinker is created
+// Returns true if a thinker is created
 //
 // jff 02/04/98 Added this routine (and file) to handle generalized
 // floor movers using bit fields in the line special type.
@@ -80,13 +80,13 @@ int EV_DoGenFloor
   rtn = 0;
 
   // check if a manual trigger, if so do just the sector on the backside
-  manual = FALSE;
+  manual = false;
   if (Trig==PushOnce || Trig==PushMany)
   {
     if (!(sec = line->backsector))
       return rtn;
     secnum = sec-sectors;
-    manual = TRUE;
+    manual = true;
     goto manual_floor;
   }
 
@@ -255,7 +255,7 @@ manual_floor:
 // Handle generalized ceiling types
 //
 // Passed the linedef activating the ceiling function
-// Returns TRUE if a thinker created
+// Returns true if a thinker created
 //
 // jff 02/04/98 Added this routine (and file) to handle generalized
 // floor movers using bit fields in the line special type.
@@ -284,13 +284,13 @@ int EV_DoGenCeiling
   rtn = 0;
 
   // check if a manual trigger, if so do just the sector on the backside
-  manual = FALSE;
+  manual = false;
   if (Trig==PushOnce || Trig==PushMany)
   {
     if (!(sec = line->backsector))
       return rtn;
     secnum = sec-sectors;
-    manual = TRUE;
+    manual = true;
     goto manual_ceiling;
   }
 
@@ -464,7 +464,7 @@ manual_ceiling:
 // Handle generalized lift types
 //
 // Passed the linedef activating the lift
-// Returns TRUE if a thinker is created
+// Returns true if a thinker is created
 //
 int EV_DoGenLift
 ( line_t*       line )
@@ -492,13 +492,13 @@ int EV_DoGenLift
     P_ActivateInStasis(line->tag);
 
   // check if a manual trigger, if so do just the sector on the backside
-  manual = FALSE;
+  manual = false;
   if (Trig==PushOnce || Trig==PushMany)
   {
     if (!(sec = line->backsector))
       return rtn;
     secnum = sec-sectors;
-    manual = TRUE;
+    manual = true;
     goto manual_lift;
   }
 
@@ -526,7 +526,7 @@ manual_lift:
     plat->sector = sec;
     plat->sector->floordata = plat;
     plat->thinker.function = T_PlatRaise;
-    plat->crush = FALSE;
+    plat->crush = false;
     plat->tag = line->tag;
 
     plat->type = genLift;
@@ -614,7 +614,7 @@ manual_lift:
 // Handle generalized stair building
 //
 // Passed the linedef activating the stairs
-// Returns TRUE if a thinker is created
+// Returns true if a thinker is created
 //
 int EV_DoGenStairs
 ( line_t*       line )
@@ -650,13 +650,13 @@ int EV_DoGenStairs
   rtn = 0;
 
   // check if a manual trigger, if so do just the sector on the backside
-  manual = FALSE;
+  manual = false;
   if (Trig==PushOnce || Trig==PushMany)
   {
     if (!(sec = line->backsector))
       return rtn;
     secnum = sec-sectors;
-    manual = TRUE;
+    manual = true;
     goto manual_stair;
   }
 
@@ -728,7 +728,7 @@ manual_stair:
     height = sec->floorheight + floor->direction * stairsize;
     floor->floordestheight = height;
     texture = sec->floorpic;
-    floor->crush = FALSE;
+    floor->crush = false;
     floor->type = genBuildStair; // jff 3/31/98 do not leave uninited
 
     sec->stairlock = -2;         // jff 2/26/98 set up lock on current sector
@@ -792,7 +792,7 @@ manual_stair:
         floor->sector = sec;
         floor->speed = speed;
         floor->floordestheight = height;
-        floor->crush = FALSE;
+        floor->crush = false;
         floor->type = genBuildStair; // jff 3/31/98 do not leave uninited
 
         ok = 1;
@@ -815,7 +815,7 @@ manual_stair:
 // Handle generalized crusher types
 //
 // Passed the linedef activating the crusher
-// Returns TRUE if a thinker created
+// Returns true if a thinker created
 //
 int EV_DoGenCrusher
 ( line_t*       line )
@@ -838,13 +838,13 @@ int EV_DoGenCrusher
   rtn = P_ActivateInStasisCeiling(line);
 
   // check if a manual trigger, if so do just the sector on the backside
-  manual = FALSE;
+  manual = false;
   if (Trig==PushOnce || Trig==PushMany)
   {
     if (!(sec = line->backsector))
       return rtn;
     secnum = sec-sectors;
-    manual = TRUE;
+    manual = true;
     goto manual_crusher;
   }
 
@@ -871,7 +871,7 @@ manual_crusher:
     P_AddThinker (&ceiling->thinker);
     sec->ceilingdata = ceiling; //jff 2/22/98
     ceiling->thinker.function = T_MoveCeiling;
-    ceiling->crush = TRUE;
+    ceiling->crush = true;
     ceiling->direction = -1;
     ceiling->sector = sec;
     ceiling->texture = sec->ceilingpic;
@@ -913,7 +913,7 @@ manual_crusher:
 // Handle generalized locked door types
 //
 // Passed the linedef activating the generalized locked door
-// Returns TRUE if a thinker created
+// Returns true if a thinker created
 //
 int EV_DoGenLockedDoor
 ( line_t* line )
@@ -933,13 +933,13 @@ int EV_DoGenLockedDoor
   rtn = 0;
 
   // check if a manual trigger, if so do just the sector on the backside
-  manual = FALSE;
+  manual = false;
   if (Trig==PushOnce || Trig==PushMany)
   {
     if (!(sec = line->backsector))
       return rtn;
     secnum = sec-sectors;
-    manual = TRUE;
+    manual = true;
     goto manual_locked;
   }
 
@@ -1021,7 +1021,7 @@ manual_locked:
 // Handle generalized door types
 //
 // Passed the linedef activating the generalized door
-// Returns TRUE if a thinker created
+// Returns true if a thinker created
 //
 int EV_DoGenDoor
 ( line_t* line )
@@ -1042,13 +1042,13 @@ int EV_DoGenDoor
   rtn = 0;
 
   // check if a manual trigger, if so do just the sector on the backside
-  manual = FALSE;
+  manual = false;
   if (Trig==PushOnce || Trig==PushMany)
   {
     if (!(sec = line->backsector))
       return rtn;
     secnum = sec-sectors;
-    manual = TRUE;
+    manual = true;
     goto manual_door;
   }
 

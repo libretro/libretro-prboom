@@ -89,14 +89,14 @@ static int wipe_initMelt(int ticks)
 
 static int wipe_doMelt(int ticks)
 {
-  boolean done = TRUE;
+  boolean done = true;
   int i;
 
   while (ticks--) {
     for (i=0;i<(SCREENWIDTH);i++) {
       if (y_lookup[i]<0) {
         y_lookup[i]++;
-        done = FALSE;
+        done = false;
         continue;
       }
       if (y_lookup[i] < SCREENHEIGHT) {
@@ -133,7 +133,7 @@ static int wipe_doMelt(int ticks)
           d += SURFACE_BYTE_PITCH;
           s += SURFACE_BYTE_PITCH;
         }
-        done = FALSE;
+        done = false;
       }
     }
   }
@@ -157,7 +157,7 @@ static int wipe_exitMelt(int ticks)
 int wipe_StartScreen(void)
 {
   wipe_scr_start.height = SCREENHEIGHT;
-  wipe_scr_start.not_on_heap = FALSE;
+  wipe_scr_start.not_on_heap = false;
   V_AllocScreen(&wipe_scr_start);
   screens[SRC_SCR] = wipe_scr_start;
   V_CopyRect(0, 0, 0,       SCREENWIDTH, SCREENHEIGHT, 0, 0, SRC_SCR, VPT_NONE ); // Copy start screen to buffer
@@ -167,7 +167,7 @@ int wipe_StartScreen(void)
 int wipe_EndScreen(void)
 {
   wipe_scr_end.height = SCREENHEIGHT;
-  wipe_scr_end.not_on_heap = FALSE;
+  wipe_scr_end.not_on_heap = false;
   V_AllocScreen(&wipe_scr_end);
   screens[DEST_SCR] = wipe_scr_end;
   V_CopyRect(0, 0, 0,       SCREENWIDTH, SCREENHEIGHT, 0, 0, DEST_SCR, VPT_NONE); // Copy end screen to buffer

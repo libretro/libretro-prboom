@@ -69,7 +69,7 @@ void HUlib_clearTextLine(hu_textline_t* t)
   t->linelen =         // killough 1/23 98: support multiple lines
     t->len = 0;
   t->l[0] = 0;
-  t->needsupdate = TRUE;
+  t->needsupdate = true;
 }
 
 //
@@ -99,7 +99,7 @@ void HUlib_initTextLine(hu_textline_t* t, int x, int y,
 // Adds a character at the end of the text line in a hu_textline_t widget
 //
 // Passed the hu_textline_t and the char to add
-// Returns FALSE if already at length limit, TRUE if the character added
+// Returns false if already at length limit, true if the character added
 //
 boolean HUlib_addCharToTextLine
 ( hu_textline_t*  t,
@@ -107,7 +107,7 @@ boolean HUlib_addCharToTextLine
 {
   // killough 1/23/98 -- support multiple lines
   if (t->linelen == HU_MAXLINELENGTH)
-    return FALSE;
+    return false;
   else
   {
     t->linelen++;
@@ -117,7 +117,7 @@ boolean HUlib_addCharToTextLine
     t->l[t->len++] = ch;
     t->l[t->len] = 0;
     t->needsupdate = 4;
-    return TRUE;
+    return true;
   }
 
 }
@@ -128,16 +128,16 @@ boolean HUlib_addCharToTextLine
 // Deletes a character at the end of the text line in a hu_textline_t widget
 //
 // Passed the hu_textline_t
-// Returns FALSE if already empty, TRUE if the character deleted
+// Returns false if already empty, true if the character deleted
 //
 static boolean HUlib_delCharFromTextLine(hu_textline_t* t)
 {
-  if (!t->len) return FALSE;
+  if (!t->len) return false;
   else
   {
     t->l[--t->len] = 0;
     t->needsupdate = 4;
-    return TRUE;
+    return true;
   }
 }
 
@@ -249,7 +249,7 @@ void HUlib_initSText
 
   s->h = h;
   s->on = on;
-  s->laston = TRUE;
+  s->laston = true;
   s->cl = 0;
   for (i=0;i<h;i++)
     HUlib_initTextLine
@@ -332,7 +332,7 @@ void HUlib_drawSText(hu_stext_t* s)
     l = &s->l[idx];
 
     // need a decision made here on whether to skip the draw
-    HUlib_drawTextLine(l, FALSE); // no cursor, please
+    HUlib_drawTextLine(l, false); // no cursor, please
   }
 }
 
@@ -528,7 +528,7 @@ void HUlib_drawMText(hu_mtext_t* m)
     }
 
     // need a decision made here on whether to skip the draw
-    HUlib_drawTextLine(l, FALSE); // no cursor, please
+    HUlib_drawTextLine(l, false); // no cursor, please
   }
 }
 
@@ -577,7 +577,7 @@ void HUlib_initIText
 {
   it->lm = 0; // default left margin is start of text
   it->on = on;
-  it->laston = TRUE;
+  it->laston = true;
   HUlib_initTextLine(&it->l, x, y, font, startchar, cm);
 }
 
@@ -650,7 +650,7 @@ void HUlib_addPrefixToIText
 // Wrapper function for handling general keyed input.
 //
 // Passed the hu_itext_t and the char input
-// Returns TRUE if it ate the key
+// Returns true if it ate the key
 //
 boolean HUlib_keyInIText
 ( hu_itext_t* it,
@@ -662,9 +662,9 @@ boolean HUlib_keyInIText
   else if (ch == key_backspace)                   // phares
     HUlib_delCharFromIText(it);
   else if (ch != key_enter)                       // phares
-    return FALSE;                                 // did not eat key
+    return false;                                 // did not eat key
 
-  return TRUE;                                    // ate the key
+  return true;                                    // ate the key
 }
 
 //
@@ -681,7 +681,7 @@ void HUlib_drawIText(hu_itext_t* it)
 
   if (!*it->on)
     return;
-  HUlib_drawTextLine(l, TRUE); // draw the line w/ cursor
+  HUlib_drawTextLine(l, true); // draw the line w/ cursor
 }
 
 //

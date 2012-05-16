@@ -42,15 +42,19 @@
 #ifndef __BYTEBOOL__
 #define __BYTEBOOL__
 /* Fixed to use builtin bool type with C++. */
-#ifndef FALSE
-#define FALSE 0
-#endif
+#ifdef _MSC_VER
+typedef enum
+{
+  bfalse = 0,
+  btrue = 1
+} boolean;
 
-#ifndef TRUE
-#define TRUE 1
+#define bool boolean
+#define false  bfalse
+#define true btrue
+#else
+typedef enum {false, true} boolean;
 #endif
-
-typedef unsigned char boolean;
 typedef unsigned char byte;
 #endif
 

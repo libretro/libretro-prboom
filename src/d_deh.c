@@ -1035,7 +1035,7 @@ static const deh_block deh_blocks[] = { // CPhipps - static const
 };
 
 // flag to skip included deh-style text, used with INCLUDE NOTEXT directive
-static boolean includenotext = FALSE;
+static boolean includenotext = false;
 
 // MOBJINFO - Dehacked block name = "Thing"
 // Usage: Thing nn (name)
@@ -1402,7 +1402,7 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
   // Open output file if we're writing output
   if (outfilename && *outfilename && !fileout)
     {
-      static boolean firstfile = TRUE; // to allow append to output log
+      static boolean firstfile = true; // to allow append to output log
       if (!strcmp(outfilename, "-"))
         fileout = stdout;
       else
@@ -1412,7 +1412,7 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
                    outfilename);
             fileout = stdout;
           }
-      firstfile = FALSE;
+      firstfile = false;
     }
 
   // killough 10/98: allow DEH files to come from wad lumps
@@ -1480,7 +1480,7 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
           // file but using the BEX format to handle strings
 
           if (!strnicmp(nextfile = ptr_lstrip(inbuffer+7),"NOTEXT",6))
-            includenotext = TRUE, nextfile = ptr_lstrip(nextfile+6);
+            includenotext = true, nextfile = ptr_lstrip(nextfile+6);
 
           if (fileout)
             fprintf(fileout,"Branching to include file %s...\n", nextfile);
@@ -2316,6 +2316,17 @@ static void deh_procCheat(DEHFILE *fpin, FILE* fpout, char *line) // done
                 // Ty 03/16/98 - change to use a strdup and orphan the original
                 // Also has the advantage of allowing length changes.
                 // strncpy(cheat[iy].cheat,p,strlen(cheat[iy].cheat));
+#if 0
+                {    // killough 9/12/98: disable cheats which are prefixes of this one
+                  int i;
+                  for (i=0; cheat[i].cheat; i++)
+                    if (cheat[i].when & not_deh &&
+                        !strncasecmp(cheat[i].cheat,
+                                     cheat[iy].cheat,
+                                     strlen(cheat[i].cheat)) && i != iy)
+          cheat[i].deh_modified = true;
+                }
+#endif
                 cheat[iy].cheat = strdup(p);
                 if (fpout) fprintf(fpout,
                                    "Assigned new cheat '%s' to cheat '%s'at index %d\n",
@@ -2497,7 +2508,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
     sprnames[i] = s = strdup(sprnames[i]);
 
     //e6y: flag the sprite as changed
-    sprnames_state[i] = TRUE;
+    sprnames_state[i] = true;
 
     strncpy(s,&inbuffer[fromlen],tolen);
         }
@@ -2529,7 +2540,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
                 S_sfx[i].name = strdup(&inbuffer[fromlen]);
 
                 //e6y: flag the SFX as changed
-                S_sfx_state[i] = TRUE;
+                S_sfx_state[i] = true;
 
                 found = TRUE;
                 break;  // only one matches, quit early
@@ -2551,7 +2562,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
                     S_music[i].name = strdup(&inbuffer[fromlen]);
 
                     //e6y: flag the music as changed
-                    S_music_state[i] = TRUE;
+                    S_music_state[i] = true;
 
                     found = TRUE;
                     break;  // only one matches, quit early
@@ -2602,7 +2613,7 @@ static void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
   // a time as needed
   // holds the final result of the string after concatenation
   static char *holdstring = NULL;
-  boolean found = FALSE;  // looking for string continuation
+  boolean found = false;  // looking for string continuation
 
   if (fpout) fprintf(fpout,"Processing extended string substitution\n");
 
@@ -2677,7 +2688,7 @@ boolean deh_procStringSub(char *key, char *lookfor, char *newstring, FILE *fpout
   boolean found; // loop exit flag
   int i;  // looper
 
-  found = FALSE;
+  found = false;
   for (i=0;i<deh_numstrlookup;i++)
     {
       if (deh_strlookup[i].orig == NULL)
@@ -2691,7 +2702,7 @@ boolean deh_procStringSub(char *key, char *lookfor, char *newstring, FILE *fpout
         {
     char *t;
           *deh_strlookup[i].ppstr = t = strdup(newstring); // orphan originalstring
-          found = TRUE;
+          found = true;
           // Handle embedded \n's in the incoming string, convert to 0x0a's
           {
             const char *s;

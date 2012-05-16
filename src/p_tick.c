@@ -120,7 +120,7 @@ void P_AddThinker(thinker_t* thinker)
   // killough 8/29/98: set sentinel pointers, and then add to appropriate list
   thinker->cnext = thinker->cprev = NULL;
   P_UpdateThinker(thinker);
-  newthinkerpresent = TRUE;
+  newthinkerpresent = true;
 }
 
 //
@@ -253,7 +253,7 @@ static void P_RunThinkers (void)
     if (currentthinker->function)
       currentthinker->function(currentthinker);
   }
-  newthinkerpresent = FALSE;
+  newthinkerpresent = false;
 }
 
 //

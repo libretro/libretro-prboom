@@ -103,12 +103,12 @@ int             gameepisode;
 int             gamemap;
 boolean         paused;
 // CPhipps - moved *_loadgame vars here
-static boolean forced_loadgame = FALSE;
-static boolean command_loadgame = FALSE;
+static boolean forced_loadgame = false;
+static boolean command_loadgame = false;
 
 boolean         usergame;      // ok to save / end game
 boolean         deathmatch;    // only if started as net death
-boolean         netgame;       // only TRUE if packets are broadcast
+boolean         netgame;       // only true if packets are broadcast
 boolean         playeringame[MAXPLAYERS];
 player_t        players[MAXPLAYERS];
 int             consoleplayer; // player taking events and displaying
@@ -119,9 +119,9 @@ int             totalkills, totallive, totalitems, totalsecret;    // for interm
 boolean         demoplayback;
 int             demover;
 wbstartstruct_t wminfo;               // parms for world map / intermission
-boolean         haswolflevels = FALSE;// jff 4/18/98 wolf levels present
+boolean         haswolflevels = false;// jff 4/18/98 wolf levels present
 static byte     *savebuffer;          // CPhipps - static
-int             autorun = FALSE;      // always running?          // phares
+int             autorun = false;      // always running?          // phares
 int             totalleveltimes;      // CPhipps - total time for all completed levels
 int		longtics;
 
@@ -297,7 +297,7 @@ void G_BuildTiccmd(ticcmd_t* cmd)
   if (gamekeydown[key_reverse])                                   //    V
     {
       cmd->angleturn += QUICKREVERSE;                             //    ^
-      gamekeydown[key_reverse] = FALSE;                           //    |
+      gamekeydown[key_reverse] = false;                           //    |
     }                                                             // phares
 
   // let movement keys cancel each other out
@@ -580,7 +580,7 @@ static void G_DoLoadLevel (void)
   // clear cmd building stuff
   memset (gamekeydown, 0, sizeof(gamekeydown));
   mousex = mousey = 0;
-  special_event = 0; paused = FALSE;
+  special_event = 0; paused = false;
   memset (mousebuttons, 0, sizeof(mousebuttons));
 
   // killough 5/13/98: in case netdemo has consoleplayer other than green
@@ -605,10 +605,10 @@ boolean G_Responder (event_t* ev)
       gamestate == GS_LEVEL)
     {
       if (ev->type == ev_keyup)
-  gamekeydown[key_spy] = FALSE;
+  gamekeydown[key_spy] = false;
       if (ev->type == ev_keydown && !gamekeydown[key_spy])
   {
-    gamekeydown[key_spy] = TRUE;
+    gamekeydown[key_spy] = true;
     do                                          // spy mode
       if (++displayplayer >= MAXPLAYERS)
         displayplayer = 0;
@@ -622,7 +622,7 @@ boolean G_Responder (event_t* ev)
 #endif
     R_SmoothPlaying_Reset(NULL);
   }
-      return TRUE;
+      return true;
     }
 
   // any other key pops up menu if in demos
@@ -641,7 +641,7 @@ boolean G_Responder (event_t* ev)
       S_PauseSound();
     else
       S_ResumeSound();
-    return TRUE;
+    return true;
   }
 
       // killough 10/98:
@@ -653,11 +653,11 @@ boolean G_Responder (event_t* ev)
   !(paused & 2) && !(automapmode & am_active) &&
   ((ev->type == ev_keydown) ||
    (ev->type == ev_mouse && ev->data1)) ?
-  M_StartControlPanel(), TRUE : FALSE;
+  M_StartControlPanel(), true : false;
     }
 
   if (gamestate == GS_FINALE && F_Responder(ev))
-    return TRUE;  // finale ate the event
+    return true;  // finale ate the event
 
   switch (ev->type)
     {
@@ -665,16 +665,16 @@ boolean G_Responder (event_t* ev)
       if (ev->data1 == key_pause)           // phares
         {
           special_event = BT_SPECIAL | (BTS_PAUSE & BT_SPECIALMASK);
-          return TRUE;
+          return true;
         }
       if (ev->data1 <NUMKEYS)
-        gamekeydown[ev->data1] = TRUE;
-      return TRUE;    // eat key down events
+        gamekeydown[ev->data1] = true;
+      return true;    // eat key down events
 
     case ev_keyup:
       if (ev->data1 <NUMKEYS)
-        gamekeydown[ev->data1] = FALSE;
-      return FALSE;   // always let key up events filter down
+        gamekeydown[ev->data1] = false;
+      return false;   // always let key up events filter down
 
     case ev_mouse:
       mousebuttons[0] = ev->data1 & 1;
@@ -689,11 +689,11 @@ boolean G_Responder (event_t* ev)
        */
       mousex += (ev->data2*(mouseSensitivity_horiz))/10;  /* killough */
       mousey += (ev->data3*(mouseSensitivity_vert))/10;  /*Mead rm *4 */
-      return TRUE;    // eat events
+      return true;    // eat events
     default:
       break;
     }
-  return FALSE;
+  return false;
 }
 
 //
@@ -740,7 +740,7 @@ void G_Ticker (void)
           G_DoLoadGame ();
           break;
         case ga_savegame:
-          G_DoSaveGame (FALSE);
+          G_DoSaveGame (false);
           break;
         case ga_playdemo:
           G_DoPlayDemo ();
@@ -830,7 +830,7 @@ void G_Ticker (void)
                     (players[i].cmd.buttons & BTS_SAVEMASK)>>BTS_SAVESHIFT;
                   gameaction = ga_loadgame;
       forced_loadgame = netgame; // Force if a netgame
-      command_loadgame = FALSE;
+      command_loadgame = false;
                   break;
 
       // CPhipps - Restart the level
@@ -978,12 +978,12 @@ void G_PlayerReborn (int player)
   players[player].itemcount = itemcount;
   players[player].secretcount = secretcount;
 
-  p->usedown = p->attackdown = TRUE;  // don't do anything immediately
+  p->usedown = p->attackdown = true;  // don't do anything immediately
   p->playerstate = PST_LIVE;
   p->health = initial_health;  // Ty 03/12/98 - use dehacked values
   p->readyweapon = p->pendingweapon = wp_pistol;
-  p->weaponowned[wp_fist] = TRUE;
-  p->weaponowned[wp_pistol] = TRUE;
+  p->weaponowned[wp_fist] = true;
+  p->weaponowned[wp_pistol] = true;
   p->ammo[am_clip] = initial_bullets; // Ty 03/12/98 - use dehacked values
 
   for (i=0 ; i<NUMAMMO ; i++)
@@ -992,7 +992,7 @@ void G_PlayerReborn (int player)
 
 //
 // G_CheckSpot
-// Returns FALSE if the player cannot be respawned
+// Returns false if the player cannot be respawned
 // at the given mapthing_t spot
 // because something is occupying it
 //
@@ -1009,8 +1009,8 @@ static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
       for (i=0 ; i<playernum ; i++)
         if (players[i].mo->x == mthing->x << FRACBITS
             && players[i].mo->y == mthing->y << FRACBITS)
-          return FALSE;
-      return TRUE;
+          return false;
+      return true;
     }
 
   x = mthing->x << FRACBITS;
@@ -1021,13 +1021,13 @@ static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
   //
   // Old code:
   // if (!P_CheckPosition (players[playernum].mo, x, y))
-  //    return FALSE;
+  //    return false;
 
   players[playernum].mo->flags |=  MF_SOLID;
   i = P_CheckPosition(players[playernum].mo, x, y);
   players[playernum].mo->flags &= ~MF_SOLID;
   if (!i)
-    return FALSE;
+    return false;
 
   // flush an old corpse if needed
   // killough 2/8/98: make corpse queue have an adjustable limit
@@ -1093,7 +1093,7 @@ static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
       S_StartSound(mo, sfx_telept);  // don't start sound on first frame
   }
 
-  return TRUE;
+  return true;
 }
 
 
@@ -1186,7 +1186,7 @@ static boolean secretexit;
 
 void G_ExitLevel (void)
 {
-  secretexit = FALSE;
+  secretexit = false;
   gameaction = ga_completed;
 }
 
@@ -1196,9 +1196,9 @@ void G_ExitLevel (void)
 void G_SecretExitLevel (void)
 {
   if (gamemode!=commercial || haswolflevels)
-    secretexit = TRUE;
+    secretexit = true;
   else
-    secretexit = FALSE;
+    secretexit = false;
   gameaction = ga_completed;
 }
 
@@ -1225,7 +1225,7 @@ void G_DoCompleted (void)
   // cph - Remove ExM8 special case, so it gets summary screen displayed
       case 9:
         for (i=0 ; i<MAXPLAYERS ; i++)
-          players[i].didsecret = TRUE;
+          players[i].didsecret = true;
         break;
       }
 
@@ -1327,7 +1327,7 @@ void G_WorldDone (void)
   gameaction = ga_worlddone;
 
   if (secretexit)
-    players[consoleplayer].didsecret = TRUE;
+    players[consoleplayer].didsecret = true;
 
   if (gamemode == commercial)
     {
@@ -1395,12 +1395,12 @@ static uint_64_t G_UpdateSignature(uint_64_t s, const char *name)
 static uint_64_t G_Signature(void)
 {
   static uint_64_t s = 0;
-  static boolean computed = FALSE;
+  static boolean computed = false;
   char name[9];
   int episode, map;
 
   if (!computed) {
-   computed = TRUE;
+   computed = true;
    if (gamemode == commercial)
     for (map = haswolflevels ? 32 : 30; map; map--)
       sprintf(name, "map%02d", map), s = G_UpdateSignature(s, name);
@@ -1422,7 +1422,7 @@ void G_ForcedLoadGame(void)
   // CPhipps - net loadgames are always forced, so we only reach here
   //  in single player
   gameaction = ga_loadgame;
-  forced_loadgame = TRUE;
+  forced_loadgame = true;
 }
 
 // killough 3/16/98: add slot info
@@ -1439,12 +1439,12 @@ void G_LoadGame(int slot, boolean command)
   } else {
     // Do the old thing, immediate load
     gameaction = ga_loadgame;
-    forced_loadgame = FALSE;
+    forced_loadgame = false;
     savegameslot = slot;
-    demoplayback = FALSE;
+    demoplayback = false;
     // Don't stay in netgame state if loading single player save
     // while watching multiplayer demo
-    netgame = FALSE;
+    netgame = false;
   }
   command_loadgame = command;
   R_SmoothPlaying_Reset(NULL); // e6y
@@ -1630,7 +1630,7 @@ void G_SaveGame(int slot, char *description)
      * running so, go outside normal mechanisms
      */
     savegameslot = slot;
-    G_DoSaveGame(TRUE);
+    G_DoSaveGame(true);
   }
   // CPhipps - store info in special_event
   special_event = BT_SPECIAL | (BTS_SAVEGAME & BT_SPECIALMASK) |
@@ -1950,8 +1950,8 @@ void G_ReloadDefaults(void)
   if (startskill==sk_none)
     startskill = (skill_t)(defaultskill-1);
 
-  demoplayback = FALSE;
-  netdemo = FALSE;
+  demoplayback = false;
+  netdemo = false;
 
   // killough 2/21/98:
   memset(playeringame+1, 0, sizeof(*playeringame)*(MAXPLAYERS-1));
@@ -1982,8 +1982,8 @@ void G_ReloadDefaults(void)
 void G_DoNewGame (void)
 {
   G_ReloadDefaults();            // killough 3/1/98
-  netgame = FALSE;               // killough 3/29/98
-  deathmatch = FALSE;
+  netgame = false;               // killough 3/29/98
+  deathmatch = false;
   G_InitNew (d_skill, d_episode, d_map);
   gameaction = ga_nothing;
 
@@ -2031,7 +2031,7 @@ void G_InitNew(skill_t skill, int episode, int map)
 
   if (paused)
     {
-      paused = FALSE;
+      paused = false;
       S_ResumeSound();
     }
 
@@ -2071,8 +2071,8 @@ void G_InitNew(skill_t skill, int episode, int map)
   for (i=0 ; i<MAXPLAYERS ; i++)
     players[i].playerstate = PST_REBORN;
 
-  usergame = TRUE;                // will be set FALSE if a demo
-  paused = FALSE;
+  usergame = true;                // will be set false if a demo
+  paused = false;
   automapmode &= ~am_active;
   gameepisode = episode;
   gamemap = map;
@@ -2332,9 +2332,9 @@ static boolean CheckForOverrun(const byte *start_p, const byte *current_p, size_
     if (failonerror)
       I_Error("G_ReadDemoHeader: wrong demo header\n");
     else
-      return TRUE;
+      return true;
   }
-  return FALSE;
+  return false;
 }
 
 static const byte* G_ReadDemoHeader(const byte *demo_p, size_t size, boolean failonerror)
@@ -2543,8 +2543,8 @@ static const byte* G_ReadDemoHeader(const byte *demo_p, size_t size, boolean fai
 
   if (playeringame[1])
     {
-      netgame = TRUE;
-      netdemo = TRUE;
+      netgame = true;
+      netdemo = true;
     }
 
   if (gameaction != ga_loadgame) { /* killough 12/98: support -loadgame */
@@ -2569,19 +2569,19 @@ void G_DoPlayDemo(void)
   demobuffer = W_CacheLumpNum(demolumpnum);
   demolength = W_LumpLength(demolumpnum);
 
-  demo_p = G_ReadDemoHeader(demobuffer, demolength, TRUE);
+  demo_p = G_ReadDemoHeader(demobuffer, demolength, true);
 
   gameaction = ga_nothing;
-  usergame = FALSE;
+  usergame = false;
 
-  demoplayback = TRUE;
+  demoplayback = true;
   R_SmoothPlaying_Reset(NULL); // e6y
 }
 
 /* G_CheckDemoStatus
  *
  * Called after a death or level completion to allow demos to be cleaned up
- * Returns TRUE if a new demo loop action will take place
+ * Returns true if a new demo loop action will take place
  */
 boolean G_CheckDemoStatus (void)
 {
@@ -2595,12 +2595,12 @@ boolean G_CheckDemoStatus (void)
   demolumpnum = -1;
       }
       G_ReloadDefaults();    // killough 3/1/98
-      netgame = FALSE;       // killough 3/29/98
-      deathmatch = FALSE;
+      netgame = false;       // killough 3/29/98
+      deathmatch = false;
       D_AdvanceDemo ();
-      return TRUE;
+      return true;
     }
-  return FALSE;
+  return false;
 }
 
 // killough 1/22/98: this is a "Doom printf" for messages. I've gotten

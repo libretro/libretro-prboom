@@ -346,7 +346,7 @@ int     setblocks;
 
 void R_SetViewSize(int blocks)
 {
-  setsizeneeded = TRUE;
+  setsizeneeded = true;
   setblocks = blocks;
 }
 
@@ -358,7 +358,7 @@ void R_ExecuteSetViewSize (void)
 {
   int i;
 
-  setsizeneeded = FALSE;
+  setsizeneeded = false;
   viewheight = SCREENHEIGHT;
 
   if (!setblocks)

@@ -210,7 +210,7 @@ void S_Start(void)
         else
           mnum = spmus[gamemap-1];
       }
-  S_ChangeMusic(mnum, TRUE);
+  S_ChangeMusic(mnum, true);
 }
 
 void S_StartSoundAtVolume(void *origin_p, int sfx_id, int volume)
@@ -344,7 +344,7 @@ void S_PauseSound(void)
   if (mus_playing && !mus_paused)
     {
       I_PauseSong(mus_playing->handle);
-      mus_paused = TRUE;
+      mus_paused = true;
     }
 }
 
@@ -357,7 +357,7 @@ void S_ResumeSound(void)
   if (mus_playing && mus_paused)
     {
       I_ResumeSong(mus_playing->handle);
-      mus_paused = FALSE;
+      mus_paused = false;
     }
 }
 
@@ -455,7 +455,7 @@ void S_StartMusic(int m_id)
   //jff 1/22/98 return if music is not enabled
   if (!mus_card || nomusicparm)
     return;
-  S_ChangeMusic(m_id, FALSE);
+  S_ChangeMusic(m_id, false);
 }
 
 
@@ -463,7 +463,7 @@ void S_StartMusic(int m_id)
 void S_ChangeMusic(int musicnum, int looping)
 {
   musicinfo_t *music;
-  int music_file_failed; // cournia - if TRUE load the default MIDI music
+  int music_file_failed; // cournia - if true load the default MIDI music
   char* music_filename;  // cournia
 
   //jff 1/22/98 return if music is not enabled

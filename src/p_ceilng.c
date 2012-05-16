@@ -75,7 +75,7 @@ void T_MoveCeiling (ceiling_t* ceiling)
               ceiling->sector,
               ceiling->speed,
               ceiling->topheight,
-              FALSE,
+              false,
               1,
               ceiling->direction
             );
@@ -241,7 +241,7 @@ void T_MoveCeiling (ceiling_t* ceiling)
 // Move a ceiling up/down or start a crusher
 //
 // Passed the linedef activating the function and the type of function desired
-// returns TRUE if a thinker started
+// returns true if a thinker started
 //
 int EV_DoCeiling
 ( line_t* line,
@@ -285,13 +285,13 @@ int EV_DoCeiling
     sec->ceilingdata = ceiling;               //jff 2/22/98
     ceiling->thinker.function = T_MoveCeiling;
     ceiling->sector = sec;
-    ceiling->crush = FALSE;
+    ceiling->crush = false;
 
     // setup ceiling structure according to type of function
     switch(type)
     {
       case fastCrushAndRaise:
-        ceiling->crush = TRUE;
+        ceiling->crush = true;
         ceiling->topheight = sec->ceilingheight;
         ceiling->bottomheight = sec->floorheight + (8*FRACUNIT);
         ceiling->direction = -1;
@@ -300,7 +300,7 @@ int EV_DoCeiling
 
       case silentCrushAndRaise:
       case crushAndRaise:
-        ceiling->crush = TRUE;
+        ceiling->crush = true;
         ceiling->topheight = sec->ceilingheight;
       case lowerAndCrush:
       case lowerToFloor:
@@ -363,7 +363,7 @@ int EV_DoCeiling
 // Reactivates all stopped crushers with the right tag
 //
 // Passed the line reactivating the crusher
-// Returns TRUE if a ceiling reactivated
+// Returns true if a ceiling reactivated
 //
 //jff 4/5/98 return if activated
 int P_ActivateInStasisCeiling(line_t *line)
@@ -391,7 +391,7 @@ int P_ActivateInStasisCeiling(line_t *line)
 // Stops all active ceilings with the right tag
 //
 // Passed the linedef stopping the ceilings
-// Returns TRUE if a ceiling put in stasis
+// Returns true if a ceiling put in stasis
 //
 int EV_CeilingCrushStop(line_t* line)
 {

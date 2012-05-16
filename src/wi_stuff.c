@@ -433,7 +433,7 @@ static void WI_slamBackground(void)
 //  because of timing issues in netgames.
 boolean WI_Responder(event_t* ev)
 {
-  return FALSE;
+  return false;
 }
 
 
@@ -512,7 +512,7 @@ WI_drawOnLnode  // draw stuff at a location by episode/map#
   const char* const c[] )
 {
   int   i;
-  boolean fits = FALSE;
+  boolean fits = false;
 
   i = 0;
   do
@@ -534,7 +534,7 @@ WI_drawOnLnode  // draw stuff at a location by episode/map#
        && top >= 0
        && bottom < 200)
     {
-      fits = TRUE;
+      fits = true;
     }
     else
     {
@@ -873,7 +873,7 @@ void WI_updateNoState(void)
     G_WorldDone();
 }
 
-static boolean    snl_pointeron = FALSE;
+static boolean    snl_pointeron = false;
 
 
 // ====================================================================
@@ -979,7 +979,7 @@ void WI_drawShowNextLoc(void)
 //
 void WI_drawNoState(void)
 {
-  snl_pointeron = TRUE;
+  snl_pointeron = true;
   WI_drawShowNextLoc();
 }
 
@@ -1110,7 +1110,7 @@ void WI_updateDeathmatchStats(void)
     if (!(bcnt&3))
       S_StartSound(0, sfx_pistol);  // noise while counting
 
-    stillticking = FALSE;
+    stillticking = false;
 
     for (i=0 ; i<MAXPLAYERS ; i++)
     {
@@ -1132,7 +1132,7 @@ void WI_updateDeathmatchStats(void)
             if (dm_frags[i][j] < -999)
               dm_frags[i][j] = -999;
 
-            stillticking = TRUE;
+            stillticking = true;
           }
         }
         dm_totals[i] = WI_fragSum(i);
@@ -1272,7 +1272,7 @@ void WI_drawDeathmatchStats(void)
 // Actually PrBoom will be in an infinite cycle at calculation of
 // percentage if the player will not press <Use> for acceleration, because
 // the condition (cnt_kills[0] >= (plrs[me].skills * 100) / wbs->maxkills)
-// will be always FALSE in this case.
+// will be always false in this case.
 //
 // If you will kill 800 monsters on MAP30 on Ultra-Violence skill and
 // will not press <Use>, vanilla will count up to 80000%, but PrBoom
@@ -1327,7 +1327,7 @@ void WI_initNetgameStats(void)
     if (playeringame[i])
       dofrags += WI_fragSum(i);
 
-  dofrags = !!dofrags; // set to TRUE or FALSE - did we have frags?
+  dofrags = !!dofrags; // set to true or false - did we have frags?
 
   WI_initAnimatedBack();
 }
@@ -1376,7 +1376,7 @@ void WI_updateNetgameStats(void)
     if (!(bcnt&3))
       S_StartSound(0, sfx_pistol);  // pop
 
-    stillticking = FALSE;
+    stillticking = false;
 
     for (i=0 ; i<MAXPLAYERS ; i++)
     {
@@ -1388,7 +1388,7 @@ void WI_updateNetgameStats(void)
       if (cnt_kills[i] >= (plrs[i].skills * 100) / wbs->maxkills)
         cnt_kills[i] = (plrs[i].skills * 100) / wbs->maxkills;
       else
-        stillticking = TRUE; // still got stuff to tally
+        stillticking = true; // still got stuff to tally
     }
 
     if (!stillticking)
@@ -1402,7 +1402,7 @@ void WI_updateNetgameStats(void)
     if (!(bcnt&3))
       S_StartSound(0, sfx_pistol);
 
-    stillticking = FALSE;
+    stillticking = false;
 
     for (i=0 ; i<MAXPLAYERS ; i++)
     {
@@ -1413,7 +1413,7 @@ void WI_updateNetgameStats(void)
       if (cnt_items[i] >= (plrs[i].sitems * 100) / wbs->maxitems)
         cnt_items[i] = (plrs[i].sitems * 100) / wbs->maxitems;
       else
-        stillticking = TRUE;
+        stillticking = true;
     }
 
     if (!stillticking)
@@ -1427,7 +1427,7 @@ void WI_updateNetgameStats(void)
     if (!(bcnt&3))
       S_StartSound(0, sfx_pistol);
 
-    stillticking = FALSE;
+    stillticking = false;
 
     for (i=0 ; i<MAXPLAYERS ; i++)
     {
@@ -1441,7 +1441,7 @@ void WI_updateNetgameStats(void)
       if (cnt_secret[i] >= (wbs->maxsecret ? (plrs[i].ssecret * 100) / wbs->maxsecret : compatibility_level < lxdoom_1_compatibility ? 0 : 100))
         cnt_secret[i] = wbs->maxsecret ? (plrs[i].ssecret * 100) / wbs->maxsecret : 100;
       else
-        stillticking = TRUE;
+        stillticking = true;
     }
 
     if (!stillticking)
@@ -1455,7 +1455,7 @@ void WI_updateNetgameStats(void)
     if (!(bcnt&3))
       S_StartSound(0, sfx_pistol);
 
-    stillticking = FALSE;
+    stillticking = false;
 
     for (i=0 ; i<MAXPLAYERS ; i++)
     {
@@ -1467,7 +1467,7 @@ void WI_updateNetgameStats(void)
       if (cnt_frags[i] >= (fsum = WI_fragSum(i)))
         cnt_frags[i] = fsum;
       else
-        stillticking = TRUE;
+        stillticking = true;
     }
 
     if (!stillticking)
@@ -1679,7 +1679,7 @@ void WI_updateStats(void)
     int time_just, total_just, par_just; // _just_ finished counting?
 
     // Test if counter is below target, then increment, and test again
-    // If the first is FALSE and the second TRUE, we've just gone over
+    // If the first is false and the second true, we've just gone over
 #define UPDATE_COUNT(count, inc, target, done, just) \
     (just) = ((count) >= (target)); \
     (count) += (inc); \
@@ -1809,19 +1809,19 @@ void WI_checkForAccelerate(void)
       {
         if (!player->attackdown)
           acceleratestage = 1;
-        player->attackdown = TRUE;
+        player->attackdown = true;
       }
       else
-        player->attackdown = FALSE;
+        player->attackdown = false;
 
       if (player->cmd.buttons & BT_USE)
       {
         if (!player->usedown)
           acceleratestage = 1;
-        player->usedown = TRUE;
+        player->usedown = true;
       }
       else
-        player->usedown = FALSE;
+        player->usedown = false;
     }
   }
 }
@@ -1842,9 +1842,9 @@ void WI_Ticker(void)
   {
     // intermission music
     if ( gamemode == commercial )
-      S_ChangeMusic(mus_dm2int, TRUE);
+      S_ChangeMusic(mus_dm2int, true);
     else
-      S_ChangeMusic(mus_inter, TRUE);
+      S_ChangeMusic(mus_inter, true);
   }
 
   WI_checkForAccelerate();

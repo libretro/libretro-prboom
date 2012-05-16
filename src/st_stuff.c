@@ -361,7 +361,7 @@ boolean ST_Responder(event_t *ev)
         {
         case AM_MSGENTERED:
           st_gamestate = AutomapState;
-          st_firsttime = TRUE;
+          st_firsttime = true;
           break;
 
         case AM_MSGEXITED:
@@ -372,7 +372,7 @@ boolean ST_Responder(event_t *ev)
   else  // if a user keypress...
     if (ev->type == ev_keydown)       // Try cheat responder in m_cheat.c
       return M_FindCheats(ev->data1); // killough 4/17/98, 5/2/98
-  return FALSE;
+  return false;
 }
 
 static int ST_calcPainOffset(void)
@@ -421,13 +421,13 @@ static void ST_updateFaceWidget(void)
       if (plyr->bonuscount)
         {
           // picking up bonus
-          doevilgrin = FALSE;
+          doevilgrin = false;
 
           for (i=0;i<NUMWEAPONS;i++)
             {
               if (oldweaponsowned[i] != plyr->weaponowned[i])
                 {
-                  doevilgrin = TRUE;
+                  doevilgrin = true;
                   oldweaponsowned[i] = plyr->weaponowned[i];
                 }
             }
@@ -598,7 +598,7 @@ static void ST_updateWidgets(void)
   w_ready.data = plyr->readyweapon;
 
   // if (*w_ready.on)
-  //  STlib_updateNum(&w_ready, TRUE);
+  //  STlib_updateNum(&w_ready, true);
   // refresh weapon change
   //  }
 
@@ -694,8 +694,8 @@ static void ST_doPaletteStuff(void)
     V_SetPalette(st_palette = palette); // CPhipps - use new palette function
 
     // have to redraw the entire status bar when the palette changes
-    // in TRUEcolor modes - POPE
-    st_firsttime = TRUE;
+    // in truecolor modes - POPE
+    st_firsttime = true;
   }
 }
 
@@ -780,16 +780,16 @@ void ST_Drawer(boolean statusbaron, boolean refresh, boolean fullmenu)
     if (st_firsttime)
     {
       /* If just after ST_Start(), refresh all */
-      st_firsttime = FALSE;
+      st_firsttime = false;
       ST_refreshBackground(); // draw status bar background to off-screen buff
       if (!fullmenu)
-        ST_drawWidgets(TRUE); // and refresh all widgets
+        ST_drawWidgets(true); // and refresh all widgets
     }
     else
     {
       /* Otherwise, update as little as possible */
       if (!fullmenu)
-        ST_drawWidgets(FALSE); // update all widgets
+        ST_drawWidgets(false); // update all widgets
     }
   }
 }
@@ -799,7 +799,7 @@ void ST_Drawer(boolean statusbaron, boolean refresh, boolean fullmenu)
 //
 // ST_loadGraphics
 //
-// CPhipps - Loads graphics needed for status bar if doload is TRUE,
+// CPhipps - Loads graphics needed for status bar if doload is true,
 //  unloads them otherwise
 //
 static void ST_loadGraphics(boolean doload)
@@ -878,28 +878,28 @@ static void ST_loadGraphics(boolean doload)
 
 static void ST_loadData(void)
 {
-  ST_loadGraphics(TRUE);
+  ST_loadGraphics(true);
 }
 
 static void ST_unloadData(void)
 {
-  ST_loadGraphics(FALSE);
+  ST_loadGraphics(false);
 }
 
 static void ST_initData(void)
 {
   int i;
 
-  st_firsttime = TRUE;
+  st_firsttime = true;
   plyr = &players[displayplayer];            // killough 3/7/98
 
   st_clock = 0;
   st_chatstate = StartChatState;
   st_gamestate = FirstPersonState;
 
-  st_statusbaron = TRUE;
-  st_oldchat = st_chat = FALSE;
-  st_cursoron = FALSE;
+  st_statusbaron = true;
+  st_oldchat = st_chat = false;
+  st_cursoron = false;
 
   st_faceindex = 0;
   st_palette = -1;
@@ -1072,7 +1072,7 @@ static void ST_createWidgets(void)
                 ST_MAXAMMO3WIDTH);
 }
 
-static boolean st_stopped = TRUE;
+static boolean st_stopped = true;
 
 void ST_Start(void)
 {
@@ -1080,7 +1080,7 @@ void ST_Start(void)
     ST_Stop();
   ST_initData();
   ST_createWidgets();
-  st_stopped = FALSE;
+  st_stopped = false;
 }
 
 static void ST_Stop(void)
@@ -1088,7 +1088,7 @@ static void ST_Stop(void)
   if (st_stopped)
     return;
   V_SetPalette(0);
-  st_stopped = TRUE;
+  st_stopped = true;
 }
 
 void ST_Init(void)

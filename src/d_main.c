@@ -192,12 +192,11 @@ void D_Display (void)
      return;
   }
 
-  static boolean isborderstate        = FALSE;
-  static boolean borderwillneedredraw = FALSE;
+  static boolean isborderstate        = false;
+  static boolean borderwillneedredraw = false;
   static gamestate_t oldgamestate = -1;
   boolean wipe;
-  boolean viewactive = FALSE;
-  boolean isborder = FALSE;
+  boolean viewactive = false, isborder = false;
 
   if (!I_StartDisplay())
     return;
@@ -353,7 +352,7 @@ static void D_PageDrawer(void)
 //
 void D_AdvanceDemo (void)
 {
-  advancedemo = TRUE;
+  advancedemo = true;
 }
 
 /* killough 11/98: functions to perform demo sequences
@@ -458,9 +457,7 @@ static struct
 void D_DoAdvanceDemo(void)
 {
   players[consoleplayer].playerstate = PST_LIVE;  /* not reborn */
-  advancedemo = FALSE;
-  usergame = FALSE;
-  paused = FALSE;
+  advancedemo = usergame = paused = false;
   gameaction = ga_nothing;
 
   pagetic = TICRATE * 11;         /* killough 11/98: default behavior */
@@ -621,7 +618,7 @@ static void CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
     // Lack of wolf-3d levels also detected here
 
     *gmode = indetermined;
-    *hassec = FALSE;
+    *hassec = false;
     if (cm>=30)
     {
       *gmode = commercial;
@@ -934,7 +931,7 @@ static void DoLooseFiles(void)
   boolean skip[MAXARGVS]; // CPhipps - should these be skipped at the end
 
   for (i=0; i<MAXARGVS; i++)
-    skip[i] = FALSE;
+    skip[i] = false;
 
   for (i=1;i<myargc;i++)
   {
@@ -952,7 +949,7 @@ static void DoLooseFiles(void)
       dehs[dehcount++] = strdup(myargv[i]);
     if (myargv[i][j-4] != '.')  // assume wad if no extension
       wads[wadcount++] = strdup(myargv[i]);
-    skip[i] = TRUE; // nuke that entry so it won't repeat later
+    skip[i] = true; // nuke that entry so it won't repeat later
   }
 
   // Now, if we didn't find any loose files, we can just leave.
@@ -960,21 +957,21 @@ static void DoLooseFiles(void)
 
   if ((p = M_CheckParm ("-file")))
   {
-    skip[p] = TRUE;    // nuke the entry
+    skip[p] = true;    // nuke the entry
     while (++p != myargc && *myargv[p] != '-')
     {
       wads[wadcount++] = strdup(myargv[p]);
-      skip[p] = TRUE;  // null any we find and save
+      skip[p] = true;  // null any we find and save
     }
   }
 
   if ((p = M_CheckParm ("-deh")))
   {
-    skip[p] = TRUE;    // nuke the entry
+    skip[p] = true;    // nuke the entry
     while (++p != myargc && *myargv[p] != '-')
     {
       dehs[dehcount++] = strdup(myargv[p]);
-      skip[p] = TRUE;  // null any we find and save
+      skip[p] = true;  // null any we find and save
     }
   }
 
@@ -1033,12 +1030,12 @@ void D_DoomMainSetup(void)
     int i;
 
     do {
-      rsp_found=FALSE;
+      rsp_found=false;
       for (i=0; i<myargc; i++)
         if (myargv[i][0]=='@')
-          rsp_found= TRUE;
+          rsp_found=true;
       FindResponseFile();
-    } while (rsp_found== TRUE);
+    } while (rsp_found==true);
   }
 
   lprintf(LO_INFO,"M_LoadDefaults: Load system defaults.\n");
@@ -1048,7 +1045,7 @@ void D_DoomMainSetup(void)
   if (M_CheckParm ("-forceoldbsp"))
   {
     extern boolean forceOldBsp;
-    forceOldBsp = TRUE;
+    forceOldBsp = true;
   }
 
   D_BuildBEXTables(); // haleyjd
@@ -1126,26 +1123,26 @@ void D_DoomMainSetup(void)
       version_date, doomverstr);
   }
 
-  modifiedgame = FALSE;
+  modifiedgame = false;
 
   // get skill / episode / map from parms
 
   startskill = sk_none; // jff 3/24/98 was sk_medium, just note not picked
   startepisode = 1;
   startmap = 1;
-  autostart = FALSE;
+  autostart = false;
 
   if ((p = M_CheckParm ("-skill")) && p < myargc-1)
     {
       startskill = myargv[p+1][0]-'1';
-      autostart = TRUE;
+      autostart = true;
     }
 
   if ((p = M_CheckParm ("-episode")) && p < myargc-1)
     {
       startepisode = myargv[p+1][0]-'0';
       startmap = 1;
-      autostart = TRUE;
+      autostart = true;
     }
 
   if ((p = M_CheckParm ("-warp")) ||      // killough 5/2/98
@@ -1153,7 +1150,7 @@ void D_DoomMainSetup(void)
        // Ty 08/29/98 - moved this check later so we can have -warp alone: && p < myargc-1)
   {
     startmap = 0; // Ty 08/29/98 - allow "-warp x" to go to first map in wad(s)
-    autostart = TRUE; // Ty 08/29/98 - move outside the decision tree
+    autostart = true; // Ty 08/29/98 - move outside the decision tree
     if (gamemode == commercial)
     {
       if (p < myargc-1)
@@ -1217,7 +1214,7 @@ void D_DoomMainSetup(void)
         lprintf(LO_WARN, "Failed to autoload %s\n", fname);
       else {
         D_AddFile(fpath,source_auto_load);
-        modifiedgame = TRUE;
+        modifiedgame = true;
         free(fpath);
       }
     }
@@ -1232,7 +1229,7 @@ void D_DoomMainSetup(void)
     {
       // the parms after p are wadfile/lump names,
       // until end of parms or another - preceded parm
-      modifiedgame = TRUE;            // homebrew levels
+      modifiedgame = true;            // homebrew levels
       while (++p != myargc && *myargv[p] != '-')
         D_AddFile(myargv[p],source_pwad);
     }
@@ -1410,6 +1407,14 @@ void D_DoomMainSetup(void)
       P_RecordChecksum (myargv[p]);
     }
 
+#if 0
+  if (slot && ++slot < myargc)
+    {
+      slot = atoi(myargv[slot]);        // killough 3/16/98: add slot info
+      G_LoadGame(slot, true);           // killough 5/15/98: add command flag // cph - no filename
+    }
+  else
+#endif
 #ifdef HAVE_NET
       if (autostart || netgame)
 #else
@@ -1437,7 +1442,7 @@ void D_DoomLoop(void)
   //Doom loop
   do
   {
-	  WasRenderedInTryRunTics = FALSE;
+	  WasRenderedInTryRunTics = false;
 
 	  if (ffmap == gamemap) ffmap = 0;
 
@@ -1484,10 +1489,10 @@ void D_DoomDeinit(void)
 void GetFirstMap(int *ep, int *map)
 {
   int i,j; // used to generate map name
-  boolean done = FALSE;  // Ty 09/13/98 - to exit inner loops
+  boolean done = false;  // Ty 09/13/98 - to exit inner loops
   char test[6];  // MAPxx or ExMx plus terminator for testing
   char name[6];  // MAPxx or ExMx plus terminator for display
-  boolean newlevel = FALSE;  // Ty 10/04/98 - to test for new level
+  boolean newlevel = false;  // Ty 10/04/98 - to test for new level
   int ix;  // index for lookup
 
   strcpy(name,""); // initialize
@@ -1507,8 +1512,8 @@ void GetFirstMap(int *ep, int *map)
           {
             *map = i;
             strcpy(name,test);  // Ty 10/04/98
-            done = TRUE;  // Ty 09/13/98
-            newlevel = TRUE; // Ty 10/04/98
+            done = true;  // Ty 09/13/98
+            newlevel = true; // Ty 10/04/98
           }
           else
           {
@@ -1534,8 +1539,8 @@ void GetFirstMap(int *ep, int *map)
               *ep = i;
               *map = j;
               strcpy(name,test); // Ty 10/04/98
-              done = TRUE;  // Ty 09/13/98
-              newlevel = TRUE; // Ty 10/04/98
+              done = true;  // Ty 09/13/98
+              newlevel = true; // Ty 10/04/98
             }
             else
             {

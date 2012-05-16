@@ -74,7 +74,7 @@ static INLINE int P_DivlineSide(fixed_t x, fixed_t y, const divline_t *node)
 
 //
 // P_CrossSubsector
-// Returns TRUE
+// Returns true
 //  if strace crosses the given subsector successfully.
 //
 // killough 4/19/98: made static and cleaned up
@@ -156,7 +156,7 @@ static boolean P_CrossSubsector(int num)
     // solid wrt this LOS
     if (!(line->flags & ML_TWOSIDED) || (openbottom >= opentop) ||
   (opentop < los.minz) || (openbottom > los.maxz))
-  return FALSE;
+  return false;
 
     { // crosses a two sided line
       /* cph 2006/07/15 - oops, we missed this in 2.4.0 & .1;
@@ -179,16 +179,16 @@ static boolean P_CrossSubsector(int num)
         }
 
       if (los.topslope <= los.bottomslope)
-        return FALSE;               // stop
+        return false;               // stop
     }
   }
   // passed the subsector ok
-  return TRUE;
+  return true;
 }
 
 //
 // P_CrossBSPNode
-// Returns TRUE
+// Returns true
 //  if strace crosses the given node successfully.
 //
 // killough 4/20/98: rewritten to remove tail recursion, clean up, and optimize
@@ -248,7 +248,7 @@ static boolean P_CrossBSPNode(int bspnum)
 
 //
 // P_CheckSight
-// Returns TRUE
+// Returns true
 //  if a straight line between t1 and t2 is unobstructed.
 // Uses REJECT.
 //
@@ -266,7 +266,7 @@ boolean P_CheckSight(mobj_t *t1, mobj_t *t2)
   // Check in REJECT table.
 
   if (rejectmatrix[pnum>>3] & (1 << (pnum&7)))   // can't possibly be connected
-    return FALSE;
+    return false;
 
   // killough 4/19/98: make fake floors and ceilings block monster view
 
@@ -281,14 +281,14 @@ boolean P_CheckSight(mobj_t *t1, mobj_t *t2)
          t1->z >= sectors[s2->heightsec].floorheight) ||
         (t2->z >= sectors[s2->heightsec].ceilingheight &&
          t1->z + t2->height <= sectors[s2->heightsec].ceilingheight))))
-    return FALSE;
+    return false;
 
   /* killough 11/98: shortcut for melee situations
    * same subsector? obviously visible
    * cph - compatibility optioned for demo sync, cf HR06-UV.LMP */
   if ((t1->subsector == t2->subsector) &&
       (compatibility_level >= mbf_compatibility))
-    return TRUE;
+    return true;
 
   // An unobstructed LOS is possible.
   // Now look from eyes of t1 to any part of t2.

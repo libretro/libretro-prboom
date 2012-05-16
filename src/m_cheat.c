@@ -297,8 +297,8 @@ char buf[3];
 // 'choppers' invulnerability & chainsaw
 static void cheat_choppers()
 {
-  plyr->weaponowned[wp_chainsaw] = TRUE;
-  plyr->powers[pw_invulnerability] = TRUE;
+  plyr->weaponowned[wp_chainsaw] = true;
+  plyr->powers[pw_invulnerability] = true;
   plyr->message = s_STSTR_CHOPPERS; // Ty 03/27/98 - externalized
 }
 
@@ -343,7 +343,7 @@ static void cheat_fa()
     {
       for (i=0 ; i<NUMAMMO ; i++)
         plyr->maxammo[i] *= 2;
-      plyr->backpack = TRUE;
+      plyr->backpack = true;
     }
 
   plyr->armorpoints = idfa_armor;      // Ty 03/09/98 - deh
@@ -353,7 +353,7 @@ static void cheat_fa()
   for (i=0;i<NUMWEAPONS;i++)
     if (!(((i == wp_plasma || i == wp_bfg) && gamemode == shareware) ||
           (i == wp_supershotgun && gamemode != commercial)))
-      plyr->weaponowned[i] = TRUE;
+      plyr->weaponowned[i] = true;
 
   for (i=0;i<NUMAMMO;i++)
     if (i!=am_cell || gamemode!=shareware)
@@ -368,7 +368,7 @@ static void cheat_k()
   for (i=0;i<NUMCARDS;i++)
     if (!plyr->cards[i])     // only print message if at least one key added
       {                      // however, caller may overwrite message anyway
-        plyr->cards[i] = TRUE;
+        plyr->cards[i] = true;
         plyr->message = "Keys Added";
       }
 }

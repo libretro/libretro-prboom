@@ -540,7 +540,7 @@ lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
   size_t pl;
   
   /* Precalculate a length we will need in the loop */
-  size_t  pl = strlen(wfname) + strlen(ext) + 4;
+  pl = strlen(wfname) + strlen(ext) + 4;
 
   for (i = 0; i < sizeof(search)/sizeof(*search); i++) {
     char  * p;

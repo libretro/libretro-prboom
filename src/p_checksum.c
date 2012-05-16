@@ -3,6 +3,7 @@
 #include <errno.h>
 #include <stdlib.h> /*  */
 
+#include "config.h"
 #include "p_checksum.h"
 #include "md5.h"
 #include "doomstat.h" /* players{,ingame} */

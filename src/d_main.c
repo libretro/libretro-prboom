@@ -1018,7 +1018,7 @@ const char *wad_files[MAXLOADFILES], *deh_files[MAXLOADFILES];
 
 void D_DoomMainSetup(void)
 {
-  int p,slot;
+  int p;
 
   setbuf(stdout,NULL);
 
@@ -1459,6 +1459,9 @@ void D_DoomLoop(void)
 	  }
   } while(!has_exited);
 }
+
+//foward decl
+void M_QuitDOOM(int choice);
 
 void D_DoomDeinit(void)
 {

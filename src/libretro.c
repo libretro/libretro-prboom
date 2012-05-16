@@ -27,6 +27,7 @@
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
 #endif
+#include <math.h>
 #include <errno.h>
 
 /* PS3 values for i_sound.h - check if correct for libretro */
@@ -103,6 +104,7 @@ void I_PreInitGraphics(void);
 void D_DoomDeinit(void);
 void I_SetRes(void);
 void I_UpdateSound(void);
+void M_EndGame(int choice);
 extern int gametic;
 extern int snd_SfxVolume;
 extern int snd_MusicVolume;
@@ -239,7 +241,6 @@ static void extract_directory(char *buf, const char *path, size_t size)
 bool retro_load_game(const struct retro_game_info *info)
 {
    int argc = 0;
-   char vbuf[200];
    static char *argv[32] = {NULL};
 
    extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
@@ -512,8 +513,13 @@ char* I_FindFile(const char* wfname, const char* ext)
   lprintf(LO_ALWAYS, "g_wad_dir: %s\n", g_wad_dir);
 
   p = malloc(strlen(g_wad_dir) + pl);
-  fprintf(stderr, "%s/%s", g_wad_dir, wfname);
+#ifdef _XBOX
+  lprintf(LO_ALWAYS, "%s\\%s\n", g_wad_dir, wfname);
+  sprintf(p, "%s\\%s", g_wad_dir, wfname);
+#else
+  fprintf(LO_ALWAYS, "%s/%s\n", g_wad_dir, wfname);
   sprintf(p, "%s/%s", g_wad_dir, wfname);
+#endif
   lprintf(LO_ALWAYS, "p: %s\n", p);
 
   file = fopen(p, "rb");

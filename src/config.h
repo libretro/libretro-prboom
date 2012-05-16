@@ -93,3 +93,7 @@
 
 /* Define to strncasecmp, if we have it */
 #define strnicmp strncasecmp
+
+#ifdef _MSC_VER
+#define snprintf _snprintf
+#endif

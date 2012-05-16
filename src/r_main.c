@@ -561,7 +561,7 @@ void R_RenderPlayerView (player_t* player)
     if (autodetect_hom)
     { // killough 2/10/98: add flashing red HOM indicators
       unsigned char color=(gametic % 20) < 9 ? 0xb0 : 0;
-      V_FillRect(0, 0, 0, viewwidth, viewheight, color);
+      V_FillRect(0, 0, viewwidth, viewheight, color);
     }
 
   // check for new console commands.

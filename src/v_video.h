@@ -122,7 +122,7 @@ extern void V_CopyRect(int srcx,  int srcy,  int srcscrn,
                              int destx, int desty, int destscrn,
                              enum patch_translation_e flags);
 
-extern void V_FillRect_f(int scrn, int x, int y,
+extern void V_FillRect_f(int x, int y,
                              int width, int height, byte colour);
 
 // CPhipps - patch drawing

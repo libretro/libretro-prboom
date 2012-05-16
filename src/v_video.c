@@ -135,8 +135,7 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
  */
 
 // FIXME: restore v_video.inl
-static INLINE short GETCOL15(byte col)
-  { return VID_PAL15(col, VID_COLORWEIGHTMASK); }
+#define GETCOL15(col) (VID_PAL15(col, VID_COLORWEIGHTMASK))
 
 // draw a stretched 64x64 flat to the top left corner of the screen
 #define V_DRAWFLAT(SCRN, TYPE, GETCOL) { \
@@ -211,10 +210,19 @@ void V_Init (void)
 // (indeed, laziness of the people who wrote the 'clones' of the original V_DrawPatch
 //  means that their inner loops weren't so well optimised, so merging code may even speed them).
 //
+//
+#define COLORS 65536
+
 static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
         int cm, enum patch_translation_e flags)
 {
   const byte *trans;
+  int   col, left, right, top, bottom, w;
+  R_DrawColumn_f colfunc;
+  draw_column_vars_t dcvars;
+  draw_vars_t olddrawvars = drawvars;
+
+  w = (patch->width << 16) - 1; // CPhipps - -1 for faster flipping
 
   if (cm<CR_LIMIT)
     trans=colrngs[cm];
@@ -230,16 +238,6 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
     // CPhipps - move stretched patch drawing code here
     //         - reformat initialisers, move variables into inner blocks
 
-    int   col;
-    int   w = (patch->width << 16) - 1; // CPhipps - -1 for faster flipping
-    int   left, right, top, bottom;
-    int  DX = 1 << 16;
-    int  DXI = 1 << 16;
-    int  DY = 1 << 16;
-    int  DYI = 1 << 16;
-    R_DrawColumn_f colfunc;
-    draw_column_vars_t dcvars;
-    draw_vars_t olddrawvars = drawvars;
 
     R_SetDefaultDrawColumnVars(&dcvars);
 
@@ -254,13 +252,13 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
       colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, drawvars.filterpatch, RDRAW_FILTER_NONE);
     }
 
-    left = ( x * DX ) >> FRACBITS;
-    top = ( y * DY ) >> FRACBITS;
-    right = ( (x + patch->width) * DX ) >> FRACBITS;
-    bottom = ( (y + patch->height) * DY ) >> FRACBITS;
+    left = ( x * COLORS ) >> FRACBITS;
+    top = ( y * COLORS ) >> FRACBITS;
+    right = ( (x + patch->width) * COLORS ) >> FRACBITS;
+    bottom = ( (y + patch->height) * COLORS ) >> FRACBITS;
 
     dcvars.texheight = patch->height;
-    dcvars.iscale = DYI;
+    dcvars.iscale = COLORS;
     dcvars.drawingmasked = MAX(patch->width, patch->height) > 8;
     dcvars.edgetype = drawvars.patch_edges;
 
@@ -275,7 +273,7 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
       col = 0;
     }
 
-    for (dcvars.x=left; dcvars.x<right; dcvars.x++, col+=DXI) {
+    for (dcvars.x=left; dcvars.x<right; dcvars.x++, col+= COLORS) {
       int i;
       const int colindex = (flags & VPT_FLIP) ? ((w - col)>>16): (col>>16);
       const rcolumn_t *column = R_GetPatchColumn(patch, colindex);
@@ -295,8 +293,8 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
         const rpost_t *post = &column->posts[i];
         int yoffset = 0;
 
-        dcvars.yl = (((y + post->topdelta) * DY)>>FRACBITS);
-        dcvars.yh = (((y + post->topdelta + post->length) * DY - (FRACUNIT>>1))>>FRACBITS);
+        dcvars.yl = (((y + post->topdelta) * COLORS)>>FRACBITS);
+        dcvars.yh = (((y + post->topdelta + post->length) * COLORS - (FRACUNIT>>1))>>FRACBITS);
         dcvars.edgeslope = post->slope;
 
         if ((dcvars.yh < 0) || (dcvars.yh < top))
@@ -452,9 +450,9 @@ void V_SetPalette(int pal)
 // V_FillRect
 //
 // CPhipps - New function to fill a rectangle with a given colour
-void V_FillRect(int scrn, int x, int y, int width, int height, byte colour)
+void V_FillRect(int x, int y, int width, int height, byte colour)
 {
-  unsigned short* dest = (unsigned short *)screens[scrn].data + x + y * SURFACE_SHORT_PITCH;
+  unsigned short* dest = (unsigned short *)screens[0].data + x + y * SURFACE_SHORT_PITCH;
   int w;
   short c = VID_PAL15(colour, VID_COLORWEIGHTMASK);
   while (height--) {

@@ -129,8 +129,10 @@ static void W_AddFile(wadfile_info_t *wadfile)
   unsigned    i;
   int         length;
   int         startlump;
-  filelump_t  *fileinfo, *fileinfo2free=NULL; //killough
-  filelump_t  singleinfo;
+  filelump_t  *fileinfo = NULL;
+  filelump_t *fileinfo2free=NULL; //killough
+  filelump_t singleinfo;
+  struct stat statbuf;
 
   // open the file and add to directory
 
@@ -152,7 +154,6 @@ static void W_AddFile(wadfile_info_t *wadfile)
       return;
     }
 
-    struct stat statbuf;
     stat(wadfile->name, &statbuf);
     wadfile->length = statbuf.st_size;
     wadfile->data = malloc(statbuf.st_size);

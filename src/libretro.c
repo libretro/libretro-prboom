@@ -102,6 +102,7 @@ extern void M_QuitDOOM(int choice);
 void I_PreInitGraphics(void);
 void D_DoomDeinit(void);
 void I_SetRes(void);
+void I_UpdateSound(void);
 extern int gametic;
 extern int snd_SfxVolume;
 extern int snd_MusicVolume;
@@ -252,10 +253,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
    myargc = argc;
    myargv = argv;
-
-  /* Version info */
-  lprintf(LO_INFO,"\n");
-  lprintf(LO_INFO,"%s\n",I_GetVersionString(vbuf,200));
 
   Z_Init(); /* 1/18/98 killough: start up memory stuff first */
 
@@ -458,19 +455,6 @@ unsigned long I_GetRandomTimeSeed(void)
 	return 0;
 }
 
-/* cphipps - I_GetVersionString
- * Returns a version string in the given buffer
- */
-const char* I_GetVersionString(char* buf, size_t sz)
-{
-#ifdef HAVE_SNPRINTF
-  snprintf(buf,sz,"%s v%s (http://prboom.sourceforge.net/)",PACKAGE,VERSION);
-#else
-  sprintf(buf,"%s v%s (http://prboom.sourceforge.net/)",PACKAGE,VERSION);
-#endif
-  return buf;
-}
-
 #ifdef PRBOOM_SERVER
 
 /* cphipps - I_SigString
@@ -575,14 +559,6 @@ void I_Init(void)
 #ifndef __LIBRETRO__
   R_InitInterpolation();
 #endif
-}
-
-// killough 2/22/98: Add support for ENDBOOM, which is PC-specific
-
-static void PrintVer(void)
-{
-  char vbuf[200];
-  lprintf(LO_INFO,"%s\n",I_GetVersionString(vbuf,200));
 }
 
 extern void D_Doom_Deinit(void);

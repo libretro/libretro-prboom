@@ -47,11 +47,6 @@ unsigned long I_GetRandomTimeSeed(void); /* cphipps */
 
 void I_uSleep(unsigned long usecs);
 
-/* cphipps - I_GetVersionString
- * Returns a version string in the given buffer
- */
-const char* I_GetVersionString(char* buf, size_t sz);
-
 /* cphipps - I_SigString
  * Returns a string describing a signal number
  */

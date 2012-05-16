@@ -34,12 +34,7 @@
 #include "config.h"
 #endif
 
-#if defined(_WIN32) && !defined(_XBOX)
-#define WIN32_LEAN_AND_MEAN
-#include <windows.h>
-#elif defined(_XBOX)
-#include <xtl.h>
-#else
+#ifndef _WIN32
 #include <sys/mman.h>
 #endif
 

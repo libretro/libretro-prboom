@@ -13,6 +13,8 @@ extern "C" {
 #define false 0
 #else
 #include <stdbool.h>
+#undef true
+#undef false
 #endif
 #endif
 

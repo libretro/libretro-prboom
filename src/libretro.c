@@ -1,13 +1,4 @@
-#ifndef _MSC_VER
-#include <stdbool.h>
-#endif
-
-#if defined(_MSC_VER) && !defined(_XBOX)
-#define EXPORT __declspec(dllexport)
-#else
-#define EXPORT
-#endif
-
+#define LIBRETRO_CORE 1
 #include "config.h"
 #include "libretro.h"
 
@@ -34,7 +25,6 @@
 #include "madplayer.h"
 
 #include <sys/stat.h>
-#include <math.h>
 
 #ifdef HAVE_UNISTD_H
 #include <unistd.h>
@@ -114,7 +104,6 @@ extern void M_QuitDOOM(int choice);
 void I_PreInitGraphics(void);
 void D_DoomDeinit(void);
 void I_SetRes(void);
-void M_EndGame(int choice);
 extern int gametic;
 extern int snd_SfxVolume;
 extern int snd_MusicVolume;
@@ -157,14 +146,18 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
-   info->timing.fps = 60.0;
-   info->timing.sample_rate = 44100.0;
+   info->timing = (struct retro_system_timing) {
+      .fps = 60.0,
+      .sample_rate = 44100.0,
+   };
 
-   info->geometry.base_width = 320;
-   info->geometry.base_height = 200;
-   info->geometry.max_width = 320;
-   info->geometry.max_height = 200;
-   info->geometry.aspect_ratio = 4.0 / 3.0;
+   info->geometry = (struct retro_game_geometry) {
+      .base_width   = 320,
+      .base_height  = 200,
+      .max_width    = 320,
+      .max_height   = 200,
+      .aspect_ratio = 4.0 / 3.0,
+   };
 }
 
 static retro_video_refresh_t video_cb;
@@ -209,8 +202,6 @@ void retro_reset(void)
    M_EndGame(0);
 }
 
-void I_UpdateSound(void);
-
 void retro_run(void)
 {
    D_DoomLoop();
@@ -234,12 +225,10 @@ static void extract_basename(char *buf, const char *path, size_t size)
 
 static void extract_directory(char *buf, const char *path, size_t size)
 {
-   char *base;
-
    strncpy(buf, path, size - 1);
    buf[size - 1] = '\0';
 
-   base = strrchr(buf, '/');
+   char *base = strrchr(buf, '/');
    if (!base)
       base = strrchr(buf, '\\');
 
@@ -535,6 +524,7 @@ boolean HasTrailingSlash(const char* dn)
 
 char* I_FindFile(const char* wfname, const char* ext)
 {
+lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
   // lookup table of directories to search
   static const struct {
     const char *dir; // directory
@@ -548,8 +538,6 @@ char* I_FindFile(const char* wfname, const char* ext)
   int   i;
   FILE *file;
   size_t pl;
-
-  lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
   
   /* Precalculate a length we will need in the loop */
   pl = strlen(wfname) + strlen(ext) + 4;

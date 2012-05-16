@@ -247,7 +247,7 @@ mpoint_t *markpoints = NULL;    // where the points are
 int markpointnum = 0; // next point to be assigned (also number of points now)
 int markpointnum_max = 0;       // killough 2/22/98
 
-static boolean stopped = true;
+static boolean stopped = TRUE;
 
 //
 // AM_activateNewScale()
@@ -527,7 +527,7 @@ void AM_Stop (void)
   AM_unloadPics();
   automapmode &= ~am_active;
   ST_Responder(&st_notify);
-  stopped = true;
+  stopped = TRUE;
 }
 
 //
@@ -546,7 +546,7 @@ void AM_Start(void)
 
   if (!stopped)
     AM_Stop();
-  stopped = false;
+  stopped = FALSE;
   if (lastlevel != gamemap || lastepisode != gameepisode)
   {
     AM_LevelInit();
@@ -600,40 +600,40 @@ boolean AM_Responder
   static int bigstate=0;
   int ch;                                                       // phares
 
-  rc = false;
+  rc = FALSE;
 
   if (!(automapmode & am_active))
   {
     if (ev->type == ev_keydown && ev->data1 == key_map)         // phares
     {
       AM_Start ();
-      rc = true;
+      rc = TRUE;
     }
   }
   else if (ev->type == ev_keydown)
   {
-    rc = true;
+    rc = TRUE;
     ch = ev->data1;                                             // phares
     if (ch == key_map_right)                                    //    |
       if (!(automapmode & am_follow))                           //    V
         m_paninc.x = FTOM(F_PANINC);
       else
-        rc = false;
+        rc = FALSE;
     else if (ch == key_map_left)
       if (!(automapmode & am_follow))
           m_paninc.x = -FTOM(F_PANINC);
       else
-          rc = false;
+          rc = FALSE;
     else if (ch == key_map_up)
       if (!(automapmode & am_follow))
           m_paninc.y = FTOM(F_PANINC);
       else
-          rc = false;
+          rc = FALSE;
     else if (ch == key_map_down)
       if (!(automapmode & am_follow))
           m_paninc.y = -FTOM(F_PANINC);
       else
-          rc = false;
+          rc = FALSE;
     else if (ch == key_map_zoomout)
     {
       mtof_zoommul = M_ZOOMOUT;
@@ -696,12 +696,12 @@ boolean AM_Responder
     else                                                        // phares
     {
       cheatstate=0;
-      rc = false;
+      rc = FALSE;
     }
   }
   else if (ev->type == ev_keyup)
   {
-    rc = false;
+    rc = FALSE;
     ch = ev->data1;
     if (ch == key_map_right)
     {
@@ -881,7 +881,7 @@ static boolean AM_clipMline
   outcode2 = BOTTOM;
 
   if (outcode1 & outcode2)
-  return false; // trivially outside
+  return FALSE; // trivially outside
 
   if (ml->a.x < m_x)
   outcode1 |= LEFT;
@@ -894,7 +894,7 @@ static boolean AM_clipMline
   outcode2 |= RIGHT;
 
   if (outcode1 & outcode2)
-  return false; // trivially outside
+  return FALSE; // trivially outside
 
   // transform to frame-buffer coordinates.
   fl->a.x = CXMTOF(ml->a.x);
@@ -906,7 +906,7 @@ static boolean AM_clipMline
   DOOUTCODE(outcode2, fl->b.x, fl->b.y);
 
   if (outcode1 & outcode2)
-  return false;
+  return FALSE;
 
   while (outcode1 | outcode2)
   {
@@ -959,10 +959,10 @@ static boolean AM_clipMline
     }
 
     if (outcode1 & outcode2)
-      return false; // trivially outside
+      return FALSE; // trivially outside
   }
 
-  return true;
+  return TRUE;
 }
 #undef DOOUTCODE
 

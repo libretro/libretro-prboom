@@ -36,7 +36,7 @@
 #include "r_demo.h"
 #include "r_fps.h"
 
-int demo_smoothturns = false;
+int demo_smoothturns = FALSE;
 int demo_smoothturnsfactor = 6;
 
 static int smooth_playing_turns[SMOOTH_PLAYING_MAXFACTOR];

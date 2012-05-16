@@ -112,7 +112,7 @@ void T_PlatRaise(plat_t* plat)
       break;
 
     case down: // plat moving down
-      res = T_MovePlane(plat->sector,plat->speed,plat->low,false,0,-1);
+      res = T_MovePlane(plat->sector,plat->speed,plat->low,FALSE,0,-1);
 
       // handle reaching end of down stroke
       if (res == pastdest)
@@ -175,7 +175,7 @@ void T_PlatRaise(plat_t* plat)
 //
 // Passed the linedef that activated the plat, the type of plat action,
 // and for some plat types, an amount to raise
-// Returns true if a thinker is started, or restarted from stasis
+// Returns TRUE if a thinker is started, or restarted from stasis
 //
 int EV_DoPlat
 ( line_t*       line,
@@ -226,7 +226,7 @@ int EV_DoPlat
     plat->sector = sec;
     plat->sector->floordata = plat; //jff 2/23/98 multiple thinkers
     plat->thinker.function = T_PlatRaise;
-    plat->crush = false;
+    plat->crush = FALSE;
     plat->tag = line->tag;
 
     //jff 1/26/98 Avoid raise plat bouncing a head off a ceiling and then
@@ -306,7 +306,7 @@ int EV_DoPlat
       case toggleUpDn: //jff 3/14/98 add new type to support instant toggle
         plat->speed = PLATSPEED;  //not used
         plat->wait = 35*PLATWAIT; //not used
-        plat->crush = true; //jff 3/14/98 crush anything in the way
+        plat->crush = TRUE; //jff 3/14/98 crush anything in the way
 
         // set up toggling between ceiling, floor inclusive
         plat->low = sec->ceilingheight;
@@ -362,7 +362,7 @@ void P_ActivateInStasis(int tag)
 // Handler for "stop perpetual floor" linedef type
 //
 // Passed the linedef that stopped the plat
-// Returns true if a plat was put in stasis
+// Returns TRUE if a plat was put in stasis
 //
 // jff 2/12/98 added int return value, fixed return
 //

@@ -124,7 +124,7 @@ void T_VerticalDoor (vldoor_t* door)
               door->sector,
               door->speed,
               door->sector->floorheight,
-              false,
+              FALSE,
               1,
               door->direction
             );
@@ -221,7 +221,7 @@ void T_VerticalDoor (vldoor_t* door)
               door->sector,
               door->speed,
               door->topheight,
-              false,
+              FALSE,
               1,
               door->direction
             );
@@ -289,7 +289,7 @@ void T_VerticalDoor (vldoor_t* door)
 //
 // Passed the line activating the door, the type of door,
 // and the thing that activated the line
-// Returns true if a thinker created
+// Returns TRUE if a thinker created
 //
 int EV_DoLockedDoor
 ( line_t* line,
@@ -348,7 +348,7 @@ int EV_DoLockedDoor
 // Handle opening a tagged door
 //
 // Passed the line activating the door and the type of door
-// Returns true if a thinker created
+// Returns TRUE if a thinker created
 //
 int EV_DoDoor
 ( line_t* line,
@@ -441,7 +441,7 @@ int EV_DoDoor
 // Handle opening a door manually, no tag value
 //
 // Passed the line activating the door and the thing activating it
-// Returns true if a thinker created
+// Returns TRUE if a thinker created
 //
 // jff 2/12/98 added int return value, fixed all returns
 //

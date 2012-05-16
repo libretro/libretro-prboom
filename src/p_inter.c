@@ -90,7 +90,7 @@ int clipammo[NUMAMMO] = { 10,  4,  20,  1};
 // P_GiveAmmo
 // Num is the number of clip loads,
 // not the individual count (0= 1/2 clip).
-// Returns false if the ammo can't be picked up at all
+// Returns FALSE if the ammo can't be picked up at all
 //
 
 static boolean P_GiveAmmo(player_t *player, ammotype_t ammo, int num)
@@ -98,10 +98,10 @@ static boolean P_GiveAmmo(player_t *player, ammotype_t ammo, int num)
   int oldammo;
 
   if (ammo == am_noammo)
-    return false;
+    return FALSE;
 
   if ( player->ammo[ammo] == player->maxammo[ammo]  )
-    return false;
+    return FALSE;
 
   if (num)
     num *= clipammo[ammo];
@@ -120,7 +120,7 @@ static boolean P_GiveAmmo(player_t *player, ammotype_t ammo, int num)
 
   // If non zero ammo, don't change up weapons, player was lower on purpose.
   if (oldammo)
-    return true;
+    return TRUE;
 
   // We were down to zero, so select a new weapon.
   // Preferences are not user selectable.
@@ -155,7 +155,7 @@ static boolean P_GiveAmmo(player_t *player, ammotype_t ammo, int num)
     default:
       break;
     }
-  return true;
+  return TRUE;
 }
 
 //
@@ -172,10 +172,10 @@ static boolean P_GiveWeapon(player_t *player, weapontype_t weapon, boolean dropp
     {
       // leave placed weapons forever on net games
       if (player->weaponowned[weapon])
-        return false;
+        return FALSE;
 
       player->bonuscount += BONUSADD;
-      player->weaponowned[weapon] = true;
+      player->weaponowned[weapon] = TRUE;
 
       P_GiveAmmo(player, weaponinfo[weapon].ammo, deathmatch ? 5 : 2);
 
@@ -185,7 +185,7 @@ static boolean P_GiveWeapon(player_t *player, weapontype_t weapon, boolean dropp
       // displayplayer, not consoleplayer, for viewing multiplayer demos
       if (!comp[comp_sound] || player == &players[displayplayer])
         S_StartSound (player->mo, sfx_wpnup|PICKUP_SOUND); // killough 4/25/98
-      return false;
+      return FALSE;
     }
 
   if (weaponinfo[weapon].ammo != am_noammo)
@@ -195,14 +195,14 @@ static boolean P_GiveWeapon(player_t *player, weapontype_t weapon, boolean dropp
       gaveammo = P_GiveAmmo (player, weaponinfo[weapon].ammo, dropped ? 1 : 2);
     }
   else
-    gaveammo = false;
+    gaveammo = FALSE;
 
   if (player->weaponowned[weapon])
-    gaveweapon = false;
+    gaveweapon = FALSE;
   else
     {
-      gaveweapon = true;
-      player->weaponowned[weapon] = true;
+      gaveweapon = TRUE;
+      player->weaponowned[weapon] = TRUE;
       player->pendingweapon = weapon;
     }
   return gaveweapon || gaveammo;
@@ -210,23 +210,23 @@ static boolean P_GiveWeapon(player_t *player, weapontype_t weapon, boolean dropp
 
 //
 // P_GiveBody
-// Returns false if the body isn't needed at all
+// Returns FALSE if the body isn't needed at all
 //
 
 static boolean P_GiveBody(player_t *player, int num)
 {
   if (player->health >= maxhealth)
-    return false; // Ty 03/09/98 externalized MAXHEALTH to maxhealth
+    return FALSE; // Ty 03/09/98 externalized MAXHEALTH to maxhealth
   player->health += num;
   if (player->health > maxhealth)
     player->health = maxhealth;
   player->mo->health = player->health;
-  return true;
+  return TRUE;
 }
 
 //
 // P_GiveArmor
-// Returns false if the armor is worse
+// Returns FALSE if the armor is worse
 // than the current armor.
 //
 
@@ -234,10 +234,10 @@ static boolean P_GiveArmor(player_t *player, int armortype)
 {
   int hits = armortype*100;
   if (player->armorpoints >= hits)
-    return false;   // don't pick up
+    return FALSE;   // don't pick up
   player->armortype = armortype;
   player->armorpoints = hits;
-  return true;
+  return TRUE;
 }
 
 //
@@ -272,7 +272,7 @@ boolean P_GivePower(player_t *player, int power)
         break;
       case pw_allmap:
         if (player->powers[pw_allmap])
-          return false;
+          return FALSE;
         break;
       case pw_strength:
         P_GiveBody(player,100);
@@ -283,7 +283,7 @@ boolean P_GivePower(player_t *player, int power)
 
   if (player->powers[power] >= 0)
     player->powers[power] = tics[power];
-  return true;
+  return TRUE;
 }
 
 //
@@ -536,7 +536,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         {
           for (i=0 ; i<NUMAMMO ; i++)
             player->maxammo[i] *= 2;
-          player->backpack = true;
+          player->backpack = TRUE;
         }
       for (i=0 ; i<NUMAMMO ; i++)
         P_GiveAmmo (player, i, 1);
@@ -545,7 +545,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
 
         // weapons
     case SPR_BFUG:
-      if (!P_GiveWeapon (player, wp_bfg, false) )
+      if (!P_GiveWeapon (player, wp_bfg, FALSE) )
         return;
       player->message = s_GOTBFG9000; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
@@ -559,21 +559,21 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       break;
 
     case SPR_CSAW:
-      if (!P_GiveWeapon (player, wp_chainsaw, false) )
+      if (!P_GiveWeapon (player, wp_chainsaw, FALSE) )
         return;
       player->message = s_GOTCHAINSAW; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
       break;
 
     case SPR_LAUN:
-      if (!P_GiveWeapon (player, wp_missile, false) )
+      if (!P_GiveWeapon (player, wp_missile, FALSE) )
         return;
       player->message = s_GOTLAUNCHER; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
       break;
 
     case SPR_PLAS:
-      if (!P_GiveWeapon (player, wp_plasma, false) )
+      if (!P_GiveWeapon (player, wp_plasma, FALSE) )
         return;
       player->message = s_GOTPLASMA; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
@@ -740,7 +740,7 @@ static void P_KillMobj(mobj_t *source, mobj_t *target)
 void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
 {
   player_t *player;
-  boolean justhit = false;          /* killough 11/98 */
+  boolean justhit = FALSE;          /* killough 11/98 */
 
   /* killough 8/31/98: allow bouncers to take damage */
   if (!(target->flags & (MF_SHOOTABLE | MF_BOUNCES)))
@@ -862,7 +862,7 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
   if (P_Random (pr_painchance) < target->info->painchance &&
       !(target->flags & MF_SKULLFLY)) { //killough 11/98: see below
     if (mbf_features)
-      justhit = true;
+      justhit = TRUE;
     else
       target->flags |= MF_JUSTHIT;    // fight back!
 

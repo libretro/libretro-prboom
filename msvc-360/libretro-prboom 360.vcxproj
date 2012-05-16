@@ -749,7 +749,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;_XBOX;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE="_inline";FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_XBOX;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -769,7 +769,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;_XBOX;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE="_inline";FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_XBOX;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -790,7 +790,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;PROFILE;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE="_inline";FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;PROFILE;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -815,7 +815,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;PROFILE;FASTCAP;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE="_inline";FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;PROFILE;FASTCAP;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -837,7 +837,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE="_inline";FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -859,7 +859,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;LTCG;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE="_inline";FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;LTCG;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>

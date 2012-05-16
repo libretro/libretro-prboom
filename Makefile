@@ -21,7 +21,7 @@ LMADSRCDIR = libmad
 ifeq ($(platform), unix)
    TARGET := libretro.so
    fpic := -fPIC
-   SHARED := -shared -Wl,--version-script=src/libretro/link.T -Wl,-no-undefined
+   SHARED := -shared -Wl,--version-script=src/link.T -Wl,-no-undefined
    CFLAGS += -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT
 else ifeq ($(platform), osx)
    TARGET := libretro.dylib
@@ -50,7 +50,7 @@ else ifeq ($(platform), wii)
 else
    TARGET := retro.dll
    CC = gcc
-   SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=src/libretro/link.T
+   SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=src/link.T
    CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__ -DHAVE_LIBMAD -DMUSIC_SUPPORT -Wno-missing-field-initializers -DHAVE_STRLWR -DNO_ASM_BYTEORDER
 endif
 

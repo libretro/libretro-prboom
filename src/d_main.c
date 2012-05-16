@@ -185,19 +185,19 @@ extern int     showMessages;
 
 void D_Display (void)
 {
-  static boolean isborderstate        = FALSE;
-  static boolean borderwillneedredraw = FALSE;
-  static gamestate_t oldgamestate = -1;
-  boolean wipe;
-  boolean viewactive = FALSE;
-  boolean isborder = FALSE;
-
   // Reentrancy.
   if (in_d_wipe)
   {
      D_Wipe();
      return;
   }
+
+  static boolean isborderstate        = FALSE;
+  static boolean borderwillneedredraw = FALSE;
+  static gamestate_t oldgamestate = -1;
+  boolean wipe;
+  boolean viewactive = FALSE;
+  boolean isborder = FALSE;
 
   if (!I_StartDisplay())
     return;
@@ -1022,7 +1022,7 @@ const char *wad_files[MAXLOADFILES], *deh_files[MAXLOADFILES];
 
 void D_DoomMainSetup(void)
 {
-  int p;
+  int p,slot;
 
   setbuf(stdout,NULL);
 

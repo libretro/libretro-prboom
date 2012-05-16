@@ -219,10 +219,11 @@ static void extract_basename(char *buf, const char *path, size_t size)
 
 static void extract_directory(char *buf, const char *path, size_t size)
 {
+   char *base;
    strncpy(buf, path, size - 1);
    buf[size - 1] = '\0';
 
-   char *base = strrchr(buf, '/');
+   base = strrchr(buf, '/');
    if (!base)
       base = strrchr(buf, '\\');
 

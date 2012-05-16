@@ -20,18 +20,11 @@
  * so by contacting: Underbit Technologies, Inc. <info@underbit.com>
  */
 
-# ifdef __cplusplus
-extern "C" {
-# endif
-
 # define FPM_INTEL
-
-
 
 # define SIZEOF_INT 4
 # define SIZEOF_LONG 4
 # define SIZEOF_LONG_LONG 8
-
 
 /* Id: version.h,v 1.26 2004/01/23 09:41:33 rob Exp */
 
@@ -861,8 +854,4 @@ int mad_decoder_finish(struct mad_decoder *);
 int mad_decoder_run(struct mad_decoder *, enum mad_decoder_mode);
 int mad_decoder_message(struct mad_decoder *, void *, unsigned int *);
 
-# endif
-
-# ifdef __cplusplus
-}
 # endif

@@ -4,10 +4,7 @@
 #include <stdint.h>
 #include <stddef.h>
 
-#ifdef __cplusplus
-extern "C" {
-#else
-#if defined(_MSC_VER) && !defined(__cplusplus)
+#if defined(_MSC_VER)
 #define bool unsigned char
 #define true 1
 #define false 0
@@ -15,7 +12,6 @@ extern "C" {
 #include <stdbool.h>
 #undef true
 #undef false
-#endif
 #endif
 
 #define RETRO_API_VERSION         1
@@ -275,9 +271,5 @@ unsigned retro_get_region(void);
 // Gets region of memory.
 void *retro_get_memory_data(unsigned id);
 size_t retro_get_memory_size(unsigned id);
-
-#ifdef __cplusplus
-}
-#endif
 
 #endif

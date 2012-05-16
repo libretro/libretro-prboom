@@ -392,7 +392,7 @@ int R_ColormapNumForName(const char *name)
  *  obsoletes old c_scalelight stuff
  */
 
-static inline int between(int l,int u,int x)
+static INLINE int between(int l,int u,int x)
 { return (l > x ? l : x > u ? u : x); }
 
 const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
@@ -519,7 +519,7 @@ int PUREFUNC R_SafeTextureNumForName(const char *name, int snum)
 // to avoid using alloca(), and to improve performance.
 // cph - new wad lump handling, calls cache functions but acquires no locks
 
-static inline void precache_lump(int l)
+static INLINE void precache_lump(int l)
 {
   W_CacheLumpNum(l); W_UnlockLumpNum(l);
 }

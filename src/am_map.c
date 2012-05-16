@@ -1542,7 +1542,7 @@ static void AM_drawMarks(void)
 //
 // CPhipps - made static inline, and use the general pixel plotter function
 
-inline static void AM_drawCrosshair(int color)
+static INLINE void AM_drawCrosshair(int color)
 {
   fline_t line;
 

@@ -46,7 +46,7 @@ struct block_memory_alloc_s name = { NULL, size, num, tag, desc}
 
 void* Z_BMalloc(struct block_memory_alloc_s *pzone);
 
-inline static void* Z_BCalloc(struct block_memory_alloc_s *pzone)
+static INLINE void* Z_BCalloc(struct block_memory_alloc_s *pzone)
 { void *p = Z_BMalloc(pzone); memset(p,0,pzone->size); return p; }
 
 void Z_BFree(struct block_memory_alloc_s *pzone, void* p);

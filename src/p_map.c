@@ -2010,14 +2010,14 @@ boolean P_CheckSector(sector_t* sector,boolean crunch)
 
 IMPLEMENT_BLOCK_MEMORY_ALLOC_ZONE(secnodezone, sizeof(msecnode_t), PU_LEVEL, 32, "SecNodes");
 
-inline static msecnode_t* P_GetSecnode(void)
+static INLINE msecnode_t* P_GetSecnode(void)
 {
   return (msecnode_t*)Z_BMalloc(&secnodezone);
 }
 
 // P_PutSecnode() returns a node to the freelist.
 
-inline static void P_PutSecnode(msecnode_t* node)
+static INLINE void P_PutSecnode(msecnode_t* node)
 {
   Z_BFree(&secnodezone, node);
 }

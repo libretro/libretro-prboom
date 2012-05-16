@@ -135,7 +135,7 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
  */
 
 // FIXME: restore v_video.inl
-static inline short GETCOL15(byte col)
+static INLINE short GETCOL15(byte col)
   { return VID_PAL15(col, VID_COLORWEIGHTMASK); }
 
 // draw a stretched 64x64 flat to the top left corner of the screen

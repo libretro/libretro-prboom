@@ -72,7 +72,7 @@ const music_player_t mp_player =
 #include <string.h>
 #include "lprintf.h"
 
-#include <mad.h>
+#include "../libmad/mad.h"
 
 #include "i_sound.h"
 
@@ -212,7 +212,7 @@ static void mp_stop (void)
 }
 
 // convert from mad's internal fixed point representation
-static inline short mp_fixtoshort (mad_fixed_t f)
+static INLINE short mp_fixtoshort (mad_fixed_t f)
 {
   // clip
   if (f < -MAD_F_ONE)

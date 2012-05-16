@@ -55,7 +55,7 @@ typedef struct {
   unsigned tic;        // Timestamp
 } PACKEDATTR packet_header_t;
 
-static inline void packet_set(packet_header_t* p, enum packet_type_e t, unsigned long tic)
+static INLINE void packet_set(packet_header_t* p, enum packet_type_e t, unsigned long tic)
 { p->tic = doom_htonl(tic); p->type = t; p->reserved[0] = 0; p->reserved[1] = 0; }
 
 #ifndef GAME_OPTIONS_SIZE
@@ -76,14 +76,14 @@ struct setup_packet_s {
  *       it means gcc won't assume alignment so won't make false assumptions
  *       when optimising. So I'm told.
  */
-inline static void RawToTic(ticcmd_t* dst, const void* src)
+static INLINE void RawToTic(ticcmd_t* dst, const void* src)
 {
   memcpy(dst,src,sizeof *dst);
   dst->angleturn = doom_ntohs(dst->angleturn);
   dst->consistancy = doom_ntohs(dst->consistancy);
 }
 
-inline static void TicToRaw(void* dst, const ticcmd_t* src)
+static INLINE void TicToRaw(void* dst, const ticcmd_t* src)
 {
   /* We have to make a copy of the source struct, then do byte swaps,
    * and fnially copy to the destination (can't do the swaps in the

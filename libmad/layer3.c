@@ -1512,8 +1512,7 @@ enum mad_error III_stereo(mad_fixed_t xr[2][576],
  * NAME:	III_aliasreduce()
  * DESCRIPTION:	perform frequency line alias reduction
  */
-static
-void III_aliasreduce(mad_fixed_t xr[576], int lines)
+static void III_aliasreduce(mad_fixed_t xr[576], int lines)
 {
   mad_fixed_t const *bound;
   int i;
@@ -1551,8 +1550,7 @@ void III_aliasreduce(mad_fixed_t xr[576], int lines)
 void III_imdct_l(mad_fixed_t const [18], mad_fixed_t [36], unsigned int);
 # else
 #  if 1
-static
-void fastsdct(mad_fixed_t const x[9], mad_fixed_t y[18])
+static void fastsdct(mad_fixed_t const x[9], mad_fixed_t y[18])
 {
   mad_fixed_t a0,  a1,  a2,  a3,  a4,  a5,  a6,  a7,  a8,  a9,  a10, a11, a12;
   mad_fixed_t a13, a14, a15, a16, a17, a18, a19, a20, a21, a22, a23, a24, a25;
@@ -1619,8 +1617,7 @@ void fastsdct(mad_fixed_t const x[9], mad_fixed_t y[18])
   y[16] = a22 + m7;
 }
 
-static inline
-void sdctII(mad_fixed_t const x[18], mad_fixed_t X[18])
+static INLINE void sdctII(mad_fixed_t const x[18], mad_fixed_t X[18])
 {
   mad_fixed_t tmp[9];
   int i;
@@ -1664,8 +1661,7 @@ void sdctII(mad_fixed_t const x[18], mad_fixed_t X[18])
   }
 }
 
-static inline
-void dctIV(mad_fixed_t const y[18], mad_fixed_t X[18])
+static INLINE void dctIV(mad_fixed_t const y[18], mad_fixed_t X[18])
 {
   mad_fixed_t tmp[18];
   int i;
@@ -1708,8 +1704,7 @@ void dctIV(mad_fixed_t const y[18], mad_fixed_t X[18])
  * NAME:	imdct36
  * DESCRIPTION:	perform X[18]->x[36] IMDCT using Szu-Wei Lee's fast algorithm
  */
-static inline
-void imdct36(mad_fixed_t const x[18], mad_fixed_t y[36])
+static INLINE void imdct36(mad_fixed_t const x[18], mad_fixed_t y[36])
 {
   mad_fixed_t tmp[18];
   int i;
@@ -2247,8 +2242,7 @@ void III_overlap(mad_fixed_t const output[36], mad_fixed_t overlap[18],
  * NAME:	III_overlap_z()
  * DESCRIPTION:	perform "overlap-add" of zero IMDCT outputs
  */
-static inline
-void III_overlap_z(mad_fixed_t overlap[18],
+static INLINE void III_overlap_z(mad_fixed_t overlap[18],
 		   mad_fixed_t sample[18][32], unsigned int sb)
 {
   unsigned int i;

@@ -131,8 +131,7 @@ extern int        numlumps;
 int     (W_FindNumFromName)(const char *name, int ns, int lump);
 int     W_ListNumFromName(const char *name, int lump);
 #define W_CheckNumForName(name) (W_CheckNumForName)(name, ns_global)
-static inline
-int     (W_CheckNumForName)(const char *name, int ns)
+static INLINE int     (W_CheckNumForName)(const char *name, int ns)
         { return (W_FindNumFromName)(name, ns, -1); }
 int     W_GetNumForName (const char* name);
 int     W_LumpLength (int lump);

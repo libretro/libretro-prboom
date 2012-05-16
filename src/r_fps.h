@@ -39,7 +39,7 @@
 
 extern int movement_smooth;
 
-void R_InterpolateView (player_t *player);
+extern void R_InterpolateView (player_t *player);
 
 extern boolean WasRenderedInTryRunTics;
 

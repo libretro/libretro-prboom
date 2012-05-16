@@ -710,7 +710,7 @@ int EV_DoChange
  * stairs
  * - Boom fixed the bug, and MBF/PrBoom without comp_stairs work right
  */
-static inline int P_FindSectorFromLineTagWithLowerBound
+static INLINE int P_FindSectorFromLineTagWithLowerBound
 (line_t* l, int start, int min)
 {
   /* Emulate original Doom's linear lower-bounded P_FindSectorFromLineTag

@@ -669,13 +669,13 @@ static void NormalizeSlashes(char *str)
  */
 static char *FindIWADFile(void)
 {
-  int   i;
+  int   i, x;
   char  * iwad  = NULL;
 
   i = M_CheckParm("-iwad");
   lprintf(LO_ALWAYS, "i: %d\n", i);
 
-  for(int x = 0; x < 32; x++)
+  for(x = 0; x < 32; x++)
      lprintf(LO_ALWAYS, "myargv[%d]: %s\n", x, myargv[x]);
 
   if (i && (++i < myargc)) {

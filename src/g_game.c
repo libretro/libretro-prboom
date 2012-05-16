@@ -244,7 +244,7 @@ static const byte* G_ReadDemoHeader(const byte* demo_p, size_t size, boolean fai
 // or reads it from the demo buffer.
 // If recording a demo, write it out
 //
-static inline signed char fudgef(signed char b)
+static INLINE signed char fudgef(signed char b)
 {
   static int c;
   if (!b || !demo_compatibility || longtics) return b;
@@ -253,7 +253,7 @@ static inline signed char fudgef(signed char b)
   return b;
 }
 
-static inline signed short fudgea(signed short b)
+static INLINE signed short fudgea(signed short b)
 {
   if (!b || !demo_compatibility || !longtics) return b;
   b |= 1; if (b>2) b-=2;

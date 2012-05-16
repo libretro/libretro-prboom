@@ -61,7 +61,7 @@ static los_t los; // cph - made static
 //
 // killough 4/19/98: made static, cleaned up
 
-inline static int P_DivlineSide(fixed_t x, fixed_t y, const divline_t *node)
+static INLINE int P_DivlineSide(fixed_t x, fixed_t y, const divline_t *node)
 {
   fixed_t left, right;
   return

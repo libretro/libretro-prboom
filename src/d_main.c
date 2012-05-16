@@ -185,18 +185,17 @@ extern int     showMessages;
 
 void D_Display (void)
 {
+  boolean wipe, viewactive, isborder;
+  static boolean isborderstate        = FALSE;
+  static boolean borderwillneedredraw = FALSE;
+  static gamestate_t oldgamestate = -1;
+
   // Reentrancy.
   if (in_d_wipe)
   {
      D_Wipe();
      return;
   }
-
-  static boolean isborderstate        = FALSE;
-  static boolean borderwillneedredraw = FALSE;
-  static gamestate_t oldgamestate = -1;
-  boolean wipe;
-  boolean viewactive = FALSE, isborder = FALSE;
 
   if (!I_StartDisplay())
     return;

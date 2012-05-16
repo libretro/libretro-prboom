@@ -214,7 +214,11 @@ void V_Init (void)
 static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
         int cm, enum patch_translation_e flags)
 {
+  int col, w, left, right, top, bottom, DX, DXI, DY, DYI;
   const byte *trans;
+  R_DrawColumn_f colfunc;
+  draw_column_vars_t dcvars;
+  draw_vars_t olddrawvars; 
 
   if (cm<CR_LIMIT)
     trans=colrngs[cm];
@@ -230,16 +234,13 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
     // CPhipps - move stretched patch drawing code here
     //         - reformat initialisers, move variables into inner blocks
 
-    int   col;
-    int   w = (patch->width << 16) - 1; // CPhipps - -1 for faster flipping
-    int   left, right, top, bottom;
-    int  DX = 1 << 16;
-    int  DXI = 1 << 16;
-    int  DY = 1 << 16;
-    int  DYI = 1 << 16;
-    R_DrawColumn_f colfunc;
-    draw_column_vars_t dcvars;
-    draw_vars_t olddrawvars = drawvars;
+    w = (patch->width << 16) - 1; // CPhipps - -1 for faster flipping
+
+    DX = 1 << 16;
+    DXI = 1 << 16;
+    DY = 1 << 16;
+    DYI = 1 << 16;
+    olddrawvars = drawvars;
 
     R_SetDefaultDrawColumnVars(&dcvars);
 

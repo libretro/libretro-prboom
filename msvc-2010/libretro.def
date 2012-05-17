@@ -2,6 +2,7 @@ LIBRARY "libretro-prboom msvc2010"
 EXPORTS
 retro_set_environment
 retro_set_video_refresh
+retro_set_audio_sample
 retro_set_audio_sample_batch
 retro_set_input_poll
 retro_set_input_state

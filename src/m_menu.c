@@ -876,8 +876,6 @@ static void M_DoSave(int slot)
     quickSaveSlot = slot;
 }
 
-extern wbstartstruct_t *wbs;
-
 //
 // User wants to save. Start string input for M_Responder
 //

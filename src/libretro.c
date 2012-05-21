@@ -1,4 +1,3 @@
-#define LIBRETRO_CORE 1
 #include "libretro.h"
 
 /* prboom includes */

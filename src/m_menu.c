@@ -36,6 +36,7 @@
  *-----------------------------------------------------------------------------*/
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <fcntl.h>
 
 #include "doomdef.h"
@@ -853,11 +854,13 @@ void M_DrawSave(void)
     M_WriteText(LoadDef.x,LoadDef.y+LINEHEIGHT*i,savegamestrings[i], CR_DEFAULT);
     }
 
+#if 0
   if (saveStringEnter)
     {
     i = M_StringWidth(savegamestrings[saveSlot]);
     M_WriteText(LoadDef.x + i,LoadDef.y+LINEHEIGHT*saveSlot,"_", CR_DEFAULT);
     }
+#endif
 }
 
 //
@@ -873,6 +876,8 @@ static void M_DoSave(int slot)
     quickSaveSlot = slot;
 }
 
+extern wbstartstruct_t *wbs;
+
 //
 // User wants to save. Start string input for M_Responder
 //
@@ -881,10 +886,14 @@ void M_SaveSelect(int choice)
   // we are going to be intercepting all chars
   saveStringEnter = 1;
 
+  char lname[9];
   saveSlot = choice;
   strcpy(saveOldString,savegamestrings[choice]);
-  if (!strcmp(savegamestrings[choice],s_EMPTYSTRING)) // Ty 03/27/98 - externalized
-    savegamestrings[choice][0] = 0;
+  savegamestrings[choice][0] = 'S';
+  savegamestrings[choice][1] = 'A';
+  savegamestrings[choice][2] = 'V';
+  savegamestrings[choice][3] = 'E';
+  savegamestrings[choice][4] = 0;
   saveCharIndex = strlen(savegamestrings[choice]);
 }
 
@@ -3975,22 +3984,13 @@ boolean M_Responder (event_t* ev) {
   // Save Game string input
 
   if (saveStringEnter) {
-    if (ch == key_menu_backspace)                            // phares 3/7/98
-      {
-      if (saveCharIndex > 0)
-        {
-        saveCharIndex--;
-        savegamestrings[saveSlot][saveCharIndex] = 0;
-        }
-      }
-
-      else if (ch == key_menu_escape)                    // phares 3/7/98
+      if (ch == key_use)                    // phares 3/7/98
   {
     saveStringEnter = 0;
     strcpy(&savegamestrings[saveSlot][0],saveOldString);
   }
 
-      else if (ch == key_menu_enter)                     // phares 3/7/98
+      else if (ch == key_fire)                     // phares 3/7/98
   {
     saveStringEnter = 0;
     if (savegamestrings[saveSlot][0])

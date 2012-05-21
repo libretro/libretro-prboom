@@ -309,7 +309,7 @@ static int    me;
 static stateenum_t  state;
 
 // contains information passed into intermission
-static wbstartstruct_t* wbs;
+wbstartstruct_t* wbs;
 
 static wbplayerstruct_t* plrs;  // wbs->plyr[]
 

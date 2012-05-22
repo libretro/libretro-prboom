@@ -197,6 +197,11 @@ void retro_reset(void)
    M_EndGame(0);
 }
 
+void retro_shutdown_prboom(void)
+{
+   environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+}
+
 void retro_run(void)
 {
    D_DoomLoop();

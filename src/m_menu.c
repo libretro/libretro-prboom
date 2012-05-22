@@ -62,6 +62,8 @@
 #include "r_demo.h"
 #include "r_fps.h"
 
+#include "libretro.h"
+
 extern patchnum_t hu_font[HU_FONTSIZE];
 extern boolean  message_dontfuckwithme;
 
@@ -884,7 +886,6 @@ void M_SaveSelect(int choice)
   // we are going to be intercepting all chars
   saveStringEnter = 1;
 
-  char lname[9];
   saveSlot = choice;
   strcpy(saveOldString,savegamestrings[choice]);
   savegamestrings[choice][0] = 'S';
@@ -1042,6 +1043,8 @@ static void M_QuitResponse(int ch)
   I_SafeExit(1);
 }
 
+extern void retro_shutdown_prboom(void);
+
 void M_QuitDOOM(int choice)
 {
   static char endstring[160];
@@ -1049,8 +1052,9 @@ void M_QuitDOOM(int choice)
   // We pick index 0 which is language sensitive,
   // or one at random, between 1 and maximum number.
   // Ty 03/27/98 - externalized DOSY as a string s_DOSY that's in the sprintf
-  if(!has_exited)
-     M_QuitResponse('y');
+  has_exited = 0;
+  M_QuitResponse('y');
+  retro_shutdown_prboom();
 }
 
 /////////////////////////////

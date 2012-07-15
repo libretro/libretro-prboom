@@ -138,7 +138,7 @@ void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
    info->library_name     = "prboom";
-   info->library_version  = "2.5.0";
+   info->library_version  = "v2.5.0";
    info->need_fullpath    = FALSE;
    info->valid_extensions = "WAD|wad|IWAD|iwad";
    info->block_extract = FALSE;

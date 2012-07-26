@@ -55,7 +55,9 @@
 #define HAVE_SNPRINTF 1
 
 /* Define to 1 if you have the `vsnprintf' function. */
+#ifndef _XBOX1
 #define HAVE_VSNPRINTF 1
+#endif
 
 /* Name of package */
 #define PACKAGE "prboom"

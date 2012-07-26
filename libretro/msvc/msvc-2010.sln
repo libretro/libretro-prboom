@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 11.00
 # Visual Studio 2010
-Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libretro-prboom msvc2010", "msvc-2010/libretro-prboom msvc2010.vcxproj", "{11E790E0-2FB5-4E69-9615-03442AFCD994}"
+Project("{8BC9CEB8-8B4A-11D0-8D11-00A0C91BC942}") = "libretro-prboom msvc2010", "msvc-2010/msvc-2010.vcxproj", "{11E790E0-2FB5-4E69-9615-03442AFCD994}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

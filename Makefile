@@ -65,7 +65,7 @@ else
 CFLAGS += -O3
 endif
 
-PORTOBJECTS = ./$(DOOMSRC)/libretro.o
+PORTOBJECTS = ./libretro/libretro.o
 
 LIBMADOBJECTS = ./$(LMADSRCDIR)/bit.o ./$(LMADSRCDIR)/decoder.o ./$(LMADSRCDIR)/fixed.o ./$(LMADSRCDIR)/frame.o ./$(LMADSRCDIR)/huffman.o ./$(LMADSRCDIR)/layer3.o ./$(LMADSRCDIR)/layer12.o ./$(LMADSRCDIR)/stream.o ./$(LMADSRCDIR)/synth.o ./$(LMADSRCDIR)/timer.o
 

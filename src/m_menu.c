@@ -62,7 +62,7 @@
 #include "r_demo.h"
 #include "r_fps.h"
 
-#include "libretro.h"
+#include "../libretro/libretro.h"
 
 extern patchnum_t hu_font[HU_FONTSIZE];
 extern boolean  message_dontfuckwithme;

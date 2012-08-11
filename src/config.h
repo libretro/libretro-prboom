@@ -19,6 +19,10 @@
 #define HAVE_ASM_BYTEORDER_H 1
 #endif
 
+#ifdef GEKKO
+#define HAVE_STRLWR
+#endif
+
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 

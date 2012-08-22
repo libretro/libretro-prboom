@@ -117,8 +117,11 @@ endif
 %.o: %.c
 	$(CC) $(INCLUDES) $(CFLAGS) -c -o $@ $<
 
+clean-objs:
+	rm -f $(OBJECTS)
+
 clean:
 	rm -f $(OBJECTS) $(TARGET)
 
-.PHONY: clean
+.PHONY: clean clean-objs
 

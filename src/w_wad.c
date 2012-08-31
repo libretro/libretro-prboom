@@ -132,19 +132,22 @@ static void W_AddFile(wadfile_info_t *wadfile)
   filelump_t  *fileinfo = NULL;
   filelump_t *fileinfo2free=NULL; //killough
   filelump_t singleinfo;
+#ifndef MEMORY_LOW
   struct stat statbuf;
+#endif
 
   // open the file and add to directory
 
-//precache into memory instead of reading from disk
+#ifdef MEMORY_LOW
+  wadfile->handle = open(wadfile->name, O_RDONLY | O_BINARY);
+
+  if (wadfile->handle == -1) 
+#else
+  //precache into memory instead of reading from disk
   wadfile->handle = fopen(wadfile->name, "rb");
 
-#ifdef HAVE_NET
-  if (wadfile->handle == 0 && D_NetGetWad(wadfile->name)) // CPhipps
-    wadfile->handle = fopen(wadfile->name, "rb");
-#endif
-    
   if (wadfile->handle == 0) 
+#endif
     {
       if (  strlen(wadfile->name)<=4 ||      // add error check -- killough
 	         (strcasecmp(wadfile->name+strlen(wadfile->name)-4 , ".lmp" ) &&
@@ -154,10 +157,12 @@ static void W_AddFile(wadfile_info_t *wadfile)
       return;
     }
 
+#ifndef MEMORY_LOW
     stat(wadfile->name, &statbuf);
     wadfile->length = statbuf.st_size;
     wadfile->data = malloc(statbuf.st_size);
     fread(wadfile->data, statbuf.st_size, 1, wadfile->handle);
+#endif
 
   //jff 8/3/98 use logical output routine
   lprintf (LO_INFO," adding %s\n",wadfile->name);
@@ -173,14 +178,22 @@ static void W_AddFile(wadfile_info_t *wadfile)
       // single lump file
       fileinfo = &singleinfo;
       singleinfo.filepos = 0;
+#ifdef MEMORY_LOW
+      singleinfo.size = LittleLong(I_Filelength(wadfile->handle));
+#else
       singleinfo.size = wadfile->length;
+#endif
       ExtractFileBase(wadfile->name, singleinfo.name);
       numlumps++;
     }
   else
     {
       // WAD file
+#ifdef MEMORY_LOW
+      I_Read(wadfile->handle, &header, sizeof(header));
+#else
       memcpy(&header, wadfile->data, sizeof(header));
+#endif
       if (strncmp(header.identification,"IWAD",4) &&
           strncmp(header.identification,"PWAD",4))
         I_Error("W_AddFile: Wad file %s doesn't have IWAD or PWAD id", wadfile->name);
@@ -188,7 +201,12 @@ static void W_AddFile(wadfile_info_t *wadfile)
       header.infotableofs = LONG(header.infotableofs);
       length = header.numlumps*sizeof(filelump_t);
       fileinfo2free = fileinfo = malloc(length);    // killough
+#ifdef MEMORY_LOW
+      lseek(wadfile->handle, header.infotableofs, SEEK_SET);
+      I_Read(wadfile->handle, fileinfo, length);
+#else
       memcpy(fileinfo, &wadfile->data[header.infotableofs], length);
+#endif
       numlumps += header.numlumps;
     }
 
@@ -467,10 +485,18 @@ void W_ReleaseAllWads(void)
 
 	for(i = 0; i < numwadfiles; i++)
 	{
+#ifdef MEMORY_LOW
+		if(wadfiles[i].handle > 0)
+#else
 		if(wadfiles[i].handle)
+#endif
 		{
+#ifdef MEMORY_LOW
+			close(wadfiles[i].handle);
+#else
 			fclose(wadfiles[i].handle);
 			free(wadfiles[i].data);
+#endif
 			wadfiles[i].handle = 0;
 		}
 	}
@@ -506,7 +532,14 @@ void W_ReadLump(int lump, void *dest)
 
     {
       if (l->wadfile)
+      {
+#ifdef MEMORY_LOW
+        lseek(l->wadfile->handle, l->position, SEEK_SET);
+        I_Read(l->wadfile->handle, dest, l->size);
+#else
 	memcpy(dest, &l->wadfile->data[l->position], l->size);
+#endif
+      }
     }
 }
 

@@ -77,10 +77,14 @@ typedef enum {
 typedef struct {
   const char* name;
   wad_source_t src;
+#ifdef MEMORY_LOW
+  int handle;
+#else
   FILE* handle;
   unsigned char *data;
   int position;
   int length;
+#endif
 } wadfile_info_t;
 
 extern wadfile_info_t *wadfiles;

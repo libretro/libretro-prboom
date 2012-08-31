@@ -58,11 +58,16 @@ else ifeq ($(platform), xenon)
    CC = xenon-gcc$(EXE_EXT)
    AR = xenon-ar$(EXE_EXT)
    CFLAGS += -D__LIBXENON__ -m32 -D__ppc__ -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT
+else ifeq ($(platform), ngc)
+   TARGET := libretro_wii.a
+   CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
+   AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
+   CFLAGS += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT -DNO_ASM_BYTEORDER
 else ifeq ($(platform), wii)
    TARGET := libretro_wii.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -mrvl -mcpu=750 -meabi -mhard-float -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT -DNO_ASM_BYTEORDER
+   CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT -DNO_ASM_BYTEORDER
 else
    TARGET := retro.dll
    CC = gcc
@@ -107,6 +112,8 @@ else ifeq ($(platform), sncps3)
 else ifeq ($(platform), psl1ght)
 	$(AR) rcs $@ $(OBJECTS)
 else ifeq ($(platform), xenon)
+	$(AR) rcs $@ $(OBJECTS)
+else ifeq ($(platform), ngc)
 	$(AR) rcs $@ $(OBJECTS)
 else ifeq ($(platform), wii)
 	$(AR) rcs $@ $(OBJECTS)

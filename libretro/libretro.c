@@ -1175,3 +1175,15 @@ void I_ResampleStream (void *dest, unsigned nsamp, void (*proc) (void *dest, uns
   sin[1] = sin[nreq * 2 + 1];
 }  
 
+void I_Read(int fd, void* vbuf, size_t sz)
+{
+  unsigned char* buf = vbuf;
+
+  while (sz) {
+    int rc = read(fd,buf,sz);
+    if (rc <= 0) {
+      I_Error("I_Read: read failed: %s", rc ? strerror(errno) : "EOF");
+    }
+    sz -= rc; buf += rc;
+  }
+}

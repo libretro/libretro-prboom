@@ -179,7 +179,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
       fileinfo = &singleinfo;
       singleinfo.filepos = 0;
 #ifdef MEMORY_LOW
-      singleinfo.size = LittleLong(I_Filelength(wadfile->handle));
+      singleinfo.size = doom_wtohl(I_Filelength(wadfile->handle));
 #else
       singleinfo.size = wadfile->length;
 #endif

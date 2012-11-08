@@ -135,7 +135,7 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
  */
 
 // FIXME: restore v_video.inl
-#define GETCOL15(col) (VID_PAL15(col, VID_COLORWEIGHTMASK))
+#define GETCOL16(col) (VID_PAL16(col, VID_COLORWEIGHTMASK))
 
 // draw a stretched 64x64 flat to the top left corner of the screen
 #define V_DRAWFLAT(SCRN, TYPE, GETCOL) { \
@@ -169,7 +169,7 @@ void V_DrawBackground(const char* flatname, int scrn)
   src = W_CacheLumpNum(lump = firstflat + R_FlatNumForName(flatname));
 
   /* V_DrawBlock(0, 0, scrn, 64, 64, src, 0); */
-  V_DRAWFLAT(scrn, short, GETCOL15);
+  V_DRAWFLAT(scrn, short, GETCOL16);
   /* end V_DrawBlock */
 
   for (y=0 ; y<SCREENHEIGHT ; y+=h)
@@ -349,8 +349,8 @@ void V_DrawNumPatch(int x, int y, int scrn, int lump,
   R_UnlockPatchNum(lump);
 }
 
-unsigned short *V_Palette15 = NULL;
-static unsigned short *Palettes15 = NULL;
+unsigned short *V_Palette16 = NULL;
+static unsigned short *Palettes16 = NULL;
 static int currentPaletteIndex = 0;
 //
 // V_UpdateTrueColorPalette
@@ -377,14 +377,14 @@ void V_UpdateTrueColorPalette(void) {
   float roundUpR, roundUpG, roundUpB;
   
   if (usegammaOnLastPaletteGeneration != usegamma) {
-    if (Palettes15) free(Palettes15);
-    Palettes15 = NULL;
+    if (Palettes16) free(Palettes16);
+    Palettes16 = NULL;
     usegammaOnLastPaletteGeneration = usegamma;      
   }
   
-    if (!Palettes15) {
+    if (!Palettes16) {
       // set short palette
-      Palettes15 = (short*)malloc(numPals*256*sizeof(short)*VID_NUMCOLORWEIGHTS);
+      Palettes16 = malloc(numPals*256*sizeof(short)*VID_NUMCOLORWEIGHTS);
       for (p=0; p<numPals; p++) {
         for (i=0; i<256; i++) {
           r = gtable[pal[(256*p+i)*3+0]];
@@ -400,16 +400,16 @@ void V_UpdateTrueColorPalette(void) {
           for (w=0; w<VID_NUMCOLORWEIGHTS; w++) {
             t = (float)(w)/(float)(VID_NUMCOLORWEIGHTS-1);
             nr = (int)((r>>3)*t+roundUpR);
-            ng = (int)((g>>3)*t+roundUpG);
+            ng = (int)((g>>2)*t+roundUpG);
             nb = (int)((b>>3)*t+roundUpB);
-            Palettes15[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] = (
-              (nr<<10) | (ng<<5) | nb
+            Palettes16[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] = (
+              (nr<<11) | (ng<<5) | nb
             );
           }
         }
       }
     }
-    V_Palette15 = Palettes15 + paletteNum*256*VID_NUMCOLORWEIGHTS;
+    V_Palette16 = Palettes16 + paletteNum*256*VID_NUMCOLORWEIGHTS;
    
   W_UnlockLumpNum(pplump);
   W_UnlockLumpNum(gtlump);
@@ -420,9 +420,9 @@ void V_UpdateTrueColorPalette(void) {
 // V_DestroyTrueColorPalette
 //---------------------------------------------------------------------------
 static void V_DestroyTrueColorPalette(void) {
-    if (Palettes15) free(Palettes15);
-    Palettes15 = NULL;
-    V_Palette15 = NULL;
+    if (Palettes16) free(Palettes16);
+    Palettes16 = NULL;
+    V_Palette16 = NULL;
 }
 
 void V_DestroyUnusedTrueColorPalettes(void) {
@@ -452,9 +452,9 @@ void V_SetPalette(int pal)
 // CPhipps - New function to fill a rectangle with a given colour
 void V_FillRect(int x, int y, int width, int height, byte colour)
 {
-  unsigned short* dest = (unsigned short *)screens[0].data + x + y * SURFACE_SHORT_PITCH;
+  unsigned short* dest = (unsigned short *)screens[0].data + x + y* SURFACE_SHORT_PITCH;
   int w;
-  short c = VID_PAL15(colour, VID_COLORWEIGHTMASK);
+  short c = VID_PAL16(colour, VID_COLORWEIGHTMASK);
   while (height--) {
     for (w=0; w<width; w++) {
       dest[w] = c;
@@ -469,7 +469,7 @@ const char *default_videomode;
 // V_InitMode
 //
 void V_InitMode(void) {
-  lprintf(LO_INFO, "V_InitMode: using 15 bit video mode\n");
+   lprintf(LO_INFO, "V_InitMode: using 16 bit video mode\n");
   R_FilterInit();
 }
 
@@ -477,7 +477,7 @@ void V_InitMode(void) {
 // V_GetNumPixelBits
 //
 int V_GetNumPixelBits(void) {
-    return 15;
+    return 16;
 }
 
 //
@@ -527,7 +527,7 @@ void V_FreeScreens(void) {
 }
 
 void V_PlotPixel(int scrn, int x, int y, byte color) {
-  ((unsigned short *)screens[scrn].data)[x + SURFACE_SHORT_PITCH * y] = VID_PAL15(color, VID_COLORWEIGHTMASK);
+  ((unsigned short *)screens[scrn].data)[x + SURFACE_SHORT_PITCH *y] = VID_PAL16(color, VID_COLORWEIGHTMASK);
 }
 
 //

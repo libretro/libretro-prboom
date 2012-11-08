@@ -87,30 +87,32 @@ void R_FilterInit(void);
 
 byte *filter_getScale2xQuadColors(byte e, byte b, byte f, byte h, byte d);
 
-#define filter_getFilteredForColumn15(depthmap, texV, nextRowTexV) ( \
-  VID_PAL15( depthmap(nextsource[(nextRowTexV)>>FRACBITS]),   (filter_fracu*((texV)&0xffff))>>(32-VID_COLORWEIGHTBITS) ) + \
-  VID_PAL15( depthmap(source[(nextRowTexV)>>FRACBITS]),       ((0xffff-filter_fracu)*((texV)&0xffff))>>(32-VID_COLORWEIGHTBITS) ) + \
-  VID_PAL15( depthmap(source[(texV)>>FRACBITS]),              ((0xffff-filter_fracu)*(0xffff-((texV)&0xffff)))>>(32-VID_COLORWEIGHTBITS) ) + \
-  VID_PAL15( depthmap(nextsource[(texV)>>FRACBITS]),          (filter_fracu*(0xffff-((texV)&0xffff)))>>(32-VID_COLORWEIGHTBITS) ))
+#define filter_getFilteredForColumn16(depthmap, texV, nextRowTexV) ( \
+  VID_PAL16( depthmap(nextsource[(nextRowTexV)>>FRACBITS]),   (filter_fracu*((texV)&0xffff))>>(32-VID_COLORWEIGHTBITS) ) + \
+  VID_PAL16( depthmap(source[(nextRowTexV)>>FRACBITS]),       ((0xffff-filter_fracu)*((texV)&0xffff))>>(32-VID_COLORWEIGHTBITS) ) + \
+  VID_PAL16( depthmap(source[(texV)>>FRACBITS]),              ((0xffff-filter_fracu)*(0xffff-((texV)&0xffff)))>>(32-VID_COLORWEIGHTBITS) ) + \
+  VID_PAL16( depthmap(nextsource[(texV)>>FRACBITS]),          (filter_fracu*(0xffff-((texV)&0xffff)))>>(32-VID_COLORWEIGHTBITS) ))
 
-#define filter_getFilteredForSpan15(depthmap, texU, texV) ( \
-  VID_PAL15( depthmap(source[ ((((texU)+FRACUNIT)>>16)&0x3f) | ((((texV)+FRACUNIT)>>10)&0xfc0)]),  (unsigned int)(((texU)&0xffff)*((texV)&0xffff))>>(32-VID_COLORWEIGHTBITS)) + \
-  VID_PAL15( depthmap(source[ (((texU)>>16)&0x3f) | ((((texV)+FRACUNIT)>>10)&0xfc0)]),             (unsigned int)((0xffff-((texU)&0xffff))*((texV)&0xffff))>>(32-VID_COLORWEIGHTBITS)) + \
-  VID_PAL15( depthmap(source[ (((texU)>>16)&0x3f) | (((texV)>>10)&0xfc0)]),                        (unsigned int)((0xffff-((texU)&0xffff))*(0xffff-((texV)&0xffff)))>>(32-VID_COLORWEIGHTBITS)) + \
-  VID_PAL15( depthmap(source[ ((((texU)+FRACUNIT)>>16)&0x3f) | (((texV)>>10)&0xfc0)]),             (unsigned int)(((texU)&0xffff)*(0xffff-((texV)&0xffff)))>>(32-VID_COLORWEIGHTBITS)))
+// Use 16 bit addition here since it's a little faster and the defects from
+// such low-accuracy blending are less visible on spans
+#define filter_getFilteredForSpan16(depthmap, texU, texV) ( \
+  VID_PAL16( depthmap(source[ ((((texU)+FRACUNIT)>>16)&0x3f) | ((((texV)+FRACUNIT)>>10)&0xfc0)]),  (unsigned int)(((texU)&0xffff)*((texV)&0xffff))>>(32-VID_COLORWEIGHTBITS)) + \
+  VID_PAL16( depthmap(source[ (((texU)>>16)&0x3f) | ((((texV)+FRACUNIT)>>10)&0xfc0)]),             (unsigned int)((0xffff-((texU)&0xffff))*((texV)&0xffff))>>(32-VID_COLORWEIGHTBITS)) + \
+  VID_PAL16( depthmap(source[ (((texU)>>16)&0x3f) | (((texV)>>10)&0xfc0)]),                        (unsigned int)((0xffff-((texU)&0xffff))*(0xffff-((texV)&0xffff)))>>(32-VID_COLORWEIGHTBITS)) + \
+  VID_PAL16( depthmap(source[ ((((texU)+FRACUNIT)>>16)&0x3f) | (((texV)>>10)&0xfc0)]),             (unsigned int)(((texU)&0xffff)*(0xffff-((texV)&0xffff)))>>(32-VID_COLORWEIGHTBITS)))
 
 // do red and blue at once for slight speedup
+//
+#define GETBLENDED16_5050(col1, col2) \
+  ((((col1&0xf81f)+(col2&0xf81f))>>1)&0xf81f) | \
+  ((((col1&0x07e0)+(col2&0x07e0))>>1)&0x07e0)
+//
+#define GETBLENDED16_3268(col1, col2) \
+  ((((col1&0xf81f)*5+(col2&0xf81f)*11)>>4)&0xf81f) | \
+  ((((col1&0x07e0)*5+(col2&0x07e0)*11)>>4)&0x07e0)
 
-#define GETBLENDED15_5050(col1, col2) \
-  ((((col1&0x7c1f)+(col2&0x7c1f))>>1)&0x7c1f) | \
-  ((((col1&0x03e0)+(col2&0x03e0))>>1)&0x03e0)
-
-#define GETBLENDED15_3268(col1, col2) \
-  ((((col1&0x7c1f)*5+(col2&0x7c1f)*11)>>4)&0x7c1f) | \
-  ((((col1&0x03e0)*5+(col2&0x03e0)*11)>>4)&0x03e0)
-
-#define GETBLENDED15_9406(col1, col2) \
-  ((((col1&0x7c1f)*15+(col2&0x7c1f))>>4)&0x7c1f) | \
-  ((((col1&0x03e0)*15+(col2&0x03e0))>>4)&0x03e0)
+#define GETBLENDED16_9406(col1, col2) \
+  ((((col1&0xf81f)*15+(col2&0xf81f))>>4)&0xf81f) | \
+  ((((col1&0x07e0)*15+(col2&0x07e0))>>4)&0x07e0)
 
 #endif

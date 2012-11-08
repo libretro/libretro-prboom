@@ -30,15 +30,16 @@
 
 #define SCREENTYPE unsigned short
 #define TOPLEFT short_topleft
+#define PITCH short_pitch
 #define TEMPBUF short_tempbuf
 
 #if (R_DRAWCOLUMN_PIPELINE & RDC_FUZZ)
-#define GETDESTCOLOR15(col) GETBLENDED15_9406(col, 0)
+#define GETDESTCOLOR16(col) GETBLENDED16_9406(col, 0)
 #else
-#define GETDESTCOLOR15(col) (col)
+#define GETDESTCOLOR16(col) (col)
 #endif
 
-#define GETDESTCOLOR(col) GETDESTCOLOR15(col)
+#define GETDESTCOLOR(col) GETDESTCOLOR16(col)
 
 //
 // R_FlushWholeOpaque
@@ -194,7 +195,7 @@ static void R_FLUSHQUAD_FUNCNAME(void)
 #endif
 }
 
-#undef GETDESTCOLOR15
+#undef GETDESTCOLOR16
 #undef GETDESTCOLOR
 
 #undef TEMPBUF

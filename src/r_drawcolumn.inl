@@ -31,7 +31,7 @@
 #define SCREENTYPE unsigned short
 #define TEMPBUF short_tempbuf
 
-#define GETDESTCOLOR15(col) (col)
+#define GETDESTCOLOR16(col) (col)
 
 #if (R_DRAWCOLUMN_PIPELINE & RDC_TRANSLATED)
 #define GETCOL8_MAPPED(col) (translation[(col)])
@@ -50,11 +50,11 @@
 #endif
 
 #if (R_DRAWCOLUMN_PIPELINE & RDC_BILINEAR)
- #define GETCOL15(frac, nextfrac) filter_getFilteredForColumn15(GETCOL8_DEPTH,frac,nextfrac)
+ #define GETCOL16(frac, nextfrac) filter_getFilteredForColumn16(GETCOL8_DEPTH,frac,nextfrac)
 #elif (R_DRAWCOLUMN_PIPELINE & RDC_ROUNDED)
- #define GETCOL15(frac, nextfrac) VID_PAL15(GETCOL8_DEPTH(filter_getRoundedForColumn(frac,nextfrac)), VID_COLORWEIGHTMASK)
+ #define GETCOL16(frac, nextfrac) VID_PAL16(GETCOL8_DEPTH(filter_getRoundedForColumn(frac,nextfrac)), VID_COLORWEIGHTMASK)
 #else
- #define GETCOL15(frac, nextfrac) VID_PAL15(GETCOL8_DEPTH(source[(frac)>>FRACBITS]), VID_COLORWEIGHTMASK)
+ #define GETCOL16(frac, nextfrac) VID_PAL16(GETCOL8_DEPTH(source[(frac)>>FRACBITS]), VID_COLORWEIGHTMASK)
 #endif
 
 #if (R_DRAWCOLUMN_PIPELINE & (RDC_BILINEAR|RDC_ROUNDED|RDC_DITHERZ))
@@ -71,8 +71,8 @@
 #define COLTYPE (COL_OPAQUE)
 #endif
 
-#define GETCOL(frac, nextfrac) GETCOL15(frac, nextfrac)
-#define GETDESTCOLOR(col) GETDESTCOLOR15(col)
+#define GETCOL(frac, nextfrac) GETCOL16(frac, nextfrac)
+#define GETDESTCOLOR(col) GETDESTCOLOR16(col)
 
 static void R_DRAWCOLUMN_FUNCNAME(draw_column_vars_t *dcvars)
 {
@@ -308,16 +308,12 @@ static void R_DRAWCOLUMN_FUNCNAME(draw_column_vars_t *dcvars)
 #endif // (!(R_DRAWCOLUMN_PIPELINE & RDC_FUZZ))
 }
 
-#undef GETDESTCOLOR32
 #undef GETDESTCOLOR16
-#undef GETDESTCOLOR15
 #undef GETDESTCOLOR8
 #undef GETDESTCOLOR
 #undef GETCOL8_MAPPED
 #undef GETCOL8_DEPTH
-#undef GETCOL32
 #undef GETCOL16
-#undef GETCOL15
 #undef GETCOL8
 #undef GETCOL
 #undef INCY

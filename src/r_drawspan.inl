@@ -34,6 +34,7 @@
 
 #define SCREENTYPE unsigned short
 #define TOPLEFT short_topleft
+#define PITCH short_pitch
 
 #if (R_DRAWSPAN_PIPELINE & RDC_DITHERZ)  
   #define GETDEPTHMAP(col) dither_colormaps[filter_getDitheredPixelLevel(x1, y, fracz)][(col)]
@@ -41,8 +42,8 @@
   #define GETDEPTHMAP(col) colormap[(col)]
 #endif
 
-#define GETCOL_POINT(col) VID_PAL15(GETDEPTHMAP(col), VID_COLORWEIGHTMASK)
-#define GETCOL_LINEAR(col) filter_getFilteredForSpan15(GETDEPTHMAP, xfrac, yfrac)
+#define GETCOL_POINT(col) VID_PAL16(GETDEPTHMAP(col), VID_COLORWEIGHTMASK)
+#define GETCOL_LINEAR(col) filter_getFilteredForSpan16(GETDEPTHMAP, xfrac, yfrac)
 
 #if (R_DRAWSPAN_PIPELINE & RDC_BILINEAR)
  #define GETCOL(col) GETCOL_LINEAR(col)

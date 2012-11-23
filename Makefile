@@ -53,6 +53,11 @@ else ifeq ($(platform), psl1ght)
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
    CFLAGS += -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT -DHAVE_STRLWR -DNO_ASM_BYTEORDER
+else ifeq ($(platform), psp1)
+   TARGET := libretro_psp1.a
+   CC = psp-gcc$(EXE_EXT)
+   AR = psp-ar$(EXE_EXT)
+   CFLAGS += -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT -DHAVE_STRLWR -DNO_ASM_BYTEORDER -DPSP
 else ifeq ($(platform), xenon)
    TARGET := libretro_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
@@ -110,6 +115,8 @@ ifeq ($(platform), ps3)
 else ifeq ($(platform), sncps3)
 	$(AR) rcs $@ $(OBJECTS)
 else ifeq ($(platform), psl1ght)
+	$(AR) rcs $@ $(OBJECTS)
+else ifeq ($(platform), psp1)
 	$(AR) rcs $@ $(OBJECTS)
 else ifeq ($(platform), xenon)
 	$(AR) rcs $@ $(OBJECTS)

@@ -57,7 +57,7 @@ else ifeq ($(platform), psp1)
    TARGET := libretro_psp1.a
    CC = psp-gcc$(EXE_EXT)
    AR = psp-ar$(EXE_EXT)
-   CFLAGS += -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT -DHAVE_STRLWR -DNO_ASM_BYTEORDER -DPSP
+   CFLAGS += -D_GNU_SOURCE=1 -DHAVE_LIBMAD -DMUSIC_SUPPORT -DHAVE_STRLWR -DNO_ASM_BYTEORDER -DPSP -G0
 else ifeq ($(platform), xenon)
    TARGET := libretro_xenon360.a
    CC = xenon-gcc$(EXE_EXT)

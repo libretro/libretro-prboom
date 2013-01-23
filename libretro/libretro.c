@@ -117,13 +117,14 @@ static retro_input_state_t input_state_cb;
 
 void retro_init(void)
 {
+#ifdef FRONTEND_SUPPORTS_RGB565
+   enum retro_pixel_format rgb565;
+#endif
 #ifdef MUSIC_SUPPORT
    mp_player.init(44100);
 #endif
 
 #ifdef FRONTEND_SUPPORTS_RGB565
-   enum retro_pixel_format rgb565;
-
    rgb565 = RETRO_PIXEL_FORMAT_RGB565;
    if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
       fprintf(stderr, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");

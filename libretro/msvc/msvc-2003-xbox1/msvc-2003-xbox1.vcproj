@@ -56,7 +56,7 @@
 				OmitFramePointers="TRUE"
 				OptimizeForProcessor="2"
 				AdditionalIncludeDirectories="&quot;$(SolutionDir)\msvc-2003-xbox1&quot;"
-				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;_LIB;HAVE_LIBMAD;_XBOX1"
+				PreprocessorDefinitions="NDEBUG;_XBOX;PROFILE;_LIB;HAVE_LIBMAD;_XBOX1;FRONTEND_SUPPORTS_RGB565"
 				StringPooling="TRUE"
 				RuntimeLibrary="0"
 				BufferSecurityCheck="TRUE"

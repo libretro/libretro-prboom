@@ -1659,11 +1659,12 @@ void (CheckSaveGame)(size_t size, const char* file, int line)
 void G_SaveGameName(char *name, size_t size, int slot, boolean demoplayback)
 {
   const char* sgn = demoplayback ? "demosav" : savegamename;
-#ifdef HAVE_SNPRINTF
-  snprintf (name, size, "%s/%s%d.dsg", basesavegame, sgn, slot);
+#ifdef _WIN32
+  char slash = '\\';
 #else
-  sprintf (name, "%s/%s%d.dsg", basesavegame, sgn, slot);
+  char slash = '/';
 #endif
+  snprintf (name, size, "%s%c%s%d.dsg", basesavegame, slash, sgn, slot);
 }
 
 static void G_DoSaveGame (boolean menu)

@@ -523,18 +523,16 @@ char* I_FindFile(const char* wfname, const char* ext)
   /* Precalculate a length we will need in the loop */
   pl = strlen(wfname) + strlen(ext) + 4;
 
-  lprintf(LO_ALWAYS, "wfname: %s\n", wfname);
-  lprintf(LO_ALWAYS, "g_wad_dir: %s\n", g_wad_dir);
+  lprintf(LO_ALWAYS, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
 
   p = malloc(strlen(g_wad_dir) + pl);
-#ifdef _XBOX
-  lprintf(LO_ALWAYS, "%s\\%s\n", g_wad_dir, wfname);
-  sprintf(p, "%s\\%s", g_wad_dir, wfname);
+#ifdef _WIN32
+  char slash = '\\';
 #else
-  lprintf(LO_ALWAYS, "%s/%s\n", g_wad_dir, wfname);
-  sprintf(p, "%s/%s", g_wad_dir, wfname);
+  char slash = '/';
 #endif
-  lprintf(LO_ALWAYS, "p: %s\n", p);
+  lprintf(LO_ALWAYS, "%s%c%s\n", g_wad_dir, slash, wfname);
+  sprintf(p, "%s%c%s", g_wad_dir, slash, wfname);
 
   file = fopen(p, "rb");
   if (!file)

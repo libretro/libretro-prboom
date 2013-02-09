@@ -836,12 +836,13 @@ void M_LoadDefaults (void)
     const char* exedir = I_DoomExeDir();
     defaultfile = malloc(PATH_MAX+1);
     /* get config file from same directory as executable */
-#ifdef HAVE_SNPRINTF
     snprintf(defaultfile, PATH_MAX,
+            "%s%s%sboom.cfg", exedir,
+#ifdef _WIN32
+            HasTrailingSlash(exedir) ? "" : "\\", 
 #else
-    sprintf (defaultfile,
+            HasTrailingSlash(exedir) ? "" : "/", 
 #endif
-            "%s%s%sboom.cfg", exedir, HasTrailingSlash(exedir) ? "" : "/", 
             "pr");
   }
 

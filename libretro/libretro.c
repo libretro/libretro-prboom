@@ -519,6 +519,7 @@ char* I_FindFile(const char* wfname, const char* ext)
   FILE *file;
   size_t pl;
   char  * p;
+  char slash;
 
   /* Precalculate a length we will need in the loop */
   pl = strlen(wfname) + strlen(ext) + 4;
@@ -527,9 +528,9 @@ char* I_FindFile(const char* wfname, const char* ext)
 
   p = malloc(strlen(g_wad_dir) + pl);
 #ifdef _WIN32
-  char slash = '\\';
+  slash = '\\';
 #else
-  char slash = '/';
+  slash = '/';
 #endif
   lprintf(LO_ALWAYS, "%s%c%s\n", g_wad_dir, slash, wfname);
   sprintf(p, "%s%c%s", g_wad_dir, slash, wfname);

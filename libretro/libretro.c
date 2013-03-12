@@ -356,8 +356,10 @@ static int action_lut[] = {
 void I_StartTic (void)
 {
    unsigned i;
-   static bool old_input[14];
-   bool new_input[14];
+   static bool old_input[20];
+   bool new_input[20];
+   event_t analog_event = {0};
+   int analog_l_x, analog_l_y, analog_r_x;
 
    input_poll_cb();
 
@@ -383,6 +385,149 @@ void I_StartTic (void)
 
       old_input[i] = new_input[i];
    }
+
+   analog_l_x = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+         RETRO_DEVICE_ID_ANALOG_X);
+   analog_l_y = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+         RETRO_DEVICE_ID_ANALOG_Y);
+   analog_r_x = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+         RETRO_DEVICE_ID_ANALOG_X);
+
+   /* analog stick right - right */
+
+   new_input[14] = (analog_r_x > 0);
+
+   if(new_input[14] && !old_input[14])
+   {
+      analog_event.type = ev_keydown;
+      analog_event.data1 = '.';
+   }
+
+   if(!new_input[14] && old_input[14])
+   {
+      analog_event.type = ev_keyup;
+      analog_event.data1 = '.';
+   }
+
+   if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
+      D_PostEvent(&analog_event);
+
+   old_input[14] = new_input[14];
+
+   /* analog stick right - left */
+   analog_event.type = 0;
+   analog_event.data1 = 0;
+
+   new_input[15] = (analog_r_x < 0);
+
+   if(new_input[15] && !old_input[15])
+   {
+      analog_event.type = ev_keydown;
+      analog_event.data1 = ',';
+   }
+
+   if(!new_input[15] && old_input[15])
+   {
+      analog_event.type = ev_keyup;
+      analog_event.data1 = ',';
+   }
+
+   if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
+      D_PostEvent(&analog_event);
+
+   old_input[15] = new_input[15];
+
+   /* analog stick left - right */
+   analog_event.type = 0;
+   analog_event.data1 = 0;
+
+   new_input[16] = (analog_l_x > 0);
+
+   if(new_input[16] && !old_input[16])
+   {
+      analog_event.type = ev_keydown;
+      analog_event.data1 = KEYD_RIGHTARROW;
+   }
+
+   if(!new_input[16] && old_input[16])
+   {
+      analog_event.type = ev_keyup;
+      analog_event.data1 = KEYD_RIGHTARROW;
+   }
+
+   if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
+      D_PostEvent(&analog_event);
+
+   old_input[16] = new_input[16];
+
+   /* analog stick left - left */
+   analog_event.type = 0;
+   analog_event.data1 = 0;
+
+   new_input[17] = (analog_l_x < 0);
+
+   if(new_input[17] && !old_input[17])
+   {
+      analog_event.type = ev_keydown;
+      analog_event.data1 = KEYD_LEFTARROW;
+   }
+
+   if(!new_input[17] && old_input[17])
+   {
+      analog_event.type = ev_keyup;
+      analog_event.data1 = KEYD_LEFTARROW;
+   }
+
+   if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
+      D_PostEvent(&analog_event);
+
+   old_input[17] = new_input[17];
+
+   /* analog stick left - up */
+   analog_event.type = 0;
+   analog_event.data1 = 0;
+
+   new_input[18] = (analog_l_y < 0);
+
+   if(new_input[18] && !old_input[18])
+   {
+      analog_event.type = ev_keydown;
+      analog_event.data1 = KEYD_UPARROW;
+   }
+
+   if(!new_input[18] && old_input[18])
+   {
+      analog_event.type = ev_keyup;
+      analog_event.data1 = KEYD_UPARROW;
+   }
+
+   if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
+      D_PostEvent(&analog_event);
+
+   old_input[18] = new_input[18];
+
+   /* analog stick left - down */
+   analog_event.type = 0;
+   analog_event.data1 = 0;
+
+   new_input[19] = (analog_l_y > 0);
+
+   if(new_input[19] && !old_input[19])
+   {
+      analog_event.type = ev_keydown;
+      analog_event.data1 = KEYD_DOWNARROW;
+   }
+
+   if(!new_input[19] && old_input[19])
+   {
+      analog_event.type = ev_keyup;
+      analog_event.data1 = KEYD_DOWNARROW;
+   }
+
+   if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
+      D_PostEvent(&analog_event);
+
+   old_input[19] = new_input[19];
 }
 
 static void I_UpdateVideoMode(void)

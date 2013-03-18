@@ -38,6 +38,14 @@ else ifeq ($(platform), osx)
    TARGET := prboom_libretro.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
+   CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
+else ifeq ($(platform), ios)
+   TARGET := prboom_libretro.dylib
+   fpic := -fPIC
+   SHARED := -dynamiclib
+   CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
+
+   CC = clang -arch armv7 -isysroot $(IOSSDK)
 else ifeq ($(platform), ps3)
    TARGET := prboom_libretro_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe

@@ -42,7 +42,7 @@ else ifeq ($(platform), osx)
    SHARED := -dynamiclib
    CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
 else ifeq ($(platform), ios)
-   TARGET := $(TARGET_NAME)_libretro.dylib
+   TARGET := $(TARGET_NAME)_libretro_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
    CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER

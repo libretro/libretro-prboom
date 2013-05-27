@@ -386,6 +386,7 @@ void I_StartTic (void)
       old_input[i] = new_input[i];
    }
 
+#if 0
    analog_l_x = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
          RETRO_DEVICE_ID_ANALOG_X);
    analog_l_y = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
@@ -528,6 +529,7 @@ void I_StartTic (void)
       D_PostEvent(&analog_event);
 
    old_input[19] = new_input[19];
+#endif
 }
 
 static void I_UpdateVideoMode(void)

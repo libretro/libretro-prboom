@@ -176,13 +176,12 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
-   environ_cb = cb;
-
    struct retro_variable variables[] = {
       { "gamepad",
          "Gamepad type; gamepad|dual-analog" },
       { NULL, NULL },
    };
+   environ_cb = cb;
 
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
 }

@@ -3,9 +3,7 @@
 /* prboom includes */
 
 #include "../src/d_main.h"
-#include "../src/lprintf.h"
 #include "../src/doomdef.h"
-#include "../src/lprintf.h"
 #include "../src/m_fixed.h"
 #include "../src/r_fps.h"
 #include "../src/m_argv.h"
@@ -110,6 +108,7 @@ extern int gametic;
 extern int snd_SfxVolume;
 extern int snd_MusicVolume;
 
+static retro_log_printf_t log_cb;
 static retro_video_refresh_t video_cb;
 static retro_audio_sample_t audio_cb;
 static retro_audio_sample_batch_t audio_batch_cb;
@@ -128,8 +127,8 @@ void retro_init(void)
 
 #ifdef FRONTEND_SUPPORTS_RGB565
    rgb565 = RETRO_PIXEL_FORMAT_RGB565;
-   if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
-      fprintf(stderr, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+   if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
+      log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
 #endif
 }
 
@@ -567,7 +566,8 @@ void I_StartTic (void)
 
 static void I_UpdateVideoMode(void)
 {
-  lprintf(LO_INFO, "I_UpdateVideoMode: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "I_UpdateVideoMode: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 
   V_InitMode();
   V_DestroyUnusedTrueColorPalettes();
@@ -600,7 +600,8 @@ void I_InitGraphics(void)
   {
     firsttime = 0;
 
-    lprintf(LO_INFO, "I_InitGraphics: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+    if (log_cb)
+       log_cb(RETRO_LOG_INFO, "I_InitGraphics: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 
     /* Set the video mode */
     I_UpdateVideoMode();
@@ -621,7 +622,8 @@ void I_SetRes(void)
 
   screens[4].height = (ST_SCALED_HEIGHT+1);
 
-  lprintf(LO_INFO,"I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+  if (log_cb)
+     log_cb(RETRO_LOG_INFO, "I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 }
 
 /* i_system - i_main */
@@ -704,7 +706,8 @@ char* I_FindFile(const char* wfname, const char* ext)
   /* Precalculate a length we will need in the loop */
   pl = strlen(wfname) + strlen(ext) + 4;
 
-  lprintf(LO_ALWAYS, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
+  if (log_cb)
+     log_cb(RETRO_LOG_INFO, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
 
   p = malloc(strlen(g_wad_dir) + pl);
 #ifdef _WIN32
@@ -712,7 +715,8 @@ char* I_FindFile(const char* wfname, const char* ext)
 #else
   slash = '/';
 #endif
-  lprintf(LO_ALWAYS, "%s%c%s\n", g_wad_dir, slash, wfname);
+  if (log_cb)
+     log_cb(RETRO_LOG_INFO, "%s%c%s\n", g_wad_dir, slash, wfname);
   sprintf(p, "%s%c%s", g_wad_dir, slash, wfname);
 
   file = fopen(p, "rb");
@@ -724,7 +728,8 @@ char* I_FindFile(const char* wfname, const char* ext)
 
   if (file)
   {
-	  lprintf(LO_INFO, " found %s\n", p);
+     if (log_cb)
+        log_cb(RETRO_LOG_INFO, " found %s\n", p);
 	  fclose(file);
 	  return p;
   }
@@ -1119,7 +1124,6 @@ void I_UpdateSound(void)
       frames++;
    }
 
-   //fprintf(stderr, "AUDIO!\n");
    for (frames = 0; frames < out_frames; )
       frames += audio_batch_cb(mixbuffer + (frames << 1), out_frames - frames);
 
@@ -1186,7 +1190,8 @@ void I_InitSound(void)
 
     I_SetChannels();
   
-    printf ("I_InitSound: \n");
+    if (log_cb)
+       log_cb(RETRO_LOG_INFO, "I_InitSound: \n");
 
     return;
 }
@@ -1299,12 +1304,14 @@ int I_RegisterMusic( const char* filename, musicinfo_t *song )
   int len;
 
 #ifdef MUSIC_SUPPORT
-  fprintf(stderr, "RegisterMusic: %s\n", filename);
+  if (log_cb)
+     log_cb(RETRO_LOG_INFO, "RegisterMusic: %s\n", filename);
 
   len = M_ReadFile(filename, (byte **) &song_data);
   if (len == -1)
   {
-     lprintf(LO_WARN, "Couldn't read %s\n", filename);
+     if (log_cb)
+        log_cb(RETRO_LOG_WARN, "Couldn't read %s\n", filename);
      return 1;
   }
 
@@ -1312,7 +1319,8 @@ int I_RegisterMusic( const char* filename, musicinfo_t *song )
   {
      free(song_data);
      song_data = NULL;
-     lprintf(LO_WARN, "Couldn't load music from %s\n", filename);
+     if (log_cb)
+        log_cb(RETRO_LOG_WARN, "Couldn't load music from %s\n", filename);
      return 1;
   }
 

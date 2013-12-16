@@ -94,6 +94,9 @@ extern "C" {
 // Eventually _PRESSED will return false for an index. No further presses are registered at this point.
 #define RETRO_DEVICE_POINTER      6
 
+// FIXME: Document this.
+#define RETRO_DEVICE_SENSOR_ACCELEROMETER 7
+
 // These device types are specializations of the base types above.
 // They should only be used in retro_set_controller_type() to inform libretro implementations
 // about use of a very specific device type.
@@ -149,6 +152,11 @@ extern "C" {
 #define RETRO_DEVICE_ID_POINTER_X         0
 #define RETRO_DEVICE_ID_POINTER_Y         1
 #define RETRO_DEVICE_ID_POINTER_PRESSED   2
+
+// Id values for SENSOR types.
+#define RETRO_DEVICE_ID_SENSOR_ACCELEROMETER_X      0
+#define RETRO_DEVICE_ID_SENSOR_ACCELEROMETER_Y      1
+#define RETRO_DEVICE_ID_SENSOR_ACCELEROMETER_Z      2
 
 // Returned from retro_get_region().
 #define RETRO_REGION_NTSC  0
@@ -357,6 +365,8 @@ enum retro_mod
 
 // If set, this call is not part of the public libretro API yet. It can change or be removed at any time.
 #define RETRO_ENVIRONMENT_EXPERIMENTAL 0x10000
+// Environment callback to be used internally in frontend.
+#define RETRO_ENVIRONMENT_PRIVATE 0x20000
 
 // Environment commands.
 #define RETRO_ENVIRONMENT_SET_ROTATION  1  // const unsigned * --
@@ -436,8 +446,6 @@ enum retro_mod
                                            // swapped out by the user (e.g. PSX).
 #define RETRO_ENVIRONMENT_SET_HW_RENDER 14
                                            // struct retro_hw_render_callback * --
-                                           // NOTE: This call is currently very experimental, and should not be considered part of the public API.
-                                           // The interface could be changed or removed at any time.
                                            // Sets an interface to let a libretro core render with hardware acceleration.
                                            // Should be called in retro_load_game().
                                            // If successful, libretro cores will be able to render to a frontend-provided framebuffer.
@@ -445,7 +453,7 @@ enum retro_mod
                                            // If HW rendering is used, pass only RETRO_HW_FRAME_BUFFER_VALID or NULL to retro_video_refresh_t.
 #define RETRO_ENVIRONMENT_GET_VARIABLE 15
                                            // struct retro_variable * --
-                                           // Interface to aquire user-defined information from environment
+                                           // Interface to acquire user-defined information from environment
                                            // that cannot feasibly be supported in a multi-system way.
                                            // 'key' should be set to a key which has already been set by SET_VARIABLES.
                                            // 'data' will be set to a value or NULL.
@@ -487,7 +495,10 @@ enum retro_mod
                                            // NULL is returned if the libretro was loaded statically (i.e. linked statically to frontend), or if the path cannot be determined.
                                            // Mostly useful in cooperation with SET_SUPPORT_NO_GAME as assets can be loaded without ugly hacks.
                                            //
-#define RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK 20
+                                           //
+// Environment 20 was an obsolete version of SET_AUDIO_CALLBACK. It was not used by any known core at the time,
+// and was removed from the API.
+#define RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK 22
                                            // const struct retro_audio_callback * --
                                            // Sets an interface which is used to notify a libretro core about audio being available for writing.
                                            // The callback can be called from any thread, so a core using this must have a thread safe audio implementation.
@@ -509,13 +520,169 @@ enum retro_mod
                                            // Lets the core know how much time has passed since last invocation of retro_run().
                                            // The frontend can tamper with the timing to fake fast-forward, slow-motion, frame stepping, etc.
                                            // In this case the delta time will use the reference value in frame_time_callback..
-                                          
+                                           //
+#define RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE 23
+                                           // struct retro_rumble_interface * --
+                                           // Gets an interface which is used by a libretro core to set state of rumble motors in controllers.
+                                           // A strong and weak motor is supported, and they can be controlled indepedently.
+                                           //
+#define RETRO_ENVIRONMENT_GET_INPUT_DEVICE_CAPABILITIES 24
+                                           // uint64_t * --
+                                           // Gets a bitmask telling which device type are expected to be handled properly in a call to retro_input_state_t.
+                                           // Devices which are not handled or recognized always return 0 in retro_input_state_t.
+                                           // Example bitmask: caps = (1 << RETRO_DEVICE_JOYPAD) | (1 << RETRO_DEVICE_ANALOG).
+                                           // Should only be called in retro_run().
+                                           //
+#define RETRO_ENVIRONMENT_GET_SENSOR_INTERFACE (25 | RETRO_ENVIRONMENT_EXPERIMENTAL)
+                                           // struct retro_sensor_interface * --
+                                           // Gets access to the sensor interface.
+                                           // The purpose of this interface is to allow
+                                           // setting state related to sensors such as polling rate, enabling/disable it entirely, etc.
+                                           // Reading sensor state is done via the normal input_state_callback API.
+                                           //
+#define RETRO_ENVIRONMENT_GET_CAMERA_INTERFACE (26 | RETRO_ENVIRONMENT_EXPERIMENTAL)
+                                           // struct retro_camera_callback * --
+                                           // Gets an interface to a video camera driver.
+                                           // A libretro core can use this interface to get access to a video camera.
+                                           // New video frames are delivered in a callback in same thread as retro_run().
+                                           //
+                                           // GET_CAMERA_INTERFACE should be called in retro_load_game().
+                                           //
+                                           // Depending on the camera implementation used, camera frames will be delivered as a raw framebuffer,
+                                           // or as an OpenGL texture directly.
+                                           //
+                                           // The core has to tell the frontend here which types of buffers can be handled properly.
+                                           // An OpenGL texture can only be handled when using a libretro GL core (SET_HW_RENDER).
+                                           // It is recommended to use a libretro GL core when using camera interface.
+                                           //
+                                           // The camera is not started automatically. The retrieved start/stop functions must be used to explicitly
+                                           // start and stop the camera driver.
+                                           //
+#define RETRO_ENVIRONMENT_GET_LOG_INTERFACE 27
+                                           // struct retro_log_callback * --
+                                           // Gets an interface for logging. This is useful for logging in a cross-platform way
+                                           // as certain platforms cannot use use stderr for logging. It also allows the frontend to
+                                           // show logging information in a more suitable way.
+                                           // If this interface is not used, libretro cores should log to stderr as desired.
+
+enum retro_log_level
+{
+   RETRO_LOG_DEBUG = 0,
+   RETRO_LOG_INFO,
+   RETRO_LOG_WARN,
+   RETRO_LOG_ERROR,
+
+   RETRO_LOG_DUMMY = INT_MAX
+};
+
+// Logging function. Takes log level argument as well.
+typedef void (*retro_log_printf_t)(enum retro_log_level level, const char *fmt, ...);
+
+struct retro_log_callback
+{
+   retro_log_printf_t log;
+};
+
+// FIXME: Document the sensor API and work out behavior.
+// It will be marked as experimental until then.
+enum retro_sensor_action
+{
+   RETRO_SENSOR_ACCELEROMETER_ENABLE = 0,
+   RETRO_SENSOR_ACCELEROMETER_DISABLE,
+
+   RETRO_SENSOR_DUMMY = INT_MAX
+};
+
+typedef bool (*retro_set_sensor_state_t)(unsigned port, enum retro_sensor_action action, unsigned rate);
+struct retro_sensor_interface
+{
+   retro_set_sensor_state_t set_sensor_state;
+};
+////
+
+enum retro_camera_buffer
+{
+   RETRO_CAMERA_BUFFER_OPENGL_TEXTURE = 0,
+   RETRO_CAMERA_BUFFER_RAW_FRAMEBUFFER,
+
+   RETRO_CAMERA_BUFFER_DUMMY = INT_MAX
+};
+
+// Starts the camera driver. Can only be called in retro_run().
+typedef bool (*retro_camera_start_t)(void);
+// Stops the camera driver. Can only be called in retro_run().
+typedef void (*retro_camera_stop_t)(void);
+// Callback which signals when the camera driver is initialized and/or deinitialized.
+// retro_camera_start_t can be called in initialized callback.
+typedef void (*retro_camera_lifetime_status_t)(void);
+// A callback for raw framebuffer data. buffer points to an XRGB8888 buffer.
+// Width, height and pitch are similar to retro_video_refresh_t.
+// First pixel is top-left origin.
+typedef void (*retro_camera_frame_raw_framebuffer_t)(const uint32_t *buffer, unsigned width, unsigned height, size_t pitch);
+// A callback for when OpenGL textures are used.
+//
+// texture_id is a texture owned by camera driver.
+// Its state or content should be considered immutable, except for things like texture filtering and clamping.
+//
+// texture_target is the texture target for the GL texture.
+// These can include e.g. GL_TEXTURE_2D, GL_TEXTURE_RECTANGLE, and possibly more depending on extensions.
+// 
+// affine points to a packed 3x3 column-major matrix used to apply an affine transform to texture coordinates. (affine_matrix * vec3(coord_x, coord_y, 1.0))
+// After transform, normalized texture coord (0, 0) should be bottom-left and (1, 1) should be top-right (or (width, height) for RECTANGLE).
+//
+// GL-specific typedefs are avoided here to avoid relying on gl.h in the API definition.
+typedef void (*retro_camera_frame_opengl_texture_t)(unsigned texture_id, unsigned texture_target, const float *affine);
+struct retro_camera_callback
+{
+   uint64_t caps; // Set by libretro core. Example bitmask: caps = (1 << RETRO_CAMERA_BUFFER_OPENGL_TEXTURE) | (1 << RETRO_CAMERA_BUFFER_RAW_FRAMEBUFFER).
+
+   unsigned width; // Desired resolution for camera. Is only used as a hint.
+   unsigned height;
+   retro_camera_start_t start; // Set by frontend.
+   retro_camera_stop_t stop; // Set by frontend.
+
+   retro_camera_frame_raw_framebuffer_t frame_raw_framebuffer; // Set by libretro core if raw framebuffer callbacks will be used.
+   retro_camera_frame_opengl_texture_t frame_opengl_texture; // Set by libretro core if OpenGL texture callbacks will be used.
+
+   // Set by libretro core. Called after camera driver is initialized and ready to be started.
+   // Can be NULL, in which this callback is not called.
+   retro_camera_lifetime_status_t initialized;
+
+   // Set by libretro core. Called right before camera driver is deinitialized.
+   // Can be NULL, in which this callback is not called.
+   retro_camera_lifetime_status_t deinitialized;
+};
+
+enum retro_rumble_effect
+{
+   RETRO_RUMBLE_STRONG = 0,
+   RETRO_RUMBLE_WEAK = 1,
+
+   RETRO_RUMBLE_DUMMY = INT_MAX
+};
+
+// Sets rumble state for joypad plugged in port 'port'. Rumble effects are controlled independently,
+// and setting e.g. strong rumble does not override weak rumble.
+// Strength has a range of [0, 0xffff].
+//
+// Returns true if rumble state request was honored. Calling this before first retro_run() is likely to return false.
+typedef bool (*retro_set_rumble_state_t)(unsigned port, enum retro_rumble_effect effect, uint16_t strength);
+struct retro_rumble_interface
+{
+   retro_set_rumble_state_t set_rumble_state;
+};
 
 // Notifies libretro that audio data should be written.
 typedef void (*retro_audio_callback_t)(void);
+
+// True: Audio driver in frontend is active, and callback is expected to be called regularily.
+// False: Audio driver in frontend is paused or inactive. Audio callback will not be called until set_state has been called with true.
+// Initial state is false (inactive).
+typedef void (*retro_audio_set_state_callback_t)(bool enabled);
 struct retro_audio_callback
 {
    retro_audio_callback_t callback;
+   retro_audio_set_state_callback_t set_state;
 };
 
 // Notifies a libretro core of time spent since last invocation of retro_run() in microseconds.
@@ -551,9 +718,10 @@ typedef retro_proc_address_t (*retro_hw_get_proc_address_t)(const char *sym);
 enum retro_hw_context_type
 {
    RETRO_HW_CONTEXT_NONE = 0,
-   RETRO_HW_CONTEXT_OPENGL, // OpenGL 2.x. Latest version available before 3.x+.
+   RETRO_HW_CONTEXT_OPENGL, // OpenGL 2.x. Latest version available before 3.x+. Driver can choose to use latest compatibility context.
    RETRO_HW_CONTEXT_OPENGLES2, // GLES 2.0
    RETRO_HW_CONTEXT_OPENGL_CORE, // Modern desktop core GL context. Use major/minor fields to set GL version.
+   RETRO_HW_CONTEXT_OPENGLES3, // GLES 3.0
 
    RETRO_HW_CONTEXT_DUMMY = INT_MAX
 };
@@ -583,6 +751,13 @@ struct retro_hw_render_callback
 // keycode is the RETROK value of the char.
 // character is the text character of the pressed key. (UTF-32).
 // key_modifiers is a set of RETROKMOD values or'ed together.
+//
+// The pressed/keycode state can be indepedent of the character.
+// It is also possible that multiple characters are generated from a single keypress.
+// Keycode events should be treated separately from character events.
+// However, when possible, the frontend should try to synchronize these.
+// If only a character is posted, keycode should be RETROK_UNKNOWN.
+// Similarily if only a keycode event is generated with no corresponding character, character should be 0.
 typedef void (*retro_keyboard_event_t)(bool down, unsigned keycode, uint32_t character, uint16_t key_modifiers);
 
 struct retro_keyboard_callback

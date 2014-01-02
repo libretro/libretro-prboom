@@ -118,6 +118,12 @@ static retro_input_state_t input_state_cb;
 
 void retro_init(void)
 {
+   struct retro_log_callback log;
+
+   if(environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
+      log_cb = log.log;
+   else
+      log_cb = NULL;
 #ifdef FRONTEND_SUPPORTS_RGB565
    enum retro_pixel_format rgb565;
 #endif

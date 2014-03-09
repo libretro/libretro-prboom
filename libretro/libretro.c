@@ -40,7 +40,7 @@
 //i_system
 int ms_to_next_tick;
 
-unsigned device_type = 0;
+static bool use_audio_cb;
 
 //i_video
 static unsigned char screen_buf[2 * 320 * 200];
@@ -179,14 +179,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
-   struct retro_variable variables[] = {
-      { "gamepad",
-         "Gamepad type; gamepad|dual-analog" },
-      { NULL, NULL },
-   };
    environ_cb = cb;
-
-   cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -226,18 +219,6 @@ void retro_shutdown_prboom(void)
 
 static void update_variables(void)
 {
-   struct retro_variable var;
-   
-   var.key = "gamepad";
-   var.value = NULL;
-
-   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
-   {
-      if (strcmp(var.value, "gamepad") == 0)
-         device_type = 0;
-      else if (strcmp(var.value, "dual-analog") == 0)
-         device_type = 1;
-   }
 }
 
 void retro_run(void)
@@ -247,7 +228,8 @@ void retro_run(void)
       update_variables();
 
    D_DoomLoop();
-   I_UpdateSound();
+   if (!use_audio_cb)
+      I_UpdateSound();
 }
 
 static void extract_basename(char *buf, const char *path, size_t size)
@@ -284,9 +266,14 @@ static void extract_directory(char *buf, const char *path, size_t size)
    }
 }
 
+static void audio_set_state(bool enable)
+{
+   (void)enable;
+}
 
 bool retro_load_game(const struct retro_game_info *info)
 {
+   struct retro_audio_callback cb = { I_UpdateSound, audio_set_state };
    int argc = 0;
    static char *argv[32] = {NULL};
 
@@ -294,6 +281,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
    extract_basename(g_basename, info->path, sizeof(g_basename));
+
 
    argv[argc++] = strdup("prboom");
    if(info->path)
@@ -311,6 +299,8 @@ bool retro_load_game(const struct retro_game_info *info)
   I_PreInitGraphics();
 
   D_DoomMainSetup();
+
+  use_audio_cb = environ_cb(RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK, &cb);
   return TRUE;
 }
 
@@ -419,152 +409,6 @@ void I_StartTic (void)
          D_PostEvent(&event);
 
       old_input[i] = new_input[i];
-   }
-
-   if (device_type == 1)
-   {
-      analog_l_x = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-            RETRO_DEVICE_ID_ANALOG_X);
-      analog_l_y = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-            RETRO_DEVICE_ID_ANALOG_Y);
-      analog_r_x = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-            RETRO_DEVICE_ID_ANALOG_X);
-
-      /* analog stick right - right */
-
-      new_input[14] = (analog_r_x > 0);
-
-      if(new_input[14] && !old_input[14])
-      {
-         analog_event.type = ev_keydown;
-         analog_event.data1 = '.';
-      }
-
-      if(!new_input[14] && old_input[14])
-      {
-         analog_event.type = ev_keyup;
-         analog_event.data1 = '.';
-      }
-
-      if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
-         D_PostEvent(&analog_event);
-
-      old_input[14] = new_input[14];
-
-      /* analog stick right - left */
-      analog_event.type = 0;
-      analog_event.data1 = 0;
-
-      new_input[15] = (analog_r_x < 0);
-
-      if(new_input[15] && !old_input[15])
-      {
-         analog_event.type = ev_keydown;
-         analog_event.data1 = ',';
-      }
-
-      if(!new_input[15] && old_input[15])
-      {
-         analog_event.type = ev_keyup;
-         analog_event.data1 = ',';
-      }
-
-      if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
-         D_PostEvent(&analog_event);
-
-      old_input[15] = new_input[15];
-
-      /* analog stick left - right */
-      analog_event.type = 0;
-      analog_event.data1 = 0;
-
-      new_input[16] = (analog_l_x > 0);
-
-      if(new_input[16] && !old_input[16])
-      {
-         analog_event.type = ev_keydown;
-         analog_event.data1 = KEYD_RIGHTARROW;
-      }
-
-      if(!new_input[16] && old_input[16])
-      {
-         analog_event.type = ev_keyup;
-         analog_event.data1 = KEYD_RIGHTARROW;
-      }
-
-      if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
-         D_PostEvent(&analog_event);
-
-      old_input[16] = new_input[16];
-
-      /* analog stick left - left */
-      analog_event.type = 0;
-      analog_event.data1 = 0;
-
-      new_input[17] = (analog_l_x < 0);
-
-      if(new_input[17] && !old_input[17])
-      {
-         analog_event.type = ev_keydown;
-         analog_event.data1 = KEYD_LEFTARROW;
-      }
-
-      if(!new_input[17] && old_input[17])
-      {
-         analog_event.type = ev_keyup;
-         analog_event.data1 = KEYD_LEFTARROW;
-      }
-
-      if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
-         D_PostEvent(&analog_event);
-
-      old_input[17] = new_input[17];
-
-      /* analog stick left - up */
-      analog_event.type = 0;
-      analog_event.data1 = 0;
-
-      new_input[18] = (analog_l_y < 0);
-
-      if(new_input[18] && !old_input[18])
-      {
-         analog_event.type = ev_keydown;
-         analog_event.data1 = KEYD_UPARROW;
-      }
-
-      if(!new_input[18] && old_input[18])
-      {
-         analog_event.type = ev_keyup;
-         analog_event.data1 = KEYD_UPARROW;
-      }
-
-      if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
-         D_PostEvent(&analog_event);
-
-      old_input[18] = new_input[18];
-
-      /* analog stick left - down */
-      analog_event.type = 0;
-      analog_event.data1 = 0;
-
-      new_input[19] = (analog_l_y > 0);
-
-      if(new_input[19] && !old_input[19])
-      {
-         analog_event.type = ev_keydown;
-         analog_event.data1 = KEYD_DOWNARROW;
-      }
-
-      if(!new_input[19] && old_input[19])
-      {
-         analog_event.type = ev_keyup;
-         analog_event.data1 = KEYD_DOWNARROW;
-      }
-
-      if(analog_event.type == ev_keydown || analog_event.type == ev_keyup)
-         D_PostEvent(&analog_event);
-
-      old_input[19] = new_input[19];
    }
 }
 

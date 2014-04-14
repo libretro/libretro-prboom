@@ -8,6 +8,10 @@ else ifneq ($(findstring MINGW,$(shell uname -a)),)
    platform = win
 else ifneq ($(findstring Darwin,$(shell uname -a)),)
    platform = osx
+	arch = intel
+ifeq ($(shell uname -p),powerpc)
+	arch = ppc
+endif
 else ifneq ($(findstring win,$(shell uname -a)),)
    platform = win
 endif
@@ -25,6 +29,10 @@ EXE_EXT = .exe
    system_platform = win
 else ifneq ($(findstring Darwin,$(shell uname -a)),)
    system_platform = osx
+	arch = intel
+ifeq ($(shell uname -p),powerpc)
+	arch = ppc
+endif
 else ifneq ($(findstring MINGW,$(shell uname -a)),)
    system_platform = win
 endif
@@ -38,8 +46,13 @@ ifeq ($(platform), unix)
    CFLAGS += -D_GNU_SOURCE=1
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME)_libretro.dylib
-   fpic := -fPIC -mmacosx-version-min=10.6
+   fpic := -fPIC
    SHARED := -dynamiclib
+ifeq ($(arch),ppc)
+   CFLAGS += -DWORDS_BIGENDIAN=1
+else
+   fpic += -mmacosx-version-min=10.6
+endif
    CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
 else ifeq ($(platform), ios)
    TARGET := $(TARGET_NAME)_libretro_ios.dylib

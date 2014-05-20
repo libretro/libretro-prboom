@@ -65,7 +65,6 @@ else ifeq ($(platform), ios)
 OSXVER = `sw_vers -productVersion | cut -c 4`
 ifneq ($(OSXVER),9)
    CFLAGS +=  -miphoneos-version-min=5.0
-   CC +=  -miphoneos-version-min=5.0
 endif
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_libretro_qnx.so

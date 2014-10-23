@@ -51,8 +51,9 @@ else ifeq ($(platform), osx)
 ifeq ($(arch),ppc)
    CFLAGS += -DWORDS_BIGENDIAN=1
 endif
-OSXVER = `sw_vers -productVersion | cut -c 4`
-ifneq ($(OSXVER),9)
+   OSXVER = `sw_vers -productVersion | cut -d. -f 2`
+   OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
+ifeq ($(OSX_LT_MAVERICKS),"YES")
    fpic += -mmacosx-version-min=10.5
 endif
    CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
@@ -61,9 +62,15 @@ else ifeq ($(platform), ios)
    fpic := -fPIC
    SHARED := -dynamiclib
    CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
+
+ifeq ($(IOSSDK),)
+   IOSSDK := $(shell xcrun -sdk iphoneos -show-sdk-path)
+endif
+
    CC = clang -arch armv7 -isysroot $(IOSSDK)
-OSXVER = `sw_vers -productVersion | cut -c 4`
-ifneq ($(OSXVER),9)
+   OSXVER = `sw_vers -productVersion | cut -d. -f 2`
+   OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
+ifeq ($(OSX_LT_MAVERICKS),"YES")
    CFLAGS +=  -miphoneos-version-min=5.0
 endif
 else ifeq ($(platform), qnx)

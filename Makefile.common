@@ -1,0 +1,83 @@
+INCFLAGS   = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(ROOT_DIR)/libmad
+
+SOURCES_C := $(ROOT_DIR)/libretro/libretro.c
+
+SOURCES_C += $(ROOT_DIR)/libmad/bit.c \
+					 $(ROOT_DIR)/libmad/decoder.c \
+					 $(ROOT_DIR)/libmad/fixed.c \
+					 $(ROOT_DIR)/libmad/frame.c \
+					 $(ROOT_DIR)/libmad/huffman.c \
+					 $(ROOT_DIR)/libmad/layer3.c \
+					 $(ROOT_DIR)/libmad/layer12.c \
+					 $(ROOT_DIR)/libmad/stream.c \
+					 $(ROOT_DIR)/libmad/synth.c \
+					 $(ROOT_DIR)/libmad/timer.c
+
+SOURCES_C += $(CORE_DIR)/am_map.c \
+				 $(CORE_DIR)/d_deh.c \
+				 $(CORE_DIR)/d_items.c \
+				 $(CORE_DIR)/d_main.c \
+				 $(CORE_DIR)/doomstat.c \
+				 $(CORE_DIR)/dstrings.c \
+				 $(CORE_DIR)/f_finale.c \
+				 $(CORE_DIR)/f_wipe.c \
+				 $(CORE_DIR)/g_game.c \
+				 $(CORE_DIR)/hu_lib.c \
+				 $(CORE_DIR)/hu_stuff.c \
+				 $(CORE_DIR)/info.c \
+				 $(CORE_DIR)/m_argv.c \
+				 $(CORE_DIR)/m_bbox.c \
+				 $(CORE_DIR)/m_cheat.c \
+				 $(CORE_DIR)/m_menu.c \
+				 $(CORE_DIR)/m_misc.c \
+				 $(CORE_DIR)/m_random.c \
+				 $(CORE_DIR)/p_ceilng.c \
+				 $(CORE_DIR)/p_doors.c \
+				 $(CORE_DIR)/p_enemy.c \
+				 $(CORE_DIR)/p_floor.c \
+				 $(CORE_DIR)/p_inter.c \
+				 $(CORE_DIR)/p_lights.c \
+				 $(CORE_DIR)/p_map.c \
+				 $(CORE_DIR)/p_maputl.c \
+				 $(CORE_DIR)/p_mobj.c \
+				 $(CORE_DIR)/p_plats.c \
+				 $(CORE_DIR)/p_pspr.c \
+				 $(CORE_DIR)/p_saveg.c \
+				 $(CORE_DIR)/p_setup.c \
+				 $(CORE_DIR)/p_sight.c \
+				 $(CORE_DIR)/p_spec.c \
+				 $(CORE_DIR)/p_switch.c \
+				 $(CORE_DIR)/p_telept.c \
+				 $(CORE_DIR)/p_tick.c \
+				 $(CORE_DIR)/p_user.c \
+				 $(CORE_DIR)/r_bsp.c \
+				 $(CORE_DIR)/r_data.c \
+				 $(CORE_DIR)/r_draw.c \
+				 $(CORE_DIR)/r_main.c \
+				 $(CORE_DIR)/r_plane.c \
+				 $(CORE_DIR)/r_segs.c \
+				 $(CORE_DIR)/r_sky.c \
+				 $(CORE_DIR)/r_things.c \
+				 $(CORE_DIR)/r_patch.c \
+				 $(CORE_DIR)/s_sound.c \
+				 $(CORE_DIR)/sounds.c \
+				 $(CORE_DIR)/st_lib.c \
+				 $(CORE_DIR)/st_stuff.c \
+				 $(CORE_DIR)/tables.c \
+				 $(CORE_DIR)/v_video.c \
+				 $(CORE_DIR)/w_wad.c \
+				 $(CORE_DIR)/z_zone.c \
+				 $(CORE_DIR)/w_memcache.c \
+				 $(CORE_DIR)/r_fps.c \
+				 $(CORE_DIR)/r_filter.c \
+				 $(CORE_DIR)/p_genlin.c \
+				 $(CORE_DIR)/r_demo.c \
+				 $(CORE_DIR)/z_bmalloc.c \
+				 $(CORE_DIR)/lprintf.c \
+				 $(CORE_DIR)/wi_stuff.c \
+				 $(CORE_DIR)/p_checksum.c \
+				 $(CORE_DIR)/md5.c \
+				 $(CORE_DIR)/version.c \
+				 $(CORE_DIR)/d_client.c \
+				 $(CORE_DIR)/mmus2mid.c \
+				 $(CORE_DIR)/madplayer.c

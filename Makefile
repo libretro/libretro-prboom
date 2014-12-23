@@ -70,6 +70,18 @@ endif
 ifeq ($(OSX_LT_MAVERICKS),"YES")
    CFLAGS +=  -miphoneos-version-min=5.0
 endif
+else ifeq ($(platform), theos_ios)
+	# Theos iOS
+DEPLOYMENT_IOSVERSION = 5.0
+TARGET = iphone:latest:$(DEPLOYMENT_IOSVERSION)
+ARCHS = armv7 armv7s
+TARGET_IPHONEOS_DEPLOYMENT_VERSION=$(DEPLOYMENT_IOSVERSION)
+THEOS_BUILD_DIR := objs
+include $(THEOS)/makefiles/common.mk
+
+LIBRARY_NAME = $(TARGET_NAME)_libretro_ios
+   CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
+
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_libretro_qnx.so
    fpic := -fPIC
@@ -159,7 +171,7 @@ CFLAGS += -DHAVE_LIBMAD -DMUSIC_SUPPORT
 ifeq ($(DEBUG), 1)
 CFLAGS += -O0 -g
 else
-CFLAGS += -O3
+CFLAGS += -O2 -DNDEBUG
 endif
 
 ROOT_DIR    := .
@@ -179,10 +191,19 @@ WARNINGS_DEFINES = -Wall -W -Wno-unused-parameter
 CODE_DEFINES = -fomit-frame-pointer
 endif
 
-COMMON_DEFINES += $(CODE_DEFINES) $(WARNINGS_DEFINES) -DNDEBUG=1 $(fpic)
+COMMON_DEFINES += $(CODE_DEFINES) $(WARNINGS_DEFINES) $(fpic)
 
 CFLAGS     += $(DEFINES) $(COMMON_DEFINES)
 
+%.o: %.c
+	$(CC) $(INCFLAGS) $(CFLAGS) -c -o $@ $<
+
+ifeq ($(platform), theos_ios)
+COMMON_FLAGS := -DIOS $(COMMON_DEFINES) $(INCFLAGS) -I$(THEOS_INCLUDE_PATH) -Wno-error
+$(LIBRARY_NAME)_CFLAGS += $(COMMON_FLAGS) $(CFLAGS)
+${LIBRARY_NAME}_FILES = $(SOURCES_C)
+include $(THEOS_MAKE_PATH)/library.mk
+else
 all: $(TARGET)
 
 $(TARGET): $(OBJECTS)
@@ -192,8 +213,6 @@ else
 	$(CC) $(fpic) $(SHARED) $(INCFLAGS) -o $@ $(OBJECTS) -lm
 endif
 
-%.o: %.c
-	$(CC) $(INCFLAGS) $(CFLAGS) -c -o $@ $<
 
 clean-objs:
 	rm -f $(OBJECTS)
@@ -202,4 +221,4 @@ clean:
 	rm -f $(OBJECTS) $(TARGET)
 
 .PHONY: clean clean-objs
-
+endif

@@ -112,6 +112,7 @@ enum patch_translation_e {
   VPT_NONE    = 0, // Normal
   VPT_FLIP    = 1, // Flip image horizontally
   VPT_TRANS   = 2, // Translate image via a translation table
+  VPT_STRETCH = 4, // Stretch to compensate for high-res
 };
 
 #endif

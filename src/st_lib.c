@@ -128,7 +128,7 @@ static void STlib_drawNum
   // clear the area
   x = n->x - numdigits*w;
 
-  V_CopyRect(x, n->y - ST_Y, BG, w*numdigits, h, x, n->y, FG, VPT_NONE);
+  V_CopyRect(x, n->y - ST_Y, BG, w*numdigits, h, x, n->y, FG, VPT_STRETCH);
 
   // if non-number, do not draw it
   if (num == 1994)
@@ -141,7 +141,7 @@ static void STlib_drawNum
   if (!num)
     // CPhipps - patch drawing updated, reformatted
     V_DrawNumPatch(x - w, n->y, FG, n->p[0].lumpnum, cm,
-       (((cm!=CR_DEFAULT) && !sts_always_red) ? VPT_TRANS : VPT_NONE));
+       (((cm!=CR_DEFAULT) && !sts_always_red) ? VPT_TRANS : VPT_NONE) | VPT_STRETCH);
 
   // draw the new number
   //jff 2/16/98 add color translation to digit output
@@ -149,7 +149,7 @@ static void STlib_drawNum
     // CPhipps - patch drawing updated, reformatted
     x -= w;
     V_DrawNumPatch(x, n->y, FG, n->p[num % 10].lumpnum, cm,
-       (((cm!=CR_DEFAULT) && !sts_always_red) ? VPT_TRANS : VPT_NONE));
+       (((cm!=CR_DEFAULT) && !sts_always_red) ? VPT_TRANS : VPT_NONE) | VPT_STRETCH);
     num /= 10;
   }
 
@@ -226,7 +226,7 @@ void STlib_updatePercent
     // CPhipps - patch drawing updated
     V_DrawNumPatch(per->n.x, per->n.y, FG, per->p->lumpnum,
        sts_pct_always_gray ? CR_GRAY : cm,
-       (sts_always_red ? VPT_NONE : VPT_TRANS));
+       (sts_always_red ? VPT_NONE : VPT_TRANS) | VPT_STRETCH);
   }
 
   STlib_updateNum(&per->n, cm, refresh);
@@ -286,10 +286,10 @@ void STlib_updateMultIcon
       w = mi->p[mi->oldinum].width;
       h = mi->p[mi->oldinum].height;
 
-      V_CopyRect(x, y-ST_Y, BG, w, h, x, y, FG, VPT_NONE);
+      V_CopyRect(x, y-ST_Y, BG, w, h, x, y, FG, VPT_STRETCH);
     }
     if (*mi->inum != -1)  // killough 2/16/98: redraw only if != -1
-      V_DrawNumPatch(mi->x, mi->y, FG, mi->p[*mi->inum].lumpnum, CR_DEFAULT, VPT_NONE);
+      V_DrawNumPatch(mi->x, mi->y, FG, mi->p[*mi->inum].lumpnum, CR_DEFAULT, VPT_STRETCH);
     mi->oldinum = *mi->inum;
   }
 }
@@ -350,9 +350,9 @@ void STlib_updateBinIcon
     h = bi->p->height;
 
     if (*bi->val)
-      V_DrawNumPatch(bi->x, bi->y, FG, bi->p->lumpnum, CR_DEFAULT, VPT_NONE);
+      V_DrawNumPatch(bi->x, bi->y, FG, bi->p->lumpnum, CR_DEFAULT, VPT_STRETCH);
     else
-      V_CopyRect(x, y-ST_Y, BG, w, h, x, y, FG, VPT_NONE);
+      V_CopyRect(x, y-ST_Y, BG, w, h, x, y, FG, VPT_STRETCH);
 
     bi->oldval = *bi->val;
   }

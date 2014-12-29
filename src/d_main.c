@@ -274,7 +274,7 @@ void D_Display (void)
   if (paused && (menuactive != mnact_full)) {
     // Simplified the "logic" here and no need for x-coord caching - POPE
     V_DrawNamePatch((320 - V_NamePatchWidth("M_PAUSE"))/2, 4,
-                    0, "M_PAUSE", CR_DEFAULT, VPT_NONE);
+                    0, "M_PAUSE", CR_DEFAULT, VPT_STRETCH);
   }
 
   // menus go directly to the screen
@@ -339,7 +339,7 @@ static void D_PageDrawer(void)
   // proff - added M_DrawCredits
   if (pagename)
   {
-    V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_NONE);
+    V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
   }
   else
     M_DrawCredits();

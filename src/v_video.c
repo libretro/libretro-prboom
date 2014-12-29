@@ -116,6 +116,16 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
   byte *src;
   byte *dest;
 
+  if (flags & VPT_STRETCH)
+  {
+    srcx=srcx*SCREENWIDTH/320;
+    srcy=srcy*SCREENHEIGHT/200;
+    width=width*SCREENWIDTH/320;
+    height=height*SCREENHEIGHT/200;
+    destx=destx*SCREENWIDTH/320;
+    desty=desty*SCREENHEIGHT/200;
+  }
+
   src = screens[srcscrn].data + SURFACE_BYTE_PITCH * srcy + srcx * SURFACE_PIXEL_DEPTH;
   dest = screens[destscrn].data + SURFACE_BYTE_PITCH * desty + destx * SURFACE_PIXEL_DEPTH;
 
@@ -230,6 +240,11 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
     trans=translationtables + 256*((cm-CR_LIMIT)-1);
   y -= patch->topoffset;
   x -= patch->leftoffset;
+
+  // CPhipps - auto-no-stretch if not high-res
+  if (flags & VPT_STRETCH)
+    if ((SCREENWIDTH==320) && (SCREENHEIGHT==200))
+      flags &= ~VPT_STRETCH;
 
   // CPhipps - null translation pointer => no translation
   if (!trans)

@@ -359,12 +359,18 @@ void R_ExecuteSetViewSize (void)
   int i;
 
   setsizeneeded = FALSE;
-  viewheight = SCREENHEIGHT;
 
   if (!setblocks)
-    viewheight -= ST_SCALED_HEIGHT;
+  {
+     scaledviewwidth = SCREENWIDTH;
+     viewheight = SCREENHEIGHT - ST_SCALED_HEIGHT;
+  }
+  else
+  {
+     scaledviewwidth = SCREENWIDTH;
+     viewheight = SCREENHEIGHT;
+  }
 
-  scaledviewwidth = SCREENWIDTH;
   viewwidth = scaledviewwidth;
 
   viewheightfrac = viewheight<<FRACBITS;//e6y

@@ -167,9 +167,9 @@ void retro_get_system_info(struct retro_system_info *info)
    memset(info, 0, sizeof(*info));
    info->library_name     = "prboom";
    info->library_version  = "v2.5.0";
-   info->need_fullpath    = FALSE;
+   info->need_fullpath    = false;
    info->valid_extensions = "wad|iwad";
-   info->block_extract = FALSE;
+   info->block_extract = false;
 }
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
@@ -329,7 +329,7 @@ bool retro_load_game(const struct retro_game_info *info)
   D_DoomMainSetup();
 
   use_audio_cb = environ_cb(RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK, &cb);
-  return TRUE;
+  return true;
 }
 
 
@@ -347,7 +347,7 @@ bool retro_load_game_special(unsigned type, const struct retro_game_info *info, 
    (void)type;
    (void)info;
    (void)num;
-   return FALSE;
+   return false;
 }
 
 size_t retro_serialize_size(void)
@@ -357,12 +357,12 @@ size_t retro_serialize_size(void)
 
 bool retro_serialize(void *data_, size_t size)
 {
-   return FALSE;
+   return false;
 }
 
 bool retro_unserialize(const void *data_, size_t size)
 {
-   return FALSE;
+   return false;
 }
 
 void *retro_get_memory_data(unsigned id)
@@ -451,7 +451,7 @@ static void I_UpdateVideoMode(void)
 
   I_SetRes();
 
-  screens[0].not_on_heap = TRUE;
+  screens[0].not_on_heap = true;
   screens[0].data = (unsigned char *)screen_buf;
 
   V_AllocScreens();
@@ -504,20 +504,20 @@ void I_SetRes(void)
 
 /* i_system - i_main */
 
-static boolean InDisplay = FALSE;
+static boolean InDisplay = false;
 
 boolean I_StartDisplay(void)
 {
   if (InDisplay)
-    return FALSE;
+    return false;
 
-  InDisplay = TRUE;
-  return TRUE;
+  InDisplay = true;
+  return true;
 }
 
 void I_EndDisplay(void)
 {
-  InDisplay = FALSE;
+  InDisplay = false;
 }
 
 /*
@@ -1074,7 +1074,7 @@ void I_InitSound(void)
 
 boolean I_AnySoundStillPlaying(void)
 {
-  boolean result = FALSE;
+  boolean result = false;
   int i;
 
   for (i=0; i<MAX_CHANNELS; i++)

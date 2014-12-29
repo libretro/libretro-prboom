@@ -93,7 +93,7 @@ typedef enum {
 // For resize of screen, at start of game.
 //
 
-#define BASE_WIDTH 320
+#define BASE_WIDTH SCREENWIDTH
 
 // It is educational but futile to change this
 //  scaling e.g. to 2. Drawing of status bar,
@@ -107,8 +107,8 @@ typedef enum {
 // when multiple screen sizes are supported
 
 // proff 08/17/98: Changed for high-res
-#define MAX_SCREENWIDTH  320
-#define MAX_SCREENHEIGHT 200
+#define MAX_SCREENWIDTH  SCREENWIDTH
+#define MAX_SCREENHEIGHT SCREENHEIGHT
 
 // The maximum number of players, multiplayer/networking.
 #define MAXPLAYERS       4

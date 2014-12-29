@@ -43,7 +43,7 @@ int ms_to_next_tick;
 static bool use_audio_cb;
 
 //i_video
-static unsigned char screen_buf[2 * 320 * 200];
+static unsigned char screen_buf[SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT];
 
 //i_sound
 int 		lengths[NUMSFX];
@@ -176,10 +176,10 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 {
    info->timing.fps = 60.0;
    info->timing.sample_rate = 44100.0;
-   info->geometry.base_width = 320;
-   info->geometry.base_height = 200;
-   info->geometry.max_width = 320;
-   info->geometry.max_height = 200;
+   info->geometry.base_width = SCREENWIDTH;
+   info->geometry.base_height = SCREENHEIGHT;
+   info->geometry.max_width = SCREENWIDTH;
+   info->geometry.max_height = SCREENHEIGHT;
    info->geometry.aspect_ratio = 4.0 / 3.0;
 }
 

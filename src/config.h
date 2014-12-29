@@ -4,15 +4,15 @@
 /* Define to be the path where Doom WADs are stored */
 #define DOOMWADDIR "/usr/local/share/games/doom"
 
+#define SURFACE_PIXEL_DEPTH 2
 #define SCREENWIDTH 320
 #define SCREENHEIGHT 200
-#define SCREENPITCH 640
+#define SCREENPITCH (SCREENWIDTH*SURFACE_PIXEL_DEPTH)
 
-#define SURFACE_WIDTH 320
+#define SURFACE_WIDTH SCREENWIDTH
 #define SURFACE_BYTE_PITCH SCREENPITCH
 #define SURFACE_SHORT_PITCH SCREENWIDTH
-#define SURFACE_INT_PITCH 160
-#define SURFACE_PIXEL_DEPTH 2
+#define SURFACE_INT_PITCH (SCREENWIDTH/2)
 
 /* Define to 1 if you have the <asm/byteorder.h> header file. */
 #ifndef __CELLOS_LV2__

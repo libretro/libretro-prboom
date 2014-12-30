@@ -5,8 +5,8 @@
 #define DOOMWADDIR "/usr/local/share/games/doom"
 
 #define SURFACE_PIXEL_DEPTH 2
-#define SCREENWIDTH 320
-#define SCREENHEIGHT 200
+extern int SCREENWIDTH;
+extern int SCREENHEIGHT;
 #define SCREENPITCH (SCREENWIDTH*SURFACE_PIXEL_DEPTH)
 
 #define SURFACE_WIDTH SCREENWIDTH

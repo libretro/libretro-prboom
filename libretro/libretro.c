@@ -40,10 +40,14 @@
 //i_system
 int ms_to_next_tick;
 
+int SCREENWIDTH  = 320;
+int SCREENHEIGHT = 200;
+
 static bool use_audio_cb;
 
 //i_video
-static unsigned char screen_buf[SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT];
+static unsigned char *screen_buf;
+
 
 //i_sound
 int 		lengths[NUMSFX];
@@ -186,7 +190,15 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
+   struct retro_variable variables[] = {
+      { "prboom_resolution",
+         "Resolution (restart); 320x200|320x240|320x480|360x200|360x240|360x400|360x480|400x224|480x272|512x224|512x240|512x384|512x512|640x224|640x240|640x448|640x480|720x576|800x480|800x600|960x720|1024x768|1280x720" },
+      { NULL, NULL },
+   };
+
    environ_cb = cb;
+
+   cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -224,15 +236,39 @@ void retro_shutdown_prboom(void)
    environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
 }
 
-static void update_variables(void)
+static void update_variables(bool startup)
 {
+   struct retro_variable var;
+   
+   if (startup)
+   {
+      var.key = "prboom_resolution";
+      var.value = NULL;
+
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+      {
+         char *pch;
+         char str[100];
+         snprintf(str, sizeof(str), "%s", var.value);
+
+         pch = strtok(str, "x");
+         if (pch)
+            SCREENWIDTH = strtoul(pch, NULL, 0);
+         pch = strtok(str, "x");
+         if (pch)
+             SCREENHEIGHT = strtoul(pch, NULL, 0);
+
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
+      }
+   }
 }
 
 void retro_run(void)
 {
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
-      update_variables();
+      update_variables(false);
 
    D_DoomLoop();
    if (!use_audio_cb)
@@ -305,7 +341,9 @@ bool retro_load_game(const struct retro_game_info *info)
 
    environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
 
-   update_variables();
+   update_variables(true);
+
+   screen_buf = malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
 
    extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
    extract_basename(g_basename, info->path, sizeof(g_basename));
@@ -335,6 +373,9 @@ bool retro_load_game(const struct retro_game_info *info)
 
 void retro_unload_game(void)
 {
+   if (screen_buf)
+      free(screen_buf);
+   screen_buf = NULL;
 }
 
 unsigned retro_get_region(void)

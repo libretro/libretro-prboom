@@ -43,8 +43,6 @@ int ms_to_next_tick;
 int SCREENWIDTH  = 320;
 int SCREENHEIGHT = 200;
 
-static bool use_audio_cb;
-
 //i_video
 static unsigned char *screen_buf;
 
@@ -276,8 +274,7 @@ void retro_run(void)
       update_variables(false);
 
    D_DoomLoop();
-   if (!use_audio_cb)
-      I_UpdateSound();
+   I_UpdateSound();
 }
 
 static void extract_basename(char *buf, const char *path, size_t size)
@@ -371,7 +368,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
   D_DoomMainSetup();
 
-  use_audio_cb = environ_cb(RETRO_ENVIRONMENT_SET_AUDIO_CALLBACK, &cb);
   return true;
 }
 

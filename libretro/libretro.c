@@ -191,8 +191,8 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 void retro_set_environment(retro_environment_t cb)
 {
    struct retro_variable variables[] = {
-      { "prboom_resolution",
-         "Resolution (restart); 320x200|320x240|320x480|360x200|360x240|360x400|360x480|400x224|480x272|512x224|512x240|512x384|512x512|640x224|640x240|640x448|640x480|720x576|800x480|800x600|960x720|1024x768" },
+      { "prboom-resolution",
+         "Internal resolution; 320x200|320x240|320x480|360x200|360x240|360x400|360x480|400x224|480x272|512x224|512x240|512x384|512x512|640x224|640x240|640x448|640x480|720x576|800x480|800x600|960x720|1024x768" },
       { NULL, NULL },
    };
 
@@ -242,10 +242,10 @@ static void update_variables(bool startup)
    
    if (startup)
    {
-      var.key = "prboom_resolution";
+      var.key = "prboom-resolution";
       var.value = NULL;
 
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var))
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
          char *pch;
          char str[100];
@@ -256,10 +256,15 @@ static void update_variables(bool startup)
             SCREENWIDTH = strtoul(pch, NULL, 0);
          pch = strtok(str, "x");
          if (pch)
-             SCREENHEIGHT = strtoul(pch, NULL, 0);
+            SCREENHEIGHT = strtoul(pch, NULL, 0);
 
          if (log_cb)
             log_cb(RETRO_LOG_INFO, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
+      }
+      else
+      {
+         SCREENWIDTH = 320;
+         SCREENHEIGHT = 200;
       }
    }
 }

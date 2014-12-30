@@ -254,7 +254,7 @@ static void update_variables(bool startup)
          pch = strtok(str, "x");
          if (pch)
             SCREENWIDTH = strtoul(pch, NULL, 0);
-         pch = strtok(str, "x");
+         pch = strtok(NULL, "x");
          if (pch)
             SCREENHEIGHT = strtoul(pch, NULL, 0);
 

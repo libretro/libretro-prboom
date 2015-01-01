@@ -85,7 +85,12 @@ extern int SCREENHEIGHT;
 #define PACKAGE_VERSION "2.5.0"
 
 /* Set to the attribute to apply to struct definitions to make them packed */
+#ifdef __MINGW32__
+/* Use gcc_struct to work around http://gcc.gnu.org/PR52991 */
+#define PACKEDATTR __attribute__((packed, gcc_struct))
+#else
 #define PACKEDATTR __attribute__((packed))
+#endif
 
 /* Version number of package */
 #define VERSION "2.5.0"

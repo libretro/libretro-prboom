@@ -36,11 +36,21 @@ endif
 
 TARGET_NAME := prboom
 
+LIBM := -lm
+LDFLAGS := 
+
 ifeq ($(platform), unix)
    TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
    CFLAGS += -D_GNU_SOURCE=1
+else ifeq ($(platform), linux-portable)
+   TARGET := $(TARGET_NAME)_libretro.so
+   fpic := -fPIC -nostdlib
+   SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
+   CFLAGS += -D_GNU_SOURCE=1
+	LIBM :=
+	LDFLAGS += -L. -lmusl
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
@@ -166,6 +176,8 @@ else
    CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__ -Wno-missing-field-initializers -DHAVE_STRLWR -DNO_ASM_BYTEORDER
 endif
 
+LDFLAGS += $(LIBM)
+
 CFLAGS += -DHAVE_LIBMAD -DMUSIC_SUPPORT
 
 ifeq ($(DEBUG), 1)
@@ -210,7 +222,7 @@ $(TARGET): $(OBJECTS)
 ifeq ($(STATIC_LINKING), 1)
 	$(AR) rcs $@ $(OBJECTS)
 else
-	$(CC) $(fpic) $(SHARED) $(INCFLAGS) -o $@ $(OBJECTS) -lm
+	$(CC) $(fpic) $(SHARED) $(INCFLAGS) -o $@ $(OBJECTS) $(LDFLAGS)
 endif
 
 

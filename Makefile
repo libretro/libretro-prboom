@@ -50,7 +50,6 @@ else ifeq ($(platform), linux-portable)
    SHARED := -shared -Wl,--version-script=libretro/link.T
    CFLAGS += -D_GNU_SOURCE=1
 	LIBM :=
-	LDFLAGS += -L. -lmusl
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC

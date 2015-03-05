@@ -47,7 +47,7 @@ ifeq ($(platform), unix)
 else ifeq ($(platform), linux-portable)
    TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC -nostdlib
-   SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
+   SHARED := -shared -Wl,--version-script=libretro/link.T
    CFLAGS += -D_GNU_SOURCE=1
 	LIBM :=
 	LDFLAGS += -L. -lmusl

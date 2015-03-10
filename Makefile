@@ -70,7 +70,7 @@ else ifeq ($(platform), ios)
    CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
 
 ifeq ($(IOSSDK),)
-   IOSSDK := $(shell xcrun -sdk iphoneos -show-sdk-path)
+   IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
 endif
 
    CC = clang -arch armv7 -isysroot $(IOSSDK)

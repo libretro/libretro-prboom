@@ -167,7 +167,7 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
-   info->library_name     = "prboom";
+   info->library_name     = "PrBoom";
    info->library_version  = "v2.5.0";
    info->need_fullpath    = false;
    info->valid_extensions = "wad|iwad";

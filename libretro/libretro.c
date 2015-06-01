@@ -190,7 +190,7 @@ void retro_set_environment(retro_environment_t cb)
 {
    struct retro_variable variables[] = {
       { "prboom-resolution",
-         "Internal resolution; 320x200|320x240|320x480|360x200|360x240|360x400|360x480|400x224|480x272|512x224|512x240|512x384|512x512|640x224|640x240|640x448|640x480|720x576|800x480|800x600|960x720|1024x768" },
+         "Internal resolution; 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
       { NULL, NULL },
    };
 

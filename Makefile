@@ -17,8 +17,6 @@ else ifneq ($(findstring win,$(shell uname -a)),)
 endif
 endif
 
-CC         = gcc
-
 # system platform
 system_platform = unix
 ifeq ($(shell uname -a),)

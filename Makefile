@@ -57,9 +57,7 @@ ifeq ($(arch),ppc)
 endif
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
    OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
-ifeq ($(OSX_LT_MAVERICKS),"YES")
-   fpic += -mmacosx-version-min=10.5
-endif
+   fpic += -mmacosx-version-min=10.1
    CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
 else ifeq ($(platform), ios)
    TARGET := $(TARGET_NAME)_libretro_ios.dylib

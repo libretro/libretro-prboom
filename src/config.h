@@ -26,22 +26,6 @@ extern int SCREENHEIGHT;
 /* Define to 1 if you have the <inttypes.h> header file. */
 #define HAVE_INTTYPES_H 1
 
-#ifdef HAVE_SDL
-
-/* Define to 1 if you have the `SDL_mixer' library (-lSDL_mixer). */
-#define HAVE_LIBSDL_MIXER 1
-
-/* Define to 1 if you have the 'SDL_mixer' library (-lSDL_mixer) and Timidity. */
-#define HAVE_MIDI_MIXER 1
-
-/* Define if you have the SDL net library -lSDL_net */
-#define HAVE_LIBSDL_NET 1
-
-/* Define if you want to use the SDL net lib */
-#define USE_SDL_NET 1
-
-#endif
-
 #ifdef HAVE_NET
 
 /* Define to 1 if you have the `inet_aton' function. */

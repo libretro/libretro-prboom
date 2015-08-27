@@ -1479,9 +1479,6 @@ void D_DoomDeinit(void)
   W_Exit();
   I_ShutdownSound();
   I_ShutdownMusic();
-#ifdef HAVE_SDL
-  SDL_Quit();
-#endif
   p_checksum_cleanup();
 }
 

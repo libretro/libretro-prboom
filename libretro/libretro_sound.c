@@ -42,7 +42,6 @@ int 		lengths[NUMSFX];
 int snd_card = 1;
 int mus_card = 0;
 int snd_samplerate= 11025;
-int use_doublebuffer = 1;
 
 typedef struct
 {

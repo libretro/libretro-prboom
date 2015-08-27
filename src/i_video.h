@@ -55,6 +55,4 @@ void I_FinishUpdate (void);
  */
 void I_StartTic (void);
 
-extern int use_doublebuffer;  /* proff 2001-7-4 - controls wether to use doublebuffering*/
-
 #endif

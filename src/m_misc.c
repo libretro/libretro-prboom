@@ -260,8 +260,6 @@ default_t defaults[] =
    def_int,ss_none}, // number of audio events simultaneously // killough
 
   {"Video settings",{NULL},{0},UL,UL,def_none,ss_none},
-  {"use_doublebuffer",{&use_doublebuffer},{1},0,1,             // proff 2001-7-4
-   def_bool,ss_none}, // enable doublebuffer to avoid display tearing (fullscreen)
   {"screenblocks",{&screenblocks},{10},3,11,  // killough 2/21/98: default to 10
    def_int,ss_none},
   {"usegamma",{&usegamma},{0},0,4, //jff 3/6/98 fix erroneous upper limit in range

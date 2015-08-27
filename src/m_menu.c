@@ -1043,8 +1043,6 @@ static void M_QuitResponse(int ch)
   I_SafeExit(1);
 }
 
-extern void retro_shutdown_prboom(void);
-
 void M_QuitDOOM(int choice)
 {
   static char endstring[160];
@@ -1054,7 +1052,6 @@ void M_QuitDOOM(int choice)
   // Ty 03/27/98 - externalized DOSY as a string s_DOSY that's in the sprintf
   has_exited = 0;
   M_QuitResponse('y');
-  retro_shutdown_prboom();
 }
 
 /////////////////////////////

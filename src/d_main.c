@@ -299,6 +299,8 @@ void D_Display (void)
 
 int has_exited;
 
+extern void retro_shutdown_prboom(void);
+
 /* I_SafeExit
  * This function is called instead of exit() by functions that might be called
  * during the exit process (i.e. after exit() has already been called)
@@ -308,7 +310,10 @@ int has_exited;
 void I_SafeExit(int rc)
 {
   if (!has_exited)    /* If it hasn't exited yet, exit now -- killough */
+  {
       has_exited=rc ? 2 : 1;
+      retro_shutdown_prboom();
+  }
 }
 
 //
@@ -1438,26 +1443,23 @@ extern void D_QuitNetGame (void);
 
 void D_DoomLoop(void)
 {
-  //Doom loop
-  do
-  {
-	  WasRenderedInTryRunTics = FALSE;
+   //Doom loop
+   WasRenderedInTryRunTics = FALSE;
 
-	  if (ffmap == gamemap) ffmap = 0;
+   if (ffmap == gamemap) ffmap = 0;
 
-	  TryRunTics (); // will run at least one tic
+   TryRunTics (); // will run at least one tic
 
-	  // killough 3/16/98: change consoleplayer to displayplayer
-	  if (players[displayplayer].mo) // cph 2002/08/10
-		  S_UpdateSounds(players[displayplayer].mo);// move positional sounds
+   // killough 3/16/98: change consoleplayer to displayplayer
+   if (players[displayplayer].mo) // cph 2002/08/10
+      S_UpdateSounds(players[displayplayer].mo);// move positional sounds
 
-	  if (!movement_smooth || !WasRenderedInTryRunTics || gamestate != wipegamestate)
-	  {
-		  // Update display, next frame, with current state.
-		  D_Display();
-        return;
-	  }
-  } while(!has_exited);
+   if (!movement_smooth || !WasRenderedInTryRunTics || gamestate != wipegamestate)
+   {
+      // Update display, next frame, with current state.
+      D_Display();
+      return;
+   }
 }
 
 //foward decl

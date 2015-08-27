@@ -1474,6 +1474,7 @@ void D_DoomDeinit(void)
   I_ShutdownNetwork();
 #endif
   M_SaveDefaults ();
+  W_Exit();
   I_ShutdownSound();
   I_ShutdownMusic();
 #ifdef HAVE_SDL

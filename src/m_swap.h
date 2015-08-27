@@ -96,8 +96,7 @@
  * Use separate macros so network could be converted to big-endian later.
  */
 
-#ifdef WORDS_BIGENDIAN
-
+#ifdef MSB_FIRST
 #define doom_wtohl(x) doom_swap_l(x)
 #define doom_htowl(x) doom_swap_l(x)
 #define doom_wtohs(x) doom_swap_s(x)
@@ -107,9 +106,7 @@
 #define doom_htonl(x) doom_swap_l(x)
 #define doom_ntohs(x) doom_swap_s(x)
 #define doom_htons(x) doom_swap_s(x)
-
 #else
-
 #define doom_wtohl(x) (long int)(x)
 #define doom_htowl(x) (long int)(x)
 #define doom_wtohs(x) (short int)(x)

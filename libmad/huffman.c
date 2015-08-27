@@ -40,11 +40,11 @@
 #  define V(v, w, x, y, hlen)	{ .value = { 1, hlen, v, w, x, y } }
 # else
 #  define PTR(offs, bits)	{ { 0, bits, offs } }
-#  if defined(WORDS_BIGENDIAN)
-#   define V(v, w, x, y, hlen)	{ { 1, hlen, (v << 11) | (w << 10) |  \
+#if defined(MSB_FIRST
+#define V(v, w, x, y, hlen)	{ { 1, hlen, (v << 11) | (w << 10) |  \
                                              (x <<  9) | (y <<  8) } }
-#  else
-#   define V(v, w, x, y, hlen)	{ { 1, hlen, (v <<  0) | (w <<  1) |  \
+#else
+#define V(v, w, x, y, hlen)	{ { 1, hlen, (v <<  0) | (w <<  1) |  \
                                              (x <<  2) | (y <<  3) } }
 #  endif
 # endif
@@ -118,7 +118,7 @@ union huffquad const hufftabB[] = {
 #  define V(x, y, hlen)		{ .value = { 1, hlen, x, y } }
 # else
 #  define PTR(offs, bits)	{ { 0, bits, offs } }
-#  if defined(WORDS_BIGENDIAN)
+#  if defined(MSB_FIRST)
 #   define V(x, y, hlen)	{ { 1, hlen, (x << 8) | (y << 4) } }
 #  else
 #   define V(x, y, hlen)	{ { 1, hlen, (x << 0) | (y << 4) } }

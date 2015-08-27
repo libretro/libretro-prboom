@@ -41,29 +41,27 @@ ifeq ($(platform), unix)
    TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
-   CFLAGS += -D_GNU_SOURCE=1
 else ifeq ($(platform), linux-portable)
    TARGET := $(TARGET_NAME)_libretro.so
    fpic := -fPIC -nostdlib
    SHARED := -shared -Wl,--version-script=libretro/link.T
-   CFLAGS += -D_GNU_SOURCE=1
 	LIBM :=
 else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME)_libretro.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
 ifeq ($(arch),ppc)
-   CFLAGS += -DWORDS_BIGENDIAN=1
+   CFLAGS += -DMSB_FIRST
 endif
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
    OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
    fpic += -mmacosx-version-min=10.1
-   CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
+   CFLAGS += -DNO_ASM_BYTEORDER
 else ifeq ($(platform), ios)
    TARGET := $(TARGET_NAME)_libretro_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
-   CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
+   CFLAGS += -DNO_ASM_BYTEORDER
 
 ifeq ($(IOSSDK),)
    IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
@@ -85,7 +83,7 @@ THEOS_BUILD_DIR := objs
 include $(THEOS)/makefiles/common.mk
 
 LIBRARY_NAME = $(TARGET_NAME)_libretro_ios
-   CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
+   CFLAGS += -DNO_ASM_BYTEORDER
 
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_libretro_qnx.so
@@ -93,55 +91,54 @@ else ifeq ($(platform), qnx)
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
 	CC = qcc -Vgcc_ntoarmv7le
 	AR = qcc -Vgcc_ntoarmv7le
-   CFLAGS += -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER -DHAVE_STRLWR
+   CFLAGS += -DNO_ASM_BYTEORDER -DHAVE_STRLWR
 	CFLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
 else ifeq ($(platform), ps3)
    TARGET := $(TARGET_NAME)_libretro_ps3.a
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
    AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
-   CFLAGS += -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1
+   CFLAGS += -DMSB_FIRST
 	STATIC_LINKING = 1
 else ifeq ($(platform), sncps3)
    TARGET := $(TARGET_NAME)_libretro_ps3.a
    CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
    AR = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
-   CFLAGS += -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1
+   CFLAGS += -DMSB_FIRST
 	STATIC_LINKING = 1
 else ifeq ($(platform), psl1ght)
    TARGET := $(TARGET_NAME)_libretro_psl1ght.a
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
-   CFLAGS += -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1 -DHAVE_STRLWR -DNO_ASM_BYTEORDER
+   CFLAGS += -DMSB_FIRST -DHAVE_STRLWR -DNO_ASM_BYTEORDER
 	STATIC_LINKING = 1
 else ifeq ($(platform), psp1)
    TARGET := $(TARGET_NAME)_libretro_psp1.a
    CC = psp-gcc$(EXE_EXT)
    AR = psp-ar$(EXE_EXT)
-   CFLAGS += -D_GNU_SOURCE=1 -DHAVE_STRLWR -DNO_ASM_BYTEORDER -DPSP -G0
+   CFLAGS += -DHAVE_STRLWR -DNO_ASM_BYTEORDER -DPSP -G0
 	STATIC_LINKING = 1
 else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_libretro_xenon360.a
    CC = xenon-gcc$(EXE_EXT)
    AR = xenon-ar$(EXE_EXT)
-   CFLAGS += -D__LIBXENON__ -m32 -D__ppc__ -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1
+   CFLAGS += -D__LIBXENON__ -m32 -D__ppc__ -DMSB_FIRST
 	STATIC_LINKING = 1
 else ifeq ($(platform), ngc)
    TARGET := $(TARGET_NAME)_libretro_ngc.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMEMORY_LOW -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
+   CFLAGS += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMEMORY_LOW -DMSB_FIRST -DNO_ASM_BYTEORDER
 	STATIC_LINKING = 1
 else ifeq ($(platform), wii)
    TARGET := $(TARGET_NAME)_libretro_wii.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DWORDS_BIGENDIAN=1 -D_GNU_SOURCE=1 -DNO_ASM_BYTEORDER
+   CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST -DNO_ASM_BYTEORDER
 	STATIC_LINKING = 1
 else ifneq (,$(findstring armv,$(platform)))
    TARGET := $(TARGET_NAME)_libretro.so
    SHARED := -shared -Wl,--no-undefined
    fpic := -fPIC
-   CFLAGS += -D_GNU_SOURCE=1
    CC = gcc
 ifneq (,$(findstring cortexa8,$(platform)))
    CFLAGS += -marm -mcpu=cortex-a8

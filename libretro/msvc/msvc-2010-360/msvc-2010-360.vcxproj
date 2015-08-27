@@ -769,7 +769,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;_XBOX;_XBOX360;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_XBOX;_XBOX360;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -789,7 +789,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreadedDebug</RuntimeLibrary>
-      <PreprocessorDefinitions>_DEBUG;_XBOX;_XBOX360;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
+      <PreprocessorDefinitions>_DEBUG;_XBOX;_XBOX360;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -810,7 +810,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;_XBOX360;PROFILE;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;_XBOX360;PROFILE;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
       <CallAttributedProfiling>Callcap</CallAttributedProfiling>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
@@ -835,7 +835,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;_XBOX360;PROFILE;FASTCAP;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;_XBOX360;PROFILE;FASTCAP;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -857,7 +857,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;_XBOX360;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;HAVE_STDINT_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;_XBOX360;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;HAVE_INTTYPES_H;HAVE_STDINT_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>
@@ -879,7 +879,7 @@
       <BufferSecurityCheck>false</BufferSecurityCheck>
       <PrecompiledHeaderOutputFile>$(OutDir)$(ProjectName).pch</PrecompiledHeaderOutputFile>
       <RuntimeLibrary>MultiThreaded</RuntimeLibrary>
-      <PreprocessorDefinitions>NDEBUG;_XBOX;_XBOX360;LTCG;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;WORDS_BIGENDIAN=1;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
+      <PreprocessorDefinitions>NDEBUG;_XBOX;_XBOX360;LTCG;_LIB;%(PreprocessorDefinitions);HAVE_LIBMAD;MUSIC_SUPPORT;HAVE_INTTYPES_H;__LIBRETRO__;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;SIZEOF_LONG=4;SIZEOF_LONG_LONG=8;NO_ASM_BYTEORDER;FRONTEND_SUPPORTS_RGB565</PreprocessorDefinitions>
       <AdditionalIncludeDirectories>src;src/libretro;libmad;%(AdditionalIncludeDirectories)</AdditionalIncludeDirectories>
     </ClCompile>
     <Link>

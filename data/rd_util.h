@@ -9,7 +9,7 @@
 #define ATTR(x)
 #endif
 
-#ifdef WORDS_BIGENDIAN
+#ifdef MSB_FIRST
 # ifdef __GNUC__
 #define LONG(x) __builtin_bswap32((x))
 #define SHORT(x) (__builtin_bswap32((x))>>16)

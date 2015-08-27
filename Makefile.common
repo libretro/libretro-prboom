@@ -1,6 +1,7 @@
 INCFLAGS   = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(ROOT_DIR)/libmad
 
-SOURCES_C := $(ROOT_DIR)/libretro/libretro.c
+SOURCES_C := $(ROOT_DIR)/libretro/libretro.c \
+				 $(ROOT_DIR)/libretro/libretro_sound.c \
 
 SOURCES_C += $(ROOT_DIR)/libmad/bit.c \
 					 $(ROOT_DIR)/libmad/decoder.c \

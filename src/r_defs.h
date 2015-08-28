@@ -338,8 +338,6 @@ typedef struct
 
 typedef struct vissprite_s
 {
-  mobj_t *thing;
-  boolean flip;
   int x1, x2;
   fixed_t gx, gy;              // for line side calculation
   fixed_t gz, gzt;             // global bottom / top for silhouette clipping

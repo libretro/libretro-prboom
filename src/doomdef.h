@@ -61,6 +61,9 @@
 
 #include "m_swap.h"
 #include "version.h"
+#include "doomtype.h"
+
+extern boolean bfgedition;
 
 // Game mode handling - identify IWAD version
 //  to handle IWAD dependend animations etc.

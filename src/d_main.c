@@ -323,6 +323,7 @@ void I_SafeExit(int rc)
 static int  demosequence;         // killough 5/2/98: made static
 static int  pagetic;
 static const char *pagename; // CPhipps - const
+boolean bfgedition = 0;
 
 //
 // D_PageTicker

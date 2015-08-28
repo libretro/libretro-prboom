@@ -581,7 +581,7 @@ static void G_DoLoadLevel (void)
   memset (gamekeydown, 0, sizeof(gamekeydown));
   mousex = mousey = 0;
   special_event = 0; paused = FALSE;
-  memset (mousebuttons, 0, sizeof(mousebuttons));
+  memset (mousebuttons, 0, sizeof(*mousebuttons));
 
   // killough 5/13/98: in case netdemo has consoleplayer other than green
   ST_Start();

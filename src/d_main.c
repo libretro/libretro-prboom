@@ -1277,6 +1277,15 @@ void D_DoomMainSetup(void)
           || lumpinfo[p].source == source_auto_load)
         ProcessDehFile(NULL, D_dehout(), p); // cph - add dehacked-in-a-wad support
 
+   if (bfgedition)
+    {
+      int lump = (W_CheckNumForName)("BFGDEH", ns_prboom);
+      if (lump != -1)
+      {
+        ProcessDehFile(NULL, D_dehout(), lump);
+      }
+    }
+
   if (!M_CheckParm("-noload")) {
     // now do autoloaded dehacked patches, after IWAD patches but before PWAD
     int i;

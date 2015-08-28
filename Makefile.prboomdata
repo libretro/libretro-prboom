@@ -62,8 +62,11 @@ LUMPS = data/lumps/switches.lmp data/lumps/animated.lmp data/lumps/crbrick.lmp \
 	data/lumps/crblue.lmp data/lumps/crblue2.lmp data/lumps/crorange.lmp \
 	data/lumps/cryellow.lmp
 COLORMAPS = data/lumps/watermap.lmp
-TABLES = data/lumps/sinetabl.lmp data/lumps/tangtabl.lmp data/lumps/tantoang.lmp \
-	data/lumps/gammatbl.lmp
+TABLES = data/lumps/sinetabl.lmp \
+			data/lumps/tangtabl.lmp \
+			data/lumps/tantoang.lmp \
+			data/lumps/gammatbl.lmp \
+			data/lumps/bfgdeh.lmp
 GRAPHICS = data/graphics/dig0.ppm data/graphics/dig1.ppm data/graphics/dig2.ppm \
 	data/graphics/dig3.ppm data/graphics/dig4.ppm data/graphics/dig5.ppm \
 	data/graphics/dig6.ppm data/graphics/dig7.ppm data/graphics/dig8.ppm \

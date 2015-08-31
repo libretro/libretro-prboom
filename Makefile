@@ -111,12 +111,23 @@ else ifeq ($(platform), psl1ght)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
    CFLAGS += -DMSB_FIRST -DHAVE_STRLWR -DNO_ASM_BYTEORDER
 	STATIC_LINKING = 1
+
+# PSP1
 else ifeq ($(platform), psp1)
    TARGET := $(TARGET_NAME)_libretro_psp1.a
    CC = psp-gcc$(EXE_EXT)
    AR = psp-ar$(EXE_EXT)
    CFLAGS += -DHAVE_STRLWR -DNO_ASM_BYTEORDER -DPSP -G0
 	STATIC_LINKING = 1
+
+# Vita
+else ifeq ($(platform), vita)
+   TARGET := $(TARGET_NAME)_libretro_vita.a
+	CC = arm-vita-eabi-gcc$(EXE_EXT)
+	AR = arm-vita-eabi-ar$(EXE_EXT)
+   CFLAGS += -DHAVE_STRLWR -DNO_ASM_BYTEORDER -DVITA
+	STATIC_LINKING = 1
+
 else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_libretro_xenon360.a
    CC = xenon-gcc$(EXE_EXT)

@@ -56,12 +56,10 @@ endif
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
    OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
    fpic += -mmacosx-version-min=10.1
-   CFLAGS += -DNO_ASM_BYTEORDER
 else ifeq ($(platform), ios)
    TARGET := $(TARGET_NAME)_libretro_ios.dylib
    fpic := -fPIC
    SHARED := -dynamiclib
-   CFLAGS += -DNO_ASM_BYTEORDER
 
 ifeq ($(IOSSDK),)
    IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
@@ -83,7 +81,6 @@ THEOS_BUILD_DIR := objs
 include $(THEOS)/makefiles/common.mk
 
 LIBRARY_NAME = $(TARGET_NAME)_libretro_ios
-   CFLAGS += -DNO_ASM_BYTEORDER
 
 else ifeq ($(platform), qnx)
    TARGET := $(TARGET_NAME)_libretro_qnx.so
@@ -91,7 +88,7 @@ else ifeq ($(platform), qnx)
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
 	CC = qcc -Vgcc_ntoarmv7le
 	AR = qcc -Vgcc_ntoarmv7le
-   CFLAGS += -DNO_ASM_BYTEORDER -DHAVE_STRLWR
+   CFLAGS += -DHAVE_STRLWR
 	CFLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
 else ifeq ($(platform), ps3)
    TARGET := $(TARGET_NAME)_libretro_ps3.a
@@ -109,7 +106,7 @@ else ifeq ($(platform), psl1ght)
    TARGET := $(TARGET_NAME)_libretro_psl1ght.a
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
-   CFLAGS += -DMSB_FIRST -DHAVE_STRLWR -DNO_ASM_BYTEORDER
+   CFLAGS += -DMSB_FIRST -DHAVE_STRLWR
 	STATIC_LINKING = 1
 
 # PSP1
@@ -117,7 +114,7 @@ else ifeq ($(platform), psp1)
    TARGET := $(TARGET_NAME)_libretro_psp1.a
    CC = psp-gcc$(EXE_EXT)
    AR = psp-ar$(EXE_EXT)
-   CFLAGS += -DHAVE_STRLWR -DNO_ASM_BYTEORDER -DPSP -G0
+   CFLAGS += -DHAVE_STRLWR -DPSP -G0
 	STATIC_LINKING = 1
 
 # Vita
@@ -125,7 +122,7 @@ else ifeq ($(platform), vita)
    TARGET := $(TARGET_NAME)_libretro_vita.a
 	CC = arm-vita-eabi-gcc$(EXE_EXT)
 	AR = arm-vita-eabi-ar$(EXE_EXT)
-   CFLAGS += -DHAVE_STRLWR -DNO_ASM_BYTEORDER -DVITA
+   CFLAGS += -DHAVE_STRLWR -DVITA
 	STATIC_LINKING = 1
 
 # CTR (3DS)
@@ -149,13 +146,13 @@ else ifeq ($(platform), ngc)
    TARGET := $(TARGET_NAME)_libretro_ngc.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMEMORY_LOW -DMSB_FIRST -DNO_ASM_BYTEORDER
+   CFLAGS += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMEMORY_LOW -DMSB_FIRST 
 	STATIC_LINKING = 1
 else ifeq ($(platform), wii)
    TARGET := $(TARGET_NAME)_libretro_wii.a
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST -DNO_ASM_BYTEORDER
+   CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST
 	STATIC_LINKING = 1
 else ifneq (,$(findstring armv,$(platform)))
    TARGET := $(TARGET_NAME)_libretro.so
@@ -187,7 +184,7 @@ else
    TARGET := $(TARGET_NAME)_libretro.dll
    CC = gcc
    SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=libretro/link.T
-   CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__ -Wno-missing-field-initializers -DHAVE_STRLWR -DNO_ASM_BYTEORDER
+   CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__ -Wno-missing-field-initializers -DHAVE_STRLWR
 endif
 
 LDFLAGS += $(LIBM)

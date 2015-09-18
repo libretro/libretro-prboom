@@ -55,24 +55,6 @@
  * might as well use the xdoom macros.
  */
 
-/* Try to use superfast macros on systems that support them */
-#if defined(HAVE_ASM_BYTEORDER_H) && !defined(NO_ASM_BYTEORDER)
-#include <asm/byteorder.h>
-#ifdef __arch_swab16
-#define doom_swap_s  (signed short)__arch_swab16
-#endif
-#ifdef __arch_swab32
-#define doom_swap_l  (signed long)__arch_swab32
-#endif
-#endif /* HAVE_ASM_BYTEORDER_H */
-
-#ifdef HAVE_LIBKERN_OSBYTEORDER_H
-#include <libkern/OSByteOrder.h>
-
-#define doom_swap_s (short)OSSwapInt16
-#define doom_swap_l (long)OSSwapInt32
-#endif
-
 #ifndef doom_swap_l
 #define doom_swap_l(x) \
         ((long int)((((unsigned long int)(x) & 0x000000ffU) << 24) | \

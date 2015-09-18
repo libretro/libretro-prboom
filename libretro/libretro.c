@@ -171,7 +171,7 @@ void retro_shutdown_prboom(void)
 static void update_variables(bool startup)
 {
    struct retro_variable var;
-   
+
    if (startup)
    {
       var.key = "prboom-resolution";
@@ -289,14 +289,14 @@ bool retro_load_game(const struct retro_game_info *info)
    myargc = argc;
    myargv = argv;
 
-  Z_Init(); /* 1/18/98 killough: start up memory stuff first */
+   Z_Init(); /* 1/18/98 killough: start up memory stuff first */
 
-  /* cphipps - call to video specific startup code */
-  I_PreInitGraphics();
+   /* cphipps - call to video specific startup code */
+   I_PreInitGraphics();
 
-  D_DoomMainSetup();
+   D_DoomMainSetup();
 
-  return true;
+   return true;
 }
 
 
@@ -360,20 +360,20 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
 /* i_video */
 
 static int action_lut[] = { 
-	KEYD_RALT,         /* RETRO_DEVICE_ID_JOYPAD_B */
-        KEYD_RSHIFT,       /* RETRO DEVICE_ID_JOYPAD_Y */
-        KEYD_TAB,          /* RETRO_DEVICE_ID_JOYPAD_SELECT */
-        KEYD_ESCAPE,       /* RETRO_DEVICE_ID_JOYPAD_START */
-        KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
-        KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
-        KEYD_LEFTARROW,    /* RETRO_DEVICE_ID_JOYPAD_LEFT */
-        KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
-        KEYD_SPACEBAR,     /* RETRO_DEVICE_ID_JOYPAD_A */
-        KEYD_RCTRL,        /* RETRO_DEVICE_ID_JOYPAD_X */
-        ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
-        '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
-        'n',               /* RETRO_DEVICE_ID_JOYPAD_L2 */ 
-        'm',               /* RETRO_DEVICE_ID_JOYPAD_R2 */
+   KEYD_RALT,         /* RETRO_DEVICE_ID_JOYPAD_B */
+   KEYD_RSHIFT,       /* RETRO DEVICE_ID_JOYPAD_Y */
+   KEYD_TAB,          /* RETRO_DEVICE_ID_JOYPAD_SELECT */
+   KEYD_ESCAPE,       /* RETRO_DEVICE_ID_JOYPAD_START */
+   KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
+   KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
+   KEYD_LEFTARROW,    /* RETRO_DEVICE_ID_JOYPAD_LEFT */
+   KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
+   KEYD_SPACEBAR,     /* RETRO_DEVICE_ID_JOYPAD_A */
+   KEYD_RCTRL,        /* RETRO_DEVICE_ID_JOYPAD_X */
+   ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
+   '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
+   'n',               /* RETRO_DEVICE_ID_JOYPAD_L2 */ 
+   'm',               /* RETRO_DEVICE_ID_JOYPAD_R2 */
 };
 
 void I_StartTic (void)
@@ -413,23 +413,23 @@ static void I_UpdateVideoMode(void)
    if (log_cb)
       log_cb(RETRO_LOG_INFO, "I_UpdateVideoMode: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 
-  V_InitMode();
-  V_DestroyUnusedTrueColorPalettes();
-  V_FreeScreens();
+   V_InitMode();
+   V_DestroyUnusedTrueColorPalettes();
+   V_FreeScreens();
 
-  I_SetRes();
+   I_SetRes();
 
-  screens[0].not_on_heap = true;
-  screens[0].data = (unsigned char *)screen_buf;
+   screens[0].not_on_heap = true;
+   screens[0].data = (unsigned char *)screen_buf;
 
-  V_AllocScreens();
+   V_AllocScreens();
 
-  R_InitBuffer(SCREENWIDTH, SCREENHEIGHT);
+   R_InitBuffer(SCREENWIDTH, SCREENHEIGHT);
 }
 
 void I_FinishUpdate (void)
 {
-  video_cb(screen_buf, SCREENWIDTH, SCREENHEIGHT, SCREENPITCH);
+   video_cb(screen_buf, SCREENWIDTH, SCREENHEIGHT, SCREENPITCH);
 }
 
 void I_SetPalette (int pal)
@@ -438,19 +438,19 @@ void I_SetPalette (int pal)
 
 void I_InitGraphics(void)
 {
-  static int    firsttime=1;
+   static int    firsttime=1;
 
-  if (firsttime)
-  {
-    firsttime = 0;
+   if (firsttime)
+   {
+      firsttime = 0;
 
-    if (log_cb)
-       log_cb(RETRO_LOG_INFO, "I_InitGraphics: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+      if (log_cb)
+         log_cb(RETRO_LOG_INFO, "I_InitGraphics: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 
-    /* Set the video mode */
-    I_UpdateVideoMode();
+      /* Set the video mode */
+      I_UpdateVideoMode();
 
-  }
+   }
 }
 
 void I_PreInitGraphics(void)
@@ -459,15 +459,15 @@ void I_PreInitGraphics(void)
 
 void I_SetRes(void)
 {
-  int i;
+   int i;
 
-  for (i=0; i<3; i++)
-    screens[i].height = SCREENHEIGHT;
+   for (i=0; i<3; i++)
+      screens[i].height = SCREENHEIGHT;
 
-  screens[4].height = (ST_SCALED_HEIGHT+1);
+   screens[4].height = (ST_SCALED_HEIGHT+1);
 
-  if (log_cb)
-     log_cb(RETRO_LOG_INFO, "I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 }
 
 /* i_system - i_main */
@@ -476,16 +476,16 @@ static boolean InDisplay = false;
 
 boolean I_StartDisplay(void)
 {
-  if (InDisplay)
-    return false;
+   if (InDisplay)
+      return false;
 
-  InDisplay = true;
-  return true;
+   InDisplay = true;
+   return true;
 }
 
 void I_EndDisplay(void)
 {
-  InDisplay = false;
+   InDisplay = false;
 }
 
 /*
@@ -494,7 +494,7 @@ void I_EndDisplay(void)
  */
 unsigned long I_GetRandomTimeSeed(void)
 {
-	return 0;
+   return 0;
 }
 
 #ifdef PRBOOM_SERVER
@@ -505,18 +505,18 @@ unsigned long I_GetRandomTimeSeed(void)
 const char* I_SigString(char* buf, size_t sz, int signum)
 {
 #ifdef HAVE_SNPRINTF
-    snprintf(buf,sz,"signal %d",signum);
+   snprintf(buf,sz,"signal %d",signum);
 #else
-    sprintf(buf,"signal %d",signum);
+   sprintf(buf,"signal %d",signum);
 #endif
-  return buf;
+   return buf;
 }
 
 #else
 
 const char *I_DoomExeDir(void)
 {
-  return g_wad_dir;
+   return g_wad_dir;
 }
 
 /*
@@ -527,7 +527,7 @@ const char *I_DoomExeDir(void)
 
 boolean HasTrailingSlash(const char* dn)
 {
-  return ( (dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\'));
+   return ( (dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\'));
 }
 
 /*
@@ -542,44 +542,30 @@ boolean HasTrailingSlash(const char* dn)
 
 char* I_FindFile(const char* wfname, const char* ext)
 {
-  FILE *file;
-  size_t pl;
-  char  * p;
-  char slash;
-
-  /* Precalculate a length we will need in the loop */
-  pl = strlen(wfname) + strlen(ext) + 4;
-
-  if (log_cb)
-     log_cb(RETRO_LOG_INFO, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
-
-  p = malloc(strlen(g_wad_dir) + pl);
 #ifdef _WIN32
-  slash = '\\';
+   char slash = '\\';
 #else
-  slash = '/';
+   char slash = '/';
 #endif
-  if (log_cb)
-     log_cb(RETRO_LOG_INFO, "%s%c%s\n", g_wad_dir, slash, wfname);
-  sprintf(p, "%s%c%s", g_wad_dir, slash, wfname);
+   /* Precalculate a length we will need in the loop */
+   size_t pl  = strlen(wfname) + strlen(ext) + 4;
+   char *p    = malloc(strlen(g_wad_dir) + pl);
+   FILE *file = fopen(p, "rb");
 
-  file = fopen(p, "rb");
-  if (!file)
-  {
-	  strcat(p, ext);
-	  file = fopen(p, "rb");
-  }
+   if (!file)
+   {
+      strcat(p, ext);
+      file = fopen(p, "rb");
+   }
 
-  if (file)
-  {
-     if (log_cb)
-        log_cb(RETRO_LOG_INFO, " found %s\n", p);
-	  fclose(file);
-	  return p;
-  }
+   if (file)
+   {
+      fclose(file);
+      return p;
+   }
 
-  free(p);
-  return NULL;
+   free(p);
+   return NULL;
 }
 
 #endif
@@ -587,12 +573,12 @@ char* I_FindFile(const char* wfname, const char* ext)
 
 void I_Init(void)
 {
-  /* killough 2/21/98: avoid sound initialization if no sound & no music */
-  if (!(nomusicparm && nosfxparm))
-    I_InitSound();
+   /* killough 2/21/98: avoid sound initialization if no sound & no music */
+   if (!(nomusicparm && nosfxparm))
+      I_InitSound();
 
 #ifndef __LIBRETRO__
-  R_InitInterpolation();
+   R_InitInterpolation();
 #endif
 }
 

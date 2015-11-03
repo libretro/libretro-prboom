@@ -179,49 +179,44 @@ int R_PointOnSegSide(fixed_t x, fixed_t y, const seg_t *line)
 
 angle_t R_PointToAngle (fixed_t x, fixed_t y)
 {
-	x -= viewx;
-	y -= viewy;
-	if ( (!x) && (!y) )
-		return 0;
-	if (x>= 0)
-	{	// x >=0
-		if (y>= 0)
-		{	// y>= 0
-			if (x>y)
-				return tantoangle[ SlopeDiv(y,x)];     // octant 0
-			else
-				return ANG90-1-tantoangle[ SlopeDiv(x,y)];  // octant 1
-		}
-		else
-		{	// y<0
-			y = -y;
-			if (x>y)
-				return -tantoangle[SlopeDiv(y,x)];  // octant 8
-			else
-				return ANG270+tantoangle[ SlopeDiv(x,y)];  // octant 7
-		}
-	}
-	else
-	{	// x<0
-		x = -x;
-		if (y>= 0)
-		{	// y>= 0
-			if (x>y)
-				return ANG180-1-tantoangle[ SlopeDiv(y,x)]; // octant 3
-			else
-				return ANG90+ tantoangle[ SlopeDiv(x,y)];  // octant 2
-		}
-		else
-		{	// y<0
-			y = -y;
-			if (x>y)
-				return ANG180+tantoangle[ SlopeDiv(y,x)];  // octant 4
-			else
-				return ANG270-1-tantoangle[ SlopeDiv(x,y)];  // octant 5
-		}
-	}
+   x -= viewx;
+   y -= viewy;
 
-	return 0;
+   if ( (!x) && (!y) )
+      return 0;
+
+   if (x >= 0)
+   {
+      if (y>= 0)
+      {
+         /* y>= 0 */
+         if (x>y)
+            return tantoangle[ SlopeDiv(y,x)];     /* octant 0 */
+         return ANG90-1-tantoangle[ SlopeDiv(x,y)];  /* octant 1 */
+      }
+
+      /* y<0 */
+      y = -y;
+      if (x>y)
+         return -tantoangle[SlopeDiv(y,x)];  /* octant 8 */
+      return ANG270+tantoangle[ SlopeDiv(x,y)];  /* octant 7 */
+   }
+
+   /* x < 0 */
+   x = -x;
+
+   if (y>= 0)
+   {
+      if (x>y)
+         return ANG180-1-tantoangle[ SlopeDiv(y,x)]; /* octant 3 */
+      return ANG90+ tantoangle[ SlopeDiv(x,y)];  /* octant 2 */
+   }
+
+   /* y < 0 */
+   y = -y;
+   if (x>y)
+      return ANG180+tantoangle[ SlopeDiv(y,x)]; /* octant 4 */
+   return ANG270-1-tantoangle[ SlopeDiv(x,y)];  /* octant 5 */
 }
 
 angle_t R_PointToAngle2(fixed_t viewx, fixed_t viewy, fixed_t x, fixed_t y)

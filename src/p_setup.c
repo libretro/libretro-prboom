@@ -32,8 +32,6 @@
  *
  *-----------------------------------------------------------------------------*/
 
-#include <math.h>
-
 #include "doomstat.h"
 #include "m_bbox.h"
 #include "m_argv.h"
@@ -115,6 +113,21 @@ enum
    ML_GL_SSECT,    // SubSectors, list of segs
    ML_GL_NODES     // GL BSP nodes
 };
+
+
+static float fast_sqrt(float n)
+{
+	float		prev = 0.0f;
+	float		cur  = 1.0f;
+
+	while (prev != cur)
+	{
+		prev = cur;
+		cur  = 0.5 * (prev + (n / prev));
+	}
+
+	return cur;
+}
 
 //
 // P_GetNodesVersion
@@ -442,7 +455,7 @@ static int checkGLVertex(int num)
 static float GetDistance(int dx, int dy)
 {
   float fx = (float)(dx)/FRACUNIT, fy = (float)(dy)/FRACUNIT;
-  return (float)sqrt(fx*fx + fy*fy);
+  return fast_sqrt(fx*fx + fy*fy);
 }
 
 
@@ -452,7 +465,7 @@ static int GetOffset(vertex_t *v1, vertex_t *v2)
   int r;
   a = (float)(v1->x - v2->x) / (float)FRACUNIT;
   b = (float)(v1->y - v2->y) / (float)FRACUNIT;
-  r = (int)(sqrt(a*a+b*b) * (float)FRACUNIT);
+  r = (int)(fast_sqrt(a*a+b*b) * (float)FRACUNIT);
   return r;
 }
 

@@ -2,7 +2,6 @@
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -82,6 +81,34 @@ static channel_t channels[NUM_CHANNELS];
 
 int		vol_lookup[128*256];
 
+static double R_ceil (double x)
+{
+   if (x > LONG_MAX)
+      return x; /* big floats are all ints */
+   return ((long)(x+(0.99999999999999997)));
+}
+
+static double R_floor(double x)
+{
+   double y;
+   union {double f; uint64_t i;} u = {x};
+   int e = u.i >> 52 & 0x7ff;
+
+   if (e >= 0x3ff+52 || x == 0)
+      return x;
+   /* y = int(x) - x, where int(x) is an integer neighbor of x */
+   if (u.i >> 63)
+      y = (double)(x - 0x1p52) + 0x1p52 - x;
+   else
+      y = (double)(x + 0x1p52) - 0x1p52 - x;
+   /* special case because of non-nearest rounding modes */
+   if (e <= 0x3ff-1)
+      return u.i >> 63 ? -1 : 0;
+   if (y > 0)
+      return x + y - 1;
+   return x + y;
+}
+
 /* i_sound */
 static void I_SndMixResetChannel (int channum)
 {
@@ -123,12 +150,12 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
     
     times = 48000.0f / (float)orig_rate;
     
-    padded_sfx_len = ((sfxlump_len*ceil(times) + (SAMPLECOUNT_35-1)) / SAMPLECOUNT_35) * SAMPLECOUNT_35;
+    padded_sfx_len = ((sfxlump_len*R_ceil(times) + (SAMPLECOUNT_35-1)) / SAMPLECOUNT_35) * SAMPLECOUNT_35;
     padded_sfx_data = (byte*)malloc(padded_sfx_len);
     
     for (i=0; i < padded_sfx_len; i++)
     {
-        x = floor ((float)i/times);
+        x = R_floor ((float)i/times);
         
         if (x < sfxlump_len) // 8 was already subtracted
             padded_sfx_data[i] = sfxlump_sound[x];

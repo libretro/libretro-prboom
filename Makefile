@@ -34,7 +34,7 @@ endif
 
 TARGET_NAME := prboom
 
-LIBM := -lm
+LIBM := 
 LDFLAGS := 
 
 ifeq ($(platform), unix)

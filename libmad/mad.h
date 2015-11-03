@@ -23,8 +23,6 @@
 # define FPM_INTEL
 
 # define SIZEOF_INT 4
-# define SIZEOF_LONG 4
-# define SIZEOF_LONG_LONG 8
 
 /* Id: version.h,v 1.26 2004/01/23 09:41:33 rob Exp */
 

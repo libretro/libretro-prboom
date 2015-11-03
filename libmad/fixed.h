@@ -22,17 +22,10 @@
 # ifndef LIBMAD_FIXED_H
 # define LIBMAD_FIXED_H
 
-# if SIZEOF_INT >= 4
 typedef   signed int mad_fixed_t;
 
 typedef   signed int mad_fixed64hi_t;
 typedef unsigned int mad_fixed64lo_t;
-# else
-typedef   signed long mad_fixed_t;
-
-typedef   signed long mad_fixed64hi_t;
-typedef unsigned long mad_fixed64lo_t;
-# endif
 
 # if defined(_MSC_VER)
 #  define mad_fixed64_t  signed __int64

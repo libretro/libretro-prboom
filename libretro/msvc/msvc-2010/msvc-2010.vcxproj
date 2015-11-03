@@ -68,7 +68,7 @@
       <Optimization>MaxSpeed</Optimization>
       <FunctionLevelLinking>true</FunctionLevelLinking>
       <IntrinsicFunctions>true</IntrinsicFunctions>
-      <PreprocessorDefinitions>HAVE_LIBMAD;MUSIC_SUPPORT;_WIN32;HAVE_INTTYPES_H;HAVE_STRLWR;__LIBRETRO__;FRONTEND_SUPPORTS_RGB565;HAVE_MEMORY_H;INLINE=_inline;FPM_DEFAULT;SIZEOF_INT=4;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
+      <PreprocessorDefinitions>HAVE_LIBMAD;MUSIC_SUPPORT;_WIN32;HAVE_STRLWR;__LIBRETRO__;FRONTEND_SUPPORTS_RGB565;INLINE=_inline;FPM_DEFAULT;%(PreprocessorDefinitions);_CRT_SECURE_NO_WARNINGS</PreprocessorDefinitions>
     </ClCompile>
     <Link>
       <SubSystem>Windows</SubSystem>

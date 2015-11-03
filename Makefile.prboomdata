@@ -35,7 +35,7 @@ endif
 OBJECTS	   = data/rd_graphic.o data/rd_output.o data/rd_palette.o data/rd_sound.o data/rd_util.o data/rd_main.o
 
 INCLUDES   = -I. -I.. -Idata
-DEFINES    = -DHAVE_INTTYPES_H -D__LIBRETRO__ -DINLINE=inline
+DEFINES    = -D__LIBRETRO__ -DINLINE=inline
 
 WARNINGS_DEFINES = -Wall -W -Wno-unused-parameter
 CODE_DEFINES = -fomit-frame-pointer -std=gnu99

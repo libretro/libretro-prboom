@@ -161,7 +161,7 @@ void *(Z_Malloc)(size_t size, int tag, void **user)
       while (1)
       {
         memblock_t *next = block->next;
-        (Z_Free)((char *) block + HEADER_SIZE);
+        (Z_Free)((byte*) block + HEADER_SIZE);
         if (((free_memory + memory_size) >= (int)(size + HEADER_SIZE)) || (block == end_block))
           break;
         block = next;               // Advance to next block
@@ -200,7 +200,7 @@ void *(Z_Malloc)(size_t size, int tag, void **user)
 #endif
   block->tag = tag;           // tag
   block->user = user;         // user
-  block = (memblock_t *)((char *) block + HEADER_SIZE);
+  block = (memblock_t *)((byte*) block + HEADER_SIZE);
   if (user)                   // if there is a user
     *user = block;            // set user to point to new block
   
@@ -209,7 +209,7 @@ void *(Z_Malloc)(size_t size, int tag, void **user)
 
 void (Z_Free)(void *p)
 {
-  memblock_t *block = (memblock_t *)((char *) p - HEADER_SIZE);
+  memblock_t *block = (memblock_t *)((byte*) p - HEADER_SIZE);
 
   if (!p)
     return;
@@ -257,7 +257,7 @@ void (Z_FreeTags)(int lowtag, int hightag)
     while (1)
     {
       memblock_t *next = block->next;
-      (Z_Free)((char *) block + HEADER_SIZE);
+      (Z_Free)((byte*) block + HEADER_SIZE);
       if (block == end_block)
         break;
       block = next;               // Advance to next block
@@ -268,7 +268,7 @@ void (Z_FreeTags)(int lowtag, int hightag)
 void (Z_ChangeTag)(void *ptr, int tag
        )
 {
-  memblock_t *block = (memblock_t *)((char *) ptr - HEADER_SIZE);
+  memblock_t *block = (memblock_t *)((byte*) ptr - HEADER_SIZE);
 
   // proff - added sanity check, this can happen when an empty lump is locked
   if (!ptr)
@@ -319,7 +319,7 @@ void *(Z_Realloc)(void *ptr, size_t n, int tag, void **user
   void *p = (Z_Malloc)(n, tag, user DA(file, line));
   if (ptr)
     {
-      memblock_t *block = (memblock_t *)((char *) ptr - HEADER_SIZE);
+      memblock_t *block = (memblock_t *)((byte*) ptr - HEADER_SIZE);
       memcpy(p, ptr, n <= block->size ? n : block->size);
       (Z_Free)(ptr DA(file, line));
       if (user) // in case Z_Free nullified same user

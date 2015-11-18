@@ -78,7 +78,6 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/wi_stuff.c \
 				 $(CORE_DIR)/p_checksum.c \
 				 $(CORE_DIR)/md5.c \
-				 $(CORE_DIR)/version.c \
 				 $(CORE_DIR)/d_client.c \
 				 $(CORE_DIR)/mmus2mid.c \
 				 $(CORE_DIR)/madplayer.c

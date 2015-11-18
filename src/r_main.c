@@ -114,14 +114,16 @@ const lighttable_t **colormaps;
 
 int extralight;                           // bumped light from gun blasts
 
-//
-// R_PointOnSide
-// Traverse BSP (sub) tree,
-//  check point against partition plane.
-// Returns side 0 (front) or 1 (back).
-//
-// killough 5/2/98: reformatted
-//
+/*
+===============================================================================
+=
+= R_PointOnSide
+=  Traverse BSP (sub) tree,
+=  check point against partition plane.
+=
+= Returns side 0 (front) or 1 (back)
+===============================================================================
+*/
 
 int R_PointOnSide(fixed_t x, fixed_t y, const node_t *node)
 {
@@ -219,20 +221,52 @@ angle_t R_PointToAngle (fixed_t x, fixed_t y)
    return ANG270-1-tantoangle[ SlopeDiv(x,y)];  /* octant 5 */
 }
 
-angle_t R_PointToAngle2(fixed_t viewx, fixed_t viewy, fixed_t x, fixed_t y)
+angle_t R_PointToAngle2(fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2)
 {
-  return (y -= viewy, (x -= viewx) || y) ?
-    x >= 0 ?
-      y >= 0 ?
-        (x > y) ? tantoangle[SlopeDiv(y,x)] :                      // octant 0
-                ANG90-1-tantoangle[SlopeDiv(x,y)] :                // octant 1
-        x > (y = -y) ? 0-tantoangle[SlopeDiv(y,x)] :                // octant 8
-                       ANG270+tantoangle[SlopeDiv(x,y)] :          // octant 7
-      y >= 0 ? (x = -x) > y ? ANG180-1-tantoangle[SlopeDiv(y,x)] : // octant 3
-                            ANG90 + tantoangle[SlopeDiv(x,y)] :    // octant 2
-        (x = -x) > (y = -y) ? ANG180+tantoangle[ SlopeDiv(y,x)] :  // octant 4
-                              ANG270-1-tantoangle[SlopeDiv(x,y)] : // octant 5
-    0;
+   int x = x2 - x1;
+   int y = y2 - y1;
+
+   if ( (!x) && (!y))
+      return 0;
+
+   if (x >= 0)
+   { /* x >= 0 */
+      if (y >= 0)
+      {
+         /* y >= 0 */
+         if (x > y)
+            return tantoangle[SlopeDiv(y,x)];                      /* octant 0 */
+         return ANG90-1-tantoangle[SlopeDiv(x,y)];                 /* octant 1 */
+      }
+      else
+      { /* y < 0 */
+         y = -y;
+         if (x > y)
+            return -tantoangle[SlopeDiv(y,x)];                     /* octant 8 */
+         return ANG270+tantoangle[SlopeDiv(x,y)];                  /* octant 7 */
+      }
+   }
+   else
+   {
+      /* x < 0 */
+      x = -x;
+      if (y >= 0)
+      {
+         /* y >= 0 */
+         if (x > y)
+            return ANG180-1-tantoangle[SlopeDiv(y,x)];            /* octant 3 */
+         return ANG90 + tantoangle[SlopeDiv(x,y)];                /* octant 2 */
+      }
+      else
+      {
+         /* y < 0 */
+         y = -y;
+         if (x > y)
+            return ANG180+tantoangle[ SlopeDiv(y,x)];             /* octant 4 */
+         return ANG270-1-tantoangle[SlopeDiv(x,y)];               /* octant 5 */
+      }
+   }
+   return 0;
 }
 
 //

@@ -1,4 +1,4 @@
-INCFLAGS   = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(ROOT_DIR)/libmad
+INCFLAGS   = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(ROOT_DIR)/libmad -I$(ROOT_DIR)/libretro/libretro-common/include
 
 SOURCES_C := $(ROOT_DIR)/libretro/libretro.c \
 				 $(ROOT_DIR)/libretro/libretro_sound.c \

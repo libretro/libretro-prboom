@@ -45,6 +45,8 @@
 #include <io.h>
 #endif
 
+#include <boolean.h>
+
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
@@ -496,96 +498,104 @@ void G_RestartLevel(void)
 }
 
 #include "z_bmalloc.h"
-//
-// G_DoLoadLevel
-//
+
+/* 
+============== 
+= 
+= G_DoLoadLevel 
+= 
+============== 
+*/ 
 
 static void G_DoLoadLevel (void)
 {
-  int i;
+   int i;
 
-  // Set the sky map.
-  // First thing, we have a dummy sky texture name,
-  //  a flat. The data is in the WAD only because
-  //  we look for an actual index, instead of simply
-  //  setting one.
+   /* Set the sky map for the episode.
+    * First thing, we have a dummy sky texture name,
+    *  a flat. The data is in the WAD only because
+    *  we look for an actual index, instead of simply
+    *  setting one.
+    */
 
-  skyflatnum = R_FlatNumForName ( SKYFLATNAME );
+   skyflatnum = R_FlatNumForName ( SKYFLATNAME );
 
-  // DOOM determines the sky texture to be used
-  // depending on the current episode, and the game version.
-  if (gamemode == commercial)
-    // || gamemode == pack_tnt   //jff 3/27/98 sorry guys pack_tnt,pack_plut
-    // || gamemode == pack_plut) //aren't gamemodes, this was matching retail
-    {
+   /* DOOM determines the sky texture to be used
+    * depending on the current episode, and the game version.
+    */
+   if (gamemode == commercial)
+      // || gamemode == pack_tnt   //jff 3/27/98 sorry guys pack_tnt,pack_plut
+      // || gamemode == pack_plut) //aren't gamemodes, this was matching retail
+   {
       skytexture = R_TextureNumForName ("SKY3");
       if (gamemap < 12)
-        skytexture = R_TextureNumForName ("SKY1");
+         skytexture = R_TextureNumForName ("SKY1");
       else
-        if (gamemap < 21)
-          skytexture = R_TextureNumForName ("SKY2");
-    }
-  else //jff 3/27/98 and lets not forget about DOOM and Ultimate DOOM huh?
-    switch (gameepisode)
+         if (gamemap < 21)
+            skytexture = R_TextureNumForName ("SKY2");
+   }
+   else /* jff 3/27/98 and lets not forget about DOOM and Ultimate DOOM huh? */
+      switch (gameepisode)
       {
-      case 1:
-        skytexture = R_TextureNumForName ("SKY1");
-        break;
-      case 2:
-        skytexture = R_TextureNumForName ("SKY2");
-        break;
-      case 3:
-        skytexture = R_TextureNumForName ("SKY3");
-        break;
-      case 4: // Special Edition sky
-        skytexture = R_TextureNumForName ("SKY4");
-        break;
+         case 1:
+            skytexture = R_TextureNumForName ("SKY1");
+            break;
+         case 2:
+            skytexture = R_TextureNumForName ("SKY2");
+            break;
+         case 3:
+            skytexture = R_TextureNumForName ("SKY3");
+            break;
+         case 4: // Special Edition sky
+            skytexture = R_TextureNumForName ("SKY4");
+            break;
       }//jff 3/27/98 end sky setting fix
 
-  /* cph 2006/07/31 - took out unused levelstarttic variable */
+   /* cph 2006/07/31 - took out unused levelstarttic variable */
 
-  if (!demo_compatibility && !mbf_features)   // killough 9/29/98
-    basetic = gametic;
+   if (!demo_compatibility && !mbf_features)   // killough 9/29/98
+      basetic = gametic;
 
-  if (wipegamestate == GS_LEVEL && (gameaction == ga_newgame || gameaction == ga_completed))
-    wipegamestate = -1;             // force a wipe
+   if (wipegamestate == GS_LEVEL && (gameaction == ga_newgame || gameaction == ga_completed))
+      wipegamestate = -1;             // force a wipe
 
-  gamestate = GS_LEVEL;
+   gamestate = GS_LEVEL;
 
-  for (i=0 ; i<MAXPLAYERS ; i++)
-    {
+   for (i=0 ; i<MAXPLAYERS ; i++)
+   {
       if (playeringame[i] && players[i].playerstate == PST_DEAD)
-        players[i].playerstate = PST_REBORN;
+         players[i].playerstate = PST_REBORN;
       memset (players[i].frags,0,sizeof(players[i].frags));
-    }
+   }
 
-  // initialize the msecnode_t freelist.                     phares 3/25/98
-  // any nodes in the freelist are gone by now, cleared
-  // by Z_FreeTags() when the previous level ended or player
-  // died.
+   // initialize the msecnode_t freelist.                     phares 3/25/98
+   // any nodes in the freelist are gone by now, cleared
+   // by Z_FreeTags() when the previous level ended or player
+   // died.
 
-  {
-    DECLARE_BLOCK_MEMORY_ALLOC_ZONE(secnodezone);
-    NULL_BLOCK_MEMORY_ALLOC_ZONE(secnodezone);
+   {
+      DECLARE_BLOCK_MEMORY_ALLOC_ZONE(secnodezone);
+      NULL_BLOCK_MEMORY_ALLOC_ZONE(secnodezone);
       //extern msecnode_t *headsecnode; // phares 3/25/98
       //headsecnode = NULL;
-  }
+   }
 
-  P_SetupLevel (gameepisode, gamemap, 0, gameskill);
-  if (!demoplayback) // Don't switch views if playing a demo
-    displayplayer = consoleplayer;    // view the guy you are playing
-  gameaction = ga_nothing;
-  Z_CheckHeap ();
+   P_SetupLevel (gameepisode, gamemap, 0, gameskill);
+   if (!demoplayback) /* Don't switch views if playing a demo */
+      displayplayer = consoleplayer;    /* view the guy you are playing */
+   gameaction = ga_nothing;
 
-  // clear cmd building stuff
-  memset (gamekeydown, 0, sizeof(gamekeydown));
-  mousex = mousey = 0;
-  special_event = 0; paused = FALSE;
-  memset (mousebuttons, 0, sizeof(*mousebuttons));
+   Z_CheckHeap ();
 
-  // killough 5/13/98: in case netdemo has consoleplayer other than green
-  ST_Start();
-  HU_Start();
+   /* clear cmd building stuff */
+   memset (gamekeydown, 0, sizeof(gamekeydown));
+   mousex = mousey = 0;
+   special_event = 0; paused = FALSE;
+   memset (mousebuttons, 0, sizeof(*mousebuttons));
+
+   // killough 5/13/98: in case netdemo has consoleplayer other than green
+   ST_Start();
+   HU_Start();
 }
 
 
@@ -901,20 +911,26 @@ void G_Ticker (void)
 // also see P_SpawnPlayer in P_Things
 //
 
-//
-// G_PlayerFinishLevel
-// Can when a player completes a level.
-//
+/* 
+==================== 
+= 
+= G_PlayerFinishLevel 
+= 
+= Can when a player completes a level 
+==================== 
+*/ 
 
 static void G_PlayerFinishLevel(int player)
 {
   player_t *p = &players[player];
+
   memset(p->powers, 0, sizeof p->powers);
   memset(p->cards, 0, sizeof p->cards);
+
   p->mo = NULL;           // cph - this is allocated PU_LEVEL so it's gone
-  p->extralight = 0;      // cancel gun flashes
-  p->fixedcolormap = 0;   // cancel ir gogles
-  p->damagecount = 0;     // no palette changes
+  p->extralight = 0;      /* cancel gun flashes */
+  p->fixedcolormap = 0;   /* cancel ir gogles */
+  p->damagecount = 0;     /* no palette changes */
   p->bonuscount = 0;
 }
 
@@ -944,11 +960,15 @@ void G_ChangedPlayerColour(int pn, int cl)
   }
 }
 
-//
-// G_PlayerReborn
-// Called after a player dies
-// almost everything is cleared and initialized
-//
+/* 
+==================== 
+= 
+= G_PlayerReborn 
+= 
+= Called after a player dies 
+= almost everything is cleared and initialized 
+==================== 
+*/ 
 
 void G_PlayerReborn (int player)
 {
@@ -978,24 +998,27 @@ void G_PlayerReborn (int player)
   players[player].itemcount = itemcount;
   players[player].secretcount = secretcount;
 
-  p->usedown = p->attackdown = TRUE;  // don't do anything immediately
+  p->usedown = p->attackdown = true;  // don't do anything immediately
   p->playerstate = PST_LIVE;
   p->health = initial_health;  // Ty 03/12/98 - use dehacked values
   p->readyweapon = p->pendingweapon = wp_pistol;
-  p->weaponowned[wp_fist] = TRUE;
-  p->weaponowned[wp_pistol] = TRUE;
+  p->weaponowned[wp_fist] = true;
+  p->weaponowned[wp_pistol] = true;
   p->ammo[am_clip] = initial_bullets; // Ty 03/12/98 - use dehacked values
 
   for (i=0 ; i<NUMAMMO ; i++)
     p->maxammo[i] = maxammo[i];
 }
 
-//
-// G_CheckSpot
-// Returns FALSE if the player cannot be respawned
-// at the given mapthing_t spot
-// because something is occupying it
-//
+/* 
+==================== 
+= 
+= G_CheckSpot  
+= 
+= Returns false if the player cannot be respawned at the given mapthing_t spot  
+= because something is occupying it 
+==================== 
+*/ 
 
 static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
 {
@@ -1004,14 +1027,14 @@ static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
   int         i;
 
   if (!players[playernum].mo)
-    {
-      // first spawn of level, before corpses
-      for (i=0 ; i<playernum ; i++)
+  {
+     /* first spawn of level, before corpses */
+     for (i=0 ; i<playernum ; i++)
         if (players[i].mo->x == mthing->x << FRACBITS
-            && players[i].mo->y == mthing->y << FRACBITS)
-          return FALSE;
-      return TRUE;
-    }
+              && players[i].mo->y == mthing->y << FRACBITS)
+           return FALSE;
+     return TRUE;
+  }
 
   x = mthing->x << FRACBITS;
   y = mthing->y << FRACBITS;
@@ -1051,9 +1074,10 @@ static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
     if (!bodyquesize)
       P_RemoveMobj(players[playernum].mo);
 
-  // spawn a teleport fog
+  /* spawn a teleport fog */
   ss = R_PointInSubsector (x,y);
-  { // Teleport fog at respawn point
+  {
+     // Teleport fog at respawn point
     fixed_t xa,ya;
     int an;
     mobj_t      *mo;
@@ -1097,73 +1121,88 @@ static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
 }
 
 
-// G_DeathMatchSpawnPlayer
-// Spawns a player at one of the random death match spots
-// called at level load and each death
-//
+/* 
+==================== 
+= 
+= G_DeathMatchSpawnPlayer 
+= 
+= Spawns a player at one of the random death match spots 
+= called at level load and each death 
+==================== 
+*/ 
+
 void G_DeathMatchSpawnPlayer (int playernum)
 {
-  int j, selections = deathmatch_p - deathmatchstarts;
+   int i, j;
+   int selections = deathmatch_p - deathmatchstarts;
 
-  if (selections < MAXPLAYERS)
-    I_Error("G_DeathMatchSpawnPlayer: Only %i deathmatch spots, %d required",
-    selections, MAXPLAYERS);
+   if (selections < MAXPLAYERS)
+      I_Error("G_DeathMatchSpawnPlayer: Only %i deathmatch spots, %d required",
+            selections, MAXPLAYERS);
 
-  for (j=0 ; j<20 ; j++)
-    {
-      int i = P_Random(pr_dmspawn) % selections;
+   for (j=0 ; j<20 ; j++)
+   {
+      i = P_Random(pr_dmspawn) % selections;
       if (G_CheckSpot (playernum, &deathmatchstarts[i]) )
-        {
-          deathmatchstarts[i].type = playernum+1;
-          P_SpawnPlayer (playernum, &deathmatchstarts[i]);
-          return;
-        }
-    }
+      {
+         deathmatchstarts[i].type = playernum+1;
+         P_SpawnPlayer (playernum, &deathmatchstarts[i]);
+         return;
+      }
+   }
 
-  // no good spot, so the player will probably get stuck
-  P_SpawnPlayer (playernum, &playerstarts[playernum]);
+   /* no good spot, so the player will probably get stuck */
+   P_SpawnPlayer (playernum, &playerstarts[playernum]);
 }
 
-//
-// G_DoReborn
-//
+/* 
+==================== 
+= 
+= G_DoReborn 
+= 
+==================== 
+*/ 
 
 void G_DoReborn (int playernum)
 {
-  if (!netgame)
-    gameaction = ga_loadlevel;      // reload the level from scratch
-  else
-    {                               // respawn at the start
-      int i;
+   int i;
 
-      // first dissasociate the corpse
-      players[playernum].mo->player = NULL;
+   if (!netgame)
+   {
+      gameaction = ga_loadlevel;			/* reload the level from scratch  */
+      return;
+   }
 
-      // spawn at random spot if in death match
-      if (deathmatch)
-        {
-          G_DeathMatchSpawnPlayer (playernum);
-          return;
-        }
+   /*	respawn this player while the other players keep going */
 
-      if (G_CheckSpot (playernum, &playerstarts[playernum]) )
-        {
-          P_SpawnPlayer (playernum, &playerstarts[playernum]);
-          return;
-        }
+   /* dissasociate the corpse */
+   players[playernum].mo->player = NULL;
 
-      // try to spawn at one of the other players spots
-      for (i=0 ; i<MAXPLAYERS ; i++)
-        {
-          if (G_CheckSpot (playernum, &playerstarts[i]) )
-            {
-              P_SpawnPlayer (playernum, &playerstarts[i]);
-              return;
-            }
-          // he's going to be inside something.  Too bad.
-        }
+   /* spawn at random spot if in death match */
+   if (deathmatch)
+   {
+      G_DeathMatchSpawnPlayer (playernum);
+      return;
+   }
+
+   if (G_CheckSpot (playernum, &playerstarts[playernum]) )
+   {
       P_SpawnPlayer (playernum, &playerstarts[playernum]);
-    }
+      return;
+   }
+
+   /* try to spawn at one of the other players spots */
+   for (i=0 ; i<MAXPLAYERS ; i++)
+   {
+      if (G_CheckSpot (playernum, &playerstarts[i]) )
+      {
+         P_SpawnPlayer (playernum, &playerstarts[i]);
+         return;
+      }
+   }
+
+   /* he's going to be inside something.  Too bad. */
+   P_SpawnPlayer (playernum, &playerstarts[playernum]);
 }
 
 // DOOM Par Times
@@ -1183,6 +1222,14 @@ int cpars[32] = {
 };
 
 static boolean secretexit;
+
+/* 
+==================== 
+= 
+= G_ExitLevel 
+= 
+==================== 
+*/ 
 
 void G_ExitLevel (void)
 {

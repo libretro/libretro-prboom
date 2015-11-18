@@ -128,10 +128,18 @@ int extralight;                           // bumped light from gun blasts
 int R_PointOnSide(fixed_t x, fixed_t y, const node_t *node)
 {
   if (!node->dx)
-    return x <= node->x ? node->dy > 0 : node->dy < 0;
+  {
+     if (x <= node->x)
+        return node->dy > 0;
+     return node->dy < 0;
+  }
 
   if (!node->dy)
-    return y <= node->y ? node->dx < 0 : node->dx > 0;
+  {
+     if (y <= node->y)
+        return node->dx < 0;
+     return node->dx > 0;
+  }
 
   x -= node->x;
   y -= node->y;
@@ -478,22 +486,32 @@ void R_Init (void)
   R_InitPatches();
 }
 
-//
-// R_PointInSubsector
-//
-// killough 5/2/98: reformatted, cleaned up
+/*
+==============
+=
+= R_PointInSubsector
+=
+==============
+*/
 
 subsector_t *R_PointInSubsector(fixed_t x, fixed_t y)
 {
-  int nodenum = numnodes-1;
+   int nodenum;
 
-  // special case for trivial maps (single subsector, no nodes)
-  if (numnodes == 0)
-    return subsectors;
+   /* special case for trivial maps (single subsector, no nodes) */
+   if (!numnodes)
+      return subsectors;
 
-  while (!(nodenum & NF_SUBSECTOR))
-    nodenum = nodes[nodenum].children[R_PointOnSide(x, y, nodes+nodenum)];
-  return &subsectors[nodenum & ~NF_SUBSECTOR];
+   nodenum = numnodes-1;
+
+   while (!(nodenum & NF_SUBSECTOR))
+   {
+      node_t *node   = &nodes[nodenum];
+      int    side    = R_PointOnSide(x, y, node);
+      nodenum        = node->children[side];
+   }
+
+   return &subsectors[nodenum & ~NF_SUBSECTOR];
 }
 
 //

@@ -337,36 +337,35 @@ size_t     num_deathmatchstarts;   // killough
 mapthing_t *deathmatch_p;
 mapthing_t playerstarts[MAXPLAYERS];
 
-//
-// P_LoadVertexes
-//
-// killough 5/3/98: reformatted, cleaned up
-//
+/*
+=================
+=
+= P_LoadVertexes
+=
+=================
+*/
 static void P_LoadVertexes (int lump)
 {
-  const mapvertex_t *data; // cph - const
+  const mapvertex_t *data;
   int i;
+  mapvertex_t *ml;
+  vertex_t *li;
 
-  // Determine number of lumps:
-  //  total lump length / vertex record length.
   numvertexes = W_LumpLength(lump) / sizeof(mapvertex_t);
-
-  // Allocate zone memory for buffer.
   vertexes = Z_Malloc(numvertexes*sizeof(vertex_t),PU_LEVEL,0);
-
-  // Load data into cache.
-  // cph 2006/07/29 - cast to mapvertex_t here, making the loop below much neater
   data = (const mapvertex_t *)W_CacheLumpNum(lump);
 
-  // Copy and convert vertex coordinates,
-  // internal representation as fixed.
-  for (i=0; i<numvertexes; i++)
-    {
-      vertexes[i].x = SHORT(data[i].x)<<FRACBITS;
-      vertexes[i].y = SHORT(data[i].y)<<FRACBITS;
-    }
+  ml = (mapvertex_t*)data;
+  li = vertexes;
+  /* Copy and convert vertex coordinates,
+   * internal representation as fixed. */
+  for (i=0; i < numvertexes; i++, li++, ml++)
+  {
+     li->x = SHORT(ml->x)<<FRACBITS;
+     li->y = SHORT(ml->y)<<FRACBITS;
+  }
 
-  // Free buffer memory.
+  /* Free buffer memory. */
   W_UnlockLumpNum(lump);
 }
 
@@ -471,10 +470,13 @@ static int GetOffset(vertex_t *v1, vertex_t *v2)
 
 
 
-//
-// P_LoadSegs
-//
-// killough 5/3/98: reformatted, cleaned up
+/*
+=================
+=
+= P_LoadSegs
+=
+=================
+*/
 
 static void P_LoadSegs (int lump)
 {
@@ -492,23 +494,19 @@ static void P_LoadSegs (int lump)
     {
       seg_t *li = segs+i;
       const mapseg_t *ml = data + i;
-      unsigned short v1, v2;
-
       int side, linedef;
       line_t *ldef;
 
       li->iSegID = i; // proff 11/05/2000: needed for OpenGL
 
-      v1 = (unsigned short)SHORT(ml->v1);
-      v2 = (unsigned short)SHORT(ml->v2);
-      li->v1 = &vertexes[v1];
-      li->v2 = &vertexes[v2];
+      li->v1 = &vertexes[(uint16_t)SHORT(ml->v1)];
+      li->v2 = &vertexes[(uint16_t)SHORT(ml->v2)];
 
       li->miniseg = FALSE; // figgi -- there are no minisegs in classic BSP nodes
       li->length  = GetDistance(li->v2->x - li->v1->x, li->v2->y - li->v1->y);
       li->angle = (SHORT(ml->angle))<<16;
       li->offset =(SHORT(ml->offset))<<16;
-      linedef = (unsigned short)SHORT(ml->linedef);
+      linedef = (uint16_t)SHORT(ml->linedef);
       ldef = &lines[linedef];
       li->linedef = ldef;
       side = SHORT(ml->side);
@@ -532,8 +530,6 @@ static void P_LoadSegs (int lump)
 
   W_UnlockLumpNum(lump); // cph - release the data
 }
-
-
 
 /*******************************************
  * Name     : P_LoadGLSegs           *
@@ -608,6 +604,8 @@ static void P_LoadSubsectors (int lump)
   /* cph 2006/07/29 - make data a const mapsubsector_t *, so the loop below is simpler & gives no constness warnings */
   const mapsubsector_t *data;
   int  i;
+  mapsubsector_t *ms;
+  subsector_t *ss;
 
   numsubsectors = W_LumpLength (lump) / sizeof(mapsubsector_t);
   subsectors = Z_Calloc(numsubsectors,sizeof(subsector_t),PU_LEVEL,0);
@@ -616,19 +614,24 @@ static void P_LoadSubsectors (int lump)
   if ((!data) || (!numsubsectors))
     I_Error("P_LoadSubsectors: no subsectors in level");
 
-  for (i=0; i<numsubsectors; i++)
+  ms = (mapsubsector_t*)data;
+  ss = subsectors;
+  for (i=0; i<numsubsectors; i++, ss++, ms++)
   {
-    subsectors[i].numlines  = (unsigned short)SHORT(data[i].numsegs );
-    subsectors[i].firstline = (unsigned short)SHORT(data[i].firstseg);
+    ss->numlines  = (uint16_t)SHORT(ms->numsegs );
+    ss->firstline = (uint16_t)SHORT(ms->firstseg);
   }
 
   W_UnlockLumpNum(lump); // cph - release the data
 }
 
-//
-// P_LoadSectors
-//
-// killough 5/3/98: reformatted, cleaned up
+/*
+=================
+=
+= P_LoadSectors
+=
+=================
+*/
 
 static void P_LoadSectors (int lump)
 {
@@ -681,11 +684,13 @@ static void P_LoadSectors (int lump)
   W_UnlockLumpNum(lump); // cph - release the data
 }
 
-
-//
-// P_LoadNodes
-//
-// killough 5/3/98: reformatted, cleaned up
+/*
+=================
+=
+= P_LoadNodes
+=
+=================
+*/
 
 static void P_LoadNodes (int lump)
 {
@@ -854,14 +859,13 @@ static void P_LoadXNOD(int lump)
   W_UnlockLumpNum(lump);
 }
 
-
 /*
- * P_LoadThings
- *
- * killough 5/3/98: reformatted, cleaned up
- * cph 2001/07/07 - don't write into the lump cache, especially non-idepotent
- * changes like byte order reversals. Take a copy to edit.
- */
+=================
+=
+= P_LoadThings
+=
+=================
+*/
 
 static void P_LoadThings (int lump)
 {
@@ -891,17 +895,14 @@ static void P_LoadThings (int lump)
   W_UnlockLumpNum(lump); // cph - release the data
 }
 
-//
-// P_LoadLineDefs
-// Also counts secret lines for intermissions.
-//        ^^^
-// ??? killough ???
-// Does this mean secrets used to be linedef-based, rather than sector-based?
-//
-// killough 4/4/98: split into two functions, to allow sidedef overloading
-//
-// killough 5/3/98: reformatted, cleaned up
-
+/*
+=================
+=
+= P_LoadLineDefs
+=
+= Also counts secret lines for intermissions
+=================
+*/
 static void P_LoadLineDefs (int lump)
 {
   const byte *data; // cph - const*
@@ -1533,103 +1534,113 @@ static void P_AddLineToSector(line_t* li, sector_t* sector)
   M_AddToBox (bbox, li->v2->x, li->v2->y);
 }
 
-// modified to return totallines (needed by P_LoadReject)
+/*
+=================
+=
+= P_GroupLines
+=
+= Builds sector line lists and subsector sector numbers
+= Finds block bounding boxes for sectors
+=
+= Returns total lines (needed by P_LoadReject)
+=================
+*/
 static int P_GroupLines (void)
 {
-  register line_t *li;
-  register sector_t *sector;
-  int i,j, total = numlines;
+   register line_t *li;
+   register sector_t *sector;
+   int i,j, total = numlines;
 
-  // figgi
-  for (i=0 ; i<numsubsectors ; i++)
-  {
-    seg_t *seg = &segs[subsectors[i].firstline];
-    subsectors[i].sector = NULL;
-    for(j=0; j<subsectors[i].numlines; j++)
-    {
-      if(seg->sidedef)
+   /* look up sector number for each subsector */
+   for (i=0 ; i<numsubsectors ; i++)
+   {
+      seg_t *seg = &segs[subsectors[i].firstline];
+      subsectors[i].sector = NULL;
+      for(j=0; j<subsectors[i].numlines; j++)
       {
-        subsectors[i].sector = seg->sidedef->sector;
-        break;
+         if(seg->sidedef)
+         {
+            subsectors[i].sector = seg->sidedef->sector;
+            break;
+         }
+         seg++;
       }
-      seg++;
-    }
-    if(subsectors[i].sector == NULL)
-      I_Error("P_GroupLines: Subsector a part of no sector!\n");
-  }
+      if(subsectors[i].sector == NULL)
+         I_Error("P_GroupLines: Subsector a part of no sector!\n");
+   }
 
-  // count number of lines in each sector
-  for (i=0,li=lines; i<numlines; i++, li++)
-    {
+   /* count number of lines in each sector */
+   for (i=0,li=lines; i<numlines; i++, li++)
+   {
       li->frontsector->linecount++;
       if (li->backsector && li->backsector != li->frontsector)
-        {
-          li->backsector->linecount++;
-          total++;
-        }
-    }
+      {
+         li->backsector->linecount++;
+         total++;
+      }
+   }
 
-  {  // allocate line tables for each sector
-    line_t **linebuffer = Z_Malloc(total*sizeof(line_t *), PU_LEVEL, 0);
+   {  // allocate line tables for each sector
+      line_t **linebuffer = Z_Malloc(total*sizeof(line_t *), PU_LEVEL, 0);
 
-    // e6y: REJECT overrun emulation code
-    // moved to P_LoadReject
+      // e6y: REJECT overrun emulation code
+      // moved to P_LoadReject
 
-    for (i=0, sector = sectors; i<numsectors; i++, sector++)
-    {
-      sector->lines = linebuffer;
-      linebuffer += sector->linecount;
-      sector->linecount = 0;
-      M_ClearBox(sector->blockbox);
-    }
-  }
+      for (i=0, sector = sectors; i<numsectors; i++, sector++)
+      {
+         sector->lines = linebuffer;
+         linebuffer += sector->linecount;
+         sector->linecount = 0;
+         M_ClearBox(sector->blockbox);
+      }
+   }
 
-  // Enter those lines
-  for (i=0,li=lines; i<numlines; i++, li++)
-  {
-    P_AddLineToSector(li, li->frontsector);
-    if (li->backsector && li->backsector != li->frontsector)
-      P_AddLineToSector(li, li->backsector);
-  }
+   // Enter those lines
+   for (i=0,li=lines; i<numlines; i++, li++)
+   {
+      P_AddLineToSector(li, li->frontsector);
+      if (li->backsector && li->backsector != li->frontsector)
+         P_AddLineToSector(li, li->backsector);
+   }
 
-  for (i=0, sector = sectors; i<numsectors; i++, sector++)
-  {
-    fixed_t *bbox = (void*)sector->blockbox; // cph - For convenience, so
-                                  // I can sue the old code unchanged
-    int block;
+   for (i=0, sector = sectors; i<numsectors; i++, sector++)
+   {
+      fixed_t *bbox = (void*)sector->blockbox; // cph - For convenience, so
+      // I can sue the old code unchanged
+      int block;
 
-    // set the degenmobj_t to the middle of the bounding box
-    if (comp[comp_sound])
-    {
-      sector->soundorg.x = (bbox[BOXRIGHT]+bbox[BOXLEFT])/2;
-      sector->soundorg.y = (bbox[BOXTOP]+bbox[BOXBOTTOM])/2;
-    }
-    else
-    {
-      //e6y: fix sound origin for large levels
-      sector->soundorg.x = bbox[BOXRIGHT]/2+bbox[BOXLEFT]/2;
-      sector->soundorg.y = bbox[BOXTOP]/2+bbox[BOXBOTTOM]/2;
-    }
+      // set the degenmobj_t to the middle of the bounding box
+      if (comp[comp_sound])
+      {
+         sector->soundorg.x = (bbox[BOXRIGHT]+bbox[BOXLEFT])/2;
+         sector->soundorg.y = (bbox[BOXTOP]+bbox[BOXBOTTOM])/2;
+      }
+      else
+      {
+         //e6y: fix sound origin for large levels
+         sector->soundorg.x = bbox[BOXRIGHT]/2+bbox[BOXLEFT]/2;
+         sector->soundorg.y = bbox[BOXTOP]/2+bbox[BOXBOTTOM]/2;
+      }
 
-    // adjust bounding box to map blocks
-    block = (bbox[BOXTOP]-bmaporgy+MAXRADIUS)>>MAPBLOCKSHIFT;
-    block = block >= bmapheight ? bmapheight-1 : block;
-    sector->blockbox[BOXTOP]=block;
+      // adjust bounding box to map blocks
+      block = (bbox[BOXTOP]-bmaporgy+MAXRADIUS)>>MAPBLOCKSHIFT;
+      block = block >= bmapheight ? bmapheight-1 : block;
+      sector->blockbox[BOXTOP]=block;
 
-    block = (bbox[BOXBOTTOM]-bmaporgy-MAXRADIUS)>>MAPBLOCKSHIFT;
-    block = block < 0 ? 0 : block;
-    sector->blockbox[BOXBOTTOM]=block;
+      block = (bbox[BOXBOTTOM]-bmaporgy-MAXRADIUS)>>MAPBLOCKSHIFT;
+      block = block < 0 ? 0 : block;
+      sector->blockbox[BOXBOTTOM]=block;
 
-    block = (bbox[BOXRIGHT]-bmaporgx+MAXRADIUS)>>MAPBLOCKSHIFT;
-    block = block >= bmapwidth ? bmapwidth-1 : block;
-    sector->blockbox[BOXRIGHT]=block;
+      block = (bbox[BOXRIGHT]-bmaporgx+MAXRADIUS)>>MAPBLOCKSHIFT;
+      block = block >= bmapwidth ? bmapwidth-1 : block;
+      sector->blockbox[BOXRIGHT]=block;
 
-    block = (bbox[BOXLEFT]-bmaporgx-MAXRADIUS)>>MAPBLOCKSHIFT;
-    block = block < 0 ? 0 : block;
-    sector->blockbox[BOXLEFT]=block;
-  }
+      block = (bbox[BOXLEFT]-bmaporgx-MAXRADIUS)>>MAPBLOCKSHIFT;
+      block = block < 0 ? 0 : block;
+      sector->blockbox[BOXLEFT]=block;
+   }
 
-  return total; // this value is needed by the reject overrun emulation code
+   return total; // this value is needed by the reject overrun emulation code
 }
 
 //
@@ -1714,173 +1725,181 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
   free(hit);
 }
 
-//
-// P_SetupLevel
-//
-// killough 5/3/98: reformatted, cleaned up
+/*
+=================
+=
+= P_SetupLevel
+=
+=================
+*/
 
 void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 {
-  int   i;
-  char  lumpname[9];
-  int   lumpnum;
+   int   i;
+   char  lumpname[9];
+   int   lumpnum;
 
-  char  gl_lumpname[9];
-  int   gl_lumpnum;
+   char  gl_lumpname[9];
+   int   gl_lumpnum;
 
 #ifndef __LIBRETRO__
-  R_StopAllInterpolations();
+   R_StopAllInterpolations();
 #endif
 
-  totallive = totalkills = totalitems = totalsecret = wminfo.maxfrags = 0;
-  wminfo.partime = 180;
+   totallive = totalkills = totalitems = totalsecret = wminfo.maxfrags = 0;
+   wminfo.partime = 180;
 
-  for (i=0; i<MAXPLAYERS; i++)
-    players[i].killcount = players[i].secretcount = players[i].itemcount = 0;
+   for (i=0; i<MAXPLAYERS; i++)
+      players[i].killcount = players[i].secretcount = players[i].itemcount = 0;
 
-  // Initial height of PointOfView will be set by player think.
-  players[consoleplayer].viewz = 1;
+   // Initial height of PointOfView will be set by player think.
+   players[consoleplayer].viewz = 1;
 
-  // Make sure all sounds are stopped before Z_FreeTags.
-  S_Start();
+   // Make sure all sounds are stopped before Z_FreeTags.
+   S_Start();
 
-  Z_FreeTags(PU_LEVEL, PU_PURGELEVEL-1);
-  if (rejectlump != -1) { // cph - unlock the reject table
-    W_UnlockLumpNum(rejectlump);
-    rejectlump = -1;
-  }
+   Z_FreeTags(PU_LEVEL, PU_PURGELEVEL-1);
+   if (rejectlump != -1) { // cph - unlock the reject table
+      W_UnlockLumpNum(rejectlump);
+      rejectlump = -1;
+   }
 
-  P_InitThinkers();
+   P_InitThinkers();
 
-  // if working with a devlopment map, reload it
-  //    W_Reload ();     killough 1/31/98: W_Reload obsolete
+   // if working with a devlopment map, reload it
+   //    W_Reload ();     killough 1/31/98: W_Reload obsolete
 
-  // find map name
-  if (gamemode == commercial)
-  {
-    sprintf(lumpname, "map%02d", map);           // killough 1/24/98: simplify
-    sprintf(gl_lumpname, "gl_map%02d", map);    // figgi
-  }
-  else
-  {
-    sprintf(lumpname, "E%dM%d", episode, map);   // killough 1/24/98: simplify
-    sprintf(gl_lumpname, "GL_E%iM%i", episode, map); // figgi
-  }
+   // find map name
+   if (gamemode == commercial)
+   {
+      sprintf(lumpname, "map%02d", map);           // killough 1/24/98: simplify
+      sprintf(gl_lumpname, "gl_map%02d", map);    // figgi
+   }
+   else
+   {
+      sprintf(lumpname, "E%dM%d", episode, map);   // killough 1/24/98: simplify
+      sprintf(gl_lumpname, "GL_E%iM%i", episode, map); // figgi
+   }
 
-  lumpnum = W_GetNumForName(lumpname);
-  gl_lumpnum = W_CheckNumForName(gl_lumpname); // figgi
+   lumpnum = W_GetNumForName(lumpname);
+   gl_lumpnum = W_CheckNumForName(gl_lumpname); // figgi
 
-  leveltime = 0; totallive = 0;
+   leveltime = 0; totallive = 0;
 
-  // note: most of this ordering is important
+   // note: most of this ordering is important
 
-  // killough 3/1/98: P_LoadBlockMap call moved down to below
-  // killough 4/4/98: split load of sidedefs into two parts,
-  // to allow texture names to be used in special linedefs
+   // killough 3/1/98: P_LoadBlockMap call moved down to below
+   // killough 4/4/98: split load of sidedefs into two parts,
+   // to allow texture names to be used in special linedefs
 
-  // refuse to load Hexen-format maps, avoid segfaults
-  if ((i = lumpnum + ML_BLOCKMAP + 1) < numlumps
-      && !strncasecmp(lumpinfo[i].name, "BEHAVIOR", 8))
-    I_Error("P_SetupLevel: %s: Hexen format not supported", lumpname);
+   // refuse to load Hexen-format maps, avoid segfaults
+   if ((i = lumpnum + ML_BLOCKMAP + 1) < numlumps
+         && !strncasecmp(lumpinfo[i].name, "BEHAVIOR", 8))
+      I_Error("P_SetupLevel: %s: Hexen format not supported", lumpname);
 
-  // figgi 10/19/00 -- check for gl lumps and load them
-  P_GetNodesVersion(lumpnum,gl_lumpnum);
+   // figgi 10/19/00 -- check for gl lumps and load them
+   P_GetNodesVersion(lumpnum,gl_lumpnum);
 
-  if (nodes_glbsp > 0)
-    P_LoadVertexes2 (lumpnum+ML_VERTEXES,gl_lumpnum+ML_GL_VERTS);
-  else
-    P_LoadVertexes  (lumpnum+ML_VERTEXES);
-  P_LoadSectors   (lumpnum+ML_SECTORS);
-  P_LoadSideDefs  (lumpnum+ML_SIDEDEFS);
-  P_LoadLineDefs  (lumpnum+ML_LINEDEFS);
-  P_LoadSideDefs2 (lumpnum+ML_SIDEDEFS);
-  P_LoadLineDefs2 (lumpnum+ML_LINEDEFS);
-  P_LoadBlockMap  (lumpnum+ML_BLOCKMAP);
+   if (nodes_glbsp > 0)
+      P_LoadVertexes2 (lumpnum+ML_VERTEXES,gl_lumpnum+ML_GL_VERTS);
+   else
+      P_LoadVertexes  (lumpnum+ML_VERTEXES);
+   P_LoadSectors   (lumpnum+ML_SECTORS);
+   P_LoadSideDefs  (lumpnum+ML_SIDEDEFS);
+   P_LoadLineDefs  (lumpnum+ML_LINEDEFS);
+   P_LoadSideDefs2 (lumpnum+ML_SIDEDEFS);
+   P_LoadLineDefs2 (lumpnum+ML_LINEDEFS);
+   P_LoadBlockMap  (lumpnum+ML_BLOCKMAP);
 
-  if (nodes_glbsp > 0)
-  {
-    P_LoadSubsectors(gl_lumpnum + ML_GL_SSECT);
-    P_LoadNodes(gl_lumpnum + ML_GL_NODES);
-    P_LoadGLSegs(gl_lumpnum + ML_GL_SEGS);
-  }
-  else if (nodes_zdbsp == 1)
-  {
-    P_LoadXNOD(lumpnum + ML_NODES);
-  }
-  else
-  {
-    P_LoadSubsectors(lumpnum + ML_SSECTORS);
-    P_LoadNodes(lumpnum + ML_NODES);
-    P_LoadSegs(lumpnum + ML_SEGS);
-  }
+   if (nodes_glbsp > 0)
+   {
+      P_LoadSubsectors(gl_lumpnum + ML_GL_SSECT);
+      P_LoadNodes(gl_lumpnum + ML_GL_NODES);
+      P_LoadGLSegs(gl_lumpnum + ML_GL_SEGS);
+   }
+   else if (nodes_zdbsp == 1)
+   {
+      P_LoadXNOD(lumpnum + ML_NODES);
+   }
+   else
+   {
+      P_LoadSubsectors(lumpnum + ML_SSECTORS);
+      P_LoadNodes(lumpnum + ML_NODES);
+      P_LoadSegs(lumpnum + ML_SEGS);
+   }
 
-  // reject loading and underflow padding separated out into new function
-  // P_GroupLines modified to return a number the underflow padding needs
-  P_LoadReject(lumpnum, P_GroupLines());
+   // reject loading and underflow padding separated out into new function
+   // P_GroupLines modified to return a number the underflow padding needs
+   P_LoadReject(lumpnum, P_GroupLines());
 
-  // e6y
-  // Correction of desync on dv04-423.lmp/dv.wad
-  // http://www.doomworld.com/vb/showthread.php?s=&postid=627257#post627257
-  if (compatibility_level>=lxdoom_1_compatibility || M_CheckParm("-force_remove_slime_trails") > 0)
-    P_RemoveSlimeTrails();    // killough 10/98: remove slime trails from wad
+   // e6y
+   // Correction of desync on dv04-423.lmp/dv.wad
+   // http://www.doomworld.com/vb/showthread.php?s=&postid=627257#post627257
+   if (compatibility_level>=lxdoom_1_compatibility || M_CheckParm("-force_remove_slime_trails") > 0)
+      P_RemoveSlimeTrails();    // killough 10/98: remove slime trails from wad
 
-  // Note: you don't need to clear player queue slots --
-  // a much simpler fix is in g_game.c -- killough 10/98
+   // Note: you don't need to clear player queue slots --
+   // a much simpler fix is in g_game.c -- killough 10/98
 
-  bodyqueslot = 0;
+   bodyqueslot = 0;
 
-  /* cph - reset all multiplayer starts */
-  memset(playerstarts,0,sizeof(playerstarts));
-  deathmatch_p = deathmatchstarts;
-  for (i = 0; i < MAXPLAYERS; i++)
-    players[i].mo = NULL;
+   /* cph - reset all multiplayer starts */
+   memset(playerstarts,0,sizeof(playerstarts));
+   deathmatch_p = deathmatchstarts;
+   for (i = 0; i < MAXPLAYERS; i++)
+      players[i].mo = NULL;
 
-  P_MapStart();
+   P_MapStart();
 
-  P_LoadThings(lumpnum+ML_THINGS);
+   P_LoadThings(lumpnum+ML_THINGS);
 
-  // if deathmatch, randomly spawn the active players
-  if (deathmatch)
-  {
-    for (i=0; i<MAXPLAYERS; i++)
-      if (playeringame[i])
-        {
-          players[i].mo = NULL; // not needed? - done before P_LoadThings
-          G_DeathMatchSpawnPlayer(i);
-        }
-  }
-  else // if !deathmatch, check all necessary player starts actually exist
-  {
-    for (i=0; i<MAXPLAYERS; i++)
-      if (playeringame[i] && !players[i].mo)
-        I_Error("P_SetupLevel: missing player %d start\n", i+1);
-  }
+   // if deathmatch, randomly spawn the active players
+   if (deathmatch)
+   {
+      for (i=0; i<MAXPLAYERS; i++)
+         if (playeringame[i])
+         {
+            players[i].mo = NULL; // not needed? - done before P_LoadThings
+            G_DeathMatchSpawnPlayer(i);
+         }
+   }
+   else // if !deathmatch, check all necessary player starts actually exist
+   {
+      for (i=0; i<MAXPLAYERS; i++)
+         if (playeringame[i] && !players[i].mo)
+            I_Error("P_SetupLevel: missing player %d start\n", i+1);
+   }
 
-  // killough 3/26/98: Spawn icon landings:
-  if (gamemode==commercial)
-    P_SpawnBrainTargets();
+   // killough 3/26/98: Spawn icon landings:
+   if (gamemode==commercial)
+      P_SpawnBrainTargets();
 
-  // clear special respawning que
-  iquehead = iquetail = 0;
+   // clear special respawning que
+   iquehead = iquetail = 0;
 
-  // set up world state
-  P_SpawnSpecials();
+   // set up world state
+   P_SpawnSpecials();
 
-  P_MapEnd();
+   P_MapEnd();
 
-  // preload graphics
-  if (precache)
-    R_PrecacheLevel();
+   // preload graphics
+   if (precache)
+      R_PrecacheLevel();
 
-  R_SmoothPlaying_Reset(NULL); // e6y
+   R_SmoothPlaying_Reset(NULL); // e6y
 }
 
-//
-// P_Init
-//
+/*
+=================
+=
+= P_Init
+=
+=================
+*/
+
 void P_Init (void)
 {
-  P_InitSwitchList();
-  P_InitPicAnims();
-  R_InitSprites(sprnames);
+   P_InitSwitchList();
+   P_InitPicAnims();
+   R_InitSprites(sprnames);
 }

@@ -54,9 +54,13 @@ static boolean newthinkerpresent;
 // a special class of thinkers, to allow more efficient searches.
 thinker_t thinkerclasscap[th_all+1];
 
-//
-// P_InitThinkers
-//
+/*
+===============
+=
+= P_InitThinkers
+=
+===============
+*/
 
 void P_InitThinkers(void)
 {
@@ -103,10 +107,15 @@ void P_UpdateThinker(thinker_t *thinker)
   th->cprev = thinker;
 }
 
-//
-// P_AddThinker
-// Adds a new thinker at the end of the list.
-//
+/*
+===============
+=
+= P_AddThinker
+=
+= Adds a new thinker at the end of the list
+=
+===============
+*/
 
 void P_AddThinker(thinker_t* thinker)
 {
@@ -217,14 +226,6 @@ void P_SetTarget(mobj_t **mop, mobj_t *targ)
     targ->thinker.references++;
 }
 
-//
-// P_RunThinkers
-//
-// killough 4/25/98:
-//
-// Fix deallocator to stop using "next" pointer after node has been freed
-// (a Doom bug).
-//
 // Process each thinker. For thinkers which are marked deleted, we must
 // load the "next" pointer prior to freeing the node. In Doom, the "next"
 // pointer was loaded AFTER the thinker was freed, which could have caused
@@ -233,12 +234,14 @@ void P_SetTarget(mobj_t **mop, mobj_t *targ)
 // But if we are not deleting the thinker, we should reload the "next"
 // pointer after calling the function, in case additional thinkers are
 // added at the end of the list.
-//
-// killough 11/98:
-//
-// Rewritten to delete nodes implicitly, by making currentthinker
-// external and using P_RemoveThinkerDelayed() implicitly.
-//
+
+/*
+===============
+=
+= P_RunThinkers
+=
+===============
+*/
 
 static void P_RunThinkers (void)
 {
@@ -256,9 +259,13 @@ static void P_RunThinkers (void)
   newthinkerpresent = FALSE;
 }
 
-//
-// P_Ticker
-//
+/*
+=================
+=
+= P_Ticker
+=
+=================
+*/
 
 void P_Ticker (void)
 {

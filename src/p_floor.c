@@ -62,13 +62,8 @@
 //  pastdest - plane moved normally and is now at destination height
 //  crushed - plane encountered an obstacle, is holding until removed
 //
-result_e T_MovePlane
-( sector_t*     sector,
-  fixed_t       speed,
-  fixed_t       dest,
-  boolean       crush,
-  int           floorOrCeiling,
-  int           direction )
+result_e T_MovePlane( sector_t*     sector, fixed_t       speed,
+  fixed_t       dest, boolean       crush, int           floorOrCeiling, int           direction )
 {
   boolean       flag;
   fixed_t       lastpos;
@@ -77,8 +72,7 @@ result_e T_MovePlane
 
   switch(floorOrCeiling)
   {
-    case 0:
-      // Moving a floor
+    case 0: /* Moving a floor */
       switch(direction)
       {
         case -1:
@@ -251,83 +245,83 @@ void T_MoveFloor(floormove_t* floor)
 
   if (res == pastdest)    // if destination height is reached
   {
-    if (floor->direction == 1)       // going up
-    {
-      switch(floor->type) // handle texture/type changes
-      {
-        case donutRaise:
-          floor->sector->special = floor->newspecial;
-          floor->sector->floorpic = floor->texture;
-          break;
-        case genFloorChgT:
-        case genFloorChg0:
-          floor->sector->special = floor->newspecial;
-          //jff add to fix bug in special transfers from changes
-          floor->sector->oldspecial = floor->oldspecial;
-          //fall thru
-        case genFloorChg:
-          floor->sector->floorpic = floor->texture;
-          break;
-        default:
-          break;
-      }
-    }
-    else if (floor->direction == -1) // going down
-    {
-      switch(floor->type) // handle texture/type changes
-      {
-        case lowerAndChange:
-          floor->sector->special = floor->newspecial;
-          //jff add to fix bug in special transfers from changes
-          floor->sector->oldspecial = floor->oldspecial;
-          floor->sector->floorpic = floor->texture;
-          break;
-        case genFloorChgT:
-        case genFloorChg0:
-          floor->sector->special = floor->newspecial;
-          //jff add to fix bug in special transfers from changes
-          floor->sector->oldspecial = floor->oldspecial;
-          //fall thru
-        case genFloorChg:
-          floor->sector->floorpic = floor->texture;
-          break;
-        default:
-          break;
-      }
-    }
-
-    floor->sector->floordata = NULL; //jff 2/22/98
-    P_RemoveThinker(&floor->thinker);//remove this floor from list of movers
-
-    //jff 2/26/98 implement stair retrigger lockout while still building
-    // note this only applies to the retriggerable generalized stairs
-
-    if (floor->sector->stairlock==-2) // if this sector is stairlocked
-    {
-      sector_t *sec = floor->sector;
-      sec->stairlock=-1;              // thinker done, promote lock to -1
-
-      while (sec->prevsec!=-1 && sectors[sec->prevsec].stairlock!=-2)
-        sec = &sectors[sec->prevsec]; // search for a non-done thinker
-      if (sec->prevsec==-1)           // if all thinkers previous are done
-      {
-        sec = floor->sector;          // search forward
-        while (sec->nextsec!=-1 && sectors[sec->nextsec].stairlock!=-2)
-          sec = &sectors[sec->nextsec];
-        if (sec->nextsec==-1)         // if all thinkers ahead are done too
+     if (floor->direction == 1)       // going up
+     {
+        switch(floor->type) // handle texture/type changes
         {
-          while (sec->prevsec!=-1)    // clear all locks
-          {
-            sec->stairlock = 0;
-            sec = &sectors[sec->prevsec];
-          }
-          sec->stairlock = 0;
+           case donutRaise:
+              floor->sector->special = floor->newspecial;
+              floor->sector->floorpic = floor->texture;
+              break;
+           case genFloorChgT:
+           case genFloorChg0:
+              floor->sector->special = floor->newspecial;
+              //jff add to fix bug in special transfers from changes
+              floor->sector->oldspecial = floor->oldspecial;
+              //fall thru
+           case genFloorChg:
+              floor->sector->floorpic = floor->texture;
+              break;
+           default:
+              break;
         }
-      }
-    }
+     }
+     else if (floor->direction == -1) // going down
+     {
+        switch(floor->type) // handle texture/type changes
+        {
+           case lowerAndChange:
+              floor->sector->special = floor->newspecial;
+              //jff add to fix bug in special transfers from changes
+              floor->sector->oldspecial = floor->oldspecial;
+              floor->sector->floorpic = floor->texture;
+              break;
+           case genFloorChgT:
+           case genFloorChg0:
+              floor->sector->special = floor->newspecial;
+              //jff add to fix bug in special transfers from changes
+              floor->sector->oldspecial = floor->oldspecial;
+              //fall thru
+           case genFloorChg:
+              floor->sector->floorpic = floor->texture;
+              break;
+           default:
+              break;
+        }
+     }
 
-    // make floor stop sound
-    S_StartSound((mobj_t *)&floor->sector->soundorg, sfx_pstop);
+     floor->sector->floordata = NULL; //jff 2/22/98
+     P_RemoveThinker(&floor->thinker);//remove this floor from list of movers
+
+     //jff 2/26/98 implement stair retrigger lockout while still building
+     // note this only applies to the retriggerable generalized stairs
+
+     if (floor->sector->stairlock==-2) // if this sector is stairlocked
+     {
+        sector_t *sec = floor->sector;
+        sec->stairlock=-1;              // thinker done, promote lock to -1
+
+        while (sec->prevsec!=-1 && sectors[sec->prevsec].stairlock!=-2)
+           sec = &sectors[sec->prevsec]; // search for a non-done thinker
+        if (sec->prevsec==-1)           // if all thinkers previous are done
+        {
+           sec = floor->sector;          // search forward
+           while (sec->nextsec!=-1 && sectors[sec->nextsec].stairlock!=-2)
+              sec = &sectors[sec->nextsec];
+           if (sec->nextsec==-1)         // if all thinkers ahead are done too
+           {
+              while (sec->prevsec!=-1)    // clear all locks
+              {
+                 sec->stairlock = 0;
+                 sec = &sectors[sec->prevsec];
+              }
+              sec->stairlock = 0;
+           }
+        }
+     }
+
+     // make floor stop sound
+     S_StartSound((mobj_t *)&floor->sector->soundorg, sfx_pstop);
   }
 }
 
@@ -425,18 +419,15 @@ int EV_DoFloor
 ( line_t*       line,
   floor_e       floortype )
 {
-  int           secnum;
-  int           rtn;
   int           i;
-  sector_t*     sec;
   floormove_t*  floor;
+  int secnum = -1;
+  int rtn = 0;
 
-  secnum = -1;
-  rtn = 0;
-  // move all floors with the same tag as the linedef
+  /* move all floors with the same tag as the linedef */
   while ((secnum = P_FindSectorFromLineTag(line,secnum)) >= 0)
   {
-    sec = &sectors[secnum];
+    sector_t *sec = &sectors[secnum];
 
     // Don't start a second thinker on the same floor
     if (P_SectorActive(floor_special,sec)) //jff 2/23/98

@@ -56,10 +56,15 @@
 
 boolean onground; // whether player is on ground or in air
 
-//
-// P_Thrust
-// Moves the given origin along a given angle.
-//
+/* 
+================== 
+= 
+= P_Thrust 
+= 
+= moves the given origin along a given angle 
+= 
+================== 
+*/ 
 
 void P_Thrust(player_t* player,angle_t angle,fixed_t move)
 {
@@ -90,111 +95,103 @@ static void P_Bob(player_t *player, angle_t angle, fixed_t move)
   player->momy += FixedMul(move,finesine[angle]);
 }
 
-//
-// P_CalcHeight
-// Calculate the walking / running height adjustment
-//
+/* 
+================== 
+= 
+= P_CalcHeight 
+= 
+= Calculate the walking / running height adjustment
+=
+================== 
+*/ 
 
 void P_CalcHeight (player_t* player)
 {
-  int     angle;
-  fixed_t bob;
+   int     angle;
+   fixed_t bob;
 
-  // Regular movement bobbing
-  // (needs to be calculated for gun swing
-  // even if not on ground)
-  // OPTIMIZE: tablify angle
-  // Note: a LUT allows for effects
-  //  like a ramp with low health.
+   /* */
+   /* regular movement bobbing (needs to be calculated for gun swing even */
+   /* if not on ground) */
+   /* OPTIMIZE: tablify angle  */
 
+   if (!demo_compatibility && !player_bobbing)
+      player->bob = 0;
+   else
+   {
+      fixed_t x = mbf_features ? player->momx : player->mo->momx;
+      fixed_t y = mbf_features ? player->momy : player->mo->momy;
 
-  /* killough 10/98: Make bobbing depend only on player-applied motion.
-   *
-   * Note: don't reduce bobbing here if on ice: if you reduce bobbing here,
-   * it causes bobbing jerkiness when the player moves from ice to non-ice,
-   * and vice-versa.
-   */
-  if (!demo_compatibility && !player_bobbing)
-    player->bob = 0;
-  else
-  {
-    fixed_t x = mbf_features ? player->momx : player->mo->momx;
-    fixed_t y = mbf_features ? player->momy : player->mo->momy;
+      player->bob = (FixedMul(x,x) + FixedMul(y,y)) >> 2;
+   }
 
-    player->bob = (FixedMul(x,x) + FixedMul(y,y)) >> 2;
-  }
-
-    //e6y
-    if (compatibility_level >= boom_202_compatibility && 
-        compatibility_level <= lxdoom_1_compatibility &&
-        player->mo->friction > ORIG_FRICTION) // ice?
-    {
+   //e6y
+   if (compatibility_level >= boom_202_compatibility && 
+         compatibility_level <= lxdoom_1_compatibility &&
+         player->mo->friction > ORIG_FRICTION) // ice?
+   {
       if (player->bob > (MAXBOB>>2))
-        player->bob = MAXBOB>>2;
-    }
-    else
+         player->bob = MAXBOB>>2;
+   }
+   else
 
-  if (player->bob > MAXBOB)
-    player->bob = MAXBOB;
+      if (player->bob > MAXBOB)
+         player->bob = MAXBOB;
 
-  if (!onground || player->cheats & CF_NOMOMENTUM)
-    {
-    player->viewz = player->mo->z + VIEWHEIGHT;
+   if (!onground || player->cheats & CF_NOMOMENTUM)
+   {
+      player->viewz = player->mo->z + VIEWHEIGHT;
 
-    if (player->viewz > player->mo->ceilingz-4*FRACUNIT)
+      if (player->viewz > player->mo->ceilingz-4*FRACUNIT)
+         player->viewz = player->mo->ceilingz-4*FRACUNIT;
+      return;
+   }
+
+   angle = (FINEANGLES/20*leveltime)&FINEMASK;
+   bob   = FixedMul(player->bob/2,finesine[angle]);
+
+   /* move viewheight */
+
+   if (player->playerstate == PST_LIVE)
+   {
+      player->viewheight += player->deltaviewheight;
+
+      if (player->viewheight > VIEWHEIGHT)
+      {
+         player->viewheight = VIEWHEIGHT;
+         player->deltaviewheight = 0;
+      }
+
+      if (player->viewheight < VIEWHEIGHT/2)
+      {
+         player->viewheight = VIEWHEIGHT/2;
+         if (player->deltaviewheight <= 0)
+            player->deltaviewheight = 1;
+      }
+
+      if (player->deltaviewheight)
+      {
+         player->deltaviewheight += FRACUNIT/4;
+         if (!player->deltaviewheight)
+            player->deltaviewheight = 1;
+      }
+   }
+
+   player->viewz = player->mo->z + player->viewheight + bob;
+
+   if (player->viewz > player->mo->ceilingz-4*FRACUNIT)
       player->viewz = player->mo->ceilingz-4*FRACUNIT;
-
-// The following line was in the Id source and appears      // phares 2/25/98
-// to be a bug. player->viewz is checked in a similar
-// manner at a different exit below.
-
-//  player->viewz = player->mo->z + player->viewheight;
-    return;
-    }
-
-  angle = (FINEANGLES/20*leveltime)&FINEMASK;
-  bob = FixedMul(player->bob/2,finesine[angle]);
-
-  // move viewheight
-
-  if (player->playerstate == PST_LIVE)
-    {
-    player->viewheight += player->deltaviewheight;
-
-    if (player->viewheight > VIEWHEIGHT)
-      {
-      player->viewheight = VIEWHEIGHT;
-      player->deltaviewheight = 0;
-      }
-
-    if (player->viewheight < VIEWHEIGHT/2)
-      {
-      player->viewheight = VIEWHEIGHT/2;
-      if (player->deltaviewheight <= 0)
-        player->deltaviewheight = 1;
-      }
-
-    if (player->deltaviewheight)
-      {
-      player->deltaviewheight += FRACUNIT/4;
-      if (!player->deltaviewheight)
-        player->deltaviewheight = 1;
-      }
-    }
-
-  player->viewz = player->mo->z + player->viewheight + bob;
-
-  if (player->viewz > player->mo->ceilingz-4*FRACUNIT)
-    player->viewz = player->mo->ceilingz-4*FRACUNIT;
 }
 
-
-//
-// P_MovePlayer
-//
-// Adds momentum if the player is not in the air
-//
-// killough 10/98: simplified
+/*
+=================
+=
+= P_MovePlayer
+=
+= Adds momentum if the player is not in the air
+=
+=================
+*/
 
 void P_MovePlayer (player_t* player)
 {
@@ -248,211 +245,203 @@ void P_MovePlayer (player_t* player)
 
 #define ANG5 (ANG90/18)
 
-//
-// P_DeathThink
-// Fall on your face when dying.
-// Decrease POV height to floor height.
-//
+/*
+=================
+=
+= P_DeathThink
+=
+=  Fall on your face when dying.
+=  Decrease POV height to floor height.
+=
+=================
+*/
 
 void P_DeathThink (player_t* player)
 {
-  angle_t angle;
-  angle_t delta;
+   angle_t angle;
+   angle_t delta;
 
-  P_MovePsprites (player);
+   P_MovePsprites (player);
 
-  // fall to the ground
+   /* fall to the ground */
+   if (player->viewheight > 6*FRACUNIT)
+      player->viewheight -= FRACUNIT;
+   if (player->viewheight < 6*FRACUNIT)
+      player->viewheight = 6*FRACUNIT;
+   player->deltaviewheight = 0;
+   onground = (player->mo->z <= player->mo->floorz);
+   P_CalcHeight (player);
 
-  if (player->viewheight > 6*FRACUNIT)
-    player->viewheight -= FRACUNIT;
-
-  if (player->viewheight < 6*FRACUNIT)
-    player->viewheight = 6*FRACUNIT;
-
-  player->deltaviewheight = 0;
-  onground = (player->mo->z <= player->mo->floorz);
-  P_CalcHeight (player);
-
-  if (player->attacker && player->attacker != player->mo)
-    {
-    angle = R_PointToAngle2 (player->mo->x,
-                             player->mo->y,
-                             player->attacker->x,
-                             player->attacker->y);
-
-    delta = angle - player->mo->angle;
-
-    if (delta < ANG5 || delta > (unsigned)-ANG5)
+   if (player->attacker && player->attacker != player->mo)
+   {
+      angle = R_PointToAngle2 (player->mo->x,
+            player->mo->y, player->attacker->x,
+            player->attacker->y);
+      delta = angle - player->mo->angle;
+      if (delta < ANG5 || delta > (unsigned)-ANG5)
       {
-      // Looking at killer,
-      //  so fade damage flash down.
-
-      player->mo->angle = angle;
-
-      if (player->damagecount)
-        player->damagecount--;
+         /* Looking at killer, so fade damage flash down. */
+         player->mo->angle = angle;
+         if (player->damagecount)
+            player->damagecount--;
       }
-    else if (delta < ANG180)
-      player->mo->angle += ANG5;
-    else
-      player->mo->angle -= ANG5;
-    }
-  else if (player->damagecount)
-    player->damagecount--;
+      else if (delta < ANG180)
+         player->mo->angle += ANG5;
+      else
+         player->mo->angle -= ANG5;
+   }
+   else if (player->damagecount)
+      player->damagecount--;
 
-  if (player->cmd.buttons & BT_USE)
-    player->playerstate = PST_REBORN;
-  R_SmoothPlaying_Reset(player); // e6y
+   if (player->cmd.buttons & BT_USE)
+      player->playerstate = PST_REBORN;
+   R_SmoothPlaying_Reset(player); // e6y
 }
 
-
-//
-// P_PlayerThink
-//
+/*
+=================
+=
+= P_PlayerThink
+=
+=================
+*/
 
 void P_PlayerThink (player_t* player)
 {
-  ticcmd_t*    cmd;
-  weapontype_t newweapon;
+   ticcmd_t*    cmd;
+   weapontype_t newweapon;
 
 #ifndef __LIBRETRO__
-  if (movement_smooth && &players[displayplayer] == player)
-  {
-    original_view_vars.viewx = player->mo->x;
-    original_view_vars.viewy = player->mo->y;
-    original_view_vars.viewz = player->viewz;
-    original_view_vars.viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
-  }
+   if (movement_smooth && &players[displayplayer] == player)
+   {
+      original_view_vars.viewx = player->mo->x;
+      original_view_vars.viewy = player->mo->y;
+      original_view_vars.viewz = player->viewz;
+      original_view_vars.viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
+   }
 #endif
 
-  // killough 2/8/98, 3/21/98:
-  if (player->cheats & CF_NOCLIP)
-    player->mo->flags |= MF_NOCLIP;
-  else
-    player->mo->flags &= ~MF_NOCLIP;
+   // killough 2/8/98, 3/21/98:
+   if (player->cheats & CF_NOCLIP)
+      player->mo->flags |= MF_NOCLIP;
+   else
+      player->mo->flags &= ~MF_NOCLIP;
 
-  // chain saw run forward
+   cmd = &player->cmd;
 
-  cmd = &player->cmd;
-  if (player->mo->flags & MF_JUSTATTACKED)
-    {
-    cmd->angleturn = 0;
-    cmd->forwardmove = 0xc800/512;
-    cmd->sidemove = 0;
-    player->mo->flags &= ~MF_JUSTATTACKED;
-    }
+   /* chain saw run forward */
+   if (player->mo->flags & MF_JUSTATTACKED)
+   {
+      cmd->angleturn = 0;
+      cmd->forwardmove = 0xc800/512;
+      cmd->sidemove = 0;
+      player->mo->flags &= ~MF_JUSTATTACKED;
+   }
 
-  if (player->playerstate == PST_DEAD)
-    {
-    P_DeathThink (player);
-    return;
-    }
+   if (player->playerstate == PST_DEAD)
+   {
+      P_DeathThink (player);
+      return;
+   }
 
-  // Move around.
-  // Reactiontime is used to prevent movement
-  //  for a bit after a teleport.
+   // Move around.
+   // Reactiontime is used to prevent movement
+   //  for a bit after a teleport.
 
-  if (player->mo->reactiontime)
-    player->mo->reactiontime--;
-  else
-    P_MovePlayer (player);
+   if (player->mo->reactiontime)
+      player->mo->reactiontime--;
+   else
+      P_MovePlayer (player);
+   P_CalcHeight (player); /* Determines view height and bobbing */
 
-  P_CalcHeight (player); // Determines view height and bobbing
+   // Determine if there's anything about the sector you're in that's
+   // going to affect you, like painful floors.
 
-  // Determine if there's anything about the sector you're in that's
-  // going to affect you, like painful floors.
+   if (player->mo->subsector->sector->special)
+      P_PlayerInSpecialSector (player);
 
-  if (player->mo->subsector->sector->special)
-    P_PlayerInSpecialSector (player);
+   /* Check for weapon change. */
 
-  // Check for weapon change.
+   if (cmd->buttons & BT_CHANGE)
+   {
+      // The actual changing of the weapon is done
+      //  when the weapon psprite can do it
+      //  (read: not in the middle of an attack).
 
-  if (cmd->buttons & BT_CHANGE)
-    {
-    // The actual changing of the weapon is done
-    //  when the weapon psprite can do it
-    //  (read: not in the middle of an attack).
+      newweapon = (cmd->buttons & BT_WEAPONMASK)>>BT_WEAPONSHIFT;
 
-    newweapon = (cmd->buttons & BT_WEAPONMASK)>>BT_WEAPONSHIFT;
+      // killough 3/22/98: For demo compatibility we must perform the fist
+      // and SSG weapons switches here, rather than in G_BuildTiccmd(). For
+      // other games which rely on user preferences, we must use the latter.
 
-    // killough 3/22/98: For demo compatibility we must perform the fist
-    // and SSG weapons switches here, rather than in G_BuildTiccmd(). For
-    // other games which rely on user preferences, we must use the latter.
-
-    if (demo_compatibility)
+      if (demo_compatibility)
       { // compatibility mode -- required for old demos -- killough
-      if (newweapon == wp_fist && player->weaponowned[wp_chainsaw] &&
-        (player->readyweapon != wp_chainsaw ||
-         !player->powers[pw_strength]))
-        newweapon = wp_chainsaw;
-      if (gamemode == commercial &&
-        newweapon == wp_shotgun &&
-        player->weaponowned[wp_supershotgun] &&
-        player->readyweapon != wp_supershotgun)
-        newweapon = wp_supershotgun;
+         if (newweapon == wp_fist && player->weaponowned[wp_chainsaw] &&
+               (player->readyweapon != wp_chainsaw ||
+                !player->powers[pw_strength]))
+            newweapon = wp_chainsaw;
+         if (gamemode == commercial &&
+               newweapon == wp_shotgun &&
+               player->weaponowned[wp_supershotgun] &&
+               player->readyweapon != wp_supershotgun)
+            newweapon = wp_supershotgun;
       }
 
-    // killough 2/8/98, 3/22/98 -- end of weapon selection changes
+      // killough 2/8/98, 3/22/98 -- end of weapon selection changes
 
-    if (player->weaponowned[newweapon] && newweapon != player->readyweapon)
+      if (player->weaponowned[newweapon] && newweapon != player->readyweapon)
 
-      // Do not go to plasma or BFG in shareware,
-      //  even if cheated.
+         // Do not go to plasma or BFG in shareware,
+         //  even if cheated.
 
-      if ((newweapon != wp_plasma && newweapon != wp_bfg)
-          || (gamemode != shareware) )
-        player->pendingweapon = newweapon;
-    }
+         if ((newweapon != wp_plasma && newweapon != wp_bfg)
+               || (gamemode != shareware) )
+            player->pendingweapon = newweapon;
+   }
 
-  // check for use
-
-  if (cmd->buttons & BT_USE)
-    {
-    if (!player->usedown)
+   /* check for use */
+   if (cmd->buttons & BT_USE)
+   {
+      if (!player->usedown)
       {
-      P_UseLines (player);
-      player->usedown = TRUE;
+         P_UseLines (player);
+         player->usedown = TRUE;
       }
-    }
-  else
-    player->usedown = FALSE;
+   }
+   else
+      player->usedown = FALSE;
 
-  // cycle psprites
+   /* cycle psprites */
+   P_MovePsprites (player);
 
-  P_MovePsprites (player);
+   // Counters, time dependent power ups.
 
-  // Counters, time dependent power ups.
+   // Strength counts up to diminish fade.
 
-  // Strength counts up to diminish fade.
+   if (player->powers[pw_strength])
+      player->powers[pw_strength]++;
 
-  if (player->powers[pw_strength])
-    player->powers[pw_strength]++;
+   if (player->powers[pw_invulnerability])
+      player->powers[pw_invulnerability]--;
 
-  // killough 1/98: Make idbeholdx toggle:
+   if (player->powers[pw_invisibility])
+      if (! --player->powers[pw_invisibility] )
+         player->mo->flags &= ~MF_SHADOW;
 
-  if (player->powers[pw_invulnerability] > 0) // killough
-    player->powers[pw_invulnerability]--;
+   if (player->powers[pw_infrared])
+      player->powers[pw_infrared]--;
 
-  if (player->powers[pw_invisibility] > 0)    // killough
-    if (! --player->powers[pw_invisibility] )
-      player->mo->flags &= ~MF_SHADOW;
+   if (player->powers[pw_ironfeet])
+      player->powers[pw_ironfeet]--;
 
-  if (player->powers[pw_infrared] > 0)        // killough
-    player->powers[pw_infrared]--;
+   if (player->damagecount)
+      player->damagecount--;
 
-  if (player->powers[pw_ironfeet] > 0)        // killough
-    player->powers[pw_ironfeet]--;
+   if (player->bonuscount)
+      player->bonuscount--;
 
-  if (player->damagecount)
-    player->damagecount--;
-
-  if (player->bonuscount)
-    player->bonuscount--;
-
-  // Handling colormaps.
-  // killough 3/20/98: reformat to terse C syntax
-
-  player->fixedcolormap = player->powers[pw_invulnerability] > 4*32 ||
-    player->powers[pw_invulnerability] & 8 ? INVERSECOLORMAP :
-    player->powers[pw_infrared] > 4*32 || player->powers[pw_infrared] & 8;
+   /* Handling colormaps. */
+   player->fixedcolormap = player->powers[pw_invulnerability] > 4*32 ||
+      player->powers[pw_invulnerability] & 8 ? INVERSECOLORMAP :
+      player->powers[pw_infrared] > 4*32 || player->powers[pw_infrared] & 8;
 }

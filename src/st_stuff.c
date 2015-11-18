@@ -1147,6 +1147,14 @@ static void ST_Stop(void)
   st_stopped = TRUE;
 }
 
+/*
+====================
+=
+= ST_Init
+=
+= Locate and load all needed graphics
+====================
+*/
 void ST_Init(void)
 {
   veryfirsttime = 0;

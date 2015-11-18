@@ -100,12 +100,13 @@ int       *texturetranslation;
 // R_GetTextureColumn
 //
 
-const byte *R_GetTextureColumn(const rpatch_t *texpatch, int col) {
-  while (col < 0)
-    col += texpatch->width;
-  col &= texpatch->widthmask;
-  
-  return texpatch->columns[col].pixels;
+const byte *R_GetTextureColumn(const rpatch_t *texpatch, int col)
+{
+   while (col < 0)
+      col += texpatch->width;
+   col &= texpatch->widthmask;
+
+   return texpatch->columns[col].pixels;
 }
 
 //
@@ -189,8 +190,8 @@ static void R_InitTextures (void)
   // killough 4/9/98: make column offsets 32-bit;
   // clean up malloc-ing to use sizeof
 
-  textures = Z_Malloc(numtextures*sizeof*textures, PU_STATIC, 0);
-  textureheight = Z_Malloc(numtextures*sizeof*textureheight, PU_STATIC, 0);
+  textures = Z_Malloc(numtextures * sizeof(*textures), PU_STATIC, 0);
+  textureheight = Z_Malloc(numtextures * sizeof(*textureheight), PU_STATIC, 0);
 
   totalwidth = 0;
 
@@ -220,42 +221,11 @@ static void R_InitTextures (void)
       texture->height = SHORT(mtexture->height);
       texture->patchcount = SHORT(mtexture->patchcount);
 
-        /* Mattias Engdegård emailed me of the following explenation of
-         * why memcpy doesnt work on some systems:
-         * "I suppose it is the mad unaligned allocation
-         * going on (and which gcc in some way manages to cope with
-         * through the __attribute__ ((packed))), and which it forgets
-         * when optimizing memcpy (to a single word move) since it appears
-         * to be aligned. Technically a gcc bug, but I can't blame it when
-         * it's stressed with that amount of
-         * non-standard nonsense."
-   * So in short the unaligned struct confuses gcc's optimizer so
-   * i took the memcpy out alltogether to avoid future problems-Jess
-         */
-      /* The above was #ifndef SPARC, but i got a mail from
-       * Putera Joseph F NPRI <PuteraJF@Npt.NUWC.Navy.Mil> containing:
-       *   I had to use the memcpy function on a sparc machine.  The
-       *   other one would give me a core dump.
-       * cph - I find it hard to believe that sparc memcpy is broken,
-       * but I don't believe the pointers to memcpy have to be aligned
-       * either. Use fast memcpy on other machines anyway.
-       */
-/*
-  proff - I took this out, because Oli Kraus (olikraus@yahoo.com) told
-  me the memcpy produced a buserror. Since this function isn't time-
-  critical I'm using the for loop now.
-*/
-/*
-#ifndef GCC
-      memcpy(texture->name, mtexture->name, sizeof(texture->name));
-#else
-*/
       {
-        int j;
+        unsigned j;
         for(j=0;j<sizeof(texture->name);j++)
           texture->name[j]=mtexture->name[j];
       }
-/* #endif */
 
       mpatch = mtexture->patches;
       patch = texture->patches;
@@ -299,7 +269,7 @@ static void R_InitTextures (void)
   // clean up malloc-ing to use sizeof
 
   texturetranslation =
-    Z_Malloc((numtextures+1)*sizeof*texturetranslation, PU_STATIC, 0);
+    Z_Malloc((numtextures+1) * sizeof(*texturetranslation), PU_STATIC, 0);
 
   for (i=0 ; i<numtextures ; i++)
     texturetranslation[i] = i;
@@ -326,13 +296,10 @@ static void R_InitFlats(void)
   lastflat  = W_GetNumForName("F_END") - 1;
   numflats  = lastflat - firstflat + 1;
 
-  // Create translation table for global animation.
-  // killough 4/9/98: make column offsets 32-bit;
-  // clean up malloc-ing to use sizeof
+  /* Create translation table for global animation. */
 
   flattranslation =
     Z_Malloc((numflats+1)*sizeof(*flattranslation), PU_STATIC, 0);
-
   for (i=0 ; i<numflats ; i++)
     flattranslation[i] = i;
 }
@@ -393,38 +360,41 @@ int R_ColormapNumForName(const char *name)
  */
 
 static INLINE int between(int l,int u,int x)
-{ return (l > x ? l : x > u ? u : x); }
+{
+   return (l > x ? l : x > u ? u : x);
+}
 
 const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
 {
-  if (fixedcolormap) return fixedcolormap;
-  else {
-    if (curline) {
-      if (curline->v1->y == curline->v2->y)
+  if (fixedcolormap)
+     return fixedcolormap;
+
+  if (curline)
+  {
+     if (curline->v1->y == curline->v2->y)
         lightlevel -= 1 << LIGHTSEGSHIFT;
-      else
+     else
         if (curline->v1->x == curline->v2->x)
-          lightlevel += 1 << LIGHTSEGSHIFT;
-    }
-
-    lightlevel += extralight << LIGHTSEGSHIFT;
-
-    /* cph 2001/11/17 -
-     * Work out what colour map to use, remembering to clamp it to the number of
-     * colour maps we actually have. This formula is basically the one from the
-     * original source, just brought into one place. The main difference is it
-     * throws away less precision in the lightlevel half, so it supports 32
-     * light levels in WADs compared to Doom's 16.
-     *
-     * Note we can make it more accurate if we want - we should keep all the
-     * precision until the final step, so slight scale differences can count
-     * against slight light level variations.
-     */
-    return fullcolormap + between(0,NUMCOLORMAPS-1,
-          ((256-lightlevel)*2*NUMCOLORMAPS/256) - 4
-          - (FixedMul(spryscale,pspriteiscale)/2 >> LIGHTSCALESHIFT)
-          )*256;
+           lightlevel += 1 << LIGHTSEGSHIFT;
   }
+
+  lightlevel += extralight << LIGHTSEGSHIFT;
+
+  /* cph 2001/11/17 -
+   * Work out what colour map to use, remembering to clamp it to the number of
+   * colour maps we actually have. This formula is basically the one from the
+   * original source, just brought into one place. The main difference is it
+   * throws away less precision in the lightlevel half, so it supports 32
+   * light levels in WADs compared to Doom's 16.
+   *
+   * Note we can make it more accurate if we want - we should keep all the
+   * precision until the final step, so slight scale differences can count
+   * against slight light level variations.
+   */
+   return fullcolormap + between(0,NUMCOLORMAPS-1,
+         ((256-lightlevel)*2*NUMCOLORMAPS/256) - 4
+         - (FixedMul(spryscale,pspriteiscale)/2 >> LIGHTSCALESHIFT)
+         )*256;
 }
 
 //

@@ -42,10 +42,15 @@
 #include "m_random.h"
 #include "lprintf.h"
 
-//
-// M_Random
-// Returns a 0-255 number
-//
+/*
+===============
+=
+= M_Random
+=
+= Returns a 0-255 number
+=
+===============
+*/
 static const unsigned char rndtable[256] = { // 1/19/98 killough -- made const
     0,   8, 109, 220, 222, 241, 149, 107,  75, 248, 254, 140,  16,  66 ,
     74,  21, 211,  47,  80, 242, 154,  27, 205, 128, 161,  89,  77,  36 ,
@@ -72,8 +77,7 @@ rng_t rng;     // the random number state
 
 unsigned long rngseed = 1993;   // killough 3/26/98: The seed
 
-int (P_Random)(pr_class_t pr_class
-)
+int (P_Random)(pr_class_t pr_class)
 {
   // killough 2/16/98:  We always update both sets of random number
   // generators, to ensure repeatability if the demo_compatibility

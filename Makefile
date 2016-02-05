@@ -35,16 +35,20 @@ endif
 
 TARGET_NAME := prboom
 
-LIBM := 
+LIBM    := 
 LDFLAGS := 
 
 ifeq ($(STATIC_LINKING),1)
 EXT=a
+
+ifeq ($(platform), unix)
+PLAT=_unix
+endif
 endif
 
 ifeq ($(platform), unix)
 	EXT    ?= so
-   TARGET := $(TARGET_NAME)_libretro.$(EXT)
+   TARGET := $(TARGET_NAME)_libretro$(PLAT).$(EXT)
    fpic := -fPIC
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
 else ifeq ($(platform), linux-portable)

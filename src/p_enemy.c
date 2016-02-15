@@ -569,10 +569,10 @@ static boolean PIT_AvoidDropoff(line_t *line)
       // The monster must contact one of the two floors,
       // and the other must be a tall dropoff (more than 24).
 
-      if (back == floorz && front < floorz - FRACUNIT*24)
+      if (back == floorz && front < floorz - STEPSIZE)
   angle = R_PointToAngle2(0,0,line->dx,line->dy);   // front side dropoff
       else
-  if (front == floorz && back < floorz - FRACUNIT*24)
+  if (front == floorz && back < floorz - STEPSIZE)
     angle = R_PointToAngle2(line->dx,line->dy,0,0); // back side dropoff
   else
     return TRUE;
@@ -631,7 +631,7 @@ static void P_NewChaseDir(mobj_t *actor)
   actor->strafecount = 0;
 
   if (mbf_features) {
-    if (actor->floorz - actor->dropoffz > FRACUNIT*24 &&
+    if (actor->floorz - actor->dropoffz > STEPSIZE &&
   actor->z <= actor->floorz &&
   !(actor->flags & (MF_DROPOFF|MF_FLOAT)) &&
   !comp[comp_dropoff] &&
@@ -1736,8 +1736,8 @@ void A_Fire(mobj_t *actor)
   an = dest->angle >> ANGLETOFINESHIFT;
 
   P_UnsetThingPosition(actor);
-  actor->x = dest->x + FixedMul(24*FRACUNIT, finecosine[an]);
-  actor->y = dest->y + FixedMul(24*FRACUNIT, finesine[an]);
+  actor->x = dest->x + FixedMul(STEPSIZE, finecosine[an]);
+  actor->y = dest->y + FixedMul(STEPSIZE, finesine[an]);
   actor->z = dest->z;
   P_SetThingPosition(actor);
 }
@@ -1796,8 +1796,8 @@ void A_VileAttack(mobj_t *actor)
     return;
 
   // move the fire between the vile and the player
-  fire->x = actor->target->x - FixedMul (24*FRACUNIT, finecosine[an]);
-  fire->y = actor->target->y - FixedMul (24*FRACUNIT, finesine[an]);
+  fire->x = actor->target->x - FixedMul (STEPSIZE, finecosine[an]);
+  fire->y = actor->target->y - FixedMul (STEPSIZE, finesine[an]);
   P_RadiusAttack(fire, actor, 70);
 }
 

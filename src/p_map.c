@@ -799,7 +799,7 @@ boolean P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
      tmceilingz - thing->z < thing->height) ||
     // too big a step up
     (!(thing->flags & MF_TELEPORT) &&
-     tmfloorz - thing->z > 24*FRACUNIT))
+     tmfloorz - thing->z > STEPSIZE))
   return tmunstuck
     && !(ceilingline && untouched(ceilingline))
     && !(  floorline && untouched(  floorline));
@@ -817,7 +817,7 @@ boolean P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
       if ((compatibility || !dropoff
             // fix demosync bug in mbf compatibility mode
             || (mbf_features && compatibility_level <= prboom_2_compatibility))
-          && (tmfloorz - tmdropoffz > 24*FRACUNIT))
+          && (tmfloorz - tmdropoffz > STEPSIZE))
         return FALSE;                      // don't stand over a dropoff
     }
   else
@@ -826,14 +826,14 @@ boolean P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
           !thing->target || thing->target->z >tmdropoffz)))
       {
         if (!monkeys || !mbf_features ?
-      tmfloorz - tmdropoffz > 24*FRACUNIT :
-      thing->floorz  - tmfloorz > 24*FRACUNIT ||
-      thing->dropoffz - tmdropoffz > 24*FRACUNIT)
+      tmfloorz - tmdropoffz > STEPSIZE :
+      thing->floorz  - tmfloorz > STEPSIZE ||
+      thing->dropoffz - tmdropoffz > STEPSIZE)
     return FALSE;
       }
     else { /* dropoff allowed -- check for whether it fell more than 24 */
       felldown = !(thing->flags & MF_NOGRAVITY) &&
-        thing->z - tmfloorz > 24*FRACUNIT;
+        thing->z - tmfloorz > STEPSIZE;
     }
       }
 
@@ -1218,7 +1218,7 @@ boolean PTR_SlideTraverse (intercept_t* in)
   if (opentop - slidemo->z < slidemo->height)
     goto isblocking;  // mobj is too high
 
-  if (openbottom - slidemo->z > 24*FRACUNIT )
+  if (openbottom - slidemo->z > STEPSIZE )
     goto isblocking;  // too big a step up
 
   // this line doesn't block movement

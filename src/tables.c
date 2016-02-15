@@ -55,23 +55,11 @@
 
 // killough 5/3/98: reformatted
 
-int SlopeDiv(unsigned num, unsigned den)
-{
-  unsigned ans;
-
-  if (den < 512)
-    return SLOPERANGE;
-  ans = (num<<3)/(den>>8);
-  return ans <= SLOPERANGE ? ans : SLOPERANGE;
-}
-
 fixed_t finetangent[4096];
 
 //const fixed_t *const finecosine = &finesine[FINEANGLES/4];
 
 fixed_t finesine[10240];
-
-angle_t tantoangle[2049];
 
 #include "m_swap.h"
 #include "lprintf.h"

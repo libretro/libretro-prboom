@@ -215,13 +215,13 @@ void P_SpawnLightFlash (sector_t* sector)
   P_AddThinker (&flash->thinker);
 
   flash->thinker.function = T_LightFlash;
-  flash->sector = sector;
-  flash->maxlight = sector->lightlevel;
+  flash->sector           = sector;
+  flash->maxlight         = sector->lightlevel;
 
-  flash->minlight = P_FindMinSurroundingLight(sector,sector->lightlevel);
-  flash->maxtime = 64;
-  flash->mintime = 7;
-  flash->count = (P_Random(pr_lights)&flash->maxtime)+1;
+  flash->minlight         = P_FindMinSurroundingLight(sector,sector->lightlevel);
+  flash->maxtime          = 64;
+  flash->mintime          = 7;
+  flash->count            = (P_Random(pr_lights)&flash->maxtime)+1;
 }
 
 //
@@ -309,10 +309,9 @@ void P_SpawnGlowingLight(sector_t*  sector)
 //
 int EV_StartLightStrobing(line_t* line)
 {
-  int   secnum;
   sector_t* sec;
+  int   secnum = -1;
 
-  secnum = -1;
   // start lights strobing in all sectors tagged same as line
   while ((secnum = P_FindSectorFromLineTag(line,secnum)) >= 0)
   {

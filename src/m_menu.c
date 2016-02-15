@@ -1015,6 +1015,8 @@ int quitsounds2[8] =
   sfx_sgtatk
 };
 
+boolean quit_pressed = false;
+
 static void M_QuitResponse(int ch)
 {
   if (ch != 'y')
@@ -1040,7 +1042,8 @@ static void M_QuitResponse(int ch)
     }
   }
 #endif
-  I_SafeExit(1);
+
+  quit_pressed = true;
 }
 
 void M_QuitDOOM(int choice)

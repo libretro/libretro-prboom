@@ -163,10 +163,7 @@ void retro_reset(void)
    M_EndGame(0);
 }
 
-void retro_shutdown_prboom(void)
-{
-   environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
-}
+extern boolean quit_pressed;
 
 static void update_variables(bool startup)
 {
@@ -206,6 +203,11 @@ void retro_run(void)
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       update_variables(false);
+   if (quit_pressed)
+   {
+      environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
+      I_SafeExit(1);
+   }
 
    D_DoomLoop();
    I_UpdateSound();

@@ -299,8 +299,6 @@ void D_Display (void)
 
 int has_exited;
 
-extern void retro_shutdown_prboom(void);
-
 /* I_SafeExit
  * This function is called instead of exit() by functions that might be called
  * during the exit process (i.e. after exit() has already been called)
@@ -312,7 +310,6 @@ void I_SafeExit(int rc)
   if (!has_exited)    /* If it hasn't exited yet, exit now -- killough */
   {
       has_exited=rc ? 2 : 1;
-      retro_shutdown_prboom();
   }
 }
 

@@ -477,13 +477,11 @@ void V_SetPalette(int pal)
 void V_FillRect(int x, int y, int width, int height, byte colour)
 {
   unsigned short* dest = (unsigned short *)screens[0].data + x + y* SURFACE_SHORT_PITCH;
-  int w;
   short c = VID_PAL16(colour, VID_COLORWEIGHTMASK);
-  while (height--) {
-    for (w=0; w<width; w++) {
-      dest[w] = c;
-    }
-    dest += SURFACE_SHORT_PITCH;
+  while (height--)
+  {
+     memset(dest, c, width * sizeof(unsigned short));
+     dest += SURFACE_SHORT_PITCH;
   }
 }
 

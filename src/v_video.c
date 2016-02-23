@@ -224,140 +224,139 @@ void V_Init (void)
 static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
         int cm, enum patch_translation_e flags)
 {
-  const byte *trans;
-  int   col, left, right, top, bottom, w;
-  int DX, DXI, DY, DYI;
-  R_DrawColumn_f colfunc;
-  draw_column_vars_t dcvars;
-  draw_vars_t olddrawvars = drawvars;
+   int   left, right, top, bottom;
+   R_DrawColumn_f colfunc;
+   draw_column_vars_t dcvars;
+   draw_vars_t olddrawvars = drawvars;
+   int col = 0;
+   int w   = (patch->width << 16) - 1; // CPhipps - -1 for faster flipping
+   int DX  = (SCREENWIDTH<<16) / 320;
+   int DXI = (320<<16) / SCREENWIDTH;
+   int DY = (SCREENHEIGHT<<16) / 200;
+   int DYI = (200<<16) / SCREENHEIGHT;
+   const uint8_t *trans = translationtables + 256*((cm-CR_LIMIT)-1);
 
-  w = (patch->width << 16) - 1; // CPhipps - -1 for faster flipping
-  DX = (SCREENWIDTH<<16) / 320;
-  DXI = (320<<16) / SCREENWIDTH;
-  DY = (SCREENHEIGHT<<16) / 200;
-  DYI = (200<<16) / SCREENHEIGHT;
+   if (cm<CR_LIMIT)
+      trans=colrngs[cm];
 
-  if (cm<CR_LIMIT)
-    trans=colrngs[cm];
-  else
-    trans=translationtables + 256*((cm-CR_LIMIT)-1);
-  y -= patch->topoffset;
-  x -= patch->leftoffset;
+   y -= patch->topoffset;
+   x -= patch->leftoffset;
 
-  // CPhipps - auto-no-stretch if not high-res
-  if (flags & VPT_STRETCH)
-    if ((SCREENWIDTH==320) && (SCREENHEIGHT==200))
-      flags &= ~VPT_STRETCH;
+   // CPhipps - auto-no-stretch if not high-res
+   if (flags & VPT_STRETCH)
+      if ((SCREENWIDTH==320) && (SCREENHEIGHT==200))
+         flags &= ~VPT_STRETCH;
 
-  // CPhipps - null translation pointer => no translation
-  if (!trans)
-    flags &= ~VPT_TRANS;
+   // CPhipps - null translation pointer => no translation
+   if (!trans)
+      flags &= ~VPT_TRANS;
 
-    // CPhipps - move stretched patch drawing code here
-    //         - reformat initialisers, move variables into inner blocks
+   // CPhipps - move stretched patch drawing code here
+   //         - reformat initialisers, move variables into inner blocks
 
+   R_SetDefaultDrawColumnVars(&dcvars);
 
-    R_SetDefaultDrawColumnVars(&dcvars);
+   drawvars.short_topleft = (unsigned short *)screens[scrn].data;
+   drawvars.int_topleft = (unsigned int *)screens[scrn].data;
 
-    drawvars.short_topleft = (unsigned short *)screens[scrn].data;
-    drawvars.int_topleft = (unsigned int *)screens[scrn].data;
+   if (!(flags & VPT_STRETCH))
+   {
+      DX = 1 << 16;
+      DXI = 1 << 16;
+      DY = 1 << 16;
+      DYI = 1 << 16;
+   }
 
-    if (!(flags & VPT_STRETCH)) {
-       DX = 1 << 16;
-       DXI = 1 << 16;
-       DY = 1 << 16;
-       DYI = 1 << 16;
-    }
+   colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, drawvars.filterpatch, RDRAW_FILTER_NONE);
 
-    if (flags & VPT_TRANS) {
+   if (flags & VPT_TRANS)
+   {
       colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED, drawvars.filterpatch, RDRAW_FILTER_NONE);
       dcvars.translation = trans;
-    } else {
-      colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, drawvars.filterpatch, RDRAW_FILTER_NONE);
-    }
+   }
 
-    left = ( x * DX ) >> FRACBITS;
-    top = ( y * DY ) >> FRACBITS;
-    right = ( (x + patch->width) * DX ) >> FRACBITS;
-    bottom = ( (y + patch->height) * DY ) >> FRACBITS;
+   left   = ( x * DX ) >> FRACBITS;
+   top    = ( y * DY ) >> FRACBITS;
+   right  = ( (x + patch->width) * DX ) >> FRACBITS;
+   bottom = ( (y + patch->height) * DY ) >> FRACBITS;
 
-    dcvars.texheight = patch->height;
-    dcvars.iscale = DYI;
-    dcvars.drawingmasked = MAX(patch->width, patch->height) > 8;
-    dcvars.edgetype = drawvars.patch_edges;
+   dcvars.texheight     = patch->height;
+   dcvars.iscale        = DYI;
+   dcvars.drawingmasked = MAX(patch->width, patch->height) > 8;
+   dcvars.edgetype      = drawvars.patch_edges;
 
-    if (drawvars.filterpatch == RDRAW_FILTER_LINEAR) {
+   if (drawvars.filterpatch == RDRAW_FILTER_LINEAR)
+   {
       // bias the texture u coordinate
       if (patch->isNotTileable)
-        col = -(FRACUNIT>>1);
+         col = -(FRACUNIT>>1);
       else
-        col = (patch->width<<FRACBITS)-(FRACUNIT>>1);
-    }
-    else {
-      col = 0;
-    }
+         col = (patch->width<<FRACBITS)-(FRACUNIT>>1);
+   }
 
-    for (dcvars.x=left; dcvars.x<right; dcvars.x++, col+= DXI) {
+   for (dcvars.x=left; dcvars.x<right; dcvars.x++, col+= DXI)
+   {
       int i;
-      const int colindex = (flags & VPT_FLIP) ? ((w - col)>>16): (col>>16);
-      const rcolumn_t *column = R_GetPatchColumn(patch, colindex);
+      const int colindex          = (flags & VPT_FLIP) ? ((w - col)>>16): (col>>16);
+      const rcolumn_t *column     = R_GetPatchColumn(patch, colindex);
       const rcolumn_t *prevcolumn = R_GetPatchColumn(patch, colindex-1);
       const rcolumn_t *nextcolumn = R_GetPatchColumn(patch, colindex+1);
 
       // ignore this column if it's to the left of our clampRect
       if (dcvars.x < 0)
-        continue;
+         continue;
       if (dcvars.x >= SCREENWIDTH)
-        break;
+         break;
 
-      dcvars.texu = ((flags & VPT_FLIP) ? ((patch->width<<FRACBITS)-col) : col) % (patch->width<<FRACBITS);
+      dcvars.texu = ((flags & VPT_FLIP) 
+            ? ((patch->width<<FRACBITS)-col) : col) % (patch->width<<FRACBITS);
 
       // step through the posts in a column
       for (i=0; i<column->numPosts; i++) {
-        const rpost_t *post = &column->posts[i];
-        int yoffset = 0;
+         const rpost_t *post = &column->posts[i];
+         int yoffset = 0;
 
-        dcvars.yl = (((y + post->topdelta) * DY)>>FRACBITS);
-        dcvars.yh = (((y + post->topdelta + post->length) * DY - (FRACUNIT>>1))>>FRACBITS);
-        dcvars.edgeslope = post->slope;
+         dcvars.yl = (((y + post->topdelta) * DY)>>FRACBITS);
+         dcvars.yh = (((y + post->topdelta + post->length) * DY - (FRACUNIT>>1))>>FRACBITS);
+         dcvars.edgeslope = post->slope;
 
-        if ((dcvars.yh < 0) || (dcvars.yh < top))
-          continue;
-        if ((dcvars.yl >= SCREENHEIGHT) || (dcvars.yl >= bottom))
-          continue;
+         if ((dcvars.yh < 0) || (dcvars.yh < top))
+            continue;
+         if ((dcvars.yl >= SCREENHEIGHT) || (dcvars.yl >= bottom))
+            continue;
 
-        if (dcvars.yh >= bottom) {
-          dcvars.yh = bottom-1;
-          dcvars.edgeslope &= ~RDRAW_EDGESLOPE_BOT_MASK;
-        }
-        if (dcvars.yh >= SCREENHEIGHT) {
-          dcvars.yh = SCREENHEIGHT-1;
-          dcvars.edgeslope &= ~RDRAW_EDGESLOPE_BOT_MASK;
-        }
+         if (dcvars.yh >= bottom) {
+            dcvars.yh = bottom-1;
+            dcvars.edgeslope &= ~RDRAW_EDGESLOPE_BOT_MASK;
+         }
+         if (dcvars.yh >= SCREENHEIGHT) {
+            dcvars.yh = SCREENHEIGHT-1;
+            dcvars.edgeslope &= ~RDRAW_EDGESLOPE_BOT_MASK;
+         }
 
-        if (dcvars.yl < 0) {
-          yoffset = 0-dcvars.yl;
-          dcvars.yl = 0;
-          dcvars.edgeslope &= ~RDRAW_EDGESLOPE_TOP_MASK;
-        }
-        if (dcvars.yl < top) {
-          yoffset = top-dcvars.yl;
-          dcvars.yl = top;
-          dcvars.edgeslope &= ~RDRAW_EDGESLOPE_TOP_MASK;
-        }
+         if (dcvars.yl < 0) {
+            yoffset = 0-dcvars.yl;
+            dcvars.yl = 0;
+            dcvars.edgeslope &= ~RDRAW_EDGESLOPE_TOP_MASK;
+         }
+         if (dcvars.yl < top) {
+            yoffset = top-dcvars.yl;
+            dcvars.yl = top;
+            dcvars.edgeslope &= ~RDRAW_EDGESLOPE_TOP_MASK;
+         }
 
-        dcvars.source = column->pixels + post->topdelta + yoffset;
-        dcvars.prevsource = prevcolumn ? prevcolumn->pixels + post->topdelta + yoffset: dcvars.source;
-        dcvars.nextsource = nextcolumn ? nextcolumn->pixels + post->topdelta + yoffset: dcvars.source;
+         dcvars.source = column->pixels + post->topdelta + yoffset;
+         dcvars.prevsource = prevcolumn ? prevcolumn->pixels + post->topdelta + yoffset: dcvars.source;
+         dcvars.nextsource = nextcolumn ? nextcolumn->pixels + post->topdelta + yoffset: dcvars.source;
 
-        dcvars.texturemid = -((dcvars.yl-centery)*dcvars.iscale);
+         dcvars.texturemid = -((dcvars.yl-centery)*dcvars.iscale);
 
-        colfunc(&dcvars);
+         colfunc(&dcvars);
       }
-    }
+   }
 
-    R_ResetColumnBuffer();
-    drawvars = olddrawvars;
+   R_ResetColumnBuffer();
+   drawvars = olddrawvars;
 }
 
 // CPhipps - some simple, useful wrappers for that function, for drawing patches from wads
@@ -467,9 +466,8 @@ void V_SetPalette(int pal)
 	I_SetPalette(pal);
 	// V_SetPalette can be called as part of the gamma setting before
 	// we've loaded any wads, which prevents us from reading the palette - POPE
-	if (W_CheckNumForName("PLAYPAL") >= 0) {
+	if (W_CheckNumForName("PLAYPAL") >= 0)
 		V_UpdateTrueColorPalette();
-	}
 }
 
 //

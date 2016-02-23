@@ -444,13 +444,16 @@ void V_UpdateTrueColorPalette(void) {
 //---------------------------------------------------------------------------
 // V_DestroyTrueColorPalette
 //---------------------------------------------------------------------------
-static void V_DestroyTrueColorPalette(void) {
+static void V_DestroyTrueColorPalette(void)
+{
     if (Palettes16) free(Palettes16);
     Palettes16 = NULL;
     V_Palette16 = NULL;
 }
 
-void V_DestroyUnusedTrueColorPalettes(void) {
+void V_DestroyUnusedTrueColorPalettes(void)
+{
+   V_DestroyTrueColorPalette();
 }
 
 //

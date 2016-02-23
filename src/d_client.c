@@ -64,21 +64,25 @@
 #include "r_fps.h"
 #include "lprintf.h"
 
-static boolean   server;
-static int       remotetic; // Tic expected from the remote
-static int       remotesend; // Tic expected by the remote
 ticcmd_t         netcmds[MAXPLAYERS][BACKUPTICS];
 static ticcmd_t* localcmds;
-static unsigned          numqueuedpackets;
-static packet_header_t** queuedpacket;
 int maketic;
 int ticdup = 1;
-static int xtratics = 0;
 int              wanted_player_number;
+
+#ifdef HAVE_NET
+static boolean   server;
+
+static int       remotetic; // Tic expected from the remote
+static int       remotesend; // Tic expected by the remote
+
+static unsigned          numqueuedpackets;
+static packet_header_t** queuedpacket;
+
+static int xtratics = 0;
 
 static boolean isExtraDDisplay = FALSE;
 
-#ifdef HAVE_NET
 void D_CheckNetGame(void)
 {
   packet_header_t *packet = Z_Malloc(sizeof(packet_header_t)+1, PU_STATIC, NULL);

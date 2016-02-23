@@ -628,7 +628,10 @@ int MidiToMIDI(UBYTE *mid,MIDI *mididata)
 
 // proff: I moved this down, because I need MIDItoMidi
 
+#if 0
 static void FreeTracks(MIDI *mididata);
+#endif
+
 static void TWriteLength(UBYTE **midiptr,ULONG length);
 
 //
@@ -639,6 +642,7 @@ static void TWriteLength(UBYTE **midiptr,ULONG length);
 // Passed a pointer to an Allegro MIDI structure
 // Returns nothing
 //
+#if 0
 static void FreeTracks(MIDI *mididata)
 {
   int i;
@@ -650,6 +654,7 @@ static void FreeTracks(MIDI *mididata)
     mididata->track[i].len = 0;
   }
 }
+#endif
 
 //
 // TWriteLength()

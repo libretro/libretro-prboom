@@ -1850,25 +1850,25 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
         }
       if (!strcasecmp(key,deh_state[0]))  // Sprite number
         {
-          if (fpout) fprintf(fpout," - sprite = %lld\n",value);
+          if (fpout) fprintf(fpout," - sprite = %lld\n",(unsigned long long)value);
           states[indexnum].sprite = (spritenum_t)value;
         }
       else
         if (!strcasecmp(key,deh_state[1]))  // Sprite subnumber
           {
-            if (fpout) fprintf(fpout," - frame = %lld\n",value);
+            if (fpout) fprintf(fpout," - frame = %lld\n",(unsigned long long)value);
             states[indexnum].frame = (long)value; // long
           }
         else
           if (!strcasecmp(key,deh_state[2]))  // Duration
             {
-              if (fpout) fprintf(fpout," - tics = %lld\n",value);
+              if (fpout) fprintf(fpout," - tics = %lld\n",(unsigned long long)value);
               states[indexnum].tics = (long)value; // long
             }
           else
             if (!strcasecmp(key,deh_state[3]))  // Next frame
               {
-                if (fpout) fprintf(fpout," - nextstate = %lld\n",value);
+                if (fpout) fprintf(fpout," - nextstate = %lld\n",(unsigned long long)value);
                 states[indexnum].nextstate = (statenum_t)value;
               }
             else
@@ -1880,13 +1880,13 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
               else
                 if (!strcasecmp(key,deh_state[5]))  // Unknown 1
                   {
-                    if (fpout) fprintf(fpout," - misc1 = %lld\n",value);
+                    if (fpout) fprintf(fpout," - misc1 = %lld\n",(unsigned long long)value);
                     states[indexnum].misc1 = (long)value; // long
                   }
                 else
                   if (!strcasecmp(key,deh_state[6]))  // Unknown 2
                     {
-                      if (fpout) fprintf(fpout," - misc2 = %lld\n",value);
+                      if (fpout) fprintf(fpout," - misc2 = %lld\n",(unsigned long long)value);
                       states[indexnum].misc2 = (long)value; // long
                     }
                   else
@@ -1909,7 +1909,7 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
   char inbuffer[DEH_BUFFERMAX];
   uint64_t value;      // All deh values are ints or longs
   int indexnum;
-  int i; // looper
+  unsigned i; // looper
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
   // NOTE: different format from normal
@@ -1943,7 +1943,8 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
       if (value >= NUMSTATES)
         {
           if (fpout)
-            fprintf(fpout,"Bad pointer number %lld of %d\n",value, NUMSTATES);
+            fprintf(fpout,"Bad pointer number %lld of %d\n",
+                  (unsigned long long)value, NUMSTATES);
           return;
         }
 
@@ -1951,7 +1952,7 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
         {
           states[indexnum].action = deh_codeptr[value];
           if (fpout) fprintf(fpout," - applied from codeptr[%lld] to states[%d]\n",
-           value,indexnum);
+           (unsigned long long)value,indexnum);
           // Write BEX-oriented line to match:
           // for (i=0;i<NUMSTATES;i++) could go past the end of the array
           for (i=0;i<sizeof(deh_bexptrs)/sizeof(*deh_bexptrs);i++)
@@ -1968,9 +1969,8 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
         }
       else
         if (fpout) fprintf(fpout,"Invalid frame pointer index for '%s' at %lld\n",
-                           key, value);
+                           key, (unsigned long long)value);
     }
-  return;
 }
 
 // ====================================================================

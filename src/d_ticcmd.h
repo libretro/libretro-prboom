@@ -48,8 +48,8 @@ typedef struct
   signed char sidemove; /* *2048 for move       */
   signed short  angleturn;  /* <<16 for angle delta */
   short consistancy;          /* checks for net game  */
-  byte  chatchar;
-  byte  buttons;
+  uint8_t  chatchar;
+  uint8_t  buttons;
 } ticcmd_t;
 
 #endif

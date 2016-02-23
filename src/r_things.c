@@ -107,7 +107,7 @@ static void R_InstallSpriteLump(int lump, unsigned frame,
         if (sprtemp[frame].lump[r]==-1)
           {
             sprtemp[frame].lump[r] = lump - firstspritelump;
-            sprtemp[frame].flip[r] = (byte) flipped;
+            sprtemp[frame].flip[r] = (uint8_t) flipped;
             sprtemp[frame].rotate = FALSE; //jff 4/24/98 if any subbed, rotless
           }
       return;
@@ -118,7 +118,7 @@ static void R_InstallSpriteLump(int lump, unsigned frame,
   if (sprtemp[frame].lump[--rotation] == -1)
     {
       sprtemp[frame].lump[rotation] = lump - firstspritelump;
-      sprtemp[frame].flip[rotation] = (byte) flipped;
+      sprtemp[frame].flip[rotation] = (uint8_t) flipped;
       sprtemp[frame].rotate = TRUE; //jff 4/24/98 only change if rot used
     }
 }

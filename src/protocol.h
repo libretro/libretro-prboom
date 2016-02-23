@@ -49,9 +49,9 @@ enum packet_type_e {
 };
 
 typedef struct {
-  byte checksum;       // Simple checksum of the entire packet
-  byte type;           /* Type of packet */
-  byte reserved[2];	/* Was random in prboom <=2.2.4, now 0 */
+  uint8_t checksum;       // Simple checksum of the entire packet
+  uint8_t type;           /* Type of packet */
+  uint8_t reserved[2];	/* Was random in prboom <=2.2.4, now 0 */
   unsigned tic;        // Timestamp
 } PACKEDATTR packet_header_t;
 
@@ -64,10 +64,10 @@ static INLINE void packet_set(packet_header_t* p, enum packet_type_e t, unsigned
 #endif
 
 struct setup_packet_s {
-  byte players, yourplayer, skill, episode, level, deathmatch, complevel, ticdup, extratic;
-  byte game_options[GAME_OPTIONS_SIZE];
-  byte numwads;
-  byte wadnames[1]; // Actually longer
+  uint8_t players, yourplayer, skill, episode, level, deathmatch, complevel, ticdup, extratic;
+  uint8_t game_options[GAME_OPTIONS_SIZE];
+  uint8_t numwads;
+  uint8_t wadnames[1]; // Actually longer
 };
 
 /* cph - convert network byte stream to usable ticcmd_t and visa-versa

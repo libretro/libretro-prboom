@@ -299,7 +299,7 @@ typedef struct
 // from darkening PLAYPAL to all black.
 // Could use even more than 32 levels.
 
-typedef byte  lighttable_t;
+typedef uint8_t lighttable_t;
 
 //
 // Masked 2s linedefs
@@ -384,7 +384,7 @@ typedef struct
   short lump[8];
 
   // Flip bit (1 = flip) to use for view angles 0-7.
-  byte  flip[8];
+  uint8_t flip[8];
 
 } spriteframe_t;
 

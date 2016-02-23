@@ -42,7 +42,6 @@
 #ifndef __BYTEBOOL__
 #define __BYTEBOOL__
 #include "custombool.h"
-typedef unsigned char byte;
 #endif
 
 //e6y

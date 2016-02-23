@@ -67,11 +67,11 @@ typedef struct
     // High bit is retransmit request.
     unsigned            checksum;
     // Only valid if NCMD_RETRANSMIT.
-    byte                retransmitfrom;
+    uint8_t                retransmitfrom;
 
-    byte                starttic;
-    byte                player;
-    byte                numtics;
+    uint8_t                starttic;
+    uint8_t                player;
+    uint8_t                numtics;
     ticcmd_t            cmds[BACKUPTICS];
 
 } doomdata_t;
@@ -106,14 +106,14 @@ typedef struct
 #define STARTUPLEN 12
 typedef struct
 {
-  byte monsters_remember;
-  byte variable_friction;
-  byte weapon_recoil;
-  byte allow_pushers;
-  byte over_under;
-  byte player_bobbing;
-  byte fastparm;
-  byte demo_insurance;
+  uint8_t monsters_remember;
+  uint8_t variable_friction;
+  uint8_t weapon_recoil;
+  uint8_t allow_pushers;
+  uint8_t over_under;
+  uint8_t player_bobbing;
+  uint8_t fastparm;
+  uint8_t demo_insurance;
   unsigned long rngseed;
   char filler[sizeof(ticcmd_t)*BACKUPTICS-STARTUPLEN];
 } startup_t;
@@ -128,7 +128,7 @@ typedef struct
 {
   netmisctype_t type;
   size_t len;
-  byte value[sizeof(ticcmd_t)*BACKUPTICS - sizeof(netmisctype_t) - sizeof(size_t)];
+  uint8_t value[sizeof(ticcmd_t)*BACKUPTICS - sizeof(netmisctype_t) - sizeof(size_t)];
 } netmisc_t;
 
 typedef struct

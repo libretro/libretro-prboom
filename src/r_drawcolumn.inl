@@ -211,24 +211,24 @@ static void R_DRAWCOLUMN_FUNCNAME(draw_column_vars_t *dcvars)
 // do nothing else when drawin fuzz columns
 #if (!(R_DRAWCOLUMN_PIPELINE & RDC_FUZZ))
    {
-      const byte          *source = dcvars->source;
+      const uint8_t          *source = dcvars->source;
       const lighttable_t  *colormap = dcvars->colormap;
-      const byte          *translation = dcvars->translation;
+      const uint8_t          *translation = dcvars->translation;
 #if (R_DRAWCOLUMN_PIPELINE & (RDC_BILINEAR|RDC_ROUNDED|RDC_DITHERZ))
       int y = dcvars->yl;
       const int x = dcvars->x;
 #endif
 #if (R_DRAWCOLUMN_PIPELINE & RDC_DITHERZ)
       const int fracz = (dcvars->z >> 6) & 255;
-      const byte *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
+      const uint8_t *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
 #endif
 #if (R_DRAWCOLUMN_PIPELINE & RDC_BILINEAR)
-      const byte          *nextsource = dcvars->nextsource;
+      const uint8_t          *nextsource = dcvars->nextsource;
       const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
 #endif
 #if (R_DRAWCOLUMN_PIPELINE & RDC_ROUNDED)
-      const byte          *prevsource = dcvars->prevsource;
-      const byte          *nextsource = dcvars->nextsource;
+      const uint8_t          *prevsource = dcvars->prevsource;
+      const uint8_t          *nextsource = dcvars->nextsource;
       const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : (dcvars->texu>>8) & 0xff;
 #endif
 

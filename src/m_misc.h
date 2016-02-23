@@ -44,7 +44,7 @@
 
 boolean M_WriteFile (char const* name,void* source,int length);
 
-int M_ReadFile (char const* name,byte** buffer);
+int M_ReadFile (char const* name, uint8_t** buffer);
 
 void M_LoadDefaults (void);
 

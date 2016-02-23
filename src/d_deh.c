@@ -72,7 +72,7 @@ typedef struct {
   /* cph 2006/08/06 - 
    * if lump != NULL, lump is the start of the lump, 
    * inp is the current read pos. */
-  const byte *inp, *lump;
+  const uint8_t *inp, *lump;
   long size;
   /* else, !lump, and f is the file being read */
   FILE* f;

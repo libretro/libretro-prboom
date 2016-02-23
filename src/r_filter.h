@@ -31,13 +31,13 @@
 #ifndef R_FILTER_H
 #define R_FILTER_H
 
-#define DITHER_DIM 4
+#define DITHER_DIM      4
+#define FILTER_UVBITS   6
+#define FILTER_UVDIM    (1<<FILTER_UVBITS)
 
-extern byte filter_ditherMatrix[DITHER_DIM][DITHER_DIM];
-#define FILTER_UVBITS 6
-#define FILTER_UVDIM (1<<FILTER_UVBITS)
-extern byte filter_roundedUVMap[FILTER_UVDIM*FILTER_UVDIM];
-extern byte filter_roundedRowMap[4*16];
+extern uint8_t filter_ditherMatrix[DITHER_DIM][DITHER_DIM];
+extern uint8_t filter_roundedUVMap[FILTER_UVDIM*FILTER_UVDIM];
+extern uint8_t filter_roundedRowMap[4*16];
 
 void R_FilterInit(void);
 
@@ -85,7 +85,7 @@ void R_FilterInit(void);
       ((((texV)>>8) & 0xff)>>(8-FILTER_UVBITS)) \
     ] ]
 
-byte *filter_getScale2xQuadColors(byte e, byte b, byte f, byte h, byte d);
+uint8_t *filter_getScale2xQuadColors(uint8_t e, uint8_t b, uint8_t f, uint8_t h, uint8_t d);
 
 #define filter_getFilteredForColumn16(depthmap, texV, nextRowTexV) ( \
   VID_PAL16( depthmap(nextsource[(nextRowTexV)>>FRACBITS]),   (filter_fracu*((texV)&0xffff))>>(32-VID_COLORWEIGHTBITS) ) + \

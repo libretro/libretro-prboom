@@ -789,113 +789,113 @@ static void IdentifyVersion (void)
 
 static void FindResponseFile (void)
 {
-  int i;
+   int i;
 
-  for (i = 1;i < myargc;i++)
-    if (myargv[i][0] == '@')
+   for (i = 1;i < myargc;i++)
+      if (myargv[i][0] == '@')
       {
-        int  size;
-        int  index;
-	int indexinfile;
-        byte *file = NULL;
-        const char **moreargs = malloc(myargc * sizeof(const char*));
-        const char **newargv;
-        // proff 04/05/2000: Added for searching responsefile
-        char fname[PATH_MAX+1];
+         int  size;
+         int  index;
+         int indexinfile;
+         uint8_t *file = NULL;
+         const char **moreargs = malloc(myargc * sizeof(const char*));
+         const char **newargv;
+         // proff 04/05/2000: Added for searching responsefile
+         char fname[PATH_MAX+1];
 
-        strcpy(fname,&myargv[i][1]);
-        AddDefaultExtension(fname,".rsp");
+         strcpy(fname,&myargv[i][1]);
+         AddDefaultExtension(fname,".rsp");
 
-        // READ THE RESPONSE FILE INTO MEMORY
-        // proff 04/05/2000: changed for searching responsefile
-        // cph 2002/08/09 - use M_ReadFile for simplicity
-	size = M_ReadFile(fname, &file);
-        // proff 04/05/2000: Added for searching responsefile
-        if (size < 0)
-        {
-          strcat(strcpy(fname,I_DoomExeDir()),&myargv[i][1]);
-          AddDefaultExtension(fname,".rsp");
-	  size = M_ReadFile(fname, &file);
-        }
-        if (size < 0)
-        {
+         // READ THE RESPONSE FILE INTO MEMORY
+         // proff 04/05/2000: changed for searching responsefile
+         // cph 2002/08/09 - use M_ReadFile for simplicity
+         size = M_ReadFile(fname, &file);
+         // proff 04/05/2000: Added for searching responsefile
+         if (size < 0)
+         {
+            strcat(strcpy(fname,I_DoomExeDir()),&myargv[i][1]);
+            AddDefaultExtension(fname,".rsp");
+            size = M_ReadFile(fname, &file);
+         }
+         if (size < 0)
+         {
             /* proff 04/05/2000: Changed from LO_FATAL
              * proff 04/05/2000: Simply removed the exit(1);
-       * cph - made fatal, don't drop through and SEGV
-       */
+             * cph - made fatal, don't drop through and SEGV
+             */
             I_Error("No such response file: %s",fname);
-        }
-        //jff 9/3/98 use logical output routine
-        lprintf(LO_CONFIRM,"Found response file %s\n",fname);
-        // proff 04/05/2000: Added check for empty rsp file
-        if (size<=0)
-        {
-	  int k;
-          lprintf(LO_ERROR,"\nResponse file empty!\n");
+         }
+         //jff 9/3/98 use logical output routine
+         lprintf(LO_CONFIRM,"Found response file %s\n",fname);
+         // proff 04/05/2000: Added check for empty rsp file
+         if (size<=0)
+         {
+            int k;
+            lprintf(LO_ERROR,"\nResponse file empty!\n");
 
-	  newargv = calloc(sizeof(char *),MAXARGVS);
-	  newargv[0] = myargv[0];
-          for (k = 1,index = 1;k < myargc;k++)
-          {
-            if (i!=k)
-              newargv[index++] = myargv[k];
-          }
-          myargc = index; myargv = newargv;
-          return;
-        }
+            newargv = calloc(sizeof(char *),MAXARGVS);
+            newargv[0] = myargv[0];
+            for (k = 1,index = 1;k < myargc;k++)
+            {
+               if (i!=k)
+                  newargv[index++] = myargv[k];
+            }
+            myargc = index; myargv = newargv;
+            return;
+         }
 
-        // KEEP ALL CMDLINE ARGS FOLLOWING @RESPONSEFILE ARG
-	memcpy((void *)moreargs,&myargv[i+1],(index = myargc - i - 1) * sizeof(myargv[0]));
+         // KEEP ALL CMDLINE ARGS FOLLOWING @RESPONSEFILE ARG
+         memcpy((void *)moreargs,&myargv[i+1],(index = myargc - i - 1) * sizeof(myargv[0]));
 
-	{
-	  const char *firstargv = myargv[0];
-	  newargv = calloc(sizeof(char *),MAXARGVS);
-	  newargv[0] = firstargv;
-	}
+         {
+            const char *firstargv = myargv[0];
+            newargv = calloc(sizeof(char *),MAXARGVS);
+            newargv[0] = firstargv;
+         }
 
-        {
-	  byte *infile = file;
-	  indexinfile = 0;
-	  indexinfile++;  // SKIP PAST ARGV[0] (KEEP IT)
-	  do {
-	    while (size > 0 && isspace(*infile)) { infile++; size--; }
-	    if (size > 0) {
-	      char *s = malloc(size+1);
-	      char *p = s;
-	      int quoted = 0; 
+         {
+            uint8_t *infile = file;
+            indexinfile = 0;
+            indexinfile++;  // SKIP PAST ARGV[0] (KEEP IT)
+            do {
+               while (size > 0 && isspace(*infile)) { infile++; size--; }
+               if (size > 0) {
+                  char *s = malloc(size+1);
+                  char *p = s;
+                  int quoted = 0; 
 
-	      while (size > 0) {
-		// Whitespace terminates the token unless quoted
-		if (!quoted && isspace(*infile)) break;
-		if (*infile == '\"') {
-		  // Quotes are removed but remembered
-		  infile++; size--; quoted ^= 1; 
-		} else {
-		  *p++ = *infile++; size--;
-		}
-	      }
-	      if (quoted) I_Error("Runaway quoted string in response file");
+                  while (size > 0) {
+                     // Whitespace terminates the token unless quoted
+                     if (!quoted && isspace(*infile)) break;
+                     if (*infile == '\"') {
+                        // Quotes are removed but remembered
+                        infile++; size--; quoted ^= 1; 
+                     } else {
+                        *p++ = *infile++; size--;
+                     }
+                  }
+                  if (quoted) I_Error("Runaway quoted string in response file");
 
-	      // Terminate string, realloc and add to argv
-	      *p = 0;
-	      newargv[indexinfile++] = realloc(s,strlen(s)+1);
-	    }
-	  } while(size > 0);
-	}
-	free(file);
+                  // Terminate string, realloc and add to argv
+                  *p = 0;
+                  newargv[indexinfile++] = realloc(s,strlen(s)+1);
+               }
+            } while(size > 0);
+         }
+         free(file);
 
-	memcpy((void *)&newargv[indexinfile],moreargs,index*sizeof(moreargs[0]));
-	free((void *)moreargs);
+         memcpy((void *)&newargv[indexinfile],moreargs,index*sizeof(moreargs[0]));
+         free((void *)moreargs);
 
-        myargc = indexinfile+index; myargv = newargv;
+         myargc = indexinfile+index; myargv = newargv;
 
-        // DISPLAY ARGS
-        //jff 9/3/98 use logical output routine
-        lprintf(LO_CONFIRM,"%d command-line args:\n",myargc);
-	for (index=1;index<myargc;index++)
-	  //jff 9/3/98 use logical output routine
-          lprintf(LO_CONFIRM,"%s\n",myargv[index]);
-        break;
+         // DISPLAY ARGS
+         //jff 9/3/98 use logical output routine
+         lprintf(LO_CONFIRM,"%d command-line args:\n",myargc);
+         for (index=1;index<myargc;index++)
+            //jff 9/3/98 use logical output routine
+            lprintf(LO_CONFIRM,"%s\n",myargv[index]);
+         break;
       }
 }
 

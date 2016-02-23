@@ -70,7 +70,7 @@ extern int numtextures;
 extern texture_t **textures;
 
 
-const byte *R_GetTextureColumn(const rpatch_t *texpatch, int col);
+const uint8_t *R_GetTextureColumn(const rpatch_t *texpatch, int col);
 
 
 // I/O, setting up the stuff.
@@ -96,7 +96,7 @@ int R_ColormapNumForName(const char *name);      // killough 4/4/98
 /* cph 2001/11/17 - new func to do lighting calcs and get suitable colour map */
 const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale);
 
-extern const byte *main_tranmap, *tranmap;
+extern const uint8_t *main_tranmap, *tranmap;
 
 /* Proff - Added for OpenGL - cph - const char* param */
 void R_SetPatchNum(patchnum_t *patchnum, const char *name);

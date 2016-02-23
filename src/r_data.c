@@ -100,7 +100,7 @@ int       *texturetranslation;
 // R_GetTextureColumn
 //
 
-const byte *R_GetTextureColumn(const rpatch_t *texpatch, int col)
+const uint8_t *R_GetTextureColumn(const rpatch_t *texpatch, int col)
 {
    while (col < 0)
       col += texpatch->width;
@@ -210,7 +210,7 @@ static void R_InitTextures (void)
       if (offset > maxoff)
         I_Error("R_InitTextures: Bad texture directory");
 
-      mtexture = (const maptexture_t *) ( (const byte *)maptex + offset);
+      mtexture = (const maptexture_t *) ( (const uint8_t *)maptex + offset);
 
       texture = textures[i] =
         Z_Malloc(sizeof(texture_t) +
@@ -497,7 +497,7 @@ static INLINE void precache_lump(int l)
 void R_PrecacheLevel(void)
 {
   register int i;
-  register byte *hitlist;
+  register uint8_t *hitlist;
 
   if (demoplayback)
     return;

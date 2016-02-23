@@ -92,7 +92,7 @@ void D_CheckNetGame(void)
     do {
       while (!I_GetPacket(packet, sizeof(packet_header_t)+1)) {
         packet_set(packet, PKT_GO, 0);
-	*(byte*)(packet+1) = consoleplayer;
+	*(uint8_t*)(packet+1) = consoleplayer;
 	I_SendPacket(packet, sizeof(packet_header_t)+1);
 	I_uSleep(100000);
       }
@@ -114,8 +114,8 @@ boolean D_NetGetWad(const char* name)
     // Send WAD request to remote
     packet = Z_Malloc(psize, PU_STATIC, NULL);
     packet_set(packet, PKT_WAD, 0);
-    *(byte*)(packet+1) = consoleplayer;
-    strcpy(1+(byte*)(packet+1), name);
+    *(uint8_t*)(packet+1) = consoleplayer;
+    strcpy(1+(uint8_t*)(packet+1), name);
     I_SendPacket(packet, sizeof(packet_header_t) + strlen(name) + 2);
 
     I_uSleep(10000);
@@ -125,7 +125,7 @@ boolean D_NetGetWad(const char* name)
   if (!strcasecmp((void*)(packet+1), name)) {
     pid_t pid;
     int   rv;
-    byte *p = (byte*)(packet+1) + strlen(name) + 1;
+    uint8_t *p = (uint8_t*)(packet+1) + strlen(name) + 1;
 
     /* Automatic wad file retrieval using wget (supports http and ftp, using URLs)
      * Unix systems have all these commands handy, this kind of thing is easy
@@ -176,12 +176,12 @@ void NetUpdate(void)
       switch(packet->type) {
       case PKT_TICS:
   {
-    byte *p = (void*)(packet+1);
+    uint8_t *p = (void*)(packet+1);
     int tics = *p++;
     unsigned long ptic = doom_ntohl(packet->tic);
     if (ptic > (unsigned)remotetic) { // Missed some
       packet_set(packet, PKT_RETRANS, remotetic);
-      *(byte*)(packet+1) = consoleplayer;
+      *(uint8_t*)(packet+1) = consoleplayer;
       I_SendPacket(packet, sizeof(*packet)+1);
     } else {
       if (ptic + tics <= (unsigned)remotetic) break; // Will not improve things
@@ -252,13 +252,13 @@ void NetUpdate(void)
   packet_header_t *packet = Z_Malloc(pkt_size, PU_STATIC, NULL);
 
   packet_set(packet, PKT_TICC, maketic - sendtics);
-  *(byte*)(packet+1) = sendtics;
-  *(((byte*)(packet+1))+1) = consoleplayer;
+  *(uint8_t*)(packet+1) = sendtics;
+  *(((uint8_t*)(packet+1))+1) = consoleplayer;
   {
-    void *tic = ((byte*)(packet+1)) +2;
+    void *tic = ((uint8_t*)(packet+1)) +2;
     while (sendtics--) {
       TicToRaw(tic, &localcmds[remotesend++%BACKUPTICS]);
-      tic = (byte *)tic + sizeof(ticcmd_t);
+      tic = (uint8_t *)tic + sizeof(ticcmd_t);
     }
   }
   I_SendPacket(packet, pkt_size);
@@ -293,7 +293,7 @@ static void CheckQueuedPackets(void)
       switch (queuedpacket[i]->type) {
       case PKT_QUIT: // Player quit the game
   {
-    int pn = *(byte*)(queuedpacket[i]+1);
+    int pn = *(uint8_t*)(queuedpacket[i]+1);
     playeringame[pn] = FALSE;
     doom_printf("Player %d left the game\n", pn);
   }
@@ -338,7 +338,7 @@ static void CheckQueuedPackets(void)
 
 void D_QuitNetGame (void)
 {
-  byte buf[1 + sizeof(packet_header_t)];
+  uint8_t buf[1 + sizeof(packet_header_t)];
   packet_header_t *packet = (void*)buf;
   int i;
 

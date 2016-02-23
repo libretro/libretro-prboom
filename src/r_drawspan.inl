@@ -66,10 +66,10 @@ static void R_DRAWSPAN_FUNCNAME(draw_span_vars_t *dsvars)
   fixed_t yfrac = dsvars->yfrac;
   const fixed_t xstep = dsvars->xstep;
   const fixed_t ystep = dsvars->ystep;
-  const byte *source = dsvars->source;
+  const uint8_t *source = dsvars->source;
 #if (R_DRAWSPAN_PIPELINE & RDC_DITHERZ)  
 #else
-  const byte *colormap = dsvars->colormap;
+  const uint8_t *colormap = dsvars->colormap;
 #endif
   uint16_t *dest = drawvars.short_topleft + dsvars->y* SURFACE_SHORT_PITCH + dsvars->x1;
 #if (R_DRAWSPAN_PIPELINE & (RDC_DITHERZ|RDC_BILINEAR))
@@ -78,7 +78,7 @@ static void R_DRAWSPAN_FUNCNAME(draw_span_vars_t *dsvars)
 #endif
 #if (R_DRAWSPAN_PIPELINE & RDC_DITHERZ)
   const int fracz = (dsvars->z >> 12) & 255;
-  const byte *dither_colormaps[2] = { dsvars->colormap, dsvars->nextcolormap };
+  const uint8_t *dither_colormaps[2] = { dsvars->colormap, dsvars->nextcolormap };
 #endif
 
   while (count) {

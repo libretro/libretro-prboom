@@ -97,12 +97,12 @@ boolean M_WriteFile(char const *name, void *source, int length)
  * killough 9/98: rewritten to use stdio and to flash disk icon
  */
 
-int M_ReadFile(char const *name, byte **buffer)
+int M_ReadFile(char const *name, uint8_t **buffer)
 {
-  FILE *fp;
+   FILE *fp;
 
-  if ((fp = fopen(name, "rb")))
-    {
+   if ((fp = fopen(name, "rb")))
+   {
       size_t length;
 
       fseek(fp, 0, SEEK_END);
@@ -110,16 +110,16 @@ int M_ReadFile(char const *name, byte **buffer)
       fseek(fp, 0, SEEK_SET);
       *buffer = Z_Malloc(length, PU_STATIC, 0);
       if (fread(*buffer, 1, length, fp) == length)
-        {
-          fclose(fp);
-          return length;
-        }
+      {
+         fclose(fp);
+         return length;
+      }
       fclose(fp);
-    }
+   }
 
-  /* cph 2002/08/10 - this used to return 0 on error, but that's ambiguous,
-   * because we could have a legit 0-length file. So make it -1. */
-  return -1;
+   /* cph 2002/08/10 - this used to return 0 on error, but that's ambiguous,
+    * because we could have a legit 0-length file. So make it -1. */
+   return -1;
 }
 
 //

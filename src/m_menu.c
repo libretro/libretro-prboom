@@ -1822,7 +1822,7 @@ static void M_DrawSetting(const setup_menu_t* s)
                  PAL_BLACK);
       V_FillRect((x+1)*SCREENWIDTH/320, y*SCREENHEIGHT/200,
                         6*SCREENWIDTH/320, 6*SCREENHEIGHT/200,
-                 (byte)ch);
+                 (uint8_t)ch);
 
       if (!ch) // don't show this item in automap mode
   V_DrawNamePatch(x+1,y,0,"M_PALNO", CR_DEFAULT, VPT_STRETCH);
@@ -2582,7 +2582,7 @@ void M_Automap(int choice)
 
 int color_palette_x; // X position of the cursor on the color palette
 int color_palette_y; // Y position of the cursor on the color palette
-byte palette_background[16*(CHIP_SIZE+1)+8];
+uint8_t palette_background[16*(CHIP_SIZE+1)+8];
 
 // M_DrawColPal() draws the color palette when the user needs to select a
 // color.

@@ -326,7 +326,7 @@ mobj_t    **blocklinks;           // for thing chains
 //
 
 static int rejectlump = -1;// cph - store reject lump num if cached
-const byte *rejectmatrix; // cph - const*
+const uint8_t *rejectmatrix; // cph - const*
 
 // Maintain single and multi player starting spots.
 
@@ -381,7 +381,7 @@ static void P_LoadVertexes (int lump)
 
 static void P_LoadVertexes2(int lump, int gllump)
 {
-  const byte         *gldata;
+  const uint8_t      *gldata;
   int                 i;
   const mapvertex_t*  ml;
 
@@ -635,7 +635,7 @@ static void P_LoadSubsectors (int lump)
 
 static void P_LoadSectors (int lump)
 {
-  const byte *data; // cph - const*
+  const uint8_t *data; // cph - const*
   int  i;
 
   numsectors = W_LumpLength (lump) / sizeof(mapsector_t);
@@ -694,7 +694,7 @@ static void P_LoadSectors (int lump)
 
 static void P_LoadNodes (int lump)
 {
-  const byte *data; // cph - const*
+  const uint8_t *data; // cph - const*
   int  i;
 
   numnodes = W_LumpLength (lump) / sizeof(mapnode_t);
@@ -748,7 +748,7 @@ static void P_LoadNodes (int lump)
 static void P_LoadXNOD(int lump)
 {
   int len = W_LumpLength(lump);
-  const byte *data = W_CacheLumpNum(lump);
+  const uint8_t *data = W_CacheLumpNum(lump);
   int i, numorgvert, numnewvert, first_seg = 0;
   vertex_t *newvert;
 
@@ -905,7 +905,7 @@ static void P_LoadThings (int lump)
 */
 static void P_LoadLineDefs (int lump)
 {
-  const byte *data; // cph - const*
+  const uint8_t *data; // cph - const*
   int  i;
 
   numlines = W_LumpLength (lump) / sizeof(maplinedef_t);
@@ -1031,7 +1031,7 @@ static void P_LoadSideDefs (int lump)
 
 static void P_LoadSideDefs2(int lump)
 {
-  const byte *data = W_CacheLumpNum(lump); // cph - const*, wad lump handling updated
+  const uint8_t *data = W_CacheLumpNum(lump); // cph - const*, wad lump handling updated
   int  i;
 
   for (i=0; i<numsides; i++)
@@ -1464,7 +1464,7 @@ static void P_LoadBlockMap (int lump)
 static void P_LoadReject(int lumpnum, int totallines)
 {
   unsigned int length, required;
-  byte *newreject;
+  uint8_t *newreject;
 
   // dump any old cached reject lump, then cache the new one
   if (rejectlump != -1)
@@ -1481,7 +1481,7 @@ static void P_LoadReject(int lumpnum, int totallines)
   // allocate a new block and copy the reject table into it; zero the rest
   // PU_LEVEL => will be freed on level exit
   newreject = Z_Malloc(required, PU_LEVEL, NULL);
-  rejectmatrix = (const byte *)memmove(newreject, rejectmatrix, length);
+  rejectmatrix = (const uint8_t *)memmove(newreject, rejectmatrix, length);
   memset(newreject + length, 0, required - length);
   // unlock the original lump, it is no longer needed
   W_UnlockLumpNum(rejectlump);
@@ -1497,7 +1497,7 @@ static void P_LoadReject(int lumpnum, int totallines)
       0x1d4a11  // DOOM_CONST_ZONEID
     };
     unsigned int i, pad = 0, *src = rejectpad;
-    byte *dest = newreject + length;
+    uint8_t *dest = newreject + length;
 
     rejectpad[0] = ((totallines*4+3)&~3)+24; // doom.exe zone header size
 
@@ -1691,7 +1691,7 @@ static int P_GroupLines (void)
 
 static void P_RemoveSlimeTrails(void)         // killough 10/98
 {
-  byte *hit = calloc(1, numvertexes);         // Hitlist for vertices
+  uint8_t *hit = calloc(1, numvertexes);         // Hitlist for vertices
   int i;
   for (i=0; i<numsegs; i++)                   // Go through each seg
   {

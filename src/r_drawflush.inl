@@ -179,8 +179,8 @@ static void R_FLUSHQUAD_FUNCNAME(void)
       fuzz2 = (fuzz2 + 1) % FUZZTABLE;
       fuzz3 = (fuzz3 + 1) % FUZZTABLE;
       fuzz4 = (fuzz4 + 1) % FUZZTABLE;
-      source += 4 * sizeof(byte);
-      dest += SURFACE_SHORT_PITCH * sizeof(byte);
+      source += 4 * sizeof(uint8_t);
+      dest += SURFACE_SHORT_PITCH * sizeof(uint8_t);
    }
 #else
    while(--count >= 0)

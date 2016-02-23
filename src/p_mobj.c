@@ -1043,7 +1043,7 @@ void P_RespawnSpecials (void)
 //  between levels.
 //
 
-extern byte playernumtotrans[MAXPLAYERS];
+extern uint8_t playernumtotrans[MAXPLAYERS];
 
 void P_SpawnPlayer (int n, const mapthing_t* mthing)
 {

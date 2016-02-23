@@ -70,7 +70,7 @@ int16_t mixbuffer[MIXBUFFERSIZE];
 
 typedef struct
 {
-    byte *snd_start_ptr, *snd_end_ptr;
+    uint8_t *snd_start_ptr, *snd_end_ptr;
     unsigned int starttic;
     int sfxid;
     int *leftvol, *rightvol;
@@ -121,7 +121,7 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
 {
     int i, x, padded_sfx_len, sfxlump_num, sfxlump_len;
     char sfxlump_name[20];
-    byte *sfxlump_data, *sfxlump_sound, *padded_sfx_data;
+    uint8_t *sfxlump_data, *sfxlump_sound, *padded_sfx_data;
     uint16_t orig_rate;
     float times;
     
@@ -151,7 +151,7 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
     times = 48000.0f / (float)orig_rate;
     
     padded_sfx_len = ((sfxlump_len*R_ceil(times) + (SAMPLECOUNT_35-1)) / SAMPLECOUNT_35) * SAMPLECOUNT_35;
-    padded_sfx_data = (byte*)malloc(padded_sfx_len);
+    padded_sfx_data = (uint8_t*)malloc(padded_sfx_len);
     
     for (i=0; i < padded_sfx_len; i++)
     {
@@ -289,7 +289,7 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     channels[slot].handle = ++currenthandle;
     
     // Set pointers to raw sound data start & end.
-    channels[slot].snd_start_ptr = (byte *)S_sfx[id].data;
+    channels[slot].snd_start_ptr = (uint8_t*)S_sfx[id].data;
     channels[slot].snd_end_ptr = channels[slot].snd_start_ptr + lengths[id];
 
     // Save starting gametic.
@@ -357,7 +357,7 @@ static void *song_data;
 void I_UpdateSound(void)
 {
    // Mix current sound data. Data, from raw sound, for right and left.
-   byte sample;
+   uint8_t sample;
    int dl, dr, frames, out_frames, step, chan;
    int16_t mad_audio_buf[SAMPLECOUNT_35 * 2];
 
@@ -630,7 +630,7 @@ int I_RegisterMusic( const char* filename, musicinfo_t *song )
   if (log_cb)
      log_cb(RETRO_LOG_INFO, "RegisterMusic: %s\n", filename);
 
-  len = M_ReadFile(filename, (byte **) &song_data);
+  len = M_ReadFile(filename, (uint8_t**) &song_data);
   if (len == -1)
   {
      if (log_cb)

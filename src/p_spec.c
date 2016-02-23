@@ -2419,6 +2419,8 @@ void P_SpawnSpecials (void)
   if (W_CheckNumForName("texture2") >= 0)
     episode = 2;
 
+  (void)episode;
+
   // See if -timer needs to be used.
   levelTimer = FALSE;
 

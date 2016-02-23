@@ -143,7 +143,7 @@ static void R_InitTextures (void)
   names = W_CacheLumpNum(names_lump = W_GetNumForName("PNAMES"));
   nummappatches = LONG(*((const int *)names));
   name_p = names+4;
-  patchlookup = malloc(nummappatches*sizeof(*patchlookup));  // killough
+  patchlookup = Z_Malloc(nummappatches * sizeof(*patchlookup), PU_STATIC, 0);  // killough
 
   for (i=0 ; i<nummappatches ; i++)
     {
@@ -187,10 +187,7 @@ static void R_InitTextures (void)
     }
   numtextures = numtextures1 + numtextures2;
 
-  // killough 4/9/98: make column offsets 32-bit;
-  // clean up malloc-ing to use sizeof
-
-  textures = Z_Malloc(numtextures * sizeof(*textures), PU_STATIC, 0);
+  textures      = Z_Malloc(numtextures * sizeof(*textures), PU_STATIC, 0);
   textureheight = Z_Malloc(numtextures * sizeof(*textureheight), PU_STATIC, 0);
 
   totalwidth = 0;
@@ -265,8 +262,6 @@ static void R_InitTextures (void)
     I_Error("R_InitTextures: %d errors", errors);
 
   // Create translation table for global animation.
-  // killough 4/9/98: make column offsets 32-bit;
-  // clean up malloc-ing to use sizeof
 
   texturetranslation =
     Z_Malloc((numtextures+1) * sizeof(*texturetranslation), PU_STATIC, 0);
@@ -504,7 +499,7 @@ void R_PrecacheLevel(void)
 
   {
     size_t size = numflats > numsprites  ? numflats : numsprites;
-    hitlist = malloc((size_t)numtextures > size ? numtextures : size);
+    hitlist = Z_Malloc(((size_t)numtextures > size) ? numtextures : size, PU_STATIC, 0);
   }
 
   // Precache flats.

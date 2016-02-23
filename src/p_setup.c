@@ -1710,10 +1710,10 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
     hit[v - vertexes] = 1;        // Mark this vertex as processed
     if (v != l->v1 && v != l->v2) // Exclude endpoints of linedefs
       { // Project the vertex back onto the parent linedef
-        int_64_t dx2 = (l->dx >> FRACBITS) * (l->dx >> FRACBITS);
-        int_64_t dy2 = (l->dy >> FRACBITS) * (l->dy >> FRACBITS);
-        int_64_t dxy = (l->dx >> FRACBITS) * (l->dy >> FRACBITS);
-        int_64_t s = dx2 + dy2;
+        int64_t dx2 = (l->dx >> FRACBITS) * (l->dx >> FRACBITS);
+        int64_t dy2 = (l->dy >> FRACBITS) * (l->dy >> FRACBITS);
+        int64_t dxy = (l->dx >> FRACBITS) * (l->dy >> FRACBITS);
+        int64_t s = dx2 + dy2;
         int x0 = v->x, y0 = v->y, x1 = l->v1->x, y1 = l->v1->y;
         v->x = (int)((dx2 * x0 + dy2 * x1 + dxy * (y0 - y1)) / s);
         v->y = (int)((dy2 * y0 + dx2 * y1 + dxy * (x0 - x1)) / s);

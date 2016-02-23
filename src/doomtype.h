@@ -56,15 +56,11 @@
  * Except I don't know what to test as it's compiler specific
  * Proff - I fixed it */
 #ifndef _MSC_VER
-typedef signed long long int_64_t;
-typedef unsigned long long uint_64_t;
 // define compiled-specific long-long contstant notation here
-#define LONGLONG(num)   (uint_64_t)num ## ll
+#define LONGLONG(num)   (uint64_t)num ## ll
 #else
-typedef __int64 int_64_t;
-typedef unsigned __int64 uint_64_t;
 // define compiled-specific long-long contstant notation here
-#define LONGLONG(num) (uint_64_t)num
+#define LONGLONG(num) (uint64_t)num
 #undef PATH_MAX
 #define PATH_MAX 1024
 #define strcasecmp _stricmp

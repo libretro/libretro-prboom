@@ -154,11 +154,11 @@ fixed_t P_InterceptVector(const divline_t *v2, const divline_t *v1)
     return P_InterceptVector2(v2, v1);
   else {
     /* cph - This was introduced at prboom_4_compatibility - no precision/overflow problems */
-    int_64_t den = (int_64_t)v1->dy * v2->dx - (int_64_t)v1->dx * v2->dy;
+    int64_t den = (int64_t)v1->dy * v2->dx - (int64_t)v1->dx * v2->dy;
     den >>= 16;
     if (!den)
       return 0;
-    return (fixed_t)(((int_64_t)(v1->x - v2->x) * v1->dy - (int_64_t)(v1->y - v2->y) * v1->dx) / den);
+    return (fixed_t)(((int64_t)(v1->x - v2->x) * v1->dy - (int64_t)(v1->y - v2->y) * v1->dx) / den);
   }
 }
 

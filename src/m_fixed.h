@@ -69,7 +69,7 @@ static INLINE int D_abs(int x)
 
 static INLINE int FixedMul(int a, int b)
 {
-  return (int)((int_64_t) a*b >> FRACBITS);
+  return (int)((int64_t) a*b >> FRACBITS);
 }
 
 /*
@@ -82,7 +82,7 @@ static INLINE int FixedMul(int a, int b)
 static INLINE int FixedDiv(int a, int b)
 {
   return (D_abs(a)>>14) >= D_abs(b) ? ((a^b)>>31) ^ INT_MAX :
-    (int)(((int_64_t) a << FRACBITS) / b);
+    (int)(((int64_t) a << FRACBITS) / b);
 }
 
 /* CPhipps -

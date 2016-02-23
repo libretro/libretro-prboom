@@ -2529,12 +2529,12 @@ void A_Spawn(mobj_t *mo)
 
 void A_Turn(mobj_t *mo)
 {
-  mo->angle += (unsigned int)(((uint_64_t) mo->state->misc1 << 32) / 360);
+  mo->angle += (unsigned int)(((uint64_t) mo->state->misc1 << 32) / 360);
 }
 
 void A_Face(mobj_t *mo)
 {
-  mo->angle = (unsigned int)(((uint_64_t) mo->state->misc1 << 32) / 360);
+  mo->angle = (unsigned int)(((uint64_t) mo->state->misc1 << 32) / 360);
 }
 
 void A_Scratch(mobj_t *mo)

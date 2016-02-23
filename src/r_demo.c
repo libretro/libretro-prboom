@@ -40,7 +40,7 @@ int demo_smoothturns = FALSE;
 int demo_smoothturnsfactor = 6;
 
 static int smooth_playing_turns[SMOOTH_PLAYING_MAXFACTOR];
-static int_64_t smooth_playing_sum;
+static int64_t smooth_playing_sum;
 static int smooth_playing_index;
 static angle_t smooth_playing_angle;
 

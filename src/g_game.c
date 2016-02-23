@@ -1434,25 +1434,25 @@ extern boolean setsizeneeded;
  * of savegame compatibility warnings, and options lookups.
  */
 
-static uint_64_t G_UpdateSignature(uint_64_t s, const char *name)
+static uint64_t G_UpdateSignature(uint64_t s, const char *name)
 {
-  int i, lump = W_CheckNumForName(name);
-  if (lump != -1 && (i = lump+10) < numlumps)
-    do
+   int i, lump = W_CheckNumForName(name);
+   if (lump != -1 && (i = lump+10) < numlumps)
+      do
       {
-  int size = W_LumpLength(i);
-  const uint8_t *p = W_CacheLumpNum(i);
-  while (size--)
-    s <<= 1, s += *p++;
-  W_UnlockLumpNum(i);
+         int size = W_LumpLength(i);
+         const uint8_t *p = W_CacheLumpNum(i);
+         while (size--)
+            s <<= 1, s += *p++;
+         W_UnlockLumpNum(i);
       }
-    while (--i > lump);
-  return s;
+      while (--i > lump);
+   return s;
 }
 
-static uint_64_t G_Signature(void)
+static uint64_t G_Signature(void)
 {
-  static uint_64_t s = 0;
+  static uint64_t s = 0;
   static boolean computed = FALSE;
   char name[9];
   int episode, map;
@@ -1591,7 +1591,7 @@ void G_DoLoadGame(void)
   // CPhipps - always check savegames even when forced,
   //  only print a warning if forced
   {  // killough 3/16/98: check lump name checksum (independent of order)
-    uint_64_t checksum = 0;
+    uint64_t checksum = 0;
 
     checksum = G_Signature();
 
@@ -1741,7 +1741,7 @@ static void G_DoSaveGame (boolean menu)
 
   save_p = savebuffer = malloc(savegamesize);
 
-  CheckSaveGame(SAVESTRINGSIZE+VERSIONSIZE+sizeof(uint_64_t));
+  CheckSaveGame(SAVESTRINGSIZE+VERSIONSIZE+sizeof(uint64_t));
   memcpy (save_p, description, SAVESTRINGSIZE);
   save_p += SAVESTRINGSIZE;
   memset (name2,0,sizeof(name2));
@@ -1758,7 +1758,7 @@ static void G_DoSaveGame (boolean menu)
   save_p += VERSIONSIZE;
 
   { /* killough 3/16/98, 12/98: store lump name checksum */
-    uint_64_t checksum = G_Signature();
+    uint64_t checksum = G_Signature();
     memcpy(save_p, &checksum, sizeof checksum);
     save_p += sizeof checksum;
   }

@@ -28,9 +28,6 @@
  *
  *-----------------------------------------------------------------------------*/
 
-#define SCREENTYPE unsigned short
-#define TEMPBUF short_tempbuf
-
 #define GETDESTCOLOR16(col) (col)
 
 #if (R_DRAWCOLUMN_PIPELINE & RDC_TRANSLATED)
@@ -77,7 +74,9 @@
 static void R_DRAWCOLUMN_FUNCNAME(draw_column_vars_t *dcvars)
 {
   int              count;
-  SCREENTYPE       *dest;            // killough
+#if (!(R_DRAWCOLUMN_PIPELINE & RDC_FUZZ))
+  uint16_t         *dest;
+#endif
   fixed_t          frac;
   const fixed_t    fracstep = dcvars->iscale;
 #if ((R_DRAWCOLUMN_PIPELINE & RDC_BILINEAR))
@@ -188,8 +187,12 @@ static void R_DRAWCOLUMN_FUNCNAME(draw_column_vars_t *dcvars)
          R_FlushWholeColumns = R_FLUSHWHOLE_FUNCNAME;
          R_FlushHTColumns    = R_FLUSHHEADTAIL_FUNCNAME;
          R_FlushQuadColumn   = R_FLUSHQUAD_FUNCNAME;
-         dest = &TEMPBUF[dcvars->yl << 2];
-      } else {
+#if (!(R_DRAWCOLUMN_PIPELINE & RDC_FUZZ))
+         dest = &short_tempbuf[dcvars->yl << 2];
+#endif
+      }
+      else
+      {
          tempyl[temp_x] = dcvars->yl;
          tempyh[temp_x] = dcvars->yh;
    
@@ -198,113 +201,127 @@ static void R_DRAWCOLUMN_FUNCNAME(draw_column_vars_t *dcvars)
          if(dcvars->yh < commonbot)
             commonbot = dcvars->yh;
       
-         dest = &TEMPBUF[(dcvars->yl << 2) + temp_x];
+#if (!(R_DRAWCOLUMN_PIPELINE & RDC_FUZZ))
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+#endif
       }
       temp_x += 1;
    }
 
 // do nothing else when drawin fuzz columns
 #if (!(R_DRAWCOLUMN_PIPELINE & RDC_FUZZ))
-  {
-    const byte          *source = dcvars->source;
-    const lighttable_t  *colormap = dcvars->colormap;
-    const byte          *translation = dcvars->translation;
+   {
+      const byte          *source = dcvars->source;
+      const lighttable_t  *colormap = dcvars->colormap;
+      const byte          *translation = dcvars->translation;
 #if (R_DRAWCOLUMN_PIPELINE & (RDC_BILINEAR|RDC_ROUNDED|RDC_DITHERZ))
-    int y = dcvars->yl;
-    const int x = dcvars->x;
+      int y = dcvars->yl;
+      const int x = dcvars->x;
 #endif
 #if (R_DRAWCOLUMN_PIPELINE & RDC_DITHERZ)
-    const int fracz = (dcvars->z >> 6) & 255;
-    const byte *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
+      const int fracz = (dcvars->z >> 6) & 255;
+      const byte *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
 #endif
 #if (R_DRAWCOLUMN_PIPELINE & RDC_BILINEAR)
-    const byte          *nextsource = dcvars->nextsource;
-    const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+      const byte          *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
 #endif
 #if (R_DRAWCOLUMN_PIPELINE & RDC_ROUNDED)
-    const byte          *prevsource = dcvars->prevsource;
-    const byte          *nextsource = dcvars->nextsource;
-    const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : (dcvars->texu>>8) & 0xff;
+      const byte          *prevsource = dcvars->prevsource;
+      const byte          *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : (dcvars->texu>>8) & 0xff;
 #endif
 
-    count++;
+      count++;
 
-    // Inner loop that does the actual texture mapping,
-    //  e.g. a DDA-lile scaling.
-    // This is as fast as it gets.       (Yeah, right!!! -- killough)
-    //
-    // killough 2/1/98: more performance tuning
+      // Inner loop that does the actual texture mapping,
+      //  e.g. a DDA-lile scaling.
+      // This is as fast as it gets.       (Yeah, right!!! -- killough)
+      //
+      // killough 2/1/98: more performance tuning
 
-    if (dcvars->texheight == 128) {
-      #define FIXEDT_128MASK ((127<<FRACBITS)|0xffff)
-      while(count--) {
-        *dest = GETDESTCOLOR(GETCOL(frac & FIXEDT_128MASK, (frac+FRACUNIT) & FIXEDT_128MASK));
-        INCY(y);
-        dest += 4;
-        frac += fracstep;
+      if (dcvars->texheight == 128)
+      {
+#define FIXEDT_128MASK ((127<<FRACBITS)|0xffff)
+         while(count--)
+         {
+            *dest = GETDESTCOLOR(GETCOL(frac & FIXEDT_128MASK, (frac+FRACUNIT) & FIXEDT_128MASK));
+            INCY(y);
+            dest += 4;
+            frac += fracstep;
+         }
       }
-    } else if (dcvars->texheight == 0) {
-      /* cph - another special case */
-      while (count--) {
-        *dest = GETDESTCOLOR(GETCOL(frac, (frac+FRACUNIT)));
-        INCY(y);
-        dest += 4;
-        frac += fracstep;
+      else if (dcvars->texheight == 0)
+      {
+         /* cph - another special case */
+         while (count--)
+         {
+            *dest = GETDESTCOLOR(GETCOL(frac, (frac+FRACUNIT)));
+            INCY(y);
+            dest += 4;
+            frac += fracstep;
+         }
       }
-    } else {
-      unsigned heightmask = dcvars->texheight-1; // CPhipps - specify type
-      if (! (dcvars->texheight & heightmask) ) { // power of 2 -- killough
-        fixed_t fixedt_heightmask = (heightmask<<FRACBITS)|0xffff;
-        while ((count-=2)>=0) { // texture height is a power of 2 -- killough
-          *dest = GETDESTCOLOR(GETCOL(frac & fixedt_heightmask, (frac+FRACUNIT) & fixedt_heightmask));
-          INCY(y);
-          dest += 4;
-          frac += fracstep;
-          *dest = GETDESTCOLOR(GETCOL(frac & fixedt_heightmask, (frac+FRACUNIT) & fixedt_heightmask));
-          INCY(y);
-          dest += 4;
-          frac += fracstep;
-        }
-        if (count & 1)
-          *dest = GETDESTCOLOR(GETCOL(frac & fixedt_heightmask, (frac+FRACUNIT) & fixedt_heightmask));
-          INCY(y);
-      } else {
-        fixed_t nextfrac = 0;
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1; // CPhipps - specify type
+         if (! (dcvars->texheight & heightmask))
+         { // power of 2 -- killough
+            fixed_t fixedt_heightmask = (heightmask<<FRACBITS)|0xffff;
+            while ((count-=2)>=0)
+            { // texture height is a power of 2 -- killough
+               *dest = GETDESTCOLOR(GETCOL(frac & fixedt_heightmask, (frac+FRACUNIT) & fixedt_heightmask));
+               INCY(y);
+               dest += 4;
+               frac += fracstep;
+               *dest = GETDESTCOLOR(GETCOL(frac & fixedt_heightmask, (frac+FRACUNIT) & fixedt_heightmask));
+               INCY(y);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = GETDESTCOLOR(GETCOL(frac & fixedt_heightmask, (frac+FRACUNIT) & fixedt_heightmask));
+            INCY(y);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
 
-        heightmask++;
-        heightmask <<= FRACBITS;
+            heightmask++;
+            heightmask <<= FRACBITS;
 
-        if (frac < 0)
-          while ((frac += heightmask) <  0);
-        else
-          while (frac >= (int)heightmask)
-            frac -= heightmask;
+            if (frac < 0)
+               while ((frac += heightmask) <  0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
 
 #if (R_DRAWCOLUMN_PIPELINE & (RDC_BILINEAR|RDC_ROUNDED))
-        nextfrac = frac + FRACUNIT;
-        while (nextfrac >= (int)heightmask)
-          nextfrac -= heightmask;
+            nextfrac = frac + FRACUNIT;
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
 #endif
-      
+
 #define INCFRAC(f) if ((f += fracstep) >= (int)heightmask) f -= heightmask;
 
-        while (count--) {
-          // Re-map color indices from wall texture column
-          //  using a lighting/special effects LUT.
+            while (count--)
+            {
+               // Re-map color indices from wall texture column
+               //  using a lighting/special effects LUT.
 
-          // heightmask is the Tutti-Frutti fix -- killough
+               // heightmask is the Tutti-Frutti fix -- killough
 
-          *dest = GETDESTCOLOR(GETCOL(frac, nextfrac));
-          INCY(y);
-          dest += 4;
-          INCFRAC(frac);
+               *dest = GETDESTCOLOR(GETCOL(frac, nextfrac));
+               INCY(y);
+               dest += 4;
+               INCFRAC(frac);
 #if (R_DRAWCOLUMN_PIPELINE & (RDC_BILINEAR|RDC_ROUNDED))
-          INCFRAC(nextfrac); 
+               INCFRAC(nextfrac); 
 #endif
-        }
+            }
+         }
       }
-    }
-  }
+   }
 #endif // (!(R_DRAWCOLUMN_PIPELINE & RDC_FUZZ))
 }
 
@@ -319,8 +336,6 @@ static void R_DRAWCOLUMN_FUNCNAME(draw_column_vars_t *dcvars)
 #undef INCY
 #undef INCFRAC
 #undef COLTYPE
-#undef TEMPBUF
-#undef SCREENTYPE
 
 #undef R_DRAWCOLUMN_FUNCNAME
 #undef R_DRAWCOLUMN_PIPELINE

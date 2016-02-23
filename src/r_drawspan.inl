@@ -32,10 +32,6 @@
 // R_DrawSpan
 //
 
-#define SCREENTYPE unsigned short
-#define TOPLEFT short_topleft
-#define PITCH short_pitch
-
 #if (R_DRAWSPAN_PIPELINE & RDC_DITHERZ)  
   #define GETDEPTHMAP(col) dither_colormaps[filter_getDitheredPixelLevel(x1, y, fracz)][(col)]
 #else
@@ -71,8 +67,11 @@ static void R_DRAWSPAN_FUNCNAME(draw_span_vars_t *dsvars)
   const fixed_t xstep = dsvars->xstep;
   const fixed_t ystep = dsvars->ystep;
   const byte *source = dsvars->source;
+#if (R_DRAWSPAN_PIPELINE & RDC_DITHERZ)  
+#else
   const byte *colormap = dsvars->colormap;
-  SCREENTYPE *dest = drawvars.TOPLEFT + dsvars->y* SURFACE_SHORT_PITCH + dsvars->x1;
+#endif
+  uint16_t *dest = drawvars.short_topleft + dsvars->y* SURFACE_SHORT_PITCH + dsvars->x1;
 #if (R_DRAWSPAN_PIPELINE & (RDC_DITHERZ|RDC_BILINEAR))
   const int y = dsvars->y;
   int x1 = dsvars->x1;
@@ -126,9 +125,6 @@ static void R_DRAWSPAN_FUNCNAME(draw_span_vars_t *dsvars)
 #undef GETCOL_LINEAR
 #undef GETCOL_POINT
 #undef GETCOL
-#undef PITCH
-#undef TOPLEFT
-#undef SCREENTYPE
 
 #undef R_DRAWSPAN_PIPELINE
 #undef R_DRAWSPAN_FUNCNAME

@@ -510,6 +510,8 @@ int EV_VerticalDoor
   sec = sides[line->sidenum[1]].sector;
   secnum = sec-sectors;
 
+  (void)secnum;
+
   /* if door already has a thinker, use it
    * cph 2001/04/05 -
    * Ok, this is a disaster area. We're assuming that sec->ceilingdata

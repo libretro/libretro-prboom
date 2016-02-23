@@ -34,6 +34,7 @@
 #ifndef __M_MENU__
 #define __M_MENU__
 
+#include <stdint.h>
 #include "d_event.h"
 
 //
@@ -163,8 +164,8 @@ typedef struct setup_menu_s
   const char  *m_text;  /* text to display */
   int         m_flags;  /* phares 4/17/98: flag bits S_* (defined above) */
   setup_group m_group;  /* Group */
-  short       m_x;      /* screen x position (left is 0) */
-  short       m_y;      /* screen y position (top is 0) */
+  int16_t       m_x;      /* screen x position (left is 0) */
+  int16_t       m_y;      /* screen y position (top is 0) */
 
   union  /* killough 11/98: The first field is a union of several types */
   {

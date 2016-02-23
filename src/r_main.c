@@ -597,25 +597,6 @@ int autodetect_hom = 0;       // killough 2/7/98: HOM autodetection flag
 int rendered_visplanes, rendered_segs, rendered_vissprites;
 boolean rendering_stats;
 
-#ifndef __LIBRETRO__
-static void R_ShowStats(void)
-{
-//e6y
-#define KEEPTIMES 10
-  static int keeptime[KEEPTIMES], showtime;
-  int now = I_GetTime();
-
-  if (now - showtime > 35) {
-    doom_printf("Frame rate %d fps\nSegs %d, Visplanes %d, Sprites %d",
-    (35*KEEPTIMES)/(now - keeptime[0]), rendered_segs,
-    rendered_visplanes, rendered_vissprites);
-    showtime = now;
-  }
-  memmove(keeptime, keeptime+1, sizeof(keeptime[0]) * (KEEPTIMES-1));
-  keeptime[KEEPTIMES-1] = now;
-}
-#endif
-
 //
 // R_RenderView
 //

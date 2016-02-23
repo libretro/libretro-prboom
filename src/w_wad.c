@@ -451,8 +451,8 @@ void W_Init(void)
 
   { // CPhipps - new wadfiles array used 
     // open all the files, load headers, and count lumps
-    int i;
-    for (i=0; (size_t)i<numwadfiles; i++)
+    unsigned i;
+    for (i=0; i < numwadfiles; i++)
       W_AddFile(&wadfiles[i]);
   }
 

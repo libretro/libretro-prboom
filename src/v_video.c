@@ -376,20 +376,19 @@ void V_DrawNumPatch(int x, int y, int scrn, int lump,
 unsigned short *V_Palette16 = NULL;
 static unsigned short *Palettes16 = NULL;
 static int currentPaletteIndex = 0;
+
+#define DONT_ROUND_ABOVE 220
 //
 // V_UpdateTrueColorPalette
 //
 void V_UpdateTrueColorPalette(void) {
   int i, w, p;
-  byte r,g,b;
-  int nr,ng,nb;
-  float t;
   int paletteNum = currentPaletteIndex;
   static int usegammaOnLastPaletteGeneration = -1;
-  
-  int pplump = W_GetNumForName("PLAYPAL");
-  int gtlump = (W_CheckNumForName)("GAMMATBL",ns_prboom);
-  const byte *pal = W_CacheLumpNum(pplump);
+  int pplump         = W_GetNumForName("PLAYPAL");
+  int gtlump         = (W_CheckNumForName)("GAMMATBL",ns_prboom);
+  const uint8_t *pal = W_CacheLumpNum(pplump);
+
   // opengl doesn't use the gamma
   const byte *const gtable = 
     (const byte *)W_CacheLumpNum(gtlump) + 
@@ -397,8 +396,6 @@ void V_UpdateTrueColorPalette(void) {
   ;
 
   int numPals = W_LumpLength(pplump) / (3*256);
-  const float dontRoundAbove = 220;
-  float roundUpR, roundUpG, roundUpB;
   
   if (usegammaOnLastPaletteGeneration != usegamma) {
     if (Palettes16) free(Palettes16);
@@ -406,34 +403,39 @@ void V_UpdateTrueColorPalette(void) {
     usegammaOnLastPaletteGeneration = usegamma;      
   }
   
-    if (!Palettes16) {
-      // set short palette
-      Palettes16 = malloc(numPals*256*sizeof(short)*VID_NUMCOLORWEIGHTS);
-      for (p=0; p<numPals; p++) {
-        for (i=0; i<256; i++) {
-          r = gtable[pal[(256*p+i)*3+0]];
-          g = gtable[pal[(256*p+i)*3+1]];
-          b = gtable[pal[(256*p+i)*3+2]];
-          
-          // ideally, we should always round up, but very bright colors
-          // overflow the blending adds, so they don't get rounded.
-          roundUpR = (r > dontRoundAbove) ? 0 : 0.5f;
-          roundUpG = (g > dontRoundAbove) ? 0 : 0.5f;
-          roundUpB = (b > dontRoundAbove) ? 0 : 0.5f;
-                   
-          for (w=0; w<VID_NUMCOLORWEIGHTS; w++) {
-            t = (float)(w)/(float)(VID_NUMCOLORWEIGHTS-1);
-            nr = (int)((r>>3)*t+roundUpR);
-            ng = (int)((g>>2)*t+roundUpG);
-            nb = (int)((b>>3)*t+roundUpB);
-            Palettes16[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] = (
-              (nr<<11) | (ng<<5) | nb
-            );
-          }
+  if (!Palettes16)
+  {
+     // set short palette
+     Palettes16 = malloc(numPals*256*sizeof(short)*VID_NUMCOLORWEIGHTS);
+     for (p=0; p<numPals; p++)
+     {
+        for (i=0; i<256; i++)
+        {
+           uint8_t r = gtable[pal[(256*p+i)*3+0]];
+           uint8_t g = gtable[pal[(256*p+i)*3+1]];
+           uint8_t b = gtable[pal[(256*p+i)*3+2]];
+
+           // ideally, we should always round up, but very bright colors
+           // overflow the blending adds, so they don't get rounded.
+           float roundUpR = (r > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+           float roundUpG = (g > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+           float roundUpB = (b > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+
+           for (w=0; w<VID_NUMCOLORWEIGHTS; w++)
+           {
+              float t = (float)(w)/(float)(VID_NUMCOLORWEIGHTS-1);
+              int nr  = (int)((r>>3)*t+roundUpR);
+              int ng  = (int)((g>>2)*t+roundUpG);
+              int nb  = (int)((b>>3)*t+roundUpB);
+              Palettes16[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] = (
+                    (nr<<11) | (ng<<5) | nb
+                    );
+           }
         }
-      }
-    }
-    V_Palette16 = Palettes16 + paletteNum*256*VID_NUMCOLORWEIGHTS;
+     }
+  }
+
+  V_Palette16 = Palettes16 + paletteNum*256*VID_NUMCOLORWEIGHTS;
    
   W_UnlockLumpNum(pplump);
   W_UnlockLumpNum(gtlump);

@@ -480,7 +480,7 @@ void W_Init(void)
 
 void W_Exit(void)
 {
-	int i;
+	unsigned i;
 	for (i = 0; i < numwadfiles; i++)
    {
 		if (wadfiles[i].handle)
@@ -496,7 +496,7 @@ void W_Exit(void)
 
 void W_ReleaseAllWads(void)
 {
-	int i;
+	unsigned i;
 	W_DoneCache();
 
 	for(i = 0; i < numwadfiles; i++)

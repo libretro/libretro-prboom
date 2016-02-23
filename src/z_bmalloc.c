@@ -43,12 +43,12 @@
 typedef struct bmalpool_s {
   struct bmalpool_s *nextpool;
   size_t             blocks;
-  byte               used[0];
+  uint8_t            used[0];
 } bmalpool_t;
 
 static INLINE void* getelem(bmalpool_t *p, size_t size, size_t n)
 {
-  return (((byte*)p) + sizeof(bmalpool_t) + sizeof(byte)*(p->blocks) + size*n);
+  return (((uint8_t*)p) + sizeof(bmalpool_t) + sizeof(uint8_t)*(p->blocks) + size*n);
 }
 
 static INLINE int iselem(const bmalpool_t *pool, size_t size, const void* p)
@@ -67,31 +67,33 @@ enum { unused_block = 0, used_block = 1};
 
 void* Z_BMalloc(struct block_memory_alloc_s *pzone)
 {
-  register bmalpool_t **pool = (bmalpool_t **)&(pzone->firstpool);
-  while (*pool != NULL) {
-    byte *p = memchr((*pool)->used, unused_block, (*pool)->blocks); // Scan for unused marker
-    if (p) {
-      int n = p - (*pool)->used;
-      (*pool)->used[n] = used_block;
-      return getelem(*pool, pzone->size, n);
-    } else
-      pool = &((*pool)->nextpool);
-  }
-  {
-    // Nothing available, must allocate a new pool
-    bmalpool_t *newpool;
+   register bmalpool_t **pool = (bmalpool_t **)&(pzone->firstpool);
+   while (*pool != NULL)
+   {
+      uint8_t *p = memchr((*pool)->used, unused_block, (*pool)->blocks); // Scan for unused marker
+      if (p) {
+         int n = p - (*pool)->used;
+         (*pool)->used[n] = used_block;
+         return getelem(*pool, pzone->size, n);
+      } else
+         pool = &((*pool)->nextpool);
+   }
 
-    // CPhipps: Allocate new memory, initialised to 0
+   {
+      // Nothing available, must allocate a new pool
+      bmalpool_t *newpool;
 
-    *pool = newpool = Z_Calloc(sizeof(*newpool) + (sizeof(byte) + pzone->size)*(pzone->perpool),
-             1,  pzone->tag, NULL);
-    newpool->nextpool = NULL; // NULL = (void*)0 so this is redundant
+      // CPhipps: Allocate new memory, initialised to 0
 
-    // Return element 0 from this pool to satisfy the request
-    newpool->used[0] = used_block;
-    newpool->blocks = pzone->perpool;
-    return getelem(newpool, pzone->size, 0);
-  }
+      *pool = newpool = Z_Calloc(sizeof(*newpool) + (sizeof(uint8_t) + pzone->size)*(pzone->perpool),
+            1,  pzone->tag, NULL);
+      newpool->nextpool = NULL; // NULL = (void*)0 so this is redundant
+
+      // Return element 0 from this pool to satisfy the request
+      newpool->used[0] = used_block;
+      newpool->blocks = pzone->perpool;
+      return getelem(newpool, pzone->size, 0);
+   }
 }
 
 void Z_BFree(struct block_memory_alloc_s *pzone, void* p)

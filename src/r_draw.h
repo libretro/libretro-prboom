@@ -70,12 +70,12 @@ typedef struct {
   fixed_t             texturemid;
   int                 texheight;    // killough
   fixed_t             texu; // the current column u coord
-  const byte          *source; // first pixel in a column
-  const byte          *prevsource; // first pixel in previous column
-  const byte          *nextsource; // first pixel in next column
+  const uint8_t       *source; // first pixel in a column
+  const uint8_t       *prevsource; // first pixel in previous column
+  const uint8_t       *nextsource; // first pixel in next column
   const lighttable_t  *colormap;
   const lighttable_t  *nextcolormap;
-  const byte          *translation;
+  const uint8_t       *translation;
   int                 edgeslope; // OR'ed RDRAW_EDGESLOPE_*
   // 1 if R_DrawColumn* is currently drawing a masked column, otherwise 0
   int                 drawingmasked;
@@ -93,7 +93,7 @@ typedef struct {
   fixed_t             yfrac;
   fixed_t             xstep;
   fixed_t             ystep;
-  const byte          *source; // start of a 64*64 tile image
+  const uint8_t       *source; // start of a 64*64 tile image
   const lighttable_t  *colormap;
   const lighttable_t  *nextcolormap;
 } draw_span_vars_t;
@@ -119,8 +119,8 @@ typedef struct {
 
 extern draw_vars_t drawvars;
 
-extern byte playernumtotrans[MAXPLAYERS]; // CPhipps - what translation table for what player
-extern byte       *translationtables;
+extern uint8_t playernumtotrans[MAXPLAYERS]; // CPhipps - what translation table for what player
+extern uint8_t       *translationtables;
 
 typedef void (*R_DrawColumn_f)(draw_column_vars_t *dcvars);
 R_DrawColumn_f R_GetDrawColumnFunc(enum column_pipeline_e type,

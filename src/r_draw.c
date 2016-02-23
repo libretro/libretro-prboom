@@ -53,7 +53,7 @@
 //  and the total size == width*height*depth/8.,
 //
 
-byte *viewimage;
+uint8_t *viewimage;
 int  viewwidth;
 int  scaledviewwidth;
 int  viewheight;
@@ -86,7 +86,7 @@ static int    startx = 0;
 static int    temptype = COL_NONE;
 static int    commontop, commonbot;
 // SoM 7-28-04: Fix the fuzz problem.
-static const byte   *tempfuzzmap;
+static const uint8_t   *tempfuzzmap;
 
 //
 // Spectre/Invisibility.
@@ -217,7 +217,7 @@ void R_ResetColumnBuffer(void)
 //  be used. It has also been used with Wolfenstein 3D.
 //
 
-byte *translationtables;
+uint8_t *translationtables;
 
 #define R_DRAWCOLUMN_PIPELINE_TYPE RDC_PIPELINE_STANDARD
 #define R_DRAWCOLUMN_PIPELINE_BASE RDC_STANDARD
@@ -344,14 +344,14 @@ void R_SetDefaultDrawColumnVars(draw_column_vars_t *dcvars) {
 // Could be read from a lump instead.
 //
 
-byte playernumtotrans[MAXPLAYERS];
+uint8_t playernumtotrans[MAXPLAYERS];
 extern lighttable_t *(*c_zlight)[LIGHTLEVELS][MAXLIGHTZ];
 
 void R_InitTranslationTables (void)
 {
   int i, j;
 #define MAXTRANS 3
-  byte transtocolour[MAXTRANS];
+  uint8_t transtocolour[MAXTRANS];
 
   // killough 5/2/98:
   // Remove dependency of colormaps aligned on 256-byte boundary
@@ -362,7 +362,7 @@ void R_InitTranslationTables (void)
   for (i=0; i<MAXTRANS; i++) transtocolour[i] = 255;
 
   for (i=0; i<MAXPLAYERS; i++) {
-    byte wantcolour = mapcolor_plyr[i];
+    uint8_t wantcolour = mapcolor_plyr[i];
     playernumtotrans[i] = 0;
     if (wantcolour != 0x70) // Not green, would like translation
       for (j=0; j<MAXTRANS; j++)

@@ -61,7 +61,6 @@ static screeninfo_t wipe_scr;
 
 static int y_lookup[MAX_SCREENWIDTH];
 
-
 static int wipe_initMelt(int ticks)
 {
   int i;
@@ -89,55 +88,59 @@ static int wipe_initMelt(int ticks)
 
 static int wipe_doMelt(int ticks)
 {
-  boolean done = TRUE;
-  int i;
+   boolean done = TRUE;
+   int i;
 
-  while (ticks--) {
-    for (i=0;i<(SCREENWIDTH);i++) {
-      if (y_lookup[i]<0) {
-        y_lookup[i]++;
-        done = FALSE;
-        continue;
+   while (ticks--)
+   {
+      for (i=0;i<(SCREENWIDTH);i++)
+      {
+         if (y_lookup[i]<0)
+         {
+            y_lookup[i]++;
+            done = FALSE;
+            continue;
+         }
+         if (y_lookup[i] < SCREENHEIGHT)
+         {
+            uint8_t *s, *d;
+            int j, dy;
+
+            /* cph 2001/07/29 -
+             *  The original melt rate was 8 pixels/sec, i.e. 25 frames to melt
+             *  the whole screen, so make the melt rate depend on SCREENHEIGHT
+             *  so it takes no longer in high res
+             */
+            dy = (y_lookup[i] < 16) ? y_lookup[i]+1 : SCREENHEIGHT/25;
+            if (y_lookup[i]+dy >= SCREENHEIGHT)
+               dy = SCREENHEIGHT - y_lookup[i];
+
+            s = wipe_scr_end.data    + (y_lookup[i] * SURFACE_BYTE_PITCH +(i * SURFACE_PIXEL_DEPTH));
+            d = wipe_scr.data        + (y_lookup[i] * SURFACE_BYTE_PITCH +(i * SURFACE_PIXEL_DEPTH));
+            for (j=dy;j;j--) {
+
+               d[0] = s[0];
+               d[1] = s[1];
+
+               d += SURFACE_BYTE_PITCH;
+               s += SURFACE_BYTE_PITCH;
+            }
+            y_lookup[i] += dy;
+            s = wipe_scr_start.data  + (i * SURFACE_PIXEL_DEPTH);
+            d = wipe_scr.data        + (y_lookup[i] *  SURFACE_BYTE_PITCH +(i * SURFACE_PIXEL_DEPTH));
+            for (j=SCREENHEIGHT-y_lookup[i];j;j--) {
+
+               d[0] = s[0];
+               d[1] = s[1];
+
+               d += SURFACE_BYTE_PITCH;
+               s += SURFACE_BYTE_PITCH;
+            }
+            done = FALSE;
+         }
       }
-      if (y_lookup[i] < SCREENHEIGHT) {
-        byte *s, *d;
-        int j, dy;
-
-        /* cph 2001/07/29 -
-          *  The original melt rate was 8 pixels/sec, i.e. 25 frames to melt
-          *  the whole screen, so make the melt rate depend on SCREENHEIGHT
-          *  so it takes no longer in high res
-          */
-        dy = (y_lookup[i] < 16) ? y_lookup[i]+1 : SCREENHEIGHT/25;
-        if (y_lookup[i]+dy >= SCREENHEIGHT)
-          dy = SCREENHEIGHT - y_lookup[i];
-
-        s = wipe_scr_end.data    + (y_lookup[i] * SURFACE_BYTE_PITCH +(i * SURFACE_PIXEL_DEPTH));
-        d = wipe_scr.data        + (y_lookup[i] * SURFACE_BYTE_PITCH +(i * SURFACE_PIXEL_DEPTH));
-        for (j=dy;j;j--) {
-
-            d[0] = s[0];
-            d[1] = s[1];
-
-          d += SURFACE_BYTE_PITCH;
-          s += SURFACE_BYTE_PITCH;
-        }
-        y_lookup[i] += dy;
-        s = wipe_scr_start.data  + (i * SURFACE_PIXEL_DEPTH);
-        d = wipe_scr.data        + (y_lookup[i] *  SURFACE_BYTE_PITCH +(i * SURFACE_PIXEL_DEPTH));
-        for (j=SCREENHEIGHT-y_lookup[i];j;j--) {
-
-            d[0] = s[0];
-            d[1] = s[1];
-
-          d += SURFACE_BYTE_PITCH;
-          s += SURFACE_BYTE_PITCH;
-        }
-        done = FALSE;
-      }
-    }
-  }
-  return done;
+   }
+   return done;
 }
 
 // CPhipps - modified to allocate and deallocate screens[2 to 3] as needed, saving memory
@@ -178,18 +181,18 @@ int wipe_EndScreen(void)
 // killough 3/5/98: reformatted and cleaned up
 int wipe_ScreenWipe(int ticks)
 {
-  static boolean go;                               // when zero, stop the wipe
-  if (!go)                                         // initial stuff
-    {
+   static boolean go;                               // when zero, stop the wipe
+   if (!go)                                         // initial stuff
+   {
       go = 1;
       wipe_scr = screens[0];
       wipe_initMelt(ticks);
-    }
-  // do a piece of wipe-in
-  if (wipe_doMelt(ticks))     // final stuff
-    {
+   }
+   // do a piece of wipe-in
+   if (wipe_doMelt(ticks))     // final stuff
+   {
       wipe_exitMelt(ticks);
       go = 0;
-    }
-  return !go;
+   }
+   return !go;
 }

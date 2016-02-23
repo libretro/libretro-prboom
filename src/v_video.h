@@ -52,7 +52,7 @@
 // Screen 1 is an extra buffer.
 
 // array of pointers to color translation tables
-extern const byte *colrngs[];
+extern const uint8_t *colrngs[];
 
 // symbolic indices into color translation table pointer array
 typedef enum
@@ -75,7 +75,7 @@ typedef enum
 #define CR_DEFAULT CR_RED   /* default value for out of range colors */
 
 typedef struct {
-  byte *data;          // pointer to the screen content
+  uint8_t *data;       // pointer to the screen content
   boolean not_on_heap; // if set, no malloc or free is preformed and
                        // data never set to NULL. Used i.e. with SDL doublebuffer.
   int height;          // the height of the surface, used when mallocing
@@ -123,7 +123,7 @@ extern void V_CopyRect(int srcx,  int srcy,  int srcscrn,
                              enum patch_translation_e flags);
 
 extern void V_FillRect_f(int x, int y,
-                             int width, int height, byte colour);
+                             int width, int height, uint8_t colour);
 
 // CPhipps - patch drawing
 // Consolidated into the 3 really useful functions:
@@ -154,7 +154,7 @@ void V_SetPalette(int pal);
 // CPhipps - function to plot a pixel
 
 // V_PlotPixel
-extern void V_PlotPixel(int,int,int,byte);
+extern void V_PlotPixel(int,int,int,uint8_t);
 
 typedef struct
 {

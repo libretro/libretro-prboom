@@ -49,7 +49,7 @@
 screeninfo_t screens[NUM_SCREENS];
 
 /* jff 4/24/98 initialize this at runtime */
-const byte *colrngs[CR_LIMIT];
+const uint8_t *colrngs[CR_LIMIT];
 
 int usegamma;
 
@@ -70,7 +70,7 @@ int usegamma;
 
 typedef struct {
   const char *name;
-  const byte **map;
+  const uint8_t **map;
 } crdef_t;
 
 // killough 5/2/98: table-driven approach
@@ -113,8 +113,8 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
                 int height, int destx, int desty, int destscrn,
                 enum patch_translation_e flags)
 {
-  byte *src;
-  byte *dest;
+  uint8_t *src;
+  uint8_t *dest;
 
   if (flags & VPT_STRETCH)
   {
@@ -155,13 +155,13 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
   TYPE *dest = (TYPE *)screens[SCRN].data; \
   \
   while (height--) { \
-    const byte *const src_row = src + 64*((height*200)/SCREENHEIGHT); \
+    const uint8_t *const src_row = src + 64*((height*200)/SCREENHEIGHT); \
     TYPE *const dst_row = dest + SURFACE_SHORT_PITCH * height; \
     int x; \
     fixed_t tx; \
     \
     for (x=0, tx=0; x<width; x++, tx += dx) { \
-      byte col = src_row[tx >> FRACBITS]; \
+      uint8_t col = src_row[tx >> FRACBITS]; \
       dst_row[x] = GETCOL(col); \
     } \
   } \
@@ -170,7 +170,7 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
 void V_DrawBackground(const char* flatname, int scrn)
 {
   /* erase the entire screen to a tiled background */
-  const byte *src;
+  const uint8_t *src;
   int         x,y;
   int         lump;
   const int   w = (64*SCREENWIDTH/320), h = (64*SCREENHEIGHT/200);
@@ -389,8 +389,8 @@ void V_UpdateTrueColorPalette(void) {
   const uint8_t *pal = W_CacheLumpNum(pplump);
 
   // opengl doesn't use the gamma
-  const byte *const gtable = 
-    (const byte *)W_CacheLumpNum(gtlump) + 
+  const uint8_t *const gtable = 
+    (const uint8_t *)W_CacheLumpNum(gtlump) + 
     (256*(usegamma))
   ;
 
@@ -477,7 +477,7 @@ void V_SetPalette(int pal)
 // V_FillRect
 //
 // CPhipps - New function to fill a rectangle with a given colour
-void V_FillRect(int x, int y, int width, int height, byte colour)
+void V_FillRect(int x, int y, int width, int height, uint8_t colour)
 {
   uint16_t *dest = (uint16_t*)screens[0].data + x + y* SURFACE_SHORT_PITCH;
   uint16_t c = VID_PAL16(colour, VID_COLORWEIGHTMASK);
@@ -551,8 +551,9 @@ void V_FreeScreens(void) {
     V_FreeScreen(&screens[i]);
 }
 
-void V_PlotPixel(int scrn, int x, int y, byte color) {
-  ((uint16_t*)screens[scrn].data)[x + SURFACE_SHORT_PITCH *y] = VID_PAL16(color, VID_COLORWEIGHTMASK);
+void V_PlotPixel(int scrn, int x, int y, uint8_t color)
+{
+   ((uint16_t*)screens[scrn].data)[x + SURFACE_SHORT_PITCH *y] = VID_PAL16(color, VID_COLORWEIGHTMASK);
 }
 
 //
@@ -582,7 +583,7 @@ void V_DrawLine(fline_t* fl, int color)
     int d = ay - ax/2;
     while (1)
     {
-      V_PlotPixel(0, x,y, (byte)color);
+      V_PlotPixel(0, x,y, (uint8_t)color);
       if (x == fl->b.x) return;
       if (d>=0)
       {
@@ -598,7 +599,7 @@ void V_DrawLine(fline_t* fl, int color)
     int d = ax - ay/2;
     while (1)
     {
-      V_PlotPixel(0, x, y, (byte)color);
+      V_PlotPixel(0, x, y, (uint8_t)color);
       if (y == fl->b.y) return;
       if (d >= 0)
       {

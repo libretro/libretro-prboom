@@ -532,7 +532,7 @@ static void P_DoNewChaseDir(mobj_t *actor, fixed_t deltax, fixed_t deltay)
     return;
     }
   else
-    for (tdir = DI_SOUTHEAST; tdir != DI_EAST-1; tdir--)
+    for (tdir = DI_SOUTHEAST; tdir != (dirtype_t)(DI_EAST-1); tdir--)
       if (tdir != turnaround && (actor->movedir = tdir, P_TryWalk(actor)))
   return;
 
@@ -1079,6 +1079,7 @@ void A_Look(mobj_t *actor)
 // Allows monsters to continue movement while attacking
 //
 
+#if 0
 static void A_KeepChasing(mobj_t *actor)
 {
   if (actor->movecount)
@@ -1089,6 +1090,7 @@ static void A_KeepChasing(mobj_t *actor)
       P_SmartMove(actor);
     }
 }
+#endif
 
 //
 // A_Chase

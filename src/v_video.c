@@ -563,35 +563,23 @@ void V_PlotPixel(int scrn, int x, int y, byte color) {
 //
 void V_DrawLine(fline_t* fl, int color)
 {
-  register int x;
-  register int y;
-  register int dx;
-  register int dy;
-  register int sx;
-  register int sy;
-  register int ax;
-  register int ay;
-  register int d;
+  int dx = fl->b.x - fl->a.x;
+  int ax = 2 * (dx<0 ? -dx : dx);
+  int sx = dx<0 ? -1 : 1;
 
-#define PUTDOT(xx,yy,cc) V_PlotPixel(0,xx,yy,(byte)cc)
+  int dy = fl->b.y - fl->a.y;
+  int ay = 2 * (dy<0 ? -dy : dy);
+  int sy = dy<0 ? -1 : 1;
 
-  dx = fl->b.x - fl->a.x;
-  ax = 2 * (dx<0 ? -dx : dx);
-  sx = dx<0 ? -1 : 1;
-
-  dy = fl->b.y - fl->a.y;
-  ay = 2 * (dy<0 ? -dy : dy);
-  sy = dy<0 ? -1 : 1;
-
-  x = fl->a.x;
-  y = fl->a.y;
+  int x  = fl->a.x;
+  int y  = fl->a.y;
 
   if (ax > ay)
   {
-    d = ay - ax/2;
+    int d = ay - ax/2;
     while (1)
     {
-      PUTDOT(x,y,color);
+      V_PlotPixel(0, x,y, (byte)color);
       if (x == fl->b.x) return;
       if (d>=0)
       {
@@ -604,10 +592,10 @@ void V_DrawLine(fline_t* fl, int color)
   }
   else
   {
-    d = ax - ay/2;
+    int d = ax - ay/2;
     while (1)
     {
-      PUTDOT(x, y, color);
+      V_PlotPixel(0, x, y, (byte)color);
       if (y == fl->b.y) return;
       if (d >= 0)
       {

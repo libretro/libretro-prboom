@@ -92,11 +92,13 @@ static INLINE int FixedDiv(int a, int b)
 
 static INLINE int FixedMod(int a, int b)
 {
-  if (b & (b-1)) {
-    int r = a % b;
-    return ((r<0) ? r+b : r);
-  } else
-    return (a & (b-1));
+  if (b & (b-1))
+  {
+     int r = a % b;
+     return ((r<0) ? r+b : r);
+  }
+
+  return (a & (b-1));
 }
 
 #endif

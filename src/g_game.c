@@ -91,10 +91,13 @@
 
 static size_t   savegamesize = SAVEGAMESIZE; // killough
 static boolean  netdemo;
-static const byte *demobuffer;   /* cph - only used for playback */
+static const uint8_t *demobuffer;   /* cph - only used for playback */
 static int demolength; // check for overrun (missing DEMOMARKER)
+#if 0
 static FILE    *demofp; /* cph - record straight to file */
-static const byte *demo_p;
+#endif
+
+static const uint8_t *demo_p;
 static short    consistancy[MAXPLAYERS][BACKUPTICS];
 
 gameaction_t    gameaction;
@@ -122,7 +125,7 @@ boolean         demoplayback;
 int             demover;
 wbstartstruct_t wminfo;               // parms for world map / intermission
 boolean         haswolflevels = FALSE;// jff 4/18/98 wolf levels present
-static byte     *savebuffer;          // CPhipps - static
+static uint8_t     *savebuffer;          // CPhipps - static
 int             autorun = FALSE;      // always running?          // phares
 int             totalleveltimes;      // CPhipps - total time for all completed levels
 int		longtics;
@@ -227,7 +230,7 @@ static int   mousey;
 
 // Game events info
 static buttoncode_t special_event; // Event triggered by local player, to send
-static byte  savegameslot;         // Slot to load if gameaction == ga_loadgame
+static uint8_t  savegameslot;         // Slot to load if gameaction == ga_loadgame
 char         savedescription[SAVEDESCLEN];  // Description to save in savegame if gameaction == ga_savegame
 
 //jff 3/24/98 define defaultskill here
@@ -238,7 +241,7 @@ int    bodyqueslot, bodyquesize;        // killough 2/8/98
 mobj_t **bodyque = 0;                   // phares 8/10/98
 
 static void G_DoSaveGame (boolean menu);
-static const byte* G_ReadDemoHeader(const byte* demo_p, size_t size, boolean failonerror);
+static const uint8_t* G_ReadDemoHeader(const uint8_t* demo_p, size_t size, boolean failonerror);
 
 //
 // G_BuildTiccmd
@@ -266,15 +269,17 @@ static INLINE signed short fudgea(signed short b)
 void G_BuildTiccmd(ticcmd_t* cmd)
 {
   boolean strafe;
-  boolean bstrafe;
   int speed;
   int tspeed;
   int forward;
   int side;
-  int newweapon;                                          // phares
+  int newweapon   = wp_nochange;
+  boolean bstrafe = FALSE;
   /* cphipps - remove needless I_BaseTiccmd call, just set the ticcmd to zero */
   memset(cmd,0,sizeof*cmd);
   cmd->consistancy = consistancy[consoleplayer][maketic%BACKUPTICS];
+
+  (void)bstrafe;
 
   strafe = gamekeydown[key_strafe] || mousebuttons[mousebstrafe];
   //e6y: the "RUN" key inverts the autorun state
@@ -719,8 +724,8 @@ void G_Ticker (void)
   // CPhipps - player colour changing
   if (!demoplayback && mapcolor_plyr[consoleplayer] != mapcolor_me) {
     // Changed my multiplayer colour - Inform the whole game
-    int net_cl = LONG(mapcolor_me);
 #ifdef HAVE_NET
+    int net_cl = LONG(mapcolor_me);
     D_NetSendMisc(nm_plcolour, sizeof(net_cl), &net_cl);
 #endif
     G_ChangedPlayerColour(consoleplayer, mapcolor_me);
@@ -1436,7 +1441,7 @@ static uint_64_t G_UpdateSignature(uint_64_t s, const char *name)
     do
       {
   int size = W_LumpLength(i);
-  const byte *p = W_CacheLumpNum(i);
+  const uint8_t *p = W_CacheLumpNum(i);
   while (size--)
     s <<= 1, s += *p++;
   W_UnlockLumpNum(i);
@@ -1528,7 +1533,7 @@ const char * comp_lev_str[MAX_COMPATIBILITY_LEVEL] =
 
 // comp_options_by_version removed - see G_Compatibility
 
-static byte map_old_comp_levels[] =
+static uint8_t map_old_comp_levels[] =
 { 0, 1, 2, 4, 5, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16 };
 
 static const struct {
@@ -1567,7 +1572,7 @@ void G_DoLoadGame(void)
     // killough 2/22/98: "proprietary" version string :-)
     sprintf (vcheck, version_headers[i].ver_printf, version_headers[i].version);
 
-    if (!strncmp(save_p, vcheck, VERSIONSIZE)) {
+    if (!strncmp((const char*)save_p, vcheck, VERSIONSIZE)) {
       savegame_compatibility = version_headers[i].comp_level;
       i = num_version_headers;
     }
@@ -1592,10 +1597,10 @@ void G_DoLoadGame(void)
 
     if (memcmp(&checksum, save_p, sizeof checksum)) {
       if (!forced_loadgame) {
-        char *msg = malloc(strlen(save_p + sizeof checksum) + 128);
+        char *msg = malloc(strlen((const char*)save_p + sizeof checksum) + 128);
         strcpy(msg,"Incompatible Savegame!!!\n");
         if (save_p[sizeof checksum])
-          strcat(strcat(msg,"Wads expected:\n\n"), save_p + sizeof checksum);
+          strcat(strcat(msg,"Wads expected:\n\n"), (const char*)save_p + sizeof checksum);
         strcat(msg, "\nAre you sure?");
         G_LoadGameErr(msg);
         free(msg);
@@ -1606,7 +1611,7 @@ void G_DoLoadGame(void)
     save_p += sizeof checksum;
    }
 
-  save_p += strlen(save_p)+1;
+  save_p += strlen((const char*)save_p)+1;
 
   compatibility_level = (savegame_compatibility >= prboom_4_compatibility) ? *save_p : savegame_compatibility;
   if (savegame_compatibility < prboom_6_compatibility)
@@ -1766,8 +1771,8 @@ static void G_DoSaveGame (boolean menu)
       {
         const char *const w = wadfiles[i].name;
         CheckSaveGame(strlen(w)+2);
-        strcpy(save_p, w);
-        save_p += strlen(save_p);
+        strcpy((char*)save_p, w);
+        save_p += strlen((const char*)save_p);
         *save_p++ = '\n';
       }
     *save_p++ = 0;
@@ -1930,7 +1935,7 @@ void G_Compatibility(void)
     // comp_maskedanim - 2s mid textures don't animate
     { doom_1666_compatibility, prboom_4_compatibility },
   };
-  int i;
+  unsigned i;
 
   if (sizeof(levels)/sizeof(*levels) != COMP_NUM)
     I_Error("G_Compatibility: consistency error");
@@ -2175,7 +2180,7 @@ void G_ReadDemoTiccmd (ticcmd_t* cmd)
         cmd->forwardmove = cmd->sidemove;
         cmd->sidemove = (signed char)at;
         cmd->angleturn = ((unsigned char)cmd->buttons)<<8;
-        cmd->buttons = (byte)k;
+        cmd->buttons = (uint8_t)k;
       }
     }
 }
@@ -2190,9 +2195,9 @@ void G_ReadDemoTiccmd (ticcmd_t* cmd)
 
 extern int forceOldBsp;
 
-byte *G_WriteOptions(byte *demo_p)
+uint8_t *G_WriteOptions(uint8_t *demo_p)
 {
-  byte *target = demo_p + GAME_OPTION_SIZE;
+  uint8_t *target = demo_p + GAME_OPTION_SIZE;
 
   *demo_p++ = monsters_remember;  // part of monster AI
 
@@ -2214,10 +2219,10 @@ byte *G_WriteOptions(byte *demo_p)
   *demo_p++ = demo_insurance;        // killough 3/31/98
 
   // killough 3/26/98: Added rngseed. 3/31/98: moved here
-  *demo_p++ = (byte)((rngseed >> 24) & 0xff);
-  *demo_p++ = (byte)((rngseed >> 16) & 0xff);
-  *demo_p++ = (byte)((rngseed >>  8) & 0xff);
-  *demo_p++ = (byte)( rngseed        & 0xff);
+  *demo_p++ = (uint8_t)((rngseed >> 24) & 0xff);
+  *demo_p++ = (uint8_t)((rngseed >> 16) & 0xff);
+  *demo_p++ = (uint8_t)((rngseed >>  8) & 0xff);
+  *demo_p++ = (uint8_t)( rngseed        & 0xff);
 
   // Options new to v2.03 begin here
 
@@ -2267,9 +2272,9 @@ byte *G_WriteOptions(byte *demo_p)
  * cph - const byte*'s
  */
 
-const byte *G_ReadOptions(const byte *demo_p)
+const uint8_t *G_ReadOptions(const uint8_t *demo_p)
 {
-  const byte *target = demo_p + GAME_OPTION_SIZE;
+  const uint8_t *target = demo_p + GAME_OPTION_SIZE;
 
   monsters_remember = *demo_p++;
 
@@ -2378,7 +2383,7 @@ static int G_GetOriginalDoomCompatLevel(int ver)
 }
 
 //e6y: Check for overrun
-static boolean CheckForOverrun(const byte *start_p, const byte *current_p, size_t maxsize, size_t size, boolean failonerror)
+static boolean CheckForOverrun(const uint8_t *start_p, const uint8_t *current_p, size_t maxsize, size_t size, boolean failonerror)
 {
   size_t pos = current_p - start_p;
   if (pos + size > maxsize)
@@ -2391,7 +2396,7 @@ static boolean CheckForOverrun(const byte *start_p, const byte *current_p, size_
   return FALSE;
 }
 
-static const byte* G_ReadDemoHeader(const byte *demo_p, size_t size, boolean failonerror)
+static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, boolean failonerror)
 {
   skill_t skill;
   int i, episode, map;
@@ -2399,9 +2404,11 @@ static const byte* G_ReadDemoHeader(const byte *demo_p, size_t size, boolean fai
   // e6y
   // The local variable should be used instead of demobuffer,
   // because demobuffer can be uninitialized
-  const byte *header_p = demo_p;
+  const uint8_t *header_p = demo_p;
 
-  const byte *option_p = NULL;      /* killough 11/98 */
+  const uint8_t *option_p = NULL;      /* killough 11/98 */
+
+  (void)option_p;
 
   basetic = gametic;  // killough 9/29/98
 

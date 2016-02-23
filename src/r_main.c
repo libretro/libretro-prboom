@@ -647,8 +647,6 @@ void R_RenderPlayerView (player_t* player)
 #endif
 
 #ifndef __LIBRETRO__
-  if (rendering_stats) R_ShowStats();
-
   R_RestoreInterpolations();
 #endif
 }

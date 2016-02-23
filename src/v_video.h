@@ -98,7 +98,7 @@ extern int          usegamma;
 // Palettes for converting from 8 bit color to 16 and 32 bit. Also
 // contains the weighted versions of each palette color for filtering
 // operations
-extern unsigned short *V_Palette16;
+extern uint16_t *V_Palette16;
 
 #define VID_PAL16(color, weight) V_Palette16[ (color)*VID_NUMCOLORWEIGHTS + (weight) ]
 

@@ -179,7 +179,7 @@ void V_DrawBackground(const char* flatname, int scrn)
   src = W_CacheLumpNum(lump = firstflat + R_FlatNumForName(flatname));
 
   /* V_DrawBlock(0, 0, scrn, 64, 64, src, 0); */
-  V_DRAWFLAT(scrn, short, GETCOL16);
+  V_DRAWFLAT(scrn, int16_t, GETCOL16);
   /* end V_DrawBlock */
 
   for (y=0 ; y<SCREENHEIGHT ; y+=h)
@@ -256,8 +256,8 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
 
    R_SetDefaultDrawColumnVars(&dcvars);
 
-   drawvars.short_topleft = (unsigned short *)screens[scrn].data;
-   drawvars.int_topleft = (unsigned int *)screens[scrn].data;
+   drawvars.short_topleft = (uint16_t*)screens[scrn].data;
+   drawvars.int_topleft   = (uint32_t*)screens[scrn].data;
 
    if (!(flags & VPT_STRETCH))
    {
@@ -372,8 +372,8 @@ void V_DrawNumPatch(int x, int y, int scrn, int lump,
   R_UnlockPatchNum(lump);
 }
 
-unsigned short *V_Palette16 = NULL;
-static unsigned short *Palettes16 = NULL;
+uint16_t *V_Palette16 = NULL;
+static uint16_t *Palettes16 = NULL;
 static int currentPaletteIndex = 0;
 
 #define DONT_ROUND_ABOVE 220
@@ -405,7 +405,7 @@ void V_UpdateTrueColorPalette(void) {
   if (!Palettes16)
   {
      // set short palette
-     Palettes16 = malloc(numPals*256*sizeof(short)*VID_NUMCOLORWEIGHTS);
+     Palettes16 = malloc(numPals*256*sizeof(uint16_t)*VID_NUMCOLORWEIGHTS);
      for (p=0; p<numPals; p++)
      {
         for (i=0; i<256; i++)
@@ -476,11 +476,11 @@ void V_SetPalette(int pal)
 // CPhipps - New function to fill a rectangle with a given colour
 void V_FillRect(int x, int y, int width, int height, byte colour)
 {
-  unsigned short* dest = (unsigned short *)screens[0].data + x + y* SURFACE_SHORT_PITCH;
-  short c = VID_PAL16(colour, VID_COLORWEIGHTMASK);
+  uint16_t *dest = (uint16_t*)screens[0].data + x + y* SURFACE_SHORT_PITCH;
+  uint16_t c = VID_PAL16(colour, VID_COLORWEIGHTMASK);
   while (height--)
   {
-     memset(dest, c, width * sizeof(unsigned short));
+     memset(dest, c, width * sizeof(uint16_t));
      dest += SURFACE_SHORT_PITCH;
   }
 }
@@ -549,7 +549,7 @@ void V_FreeScreens(void) {
 }
 
 void V_PlotPixel(int scrn, int x, int y, byte color) {
-  ((unsigned short *)screens[scrn].data)[x + SURFACE_SHORT_PITCH *y] = VID_PAL16(color, VID_COLORWEIGHTMASK);
+  ((uint16_t*)screens[scrn].data)[x + SURFACE_SHORT_PITCH *y] = VID_PAL16(color, VID_COLORWEIGHTMASK);
 }
 
 //

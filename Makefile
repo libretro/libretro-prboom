@@ -207,6 +207,15 @@ else ifneq (,$(findstring hardfloat,$(platform)))
    ASFLAGS += -mfloat-abi=hard
 endif
    CFLAGS += -DARM
+else ifeq ($(platform), gcw0)
+   TARGET := $(TARGET_NAME)_libretro.so
+   CC = /opt/gcw0-toolchain/usr/bin/mipsel-linux-gcc
+   CXX = /opt/gcw0-toolchain/usr/bin/mipsel-linux-g++
+   AR = /opt/gcw0-toolchain/usr/bin/mipsel-linux-ar
+   fpic := -fPIC
+   SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
+   CFLAGS += -ffast-math -march=mips32 -mtune=mips32r2 -mhard-float
+
 else
 	EXT?=dll
    TARGET := $(TARGET_NAME)_libretro.$(EXT)

@@ -197,6 +197,8 @@ static void update_variables(bool startup)
    }
 }
 
+void I_SafeExit(int rc);
+
 void retro_run(void)
 {
    bool updated = false;
@@ -251,6 +253,7 @@ bool I_PreInitGraphics(void)
    screen_buf = malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
    return true;
 }
+
 
 bool retro_load_game(const struct retro_game_info *info)
 {
@@ -308,8 +311,20 @@ bool retro_load_game(const struct retro_game_info *info)
    return true;
 
 failed:
+   {
+      struct retro_message msg;
+      char msg_local[256];
+
+      snprintf(msg_local, sizeof(msg_local),
+            "ROM loading failed...");
+      msg.msg    = msg_local;
+      msg.frames = 360;
+      if (environ_cb)
+         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
+   }
    if (screen_buf)
       free(screen_buf);
+   I_SafeExit(-1);
    return false;
 }
 

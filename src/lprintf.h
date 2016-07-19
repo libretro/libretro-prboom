@@ -34,6 +34,8 @@
 #ifndef __LPRINTF__
 #define __LPRINTF__
 
+#include <boolean.h>
+
 typedef enum                /* Logical output levels */
 {
   LO_INFO=1,                /* One of these is used in each physical output    */
@@ -42,7 +44,7 @@ typedef enum                /* Logical output levels */
   LO_ERROR=8,               /* global masks: cons_output_mask,cons_error_mask. */
   LO_FATAL=16,
   LO_DEBUG=32,
-  LO_ALWAYS=64,
+  LO_ALWAYS=64
 } OutputLevels;
 
 #ifndef __GNUC__
@@ -54,6 +56,6 @@ extern int lprintf(OutputLevels pri, const char *fmt, ...) __attribute__((format
 /* killough 3/20/98: add const
  * killough 4/25/98: add gcc attributes
  * cphipps 01/11- moved from i_system.h */
-void I_Error(const char *error, ...) __attribute__((format(printf,1,2)));
+bool I_Error(const char *error, ...) __attribute__((format(printf,1,2)));
 
 #endif

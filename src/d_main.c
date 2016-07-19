@@ -545,7 +545,7 @@ static const char *D_dehout(void)
 // jff 4/19/98 Add routine to test IWAD for validity and determine
 // the gamemode from it. Also note if DOOM II, whether secret levels exist
 // CPhipps - const char* for iwadname, made static
-static void CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
+static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
 {
   int read_iwad = 0;
   FILE* fp = fopen(iwadname, "rb");
@@ -610,10 +610,10 @@ static void CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
         free(fileinfo);
       }
       else // missing IWAD tag in header
-        I_Error("CheckIWAD: IWAD tag %s not present", iwadname);
+        return I_Error("CheckIWAD: IWAD tag %s not present", iwadname);
     }
     else // error from open call
-      I_Error("CheckIWAD: Can't open IWAD %s", iwadname);
+      return I_Error("CheckIWAD: Can't open IWAD %s", iwadname);
 
     // Determine game mode from levels present
     // Must be a full set for whichever mode is present
@@ -634,7 +634,9 @@ static void CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
       *gmode = shareware;
   }
   else // error from access call
-    I_Error("CheckIWAD: IWAD %s not readable", iwadname);
+    return I_Error("CheckIWAD: IWAD %s not readable", iwadname);
+
+  return true;
 }
 
 
@@ -710,11 +712,11 @@ static char *FindIWADFile(void)
 //
 // jff 4/19/98 rewritten to use a more advanced search algorithm
 
-static void IdentifyVersion (void)
+static bool IdentifyVersion (void)
 {
   int         i;    //jff 3/24/98 index of args on commandline
   struct stat sbuf; //jff 3/24/98 used to test save path for existence
-  char *iwad;
+  char *iwad       = NULL;
 
   // set save path to -save parm or current dir
 
@@ -742,7 +744,8 @@ static void IdentifyVersion (void)
   {
     //jff 9/3/98 use logical output routine
     lprintf(LO_CONFIRM,"IWAD found: %s\n",iwad); //jff 4/20/98 print only if found
-    CheckIWAD(iwad,&gamemode,&haswolflevels);
+    if (!CheckIWAD(iwad,&gamemode,&haswolflevels))
+       return false;
 
     /* jff 8/23/98 set gamemission global appropriately in all cases
      * cphipps 12/1999 - no version output here, leave that to the caller
@@ -775,7 +778,9 @@ static void IdentifyVersion (void)
     free(iwad);
   }
   else
-    I_Error("IdentifyVersion: IWAD not found\n");
+    return I_Error("IdentifyVersion: IWAD not found\n");
+
+  return true;
 }
 
 
@@ -787,7 +792,7 @@ static void IdentifyVersion (void)
 
 #define MAXARGVS 100
 
-static void FindResponseFile (void)
+static bool FindResponseFile (void)
 {
    int i;
 
@@ -817,14 +822,10 @@ static void FindResponseFile (void)
             AddDefaultExtension(fname,".rsp");
             size = M_ReadFile(fname, &file);
          }
+
          if (size < 0)
-         {
-            /* proff 04/05/2000: Changed from LO_FATAL
-             * proff 04/05/2000: Simply removed the exit(1);
-             * cph - made fatal, don't drop through and SEGV
-             */
-            I_Error("No such response file: %s",fname);
-         }
+            return I_Error("No such response file: %s",fname);
+
          //jff 9/3/98 use logical output routine
          lprintf(LO_CONFIRM,"Found response file %s\n",fname);
          // proff 04/05/2000: Added check for empty rsp file
@@ -841,7 +842,7 @@ static void FindResponseFile (void)
                   newargv[index++] = myargv[k];
             }
             myargc = index; myargv = newargv;
-            return;
+            return true;
          }
 
          // KEEP ALL CMDLINE ARGS FOLLOWING @RESPONSEFILE ARG
@@ -874,7 +875,8 @@ static void FindResponseFile (void)
                         *p++ = *infile++; size--;
                      }
                   }
-                  if (quoted) I_Error("Runaway quoted string in response file");
+                  if (quoted)
+                     return I_Error("Runaway quoted string in response file");
 
                   // Terminate string, realloc and add to argv
                   *p = 0;
@@ -897,6 +899,8 @@ static void FindResponseFile (void)
             lprintf(LO_CONFIRM,"%s\n",myargv[index]);
          break;
       }
+
+   return true;
 }
 
 //
@@ -1036,7 +1040,8 @@ bool D_DoomMainSetup(void)
       for (i=0; i<myargc; i++)
         if (myargv[i][0]=='@')
           rsp_found=TRUE;
-      FindResponseFile();
+      if (!FindResponseFile())
+         goto failed;
     } while (rsp_found==TRUE);
   }
 
@@ -1053,14 +1058,18 @@ bool D_DoomMainSetup(void)
   D_BuildBEXTables(); // haleyjd
 
   DoLooseFiles();  // Ty 08/29/98 - handle "loose" files on command line
-  IdentifyVersion();
+  if (!IdentifyVersion())
+     goto failed;
 
   // Load prboom.wad after IWAD but before everything else
   {
     char *data_wad_path = I_FindFile(PACKAGE ".wad", ".wad");
 
     if (!data_wad_path)
+    {
       I_Error(PACKAGE ".wad not found - cannot continue");
+      goto failed;
+    }
 
     D_AddFile(data_wad_path, source_pre);
     free(data_wad_path);
@@ -1440,6 +1449,9 @@ bool D_DoomMainSetup(void)
   D_StartTitle();                 // start up intro loop
 
   return true;
+
+failed:
+  return false;
 }
 
 //

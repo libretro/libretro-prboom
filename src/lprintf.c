@@ -77,7 +77,7 @@ int lprintf(OutputLevels pri, const char *s, ...)
  * killough 3/20/98: add const
  */
 
-void I_Error(const char *error, ...)
+bool I_Error(const char *error, ...)
 {
   char errmsg[MAX_MESSAGE_SIZE];
   va_list argptr;
@@ -89,5 +89,5 @@ void I_Error(const char *error, ...)
 #endif
   va_end(argptr);
   lprintf(LO_ERROR, "%s\n", errmsg);
-  I_SafeExit(-1);
+  return false;
 }

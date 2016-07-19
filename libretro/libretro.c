@@ -38,10 +38,9 @@ static char g_wad_dir[1024];
 static char g_basename[1024];
 
 //forward decls
-extern void D_DoomMainSetup(void);
-extern void D_DoomLoop(void);
-extern void M_QuitDOOM(int choice);
-void I_PreInitGraphics(void);
+bool D_DoomMainSetup(void);
+void D_DoomLoop(void);
+void M_QuitDOOM(int choice);
 void D_DoomDeinit(void);
 void I_SetRes(void);
 void I_UpdateSound(void);
@@ -247,6 +246,12 @@ static void extract_directory(char *buf, const char *path, size_t size)
    }
 }
 
+bool I_PreInitGraphics(void)
+{
+   screen_buf = malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
+   return true;
+}
+
 bool retro_load_game(const struct retro_game_info *info)
 {
    int argc = 0;
@@ -275,7 +280,6 @@ bool retro_load_game(const struct retro_game_info *info)
 
    update_variables(true);
 
-   screen_buf = malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
 
    extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
    extract_basename(g_basename, info->path, sizeof(g_basename));
@@ -291,14 +295,22 @@ bool retro_load_game(const struct retro_game_info *info)
    myargc = argc;
    myargv = argv;
 
-  Z_Init(); /* 1/18/98 killough: start up memory stuff first */
+   if (!Z_Init()) /* 1/18/98 killough: start up memory stuff first */
+      goto failed;
 
-  /* cphipps - call to video specific startup code */
-  I_PreInitGraphics();
+   /* cphipps - call to video specific startup code */
+   if (!I_PreInitGraphics())
+      goto failed;
 
-  D_DoomMainSetup();
+   if (!D_DoomMainSetup())
+      goto failed;
 
-  return true;
+   return true;
+
+failed:
+   if (screen_buf)
+      free(screen_buf);
+   return false;
 }
 
 
@@ -455,9 +467,6 @@ void I_InitGraphics(void)
   }
 }
 
-void I_PreInitGraphics(void)
-{
-}
 
 void I_SetRes(void)
 {

@@ -115,8 +115,9 @@ void Z_Close(void)
 #endif
 }
 
-void Z_Init(void)
+bool Z_Init(void)
 {
+   return true;
 }
 
 /* Z_Malloc

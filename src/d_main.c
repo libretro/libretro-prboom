@@ -1019,7 +1019,7 @@ const char *wad_files[MAXLOADFILES], *deh_files[MAXLOADFILES];
 // CPhipps - the old contents of D_DoomMain, but moved out of the main
 //  line of execution so its stack space can be freed
 
-void D_DoomMainSetup(void)
+bool D_DoomMainSetup(void)
 {
   int p;
 
@@ -1438,6 +1438,8 @@ void D_DoomMainSetup(void)
   }
       else
   D_StartTitle();                 // start up intro loop
+
+  return true;
 }
 
 //

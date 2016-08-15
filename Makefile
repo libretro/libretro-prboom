@@ -144,7 +144,7 @@ else ifeq ($(platform), vita)
    TARGET := $(TARGET_NAME)_libretro_vita.$(EXT)
 	CC = arm-vita-eabi-gcc$(EXE_EXT)
 	AR = arm-vita-eabi-ar$(EXE_EXT)
-   CFLAGS += -DHAVE_STRLWR -DVITA
+   CFLAGS += -DHAVE_STRLWR -DVITA -fno-short-enums
 	STATIC_LINKING = 1
 
 # CTR (3DS)

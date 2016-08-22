@@ -19,10 +19,6 @@
  * $Id: frame.c,v 1.29 2004/02/04 22:59:19 rob Exp $
  */
 
-# ifdef HAVE_CONFIG_H
-#  include "config.h"
-# endif
-
 # include "global.h"
 
 # include <stdlib.h>

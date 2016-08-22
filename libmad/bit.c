@@ -19,17 +19,11 @@
  * $Id: bit.c,v 1.12 2004/01/23 09:41:32 rob Exp $
  */
 
-# ifdef HAVE_CONFIG_H
-#  include "config.h"
-# endif
-
 # include "global.h"
 
-# ifdef HAVE_LIMITS_H
-#  include <limits.h>
-# else
-#  define CHAR_BIT  8
-# endif
+#ifndef CHAR_BIT
+#define CHAR_BIT  8
+#endif
 
 # include "bit.h"
 

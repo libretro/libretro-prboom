@@ -19,20 +19,14 @@
  * $Id: layer3.c,v 1.43 2004/01/23 09:41:32 rob Exp $
  */
 
-# ifdef HAVE_CONFIG_H
-#  include "config.h"
-# endif
-
 # include "global.h"
 
 # include <stdlib.h>
 # include <string.h>
 
-# ifdef HAVE_LIMITS_H
-#  include <limits.h>
-# else
-#  define CHAR_BIT  8
-# endif
+#ifndef CHAR_BIT
+#define CHAR_BIT  8
+#endif
 
 # include "fixed.h"
 # include "bit.h"

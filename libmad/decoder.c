@@ -19,19 +19,15 @@
  * $Id: decoder.c,v 1.22 2004/01/23 09:41:32 rob Exp $
  */
 
-# ifdef HAVE_CONFIG_H
-#  include "config.h"
-# endif
-
 # include "global.h"
 
-# ifdef HAVE_SYS_TYPES_H
-#  include <sys/types.h>
-# endif
+#include <sys/types.h>
 
-# ifdef HAVE_UNISTD_H
-#  include <unistd.h>
-# endif
+#ifdef _WIN32
+#include <io.h>
+#else
+#include <unistd.h>
+#endif
 
 # include <stdlib.h>
 

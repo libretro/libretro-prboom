@@ -491,18 +491,16 @@ typedef enum
 // texture type enum
 typedef enum
 {
-    top,
-    middle,
-    bottom
-
+   SWTCH_TOP,
+   SWTCH_MIDDLE,
+   SWTCH_BOTTOM
 } bwhere_e;
 
-// crush check returns
 typedef enum
 {
-  ok,
-  crushed,
-  pastdest
+   RES_OK,
+   RES_CRUSHED,
+   RES_PASTDEST
 } result_e;
 
 //////////////////////////////////////////////////////////////////

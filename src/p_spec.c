@@ -2366,17 +2366,17 @@ void P_UpdateSpecials (void)
       {
         switch(buttonlist[i].where)
         {
-          case top:
+          case SWTCH_TOP:
             sides[buttonlist[i].line->sidenum[0]].toptexture =
               buttonlist[i].btexture;
             break;
 
-          case middle:
+          case SWTCH_MIDDLE:
             sides[buttonlist[i].line->sidenum[0]].midtexture =
               buttonlist[i].btexture;
             break;
 
-          case bottom:
+          case SWTCH_BOTTOM:
             sides[buttonlist[i].line->sidenum[0]].bottomtexture =
               buttonlist[i].btexture;
             break;

@@ -198,12 +198,23 @@ void P_ChangeSwitchTexture
   /* search for a texture to change */
   texture = NULL; position = 0;
   for (i = 0;i < numswitches*2;i++) { /* this could be more efficient... */
-    if (switchlist[i] == *ttop) {
-      texture = ttop; position = top; break;
-    } else if (switchlist[i] == *tmid) {
-      texture = tmid; position = middle; break;
-    } else if (switchlist[i] == *tbot) {
-      texture = tbot; position = bottom; break;
+    if (switchlist[i] == *ttop)
+    {
+      texture = ttop;
+      position = SWTCH_TOP;
+      break;
+    }
+    else if (switchlist[i] == *tmid)
+    {
+      texture = tmid;
+      position = SWTCH_MIDDLE;
+      break;
+    }
+    else if (switchlist[i] == *tbot)
+    {
+      texture = tbot;
+      position = SWTCH_BOTTOM;
+      break;
     }
   }
   if (texture == NULL)

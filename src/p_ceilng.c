@@ -95,7 +95,7 @@ void T_MoveCeiling (ceiling_t* ceiling)
       }
 
       // handle reaching destination height
-      if (res == pastdest)
+      if (res == RES_PASTDEST)
       {
         switch(ceiling->type)
         {
@@ -158,7 +158,7 @@ void T_MoveCeiling (ceiling_t* ceiling)
       }
 
       // handle reaching destination height
-      if (res == pastdest)
+      if (res == RES_PASTDEST)
       {
         switch(ceiling->type)
         {
@@ -206,10 +206,10 @@ void T_MoveCeiling (ceiling_t* ceiling)
             break;
         }
       }
-      else // ( res != pastdest )
+      else // ( res != RES_PASTDEST )
       {
         // handle the crusher encountering an obstacle
-        if (res == crushed)
+        if (res == RES_CRUSHED)
         {
           switch(ceiling->type)
           {

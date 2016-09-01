@@ -71,7 +71,7 @@ void T_PlatRaise(plat_t* plat)
       }
 
       // if encountered an obstacle, and not a crush type, reverse direction
-      if (res == crushed && (!plat->crush))
+      if (res == RES_CRUSHED && (!plat->crush))
       {
         plat->count = plat->wait;
         plat->status = down;
@@ -79,7 +79,7 @@ void T_PlatRaise(plat_t* plat)
       }
       else  // else handle reaching end of up stroke
       {
-        if (res == pastdest) // end of stroke
+        if (res == RES_PASTDEST) // end of stroke
         {
           // if not an instant toggle type, wait, make plat stop sound
           if (plat->type!=toggleUpDn)
@@ -115,7 +115,7 @@ void T_PlatRaise(plat_t* plat)
       res = T_MovePlane(plat->sector,plat->speed,plat->low,FALSE,0,-1);
 
       // handle reaching end of down stroke
-      if (res == pastdest)
+      if (res == RES_PASTDEST)
       {
         // if not an instant toggle, start waiting, make plat stop sound
         if (plat->type!=toggleUpDn) //jff 3/14/98 toggle up down

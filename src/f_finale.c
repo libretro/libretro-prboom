@@ -43,17 +43,18 @@
 
 // Stage of animation:
 //  0 = text, 1 = art screen, 2 = character cast
-static int finalestage; // cph -
-static int finalecount; // made static
+static int FinaleStage; // cph -
+static int FinaleCount; // made static
 static const char*   finaletext; // cph -
 static const char*   finaleflat; // made static const
 
 // defines for the end mission display text                     // phares
 
-#define TEXTSPEED    3     // original value                    // phares
-#define TEXTWAIT     250   // original value                    // phares
-#define NEWTEXTSPEED 0.01f  // new value                         // phares
-#define NEWTEXTWAIT  1000  // new value                         // phares
+#define TEXTSPEED    3
+#define TEXTWAIT     250
+
+#define NEWTEXTSPEED 0.01f
+#define NEWTEXTWAIT  1000
 
 // CPhipps - removed the old finale screen text message strings;
 // they were commented out for ages already
@@ -69,119 +70,123 @@ void WI_checkForAccelerate(void);    // killough 3/28/98: used to
 extern int acceleratestage;          // accelerate intermission screens
 static int midstage;                 // whether we're in "mid-stage"
 
-//
-// F_StartFinale
-//
+/*
+ * F_StartFinale
+*/
 void F_StartFinale (void)
 {
-  gameaction = ga_nothing;
-  gamestate = GS_FINALE;
+  gameaction   = ga_nothing;
+  gamestate    = GS_FINALE;
   automapmode &= ~am_active;
 
   // killough 3/28/98: clear accelerative text flags
   acceleratestage = midstage = 0;
 
-  // Okay - IWAD dependend stuff.
-  // This has been changed severly, and
-  //  some stuff might have changed in the process.
+  /* Okay - IWAD dependent stuff.
+   * This has been changed severely, and
+   *  some stuff might have changed in the process. */
   switch ( gamemode )
   {
-    // DOOM 1 - E1, E3 or E4, but each nine missions
-    case shareware:
-    case registered:
-    case retail:
-    {
-      S_ChangeMusic(mus_victor, TRUE);
+     /* DOOM 1 - E1, E3 or E4, but each nine missions */
+     case shareware:
+     case registered:
+     case retail:
+        {
+#ifdef HEXEN
+           S_StartSongName("hall", false);
+#else
+           S_ChangeMusic(mus_victor, true);
+#endif
 
-      switch (gameepisode)
-      {
-        case 1:
-             finaleflat = bgflatE1; // Ty 03/30/98 - new externalized bg flats
-             finaletext = s_E1TEXT; // Ty 03/23/98 - Was e1text variable.
-             break;
-        case 2:
-             finaleflat = bgflatE2;
-             finaletext = s_E2TEXT; // Ty 03/23/98 - Same stuff for each
-             break;
-        case 3:
-             finaleflat = bgflatE3;
-             finaletext = s_E3TEXT;
-             break;
-        case 4:
-             finaleflat = bgflatE4;
-             finaletext = s_E4TEXT;
-             break;
-        default:
-             // Ouch.
-             break;
-      }
-      break;
-    }
+           switch (gameepisode)
+           {
+              case 1:
+                 finaleflat = bgflatE1; // Ty 03/30/98 - new externalized bg flats
+                 finaletext = s_E1TEXT; // Ty 03/23/98 - Was e1text variable.
+                 break;
+              case 2:
+                 finaleflat = bgflatE2;
+                 finaletext = s_E2TEXT; // Ty 03/23/98 - Same stuff for each
+                 break;
+              case 3:
+                 finaleflat = bgflatE3;
+                 finaletext = s_E3TEXT;
+                 break;
+              case 4:
+                 finaleflat = bgflatE4;
+                 finaletext = s_E4TEXT;
+                 break;
+              default:
+                 // Ouch.
+                 break;
+           }
+           break;
+        }
 
-    // DOOM II and missions packs with E1, M34
-    case commercial:
-    {
-      S_ChangeMusic(mus_read_m, TRUE);
+        /* DOOM II and missions packs with E1, M34 */
+     case commercial:
+        {
+           S_ChangeMusic(mus_read_m, TRUE);
 
-      // Ty 08/27/98 - added the gamemission logic
-      switch (gamemap)
-      {
-        case 6:
-             finaleflat = bgflat06;
-             finaletext = (gamemission==pack_tnt)  ? s_T1TEXT :
-                          (gamemission==pack_plut) ? s_P1TEXT : s_C1TEXT;
-             break;
-        case 11:
-             finaleflat = bgflat11;
-             finaletext = (gamemission==pack_tnt)  ? s_T2TEXT :
-                          (gamemission==pack_plut) ? s_P2TEXT : s_C2TEXT;
-             break;
-        case 20:
-             finaleflat = bgflat20;
-             finaletext = (gamemission==pack_tnt)  ? s_T3TEXT :
-                          (gamemission==pack_plut) ? s_P3TEXT : s_C3TEXT;
-             break;
-        case 30:
-             finaleflat = bgflat30;
-             finaletext = (gamemission==pack_tnt)  ? s_T4TEXT :
-                          (gamemission==pack_plut) ? s_P4TEXT : s_C4TEXT;
-             break;
-        case 15:
-             finaleflat = bgflat15;
-             finaletext = (gamemission==pack_tnt)  ? s_T5TEXT :
-                          (gamemission==pack_plut) ? s_P5TEXT : s_C5TEXT;
-             break;
-        case 31:
-             finaleflat = bgflat31;
-             finaletext = (gamemission==pack_tnt)  ? s_T6TEXT :
-                          (gamemission==pack_plut) ? s_P6TEXT : s_C6TEXT;
-             break;
-        default:
-             // Ouch.
-             break;
-      }
-      break;
-      // Ty 08/27/98 - end gamemission logic
-    }
+           // Ty 08/27/98 - added the gamemission logic
+           switch (gamemap)
+           {
+              case 6:
+                 finaleflat = bgflat06;
+                 finaletext = (gamemission==pack_tnt)  ? s_T1TEXT :
+                    (gamemission==pack_plut) ? s_P1TEXT : s_C1TEXT;
+                 break;
+              case 11:
+                 finaleflat = bgflat11;
+                 finaletext = (gamemission==pack_tnt)  ? s_T2TEXT :
+                    (gamemission==pack_plut) ? s_P2TEXT : s_C2TEXT;
+                 break;
+              case 20:
+                 finaleflat = bgflat20;
+                 finaletext = (gamemission==pack_tnt)  ? s_T3TEXT :
+                    (gamemission==pack_plut) ? s_P3TEXT : s_C3TEXT;
+                 break;
+              case 30:
+                 finaleflat = bgflat30;
+                 finaletext = (gamemission==pack_tnt)  ? s_T4TEXT :
+                    (gamemission==pack_plut) ? s_P4TEXT : s_C4TEXT;
+                 break;
+              case 15:
+                 finaleflat = bgflat15;
+                 finaletext = (gamemission==pack_tnt)  ? s_T5TEXT :
+                    (gamemission==pack_plut) ? s_P5TEXT : s_C5TEXT;
+                 break;
+              case 31:
+                 finaleflat = bgflat31;
+                 finaletext = (gamemission==pack_tnt)  ? s_T6TEXT :
+                    (gamemission==pack_plut) ? s_P6TEXT : s_C6TEXT;
+                 break;
+              default:
+                 // Ouch.
+                 break;
+           }
+           break;
+           // Ty 08/27/98 - end gamemission logic
+        }
 
-    // Indeterminate.
-    default:  // Ty 03/30/98 - not externalized
-         S_ChangeMusic(mus_read_m, TRUE);
-         finaleflat = "F_SKY1"; // Not used anywhere else.
-         finaletext = s_C1TEXT;  // FIXME - other text, music?
-         break;
+        /* Indeterminate. */
+     default:  // Ty 03/30/98 - not externalized
+        S_ChangeMusic(mus_read_m, TRUE);
+        finaleflat = "F_SKY1"; // Not used anywhere else.
+        finaletext = s_C1TEXT;  // FIXME - other text, music?
+        break;
   }
 
-  finalestage = 0;
-  finalecount = 0;
+  FinaleStage = 0;
+  FinaleCount = 0;
 }
-
-
 
 boolean F_Responder (event_t *event)
 {
-  if (finalestage == 2)
+#ifndef HEXEN
+  if (FinaleStage == 2)
     return F_CastResponder (event);
+#endif
 
   return FALSE;
 }
@@ -196,47 +201,48 @@ static float Get_TextSpeed(void)
 }
 
 
-//
-// F_Ticker
-//
-// killough 3/28/98: almost totally rewritten, to use
-// player-directed acceleration instead of constant delays.
-// Now the player can accelerate the text display by using
-// the fire/use keys while it is being printed. The delay
-// automatically responds to the user, and gives enough
-// time to read.
-//
-// killough 5/10/98: add back v1.9 demo compatibility
-//
+/*
+ * F_Ticker
+ *
+ * killough 3/28/98: almost totally rewritten, to use
+ * player-directed acceleration instead of constant delays.
+ * Now the player can accelerate the text display by using
+ * the fire/use keys while it is being printed. The delay
+ * automatically responds to the user, and gives enough
+ * time to read.
+ *
+ * killough 5/10/98: add back v1.9 demo compatibility
+*/
 
 void F_Ticker(void)
 {
   int i;
+
   if (!demo_compatibility)
     WI_checkForAccelerate();  // killough 3/28/98: check for acceleration
   else
-    if (gamemode == commercial && finalecount > 50) // check for skipping
+    if (gamemode == commercial && FinaleCount > 50) // check for skipping
       for (i=0; i<MAXPLAYERS; i++)
         if (players[i].cmd.buttons)
           goto next_level;      // go on to the next level
 
   // advance animation
-  finalecount++;
+  FinaleCount++;
 
-  if (finalestage == 2)
+  if (FinaleStage == 2)
     F_CastTicker();
 
-  if (!finalestage)
+  if (!FinaleStage)
     {
       float speed = demo_compatibility ? TEXTSPEED : Get_TextSpeed();
       /* killough 2/28/98: changed to allow acceleration */
-      if (finalecount > strlen(finaletext)*speed +
+      if (FinaleCount > strlen(finaletext)*speed +
           (midstage ? NEWTEXTWAIT : TEXTWAIT) ||
           (midstage && acceleratestage)) {
         if (gamemode != commercial)       // Doom 1 / Ultimate Doom episode end
           {                               // with enough time, it's automatic
-            finalecount = 0;
-            finalestage = 1;
+            FinaleCount = 0;
+            FinaleStage = 1;
             wipegamestate = -1;         // force a wipe
             if (gameepisode == 3)
               S_StartMusic(mus_bunny);
@@ -277,7 +283,7 @@ static void F_TextWrite (void)
     int         cx = 10;
     int         cy = 10;
     const char* ch = finaletext; // CPhipps - const
-    int         count = (int)((float)(finalecount - 10)/Get_TextSpeed()); // phares
+    int         count = (int)((float)(FinaleCount - 10)/Get_TextSpeed()); // phares
     int         w;
 
     if (count < 0)
@@ -363,7 +369,7 @@ void F_StartCast (void)
   caststate = &states[mobjinfo[castorder[castnum].type].seestate];
   casttics = caststate->tics;
   castdeath = FALSE;
-  finalestage = 2;
+  FinaleStage = 2;
   castframes = 0;
   castonmelee = 0;
   castattacking = FALSE;
@@ -594,7 +600,7 @@ static void F_BunnyScroll (void)
   static int  laststage;
 
   {
-    int scrolled = 320 - (finalecount-230)/2;
+    int scrolled = 320 - (FinaleCount-230)/2;
     if (scrolled <= 0) {
       V_DrawNamePatch(0, 0, 0, pfub2, CR_DEFAULT, VPT_STRETCH);
     } else if (scrolled >= 320) {
@@ -605,9 +611,9 @@ static void F_BunnyScroll (void)
     }
   }
 
-  if (finalecount < 1130)
+  if (FinaleCount < 1130)
     return;
-  if (finalecount < 1180)
+  if (FinaleCount < 1180)
   {
     // CPhipps - patch drawing updated
     V_DrawNamePatch((320-13*8)/2, (200-8*8)/2,0, "END0", CR_DEFAULT, VPT_STRETCH);
@@ -615,7 +621,7 @@ static void F_BunnyScroll (void)
     return;
   }
 
-  stage = (finalecount-1180) / 5;
+  stage = (FinaleCount-1180) / 5;
   if (stage > 6)
     stage = 6;
   if (stage > laststage)
@@ -630,18 +636,18 @@ static void F_BunnyScroll (void)
 }
 
 
-//
-// F_Drawer
-//
+/*
+ * F_Drawer
+*/
 void F_Drawer (void)
 {
-  if (finalestage == 2)
+  if (FinaleStage == 2)
   {
     F_CastDrawer ();
     return;
   }
 
-  if (!finalestage)
+  if (!FinaleStage)
     F_TextWrite ();
   else
   {

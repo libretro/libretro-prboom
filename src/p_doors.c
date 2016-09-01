@@ -141,7 +141,7 @@ void T_VerticalDoor (vldoor_t* door)
                                        door->sector->floorheight));
 
       // handle door reaching bottom
-      if (res == pastdest)
+      if (res == RES_PASTDEST)
       {
         switch(door->type)
         {
@@ -188,7 +188,7 @@ void T_VerticalDoor (vldoor_t* door)
       /* jff 1/31/98 turn lighting off in tagged sectors of manual doors
        * killough 10/98: replaced with gradual lighting code
        */
-      else if (res == crushed) // handle door meeting obstruction on way down
+      else if (res == RES_CRUSHED) // handle door meeting obstruction on way down
       {
         switch(door->type)
         {
@@ -238,7 +238,7 @@ void T_VerticalDoor (vldoor_t* door)
                                        door->sector->floorheight));
 
       // handle door reaching the top
-      if (res == pastdest)
+      if (res == RES_PASTDEST)
       {
         switch(door->type)
         {

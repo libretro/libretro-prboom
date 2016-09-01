@@ -81,7 +81,7 @@ typedef enum
 
 static int    temp_x = 0;
 static int    tempyl[4], tempyh[4];
-static unsigned short short_tempbuf[MAX_SCREENHEIGHT * 4];
+static uint16_t short_tempbuf[MAX_SCREENHEIGHT * 4];
 static int    startx = 0;
 static int    temptype = COL_NONE;
 static int    commontop, commonbot;
@@ -185,7 +185,8 @@ void R_ResetColumnBuffer(void)
    // haleyjd 10/06/05: this must not be done if temp_x == 0!
    if(temp_x)
       R_FlushColumns();
-   temptype = COL_NONE;
+
+   temptype            = COL_NONE;
    R_FlushWholeColumns = R_FlushWholeError;
    R_FlushHTColumns    = R_FlushHTError;
    R_FlushQuadColumn   = R_QuadFlushError;
@@ -326,14 +327,25 @@ R_DrawColumn_f R_GetDrawColumnFunc(enum column_pipeline_e type,
   return result;
 }
 
-void R_SetDefaultDrawColumnVars(draw_column_vars_t *dcvars) {
-  dcvars->x = dcvars->yl = dcvars->yh = dcvars->z = 0;
-  dcvars->iscale = dcvars->texturemid = dcvars->texheight = dcvars->texu = 0;
-  dcvars->source = dcvars->prevsource = dcvars->nextsource = NULL;
-  dcvars->colormap = dcvars->nextcolormap = colormaps[0];
-  dcvars->translation = NULL;
-  dcvars->edgeslope = dcvars->drawingmasked = 0;
-  dcvars->edgetype = drawvars.sprite_edges;
+void R_SetDefaultDrawColumnVars(draw_column_vars_t *dcvars)
+{
+   dcvars->x             = 0;
+   dcvars->yl            = 0;
+   dcvars->yh            = 0;
+   dcvars->z             = 0;
+   dcvars->iscale        = 0;
+   dcvars->texturemid    = 0;
+   dcvars->texheight     = 0;
+   dcvars->texu          = 0;
+   dcvars->source        = NULL;
+   dcvars->prevsource    = NULL;
+   dcvars->nextsource    = NULL;
+   dcvars->colormap      = colormaps[0];
+   dcvars->nextcolormap  = colormaps[0];
+   dcvars->translation   = NULL;
+   dcvars->edgeslope     = 0;
+   dcvars->drawingmasked = 0;
+   dcvars->edgetype      = drawvars.sprite_edges;
 }
 
 //
@@ -349,39 +361,52 @@ extern lighttable_t *(*c_zlight)[LIGHTLEVELS][MAXLIGHTZ];
 
 void R_InitTranslationTables (void)
 {
-  int i, j;
+   int i, j;
 #define MAXTRANS 3
-  uint8_t transtocolour[MAXTRANS];
+   uint8_t transtocolour[MAXTRANS];
 
-  // killough 5/2/98:
-  // Remove dependency of colormaps aligned on 256-byte boundary
+   // killough 5/2/98:
+   // Remove dependency of colormaps aligned on 256-byte boundary
 
-  if (translationtables == NULL) // CPhipps - allow multiple calls
-    translationtables = Z_Malloc(256*MAXTRANS, PU_STATIC, 0);
+   if (!translationtables) // CPhipps - allow multiple calls
+      translationtables = Z_Malloc(256*MAXTRANS, PU_STATIC, 0);
 
-  for (i=0; i<MAXTRANS; i++) transtocolour[i] = 255;
+   for (i=0; i<MAXTRANS; i++)
+      transtocolour[i] = 255;
 
-  for (i=0; i<MAXPLAYERS; i++) {
-    uint8_t wantcolour = mapcolor_plyr[i];
-    playernumtotrans[i] = 0;
-    if (wantcolour != 0x70) // Not green, would like translation
-      for (j=0; j<MAXTRANS; j++)
-  if (transtocolour[j] == 255) {
-    transtocolour[j] = wantcolour; playernumtotrans[i] = j+1; break;
-  }
-  }
+   for (i=0; i<MAXPLAYERS; i++)
+   {
+      uint8_t wantcolour = mapcolor_plyr[i];
+      playernumtotrans[i] = 0;
+      if (wantcolour != 0x70) // Not green, would like translation
+         for (j=0; j<MAXTRANS; j++)
+         {
+            if (transtocolour[j] == 255)
+            {
+               transtocolour[j] = wantcolour;
+               playernumtotrans[i] = j+1;
+               break;
+            }
+         }
+   }
 
-  // translate just the 16 green colors
-  for (i=0; i<256; i++)
-    if (i >= 0x70 && i<= 0x7f)
+   // translate just the 16 green colors
+   for (i=0; i<256; i++)
+   {
+      if (i >= 0x70 && i<= 0x7f)
       {
-  // CPhipps - configurable player colours
-        translationtables[i] = colormaps[0][((i&0xf)<<9) + transtocolour[0]];
-        translationtables[i+256] = colormaps[0][((i&0xf)<<9) + transtocolour[1]];
-        translationtables[i+512] = colormaps[0][((i&0xf)<<9) + transtocolour[2]];
+         // CPhipps - configurable player colours
+         translationtables[i]     = colormaps[0][((i&0xf)<<9) + transtocolour[0]];
+         translationtables[i+256] = colormaps[0][((i&0xf)<<9) + transtocolour[1]];
+         translationtables[i+512] = colormaps[0][((i&0xf)<<9) + transtocolour[2]];
       }
-    else  // Keep all other colors as is.
-      translationtables[i]=translationtables[i+256]=translationtables[i+512]=i;
+      else  // Keep all other colors as is.
+      {
+         translationtables[i]     = i;
+         translationtables[i+256] = i;
+         translationtables[i+512] = i;
+      }
+   }
 }
 
 //

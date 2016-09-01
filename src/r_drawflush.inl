@@ -28,8 +28,6 @@
  *
  *-----------------------------------------------------------------------------*/
 
-#define PITCH short_pitch
-
 #if (R_DRAWCOLUMN_PIPELINE & RDC_FUZZ)
 #define GETDESTCOLOR16(col) GETBLENDED16_9406(col, 0)
 #else
@@ -191,8 +189,6 @@ static void R_FLUSHQUAD_FUNCNAME(void)
 }
 
 #undef GETDESTCOLOR16
-
-#undef PITCH
 
 #undef R_DRAWCOLUMN_PIPELINE
 #undef R_FLUSHWHOLE_FUNCNAME

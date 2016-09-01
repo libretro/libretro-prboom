@@ -258,14 +258,14 @@ static boolean stopped = TRUE;
 //
 static void AM_activateNewScale(void)
 {
-  m_x += m_w/2;
-  m_y += m_h/2;
-  m_w = FTOM(f_w);
-  m_h = FTOM(f_h);
-  m_x -= m_w/2;
-  m_y -= m_h/2;
-  m_x2 = m_x + m_w;
-  m_y2 = m_y + m_h;
+  m_x  += m_w/2;
+  m_y  += m_h/2;
+  m_w   = FTOM(f_w);
+  m_h   = FTOM(f_h);
+  m_x  -= m_w/2;
+  m_y  -= m_h/2;
+  m_x2  = m_x + m_w;
+  m_y2  = m_y + m_h;
 }
 
 //
@@ -278,10 +278,10 @@ static void AM_activateNewScale(void)
 //
 static void AM_saveScaleAndLoc(void)
 {
-  old_m_x = m_x;
-  old_m_y = m_y;
-  old_m_w = m_w;
-  old_m_h = m_h;
+   old_m_x = m_x;
+   old_m_y = m_y;
+   old_m_w = m_w;
+   old_m_h = m_h;
 }
 
 //
@@ -309,42 +309,39 @@ static void AM_restoreScaleAndLoc(void)
   m_x2 = m_x + m_w;
   m_y2 = m_y + m_h;
 
-  // Change the scaling multipliers
+  /* Change the scaling multipliers */
   scale_mtof = FixedDiv(f_w<<FRACBITS, m_w);
   scale_ftom = FixedDiv(FRACUNIT, scale_mtof);
 }
 
-//
-// AM_addMark()
-//
-// Adds a marker at the current location
-// Affects global variables for marked points
-//
-// Passed nothing, returns nothing
-//
+/*
+ * AM_addMark()
+ *
+ * Adds a marker at the current location
+ * Affects global variables for marked points
+ *
+ * Passed nothing, returns nothing
+*/
 static void AM_addMark(void)
 {
-  // killough 2/22/98:
-  // remove limit on automap marks
+   if (markpointnum >= markpointnum_max)
+      markpoints = realloc(markpoints,
+            (markpointnum_max = markpointnum_max ?
+             markpointnum_max*2 : 16) * sizeof(*markpoints));
 
-  if (markpointnum >= markpointnum_max)
-    markpoints = realloc(markpoints,
-                        (markpointnum_max = markpointnum_max ?
-                         markpointnum_max*2 : 16) * sizeof(*markpoints));
-
-  markpoints[markpointnum].x = m_x + m_w/2;
-  markpoints[markpointnum].y = m_y + m_h/2;
-  markpointnum++;
+   markpoints[markpointnum].x = m_x + m_w/2;
+   markpoints[markpointnum].y = m_y + m_h/2;
+   markpointnum++;
 }
 
-//
-// AM_findMinMaxBoundaries()
-//
-// Determines bounding box of all vertices,
-// sets global variables controlling zoom range.
-//
-// Passed nothing, returns nothing
-//
+/*
+ * AM_findMinMaxBoundaries()
+ *
+ * Determines bounding box of all vertices,
+ * sets global variables controlling zoom range.
+ *
+ * Passed nothing, returns nothing
+*/
 static void AM_findMinMaxBoundaries(void)
 {
   int i;
@@ -367,15 +364,13 @@ static void AM_findMinMaxBoundaries(void)
       max_y = vertexes[i].y;
   }
 
-  max_w = (max_x >>= FRACTOMAPBITS) - (min_x >>= FRACTOMAPBITS);//e6y
-  max_h = (max_y >>= FRACTOMAPBITS) - (min_y >>= FRACTOMAPBITS);//e6y
+  max_w          = (max_x >>= FRACTOMAPBITS) - (min_x >>= FRACTOMAPBITS);//e6y
+  max_h          = (max_y >>= FRACTOMAPBITS) - (min_y >>= FRACTOMAPBITS);//e6y
+  min_w          = 2 * PLAYERRADIUS;
+  min_h          = 2 * PLAYERRADIUS;
 
-  min_w = 2*PLAYERRADIUS; // const? never changed?
-  min_h = 2*PLAYERRADIUS;
-
-  a = FixedDiv(f_w<<FRACBITS, max_w);
-  b = FixedDiv(f_h<<FRACBITS, max_h);
-
+  a              = FixedDiv(f_w<<FRACBITS, max_w);
+  b              = FixedDiv(f_h<<FRACBITS, max_h);
   min_scale_mtof = a < b ? a : b;
   max_scale_mtof = FixedDiv(f_h<<FRACBITS, 2*PLAYERRADIUS);
 }
@@ -413,15 +408,15 @@ static void AM_changeWindowLoc(void)
 }
 
 
-//
-// AM_initVariables()
-//
-// Initialize the variables for the automap
-//
-// Affects the automap global variables
-// Status bar is notified that the automap has been entered
-// Passed nothing, returns nothing
-//
+/*
+ * AM_initVariables()
+ *
+ * Initialize the variables for the automap
+ *
+ * Affects the automap global variables
+ * Status bar is notified that the automap has been entered
+ * Passed nothing, returns nothing
+*/
 static void AM_initVariables(void)
 {
   int pnum;
@@ -429,82 +424,85 @@ static void AM_initVariables(void)
 
   automapmode |= am_active;
 
-  f_oldloc.x = INT_MAX;
+  f_oldloc.x   = INT_MAX;
 
-  m_paninc.x = m_paninc.y = 0;
+  m_paninc.x   = m_paninc.y = 0;
   ftom_zoommul = FRACUNIT;
   mtof_zoommul = FRACUNIT;
 
-  m_w = FTOM(f_w);
-  m_h = FTOM(f_h);
+  m_w          = FTOM(f_w);
+  m_h          = FTOM(f_h);
 
-  // find player to center on initially
+  /* find player to center on initially */
   if (!playeringame[pnum = consoleplayer])
-  for (pnum=0;pnum<MAXPLAYERS;pnum++)
-    if (playeringame[pnum])
-  break;
+  {
+     for (pnum=0;pnum<MAXPLAYERS;pnum++)
+     {
+        if (playeringame[pnum])
+           break;
+     }
+  }
 
   plr = &players[pnum];
   m_x = (plr->mo->x >> FRACTOMAPBITS) - m_w/2;//e6y
   m_y = (plr->mo->y >> FRACTOMAPBITS) - m_h/2;//e6y
   AM_changeWindowLoc();
 
-  // for saving & restoring
+  /* for saving & restoring */
   old_m_x = m_x;
   old_m_y = m_y;
   old_m_w = m_w;
   old_m_h = m_h;
 
-  // inform the status bar of the change
+  /* inform the status bar of the change */
   ST_Responder(&st_notify);
 }
 
-//
-// AM_loadPics()
-//
+/*
+ * AM_loadPics()
+*/
 static void AM_loadPics(void)
 {
-  // cph - mark numbers no longer needed cached
 }
 
-//
-// AM_unloadPics()
-//
+/*
+ * AM_unloadPics()
+*/
 static void AM_unloadPics(void)
 {
-  // cph - mark numbers no longer needed cached
 }
 
-//
-// AM_clearMarks()
-//
-// Sets the number of marks to 0, thereby clearing them from the display
-//
-// Affects the global variable markpointnum
-// Passed nothing, returns nothing
-//
+/*
+ * AM_clearMarks()
+ *
+ * Sets the number of marks to 0, thereby clearing them from the display
+ *
+ * Affects the global variable markpointnum
+ * Passed nothing, returns nothing
+*/
 void AM_clearMarks(void)
 {
   markpointnum = 0;
 }
 
-//
-// AM_LevelInit()
-//
-// Initialize the automap at the start of a new level
-// should be called at the start of every level
-//
-// Passed nothing, returns nothing
-// Affects automap's global variables
-//
-// CPhipps - get status bar height from status bar code
+/*
+ * AM_LevelInit()
+ *
+ * Initialize the automap at the start of a new level
+ * should be called at the start of every level
+ *
+ * Passed nothing, returns nothing
+ * Affects automap's global variables
+ *
+ * CPhipps - get status bar height from status bar code
+*/
 static void AM_LevelInit(void)
 {
   leveljuststarted = 0;
 
-  f_x = f_y = 0;
-  f_w = SCREENWIDTH;           // killough 2/7/98: get rid of finit_ vars
-  f_h = SCREENHEIGHT-ST_SCALED_HEIGHT;// to allow runtime setting of width/height
+  f_x              = f_y = 0;
+  f_w              = SCREENWIDTH;
+  f_h              = SCREENHEIGHT-ST_SCALED_HEIGHT;
 
   AM_findMinMaxBoundaries();
   scale_mtof = FixedDiv(min_scale_mtof, (int) (0.7*FRACUNIT));
@@ -513,13 +511,13 @@ static void AM_LevelInit(void)
   scale_ftom = FixedDiv(FRACUNIT, scale_mtof);
 }
 
-//
-// AM_Stop()
-//
-// Cease automap operations, unload patches, notify status bar
-//
-// Passed nothing, returns nothing
-//
+/*
+ * AM_Stop()
+ *
+ * Cease automap operations, unload patches, notify status bar
+ *
+ * Passed nothing, returns nothing
+*/
 void AM_Stop (void)
 {
   static event_t st_notify = { 0, ev_keyup, AM_MSGEXITED, 0 };
@@ -527,43 +525,45 @@ void AM_Stop (void)
   AM_unloadPics();
   automapmode &= ~am_active;
   ST_Responder(&st_notify);
-  stopped = TRUE;
+  stopped = true;
 }
 
-//
-// AM_Start()
-//
-// Start up automap operations,
-//  if a new level, or game start, (re)initialize level variables
-//  init map variables
-//  load mark patches
-//
-// Passed nothing, returns nothing
-//
+/*
+ * AM_Start()
+ *
+ * Start up automap operations,
+ *  if a new level, or game start, (re)initialize level variables
+ *  init map variables
+ *  load mark patches
+ *
+ * Passed nothing, returns nothing
+*/
 void AM_Start(void)
 {
   static int lastlevel = -1, lastepisode = -1;
 
   if (!stopped)
     AM_Stop();
-  stopped = FALSE;
+  stopped = false;
+
   if (lastlevel != gamemap || lastepisode != gameepisode)
   {
     AM_LevelInit();
-    lastlevel = gamemap;
+    lastlevel   = gamemap;
     lastepisode = gameepisode;
   }
+
   AM_initVariables();
   AM_loadPics();
 }
 
-//
-// AM_minOutWindowScale()
-//
-// Set the window scale to the maximum size
-//
-// Passed nothing, returns nothing
-//
+/*
+ * AM_minOutWindowScale()
+ *
+ * Set the window scale to the maximum size
+ *
+ * Passed nothing, returns nothing
+*/
 static void AM_minOutWindowScale(void)
 {
   scale_mtof = min_scale_mtof;
@@ -571,13 +571,13 @@ static void AM_minOutWindowScale(void)
   AM_activateNewScale();
 }
 
-//
-// AM_maxOutWindowScale(void)
-//
-// Set the window scale to the minimum size
-//
-// Passed nothing, returns nothing
-//
+/*
+ * AM_maxOutWindowScale(void)
+ *
+ * Set the window scale to the minimum size
+ *
+ * Passed nothing, returns nothing
+*/
 static void AM_maxOutWindowScale(void)
 {
   scale_mtof = max_scale_mtof;
@@ -595,141 +595,139 @@ static void AM_maxOutWindowScale(void)
 boolean AM_Responder
 ( event_t*  ev )
 {
-  int rc;
-  static int cheatstate=0;
-  static int bigstate=0;
-  int ch;                                                       // phares
+   static int cheatstate=0;
+   static int bigstate=0;
+   int ch;                                                       // phares
+   int rc = FALSE;
 
-  rc = FALSE;
-
-  if (!(automapmode & am_active))
-  {
-    if (ev->type == ev_keydown && ev->data1 == key_map)         // phares
-    {
-      AM_Start ();
-      rc = TRUE;
-    }
-  }
-  else if (ev->type == ev_keydown)
-  {
-    rc = TRUE;
-    ch = ev->data1;                                             // phares
-    if (ch == key_map_right)                                    //    |
-      if (!(automapmode & am_follow))                           //    V
-        m_paninc.x = FTOM(F_PANINC);
-      else
-        rc = FALSE;
-    else if (ch == key_map_left)
-      if (!(automapmode & am_follow))
-          m_paninc.x = -FTOM(F_PANINC);
-      else
-          rc = FALSE;
-    else if (ch == key_map_up)
-      if (!(automapmode & am_follow))
-          m_paninc.y = FTOM(F_PANINC);
-      else
-          rc = FALSE;
-    else if (ch == key_map_down)
-      if (!(automapmode & am_follow))
-          m_paninc.y = -FTOM(F_PANINC);
-      else
-          rc = FALSE;
-    else if (ch == key_map_zoomout)
-    {
-      mtof_zoommul = M_ZOOMOUT;
-      ftom_zoommul = M_ZOOMIN;
-    }
-    else if (ch == key_map_zoomin)
-    {
-      mtof_zoommul = M_ZOOMIN;
-      ftom_zoommul = M_ZOOMOUT;
-    }
-    else if (ch == key_map)
-    {
-      bigstate = 0;
-      AM_Stop ();
-    }
-    else if (ch == key_map_gobig)
-    {
-      bigstate = !bigstate;
-      if (bigstate)
+   if (!(automapmode & am_active))
+   {
+      if (ev->type == ev_keydown && ev->data1 == key_map)         // phares
       {
-        AM_saveScaleAndLoc();
-        AM_minOutWindowScale();
+         AM_Start ();
+         rc = TRUE;
       }
-      else
-        AM_restoreScaleAndLoc();
-    }
-    else if (ch == key_map_follow)
-    {
-      automapmode ^= am_follow;     // CPhipps - put all automap mode stuff into one enum
-      f_oldloc.x = INT_MAX;
-      // Ty 03/27/98 - externalized
-      plr->message = (automapmode & am_follow) ? s_AMSTR_FOLLOWON : s_AMSTR_FOLLOWOFF;
-    }
-    else if (ch == key_map_grid)
-    {
-      automapmode ^= am_grid;      // CPhipps
-      // Ty 03/27/98 - *not* externalized
-      plr->message = (automapmode & am_grid) ? s_AMSTR_GRIDON : s_AMSTR_GRIDOFF;
-    }
-    else if (ch == key_map_mark)
-    {
-      /* Ty 03/27/98 - *not* externalized     
-       * cph 2001/11/20 - use doom_printf so we don't have our own buffer */
-      doom_printf("%s %d", s_AMSTR_MARKEDSPOT, markpointnum);
-      AM_addMark();
-    }
-    else if (ch == key_map_clear)
-    {
-      AM_clearMarks();  // Ty 03/27/98 - *not* externalized
-      plr->message = s_AMSTR_MARKSCLEARED;                      //    ^
-    }                                                           //    |
-    else if (ch == key_map_rotate) {
-      automapmode ^= am_rotate;
-      plr->message = (automapmode & am_rotate) ? s_AMSTR_ROTATEON : s_AMSTR_ROTATEOFF;
-    }
-    else if (ch == key_map_overlay) {
-      automapmode ^= am_overlay;
-      plr->message = (automapmode & am_overlay) ? s_AMSTR_OVERLAYON : s_AMSTR_OVERLAYOFF;
-    }
-    else                                                        // phares
-    {
-      cheatstate=0;
+   }
+   else if (ev->type == ev_keydown)
+   {
+      rc = TRUE;
+      ch = ev->data1;                                             // phares
+      if (ch == key_map_right)                                    //    |
+         if (!(automapmode & am_follow))                           //    V
+            m_paninc.x = FTOM(F_PANINC);
+         else
+            rc = FALSE;
+      else if (ch == key_map_left)
+         if (!(automapmode & am_follow))
+            m_paninc.x = -FTOM(F_PANINC);
+         else
+            rc = FALSE;
+      else if (ch == key_map_up)
+         if (!(automapmode & am_follow))
+            m_paninc.y = FTOM(F_PANINC);
+         else
+            rc = FALSE;
+      else if (ch == key_map_down)
+         if (!(automapmode & am_follow))
+            m_paninc.y = -FTOM(F_PANINC);
+         else
+            rc = FALSE;
+      else if (ch == key_map_zoomout)
+      {
+         mtof_zoommul = M_ZOOMOUT;
+         ftom_zoommul = M_ZOOMIN;
+      }
+      else if (ch == key_map_zoomin)
+      {
+         mtof_zoommul = M_ZOOMIN;
+         ftom_zoommul = M_ZOOMOUT;
+      }
+      else if (ch == key_map)
+      {
+         bigstate = 0;
+         AM_Stop ();
+      }
+      else if (ch == key_map_gobig)
+      {
+         bigstate = !bigstate;
+         if (bigstate)
+         {
+            AM_saveScaleAndLoc();
+            AM_minOutWindowScale();
+         }
+         else
+            AM_restoreScaleAndLoc();
+      }
+      else if (ch == key_map_follow)
+      {
+         automapmode ^= am_follow;     // CPhipps - put all automap mode stuff into one enum
+         f_oldloc.x = INT_MAX;
+         // Ty 03/27/98 - externalized
+         plr->message = (automapmode & am_follow) ? s_AMSTR_FOLLOWON : s_AMSTR_FOLLOWOFF;
+      }
+      else if (ch == key_map_grid)
+      {
+         automapmode ^= am_grid;      // CPhipps
+         // Ty 03/27/98 - *not* externalized
+         plr->message = (automapmode & am_grid) ? s_AMSTR_GRIDON : s_AMSTR_GRIDOFF;
+      }
+      else if (ch == key_map_mark)
+      {
+         /* Ty 03/27/98 - *not* externalized     
+          * cph 2001/11/20 - use doom_printf so we don't have our own buffer */
+         doom_printf("%s %d", s_AMSTR_MARKEDSPOT, markpointnum);
+         AM_addMark();
+      }
+      else if (ch == key_map_clear)
+      {
+         AM_clearMarks();  // Ty 03/27/98 - *not* externalized
+         plr->message = s_AMSTR_MARKSCLEARED;                      //    ^
+      }                                                           //    |
+      else if (ch == key_map_rotate) {
+         automapmode ^= am_rotate;
+         plr->message = (automapmode & am_rotate) ? s_AMSTR_ROTATEON : s_AMSTR_ROTATEOFF;
+      }
+      else if (ch == key_map_overlay) {
+         automapmode ^= am_overlay;
+         plr->message = (automapmode & am_overlay) ? s_AMSTR_OVERLAYON : s_AMSTR_OVERLAYOFF;
+      }
+      else                                                        // phares
+      {
+         cheatstate=0;
+         rc = FALSE;
+      }
+   }
+   else if (ev->type == ev_keyup)
+   {
       rc = FALSE;
-    }
-  }
-  else if (ev->type == ev_keyup)
-  {
-    rc = FALSE;
-    ch = ev->data1;
-    if (ch == key_map_right)
-    {
-      if (!(automapmode & am_follow))
-          m_paninc.x = 0;
-    }
-    else if (ch == key_map_left)
-    {
-      if (!(automapmode & am_follow))
-          m_paninc.x = 0;
-    }
-    else if (ch == key_map_up)
-    {
-      if (!(automapmode & am_follow))
-          m_paninc.y = 0;
-    }
-    else if (ch == key_map_down)
-    {
-      if (!(automapmode & am_follow))
-          m_paninc.y = 0;
-    }
-    else if ((ch == key_map_zoomout) || (ch == key_map_zoomin))
-    {
-      mtof_zoommul = FRACUNIT;
-      ftom_zoommul = FRACUNIT;
-    }
-  }
-  return rc;
+      ch = ev->data1;
+      if (ch == key_map_right)
+      {
+         if (!(automapmode & am_follow))
+            m_paninc.x = 0;
+      }
+      else if (ch == key_map_left)
+      {
+         if (!(automapmode & am_follow))
+            m_paninc.x = 0;
+      }
+      else if (ch == key_map_up)
+      {
+         if (!(automapmode & am_follow))
+            m_paninc.y = 0;
+      }
+      else if (ch == key_map_down)
+      {
+         if (!(automapmode & am_follow))
+            m_paninc.y = 0;
+      }
+      else if ((ch == key_map_zoomout) || (ch == key_map_zoomin))
+      {
+         mtof_zoommul = FRACUNIT;
+         ftom_zoommul = FRACUNIT;
+      }
+   }
+   return rc;
 }
 
 //
@@ -1396,167 +1394,173 @@ static void AM_drawPlayers(void)
   }
 }
 
-//
-// AM_drawThings()
-//
-// Draws the things on the automap in double IDDT cheat mode
-//
-// Passed colors and colorrange, no longer used
-// Returns nothing
-//
+/*
+ * AM_drawThings()
+ *
+ * Draws the things on the automap in double IDDT cheat mode
+ *
+ * Passed colors and colorrange, no longer used
+ * Returns nothing
+*/
 static void AM_drawThings(void)
 {
-  int   i;
-  mobj_t* t;
+   int   i;
+   mobj_t* t;
 
-  // for all sectors
-  for (i=0;i<numsectors;i++)
-  {
-    t = sectors[i].thinglist;
-    while (t) // for all things in that sector
-    {
-      fixed_t x = t->x >> FRACTOMAPBITS, y = t->y >> FRACTOMAPBITS;//e6y
+   // for all sectors
+   for (i=0;i<numsectors;i++)
+   {
+      t = sectors[i].thinglist;
 
-      if (automapmode & am_rotate)
-  AM_rotate(&x, &y, ANG90-plr->mo->angle, plr->mo->x, plr->mo->y);
-
-      //jff 1/5/98 case over doomednum of thing being drawn
-      if (mapcolor_rkey || mapcolor_ykey || mapcolor_bkey)
+      while (t) // for all things in that sector
       {
-        switch(t->info->doomednum)
-        {
-          //jff 1/5/98 treat keys special
-          case 38: case 13: //jff  red key
-            AM_drawLineCharacter
+         fixed_t x = t->x >> FRACTOMAPBITS, y = t->y >> FRACTOMAPBITS;//e6y
+
+         if (automapmode & am_rotate)
+            AM_rotate(&x, &y, ANG90-plr->mo->angle, plr->mo->x, plr->mo->y);
+
+         //jff 1/5/98 case over doomednum of thing being drawn
+         if (mapcolor_rkey || mapcolor_ykey || mapcolor_bkey)
+         {
+            switch(t->info->doomednum)
+            {
+               //jff 1/5/98 treat keys special
+               case 38: case 13: //jff  red key
+                  AM_drawLineCharacter
+                     (
+                      cross_mark,
+                      NUMCROSSMARKLINES,
+                      16<<MAPBITS,//e6y
+                      t->angle,
+                      mapcolor_rkey!=-1? mapcolor_rkey : mapcolor_sprt,
+                      x, y
+                     );
+                  t = t->snext;
+                  continue;
+               case 39: case 6: //jff yellow key
+                  AM_drawLineCharacter
+                     (
+                      cross_mark,
+                      NUMCROSSMARKLINES,
+                      16<<MAPBITS,//e6y
+                      t->angle,
+                      mapcolor_ykey!=-1? mapcolor_ykey : mapcolor_sprt,
+                      x, y
+                     );
+                  t = t->snext;
+                  continue;
+               case 40: case 5: //jff blue key
+                  AM_drawLineCharacter
+                     (
+                      cross_mark,
+                      NUMCROSSMARKLINES,
+                      16<<MAPBITS,//e6y
+                      t->angle,
+                      mapcolor_bkey!=-1? mapcolor_bkey : mapcolor_sprt,
+                      x, y
+                     );
+                  t = t->snext;
+                  continue;
+               default:
+                  break;
+            }
+         }
+         //jff 1/5/98 end added code for keys
+         //jff previously entire code
+         AM_drawLineCharacter
             (
-              cross_mark,
-              NUMCROSSMARKLINES,
-              16<<MAPBITS,//e6y
-              t->angle,
-              mapcolor_rkey!=-1? mapcolor_rkey : mapcolor_sprt,
-              x, y
+             thintriangle_guy,
+             NUMTHINTRIANGLEGUYLINES,
+             16<<MAPBITS,//e6y
+             t->angle,
+             t->flags & MF_FRIEND && !t->player ? mapcolor_frnd : 
+             /* cph 2006/07/30 - Show count-as-kills in red. */
+             ((t->flags & (MF_COUNTKILL | MF_CORPSE)) == MF_COUNTKILL) ? mapcolor_enemy :
+             /* bbm 2/28/03 Show countable items in yellow. */
+             t->flags & MF_COUNTITEM ? mapcolor_item : mapcolor_sprt,
+             x, y
             );
-            t = t->snext;
-            continue;
-          case 39: case 6: //jff yellow key
-            AM_drawLineCharacter
-            (
-              cross_mark,
-              NUMCROSSMARKLINES,
-              16<<MAPBITS,//e6y
-              t->angle,
-              mapcolor_ykey!=-1? mapcolor_ykey : mapcolor_sprt,
-              x, y
-            );
-            t = t->snext;
-            continue;
-          case 40: case 5: //jff blue key
-            AM_drawLineCharacter
-            (
-              cross_mark,
-              NUMCROSSMARKLINES,
-              16<<MAPBITS,//e6y
-              t->angle,
-              mapcolor_bkey!=-1? mapcolor_bkey : mapcolor_sprt,
-              x, y
-            );
-            t = t->snext;
-            continue;
-          default:
-            break;
-        }
+         t = t->snext;
       }
-      //jff 1/5/98 end added code for keys
-      //jff previously entire code
-      AM_drawLineCharacter
-      (
-        thintriangle_guy,
-        NUMTHINTRIANGLEGUYLINES,
-        16<<MAPBITS,//e6y
-        t->angle,
-	t->flags & MF_FRIEND && !t->player ? mapcolor_frnd : 
-	/* cph 2006/07/30 - Show count-as-kills in red. */
-          ((t->flags & (MF_COUNTKILL | MF_CORPSE)) == MF_COUNTKILL) ? mapcolor_enemy :
-        /* bbm 2/28/03 Show countable items in yellow. */
-          t->flags & MF_COUNTITEM ? mapcolor_item : mapcolor_sprt,
-        x, y
-      );
-      t = t->snext;
-    }
-  }
+   }
 }
 
-//
-// AM_drawMarks()
-//
-// Draw the marked locations on the automap
-//
-// Passed nothing, returns nothing
-//
-// killough 2/22/98:
-// Rewrote AM_drawMarks(). Removed limit on marks.
-//
+/*
+ * AM_drawMarks()
+ *
+ * Draw the marked locations on the automap
+ *
+ * Passed nothing, returns nothing
+ *
+ * killough 2/22/98:
+ * Rewrote AM_drawMarks(). Removed limit on marks.
+*/
 static void AM_drawMarks(void)
 {
   int i;
+
   for (i=0;i<markpointnum;i++) // killough 2/22/98: remove automap mark limit
-    if (markpoints[i].x != -1)
-    {
-      int w = 5;
-      int h = 6;
-      int fx = markpoints[i].x;
-      int fy = markpoints[i].y;
-      int j = i;
+  {
+     if (markpoints[i].x == -1)
+        continue;
 
-      if (automapmode & am_rotate)
-        AM_rotate(&fx, &fy, ANG90-plr->mo->angle, plr->mo->x, plr->mo->y);
+     {
+        int w = 5;
+        int h = 6;
+        int fx = markpoints[i].x;
+        int fy = markpoints[i].y;
+        int j = i;
 
-      fx = CXMTOF(fx); fy = CYMTOF(fy);
+        if (automapmode & am_rotate)
+           AM_rotate(&fx, &fy, ANG90-plr->mo->angle, plr->mo->x, plr->mo->y);
 
-      do
-      {
-        int d = j % 10;
-        if (d==1)           // killough 2/22/98: less spacing for '1'
-          fx++;
+        fx = CXMTOF(fx); fy = CYMTOF(fy);
 
-        if (fx >= f_x && fx < f_w - w && fy >= f_y && fy < f_h - h) {
-    // cph - construct patch name and draw marker
-    char namebuf[] = { 'A', 'M', 'M', 'N', 'U', 'M', '0'+d, 0 };
+        do
+        {
+           int d = j % 10;
+           if (d==1)           // killough 2/22/98: less spacing for '1'
+              fx++;
 
-          V_DrawNamePatch(fx, fy, FB, namebuf, CR_DEFAULT, VPT_NONE);
+           if (fx >= f_x && fx < f_w - w && fy >= f_y && fy < f_h - h) {
+              // cph - construct patch name and draw marker
+              char namebuf[] = { 'A', 'M', 'M', 'N', 'U', 'M', '0'+d, 0 };
+
+              V_DrawNamePatch(fx, fy, FB, namebuf, CR_DEFAULT, VPT_NONE);
+           }
+           fx -= w-1;          // killough 2/22/98: 1 space backwards
+           j /= 10;
+        }
+        while (j>0);
+     }
   }
-        fx -= w-1;          // killough 2/22/98: 1 space backwards
-        j /= 10;
-      }
-      while (j>0);
-    }
 }
 
-//
-// AM_drawCrosshair()
-//
-// Draw the single point crosshair representing map center
-//
-// Passed the color to draw the pixel with
-// Returns nothing
-//
-// CPhipps - made static inline, and use the general pixel plotter function
+/*
+ * AM_drawCrosshair()
+ *
+ * Draw the single point crosshair representing map center
+ *
+ * Passed the color to draw the pixel with
+ * Returns nothing
+ *
+*/
 
 static INLINE void AM_drawCrosshair(int color)
 {
-  fline_t line;
+   fline_t line;
 
-  line.a.x = (f_w/2)-1;
-  line.a.y = (f_h/2);
-  line.b.x = (f_w/2)+1;
-  line.b.y = (f_h/2);
-  V_DrawLine(&line, color);
+   line.a.x = (f_w/2)-1;
+   line.a.y = (f_h/2);
+   line.b.x = (f_w/2)+1;
+   line.b.y = (f_h/2);
+   V_DrawLine(&line, color);
 
-  line.a.x = (f_w/2);
-  line.a.y = (f_h/2)-1;
-  line.b.x = (f_w/2);
-  line.b.y = (f_h/2)+1;
-  V_DrawLine(&line, color);
+   line.a.x = (f_w/2);
+   line.a.y = (f_h/2)-1;
+   line.b.x = (f_w/2);
+   line.b.y = (f_h/2)+1;
+   V_DrawLine(&line, color);
 }
 
 //
@@ -1568,8 +1572,8 @@ static INLINE void AM_drawCrosshair(int color)
 //
 void AM_Drawer (void)
 {
-  // CPhipps - all automap modes put into one enum
-  if (!(automapmode & am_active)) return;
+  if (!(automapmode & am_active))
+     return;
 
   if (!(automapmode & am_overlay)) // cph - If not overlay mode, clear background for the automap
     V_FillRect(f_x, f_y, f_w, f_h, (uint8_t)mapcolor_back); //jff 1/5/98 background default color

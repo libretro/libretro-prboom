@@ -425,17 +425,2015 @@ static void R_FlushQuadFuzz16(void)
 
 uint8_t *translationtables;
 
-#define R_DRAWCOLUMN_PIPELINE_TYPE RDC_PIPELINE_STANDARD
-#define R_DRAWCOLUMN_PIPELINE_BASE RDC_STANDARD
+// no color mapping
+static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
+{
+   int count;
 
-#define R_DRAWCOLUMN_FUNCNAME_COMPOSITE(postfix) R_DrawColumn16 ## postfix
-#define R_FLUSHWHOLE_FUNCNAME R_FlushWhole16
-#define R_FLUSHHEADTAIL_FUNCNAME R_FlushHT16
-#define R_FLUSHQUAD_FUNCNAME R_FlushQuad16
-#include "r_drawcolpipeline.inl"
+   uint16_t *dest;
 
-#undef R_DRAWCOLUMN_PIPELINE_BASE
-#undef R_DRAWCOLUMN_PIPELINE_TYPE
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+
+
+
+   const fixed_t slope_texu = dcvars->texu;
+   count = dcvars->yh - dcvars->yl;
+
+   if (count < 0)
+      return;
+
+
+
+
+
+   frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
+      }
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+      }
+      if (count <= 0) return;
+   }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ ((source[(frac & ((127<<16)|0xffff))>>16]))*64 + ((64 -1)) ]);
+            ;
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ ((source[(frac)>>16]))*64 + ((64 -1)) ]);
+            ;
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ ((source[(frac & fixedt_heightmask)>>16]))*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ ((source[(frac & fixedt_heightmask)>>16]))*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ ((source[(frac & fixedt_heightmask)>>16]))*64 + ((64 -1)) ]);
+            ;
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ ((source[(frac)>>16]))*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+
+
+            }
+         }
+      }
+   }
+}
+
+// simple depth color mapping
+static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
+{
+   int count;
+
+   uint16_t *dest;
+
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+
+
+
+   const fixed_t slope_texu = dcvars->texu;
+   count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+   if (count < 0)
+      return;
+
+
+
+
+
+   frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
+      }
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+      }
+      if (count <= 0) return;
+   }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ (colormap[(source[(frac & ((127<<16)|0xffff))>>16])])*64 + ((64 -1)) ]);
+            ;
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ (colormap[(source[(frac)>>16])])*64 + ((64 -1)) ]);
+            ;
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ (colormap[(source[(frac & fixedt_heightmask)>>16])])*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ (colormap[(source[(frac & fixedt_heightmask)>>16])])*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ (colormap[(source[(frac & fixedt_heightmask)>>16])])*64 + ((64 -1)) ]);
+            ;
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ (colormap[(source[(frac)>>16])])*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+
+
+            }
+         }
+      }
+   }
+
+}
+
+// z-dither
+static void R_DrawColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
+{
+   int count;
+
+   uint16_t *dest;
+
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+
+
+
+   const fixed_t slope_texu = dcvars->texu;
+   count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+   if (count < 0)
+      return;
+
+
+
+
+
+   frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
+      }
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+      }
+      if (count <= 0) return;
+   }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+      const int fracz = (dcvars->z >> 6) & 255;
+      const uint8_t *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac & ((127<<16)|0xffff))>>16])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac)>>16])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac & fixedt_heightmask)>>16])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac & fixedt_heightmask)>>16])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac & fixedt_heightmask)>>16])]))*64 + ((64 -1)) ]);
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac)>>16])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+
+
+            }
+         }
+      }
+   }
+
+}
+
+// bilinear with no color mapping
+static void R_DrawColumn16_LinearUV(draw_column_vars_t *dcvars)
+{
+   int count;
+
+   uint16_t *dest;
+
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+
+   const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+   if (dcvars->iscale > drawvars.mag_threshold) {
+      R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+            RDRAW_FILTER_POINT,
+            drawvars.filterz)(dcvars);
+      return;
+   }
+   count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+   if (count < 0)
+      return;
+
+
+
+   frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
+
+
+
+
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
+      }
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+      }
+      if (count <= 0) return;
+   }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+
+
+
+
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (( V_Palette16[ ((nextsource[((frac+(1<<16)) & ((127<<16)|0xffff))>>16]))*64 + ((filter_fracu*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ ((source[((frac+(1<<16)) & ((127<<16)|0xffff))>>16]))*64 + (((0xffff-filter_fracu)*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ ((source[(frac & ((127<<16)|0xffff))>>16]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ] + V_Palette16[ ((nextsource[(frac & ((127<<16)|0xffff))>>16]))*64 + ((filter_fracu*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (( V_Palette16[ ((nextsource[((frac+(1<<16)))>>16]))*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[((frac+(1<<16)))>>16]))*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[(frac)>>16]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ ((nextsource[(frac)>>16]))*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (( V_Palette16[ ((nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[((frac+(1<<16)) & fixedt_heightmask)>>16]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[(frac & fixedt_heightmask)>>16]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((nextsource[(frac & fixedt_heightmask)>>16]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (( V_Palette16[ ((nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[((frac+(1<<16)) & fixedt_heightmask)>>16]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[(frac & fixedt_heightmask)>>16]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((nextsource[(frac & fixedt_heightmask)>>16]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (( V_Palette16[ ((nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[((frac+(1<<16)) & fixedt_heightmask)>>16]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[(frac & fixedt_heightmask)>>16]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((nextsource[(frac & fixedt_heightmask)>>16]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (( V_Palette16[ ((nextsource[(nextfrac)>>16]))*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[(nextfrac)>>16]))*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((source[(frac)>>16]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ ((nextsource[(frac)>>16]))*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+// bilinear with simple depth color mapping
+static void R_DrawColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
+{
+   int count;
+
+   uint16_t *dest;
+
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+
+   const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+   if (dcvars->iscale > drawvars.mag_threshold) {
+      R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+            RDRAW_FILTER_POINT,
+            drawvars.filterz)(dcvars);
+      return;
+   }
+   count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+   if (count < 0)
+      return;
+
+
+
+   frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
+
+
+
+
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
+      }
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+      }
+      if (count <= 0) return;
+   }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+
+
+
+
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (( V_Palette16[ (colormap[(nextsource[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])])*64 + ((filter_fracu*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])])*64 + (((0xffff-filter_fracu)*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[(frac & ((127<<16)|0xffff))>>16])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(nextsource[(frac & ((127<<16)|0xffff))>>16])])*64 + ((filter_fracu*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (( V_Palette16[ (colormap[(nextsource[((frac+(1<<16)))>>16])])*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[((frac+(1<<16)))>>16])])*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[(frac)>>16])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(nextsource[(frac)>>16])])*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (( V_Palette16[ (colormap[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])])*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])])*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[(frac & fixedt_heightmask)>>16])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(nextsource[(frac & fixedt_heightmask)>>16])])*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (( V_Palette16[ (colormap[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])])*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])])*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[(frac & fixedt_heightmask)>>16])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(nextsource[(frac & fixedt_heightmask)>>16])])*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (( V_Palette16[ (colormap[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])])*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])])*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[(frac & fixedt_heightmask)>>16])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(nextsource[(frac & fixedt_heightmask)>>16])])*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (( V_Palette16[ (colormap[(nextsource[(nextfrac)>>16])])*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[(nextfrac)>>16])])*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[(frac)>>16])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(nextsource[(frac)>>16])])*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+// bilinear + z-dither
+static void R_DrawColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars)
+{
+   int count;
+
+   uint16_t *dest;
+
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+
+   const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+   if (dcvars->iscale > drawvars.mag_threshold) {
+      R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+            RDRAW_FILTER_POINT,
+            drawvars.filterz)(dcvars);
+      return;
+   }
+   count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+   if (count < 0)
+      return;
+
+
+
+   frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
+
+
+
+
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
+      }
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+      }
+      if (count <= 0) return;
+   }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+      const int fracz = (dcvars->z >> 6) & 255;
+      const uint8_t *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
+
+
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])]))*64 + ((filter_fracu*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])]))*64 + (((0xffff-filter_fracu)*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac & ((127<<16)|0xffff))>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[(frac & ((127<<16)|0xffff))>>16])]))*64 + ((filter_fracu*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[((frac+(1<<16)))>>16])]))*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[((frac+(1<<16)))>>16])]))*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[(frac)>>16])]))*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[(frac & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[(frac & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[(frac & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[(nextfrac)>>16])]))*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(nextfrac)>>16])]))*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(source[(frac)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(nextsource[(frac)>>16])]))*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+/* rounded with no color mapping */
+static void R_DrawColumn16_RoundedUV(draw_column_vars_t *dcvars)
+{
+  int count;
+
+  uint16_t *dest;
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+
+
+  const fixed_t slope_texu = dcvars->texu;
+
+
+
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+
+
+    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+      const uint8_t *prevsource = dcvars->prevsource;
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : (dcvars->texu>>8) & 0xff;
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ ((filter_getScale2xQuadColors( source[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((0)>(((frac & ((127<<16)|0xffff))>>16)-1)?(0):(((frac & ((127<<16)|0xffff))>>16)-1))) ], nextsource[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((frac+(1<<16)) & ((127<<16)|0xffff))>>16) ], prevsource[ ((frac & ((127<<16)|0xffff))>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & ((127<<16)|0xffff))>>8) & 0xff)>>(8-6)) ] ]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ ((filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ (((frac+(1<<16)))>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ ((filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ ((filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ ((filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ]))*64 + ((64 -1)) ]);
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ ((filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ ((nextfrac)>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+/* rounded with simple depth color mapping */
+static void R_DrawColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars)
+{
+  int count;
+
+  uint16_t *dest;
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+
+
+  const fixed_t slope_texu = dcvars->texu;
+
+
+
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+
+
+    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+      const uint8_t *prevsource = dcvars->prevsource;
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : (dcvars->texu>>8) & 0xff;
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ (colormap[(filter_getScale2xQuadColors( source[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((0)>(((frac & ((127<<16)|0xffff))>>16)-1)?(0):(((frac & ((127<<16)|0xffff))>>16)-1))) ], nextsource[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((frac+(1<<16)) & ((127<<16)|0xffff))>>16) ], prevsource[ ((frac & ((127<<16)|0xffff))>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & ((127<<16)|0xffff))>>8) & 0xff)>>(8-6)) ] ])])*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ (colormap[(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ (((frac+(1<<16)))>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])])*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ (colormap[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])])*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ (colormap[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])])*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ (colormap[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])])*64 + ((64 -1)) ]);
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ (colormap[(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ ((nextfrac)>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])])*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+/* rounded + z-dither */
+static void R_DrawColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvars)
+{
+  int count;
+
+  uint16_t *dest;
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+
+
+  const fixed_t slope_texu = dcvars->texu;
+
+
+
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+
+
+    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+      const int fracz = (dcvars->z >> 6) & 255;
+      const uint8_t *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
+
+
+
+
+
+
+      const uint8_t *prevsource = dcvars->prevsource;
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : (dcvars->texu>>8) & 0xff;
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(filter_getScale2xQuadColors( source[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((0)>(((frac & ((127<<16)|0xffff))>>16)-1)?(0):(((frac & ((127<<16)|0xffff))>>16)-1))) ], nextsource[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((frac+(1<<16)) & ((127<<16)|0xffff))>>16) ], prevsource[ ((frac & ((127<<16)|0xffff))>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & ((127<<16)|0xffff))>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ (((frac+(1<<16)))>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ ((nextfrac)>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+}
 
 //
 // R_DrawTranslatedColumn
@@ -447,17 +2445,1963 @@ uint8_t *translationtables;
 //  identical sprites, kinda brightened up.
 //
 
-#define R_DRAWCOLUMN_PIPELINE_TYPE RDC_PIPELINE_TRANSLATED
-#define R_DRAWCOLUMN_PIPELINE_BASE RDC_TRANSLATED
+static void R_DrawTranslatedColumn16_PointUV(draw_column_vars_t *dcvars)
+{
+  int count;
 
-#define R_DRAWCOLUMN_FUNCNAME_COMPOSITE(postfix) R_DrawTranslatedColumn16 ## postfix
-#define R_FLUSHWHOLE_FUNCNAME R_FlushWhole16
-#define R_FLUSHHEADTAIL_FUNCNAME R_FlushHT16
-#define R_FLUSHQUAD_FUNCNAME R_FlushQuad16
-#include "r_drawcolpipeline.inl"
+  uint16_t *dest;
 
-#undef R_DRAWCOLUMN_PIPELINE_BASE
-#undef R_DRAWCOLUMN_PIPELINE_TYPE
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+
+
+  const fixed_t slope_texu = dcvars->texu;
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+
+
+    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ ((translation[(source[(frac & ((127<<16)|0xffff))>>16])]))*64 + ((64 -1)) ]);
+            ;
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ ((translation[(source[(frac)>>16])]))*64 + ((64 -1)) ]);
+            ;
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ ((translation[(source[(frac & fixedt_heightmask)>>16])]))*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ ((translation[(source[(frac & fixedt_heightmask)>>16])]))*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ ((translation[(source[(frac & fixedt_heightmask)>>16])]))*64 + ((64 -1)) ]);
+            ;
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ ((translation[(source[(frac)>>16])]))*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+
+
+            }
+         }
+      }
+   }
+
+}
+
+static void R_DrawTranslatedColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
+{
+  int count;
+
+  uint16_t *dest;
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+
+
+  const fixed_t slope_texu = dcvars->texu;
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+
+
+    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ (colormap[(translation[(source[(frac & ((127<<16)|0xffff))>>16])])])*64 + ((64 -1)) ]);
+            ;
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ (colormap[(translation[(source[(frac)>>16])])])*64 + ((64 -1)) ]);
+            ;
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ (colormap[(translation[(source[(frac & fixedt_heightmask)>>16])])])*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ (colormap[(translation[(source[(frac & fixedt_heightmask)>>16])])])*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ (colormap[(translation[(source[(frac & fixedt_heightmask)>>16])])])*64 + ((64 -1)) ]);
+            ;
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ (colormap[(translation[(source[(frac)>>16])])])*64 + ((64 -1)) ]);
+               ;
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+
+
+            }
+         }
+      }
+   }
+
+}
+
+
+static void R_DrawTranslatedColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
+{
+  int count;
+
+  uint16_t *dest;
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+
+
+  const fixed_t slope_texu = dcvars->texu;
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+
+
+    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+      const int fracz = (dcvars->z >> 6) & 255;
+      const uint8_t *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac & ((127<<16)|0xffff))>>16])])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac)>>16])])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac & fixedt_heightmask)>>16])])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac & fixedt_heightmask)>>16])])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac & fixedt_heightmask)>>16])])]))*64 + ((64 -1)) ]);
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac)>>16])])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+
+
+            }
+         }
+      }
+   }
+
+}
+
+static void R_DrawTranslatedColumn16_LinearUV(draw_column_vars_t *dcvars)
+{
+  int count;
+
+  uint16_t *dest;
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+  const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+    frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
+
+
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+
+
+
+
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (( V_Palette16[ ((translation[(nextsource[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])]))*64 + ((filter_fracu*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])]))*64 + (((0xffff-filter_fracu)*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[(frac & ((127<<16)|0xffff))>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ] + V_Palette16[ ((translation[(nextsource[(frac & ((127<<16)|0xffff))>>16])]))*64 + ((filter_fracu*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (( V_Palette16[ ((translation[(nextsource[((frac+(1<<16)))>>16])]))*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[((frac+(1<<16)))>>16])]))*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[(frac)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ ((translation[(nextsource[(frac)>>16])]))*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (( V_Palette16[ ((translation[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[(frac & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((translation[(nextsource[(frac & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (( V_Palette16[ ((translation[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[(frac & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((translation[(nextsource[(frac & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (( V_Palette16[ ((translation[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[(frac & fixedt_heightmask)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((translation[(nextsource[(frac & fixedt_heightmask)>>16])]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (( V_Palette16[ ((translation[(nextsource[(nextfrac)>>16])]))*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[(nextfrac)>>16])]))*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((translation[(source[(frac)>>16])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ ((translation[(nextsource[(frac)>>16])]))*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+static void R_DrawTranslatedColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
+{
+  int count;
+
+  uint16_t *dest;
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+  const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+    frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
+
+
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+
+
+
+
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (( V_Palette16[ (colormap[(translation[(nextsource[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])])])*64 + ((filter_fracu*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])])])*64 + (((0xffff-filter_fracu)*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[(frac & ((127<<16)|0xffff))>>16])])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(nextsource[(frac & ((127<<16)|0xffff))>>16])])])*64 + ((filter_fracu*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (( V_Palette16[ (colormap[(translation[(nextsource[((frac+(1<<16)))>>16])])])*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[((frac+(1<<16)))>>16])])])*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[(frac)>>16])])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(nextsource[(frac)>>16])])])*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (( V_Palette16[ (colormap[(translation[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])])])*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])])])*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[(frac & fixedt_heightmask)>>16])])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(nextsource[(frac & fixedt_heightmask)>>16])])])*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (( V_Palette16[ (colormap[(translation[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])])])*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])])])*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[(frac & fixedt_heightmask)>>16])])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(nextsource[(frac & fixedt_heightmask)>>16])])])*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (( V_Palette16[ (colormap[(translation[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])])])*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])])])*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[(frac & fixedt_heightmask)>>16])])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(nextsource[(frac & fixedt_heightmask)>>16])])])*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (( V_Palette16[ (colormap[(translation[(nextsource[(nextfrac)>>16])])])*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[(nextfrac)>>16])])])*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(source[(frac)>>16])])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(translation[(nextsource[(frac)>>16])])])*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+static void R_DrawTranslatedColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars)
+{
+  int count;
+
+  uint16_t *dest;
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+  const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+    frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
+
+
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+      const int fracz = (dcvars->z >> 6) & 255;
+      const uint8_t *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
+
+
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])])]))*64 + ((filter_fracu*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[((frac+(1<<16)) & ((127<<16)|0xffff))>>16])])]))*64 + (((0xffff-filter_fracu)*((frac & ((127<<16)|0xffff))&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac & ((127<<16)|0xffff))>>16])])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[(frac & ((127<<16)|0xffff))>>16])])]))*64 + ((filter_fracu*(0xffff-((frac & ((127<<16)|0xffff))&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[((frac+(1<<16)))>>16])])]))*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[((frac+(1<<16)))>>16])])]))*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac)>>16])])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[(frac)>>16])])]))*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])])]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])])]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac & fixedt_heightmask)>>16])])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[(frac & fixedt_heightmask)>>16])])]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])])]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])])]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac & fixedt_heightmask)>>16])])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[(frac & fixedt_heightmask)>>16])])]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[((frac+(1<<16)) & fixedt_heightmask)>>16])])]))*64 + ((filter_fracu*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[((frac+(1<<16)) & fixedt_heightmask)>>16])])]))*64 + (((0xffff-filter_fracu)*((frac & fixedt_heightmask)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac & fixedt_heightmask)>>16])])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[(frac & fixedt_heightmask)>>16])])]))*64 + ((filter_fracu*(0xffff-((frac & fixedt_heightmask)&0xffff)))>>(32-6)) ]));
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (( V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[(nextfrac)>>16])])]))*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(nextfrac)>>16])])]))*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(source[(frac)>>16])])]))*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(nextsource[(frac)>>16])])]))*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+static void R_DrawTranslatedColumn16_RoundedUV(draw_column_vars_t *dcvars)
+{
+  int count;
+  uint16_t *dest;
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+  const fixed_t slope_texu = dcvars->texu;
+
+  if (dcvars->iscale > drawvars.mag_threshold)
+  {
+    R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+  count = dcvars->yh - dcvars->yl;
+
+  if (count < 0)
+    return;
+
+  frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+  {
+     if (dcvars->yl != 0) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += 0xffff-(slope_texu & 0xffff);
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += slope_texu & 0xffff;
+        }
+     }
+     if (dcvars->yh != viewheight-1) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+     }
+     if (count <= 0) return;
+  }
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+      const uint8_t *prevsource = dcvars->prevsource;
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : (dcvars->texu>>8) & 0xff;
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ ((translation[(filter_getScale2xQuadColors( source[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((0)>(((frac & ((127<<16)|0xffff))>>16)-1)?(0):(((frac & ((127<<16)|0xffff))>>16)-1))) ], nextsource[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((frac+(1<<16)) & ((127<<16)|0xffff))>>16) ], prevsource[ ((frac & ((127<<16)|0xffff))>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & ((127<<16)|0xffff))>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ ((translation[(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ (((frac+(1<<16)))>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ ((translation[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ ((translation[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ ((translation[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ ((translation[(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ ((nextfrac)>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+static void R_DrawTranslatedColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars)
+{
+  int count;
+
+  uint16_t *dest;
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+  const fixed_t slope_texu = dcvars->texu;
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+  frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+  {
+     if (dcvars->yl != 0) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += 0xffff-(slope_texu & 0xffff);
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += slope_texu & 0xffff;
+        }
+     }
+     if (dcvars->yh != viewheight-1) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+     }
+     if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+      const uint8_t *prevsource = dcvars->prevsource;
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : (dcvars->texu>>8) & 0xff;
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ (colormap[(translation[(filter_getScale2xQuadColors( source[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((0)>(((frac & ((127<<16)|0xffff))>>16)-1)?(0):(((frac & ((127<<16)|0xffff))>>16)-1))) ], nextsource[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((frac+(1<<16)) & ((127<<16)|0xffff))>>16) ], prevsource[ ((frac & ((127<<16)|0xffff))>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & ((127<<16)|0xffff))>>8) & 0xff)>>(8-6)) ] ])])])*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ (colormap[(translation[(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ (((frac+(1<<16)))>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])])])*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ (colormap[(translation[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])])])*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ (colormap[(translation[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])])])*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ (colormap[(translation[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])])])*64 + ((64 -1)) ]);
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ (colormap[(translation[(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ ((nextfrac)>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])])])*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+
+}
+
+static void R_DrawTranslatedColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvars)
+{
+   int count;
+   uint16_t *dest;
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+   const fixed_t slope_texu = dcvars->texu;
+
+   if (dcvars->iscale > drawvars.mag_threshold)
+   {
+      R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED,
+            RDRAW_FILTER_POINT,
+            drawvars.filterz)(dcvars);
+      return;
+   }
+
+   count = dcvars->yh - dcvars->yl;
+
+   if (count < 0)
+      return;
+
+   frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
+      }
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+      }
+      if (count <= 0) return;
+   }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_OPAQUE);
+
+
+
+
+
+         R_FlushWholeColumns = R_FlushWhole16;
+         R_FlushHTColumns = R_FlushHT16;
+         R_FlushQuadColumn = R_FlushQuad16;
+
+         dest = &short_tempbuf[dcvars->yl << 2];
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+      }
+      temp_x += 1;
+   }
+
+
+
+   {
+      const uint8_t *source = dcvars->source;
+      const lighttable_t *colormap = dcvars->colormap;
+      const uint8_t *translation = dcvars->translation;
+
+      int y = dcvars->yl;
+      const int x = dcvars->x;
+
+
+      const int fracz = (dcvars->z >> 6) & 255;
+      const uint8_t *dither_colormaps[2] = { dcvars->colormap, dcvars->nextcolormap };
+
+
+
+
+
+
+      const uint8_t *prevsource = dcvars->prevsource;
+      const uint8_t *nextsource = dcvars->nextsource;
+      const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : (dcvars->texu>>8) & 0xff;
+
+
+      count++;
+
+
+
+
+
+
+
+      if (dcvars->texheight == 128)
+      {
+
+         while(count--)
+         {
+            *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(filter_getScale2xQuadColors( source[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((0)>(((frac & ((127<<16)|0xffff))>>16)-1)?(0):(((frac & ((127<<16)|0xffff))>>16)-1))) ], nextsource[ ((frac & ((127<<16)|0xffff))>>16) ], source[ (((frac+(1<<16)) & ((127<<16)|0xffff))>>16) ], prevsource[ ((frac & ((127<<16)|0xffff))>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & ((127<<16)|0xffff))>>8) & 0xff)>>(8-6)) ] ])])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else if (dcvars->texheight == 0)
+      {
+
+         while (count--)
+         {
+            *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ (((frac+(1<<16)))>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])])]))*64 + ((64 -1)) ]);
+            (y++);
+            dest += 4;
+            frac += fracstep;
+         }
+      }
+      else
+      {
+         unsigned heightmask = dcvars->texheight-1;
+         if (! (dcvars->texheight & heightmask))
+         {
+            fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
+            while ((count-=2)>=0)
+            {
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               frac += fracstep;
+            }
+            if (count & 1)
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(filter_getScale2xQuadColors( source[ ((frac & fixedt_heightmask)>>16) ], source[ (((0)>(((frac & fixedt_heightmask)>>16)-1)?(0):(((frac & fixedt_heightmask)>>16)-1))) ], nextsource[ ((frac & fixedt_heightmask)>>16) ], source[ (((frac+(1<<16)) & fixedt_heightmask)>>16) ], prevsource[ ((frac & fixedt_heightmask)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac & fixedt_heightmask)>>8) & 0xff)>>(8-6)) ] ])])]))*64 + ((64 -1)) ]);
+            (y++);
+         }
+         else
+         {
+            fixed_t nextfrac = 0;
+
+            heightmask++;
+            heightmask <<= 16;
+
+            if (frac < 0)
+               while ((frac += heightmask) < 0);
+            else
+               while (frac >= (int)heightmask)
+                  frac -= heightmask;
+
+
+            nextfrac = frac + (1<<16);
+            while (nextfrac >= (int)heightmask)
+               nextfrac -= heightmask;
+
+
+
+
+            while (count--)
+            {
+
+
+
+
+
+               *dest = (V_Palette16[ ((dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x)&(4 -1)] < (fracz)) ? 1 : 0)][(translation[(filter_getScale2xQuadColors( source[ ((frac)>>16) ], source[ (((0)>(((frac)>>16)-1)?(0):(((frac)>>16)-1))) ], nextsource[ ((frac)>>16) ], source[ ((nextfrac)>>16) ], prevsource[ ((frac)>>16) ] ) [ filter_roundedUVMap[ ((filter_fracu>>(8-6))<<6) + ((((frac)>>8) & 0xff)>>(8-6)) ] ])])]))*64 + ((64 -1)) ]);
+               (y++);
+               dest += 4;
+               if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
+
+               if ((nextfrac += fracstep) >= (int)heightmask) nextfrac -= heightmask;;
+
+            }
+         }
+      }
+   }
+}
 
 //
 // Framebuffer postprocessing.
@@ -468,17 +4412,1051 @@ uint8_t *translationtables;
 //  i.e. spectres and invisible players.
 //
 
-#define R_DRAWCOLUMN_PIPELINE_TYPE RDC_PIPELINE_FUZZ
-#define R_DRAWCOLUMN_PIPELINE_BASE RDC_FUZZ
+static void R_DrawFuzzColumn16_PointUV(draw_column_vars_t *dcvars)
+{
+  int count;
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+  const fixed_t slope_texu = dcvars->texu;
 
-#define R_DRAWCOLUMN_FUNCNAME_COMPOSITE(postfix) R_DrawFuzzColumn16 ## postfix
-#define R_FLUSHWHOLE_FUNCNAME R_FlushWholeFuzz16
-#define R_FLUSHHEADTAIL_FUNCNAME R_FlushHTFuzz16
-#define R_FLUSHQUAD_FUNCNAME R_FlushQuadFuzz16
-#include "r_drawcolpipeline.inl"
+  if (!dcvars->yl)
+    dcvars->yl = 1;
 
-#undef R_DRAWCOLUMN_PIPELINE_BASE
-#undef R_DRAWCOLUMN_PIPELINE_TYPE
+  if (dcvars->yh == viewheight-1)
+    dcvars->yh = viewheight - 2;
+
+  count = dcvars->yh - dcvars->yl;
+
+  if (count < 0)
+    return;
+
+  frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+  {
+     if (dcvars->yl != 0) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += 0xffff-(slope_texu & 0xffff);
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += slope_texu & 0xffff;
+        }
+     }
+     if (dcvars->yh != viewheight-1) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+     }
+     if (count <= 0) return;
+  }
+
+  {
+
+     if(temp_x == 4 ||
+           (temp_x && (temptype != (COL_FUZZ) || temp_x + startx != dcvars->x)))
+        R_FlushColumns();
+
+     if(!temp_x)
+     {
+        startx = dcvars->x;
+        tempyl[0] = commontop = dcvars->yl;
+        tempyh[0] = commonbot = dcvars->yh;
+        temptype = (COL_FUZZ);
+
+
+
+        tempfuzzmap = fullcolormap;
+
+        R_FlushWholeColumns = R_FlushWholeFuzz16;
+        R_FlushHTColumns = R_FlushHTFuzz16;
+        R_FlushQuadColumn = R_FlushQuadFuzz16;
+
+
+
+     }
+     else
+     {
+        tempyl[temp_x] = dcvars->yl;
+        tempyh[temp_x] = dcvars->yh;
+
+        if(dcvars->yl > commontop)
+           commontop = dcvars->yl;
+        if(dcvars->yh < commonbot)
+           commonbot = dcvars->yh;
+
+
+
+
+     }
+     temp_x += 1;
+  }
+}
+
+static void R_DrawFuzzColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
+{
+  int count;
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+  const fixed_t slope_texu = dcvars->texu;
+
+  if (!dcvars->yl)
+    dcvars->yl = 1;
+
+  if (dcvars->yh == viewheight-1)
+    dcvars->yh = viewheight - 2;
+
+  count = dcvars->yh - dcvars->yl;
+
+  if (count < 0)
+    return;
+
+  frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+  {
+
+     if (dcvars->yl != 0) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += 0xffff-(slope_texu & 0xffff);
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += slope_texu & 0xffff;
+        }
+     }
+     if (dcvars->yh != viewheight-1) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+     }
+     if (count <= 0) return;
+  }
+
+  if(temp_x == 4 ||
+        (temp_x && (temptype != (COL_FUZZ) || temp_x + startx != dcvars->x)))
+     R_FlushColumns();
+
+  if(!temp_x)
+  {
+     startx = dcvars->x;
+     tempyl[0] = commontop = dcvars->yl;
+     tempyh[0] = commonbot = dcvars->yh;
+     temptype = (COL_FUZZ);
+
+
+
+     tempfuzzmap = fullcolormap;
+
+     R_FlushWholeColumns = R_FlushWholeFuzz16;
+     R_FlushHTColumns = R_FlushHTFuzz16;
+     R_FlushQuadColumn = R_FlushQuadFuzz16;
+
+
+
+  }
+  else
+  {
+     tempyl[temp_x] = dcvars->yl;
+     tempyh[temp_x] = dcvars->yh;
+
+     if(dcvars->yl > commontop)
+        commontop = dcvars->yl;
+     if(dcvars->yh < commonbot)
+        commonbot = dcvars->yh;
+
+
+
+
+  }
+  temp_x += 1;
+}
+
+static void R_DrawFuzzColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
+{
+  int count;
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+  const fixed_t slope_texu = dcvars->texu;
+
+  if (!dcvars->yl)
+    dcvars->yl = 1;
+
+  if (dcvars->yh == viewheight-1)
+    dcvars->yh = viewheight - 2;
+
+  count = dcvars->yh - dcvars->yl;
+
+  if (count < 0)
+    return;
+
+  frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+  {
+     if (dcvars->yl != 0) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += 0xffff-(slope_texu & 0xffff);
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += slope_texu & 0xffff;
+        }
+     }
+     if (dcvars->yh != viewheight-1) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+     }
+     if (count <= 0) return;
+  }
+
+  if(temp_x == 4 ||
+        (temp_x && (temptype != (COL_FUZZ) || temp_x + startx != dcvars->x)))
+     R_FlushColumns();
+
+  if(!temp_x)
+  {
+     startx = dcvars->x;
+     tempyl[0] = commontop = dcvars->yl;
+     tempyh[0] = commonbot = dcvars->yh;
+     temptype = (COL_FUZZ);
+
+
+
+     tempfuzzmap = fullcolormap;
+
+     R_FlushWholeColumns = R_FlushWholeFuzz16;
+     R_FlushHTColumns = R_FlushHTFuzz16;
+     R_FlushQuadColumn = R_FlushQuadFuzz16;
+
+
+
+  }
+  else
+  {
+     tempyl[temp_x] = dcvars->yl;
+     tempyh[temp_x] = dcvars->yh;
+
+     if(dcvars->yl > commontop)
+        commontop = dcvars->yl;
+     if(dcvars->yh < commonbot)
+        commonbot = dcvars->yh;
+
+
+
+
+  }
+  temp_x += 1;
+}
+
+static void R_DrawFuzzColumn16_LinearUV(draw_column_vars_t *dcvars)
+{
+  int count;
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+  const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+  if (dcvars->iscale > drawvars.mag_threshold)
+  {
+    R_GetDrawColumnFunc(RDC_PIPELINE_FUZZ,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+
+  if (!dcvars->yl)
+    dcvars->yl = 1;
+
+
+  if (dcvars->yh == viewheight-1)
+    dcvars->yh = viewheight - 2;
+
+  count = dcvars->yh - dcvars->yl;
+
+  if (count < 0)
+    return;
+
+  frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+  {
+     if (dcvars->yl != 0) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += 0xffff-(slope_texu & 0xffff);
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yl += shift;
+           count -= shift;
+           frac += slope_texu & 0xffff;
+        }
+     }
+     if (dcvars->yh != viewheight-1) {
+        if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+           int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+        else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+           int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+           dcvars->yh -= shift;
+           count -= shift;
+        }
+     }
+     if (count <= 0) return;
+  }
+
+  if(temp_x == 4 ||
+        (temp_x && (temptype != (COL_FUZZ) || temp_x + startx != dcvars->x)))
+     R_FlushColumns();
+
+  if(!temp_x)
+  {
+     startx = dcvars->x;
+     tempyl[0] = commontop = dcvars->yl;
+     tempyh[0] = commonbot = dcvars->yh;
+     temptype = (COL_FUZZ);
+
+
+
+     tempfuzzmap = fullcolormap;
+
+     R_FlushWholeColumns = R_FlushWholeFuzz16;
+     R_FlushHTColumns = R_FlushHTFuzz16;
+     R_FlushQuadColumn = R_FlushQuadFuzz16;
+
+
+
+  }
+  else
+  {
+     tempyl[temp_x] = dcvars->yl;
+     tempyh[temp_x] = dcvars->yh;
+
+     if(dcvars->yl > commontop)
+        commontop = dcvars->yl;
+     if(dcvars->yh < commonbot)
+        commonbot = dcvars->yh;
+
+
+
+
+  }
+  temp_x += 1;
+}
+
+static void R_DrawFuzzColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
+{
+   int count;
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+   const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+   if (dcvars->iscale > drawvars.mag_threshold)
+   {
+      R_GetDrawColumnFunc(RDC_PIPELINE_FUZZ,
+            RDRAW_FILTER_POINT,
+            drawvars.filterz)(dcvars);
+      return;
+   }
+
+
+
+
+   if (!dcvars->yl)
+      dcvars->yl = 1;
+
+
+   if (dcvars->yh == viewheight-1)
+      dcvars->yh = viewheight - 2;
+
+   count = dcvars->yh - dcvars->yl;
+   if (count < 0)
+      return;
+
+   frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
+
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+   {
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
+      }
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+      }
+      if (count <= 0) return;
+   }
+
+   if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_FUZZ) || temp_x + startx != dcvars->x)))
+      R_FlushColumns();
+
+   if(!temp_x)
+   {
+      startx = dcvars->x;
+      tempyl[0] = commontop = dcvars->yl;
+      tempyh[0] = commonbot = dcvars->yh;
+      temptype = (COL_FUZZ);
+
+
+
+      tempfuzzmap = fullcolormap;
+
+      R_FlushWholeColumns = R_FlushWholeFuzz16;
+      R_FlushHTColumns = R_FlushHTFuzz16;
+      R_FlushQuadColumn = R_FlushQuadFuzz16;
+
+
+
+   }
+   else
+   {
+      tempyl[temp_x] = dcvars->yl;
+      tempyh[temp_x] = dcvars->yh;
+
+      if(dcvars->yl > commontop)
+         commontop = dcvars->yl;
+      if(dcvars->yh < commonbot)
+         commonbot = dcvars->yh;
+
+
+
+
+   }
+   temp_x += 1;
+}
+
+static void R_DrawFuzzColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars)
+{
+  int count;
+
+
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+  const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+
+
+
+
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_FUZZ,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+
+
+
+
+  if (!dcvars->yl)
+    dcvars->yl = 1;
+
+
+  if (dcvars->yh == viewheight-1)
+    dcvars->yh = viewheight - 2;
+
+
+
+
+
+
+
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+    frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
+
+
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_FUZZ) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_FUZZ);
+
+
+
+         tempfuzzmap = fullcolormap;
+
+         R_FlushWholeColumns = R_FlushWholeFuzz16;
+         R_FlushHTColumns = R_FlushHTFuzz16;
+         R_FlushQuadColumn = R_FlushQuadFuzz16;
+
+
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+
+
+      }
+      temp_x += 1;
+   }
+}
+
+static void R_DrawFuzzColumn16_RoundedUV(draw_column_vars_t *dcvars)
+{
+  int count;
+
+
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+
+
+  const fixed_t slope_texu = dcvars->texu;
+
+
+
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_FUZZ,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+
+
+
+
+  if (!dcvars->yl)
+    dcvars->yl = 1;
+
+
+  if (dcvars->yh == viewheight-1)
+    dcvars->yh = viewheight - 2;
+
+
+
+
+
+
+
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+
+
+    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_FUZZ) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_FUZZ);
+
+
+
+         tempfuzzmap = fullcolormap;
+
+         R_FlushWholeColumns = R_FlushWholeFuzz16;
+         R_FlushHTColumns = R_FlushHTFuzz16;
+         R_FlushQuadColumn = R_FlushQuadFuzz16;
+
+
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+
+
+      }
+      temp_x += 1;
+   }
+}
+
+static void R_DrawFuzzColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars)
+{
+  int count;
+
+
+
+  fixed_t frac;
+  const fixed_t fracstep = dcvars->iscale;
+
+
+
+  const fixed_t slope_texu = dcvars->texu;
+
+
+
+
+  if (dcvars->iscale > drawvars.mag_threshold) {
+    R_GetDrawColumnFunc(RDC_PIPELINE_FUZZ,
+                        RDRAW_FILTER_POINT,
+                        drawvars.filterz)(dcvars);
+    return;
+  }
+
+
+
+
+  if (!dcvars->yl)
+    dcvars->yl = 1;
+
+
+  if (dcvars->yh == viewheight-1)
+    dcvars->yh = viewheight - 2;
+
+
+
+
+
+
+
+  count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+  if (count < 0)
+    return;
+
+
+
+
+
+    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+    if (dcvars->yl != 0) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += 0xffff-(slope_texu & 0xffff);
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yl += shift;
+        count -= shift;
+        frac += slope_texu & 0xffff;
+      }
+    }
+    if (dcvars->yh != viewheight-1) {
+      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+        dcvars->yh -= shift;
+        count -= shift;
+      }
+    }
+    if (count <= 0) return;
+  }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_FUZZ) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_FUZZ);
+
+
+
+         tempfuzzmap = fullcolormap;
+
+         R_FlushWholeColumns = R_FlushWholeFuzz16;
+         R_FlushHTColumns = R_FlushHTFuzz16;
+         R_FlushQuadColumn = R_FlushQuadFuzz16;
+
+
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+
+
+      }
+      temp_x += 1;
+   }
+}
+
+static void R_DrawFuzzColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvars)
+{
+   int count;
+
+
+
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+
+
+
+   const fixed_t slope_texu = dcvars->texu;
+
+
+
+
+   if (dcvars->iscale > drawvars.mag_threshold) {
+      R_GetDrawColumnFunc(RDC_PIPELINE_FUZZ,
+            RDRAW_FILTER_POINT,
+            drawvars.filterz)(dcvars);
+      return;
+   }
+
+
+
+
+   if (!dcvars->yl)
+      dcvars->yl = 1;
+
+
+   if (dcvars->yh == viewheight-1)
+      dcvars->yh = viewheight - 2;
+
+
+
+
+
+
+
+   count = dcvars->yh - dcvars->yl;
+
+
+
+
+
+
+
+   if (count < 0)
+      return;
+
+
+
+
+
+   frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+
+
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+
+
+
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
+      }
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+      }
+      if (count <= 0) return;
+   }
+
+
+
+   {
+
+      if(temp_x == 4 ||
+            (temp_x && (temptype != (COL_FUZZ) || temp_x + startx != dcvars->x)))
+         R_FlushColumns();
+
+      if(!temp_x)
+      {
+         startx = dcvars->x;
+         tempyl[0] = commontop = dcvars->yl;
+         tempyh[0] = commonbot = dcvars->yh;
+         temptype = (COL_FUZZ);
+
+
+
+         tempfuzzmap = fullcolormap;
+
+         R_FlushWholeColumns = R_FlushWholeFuzz16;
+         R_FlushHTColumns = R_FlushHTFuzz16;
+         R_FlushQuadColumn = R_FlushQuadFuzz16;
+
+
+
+      }
+      else
+      {
+         tempyl[temp_x] = dcvars->yl;
+         tempyh[temp_x] = dcvars->yh;
+
+         if(dcvars->yl > commontop)
+            commontop = dcvars->yl;
+         if(dcvars->yh < commonbot)
+            commonbot = dcvars->yh;
+
+
+
+
+      }
+      temp_x += 1;
+   }
+}
 
 static R_DrawColumn_f drawcolumnfuncs[RDRAW_FILTER_MAXFILTERS][RDRAW_FILTER_MAXFILTERS][RDC_PIPELINE_MAXPIPELINES] = {
     {

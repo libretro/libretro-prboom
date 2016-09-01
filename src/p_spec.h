@@ -341,10 +341,10 @@ typedef enum
 
 typedef enum
 {
-  up,
-  down,
-  waiting,
-  in_stasis
+  PLAT_UP,
+  PLAT_DOWN,
+  PLAT_WAITING,
+  PLAT_IN_STASIS
 } plat_e;
 
 typedef enum

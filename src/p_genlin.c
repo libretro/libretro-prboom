@@ -526,12 +526,12 @@ manual_lift:
     plat->sector = sec;
     plat->sector->floordata = plat;
     plat->thinker.function = T_PlatRaise;
-    plat->crush = FALSE;
-    plat->tag = line->tag;
+    plat->crush  = FALSE;
+    plat->tag    = line->tag;
 
-    plat->type = genLift;
-    plat->high = sec->floorheight;
-    plat->status = down;
+    plat->type   = genLift;
+    plat->high   = sec->floorheight;
+    plat->status = PLAT_DOWN;
 
     // setup the target destination height
     switch(Targ)

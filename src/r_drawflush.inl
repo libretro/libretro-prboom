@@ -28,18 +28,13 @@
  *
  *-----------------------------------------------------------------------------*/
 
-#define SCREENTYPE unsigned short
-#define TOPLEFT short_topleft
 #define PITCH short_pitch
-#define TEMPBUF short_tempbuf
 
 #if (R_DRAWCOLUMN_PIPELINE & RDC_FUZZ)
 #define GETDESTCOLOR16(col) GETBLENDED16_9406(col, 0)
 #else
 #define GETDESTCOLOR16(col) (col)
 #endif
-
-#define GETDESTCOLOR(col) GETDESTCOLOR16(col)
 
 //
 // R_FlushWholeOpaque
@@ -50,22 +45,22 @@
 //
 static void R_FLUSHWHOLE_FUNCNAME(void)
 {
-   SCREENTYPE *source;
-   SCREENTYPE *dest;
+   uint16_t *source;
+   uint16_t *dest;
    int  count, yl;
 
    while(--temp_x >= 0)
    {
       yl     = tempyl[temp_x];
-      source = &TEMPBUF[temp_x + (yl << 2)];
-      dest   = drawvars.TOPLEFT + yl * SURFACE_SHORT_PITCH + startx + temp_x;
+      source = &short_tempbuf[temp_x + (yl << 2)];
+      dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + temp_x;
       count  = tempyh[temp_x] - yl + 1;
       
       while(--count >= 0)
       {
 #if (R_DRAWCOLUMN_PIPELINE & RDC_FUZZ)
          // SoM 7-28-04: Fix the fuzz problem.
-         *dest = GETDESTCOLOR(dest[fuzzoffset[fuzzpos]]);
+         *dest = GETDESTCOLOR16(dest[fuzzoffset[fuzzpos]]);
          
          // Clamp table lookup index.
          if(++fuzzpos == FUZZTABLE) 
@@ -89,8 +84,8 @@ static void R_FLUSHWHOLE_FUNCNAME(void)
 //
 static void R_FLUSHHEADTAIL_FUNCNAME(void)
 {
-   SCREENTYPE *source;
-   SCREENTYPE *dest;
+   uint16_t *source;
+   uint16_t *dest;
    int count, colnum = 0;
    int yl, yh;
 
@@ -102,15 +97,15 @@ static void R_FLUSHHEADTAIL_FUNCNAME(void)
       // flush column head
       if(yl < commontop)
       {
-         source = &TEMPBUF[colnum + (yl << 2)];
-         dest   = drawvars.TOPLEFT + yl * SURFACE_SHORT_PITCH + startx + colnum;
+         source = &short_tempbuf[colnum + (yl << 2)];
+         dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + colnum;
          count  = commontop - yl;
          
          while(--count >= 0)
          {
 #if (R_DRAWCOLUMN_PIPELINE & RDC_FUZZ)
             // SoM 7-28-04: Fix the fuzz problem.
-            *dest = GETDESTCOLOR(dest[fuzzoffset[fuzzpos]]);
+            *dest = GETDESTCOLOR16(dest[fuzzoffset[fuzzpos]]);
             
             // Clamp table lookup index.
             if(++fuzzpos == FUZZTABLE) 
@@ -127,15 +122,15 @@ static void R_FLUSHHEADTAIL_FUNCNAME(void)
       // flush column tail
       if(yh > commonbot)
       {
-         source = &TEMPBUF[colnum + ((commonbot + 1) << 2)];
-         dest   = drawvars.TOPLEFT + (commonbot + 1) * SURFACE_SHORT_PITCH + startx + colnum;
+         source = &short_tempbuf[colnum + ((commonbot + 1) << 2)];
+         dest   = drawvars.short_topleft + (commonbot + 1) * SURFACE_SHORT_PITCH + startx + colnum;
          count  = yh - commonbot;
          
          while(--count >= 0)
          {
 #if (R_DRAWCOLUMN_PIPELINE & RDC_FUZZ)
             // SoM 7-28-04: Fix the fuzz problem.
-            *dest = GETDESTCOLOR(dest[fuzzoffset[fuzzpos]]);
+            *dest = GETDESTCOLOR16(dest[fuzzoffset[fuzzpos]]);
             
             // Clamp table lookup index.
             if(++fuzzpos == FUZZTABLE) 
@@ -154,8 +149,8 @@ static void R_FLUSHHEADTAIL_FUNCNAME(void)
 
 static void R_FLUSHQUAD_FUNCNAME(void)
 {
-   SCREENTYPE *source = &TEMPBUF[commontop << 2];
-   SCREENTYPE *dest = drawvars.TOPLEFT + commontop * SURFACE_SHORT_PITCH + startx;
+   uint16_t *source = &short_tempbuf[commontop << 2];
+   uint16_t *dest   = drawvars.short_topleft + commontop * SURFACE_SHORT_PITCH + startx;
    int count;
 #if (R_DRAWCOLUMN_PIPELINE & RDC_FUZZ)
    int fuzz1, fuzz2, fuzz3, fuzz4;
@@ -171,10 +166,10 @@ static void R_FLUSHQUAD_FUNCNAME(void)
 #if (R_DRAWCOLUMN_PIPELINE & RDC_FUZZ)
    while(--count >= 0)
    {
-      dest[0] = GETDESTCOLOR(dest[0 + fuzzoffset[fuzz1]]);
-      dest[1] = GETDESTCOLOR(dest[1 + fuzzoffset[fuzz2]]);
-      dest[2] = GETDESTCOLOR(dest[2 + fuzzoffset[fuzz3]]);
-      dest[3] = GETDESTCOLOR(dest[3 + fuzzoffset[fuzz4]]);
+      dest[0] = GETDESTCOLOR16(dest[0 + fuzzoffset[fuzz1]]);
+      dest[1] = GETDESTCOLOR16(dest[1 + fuzzoffset[fuzz2]]);
+      dest[2] = GETDESTCOLOR16(dest[2 + fuzzoffset[fuzz3]]);
+      dest[3] = GETDESTCOLOR16(dest[3 + fuzzoffset[fuzz4]]);
       fuzz1 = (fuzz1 + 1) % FUZZTABLE;
       fuzz2 = (fuzz2 + 1) % FUZZTABLE;
       fuzz3 = (fuzz3 + 1) % FUZZTABLE;
@@ -196,12 +191,8 @@ static void R_FLUSHQUAD_FUNCNAME(void)
 }
 
 #undef GETDESTCOLOR16
-#undef GETDESTCOLOR
 
-#undef TEMPBUF
 #undef PITCH
-#undef TOPLEFT
-#undef SCREENTYPE
 
 #undef R_DRAWCOLUMN_PIPELINE
 #undef R_FLUSHWHOLE_FUNCNAME

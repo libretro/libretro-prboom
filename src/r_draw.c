@@ -192,17 +192,224 @@ void R_ResetColumnBuffer(void)
    R_FlushQuadColumn   = R_QuadFlushError;
 }
 
-#define R_DRAWCOLUMN_PIPELINE RDC_STANDARD
-#define R_FLUSHWHOLE_FUNCNAME R_FlushWhole16
-#define R_FLUSHHEADTAIL_FUNCNAME R_FlushHT16
-#define R_FLUSHQUAD_FUNCNAME R_FlushQuad16
-#include "r_drawflush.inl"
+/*
+ * R_FlushWhole16
+ *
+ * Flushes the entire columns in the buffer, one at a time.
+ * This is used when a quad flush isn't possible.
+ * Opaque version -- no remapping whatsoever.
+*/
+static void R_FlushWhole16(void)
+{
+   while(--temp_x >= 0)
+   {
+      int yl           = tempyl[temp_x];
+      uint16_t *source = &short_tempbuf[temp_x + (yl << 2)];
+      uint16_t *dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + temp_x;
+      int   count      = tempyh[temp_x] - yl + 1;
+      
+      while(--count >= 0)
+      {
+         *dest   = *source;
+         source += 4;
+         dest   += SURFACE_SHORT_PITCH;
+      }
+   }
+}
 
-#define R_DRAWCOLUMN_PIPELINE RDC_FUZZ
-#define R_FLUSHWHOLE_FUNCNAME R_FlushWholeFuzz16
-#define R_FLUSHHEADTAIL_FUNCNAME R_FlushHTFuzz16
-#define R_FLUSHQUAD_FUNCNAME R_FlushQuadFuzz16
-#include "r_drawflush.inl"
+//
+// R_FlushHT16
+//
+// Flushes the head and tail of columns in the buffer in
+// preparation for a quad flush.
+// Opaque version -- no remapping whatsoever.
+//
+static void R_FlushHT16(void)
+{
+   uint16_t *source;
+   uint16_t *dest;
+   int count, colnum = 0;
+   int yl, yh;
+
+   while(colnum < 4)
+   {
+      yl = tempyl[colnum];
+      yh = tempyh[colnum];
+      
+      // flush column head
+      if(yl < commontop)
+      {
+         source = &short_tempbuf[colnum + (yl << 2)];
+         dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = commontop - yl;
+         
+         while(--count >= 0)
+         {
+            *dest = *source;
+            source += 4;
+            dest += SURFACE_SHORT_PITCH;
+         }
+      }
+      
+      // flush column tail
+      if(yh > commonbot)
+      {
+         source = &short_tempbuf[colnum + ((commonbot + 1) << 2)];
+         dest   = drawvars.short_topleft + (commonbot + 1) * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = yh - commonbot;
+         
+         while(--count >= 0)
+         {
+            *dest = *source;
+
+            source += 4;
+            dest += SURFACE_SHORT_PITCH;
+         }
+      }         
+      ++colnum;
+   }
+}
+
+static void R_FlushQuad16(void)
+{
+   uint16_t *source = &short_tempbuf[commontop << 2];
+   uint16_t *dest   = drawvars.short_topleft + commontop * SURFACE_SHORT_PITCH + startx;
+   int        count = commonbot - commontop + 1;
+
+   while(--count >= 0)
+   {
+      dest[0] = source[0];
+      dest[1] = source[1];
+      dest[2] = source[2];
+      dest[3] = source[3];
+      source += 4;
+      dest += SURFACE_SHORT_PITCH;
+   }
+}
+
+/*
+ * R_FlushWholeFuzz16
+ *
+ * Flushes the entire columns in the buffer, one at a time.
+ * This is used when a quad flush isn't possible.
+ * Opaque version -- no remapping whatsoever.
+*/
+static void R_FlushWholeFuzz16(void)
+{
+   uint16_t *source;
+   uint16_t *dest;
+   int  count, yl;
+
+   while(--temp_x >= 0)
+   {
+      yl     = tempyl[temp_x];
+      source = &short_tempbuf[temp_x + (yl << 2)];
+      dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + temp_x;
+      count  = tempyh[temp_x] - yl + 1;
+      
+      while(--count >= 0)
+      {
+         // SoM 7-28-04: Fix the fuzz problem.
+         *dest = GETBLENDED16_9406(dest[fuzzoffset[fuzzpos]], 0);
+         
+         // Clamp table lookup index.
+         if(++fuzzpos == FUZZTABLE) 
+            fuzzpos = 0;
+
+         source += 4;
+         dest += SURFACE_SHORT_PITCH;
+      }
+   }
+}
+
+//
+// R_FlushHTFuzz16
+//
+// Flushes the head and tail of columns in the buffer in
+// preparation for a quad flush.
+// Opaque version -- no remapping whatsoever.
+//
+static void R_FlushHTFuzz16(void)
+{
+   uint16_t *source;
+   uint16_t *dest;
+   int count, colnum = 0;
+   int yl, yh;
+
+   while(colnum < 4)
+   {
+      yl = tempyl[colnum];
+      yh = tempyh[colnum];
+      
+      // flush column head
+      if(yl < commontop)
+      {
+         source = &short_tempbuf[colnum + (yl << 2)];
+         dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = commontop - yl;
+         
+         while(--count >= 0)
+         {
+            // SoM 7-28-04: Fix the fuzz problem.
+            *dest = GETBLENDED16_9406(dest[fuzzoffset[fuzzpos]], 0);
+            
+            // Clamp table lookup index.
+            if(++fuzzpos == FUZZTABLE) 
+               fuzzpos = 0;
+
+            source += 4;
+            dest += SURFACE_SHORT_PITCH;
+         }
+      }
+      
+      // flush column tail
+      if(yh > commonbot)
+      {
+         source = &short_tempbuf[colnum + ((commonbot + 1) << 2)];
+         dest   = drawvars.short_topleft + (commonbot + 1) * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = yh - commonbot;
+         
+         while(--count >= 0)
+         {
+            // SoM 7-28-04: Fix the fuzz problem.
+            *dest = GETBLENDED16_9406(dest[fuzzoffset[fuzzpos]], 0);
+            
+            // Clamp table lookup index.
+            if(++fuzzpos == FUZZTABLE) 
+               fuzzpos = 0;
+
+            source += 4;
+            dest += SURFACE_SHORT_PITCH;
+         }
+      }         
+      ++colnum;
+   }
+}
+
+static void R_FlushQuadFuzz16(void)
+{
+   uint16_t *source = &short_tempbuf[commontop << 2];
+   uint16_t *dest   = drawvars.short_topleft + commontop * SURFACE_SHORT_PITCH + startx;
+   int fuzz1        = fuzzpos;
+   int fuzz2        = (fuzz1 + tempyl[1]) % FUZZTABLE;
+   int fuzz3        = (fuzz2 + tempyl[2]) % FUZZTABLE;
+   int fuzz4        = (fuzz3 + tempyl[3]) % FUZZTABLE;
+   int count        = commonbot - commontop + 1;
+
+   while(--count >= 0)
+   {
+      dest[0] = GETBLENDED16_9406(dest[0 + fuzzoffset[fuzz1]], 0);
+      dest[1] = GETBLENDED16_9406(dest[1 + fuzzoffset[fuzz2]], 0);
+      dest[2] = GETBLENDED16_9406(dest[2 + fuzzoffset[fuzz3]], 0);
+      dest[3] = GETBLENDED16_9406(dest[3 + fuzzoffset[fuzz4]], 0);
+      fuzz1 = (fuzz1 + 1) % FUZZTABLE;
+      fuzz2 = (fuzz2 + 1) % FUZZTABLE;
+      fuzz3 = (fuzz3 + 1) % FUZZTABLE;
+      fuzz4 = (fuzz4 + 1) % FUZZTABLE;
+      source += 4 * sizeof(uint8_t);
+      dest += SURFACE_SHORT_PITCH * sizeof(uint8_t);
+   }
+}
 
 //
 // R_DrawColumn

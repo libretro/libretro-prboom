@@ -69,47 +69,48 @@ button_t  buttonlist[MAXBUTTONS];
 //
 void P_InitSwitchList(void)
 {
-  int i, index = 0;
-  int episode = (gamemode == registered || gamemode==retail) ?
-                 2 : gamemode == commercial ? 3 : 1;
-  const switchlist_t *alphSwitchList;         //jff 3/23/98 pointer to switch table
-  int lump = W_GetNumForName("SWITCHES"); // cph - new wad lump handling
+   int i, index = 0;
+   int episode = (gamemode == registered || gamemode==retail) ?
+      2 : gamemode == commercial ? 3 : 1;
+   const switchlist_t *alphSwitchList;         //jff 3/23/98 pointer to switch table
+   int lump = W_GetNumForName("SWITCHES"); // cph - new wad lump handling
 
-  //jff 3/23/98 read the switch table from a predefined lump
-  alphSwitchList = (const switchlist_t *)W_CacheLumpNum(lump);
+   //jff 3/23/98 read the switch table from a predefined lump
+   alphSwitchList = (const switchlist_t *)W_CacheLumpNum(lump);
 
-  for (i=0;;i++)
-  {
-    if (index+1 >= max_numswitches)
-      switchlist = realloc(switchlist, sizeof *switchlist *
-          (max_numswitches = max_numswitches ? max_numswitches*2 : 8));
-    if (SHORT(alphSwitchList[i].episode) <= episode) //jff 5/11/98 endianess
-    {
-      int texture1, texture2;
+   for (i=0;;i++)
+   {
+      if (index+1 >= max_numswitches)
+         switchlist = realloc(switchlist, sizeof *switchlist *
+               (max_numswitches = max_numswitches ? max_numswitches*2 : 8));
 
-      if (!SHORT(alphSwitchList[i].episode))
-        break;
+      if (SHORT(alphSwitchList[i].episode) <= episode)
+      {
+         int texture1, texture2;
 
-      // Ignore switches referencing unknown texture names, instead of exiting.
-      // Warn if either one is missing, but only add if both are valid.
-      texture1 = R_CheckTextureNumForName(alphSwitchList[i].name1);
-      if (texture1 == -1)
-        lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
-            alphSwitchList[i].name1);
-      texture2 = R_CheckTextureNumForName(alphSwitchList[i].name2);
-      if (texture2 == -1)
-        lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
-            alphSwitchList[i].name2);
-      if (texture1 != -1 && texture2 != -1) {
-        switchlist[index++] = texture1;
-        switchlist[index++] = texture2;
+         if (!SHORT(alphSwitchList[i].episode))
+            break;
+
+         // Ignore switches referencing unknown texture names, instead of exiting.
+         // Warn if either one is missing, but only add if both are valid.
+         texture1 = R_CheckTextureNumForName(alphSwitchList[i].name1);
+         if (texture1 == -1)
+            lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
+                  alphSwitchList[i].name1);
+         texture2 = R_CheckTextureNumForName(alphSwitchList[i].name2);
+         if (texture2 == -1)
+            lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
+                  alphSwitchList[i].name2);
+         if (texture1 != -1 && texture2 != -1) {
+            switchlist[index++] = texture1;
+            switchlist[index++] = texture2;
+         }
       }
-    }
-  }
+   }
 
-  numswitches = index/2;
-  switchlist[index] = -1;
-  W_UnlockLumpNum(lump);
+   numswitches = index/2;
+   switchlist[index] = -1;
+   W_UnlockLumpNum(lump);
 }
 
 //
@@ -130,23 +131,26 @@ static void P_StartButton
 {
   int           i;
 
-  // See if button is already pressed
+  /* See if button is already pressed */
   for (i = 0;i < MAXBUTTONS;i++)
     if (buttonlist[i].btimer && buttonlist[i].line == line)
       return;
 
   for (i = 0;i < MAXBUTTONS;i++)
-    if (!buttonlist[i].btimer)    // use first unused element of list
-    {
-      buttonlist[i].line = line;
-      buttonlist[i].where = w;
-      buttonlist[i].btexture = texture;
-      buttonlist[i].btimer = time;
-      /* use sound origin of line itself - no need to compatibility-wrap
-       * as the popout code gets it wrong whatever its value */
-      buttonlist[i].soundorg = (mobj_t *)&line->soundorg;
-      return;
-    }
+  {
+     if (buttonlist[i].btimer)
+        continue;
+
+     /* use first unused element of list */
+     buttonlist[i].line = line;
+     buttonlist[i].where = w;
+     buttonlist[i].btexture = texture;
+     buttonlist[i].btimer = time;
+     /* use sound origin of line itself - no need to compatibility-wrap
+      * as the popout code gets it wrong whatever its value */
+     buttonlist[i].soundorg = (mobj_t *)&line->soundorg;
+     return;
+  }
 
   I_Error("P_StartButton: no button slots left!");
 }
@@ -165,80 +169,76 @@ void P_ChangeSwitchTexture
 ( line_t*       line,
   int           useAgain )
 {
-  /* Rearranged a bit to avoid too much code duplication */
-  mobj_t  *soundorg;
-  int     i, sound;
-  short   *texture, *ttop, *tmid, *tbot;
-  bwhere_e position;
+   /* Rearranged a bit to avoid too much code duplication */
+   int     i;
+   bwhere_e position = 0;
+   int16_t *texture  = NULL;
+   int16_t *ttop     = &sides[line->sidenum[0]].toptexture;
+   int16_t *tmid     = &sides[line->sidenum[0]].midtexture;
+   int16_t *tbot     = &sides[line->sidenum[0]].bottomtexture;
+   int sound         = sfx_swtchn;
 
-  ttop = &sides[line->sidenum[0]].toptexture;
-  tmid = &sides[line->sidenum[0]].midtexture;
-  tbot = &sides[line->sidenum[0]].bottomtexture;
+   /* use the sound origin of the linedef (its midpoint)
+    * unless in a compatibility mode */
+   mobj_t *soundorg  = (mobj_t *)&line->soundorg;
 
-  sound = sfx_swtchn;
-  /* use the sound origin of the linedef (its midpoint)
-   * unless in a compatibility mode */
-  soundorg = (mobj_t *)&line->soundorg;
-  if (comp[comp_sound] || compatibility_level < prboom_6_compatibility) {
-    /* usually NULL, unless there is another button already pressed in,
-     * in which case it's the sound origin of that button press... */
-    soundorg = buttonlist->soundorg;
-  } else {
-    // EXIT SWITCH?
-    /* don't do this unless you're in a compatibility mode */
-    // proff - this works as advertised, but I don't like the sound
-    // if (line->special == 11 || line->special == 51) // exit or secret exit
-    //   sound = sfx_swtchx;
-  }
+   if (comp[comp_sound] || compatibility_level < prboom_6_compatibility)
+   {
+      /* usually NULL, unless there is another button already pressed in,
+       * in which case it's the sound origin of that button press... */
+      soundorg = buttonlist->soundorg;
+   }
 
-  /* don't zero line->special until after exit switch test */
-  if (!useAgain)
-    line->special = 0;
+   /* don't zero line->special until after exit switch test */
+   if (!useAgain)
+      line->special = 0;
 
-  /* search for a texture to change */
-  texture = NULL; position = 0;
-  for (i = 0;i < numswitches*2;i++) { /* this could be more efficient... */
-    if (switchlist[i] == *ttop)
-    {
-      texture = ttop;
-      position = SWTCH_TOP;
-      break;
-    }
-    else if (switchlist[i] == *tmid)
-    {
-      texture = tmid;
-      position = SWTCH_MIDDLE;
-      break;
-    }
-    else if (switchlist[i] == *tbot)
-    {
-      texture = tbot;
-      position = SWTCH_BOTTOM;
-      break;
-    }
-  }
-  if (texture == NULL)
-    return; /* no switch texture was found to change */
-  *texture = switchlist[i^1];
+   /* search for a texture to change */
 
-  S_StartSound(soundorg, sound);
+   for (i = 0;i < numswitches*2;i++)
+   { /* this could be more efficient... */
+      if (switchlist[i] == *ttop)
+      {
+         texture = ttop;
+         position = SWTCH_TOP;
+         break;
+      }
+      else if (switchlist[i] == *tmid)
+      {
+         texture = tmid;
+         position = SWTCH_MIDDLE;
+         break;
+      }
+      else if (switchlist[i] == *tbot)
+      {
+         texture = tbot;
+         position = SWTCH_BOTTOM;
+         break;
+      }
+   }
 
-  if (useAgain)
-    P_StartButton(line, position, switchlist[i], BUTTONTIME);
+   if (texture == NULL)
+      return; /* no switch texture was found to change */
+   *texture = switchlist[i^1];
+
+   S_StartSound(soundorg, sound);
+
+   if (useAgain)
+      P_StartButton(line, position, switchlist[i], BUTTONTIME);
 }
 
 
-//
-// P_UseSpecialLine
-//
-//
-// Called when a thing uses (pushes) a special line.
-// Only the front sides of lines are usable.
-// Dispatches to the appropriate linedef function handler.
-//
-// Passed the thing using the line, the line being used, and the side used
-// Returns TRUE if a thinker was created
-//
+/*
+ * P_UseSpecialLine
+ *
+ *
+ * Called when a thing uses (pushes) a special line.
+ * Only the front sides of lines are usable.
+ * Dispatches to the appropriate linedef function handler.
+ *
+ * Passed the thing using the line, the line being used, and the side used
+ * Returns TRUE if a thinker was created
+*/
 boolean
 P_UseSpecialLine
 ( mobj_t*       thing,

@@ -64,12 +64,12 @@ thinker_t thinkerclasscap[th_all+1];
 
 void P_InitThinkers(void)
 {
-  int i;
+   int i;
 
-  for (i=0; i<NUMTHCLASS; i++)  // killough 8/29/98: initialize threaded lists
-    thinkerclasscap[i].cprev = thinkerclasscap[i].cnext = &thinkerclasscap[i];
+   for (i=0; i<NUMTHCLASS; i++)  // killough 8/29/98: initialize threaded lists
+      thinkerclasscap[i].cprev = thinkerclasscap[i].cnext = &thinkerclasscap[i];
 
-  thinkercap.prev = thinkercap.next  = &thinkercap;
+   thinkercap.prev = thinkercap.next  = &thinkercap;
 }
 
 //
@@ -81,7 +81,7 @@ void P_InitThinkers(void)
 
 void P_UpdateThinker(thinker_t *thinker)
 {
-  register thinker_t *th;
+  thinker_t *th = NULL;
   // find the class the thinker belongs to
 
   int class =
@@ -120,14 +120,15 @@ void P_UpdateThinker(thinker_t *thinker)
 void P_AddThinker(thinker_t* thinker)
 {
   thinkercap.prev->next = thinker;
-  thinker->next = &thinkercap;
-  thinker->prev = thinkercap.prev;
-  thinkercap.prev = thinker;
+  thinker->next         = &thinkercap;
+  thinker->prev         = thinkercap.prev;
+  thinkercap.prev       = thinker;
 
-  thinker->references = 0;    // killough 11/98: init reference counter to 0
+  thinker->references   = 0;    // killough 11/98: init reference counter to 0
 
   // killough 8/29/98: set sentinel pointers, and then add to appropriate list
-  thinker->cnext = thinker->cprev = NULL;
+  thinker->cnext        = NULL;
+  thinker->cprev        = NULL;
   P_UpdateThinker(thinker);
   newthinkerpresent = TRUE;
 }
@@ -153,23 +154,23 @@ static thinker_t *currentthinker;
 
 void P_RemoveThinkerDelayed(thinker_t *thinker)
 {
-  if (!thinker->references)
-    {
-      { /* Remove from main thinker list */
-        thinker_t *next = thinker->next;
-        /* Note that currentthinker is guaranteed to point to us,
-         * and since we're freeing our memory, we had better change that. So
-         * point it to thinker->prev, so the iterator will correctly move on to
-         * thinker->prev->next = thinker->next */
-        (next->prev = currentthinker = thinker->prev)->next = next;
-      }
-      {
-        /* Remove from current thinker class list */
-        thinker_t *th = thinker->cnext;
-        (th->cprev = thinker->cprev)->cnext = th;
-      }
-      Z_Free(thinker);
-    }
+   thinker_t *next = NULL;
+   thinker_t *th   = NULL;
+      if (thinker->references)
+         return;
+
+   /* Remove from main thinker list */
+   next = thinker->next;
+   /* Note that currentthinker is guaranteed to point to us,
+    * and since we're freeing our memory, we had better change that. So
+    * point it to thinker->prev, so the iterator will correctly move on to
+    * thinker->prev->next = thinker->next */
+   (next->prev = currentthinker = thinker->prev)->next = next;
+
+   /* Remove from current thinker class list */
+   th = thinker->cnext;
+   (th->cprev = thinker->cprev)->cnext = th;
+   Z_Free(thinker);
 }
 
 //
@@ -200,10 +201,18 @@ void P_RemoveThinker(thinker_t *thinker)
  */
 thinker_t* P_NextThinker(thinker_t* th, th_class cl)
 {
-  thinker_t* top = &thinkerclasscap[cl];
-  if (!th) th = top;
-  th = cl == th_all ? th->next : th->cnext;
-  return th == top ? NULL : th;
+   thinker_t* top = &thinkerclasscap[cl];
+   if (!th)
+      th = top;
+
+   if (cl == th_all)
+      th = th->next;
+   else
+      th = th->cnext;
+
+   if (th != top)
+      return th;
+   return NULL;
 }
 
 /*

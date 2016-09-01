@@ -2202,14 +2202,14 @@ void A_BossDeath(mobj_t *mo)
           if (mo->type == MT_FATSO)
             {
               junk.tag = 666;
-              EV_DoFloor(&junk,lowerFloorToLowest);
+              EV_DoFloor(&junk,FLEV_LOWERFLOORTOLOWEST);
               return;
             }
 
           if (mo->type == MT_BABY)
             {
               junk.tag = 667;
-              EV_DoFloor(&junk,raiseToTexture);
+              EV_DoFloor(&junk, FLEV_RAISETOTEXTURE);
               return;
             }
         }
@@ -2220,7 +2220,7 @@ void A_BossDeath(mobj_t *mo)
         {
         case 1:
           junk.tag = 666;
-          EV_DoFloor(&junk, lowerFloorToLowest);
+          EV_DoFloor(&junk, FLEV_LOWERFLOORTOLOWEST);
           return;
         case 4:
           switch(gamemap)
@@ -2231,7 +2231,7 @@ void A_BossDeath(mobj_t *mo)
               return;
             case 8:
               junk.tag = 666;
-              EV_DoFloor(&junk, lowerFloorToLowest);
+              EV_DoFloor(&junk, FLEV_LOWERFLOORTOLOWEST);
               return;
             }
         }

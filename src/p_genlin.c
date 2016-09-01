@@ -120,7 +120,7 @@ manual_floor:
     floor->newspecial = sec->special;
     //jff 3/14/98 transfer old special field too
     floor->oldspecial = sec->oldspecial;
-    floor->type = genFloor;
+    floor->type = FLEV_GENFLOOR;
 
     // set the speed of motion
     switch (Sped)
@@ -203,16 +203,16 @@ manual_floor:
               floor->newspecial = 0;
               //jff 3/14/98 change old field too
               floor->oldspecial = 0;
-              floor->type = genFloorChg0;
+              floor->type = FLEV_GENFLOORCHG0;
               break;
             case FChgTyp:   // copy type
               floor->newspecial = sec->special;
               //jff 3/14/98 change old field too
               floor->oldspecial = sec->oldspecial;
-              floor->type = genFloorChgT;
+              floor->type = FLEV_GENFLOORCHGT;
               break;
             case FChgTxt:   // leave type be
-              floor->type = genFloorChg;
+              floor->type = FLEV_GENFLOORCHG;
               break;
             default:
               break;
@@ -228,16 +228,16 @@ manual_floor:
             floor->newspecial = 0;
             //jff 3/14/98 change old field too
             floor->oldspecial = 0;
-            floor->type = genFloorChg0;
+            floor->type = FLEV_GENFLOORCHG0;
             break;
           case FChgTyp:     // copy type
             floor->newspecial = line->frontsector->special;
             //jff 3/14/98 change old field too
             floor->oldspecial = line->frontsector->oldspecial;
-            floor->type = genFloorChgT;
+            floor->type = FLEV_GENFLOORCHGT;
             break;
           case FChgTxt:     // leave type be
-            floor->type = genFloorChg;
+            floor->type = FLEV_GENFLOORCHG;
           default:
             break;
         }
@@ -729,7 +729,7 @@ manual_stair:
     floor->floordestheight = height;
     texture = sec->floorpic;
     floor->crush = FALSE;
-    floor->type = genBuildStair; // jff 3/31/98 do not leave uninited
+    floor->type = FLEV_GENBUILDSTAIR; // jff 3/31/98 do not leave uninited
 
     sec->stairlock = -2;         // jff 2/26/98 set up lock on current sector
     sec->nextsec = -1;
@@ -793,7 +793,7 @@ manual_stair:
         floor->speed = speed;
         floor->floordestheight = height;
         floor->crush = FALSE;
-        floor->type = genBuildStair; // jff 3/31/98 do not leave uninited
+        floor->type = FLEV_GENBUILDSTAIR; // jff 3/31/98 do not leave uninited
 
         ok = 1;
         break;

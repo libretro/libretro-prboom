@@ -413,59 +413,60 @@ typedef enum
 
 typedef enum
 {
-  // lower floor to highest surrounding floor
-  lowerFloor,
+  /* lower floor to highest surrounding floor */
+  FLEV_LOWERFLOOR,
 
-  // lower floor to lowest surrounding floor
-  lowerFloorToLowest,
+  /* lower floor to lowest surrounding floor */
+  FLEV_LOWERFLOORTOLOWEST,
 
-  // lower floor to highest surrounding floor VERY FAST
-  turboLower,
+  /* lower floor to highest surrounding floor VERY FAST */
+  FLEV_TURBOLOWER,
 
-  // raise floor to lowest surrounding CEILING
-  raiseFloor,
+  /* raise floor to lowest surrounding CEILING */
+  FLEV_RAISEFLOOR,
 
-  // raise floor to next highest surrounding floor
-  raiseFloorToNearest,
+  /* raise floor to next highest surrounding floor */
+  FLEV_RAISEFLOORTONEAREST,
 
-  //jff 02/03/98 lower floor to next lowest neighbor
-  lowerFloorToNearest,
+  /* jff 02/03/98 lower floor to next lowest neighbor */
+  FLEV_LOWERFLOORTONEAREST,
 
-  //jff 02/03/98 lower floor 24 absolute
-  lowerFloor24,
+  /* jff 02/03/98 lower floor 24 absolute */
+  FLEV_LOWERFLOOR24,
 
-  //jff 02/03/98 lower floor 32 absolute
-  lowerFloor32Turbo,
+  /* jff 02/03/98 lower floor 32 absolute */
+  FLEV_LOWERFLOOR32TURBO,
 
-  // raise floor to shortest height texture around it
-  raiseToTexture,
+  /* raise floor to shortest height texture around it */
+  FLEV_RAISETOTEXTURE,
 
-  // lower floor to lowest surrounding floor
-  //  and change floorpic
-  lowerAndChange,
+  /* lower floor to lowest surrounding floor
+   *  and change floorpic */
+  FLEV_LOWERANDCHANGE,
 
-  raiseFloor24,
+  FLEV_RAISEFLOOR24,
 
-  //jff 02/03/98 raise floor 32 absolute
-  raiseFloor32Turbo,
+  /* jff 02/03/98 raise floor 32 absolute */
+  FLEV_RAISEFLOOR32TURBO,
 
-  raiseFloor24AndChange,
-  raiseFloorCrush,
+  FLEV_RAISEFLOOR24ANDCHANGE,
 
-  // raise to next highest floor, turbo-speed
-  raiseFloorTurbo,
-  donutRaise,
-  raiseFloor512,
+  FLEV_RAISEFLOORCRUSH,
 
-  //jff 02/04/98  add types for generalized floor mover
-  genFloor,
-  genFloorChg,
-  genFloorChg0,
-  genFloorChgT,
+  /* raise to next highest floor, turbo-speed */
+  FLEV_RAISEFLOORTURBO,
+  FLEV_DONUTRAISE,
+  FLEV_RAISEFLOOR512,
 
-  //new types for stair builders
-  buildStair,
-  genBuildStair,
+  /* jff 02/04/98  add types for generalized floor mover */
+  FLEV_GENFLOOR,
+  FLEV_GENFLOORCHG,
+  FLEV_GENFLOORCHG0,
+  FLEV_GENFLOORCHGT,
+
+  /* new types for stair builders */
+  FLEV_BUILDSTAIR,
+  FLEV_GENBUILDSTAIR
 } floor_e;
 
 typedef enum

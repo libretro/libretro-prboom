@@ -448,7 +448,7 @@ P_UseSpecialLine
 
     case 18:
       // Raise Floor to next highest floor
-      if (EV_DoFloor(line, raiseFloorToNearest))
+      if (EV_DoFloor(line, FLEV_RAISEFLOORTONEAREST))
         P_ChangeSwitchTexture(line,0);
       break;
 
@@ -466,7 +466,7 @@ P_UseSpecialLine
 
     case 23:
       // Lower Floor to Lowest
-      if (EV_DoFloor(line,lowerFloorToLowest))
+      if (EV_DoFloor(line, FLEV_LOWERFLOORTOLOWEST))
         P_ChangeSwitchTexture(line,0);
       break;
 
@@ -484,7 +484,7 @@ P_UseSpecialLine
 
     case 71:
       // Turbo Lower Floor
-      if (EV_DoFloor(line,turboLower))
+      if (EV_DoFloor(line, FLEV_TURBOLOWER))
         P_ChangeSwitchTexture(line,0);
       break;
 
@@ -516,19 +516,19 @@ P_UseSpecialLine
 
     case 55:
       // Raise Floor Crush
-      if (EV_DoFloor(line,raiseFloorCrush))
+      if (EV_DoFloor(line, FLEV_RAISEFLOORCRUSH))
         P_ChangeSwitchTexture(line,0);
       break;
 
     case 101:
       // Raise Floor
-      if (EV_DoFloor(line,raiseFloor))
+      if (EV_DoFloor(line, FLEV_RAISEFLOOR))
         P_ChangeSwitchTexture(line,0);
       break;
 
     case 102:
       // Lower Floor to Surrounding floor height
-      if (EV_DoFloor(line,lowerFloor))
+      if (EV_DoFloor(line, FLEV_LOWERFLOOR))
         P_ChangeSwitchTexture(line,0);
       break;
 
@@ -570,7 +570,7 @@ P_UseSpecialLine
 
     case 131:
       // Raise Floor Turbo
-      if (EV_DoFloor(line,raiseFloorTurbo))
+      if (EV_DoFloor(line, FLEV_RAISEFLOORTURBO))
         P_ChangeSwitchTexture(line,0);
       break;
 
@@ -586,7 +586,7 @@ P_UseSpecialLine
 
     case 140:
       // Raise Floor 512
-      if (EV_DoFloor(line,raiseFloor512))
+      if (EV_DoFloor(line, FLEV_RAISEFLOOR512))
         P_ChangeSwitchTexture(line,0);
       break;
 
@@ -602,29 +602,29 @@ P_UseSpecialLine
 
           case 158:
             // Raise Floor to shortest lower texture
-            // 158 S1  EV_DoFloor(raiseToTexture), CSW(0)
-            if (EV_DoFloor(line,raiseToTexture))
+            // 158 S1  EV_DoFloor(FLEV_RAISETOTEXTURE), CSW(0)
+            if (EV_DoFloor(line, FLEV_RAISETOTEXTURE))
               P_ChangeSwitchTexture(line,0);
             break;
 
           case 159:
             // Raise Floor to shortest lower texture
-            // 159 S1  EV_DoFloor(lowerAndChange)
-            if (EV_DoFloor(line,lowerAndChange))
+            // 159 S1  EV_DoFloor(FLEV_LOWERANDCHANGE)
+            if (EV_DoFloor(line,FLEV_LOWERANDCHANGE))
               P_ChangeSwitchTexture(line,0);
             break;
 
           case 160:
             // Raise Floor 24 and change
-            // 160 S1  EV_DoFloor(raiseFloor24AndChange)
-            if (EV_DoFloor(line,raiseFloor24AndChange))
+            // 160 S1  EV_DoFloor(FLEV_RAISEFLOOR24ANDCHANGE)
+            if (EV_DoFloor(line,FLEV_RAISEFLOOR24ANDCHANGE))
               P_ChangeSwitchTexture(line,0);
             break;
 
           case 161:
             // Raise Floor 24
-            // 161 S1  EV_DoFloor(raiseFloor24)
-            if (EV_DoFloor(line,raiseFloor24))
+            // 161 S1  EV_DoFloor(FLEV_RAISEFLOOR24)
+            if (EV_DoFloor(line, FLEV_RAISEFLOOR24))
               P_ChangeSwitchTexture(line,0);
             break;
 
@@ -658,9 +658,9 @@ P_UseSpecialLine
 
           case 166:
             // Raise ceiling, Lower floor
-            // 166 S1 EV_DoCeiling(raiseToHighest), EV_DoFloor(lowerFloortoLowest)
+            // 166 S1 EV_DoCeiling(raiseToHighest), EV_DoFloor(FLEV_LOWERFLOORTOLOWEST)
             if (EV_DoCeiling(line, raiseToHighest) ||
-                EV_DoFloor(line, lowerFloorToLowest))
+                EV_DoFloor(line, FLEV_LOWERFLOORTOLOWEST))
               P_ChangeSwitchTexture(line,0);
             break;
 
@@ -765,7 +765,7 @@ P_UseSpecialLine
           case 221:
             // Lower floor to next lowest floor
             // 221 S1 Lower Floor To Nearest Floor
-            if (EV_DoFloor(line,lowerFloorToNearest))
+            if (EV_DoFloor(line, FLEV_LOWERFLOORTONEAREST))
               P_ChangeSwitchTexture(line,0);
             break;
 
@@ -805,36 +805,36 @@ P_UseSpecialLine
 
           case 176:
             // Raise Floor to shortest lower texture
-            // 176 SR  EV_DoFloor(raiseToTexture), CSW(1)
-            if (EV_DoFloor(line,raiseToTexture))
+            // 176 SR  EV_DoFloor(FLEV_RAISETOTEXTURE), CSW(1)
+            if (EV_DoFloor(line, FLEV_RAISETOTEXTURE))
               P_ChangeSwitchTexture(line,1);
             break;
 
           case 177:
             // Raise Floor to shortest lower texture
-            // 177 SR  EV_DoFloor(lowerAndChange)
-            if (EV_DoFloor(line,lowerAndChange))
+            // 177 SR  EV_DoFloor(FLEV_LOWERANDCHANGE)
+            if (EV_DoFloor(line,FLEV_LOWERANDCHANGE))
               P_ChangeSwitchTexture(line,1);
             break;
 
           case 178:
             // Raise Floor 512
-            // 178 SR  EV_DoFloor(raiseFloor512)
-            if (EV_DoFloor(line,raiseFloor512))
+            // 178 SR  EV_DoFloor(FLEV_RAISEFLOOR512)
+            if (EV_DoFloor(line, FLEV_RAISEFLOOR512))
               P_ChangeSwitchTexture(line,1);
             break;
 
           case 179:
             // Raise Floor 24 and change
-            // 179 SR  EV_DoFloor(raiseFloor24AndChange)
-            if (EV_DoFloor(line,raiseFloor24AndChange))
+            // 179 SR  EV_DoFloor(FLEV_RAISEFLOOR24ANDCHANGE)
+            if (EV_DoFloor(line, FLEV_RAISEFLOOR24ANDCHANGE))
               P_ChangeSwitchTexture(line,1);
             break;
 
           case 180:
             // Raise Floor 24
-            // 180 SR  EV_DoFloor(raiseFloor24)
-            if (EV_DoFloor(line,raiseFloor24))
+            // 180 SR  EV_DoFloor(FLEV_RAISEFLOOR24)
+            if (EV_DoFloor(line, FLEV_RAISEFLOOR24))
               P_ChangeSwitchTexture(line,1);
             break;
 
@@ -878,7 +878,7 @@ P_UseSpecialLine
             // Raise ceiling, Lower floor
             // 186 SR EV_DoCeiling(raiseToHighest), EV_DoFloor(lowerFloortoLowest)
             if (EV_DoCeiling(line, raiseToHighest) ||
-                EV_DoFloor(line, lowerFloorToLowest))
+                EV_DoFloor(line,  FLEV_LOWERFLOORTOLOWEST))
               P_ChangeSwitchTexture(line,1);
             break;
 
@@ -976,7 +976,7 @@ P_UseSpecialLine
           case 222:
             // Lower floor to next lowest floor
             // 222 SR Lower Floor To Nearest Floor
-            if (EV_DoFloor(line,lowerFloorToNearest))
+            if (EV_DoFloor(line, FLEV_LOWERFLOORTONEAREST))
               P_ChangeSwitchTexture(line,1);
             break;
 
@@ -1035,13 +1035,13 @@ P_UseSpecialLine
 
     case 45:
       // Lower Floor to Surrounding floor height
-      if (EV_DoFloor(line,lowerFloor))
+      if (EV_DoFloor(line, FLEV_LOWERFLOOR))
         P_ChangeSwitchTexture(line,1);
       break;
 
     case 60:
       // Lower Floor to Lowest
-      if (EV_DoFloor(line,lowerFloorToLowest))
+      if (EV_DoFloor(line, FLEV_LOWERFLOORTONEAREST))
         P_ChangeSwitchTexture(line,1);
       break;
 
@@ -1065,7 +1065,7 @@ P_UseSpecialLine
 
     case 64:
       // Raise Floor to ceiling
-      if (EV_DoFloor(line,raiseFloor))
+      if (EV_DoFloor(line, FLEV_RAISEFLOOR))
         P_ChangeSwitchTexture(line,1);
       break;
 
@@ -1083,7 +1083,7 @@ P_UseSpecialLine
 
     case 65:
       // Raise Floor Crush
-      if (EV_DoFloor(line,raiseFloorCrush))
+      if (EV_DoFloor(line, FLEV_RAISEFLOORCRUSH))
         P_ChangeSwitchTexture(line,1);
       break;
 
@@ -1095,13 +1095,13 @@ P_UseSpecialLine
 
     case 69:
       // Raise Floor to next highest floor
-      if (EV_DoFloor(line, raiseFloorToNearest))
+      if (EV_DoFloor(line,  FLEV_RAISEFLOORTONEAREST))
         P_ChangeSwitchTexture(line,1);
       break;
 
     case 70:
       // Turbo Lower Floor
-      if (EV_DoFloor(line,turboLower))
+      if (EV_DoFloor(line, FLEV_TURBOLOWER))
         P_ChangeSwitchTexture(line,1);
       break;
 
@@ -1131,7 +1131,7 @@ P_UseSpecialLine
 
     case 132:
       // Raise Floor Turbo
-      if (EV_DoFloor(line,raiseFloorTurbo))
+      if (EV_DoFloor(line, FLEV_RAISEFLOORTURBO))
         P_ChangeSwitchTexture(line,1);
       break;
 

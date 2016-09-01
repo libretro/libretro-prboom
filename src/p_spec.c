@@ -1283,7 +1283,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 5:
       // Raise Floor
-      if (EV_DoFloor(line,raiseFloor) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_RAISEFLOOR) || demo_compatibility)
         line->special = 0;
       break;
 
@@ -1331,7 +1331,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 19:
       // Lower Floor
-      if (EV_DoFloor(line,lowerFloor) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_LOWERFLOOR) || demo_compatibility)
         line->special = 0;
       break;
 
@@ -1350,7 +1350,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
     case 30:
       // Raise floor to shortest texture height
       //  on either side of lines.
-      if (EV_DoFloor(line,raiseToTexture) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_RAISETOTEXTURE) || demo_compatibility)
         line->special = 0;
       break;
 
@@ -1362,19 +1362,19 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 36:
       // Lower Floor (TURBO)
-      if (EV_DoFloor(line,turboLower) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_TURBOLOWER) || demo_compatibility)
         line->special = 0;
       break;
 
     case 37:
       // LowerAndChange
-      if (EV_DoFloor(line,lowerAndChange) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_LOWERANDCHANGE) || demo_compatibility)
         line->special = 0;
       break;
 
     case 38:
       // Lower Floor To Lowest
-      if (EV_DoFloor(line, lowerFloorToLowest) || demo_compatibility)
+      if (EV_DoFloor(line,  FLEV_LOWERFLOORTOLOWEST) || demo_compatibility)
         line->special = 0;
       break;
 
@@ -1389,7 +1389,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
       if (demo_compatibility)
       {
         EV_DoCeiling( line, raiseToHighest );
-        EV_DoFloor( line, lowerFloorToLowest ); //jff 02/12/98 doesn't work
+        EV_DoFloor( line, FLEV_LOWERFLOORTOLOWEST ); //jff 02/12/98 doesn't work
         line->special = 0;
       }
       else
@@ -1424,7 +1424,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 56:
       // Raise Floor Crush
-      if (EV_DoFloor(line,raiseFloorCrush) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_RAISEFLOORCRUSH) || demo_compatibility)
         line->special = 0;
       break;
 
@@ -1436,13 +1436,13 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 58:
       // Raise Floor 24
-      if (EV_DoFloor(line,raiseFloor24) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_RAISEFLOOR24) || demo_compatibility)
         line->special = 0;
       break;
 
     case 59:
       // Raise Floor 24 And Change
-      if (EV_DoFloor(line,raiseFloor24AndChange) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_RAISEFLOOR24ANDCHANGE) || demo_compatibility)
         line->special = 0;
       break;
 
@@ -1478,7 +1478,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 119:
       // Raise floor to nearest surr. floor
-      if (EV_DoFloor(line,raiseFloorToNearest) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_RAISEFLOORTONEAREST) || demo_compatibility)
         line->special = 0;
       break;
 
@@ -1505,7 +1505,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 130:
       // Raise Floor Turbo
-      if (EV_DoFloor(line,raiseFloorTurbo) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_RAISEFLOORTURBO) || demo_compatibility)
         line->special = 0;
       break;
 
@@ -1564,17 +1564,17 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 82:
       // Lower Floor To Lowest
-      EV_DoFloor( line, lowerFloorToLowest );
+      EV_DoFloor( line, FLEV_LOWERFLOORTOLOWEST );
       break;
 
     case 83:
       // Lower Floor
-      EV_DoFloor(line,lowerFloor);
+      EV_DoFloor(line, FLEV_LOWERFLOOR);
       break;
 
     case 84:
       // LowerAndChange
-      EV_DoFloor(line,lowerAndChange);
+      EV_DoFloor(line, FLEV_LOWERANDCHANGE);
       break;
 
     case 86:
@@ -1604,22 +1604,22 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 91:
       // Raise Floor
-      EV_DoFloor(line,raiseFloor);
+      EV_DoFloor(line, FLEV_RAISEFLOOR);
       break;
 
     case 92:
       // Raise Floor 24
-      EV_DoFloor(line,raiseFloor24);
+      EV_DoFloor(line, FLEV_RAISEFLOOR24);
       break;
 
     case 93:
       // Raise Floor 24 And Change
-      EV_DoFloor(line,raiseFloor24AndChange);
+      EV_DoFloor(line, FLEV_RAISEFLOOR24ANDCHANGE);
       break;
 
     case 94:
       // Raise Floor Crush
-      EV_DoFloor(line,raiseFloorCrush);
+      EV_DoFloor(line, FLEV_RAISEFLOORCRUSH);
       break;
 
     case 95:
@@ -1631,7 +1631,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
     case 96:
       // Raise floor to shortest texture height
       // on either side of lines.
-      EV_DoFloor(line,raiseToTexture);
+      EV_DoFloor(line, FLEV_RAISETOTEXTURE);
       break;
 
     case 97:
@@ -1641,7 +1641,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 98:
       // Lower Floor (TURBO)
-      EV_DoFloor(line,turboLower);
+      EV_DoFloor(line, FLEV_TURBOLOWER);
       break;
 
     case 105:
@@ -1672,12 +1672,12 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
     case 128:
       // Raise To Nearest Floor
-      EV_DoFloor(line,raiseFloorToNearest);
+      EV_DoFloor(line, FLEV_RAISEFLOORTONEAREST);
       break;
 
     case 129:
       // Raise Floor Turbo
-      EV_DoFloor(line,raiseFloorTurbo);
+      EV_DoFloor(line, FLEV_RAISEFLOORTURBO);
       break;
 
       // Extended walk triggers
@@ -1699,8 +1699,8 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
           case 142:
             // Raise Floor 512
-            // 142 W1  EV_DoFloor(raiseFloor512)
-            if (EV_DoFloor(line,raiseFloor512))
+            // 142 W1  EV_DoFloor(FLEV_RAISEFLOOR512)
+            if (EV_DoFloor(line, FLEV_RAISEFLOOR512))
               line->special = 0;
             break;
 
@@ -1770,7 +1770,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
           case 219:
             // Lower floor to next lower neighbor
             // 219 W1 Lower Floor Next Lower Neighbor
-            if (EV_DoFloor(line,lowerFloorToNearest))
+            if (EV_DoFloor(line, FLEV_LOWERFLOORTONEAREST))
               line->special = 0;
             break;
 
@@ -1832,8 +1832,8 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 
           case 147:
             // Raise Floor 512
-            // 147 WR  EV_DoFloor(raiseFloor512)
-            EV_DoFloor(line,raiseFloor512);
+            // 147 WR  EV_DoFloor(FLEV_RAISEFLOOR512)
+            EV_DoFloor(line, FLEV_RAISEFLOOR512);
             break;
 
           case 148:
@@ -1857,9 +1857,9 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
           case 151:
             // RaiseCeilingLowerFloor
             // 151 WR  EV_DoCeiling(raiseToHighest),
-            //         EV_DoFloor(lowerFloortoLowest)
+            //         EV_DoFloor(FLEV_LOWERFLOORTOLOWEST)
             EV_DoCeiling( line, raiseToHighest );
-            EV_DoFloor( line, lowerFloorToLowest );
+            EV_DoFloor( line, FLEV_LOWERFLOORTOLOWEST );
             break;
 
           case 152:
@@ -1939,7 +1939,7 @@ void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
           case 220:
             // Lower floor to next lower neighbor
             // 220 WR Lower Floor Next Lower Neighbor
-            EV_DoFloor(line,lowerFloorToNearest);
+            EV_DoFloor(line, FLEV_LOWERFLOORTONEAREST);
             break;
 
           case 228:
@@ -2128,7 +2128,7 @@ void P_ShootSpecialLine
   {
     case 24:
       // 24 G1 raise floor to highest adjacent
-      if (EV_DoFloor(line,raiseFloor) || demo_compatibility)
+      if (EV_DoFloor(line, FLEV_RAISEFLOOR) || demo_compatibility)
         P_ChangeSwitchTexture(line,0);
       break;
 

@@ -251,17 +251,17 @@ void T_MoveFloor(floormove_t* floor)
      {
         switch(floor->type) /* handle texture/type changes */
         {
-           case donutRaise:
+           case FLEV_DONUTRAISE:
               floor->sector->special = floor->newspecial;
               floor->sector->floorpic = floor->texture;
               break;
-           case genFloorChgT:
-           case genFloorChg0:
+           case FLEV_GENFLOORCHGT:
+           case FLEV_GENFLOORCHG0:
               floor->sector->special = floor->newspecial;
               //jff add to fix bug in special transfers from changes
               floor->sector->oldspecial = floor->oldspecial;
               //fall thru
-           case genFloorChg:
+           case FLEV_GENFLOORCHG:
               floor->sector->floorpic = floor->texture;
               break;
            default:
@@ -272,19 +272,19 @@ void T_MoveFloor(floormove_t* floor)
      {
         switch(floor->type) // handle texture/type changes
         {
-           case lowerAndChange:
+           case FLEV_LOWERANDCHANGE:
               floor->sector->special = floor->newspecial;
               //jff add to fix bug in special transfers from changes
               floor->sector->oldspecial = floor->oldspecial;
               floor->sector->floorpic = floor->texture;
               break;
-           case genFloorChgT:
-           case genFloorChg0:
+           case FLEV_GENFLOORCHGT:
+           case FLEV_GENFLOORCHG0:
               floor->sector->special = floor->newspecial;
               //jff add to fix bug in special transfers from changes
               floor->sector->oldspecial = floor->oldspecial;
               //fall thru
-           case genFloorChg:
+           case FLEV_GENFLOORCHG:
               floor->sector->floorpic = floor->texture;
               break;
            default:
@@ -421,210 +421,210 @@ int EV_DoFloor
 ( line_t*       line,
   floor_e       floortype )
 {
-  int           i;
-  floormove_t*  floor;
-  int secnum = -1;
-  int rtn = 0;
+   int           i;
+   floormove_t*  floor;
+   int secnum = -1;
+   int rtn = 0;
 
-  /* move all floors with the same tag as the linedef */
-  while ((secnum = P_FindSectorFromLineTag(line,secnum)) >= 0)
-  {
-    sector_t *sec = &sectors[secnum];
+   /* move all floors with the same tag as the linedef */
+   while ((secnum = P_FindSectorFromLineTag(line,secnum)) >= 0)
+   {
+      sector_t *sec = &sectors[secnum];
 
-    // Don't start a second thinker on the same floor
-    if (P_SectorActive(floor_special,sec)) //jff 2/23/98
-      continue;
+      // Don't start a second thinker on the same floor
+      if (P_SectorActive(floor_special,sec)) //jff 2/23/98
+         continue;
 
-    // new floor thinker
-    rtn = 1;
-    floor = Z_Malloc (sizeof(*floor), PU_LEVSPEC, 0);
-    memset(floor, 0, sizeof(*floor));
-    P_AddThinker (&floor->thinker);
-    sec->floordata = floor; //jff 2/22/98
-    floor->thinker.function = T_MoveFloor;
-    floor->type = floortype;
-    floor->crush = FALSE;
+      // new floor thinker
+      rtn = 1;
+      floor = Z_Malloc (sizeof(*floor), PU_LEVSPEC, 0);
+      memset(floor, 0, sizeof(*floor));
+      P_AddThinker (&floor->thinker);
+      sec->floordata = floor; //jff 2/22/98
+      floor->thinker.function = T_MoveFloor;
+      floor->type = floortype;
+      floor->crush = FALSE;
 
-    // setup the thinker according to the linedef type
-    switch(floortype)
-    {
-      case lowerFloor:
-        floor->direction = -1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight = P_FindHighestFloorSurrounding(sec);
-        break;
+      // setup the thinker according to the linedef type
+      switch(floortype)
+      {
+         case FLEV_LOWERFLOOR:
+            floor->direction = -1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
+            floor->floordestheight = P_FindHighestFloorSurrounding(sec);
+            break;
 
-        //jff 02/03/30 support lowering floor by 24 absolute
-      case lowerFloor24:
-        floor->direction = -1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight = floor->sector->floorheight + 24 * FRACUNIT;
-        break;
+            //jff 02/03/30 support lowering floor by 24 absolute
+         case FLEV_LOWERFLOOR24:
+            floor->direction = -1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
+            floor->floordestheight = floor->sector->floorheight + 24 * FRACUNIT;
+            break;
 
-        //jff 02/03/30 support lowering floor by 32 absolute (fast)
-      case lowerFloor32Turbo:
-        floor->direction = -1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED*4;
-        floor->floordestheight = floor->sector->floorheight + 32 * FRACUNIT;
-        break;
+            //jff 02/03/30 support lowering floor by 32 absolute (fast)
+         case FLEV_LOWERFLOOR32TURBO:
+            floor->direction = -1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED*4;
+            floor->floordestheight = floor->sector->floorheight + 32 * FRACUNIT;
+            break;
 
-      case lowerFloorToLowest:
-        floor->direction = -1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight = P_FindLowestFloorSurrounding(sec);
-        break;
+         case FLEV_LOWERFLOORTOLOWEST:
+            floor->direction = -1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
+            floor->floordestheight = P_FindLowestFloorSurrounding(sec);
+            break;
 
-        //jff 02/03/30 support lowering floor to next lowest floor
-      case lowerFloorToNearest:
-        floor->direction = -1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight =
-          P_FindNextLowestFloor(sec,floor->sector->floorheight);
-        break;
-
-      case turboLower:
-        floor->direction = -1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED * 4;
-        floor->floordestheight = P_FindHighestFloorSurrounding(sec);
-        if (floor->floordestheight != sec->floorheight)
-          floor->floordestheight += 8*FRACUNIT;
-        break;
-
-      case raiseFloorCrush:
-        floor->crush = TRUE;
-      case raiseFloor:
-        floor->direction = 1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight = P_FindLowestCeilingSurrounding(sec);
-        if (floor->floordestheight > sec->ceilingheight)
-          floor->floordestheight = sec->ceilingheight;
-        floor->floordestheight -= (8*FRACUNIT)*(floortype == raiseFloorCrush);
-        break;
-
-      case raiseFloorTurbo:
-        floor->direction = 1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED*4;
-        floor->floordestheight = P_FindNextHighestFloor(sec,sec->floorheight);
-        break;
-
-      case raiseFloorToNearest:
-        floor->direction = 1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight = P_FindNextHighestFloor(sec,sec->floorheight);
-        break;
-
-      case raiseFloor24:
-        floor->direction = 1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight = floor->sector->floorheight + 24 * FRACUNIT;
-        break;
-
-        // jff 2/03/30 support straight raise by 32 (fast)
-      case raiseFloor32Turbo:
-        floor->direction = 1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED*4;
-        floor->floordestheight = floor->sector->floorheight + 32 * FRACUNIT;
-        break;
-
-      case raiseFloor512:
-        floor->direction = 1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight = floor->sector->floorheight + 512 * FRACUNIT;
-        break;
-
-      case raiseFloor24AndChange:
-        floor->direction = 1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight = floor->sector->floorheight + 24 * FRACUNIT;
-        sec->floorpic = line->frontsector->floorpic;
-        sec->special = line->frontsector->special;
-        //jff 3/14/98 transfer both old and new special
-        sec->oldspecial = line->frontsector->oldspecial;
-        break;
-
-      case raiseToTexture:
-        {
-          int minsize = INT_MAX;
-          side_t*     side;
-
-    /* jff 3/13/98 no ovf */
-          if (!comp[comp_model]) minsize = 32000<<FRACBITS;
-          floor->direction = 1;
-          floor->sector = sec;
-          floor->speed = FLOORSPEED;
-          for (i = 0; i < sec->linecount; i++)
-          {
-            if (twoSided (secnum, i) )
-            {
-              side = getSide(secnum,i,0);
-              // jff 8/14/98 don't scan texture 0, its not real
-              if (side->bottomtexture > 0 ||
-                  (comp[comp_model] && !side->bottomtexture))
-                if (textureheight[side->bottomtexture] < minsize)
-                  minsize = textureheight[side->bottomtexture];
-              side = getSide(secnum,i,1);
-              // jff 8/14/98 don't scan texture 0, its not real
-              if (side->bottomtexture > 0 ||
-                  (comp[comp_model] && !side->bottomtexture))
-                if (textureheight[side->bottomtexture] < minsize)
-                  minsize = textureheight[side->bottomtexture];
-            }
-          }
-          if (comp[comp_model])
-            floor->floordestheight = floor->sector->floorheight + minsize;
-          else
-          {
+            //jff 02/03/30 support lowering floor to next lowest floor
+         case FLEV_LOWERFLOORTONEAREST:
+            floor->direction = -1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
             floor->floordestheight =
-              (floor->sector->floorheight>>FRACBITS) + (minsize>>FRACBITS);
-            if (floor->floordestheight>32000)
-              floor->floordestheight = 32000;        //jff 3/13/98 do not
-            floor->floordestheight<<=FRACBITS;       // allow height overflow
-          }
-        }
-      break;
+               P_FindNextLowestFloor(sec,floor->sector->floorheight);
+            break;
 
-      case lowerAndChange:
-        floor->direction = -1;
-        floor->sector = sec;
-        floor->speed = FLOORSPEED;
-        floor->floordestheight = P_FindLowestFloorSurrounding(sec);
-        floor->texture = sec->floorpic;
+         case FLEV_TURBOLOWER:
+            floor->direction = -1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED * 4;
+            floor->floordestheight = P_FindHighestFloorSurrounding(sec);
+            if (floor->floordestheight != sec->floorheight)
+               floor->floordestheight += 8*FRACUNIT;
+            break;
 
-        // jff 1/24/98 make sure floor->newspecial gets initialized
-        // in case no surrounding sector is at floordestheight
-        // --> should not affect compatibility <--
-        floor->newspecial = sec->special;
-        //jff 3/14/98 transfer both old and new special
-        floor->oldspecial = sec->oldspecial;
+         case FLEV_RAISEFLOORCRUSH:
+            floor->crush = TRUE;
+         case FLEV_RAISEFLOOR:
+            floor->direction = 1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
+            floor->floordestheight = P_FindLowestCeilingSurrounding(sec);
+            if (floor->floordestheight > sec->ceilingheight)
+               floor->floordestheight = sec->ceilingheight;
+            floor->floordestheight -= (8*FRACUNIT)*(floortype == FLEV_RAISEFLOORCRUSH);
+            break;
 
-        //jff 5/23/98 use model subroutine to unify fixes and handling
-        sec = P_FindModelFloorSector(floor->floordestheight,sec-sectors);
-        if (sec)
-        {
-          floor->texture = sec->floorpic;
-          floor->newspecial = sec->special;
-          //jff 3/14/98 transfer both old and new special
-          floor->oldspecial = sec->oldspecial;
-        }
-        break;
-      default:
-        break;
-    }
-  }
-  return rtn;
+         case FLEV_RAISEFLOORTURBO:
+            floor->direction = 1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED*4;
+            floor->floordestheight = P_FindNextHighestFloor(sec,sec->floorheight);
+            break;
+
+         case FLEV_RAISEFLOORTONEAREST:
+            floor->direction = 1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
+            floor->floordestheight = P_FindNextHighestFloor(sec,sec->floorheight);
+            break;
+
+         case FLEV_RAISEFLOOR24:
+            floor->direction = 1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
+            floor->floordestheight = floor->sector->floorheight + 24 * FRACUNIT;
+            break;
+
+            // jff 2/03/30 support straight raise by 32 (fast)
+         case FLEV_RAISEFLOOR32TURBO:
+            floor->direction = 1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED*4;
+            floor->floordestheight = floor->sector->floorheight + 32 * FRACUNIT;
+            break;
+
+         case FLEV_RAISEFLOOR512:
+            floor->direction = 1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
+            floor->floordestheight = floor->sector->floorheight + 512 * FRACUNIT;
+            break;
+
+         case FLEV_RAISEFLOOR24ANDCHANGE:
+            floor->direction = 1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
+            floor->floordestheight = floor->sector->floorheight + 24 * FRACUNIT;
+            sec->floorpic = line->frontsector->floorpic;
+            sec->special = line->frontsector->special;
+            //jff 3/14/98 transfer both old and new special
+            sec->oldspecial = line->frontsector->oldspecial;
+            break;
+
+         case FLEV_RAISETOTEXTURE:
+            {
+               int minsize = INT_MAX;
+               side_t*     side;
+
+               /* jff 3/13/98 no ovf */
+               if (!comp[comp_model]) minsize = 32000<<FRACBITS;
+               floor->direction = 1;
+               floor->sector = sec;
+               floor->speed = FLOORSPEED;
+               for (i = 0; i < sec->linecount; i++)
+               {
+                  if (twoSided (secnum, i) )
+                  {
+                     side = getSide(secnum,i,0);
+                     // jff 8/14/98 don't scan texture 0, its not real
+                     if (side->bottomtexture > 0 ||
+                           (comp[comp_model] && !side->bottomtexture))
+                        if (textureheight[side->bottomtexture] < minsize)
+                           minsize = textureheight[side->bottomtexture];
+                     side = getSide(secnum,i,1);
+                     // jff 8/14/98 don't scan texture 0, its not real
+                     if (side->bottomtexture > 0 ||
+                           (comp[comp_model] && !side->bottomtexture))
+                        if (textureheight[side->bottomtexture] < minsize)
+                           minsize = textureheight[side->bottomtexture];
+                  }
+               }
+               if (comp[comp_model])
+                  floor->floordestheight = floor->sector->floorheight + minsize;
+               else
+               {
+                  floor->floordestheight =
+                     (floor->sector->floorheight>>FRACBITS) + (minsize>>FRACBITS);
+                  if (floor->floordestheight>32000)
+                     floor->floordestheight = 32000;        //jff 3/13/98 do not
+                  floor->floordestheight<<=FRACBITS;       // allow height overflow
+               }
+            }
+            break;
+
+         case FLEV_LOWERANDCHANGE:
+            floor->direction = -1;
+            floor->sector = sec;
+            floor->speed = FLOORSPEED;
+            floor->floordestheight = P_FindLowestFloorSurrounding(sec);
+            floor->texture = sec->floorpic;
+
+            // jff 1/24/98 make sure floor->newspecial gets initialized
+            // in case no surrounding sector is at floordestheight
+            // --> should not affect compatibility <--
+            floor->newspecial = sec->special;
+            //jff 3/14/98 transfer both old and new special
+            floor->oldspecial = sec->oldspecial;
+
+            //jff 5/23/98 use model subroutine to unify fixes and handling
+            sec = P_FindModelFloorSector(floor->floordestheight,sec-sectors);
+            if (sec)
+            {
+               floor->texture = sec->floorpic;
+               floor->newspecial = sec->special;
+               //jff 3/14/98 transfer both old and new special
+               floor->oldspecial = sec->oldspecial;
+            }
+            break;
+         default:
+            break;
+      }
+   }
+   return rtn;
 }
 
 //
@@ -748,7 +748,7 @@ int EV_BuildStairs
     floor->thinker.function = T_MoveFloor;
     floor->direction = 1;
     floor->sector = sec;
-    floor->type = buildStair;   //jff 3/31/98 do not leave uninited
+    floor->type = FLEV_BUILDSTAIR;   //jff 3/31/98 do not leave uninited
 
     // set up the speed and stepsize according to the stairs type
     switch(type)
@@ -832,7 +832,7 @@ int EV_BuildStairs
         floor->sector = sec;
         floor->speed = speed;
         floor->floordestheight = height;
-        floor->type = buildStair; //jff 3/31/98 do not leave uninited
+        floor->type = FLEV_BUILDSTAIR; //jff 3/31/98 do not leave uninited
         //jff 2/27/98 fix uninitialized crush field
         if (!demo_compatibility)
           floor->crush = type==build8? FALSE : TRUE;
@@ -928,7 +928,7 @@ int EV_DoDonut(line_t*  line)
       P_AddThinker (&floor->thinker);
       s2->floordata = floor; //jff 2/22/98
       floor->thinker.function = T_MoveFloor;
-      floor->type = donutRaise;
+      floor->type = FLEV_DONUTRAISE;
       floor->crush = FALSE;
       floor->direction = 1;
       floor->sector = s2;
@@ -943,7 +943,7 @@ int EV_DoDonut(line_t*  line)
       P_AddThinker (&floor->thinker);
       s1->floordata = floor; //jff 2/22/98
       floor->thinker.function = T_MoveFloor;
-      floor->type = lowerFloor;
+      floor->type = FLEV_LOWERFLOOR;
       floor->crush = FALSE;
       floor->direction = -1;
       floor->sector = s1;

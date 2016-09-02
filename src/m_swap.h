@@ -45,7 +45,7 @@
 #include "config.h"
 #endif
 
-/* Endianess handling. */
+/* Endianness handling. */
 
 /* cph - First the macros to do the actual byte swapping */
 

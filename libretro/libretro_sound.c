@@ -12,6 +12,7 @@
 
 #include "../src/i_sound.h"
 #include "../src/musicplayer.h"
+#include "../src/oplplayer.h"
 #include "../src/madplayer.h"
 
 #include "../src/lprintf.h"
@@ -30,6 +31,10 @@
 #define BUFMUL           4
 #define MIXBUFFERSIZE   (SAMPLECOUNT_35*BUFMUL)
 #define MAX_CHANNELS    32
+
+#if 0
+#define MIDI_SUPPORT
+#endif
 
 extern retro_audio_sample_batch_t audio_batch_cb;
 extern retro_log_printf_t log_cb;
@@ -212,7 +217,11 @@ void I_SetMusicVolume(int volume)
 {
     snd_MusicVolume = volume;
 #ifdef MUSIC_SUPPORT
+#ifdef MIDI_SUPPORT
+    opl_synth_player.setvolume(volume);
+#else
     mp_player.setvolume(volume);
+#endif
 #endif
 }
 
@@ -391,7 +400,13 @@ void I_UpdateSound(void)
 
 #ifdef MUSIC_SUPPORT
    if (music_handle)
+   {
+#ifdef MIDI_SUPPORT
+      opl_synth_player.render(mad_audio_buf, out_frames);
+#else
       mp_player.render(mad_audio_buf, out_frames);
+#endif
+   }
    else
 #endif
       memset(mad_audio_buf, 0, out_frames * 4);
@@ -550,8 +565,13 @@ void I_PlaySong(int handle, int looping)
   (void)handle;
 
 #ifdef MUSIC_SUPPORT
+#ifdef MIDI_SUPPORT
+  opl_synth_player.play(music_handle, looping);
+  opl_synth_player.setvolume(snd_MusicVolume);
+#else
   mp_player.play(music_handle, looping);
   mp_player.setvolume(snd_MusicVolume);
+#endif
 #endif
 }
 
@@ -561,7 +581,11 @@ void I_PauseSong (int handle)
   (void)handle;
 
 #ifdef MUSIC_SUPPORT
+#ifdef MIDI_SUPPORT
+  opl_synth_player.pause();
+#else
   mp_player.pause();
+#endif
 #endif
 }
 
@@ -571,7 +595,11 @@ void I_ResumeSong (int handle)
   (void)handle;
 
 #ifdef MUSIC_SUPPORT
+#ifdef MIDI_SUPPORT
+  opl_synth_player.resume();
+#else
   mp_player.resume();
+#endif
 #endif
 }
 
@@ -584,7 +612,11 @@ void I_StopSong(int handle)
   (void)handle;
 
 #ifdef MUSIC_SUPPORT
+#ifdef MIDI_SUPPORT
+  opl_synth_player.stop();
+#else
   mp_player.stop();
+#endif
 #endif
 }
 
@@ -594,7 +626,11 @@ void I_UnRegisterSong(int handle)
   (void)handle;
 
 #ifdef MUSIC_SUPPORT
+#ifdef MIDI_SUPPORT
+  opl_synth_player.unregistersong(music_handle);
+#else
   mp_player.unregistersong(music_handle);
+#endif
   music_handle = NULL;
   free(song_data);
   song_data = NULL;
@@ -617,7 +653,11 @@ int I_QrySongPlaying(int handle)
 #ifdef MUSIC_SUPPORT
 static int RegisterSong(const void *data, size_t len)
 {
+#ifdef MIDI_SUPPORT
+   music_handle = opl_synth_player.registersong(data, len);
+#else
    music_handle = mp_player.registersong(data, len);
+#endif
    return !!music_handle;
 }
 #endif
@@ -695,13 +735,21 @@ void I_ResampleStream (void *dest, unsigned nsamp, void (*proc)(void *dest, unsi
 void I_MPPlayer_Init(void)
 {
 #ifdef MUSIC_SUPPORT
+#ifdef MIDI_SUPPORT
+   opl_synth_player.init(44100);
+#else
    mp_player.init(44100);
+#endif
 #endif
 }
 
 void I_MPPlayer_Free(void)
 {
 #ifdef MUSIC_SUPPORT
+#ifdef MIDI_SUPPORT
+   opl_synth_player.shutdown();
+#else
    mp_player.shutdown();
+#endif
 #endif
 }

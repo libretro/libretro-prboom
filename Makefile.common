@@ -83,4 +83,6 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/dbopl.c \
 				 $(CORE_DIR)/opl.c \
 				 $(CORE_DIR)/opl_queue.c \
+				 $(CORE_DIR)/oplplayer.c \
+				 $(CORE_DIR)/midifile.c \
 				 $(CORE_DIR)/madplayer.c

@@ -434,26 +434,16 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
 
    fixed_t frac;
    const fixed_t fracstep = dcvars->iscale;
-
-
-
    const fixed_t slope_texu = dcvars->texu;
    count = dcvars->yh - dcvars->yl;
 
    if (count < 0)
       return;
 
-
-
-
-
    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
 
-
-   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
-
-
-
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+   {
       if (dcvars->yl != 0) {
          if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
@@ -487,50 +477,43 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
       if (count <= 0) return;
    }
 
+   if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+      R_FlushColumns();
 
-
+   if(!temp_x)
    {
-
-      if(temp_x == 4 ||
-            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
-         R_FlushColumns();
-
-      if(!temp_x)
-      {
-         startx = dcvars->x;
-         tempyl[0] = commontop = dcvars->yl;
-         tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+      startx = dcvars->x;
+      tempyl[0] = commontop = dcvars->yl;
+      tempyh[0] = commonbot = dcvars->yh;
+      temptype = (COL_OPAQUE);
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = R_FlushWhole16;
+      R_FlushHTColumns = R_FlushHT16;
+      R_FlushQuadColumn = R_FlushQuad16;
 
-         dest = &short_tempbuf[dcvars->yl << 2];
+      dest = &short_tempbuf[dcvars->yl << 2];
 
-      }
-      else
-      {
-         tempyl[temp_x] = dcvars->yl;
-         tempyh[temp_x] = dcvars->yh;
-
-         if(dcvars->yl > commontop)
-            commontop = dcvars->yl;
-         if(dcvars->yh < commonbot)
-            commonbot = dcvars->yh;
-
-
-         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
-
-      }
-      temp_x += 1;
    }
+   else
+   {
+      tempyl[temp_x] = dcvars->yl;
+      tempyh[temp_x] = dcvars->yh;
+
+      if(dcvars->yl > commontop)
+         commontop = dcvars->yl;
+      if(dcvars->yh < commonbot)
+         commonbot = dcvars->yh;
 
 
+      dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+   }
+   temp_x += 1;
 
    {
       const uint8_t *source = dcvars->source;
@@ -612,38 +595,20 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
 // simple depth color mapping
 static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
 {
-   int count;
-
    uint16_t *dest;
 
    fixed_t frac;
-   const fixed_t fracstep = dcvars->iscale;
-
-
-
+   const fixed_t   fracstep = dcvars->iscale;
    const fixed_t slope_texu = dcvars->texu;
-   count = dcvars->yh - dcvars->yl;
-
-
-
-
-
-
+   int                count = dcvars->yh - dcvars->yl;
 
    if (count < 0)
       return;
 
-
-
-
-
    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
 
-
-   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
-
-
-
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+   {
       if (dcvars->yl != 0) {
          if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
@@ -677,48 +642,43 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
       if (count <= 0) return;
    }
 
+   if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+      R_FlushColumns();
 
-
+   if(!temp_x)
    {
-
-      if(temp_x == 4 ||
-            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
-         R_FlushColumns();
-
-      if(!temp_x)
-      {
-         startx = dcvars->x;
-         tempyl[0] = commontop = dcvars->yl;
-         tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+      startx = dcvars->x;
+      tempyl[0] = commontop = dcvars->yl;
+      tempyh[0] = commonbot = dcvars->yh;
+      temptype = (COL_OPAQUE);
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = R_FlushWhole16;
+      R_FlushHTColumns = R_FlushHT16;
+      R_FlushQuadColumn = R_FlushQuad16;
 
-         dest = &short_tempbuf[dcvars->yl << 2];
+      dest = &short_tempbuf[dcvars->yl << 2];
 
-      }
-      else
-      {
-         tempyl[temp_x] = dcvars->yl;
-         tempyh[temp_x] = dcvars->yh;
-
-         if(dcvars->yl > commontop)
-            commontop = dcvars->yl;
-         if(dcvars->yh < commonbot)
-            commonbot = dcvars->yh;
-
-
-         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
-
-      }
-      temp_x += 1;
    }
+   else
+   {
+      tempyl[temp_x] = dcvars->yl;
+      tempyh[temp_x] = dcvars->yh;
+
+      if(dcvars->yl > commontop)
+         commontop = dcvars->yl;
+      if(dcvars->yh < commonbot)
+         commonbot = dcvars->yh;
+
+
+      dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+   }
+   temp_x += 1;
 
 
 
@@ -804,38 +764,20 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
 // z-dither
 static void R_DrawColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
 {
-   int count;
-
    uint16_t *dest;
 
    fixed_t frac;
    const fixed_t fracstep = dcvars->iscale;
-
-
-
    const fixed_t slope_texu = dcvars->texu;
-   count = dcvars->yh - dcvars->yl;
-
-
-
-
-
-
+   int count = dcvars->yh - dcvars->yl;
 
    if (count < 0)
       return;
 
-
-
-
-
    frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
 
-
-   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
-
-
-
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+   {
       if (dcvars->yl != 0) {
          if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
@@ -868,10 +810,6 @@ static void R_DrawColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
       }
       if (count <= 0) return;
    }
-
-
-
-   {
 
       if(temp_x == 4 ||
             (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
@@ -910,9 +848,6 @@ static void R_DrawColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
 
       }
       temp_x += 1;
-   }
-
-
 
    {
       const uint8_t *source = dcvars->source;
@@ -1017,39 +952,23 @@ static void R_DrawColumn16_LinearUV(draw_column_vars_t *dcvars)
 
    const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
 
-
-
-
-
-
-   if (dcvars->iscale > drawvars.mag_threshold) {
+   if (dcvars->iscale > drawvars.mag_threshold)
+   {
       R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
             RDRAW_FILTER_POINT,
             drawvars.filterz)(dcvars);
       return;
    }
+
    count = dcvars->yh - dcvars->yl;
-
-
-
-
-
-
 
    if (count < 0)
       return;
 
-
-
    frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
 
-
-
-
-   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
-
-
-
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+   {
       if (dcvars->yl != 0) {
          if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
@@ -1084,47 +1003,43 @@ static void R_DrawColumn16_LinearUV(draw_column_vars_t *dcvars)
    }
 
 
+   if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+      R_FlushColumns();
 
+   if(!temp_x)
    {
-
-      if(temp_x == 4 ||
-            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
-         R_FlushColumns();
-
-      if(!temp_x)
-      {
-         startx = dcvars->x;
-         tempyl[0] = commontop = dcvars->yl;
-         tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+      startx = dcvars->x;
+      tempyl[0] = commontop = dcvars->yl;
+      tempyh[0] = commonbot = dcvars->yh;
+      temptype = (COL_OPAQUE);
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = R_FlushWhole16;
+      R_FlushHTColumns = R_FlushHT16;
+      R_FlushQuadColumn = R_FlushQuad16;
 
-         dest = &short_tempbuf[dcvars->yl << 2];
+      dest = &short_tempbuf[dcvars->yl << 2];
 
-      }
-      else
-      {
-         tempyl[temp_x] = dcvars->yl;
-         tempyh[temp_x] = dcvars->yh;
-
-         if(dcvars->yl > commontop)
-            commontop = dcvars->yl;
-         if(dcvars->yh < commonbot)
-            commonbot = dcvars->yh;
-
-
-         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
-
-      }
-      temp_x += 1;
    }
+   else
+   {
+      tempyl[temp_x] = dcvars->yl;
+      tempyh[temp_x] = dcvars->yh;
+
+      if(dcvars->yl > commontop)
+         commontop = dcvars->yl;
+      if(dcvars->yh < commonbot)
+         commonbot = dcvars->yh;
+
+
+      dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+   }
+   temp_x += 1;
 
 
 
@@ -1247,39 +1162,23 @@ static void R_DrawColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
 
    const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
 
-
-
-
-
-
-   if (dcvars->iscale > drawvars.mag_threshold) {
+   if (dcvars->iscale > drawvars.mag_threshold)
+   {
       R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
             RDRAW_FILTER_POINT,
             drawvars.filterz)(dcvars);
       return;
    }
+
    count = dcvars->yh - dcvars->yl;
-
-
-
-
-
-
 
    if (count < 0)
       return;
 
-
-
    frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
 
-
-
-
-   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
-
-
-
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+   {
       if (dcvars->yl != 0) {
          if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
@@ -1313,48 +1212,43 @@ static void R_DrawColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
       if (count <= 0) return;
    }
 
+   if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+      R_FlushColumns();
 
-
+   if(!temp_x)
    {
-
-      if(temp_x == 4 ||
-            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
-         R_FlushColumns();
-
-      if(!temp_x)
-      {
-         startx = dcvars->x;
-         tempyl[0] = commontop = dcvars->yl;
-         tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+      startx = dcvars->x;
+      tempyl[0] = commontop = dcvars->yl;
+      tempyh[0] = commonbot = dcvars->yh;
+      temptype = (COL_OPAQUE);
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = R_FlushWhole16;
+      R_FlushHTColumns = R_FlushHT16;
+      R_FlushQuadColumn = R_FlushQuad16;
 
-         dest = &short_tempbuf[dcvars->yl << 2];
+      dest = &short_tempbuf[dcvars->yl << 2];
 
-      }
-      else
-      {
-         tempyl[temp_x] = dcvars->yl;
-         tempyh[temp_x] = dcvars->yh;
-
-         if(dcvars->yl > commontop)
-            commontop = dcvars->yl;
-         if(dcvars->yh < commonbot)
-            commonbot = dcvars->yh;
-
-
-         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
-
-      }
-      temp_x += 1;
    }
+   else
+   {
+      tempyl[temp_x] = dcvars->yl;
+      tempyh[temp_x] = dcvars->yh;
+
+      if(dcvars->yl > commontop)
+         commontop = dcvars->yl;
+      if(dcvars->yh < commonbot)
+         commonbot = dcvars->yh;
+
+
+      dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+   }
+   temp_x += 1;
 
 
 
@@ -1367,19 +1261,7 @@ static void R_DrawColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
       const uint8_t *nextsource = dcvars->nextsource;
       const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
 
-
-
-
-
-
-
       count++;
-
-
-
-
-
-
 
       if (dcvars->texheight == 128)
       {
@@ -1442,16 +1324,8 @@ static void R_DrawColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
             while (nextfrac >= (int)heightmask)
                nextfrac -= heightmask;
 
-
-
-
             while (count--)
             {
-
-
-
-
-
                *dest = (( V_Palette16[ (colormap[(nextsource[(nextfrac)>>16])])*64 + ((filter_fracu*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[(nextfrac)>>16])])*64 + (((0xffff-filter_fracu)*((frac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[(frac)>>16])])*64 + (((0xffff-filter_fracu)*(0xffff-((frac)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(nextsource[(frac)>>16])])*64 + ((filter_fracu*(0xffff-((frac)&0xffff)))>>(32-6)) ]));
                (y++);
                dest += 4;
@@ -1463,7 +1337,6 @@ static void R_DrawColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
          }
       }
    }
-
 }
 
 // bilinear + z-dither
@@ -1478,39 +1351,23 @@ static void R_DrawColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars)
 
    const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
 
-
-
-
-
-
-   if (dcvars->iscale > drawvars.mag_threshold) {
+   if (dcvars->iscale > drawvars.mag_threshold)
+   {
       R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
             RDRAW_FILTER_POINT,
             drawvars.filterz)(dcvars);
       return;
    }
+
    count = dcvars->yh - dcvars->yl;
-
-
-
-
-
-
 
    if (count < 0)
       return;
 
-
-
    frac = dcvars->texturemid - ((1<<16)>>1) + (dcvars->yl-centery)*fracstep;
 
-
-
-
-   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
-
-
-
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
+   {
       if (dcvars->yl != 0) {
          if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
@@ -1544,48 +1401,43 @@ static void R_DrawColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars)
       if (count <= 0) return;
    }
 
+   if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+      R_FlushColumns();
 
-
+   if(!temp_x)
    {
-
-      if(temp_x == 4 ||
-            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
-         R_FlushColumns();
-
-      if(!temp_x)
-      {
-         startx = dcvars->x;
-         tempyl[0] = commontop = dcvars->yl;
-         tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+      startx = dcvars->x;
+      tempyl[0] = commontop = dcvars->yl;
+      tempyh[0] = commonbot = dcvars->yh;
+      temptype = (COL_OPAQUE);
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = R_FlushWhole16;
+      R_FlushHTColumns = R_FlushHT16;
+      R_FlushQuadColumn = R_FlushQuad16;
 
-         dest = &short_tempbuf[dcvars->yl << 2];
+      dest = &short_tempbuf[dcvars->yl << 2];
 
-      }
-      else
-      {
-         tempyl[temp_x] = dcvars->yl;
-         tempyh[temp_x] = dcvars->yh;
-
-         if(dcvars->yl > commontop)
-            commontop = dcvars->yl;
-         if(dcvars->yh < commonbot)
-            commonbot = dcvars->yh;
-
-
-         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
-
-      }
-      temp_x += 1;
    }
+   else
+   {
+      tempyl[temp_x] = dcvars->yl;
+      tempyh[temp_x] = dcvars->yh;
+
+      if(dcvars->yl > commontop)
+         commontop = dcvars->yl;
+      if(dcvars->yh < commonbot)
+         commonbot = dcvars->yh;
+
+
+      dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+   }
+   temp_x += 1;
 
 
 
@@ -1603,19 +1455,7 @@ static void R_DrawColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars)
       const uint8_t *nextsource = dcvars->nextsource;
       const unsigned int filter_fracu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
 
-
-
-
-
-
-
       count++;
-
-
-
-
-
-
 
       if (dcvars->texheight == 128)
       {
@@ -1711,27 +1551,16 @@ static void R_DrawColumn16_RoundedUV(draw_column_vars_t *dcvars)
 
   fixed_t frac;
   const fixed_t fracstep = dcvars->iscale;
-
-
-
   const fixed_t slope_texu = dcvars->texu;
 
-
-
-
-  if (dcvars->iscale > drawvars.mag_threshold) {
+  if (dcvars->iscale > drawvars.mag_threshold)
+  {
     R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
                         RDRAW_FILTER_POINT,
                         drawvars.filterz)(dcvars);
     return;
   }
   count = dcvars->yh - dcvars->yl;
-
-
-
-
-
-
 
   if (count < 0)
     return;
@@ -1923,77 +1752,72 @@ static void R_DrawColumn16_RoundedUV(draw_column_vars_t *dcvars)
 /* rounded with simple depth color mapping */
 static void R_DrawColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars)
 {
-  int count;
+   int count;
 
-  uint16_t *dest;
+   uint16_t *dest;
 
-  fixed_t frac;
-  const fixed_t fracstep = dcvars->iscale;
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+   const fixed_t slope_texu = dcvars->texu;
 
+   if (dcvars->iscale > drawvars.mag_threshold)
+   {
+      R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+            RDRAW_FILTER_POINT,
+            drawvars.filterz)(dcvars);
+      return;
+   }
+   count = dcvars->yh - dcvars->yl;
 
+   if (count < 0)
+      return;
 
-  const fixed_t slope_texu = dcvars->texu;
-
-
-
-
-  if (dcvars->iscale > drawvars.mag_threshold) {
-    R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
-                        RDRAW_FILTER_POINT,
-                        drawvars.filterz)(dcvars);
-    return;
-  }
-  count = dcvars->yh - dcvars->yl;
-
-  if (count < 0)
-    return;
-
-  frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+   frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
 
 
-  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
 
 
 
-    if (dcvars->yl != 0) {
-      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
-        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
-        dcvars->yl += shift;
-        count -= shift;
-        frac += 0xffff-(slope_texu & 0xffff);
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
       }
-      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
 
-        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
-        dcvars->yl += shift;
-        count -= shift;
-        frac += slope_texu & 0xffff;
-      }
-    }
-    if (dcvars->yh != viewheight-1) {
-      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
 
-        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
-        dcvars->yh -= shift;
-        count -= shift;
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
       }
-      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
-
-        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
-        dcvars->yh -= shift;
-        count -= shift;
-      }
-    }
-    if (count <= 0) return;
-  }
+      if (count <= 0) return;
+   }
 
 
 
    {
 
       if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -2139,77 +1963,73 @@ static void R_DrawColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars)
 /* rounded + z-dither */
 static void R_DrawColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvars)
 {
-  int count;
+   int count;
 
-  uint16_t *dest;
+   uint16_t *dest;
 
-  fixed_t frac;
-  const fixed_t fracstep = dcvars->iscale;
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+   const fixed_t slope_texu = dcvars->texu;
 
+   if (dcvars->iscale > drawvars.mag_threshold)
+   {
+      R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+            RDRAW_FILTER_POINT,
+            drawvars.filterz)(dcvars);
+      return;
+   }
 
+   count = dcvars->yh - dcvars->yl;
 
-  const fixed_t slope_texu = dcvars->texu;
+   if (count < 0)
+      return;
 
-
-
-
-  if (dcvars->iscale > drawvars.mag_threshold) {
-    R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
-                        RDRAW_FILTER_POINT,
-                        drawvars.filterz)(dcvars);
-    return;
-  }
-  count = dcvars->yh - dcvars->yl;
-
-  if (count < 0)
-    return;
-
-  frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
+   frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
 
 
-  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
 
 
 
-    if (dcvars->yl != 0) {
-      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
-        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
-        dcvars->yl += shift;
-        count -= shift;
-        frac += 0xffff-(slope_texu & 0xffff);
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
       }
-      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
 
-        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
-        dcvars->yl += shift;
-        count -= shift;
-        frac += slope_texu & 0xffff;
-      }
-    }
-    if (dcvars->yh != viewheight-1) {
-      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
 
-        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
-        dcvars->yh -= shift;
-        count -= shift;
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
       }
-      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
-
-        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
-        dcvars->yh -= shift;
-        count -= shift;
-      }
-    }
-    if (count <= 0) return;
-  }
+      if (count <= 0) return;
+   }
 
 
 
    {
 
       if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -2373,103 +2193,92 @@ static void R_DrawColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvars)
 
 static void R_DrawTranslatedColumn16_PointUV(draw_column_vars_t *dcvars)
 {
-  int count;
+   int count;
 
-  uint16_t *dest;
+   uint16_t *dest;
 
-  fixed_t frac;
-  const fixed_t fracstep = dcvars->iscale;
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+   const fixed_t slope_texu = dcvars->texu;
+   count = dcvars->yh - dcvars->yl;
 
+   if (count < 0)
+      return;
 
+   frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
 
-  const fixed_t slope_texu = dcvars->texu;
-  count = dcvars->yh - dcvars->yl;
-
-  if (count < 0)
-    return;
-
-  frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
-
-
-  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
-
-
-
-    if (dcvars->yl != 0) {
-      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
-
-        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
-        dcvars->yl += shift;
-        count -= shift;
-        frac += 0xffff-(slope_texu & 0xffff);
-      }
-      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
-
-        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
-        dcvars->yl += shift;
-        count -= shift;
-        frac += slope_texu & 0xffff;
-      }
-    }
-    if (dcvars->yh != viewheight-1) {
-      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
-
-        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
-        dcvars->yh -= shift;
-        count -= shift;
-      }
-      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
-
-        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
-        dcvars->yh -= shift;
-        count -= shift;
-      }
-    }
-    if (count <= 0) return;
-  }
-
-
-
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
    {
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
-      if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
-         R_FlushColumns();
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
 
-      if(!temp_x)
-      {
-         startx = dcvars->x;
-         tempyl[0] = commontop = dcvars->yl;
-         tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
-
-
-
-
-
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
-
-         dest = &short_tempbuf[dcvars->yl << 2];
-
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
       }
-      else
-      {
-         tempyl[temp_x] = dcvars->yl;
-         tempyh[temp_x] = dcvars->yh;
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
 
-         if(dcvars->yl > commontop)
-            commontop = dcvars->yl;
-         if(dcvars->yh < commonbot)
-            commonbot = dcvars->yh;
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
 
-
-         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
-
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
       }
-      temp_x += 1;
+      if (count <= 0) return;
    }
+
+   if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+      R_FlushColumns();
+
+   if(!temp_x)
+   {
+      startx = dcvars->x;
+      tempyl[0] = commontop = dcvars->yl;
+      tempyh[0] = commonbot = dcvars->yh;
+      temptype = (COL_OPAQUE);
+
+
+
+
+
+      R_FlushWholeColumns = R_FlushWhole16;
+      R_FlushHTColumns = R_FlushHT16;
+      R_FlushQuadColumn = R_FlushQuad16;
+
+      dest = &short_tempbuf[dcvars->yl << 2];
+
+   }
+   else
+   {
+      tempyl[temp_x] = dcvars->yl;
+      tempyh[temp_x] = dcvars->yh;
+
+      if(dcvars->yl > commontop)
+         commontop = dcvars->yl;
+      if(dcvars->yh < commonbot)
+         commonbot = dcvars->yh;
+
+
+      dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+   }
+   temp_x += 1;
 
 
 
@@ -2560,108 +2369,92 @@ static void R_DrawTranslatedColumn16_PointUV(draw_column_vars_t *dcvars)
 
 static void R_DrawTranslatedColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
 {
-  int count;
+   int count;
 
-  uint16_t *dest;
+   uint16_t *dest;
 
-  fixed_t frac;
-  const fixed_t fracstep = dcvars->iscale;
+   fixed_t frac;
+   const fixed_t fracstep = dcvars->iscale;
+   const fixed_t slope_texu = dcvars->texu;
+   count = dcvars->yh - dcvars->yl;
 
+   if (count < 0)
+      return;
 
+   frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
 
-  const fixed_t slope_texu = dcvars->texu;
-  count = dcvars->yh - dcvars->yl;
-
-
-
-
-
-
-
-  if (count < 0)
-    return;
-
-  frac = dcvars->texturemid + (dcvars->yl-centery)*fracstep;
-
-  if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED) {
-
-
-
-    if (dcvars->yl != 0) {
-      if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
-
-        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
-        dcvars->yl += shift;
-        count -= shift;
-        frac += 0xffff-(slope_texu & 0xffff);
-      }
-      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
-
-        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
-        dcvars->yl += shift;
-        count -= shift;
-        frac += slope_texu & 0xffff;
-      }
-    }
-    if (dcvars->yh != viewheight-1) {
-      if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
-
-        int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
-        dcvars->yh -= shift;
-        count -= shift;
-      }
-      else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
-
-        int shift = ((slope_texu & 0xffff)/dcvars->iscale);
-        dcvars->yh -= shift;
-        count -= shift;
-      }
-    }
-    if (count <= 0) return;
-  }
-
-
-
+   if (dcvars->drawingmasked && dcvars->edgetype == RDRAW_MASKEDCOLUMNEDGE_SLOPED)
    {
+      if (dcvars->yl != 0) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_UP) {
 
-      if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
-         R_FlushColumns();
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += 0xffff-(slope_texu & 0xffff);
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_TOP_DOWN) {
 
-      if(!temp_x)
-      {
-         startx = dcvars->x;
-         tempyl[0] = commontop = dcvars->yl;
-         tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
-
-
-
-
-
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
-
-         dest = &short_tempbuf[dcvars->yl << 2];
-
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yl += shift;
+            count -= shift;
+            frac += slope_texu & 0xffff;
+         }
       }
-      else
-      {
-         tempyl[temp_x] = dcvars->yl;
-         tempyh[temp_x] = dcvars->yh;
+      if (dcvars->yh != viewheight-1) {
+         if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_UP) {
 
-         if(dcvars->yl > commontop)
-            commontop = dcvars->yl;
-         if(dcvars->yh < commonbot)
-            commonbot = dcvars->yh;
+            int shift = ((0xffff-(slope_texu & 0xffff))/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
+         else if (dcvars->edgeslope & RDRAW_EDGESLOPE_BOT_DOWN) {
 
-
-         dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
-
+            int shift = ((slope_texu & 0xffff)/dcvars->iscale);
+            dcvars->yh -= shift;
+            count -= shift;
+         }
       }
-      temp_x += 1;
+      if (count <= 0) return;
    }
+
+   if(temp_x == 4 ||
+         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+      R_FlushColumns();
+
+   if(!temp_x)
+   {
+      startx = dcvars->x;
+      tempyl[0] = commontop = dcvars->yl;
+      tempyh[0] = commonbot = dcvars->yh;
+      temptype = (COL_OPAQUE);
+
+
+
+
+
+      R_FlushWholeColumns = R_FlushWhole16;
+      R_FlushHTColumns = R_FlushHT16;
+      R_FlushQuadColumn = R_FlushQuad16;
+
+      dest = &short_tempbuf[dcvars->yl << 2];
+
+   }
+   else
+   {
+      tempyl[temp_x] = dcvars->yl;
+      tempyh[temp_x] = dcvars->yh;
+
+      if(dcvars->yl > commontop)
+         commontop = dcvars->yl;
+      if(dcvars->yh < commonbot)
+         commonbot = dcvars->yh;
+
+
+      dest = &short_tempbuf[(dcvars->yl << 2) + temp_x];
+
+   }
+   temp_x += 1;
 
 
 

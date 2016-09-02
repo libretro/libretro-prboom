@@ -1480,117 +1480,117 @@ boolean PTR_AimTraverse (intercept_t* in)
 //
 boolean PTR_ShootTraverse (intercept_t* in)
 {
-  fixed_t x;
-  fixed_t y;
-  fixed_t z;
-  fixed_t frac;
+   fixed_t x;
+   fixed_t y;
+   fixed_t z;
+   fixed_t frac;
 
-  mobj_t* th;
+   mobj_t* th;
 
-  fixed_t slope;
-  fixed_t dist;
-  fixed_t thingtopslope;
-  fixed_t thingbottomslope;
+   fixed_t slope;
+   fixed_t dist;
+   fixed_t thingtopslope;
+   fixed_t thingbottomslope;
 
-  if (in->isaline)
-    {
-    line_t *li = in->d.line;
+   if (in->isaline)
+   {
+      line_t *li = in->d.line;
 
-    if (li->special)
-      P_ShootSpecialLine (shootthing, li);
+      if (li->special)
+         P_ShootSpecialLine (shootthing, li);
 
       if (li->flags & ML_TWOSIDED)
-  {  // crosses a two sided (really 2s) line
-    P_LineOpening (li);
-    dist = FixedMul(attackrange, in->frac);
+      {  // crosses a two sided (really 2s) line
+         P_LineOpening (li);
+         dist = FixedMul(attackrange, in->frac);
 
-    // killough 11/98: simplify
+         // killough 11/98: simplify
 
-    if ((li->frontsector->floorheight==li->backsector->floorheight ||
-         (slope = FixedDiv(openbottom - shootz , dist)) <= aimslope) &&
-        (li->frontsector->ceilingheight==li->backsector->ceilingheight ||
-         (slope = FixedDiv (opentop - shootz , dist)) >= aimslope))
-      return TRUE;      // shot continues
-  }
-
-    // hit line
-    // position a bit closer
-
-    frac = in->frac - FixedDiv (4*FRACUNIT,attackrange);
-    x = trace.x + FixedMul (trace.dx, frac);
-    y = trace.y + FixedMul (trace.dy, frac);
-    z = shootz + FixedMul (aimslope, FixedMul(frac, attackrange));
-
-    if (li->frontsector->ceilingpic == skyflatnum)
-      {
-      // don't shoot the sky!
-
-      if (z > li->frontsector->ceilingheight)
-        return FALSE;
-
-      // it's a sky hack wall
-
-      if  (li->backsector && li->backsector->ceilingpic == skyflatnum)
-
-        // fix bullet-eaters -- killough:
-        // WARNING: Almost all demos will lose sync without this
-        // demo_compatibility flag check!!! killough 1/18/98
-      if (demo_compatibility || li->backsector->ceilingheight < z)
-        return FALSE;
+         if ((li->frontsector->floorheight==li->backsector->floorheight ||
+                  (slope = FixedDiv(openbottom - shootz , dist)) <= aimslope) &&
+               (li->frontsector->ceilingheight==li->backsector->ceilingheight ||
+                (slope = FixedDiv (opentop - shootz , dist)) >= aimslope))
+            return TRUE;      // shot continues
       }
 
-    // Spawn bullet puffs.
+      // hit line
+      // position a bit closer
 
-    P_SpawnPuff (x,y,z);
+      frac = in->frac - FixedDiv (4*FRACUNIT,attackrange);
+      x = trace.x + FixedMul (trace.dx, frac);
+      y = trace.y + FixedMul (trace.dy, frac);
+      z = shootz + FixedMul (aimslope, FixedMul(frac, attackrange));
 
-    // don't go any farther
+      if (li->frontsector->ceilingpic == skyflatnum)
+      {
+         // don't shoot the sky!
 
-    return FALSE;
-    }
+         if (z > li->frontsector->ceilingheight)
+            return FALSE;
 
-  // shoot a thing
+         // it's a sky hack wall
 
-  th = in->d.thing;
-  if (th == shootthing)
-    return TRUE;  // can't shoot self
+         if  (li->backsector && li->backsector->ceilingpic == skyflatnum)
 
-  if (!(th->flags&MF_SHOOTABLE))
-    return TRUE;  // corpse or something
+            // fix bullet-eaters -- killough:
+            // WARNING: Almost all demos will lose sync without this
+            // demo_compatibility flag check!!! killough 1/18/98
+            if (demo_compatibility || li->backsector->ceilingheight < z)
+               return FALSE;
+      }
 
-  // check angles to see if the thing can be aimed at
+      // Spawn bullet puffs.
 
-  dist = FixedMul (attackrange, in->frac);
-  thingtopslope = FixedDiv (th->z+th->height - shootz , dist);
+      P_SpawnPuff (x,y,z);
 
-  if (thingtopslope < aimslope)
-    return TRUE;  // shot over the thing
+      // don't go any farther
 
-  thingbottomslope = FixedDiv (th->z - shootz, dist);
+      return FALSE;
+   }
 
-  if (thingbottomslope > aimslope)
-    return TRUE;  // shot under the thing
+   // shoot a thing
 
-  // hit thing
-  // position a bit closer
+   th = in->d.thing;
+   if (th == shootthing)
+      return TRUE;  // can't shoot self
 
-  frac = in->frac - FixedDiv (10*FRACUNIT,attackrange);
+   if (!(th->flags&MF_SHOOTABLE))
+      return TRUE;  // corpse or something
 
-  x = trace.x + FixedMul (trace.dx, frac);
-  y = trace.y + FixedMul (trace.dy, frac);
-  z = shootz + FixedMul (aimslope, FixedMul(frac, attackrange));
+   // check angles to see if the thing can be aimed at
 
-  // Spawn bullet puffs or blod spots,
-  // depending on target type.
-  if (in->d.thing->flags & MF_NOBLOOD)
-    P_SpawnPuff (x,y,z);
-  else
-    P_SpawnBlood (x,y,z, la_damage);
+   dist = FixedMul (attackrange, in->frac);
+   thingtopslope = FixedDiv (th->z+th->height - shootz , dist);
 
-  if (la_damage)
-    P_DamageMobj (th, shootthing, shootthing, la_damage);
+   if (thingtopslope < aimslope)
+      return TRUE;  // shot over the thing
 
-  // don't go any farther
-  return FALSE;
+   thingbottomslope = FixedDiv (th->z - shootz, dist);
+
+   if (thingbottomslope > aimslope)
+      return TRUE;  // shot under the thing
+
+   // hit thing
+   // position a bit closer
+
+   frac = in->frac - FixedDiv (10*FRACUNIT,attackrange);
+
+   x = trace.x + FixedMul (trace.dx, frac);
+   y = trace.y + FixedMul (trace.dy, frac);
+   z = shootz + FixedMul (aimslope, FixedMul(frac, attackrange));
+
+   // Spawn bullet puffs or blod spots,
+   // depending on target type.
+   if (in->d.thing->flags & MF_NOBLOOD)
+      P_SpawnPuff (x,y,z);
+   else
+      P_SpawnBlood (x,y,z, la_damage);
+
+   if (la_damage)
+      P_DamageMobj (th, shootthing, shootthing, la_damage);
+
+   // don't go any farther
+   return FALSE;
 }
 
 

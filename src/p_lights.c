@@ -369,32 +369,34 @@ int EV_TurnTagLightsOff(line_t* line)
 //
 int EV_LightTurnOn(line_t *line, int bright)
 {
-  int i;
+   int i;
 
-  // search all sectors for ones with same tag as activating line
+   // search all sectors for ones with same tag as activating line
 
-  // killough 10/98: replace inefficient search with fast search
-  for (i = -1; (i = P_FindSectorFromLineTag(line,i)) >= 0;)
-    {
+   // killough 10/98: replace inefficient search with fast search
+   for (i = -1; (i = P_FindSectorFromLineTag(line,i)) >= 0;)
+   {
       sector_t *temp, *sector = sectors+i;
       int j, tbright = bright; //jff 5/17/98 search for maximum PER sector
 
       // bright = 0 means to search for highest light level surrounding sector
 
       if (!bright)
-  for (j = 0;j < sector->linecount; j++)
-    if ((temp = getNextSector(sector->lines[j],sector)) &&
-        temp->lightlevel > tbright)
-      tbright = temp->lightlevel;
+      {
+         for (j = 0;j < sector->linecount; j++)
+            if ((temp = getNextSector(sector->lines[j],sector)) &&
+                  temp->lightlevel > tbright)
+               tbright = temp->lightlevel;
+      }
 
       sector->lightlevel = tbright;
 
       //jff 5/17/98 unless compatibility optioned
       //then maximum near ANY tagged sector
       if (comp[comp_model])
-  bright = tbright;
-    }
-  return 1;
+         bright = tbright;
+   }
+   return 1;
 }
 
 /* killough 10/98:

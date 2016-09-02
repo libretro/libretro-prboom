@@ -44,6 +44,8 @@
 #include "l_soundgen.h"
 #endif
 
+extern int mus_opl_gain; // NSM  fine tune OPL output level
+
 // Init at program start...
 void I_InitSound(void);
 

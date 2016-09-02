@@ -388,7 +388,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
 /* i_video */
 
 static int action_lut[] = { 
-	KEYD_RALT,         /* RETRO_DEVICE_ID_JOYPAD_B */
+        KEYD_RALT,         /* RETRO_DEVICE_ID_JOYPAD_B */
         KEYD_RSHIFT,       /* RETRO DEVICE_ID_JOYPAD_Y */
         KEYD_TAB,          /* RETRO_DEVICE_ID_JOYPAD_SELECT */
         KEYD_ESCAPE,       /* RETRO_DEVICE_ID_JOYPAD_START */
@@ -404,11 +404,24 @@ static int action_lut[] = {
         'm',               /* RETRO_DEVICE_ID_JOYPAD_R2 */
 };
 
+static int left_analog_lut[] = { 
+        '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
+        ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
+        KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
+        KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
+        KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
+        KEYD_LEFTARROW     /* RETRO_DEVICE_ID_JOYPAD_LEFT */
+};
+
+#define ANALOG_THRESHOLD 4096
+
 void I_StartTic (void)
 {
    unsigned i;
    static bool old_input[20];
    bool new_input[20];
+   static bool old_input_analog_l[6];
+   bool new_input_analog_l[6];
 
    input_poll_cb();
 
@@ -433,6 +446,68 @@ void I_StartTic (void)
          D_PostEvent(&event);
 
       old_input[i] = new_input[i];
+   }
+
+   {
+      int lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                     RETRO_DEVICE_ID_ANALOG_X);
+      int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                     RETRO_DEVICE_ID_ANALOG_Y);
+      int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                     RETRO_DEVICE_ID_ANALOG_X);
+      int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                     RETRO_DEVICE_ID_ANALOG_Y);
+
+      if (lsx > ANALOG_THRESHOLD)
+         new_input_analog_l[0] = true;
+      else
+         new_input_analog_l[0] = false;
+
+      if (lsx < -ANALOG_THRESHOLD)
+         new_input_analog_l[1] = true;
+      else
+         new_input_analog_l[1] = false;
+
+      if (lsy > ANALOG_THRESHOLD)
+         new_input_analog_l[2] = true;
+      else
+         new_input_analog_l[2] = false;
+
+      if (lsy < -ANALOG_THRESHOLD)
+         new_input_analog_l[3] = true;
+      else
+         new_input_analog_l[3] = false;
+
+      if (rsx > ANALOG_THRESHOLD)
+         new_input_analog_l[4] = true;
+      else
+         new_input_analog_l[4] = false;
+
+      if (rsx < -ANALOG_THRESHOLD)
+         new_input_analog_l[5] = true;
+      else
+         new_input_analog_l[5] = false;
+
+      for (i = 0; i < 6; i++)
+      {
+         event_t event = {0};
+         if(new_input_analog_l[i] && !old_input_analog_l[i])
+         {
+            event.type = ev_keydown;
+            event.data1 = left_analog_lut[i];
+         }
+
+         if(!new_input_analog_l[i] && old_input_analog_l[i])
+         {
+            event.type = ev_keyup;
+            event.data1 = left_analog_lut[i];
+         }
+
+         if(event.type == ev_keydown || event.type == ev_keyup)
+            D_PostEvent(&event);
+
+         old_input_analog_l[i] = new_input_analog_l[i];
+      }
    }
 }
 

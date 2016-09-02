@@ -5602,29 +5602,228 @@ void R_InitTranslationTables (void)
 //  and the inner loop has to step in texture space u and v.
 //
 
-#define R_DRAWSPAN_FUNCNAME R_DrawSpan16_PointUV_PointZ
-#define R_DRAWSPAN_PIPELINE (RDC_STANDARD)
-#include "r_drawspan.inl"
+static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
+{
+   unsigned count = dsvars->x2 - dsvars->x1 + 1;
+   fixed_t xfrac = dsvars->xfrac;
+   fixed_t yfrac = dsvars->yfrac;
+   const fixed_t xstep = dsvars->xstep;
+   const fixed_t ystep = dsvars->ystep;
+   const uint8_t *source = dsvars->source;
 
-#define R_DRAWSPAN_FUNCNAME R_DrawSpan16_PointUV_LinearZ
-#define R_DRAWSPAN_PIPELINE (RDC_STANDARD | RDC_DITHERZ)
-#include "r_drawspan.inl"
 
-#define R_DRAWSPAN_FUNCNAME R_DrawSpan16_LinearUV_PointZ
-#define R_DRAWSPAN_PIPELINE (RDC_STANDARD | RDC_BILINEAR)
-#include "r_drawspan.inl"
+   const uint8_t *colormap = dsvars->colormap;
 
-#define R_DRAWSPAN_FUNCNAME R_DrawSpan16_LinearUV_LinearZ
-#define R_DRAWSPAN_PIPELINE (RDC_STANDARD | RDC_BILINEAR | RDC_DITHERZ)
-#include "r_drawspan.inl"
+   uint16_t *dest = drawvars.short_topleft + dsvars->y* SCREENWIDTH + dsvars->x1;
+   while (count)
+   {
+      const fixed_t xtemp = (xfrac >> 16) & 63;
+      const fixed_t ytemp = (yfrac >> 10) & 4032;
 
-#define R_DRAWSPAN_FUNCNAME R_DrawSpan16_RoundedUV_PointZ
-#define R_DRAWSPAN_PIPELINE (RDC_STANDARD | RDC_ROUNDED)
-#include "r_drawspan.inl"
+      const fixed_t spot = xtemp | ytemp;
+      xfrac += xstep;
+      yfrac += ystep;
+      *dest++ = V_Palette16[ (colormap[(source[spot])])*64 + ((64 -1)) ];
+      count--;
+   }
+}
 
-#define R_DRAWSPAN_FUNCNAME R_DrawSpan16_RoundedUV_LinearZ
-#define R_DRAWSPAN_PIPELINE (RDC_STANDARD | RDC_ROUNDED | RDC_DITHERZ)
-#include "r_drawspan.inl"
+static void R_DrawSpan16_PointUV_LinearZ(draw_span_vars_t *dsvars)
+{
+   unsigned count = dsvars->x2 - dsvars->x1 + 1;
+   fixed_t xfrac = dsvars->xfrac;
+   fixed_t yfrac = dsvars->yfrac;
+   const fixed_t xstep = dsvars->xstep;
+   const fixed_t ystep = dsvars->ystep;
+   const uint8_t *source = dsvars->source;
+
+
+
+
+   uint16_t *dest = drawvars.short_topleft + dsvars->y* SCREENWIDTH + dsvars->x1;
+
+   const int y = dsvars->y;
+   int x1 = dsvars->x1;
+
+
+   const int fracz = (dsvars->z >> 12) & 255;
+   const uint8_t *dither_colormaps[2] = { dsvars->colormap, dsvars->nextcolormap };
+
+
+   while (count) {
+      const fixed_t xtemp = (xfrac >> 16) & 63;
+      const fixed_t ytemp = (yfrac >> 10) & 4032;
+
+      const fixed_t spot = xtemp | ytemp;
+      xfrac += xstep;
+      yfrac += ystep;
+      *dest++ = V_Palette16[ (dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x1)&(4 -1)] < (fracz)) ? 1 : 0)][(source[spot])])*64 + ((64 -1)) ];
+      count--;
+
+      x1--;
+
+
+   }
+}
+
+static void R_DrawSpan16_LinearUV_PointZ(draw_span_vars_t *dsvars)
+{
+   if ((D_abs(dsvars->xstep) > drawvars.mag_threshold)
+         || (D_abs(dsvars->ystep) > drawvars.mag_threshold))
+   {
+      R_GetDrawSpanFunc(RDRAW_FILTER_POINT,
+            drawvars.filterz)(dsvars);
+      return;
+   }
+
+   {
+      unsigned count = dsvars->x2 - dsvars->x1 + 1;
+      fixed_t xfrac = dsvars->xfrac;
+      fixed_t yfrac = dsvars->yfrac;
+      const fixed_t xstep = dsvars->xstep;
+      const fixed_t ystep = dsvars->ystep;
+      const uint8_t *source = dsvars->source;
+
+
+      const uint8_t *colormap = dsvars->colormap;
+
+      uint16_t *dest = drawvars.short_topleft + dsvars->y* SCREENWIDTH + dsvars->x1;
+
+      const int y = dsvars->y;
+      int x1 = dsvars->x1;
+
+
+
+
+
+
+      while (count) {
+
+
+         *dest++ = ( V_Palette16[ (colormap[(source[ ((((xfrac)+(1<<16))>>16)&0x3f) | ((((yfrac)+(1<<16))>>10)&0xfc0)])])*64 + ((unsigned int)(((xfrac)&0xffff)*((yfrac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[ (((xfrac)>>16)&0x3f) | ((((yfrac)+(1<<16))>>10)&0xfc0)])])*64 + ((unsigned int)((0xffff-((xfrac)&0xffff))*((yfrac)&0xffff))>>(32-6)) ] + V_Palette16[ (colormap[(source[ (((xfrac)>>16)&0x3f) | (((yfrac)>>10)&0xfc0)])])*64 + ((unsigned int)((0xffff-((xfrac)&0xffff))*(0xffff-((yfrac)&0xffff)))>>(32-6)) ] + V_Palette16[ (colormap[(source[ ((((xfrac)+(1<<16))>>16)&0x3f) | (((yfrac)>>10)&0xfc0)])])*64 + ((unsigned int)(((xfrac)&0xffff)*(0xffff-((yfrac)&0xffff)))>>(32-6)) ]);
+         xfrac += xstep;
+         yfrac += ystep;
+         count--;
+      }
+   }
+}
+
+static void R_DrawSpan16_LinearUV_LinearZ(draw_span_vars_t *dsvars)
+{
+   if ((D_abs(dsvars->xstep) > drawvars.mag_threshold)
+         || (D_abs(dsvars->ystep) > drawvars.mag_threshold))
+   {
+      R_GetDrawSpanFunc(RDRAW_FILTER_POINT,
+            drawvars.filterz)(dsvars);
+      return;
+   }
+
+   {
+      unsigned count = dsvars->x2 - dsvars->x1 + 1;
+      fixed_t xfrac = dsvars->xfrac;
+      fixed_t yfrac = dsvars->yfrac;
+      const fixed_t xstep = dsvars->xstep;
+      const fixed_t ystep = dsvars->ystep;
+      const uint8_t *source = dsvars->source;
+
+
+
+
+      uint16_t *dest = drawvars.short_topleft + dsvars->y* SCREENWIDTH + dsvars->x1;
+
+      const int y = dsvars->y;
+      int x1 = dsvars->x1;
+
+
+      const int fracz = (dsvars->z >> 12) & 255;
+      const uint8_t *dither_colormaps[2] = { dsvars->colormap, dsvars->nextcolormap };
+
+
+      while (count) {
+
+
+         *dest++ = ( V_Palette16[ (dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x1)&(4 -1)] < (fracz)) ? 1 : 0)][(source[ ((((xfrac)+(1<<16))>>16)&0x3f) | ((((yfrac)+(1<<16))>>10)&0xfc0)])])*64 + ((unsigned int)(((xfrac)&0xffff)*((yfrac)&0xffff))>>(32-6)) ] + V_Palette16[ (dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x1)&(4 -1)] < (fracz)) ? 1 : 0)][(source[ (((xfrac)>>16)&0x3f) | ((((yfrac)+(1<<16))>>10)&0xfc0)])])*64 + ((unsigned int)((0xffff-((xfrac)&0xffff))*((yfrac)&0xffff))>>(32-6)) ] + V_Palette16[ (dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x1)&(4 -1)] < (fracz)) ? 1 : 0)][(source[ (((xfrac)>>16)&0x3f) | (((yfrac)>>10)&0xfc0)])])*64 + ((unsigned int)((0xffff-((xfrac)&0xffff))*(0xffff-((yfrac)&0xffff)))>>(32-6)) ] + V_Palette16[ (dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x1)&(4 -1)] < (fracz)) ? 1 : 0)][(source[ ((((xfrac)+(1<<16))>>16)&0x3f) | (((yfrac)>>10)&0xfc0)])])*64 + ((unsigned int)(((xfrac)&0xffff)*(0xffff-((yfrac)&0xffff)))>>(32-6)) ]);
+         xfrac += xstep;
+         yfrac += ystep;
+         count--;
+
+         x1--;
+      }
+   }
+}
+
+static void R_DrawSpan16_RoundedUV_PointZ(draw_span_vars_t *dsvars)
+{
+   if ((D_abs(dsvars->xstep) > drawvars.mag_threshold)
+         || (D_abs(dsvars->ystep) > drawvars.mag_threshold))
+   {
+      R_GetDrawSpanFunc(RDRAW_FILTER_POINT,
+            drawvars.filterz)(dsvars);
+      return;
+   }
+
+   {
+      unsigned count = dsvars->x2 - dsvars->x1 + 1;
+      fixed_t xfrac = dsvars->xfrac;
+      fixed_t yfrac = dsvars->yfrac;
+      const fixed_t xstep = dsvars->xstep;
+      const fixed_t ystep = dsvars->ystep;
+      const uint8_t *source = dsvars->source;
+
+
+      const uint8_t *colormap = dsvars->colormap;
+
+      uint16_t *dest = drawvars.short_topleft + dsvars->y* SCREENWIDTH + dsvars->x1;
+      while (count) {
+         *dest++ = V_Palette16[ (colormap[(filter_getScale2xQuadColors( source[ (((xfrac)>>16)&0x3f) | (((yfrac)>>10)&0xfc0) ], source[ (((xfrac)>>16)&0x3f) | ((((yfrac)-(1<<16))>>10)&0xfc0) ], source[ ((((xfrac)+(1<<16))>>16)&0x3f) | (((yfrac)>>10)&0xfc0) ], source[ (((xfrac)>>16)&0x3f) | ((((yfrac)+(1<<16))>>10)&0xfc0) ], source[ ((((xfrac)-(1<<16))>>16)&0x3f) | (((yfrac)>>10)&0xfc0) ] ) [ filter_roundedUVMap[ (((((xfrac)>>8) & 0xff)>>(8-6))<<6) + ((((yfrac)>>8) & 0xff)>>(8-6)) ] ])])*64 + ((64 -1)) ];
+         xfrac += xstep;
+         yfrac += ystep;
+         count--;
+      }
+   }
+}
+
+static void R_DrawSpan16_RoundedUV_LinearZ(draw_span_vars_t *dsvars)
+{
+   if ((D_abs(dsvars->xstep) > drawvars.mag_threshold)
+         || (D_abs(dsvars->ystep) > drawvars.mag_threshold))
+   {
+      R_GetDrawSpanFunc(RDRAW_FILTER_POINT,
+            drawvars.filterz)(dsvars);
+      return;
+   }
+
+   {
+      unsigned count = dsvars->x2 - dsvars->x1 + 1;
+      fixed_t xfrac = dsvars->xfrac;
+      fixed_t yfrac = dsvars->yfrac;
+      const fixed_t xstep = dsvars->xstep;
+      const fixed_t ystep = dsvars->ystep;
+      const uint8_t *source = dsvars->source;
+
+
+
+
+      uint16_t *dest = drawvars.short_topleft + dsvars->y* SCREENWIDTH + dsvars->x1;
+
+      const int y = dsvars->y;
+      int x1 = dsvars->x1;
+
+
+      const int fracz = (dsvars->z >> 12) & 255;
+      const uint8_t *dither_colormaps[2] = { dsvars->colormap, dsvars->nextcolormap };
+
+
+      while (count) {
+         *dest++ = V_Palette16[ (dither_colormaps[((filter_ditherMatrix[(y)&(4 -1)][(x1)&(4 -1)] < (fracz)) ? 1 : 0)][(filter_getScale2xQuadColors( source[ (((xfrac)>>16)&0x3f) | (((yfrac)>>10)&0xfc0) ], source[ (((xfrac)>>16)&0x3f) | ((((yfrac)-(1<<16))>>10)&0xfc0) ], source[ ((((xfrac)+(1<<16))>>16)&0x3f) | (((yfrac)>>10)&0xfc0) ], source[ (((xfrac)>>16)&0x3f) | ((((yfrac)+(1<<16))>>10)&0xfc0) ], source[ ((((xfrac)-(1<<16))>>16)&0x3f) | (((yfrac)>>10)&0xfc0) ] ) [ filter_roundedUVMap[ (((((xfrac)>>8) & 0xff)>>(8-6))<<6) + ((((yfrac)>>8) & 0xff)>>(8-6)) ] ])])*64 + ((64 -1)) ];
+         xfrac += xstep;
+         yfrac += ystep;
+         count--;
+
+         x1--;
+      }
+   }
+}
 
 static R_DrawSpan_f drawspanfuncs[RDRAW_FILTER_MAXFILTERS][RDRAW_FILTER_MAXFILTERS] = {
     {

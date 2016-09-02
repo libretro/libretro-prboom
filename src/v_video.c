@@ -170,16 +170,17 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
 void V_DrawBackground(const char* flatname, int scrn)
 {
   /* erase the entire screen to a tiled background */
-  const uint8_t *src;
   int         x,y;
   int         lump;
   const int   w = (64*SCREENWIDTH/320), h = (64*SCREENHEIGHT/200);
 
   // killough 4/17/98:
-  src = W_CacheLumpNum(lump = firstflat + R_FlatNumForName(flatname));
+  const uint8_t *src = W_CacheLumpNum(lump = firstflat + R_FlatNumForName(flatname));
 
   /* V_DrawBlock(0, 0, scrn, 64, 64, src, 0); */
+
   V_DRAWFLAT(scrn, int16_t, GETCOL16);
+
   /* end V_DrawBlock */
 
   for (y=0 ; y<SCREENHEIGHT ; y+=h)

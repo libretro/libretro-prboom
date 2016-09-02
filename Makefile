@@ -246,7 +246,7 @@ include Makefile.common
 
 OBJECTS = $(SOURCES_C:.c=.o)
 
-DEFINES    = -D__LIBRETRO__ -DINLINE=inline -DFPM_DEFAULT -DFRONTEND_SUPPORTS_RGB565
+DEFINES    = -D__LIBRETRO__ -DINLINE=inline -DFPM_DEFAULT
 
 ifeq ($(platform), sncps3)
 WARNINGS_DEFINES =

@@ -1,5 +1,6 @@
 DEBUG=0
 STATIC_LINKING=0
+WANT_FLUIDSYNTH=0
 
 ifeq ($(platform),)
 platform = unix
@@ -232,6 +233,10 @@ endif
 LDFLAGS += $(LIBM)
 
 CFLAGS += -DHAVE_LIBMAD -DMUSIC_SUPPORT
+
+ifeq ($(WANT_FLUIDSYNTH), 1)
+CFLAGS += -DHAVE_FLUIDSYNTH
+endif
 
 ifeq ($(DEBUG), 1)
 CFLAGS += -O0 -g

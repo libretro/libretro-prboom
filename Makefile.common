@@ -87,3 +87,9 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/flplayer.c \
 				 $(CORE_DIR)/midifile.c \
 				 $(CORE_DIR)/madplayer.c
+
+ifeq ($(WANT_FLUIDSYNTH), 1)
+INCFLAGS   += -I$(ROOT_DIR)/fluidsynth/include -I$(ROOT_DIR)/fluidsynth/src/utils
+
+SOURCES_C += $(ROOT_DIR)/fluidsynth/src/fluidsynth.c
+endif

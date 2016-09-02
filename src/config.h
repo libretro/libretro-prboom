@@ -14,11 +14,6 @@ extern int SCREENHEIGHT;
 #define SURFACE_SHORT_PITCH SCREENWIDTH
 #define SURFACE_INT_PITCH (SCREENWIDTH/2)
 
-/* Define to 1 if you have the <asm/byteorder.h> header file. */
-#ifndef __CELLOS_LV2__
-#define HAVE_ASM_BYTEORDER_H 1
-#endif
-
 #ifdef GEKKO
 #define HAVE_STRLWR
 #endif

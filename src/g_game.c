@@ -273,7 +273,7 @@ void G_BuildTiccmd(ticcmd_t* cmd)
   int tspeed;
   int forward;
   int side;
-  int newweapon   = wp_nochange;
+  int newweapon   = WP_NOCHANGE;
   boolean bstrafe = FALSE;
   /* cphipps - remove needless I_BaseTiccmd call, just set the ticcmd to zero */
   memset(cmd,0,sizeof*cmd);
@@ -362,7 +362,7 @@ void G_BuildTiccmd(ticcmd_t* cmd)
   }
   else if (gamekeydown[key_weaponcycleup] || gamekeydown[key_weaponcycledown])
   {
-	  static weapontype_t weapons_list[] = {wp_fist, wp_chainsaw, wp_pistol, wp_shotgun, wp_supershotgun, wp_chaingun, wp_missile, wp_plasma, wp_bfg};
+	  static weapontype_t weapons_list[] = {WP_FIST, WP_CHAINSAW, WP_PISTOL, WP_SHOTGUN, WP_SUPERSHOTGUN, WP_CHAINGUN, WP_MISSILE, WP_PLASMA, WP_BFG};
 	  int i;
 	  weapontype_t origweapon = players[consoleplayer].readyweapon;
 	  int oldweapon = 0;
@@ -401,16 +401,16 @@ void G_BuildTiccmd(ticcmd_t* cmd)
   else
   {                                 // phares 02/26/98: Added gamemode checks
 	  newweapon =
-		  gamekeydown[key_weapon1] ? wp_fist :    // killough 5/2/98: reformatted
-		  gamekeydown[key_weapon2] ? wp_pistol :
-		  gamekeydown[key_weapon3] ? wp_shotgun :
-		  gamekeydown[key_weapon4] ? wp_chaingun :
-		  gamekeydown[key_weapon5] ? wp_missile :
-		  gamekeydown[key_weapon6] && gamemode != shareware ? wp_plasma :
-		  gamekeydown[key_weapon7] && gamemode != shareware ? wp_bfg :
-		  gamekeydown[key_weapon8] ? wp_chainsaw :
-		  (!demo_compatibility && gamekeydown[key_weapon9] && gamemode == commercial) ? wp_supershotgun :
-		  wp_nochange;
+		  gamekeydown[key_weapon1] ? WP_FIST :    // killough 5/2/98: reformatted
+		  gamekeydown[key_weapon2] ? WP_PISTOL :
+		  gamekeydown[key_weapon3] ? WP_SHOTGUN :
+		  gamekeydown[key_weapon4] ? WP_CHAINGUN :
+		  gamekeydown[key_weapon5] ? WP_MISSILE :
+		  gamekeydown[key_weapon6] && gamemode != shareware ? WP_PLASMA :
+		  gamekeydown[key_weapon7] && gamemode != shareware ? WP_BFG :
+		  gamekeydown[key_weapon8] ? WP_CHAINSAW :
+		  (!demo_compatibility && gamekeydown[key_weapon9] && gamemode == commercial) ? WP_SUPERSHOTGUN :
+		  WP_NOCHANGE;
 
 	  // killough 3/22/98: For network and demo consistency with the
 	  // new weapons preferences, we must do the weapons switches here
@@ -432,30 +432,30 @@ void G_BuildTiccmd(ticcmd_t* cmd)
 		  // the fist is already in use, or the player does not
 		  // have the berserker strength.
 
-		  if (newweapon==wp_fist && player->weaponowned[wp_chainsaw] &&
-				  player->readyweapon!=wp_chainsaw &&
-				  (player->readyweapon==wp_fist ||
+		  if (newweapon==WP_FIST && player->weaponowned[WP_CHAINSAW] &&
+				  player->readyweapon!=WP_CHAINSAW &&
+				  (player->readyweapon==WP_FIST ||
 				   !player->powers[pw_strength] ||
-				   P_WeaponPreferred(wp_chainsaw, wp_fist)))
-			  newweapon = wp_chainsaw;
+				   P_WeaponPreferred(WP_CHAINSAW, WP_FIST)))
+			  newweapon = WP_CHAINSAW;
 
 		  // Select SSG from '3' only if it's owned and the player
 		  // does not have a shotgun, or if the shotgun is already
 		  // in use, or if the SSG is not already in use and the
 		  // player prefers it.
 
-		  if (newweapon == wp_shotgun && gamemode == commercial &&
-				  player->weaponowned[wp_supershotgun] &&
-				  (!player->weaponowned[wp_shotgun] ||
-				   player->readyweapon == wp_shotgun ||
-				   (player->readyweapon != wp_supershotgun &&
-				    P_WeaponPreferred(wp_supershotgun, wp_shotgun))))
-			  newweapon = wp_supershotgun;
+		  if (newweapon == WP_SHOTGUN && gamemode == commercial &&
+				  player->weaponowned[WP_SUPERSHOTGUN] &&
+				  (!player->weaponowned[WP_SHOTGUN] ||
+				   player->readyweapon == WP_SHOTGUN ||
+				   (player->readyweapon != WP_SUPERSHOTGUN &&
+				    P_WeaponPreferred(WP_SUPERSHOTGUN, WP_SHOTGUN))))
+			  newweapon = WP_SUPERSHOTGUN;
 	  }
 	  // killough 2/8/98, 3/22/98 -- end of weapon selection changes
   }
 
-  if (newweapon != wp_nochange)
+  if (newweapon != WP_NOCHANGE)
     {
       cmd->buttons |= BT_CHANGE;
       cmd->buttons |= newweapon<<BT_WEAPONSHIFT;
@@ -1006,10 +1006,10 @@ void G_PlayerReborn (int player)
   p->usedown = p->attackdown = true;  // don't do anything immediately
   p->playerstate = PST_LIVE;
   p->health = initial_health;  // Ty 03/12/98 - use dehacked values
-  p->readyweapon = p->pendingweapon = wp_pistol;
-  p->weaponowned[wp_fist] = true;
-  p->weaponowned[wp_pistol] = true;
-  p->ammo[am_clip] = initial_bullets; // Ty 03/12/98 - use dehacked values
+  p->readyweapon = p->pendingweapon = WP_PISTOL;
+  p->weaponowned[WP_FIST] = true;
+  p->weaponowned[WP_PISTOL] = true;
+  p->ammo[AM_CLIP] = initial_bullets; // Ty 03/12/98 - use dehacked values
 
   for (i=0 ; i<NUMAMMO ; i++)
     p->maxammo[i] = maxammo[i];

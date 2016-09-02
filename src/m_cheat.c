@@ -297,7 +297,7 @@ char buf[3];
 // 'choppers' invulnerability & chainsaw
 static void cheat_choppers()
 {
-  plyr->weaponowned[wp_chainsaw] = TRUE;
+  plyr->weaponowned[WP_CHAINSAW] = TRUE;
   plyr->powers[pw_invulnerability] = TRUE;
   plyr->message = s_STSTR_CHOPPERS; // Ty 03/27/98 - externalized
 }
@@ -351,12 +351,12 @@ static void cheat_fa()
 
   // You can't own weapons that aren't in the game // phares 02/27/98
   for (i=0;i<NUMWEAPONS;i++)
-    if (!(((i == wp_plasma || i == wp_bfg) && gamemode == shareware) ||
-          (i == wp_supershotgun && gamemode != commercial)))
+    if (!(((i == WP_PLASMA || i == WP_BFG) && gamemode == shareware) ||
+          (i == WP_SUPERSHOTGUN && gamemode != commercial)))
       plyr->weaponowned[i] = TRUE;
 
   for (i=0;i<NUMAMMO;i++)
-    if (i!=am_cell || gamemode!=shareware)
+    if (i != AM_CELL || gamemode!=shareware)
       plyr->ammo[i] = plyr->maxammo[i];
 
   plyr->message = s_STSTR_FAADDED;
@@ -587,11 +587,11 @@ char buf[3];
 {
   int w = *buf - '1';
 
-  if ((w==wp_supershotgun && gamemode!=commercial) ||      // killough 2/28/98
-      ((w==wp_bfg || w==wp_plasma) && gamemode==shareware))
+  if ((w == WP_SUPERSHOTGUN && gamemode!=commercial) ||      // killough 2/28/98
+      ((w == WP_BFG || w == WP_PLASMA) && gamemode==shareware))
     return;
 
-  if (w==wp_fist)           // make '1' apply beserker strength toggle
+  if (w==WP_FIST)           // make '1' apply beserker strength toggle
     cheat_pw(pw_strength);
   else
     if (w >= 0 && w < NUMWEAPONS) {
@@ -629,7 +629,7 @@ char buf[1];
   else
     if (a>=0 && a<NUMAMMO)  // Ty 03/27/98 - *not* externalized
       { // killough 5/5/98: switch plasma and rockets for now -- KLUDGE
-        a = a==am_cell ? am_misl : a==am_misl ? am_cell : a;  // HACK
+        a = a == AM_CELL ? AM_MISL : a == AM_MISL ? AM_CELL : a;  // HACK
         plyr->message = (plyr->ammo[a] = !plyr->ammo[a]) ?
           plyr->ammo[a] = plyr->maxammo[a], "Ammo Added" : "Ammo Removed";
       }

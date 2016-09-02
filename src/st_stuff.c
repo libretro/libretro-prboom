@@ -638,7 +638,7 @@ static void ST_updateWidgets(void)
   // must redirect the pointer if the ready weapon has changed.
   //  if (w_ready.data != plyr->readyweapon)
   //  {
-  if (weaponinfo[plyr->readyweapon].ammo == am_noammo)
+  if (weaponinfo[plyr->readyweapon].ammo == AM_NOAMMO)
     w_ready.num = &largeammo;
   else
     w_ready.num = &plyr->ammo[weaponinfo[plyr->readyweapon].ammo];

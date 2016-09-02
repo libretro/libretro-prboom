@@ -181,28 +181,28 @@ typedef enum {
 // The defined weapons, including a marker
 // indicating user has not changed weapon.
 typedef enum {
-  wp_fist,
-  wp_pistol,
-  wp_shotgun,
-  wp_chaingun,
-  wp_missile,
-  wp_plasma,
-  wp_bfg,
-  wp_chainsaw,
-  wp_supershotgun,
+  WP_FIST,
+  WP_PISTOL,
+  WP_SHOTGUN,
+  WP_CHAINGUN,
+  WP_MISSILE,
+  WP_PLASMA,
+  WP_BFG,
+  WP_CHAINSAW,
+  WP_SUPERSHOTGUN,
 
   NUMWEAPONS,
-  wp_nochange              // No pending weapon change.
+  WP_NOCHANGE              // No pending weapon change.
 } weapontype_t;
 
 // Ammunition types defined.
 typedef enum {
-  am_clip,    // Pistol / chaingun ammo.
-  am_shell,   // Shotgun / double barreled shotgun.
-  am_cell,    // Plasma rifle, BFG.
-  am_misl,    // Missile launcher.
+  AM_CLIP,    // Pistol / chaingun ammo.
+  AM_SHELL,   // Shotgun / double barreled shotgun.
+  AM_CELL,    // Plasma rifle, BFG.
+  AM_MISL,    // Missile launcher.
   NUMAMMO,
-  am_noammo   // Unlimited for chainsaw / fist.
+  AM_NOAMMO   // Unlimited for chainsaw / fist.
 } ammotype_t;
 
 // Power up artifacts.

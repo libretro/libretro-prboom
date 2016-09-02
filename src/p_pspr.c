@@ -56,15 +56,15 @@ extern void P_Thrust(player_t *, angle_t, fixed_t);
 // The following array holds the recoil values         // phares
 
 static const int recoil_values[] = {    // phares
-  10, // wp_fist
-  10, // wp_pistol
-  30, // wp_shotgun
-  10, // wp_chaingun
-  100,// wp_missile
-  20, // wp_plasma
-  100,// wp_bfg
-  0,  // wp_chainsaw
-  80  // wp_supershotgun
+  10, // WP_FIST
+  10, // WP_PISTOL
+  30, // WP_SHOTGUN
+  10, // WP_CHAINGUN
+  100,// WP_MISSILE
+  20, // WP_PLASMA
+  100,// WP_BFG
+  0,  // WP_CHAINSAW
+  80  // WP_SUPERSHOTGUN
 };
 
 //
@@ -127,7 +127,7 @@ static void P_BringUpWeapon(player_t *player)
 {
    statenum_t newstate;
 
-   if (player->pendingweapon == wp_nochange)
+   if (player->pendingweapon == WP_NOCHANGE)
       player->pendingweapon = player->readyweapon;
 
 #ifdef HEXEN
@@ -137,12 +137,12 @@ static void P_BringUpWeapon(player_t *player)
    else
       newstate = weaponinfo[player->pendingweapon].upstate;
 #else
-   if (player->pendingweapon == wp_chainsaw)
+   if (player->pendingweapon == WP_CHAINSAW)
       S_StartSound (player->mo, sfx_sawup);
    newstate = weaponinfo[player->pendingweapon].upstate;
 #endif
 
-   player->pendingweapon = wp_nochange;
+   player->pendingweapon = WP_NOCHANGE;
 
    player->psprites[ps_weapon].sy = WEAPONBOTTOM;
 
@@ -245,42 +245,42 @@ int P_SwitchWeapon(player_t *player)
         if (!player->powers[pw_strength])      // allow chainsaw override
           break;
       case 0:
-        newweapon = wp_fist;
+        newweapon = WP_FIST;
         break;
       case 2:
-        if (player->ammo[am_clip])
-          newweapon = wp_pistol;
+        if (player->ammo[AM_CLIP])
+          newweapon = WP_PISTOL;
         break;
       case 3:
-        if (player->weaponowned[wp_shotgun] && player->ammo[am_shell])
-          newweapon = wp_shotgun;
+        if (player->weaponowned[WP_SHOTGUN] && player->ammo[AM_SHELL])
+          newweapon = WP_SHOTGUN;
         break;
       case 4:
-        if (player->weaponowned[wp_chaingun] && player->ammo[am_clip])
-          newweapon = wp_chaingun;
+        if (player->weaponowned[WP_CHAINGUN] && player->ammo[AM_CLIP])
+          newweapon = WP_CHAINGUN;
         break;
       case 5:
-        if (player->weaponowned[wp_missile] && player->ammo[am_misl])
-          newweapon = wp_missile;
+        if (player->weaponowned[WP_MISSILE] && player->ammo[AM_MISL])
+          newweapon = WP_MISSILE;
         break;
       case 6:
-        if (player->weaponowned[wp_plasma] && player->ammo[am_cell] &&
+        if (player->weaponowned[WP_PLASMA] && player->ammo[AM_CELL] &&
             gamemode != shareware)
-          newweapon = wp_plasma;
+          newweapon = WP_PLASMA;
         break;
       case 7:
-        if (player->weaponowned[wp_bfg] && gamemode != shareware &&
-            player->ammo[am_cell] >= (demo_compatibility ? 41 : 40))
-          newweapon = wp_bfg;
+        if (player->weaponowned[WP_BFG] && gamemode != shareware &&
+            player->ammo[AM_CELL] >= (demo_compatibility ? 41 : 40))
+          newweapon = WP_BFG;
         break;
       case 8:
-        if (player->weaponowned[wp_chainsaw])
-          newweapon = wp_chainsaw;
+        if (player->weaponowned[WP_CHAINSAW])
+          newweapon = WP_CHAINSAW;
         break;
       case 9:
-        if (player->weaponowned[wp_supershotgun] && gamemode == commercial &&
-            player->ammo[am_shell] >= (demo_compatibility ? 3 : 2))
-          newweapon = wp_supershotgun;
+        if (player->weaponowned[WP_SUPERSHOTGUN] && gamemode == commercial &&
+            player->ammo[AM_SHELL] >= (demo_compatibility ? 3 : 2))
+          newweapon = WP_SUPERSHOTGUN;
         break;
       }
   while (newweapon==currentweapon && --i);          // killough 5/2/98
@@ -314,9 +314,9 @@ int P_GetAmmoLevel(player_t *player, weapontype_t weapon)
   ammotype_t ammo = weaponinfo[weapon].ammo;
   int current, min, max, result;
 
-  if (weapon == wp_bfg) // Minimal amount for one shot varies.
+  if (weapon == WP_BFG) // Minimal amount for one shot varies.
     min = BFGCELLS;
-  else if (weapon == wp_supershotgun) // Double barrel.
+  else if (weapon == WP_SUPERSHOTGUN) // Double barrel.
     min = 2;
   else
     min = 1; // Regular
@@ -324,7 +324,7 @@ int P_GetAmmoLevel(player_t *player, weapontype_t weapon)
   current = player->ammo[ammo];
   max = player->maxammo[ammo];
 
-  if (ammo == am_noammo // no ammunition => always full
+  if (ammo == AM_NOAMMO // no ammunition => always full
       || current >= max // weapon is full
       || max == 0) // avoid div-by-zero
     result = 100;
@@ -436,13 +436,13 @@ void A_WeaponReady(player_t *player, pspdef_t *psp)
       P_SetMobjState(player->mo, S_PLAY);
 #endif
 
-   if (player->readyweapon == wp_chainsaw && psp->state == &states[S_SAW])
+   if (player->readyweapon == WP_CHAINSAW && psp->state == &states[S_SAW])
       S_StartSound(player->mo, sfx_sawidl);
 
    // check for change
    //  if player is dead, put the weapon away
 
-   if (player->pendingweapon != wp_nochange || !player->health)
+   if (player->pendingweapon != WP_NOCHANGE || !player->health)
    {
       // change weapon (pending weapon should already be validated)
       statenum_t newstate = weaponinfo[player->readyweapon].downstate;
@@ -456,8 +456,8 @@ void A_WeaponReady(player_t *player, pspdef_t *psp)
    if (player->cmd.buttons & BT_ATTACK)
    {
 #ifndef HEXEN
-      if (!player->attackdown || (player->readyweapon != wp_missile &&
-               player->readyweapon != wp_bfg))
+      if (!player->attackdown || (player->readyweapon != WP_MISSILE &&
+               player->readyweapon != WP_BFG))
 #endif
       {
          player->attackdown = true;
@@ -492,7 +492,7 @@ void A_ReFire(player_t *player, pspdef_t *psp)
    *  (if a weaponchange is pending, let it go through instead) */
 
   if ( (player->cmd.buttons & BT_ATTACK)
-       && player->pendingweapon == wp_nochange && player->health)
+       && player->pendingweapon == WP_NOCHANGE && player->health)
     {
       player->refire++;
       P_FireWeapon(player);

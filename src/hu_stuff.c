@@ -802,7 +802,7 @@ void HU_Drawer(void)
       // clear the widgets internal line
       HUlib_clearTextLine(&w_ammo);
       strcpy(hud_ammostr,"AMM ");
-      if (weaponinfo[plr->readyweapon].ammo == am_noammo)
+      if (weaponinfo[plr->readyweapon].ammo == AM_NOAMMO)
       { // special case for weapon with no ammo selected - blank bargraph + N/A
         strcat(hud_ammostr,"\x7f\x7f\x7f\x7f\x7f\x7f\x7f N/A");
         w_ammo.cm = CR_GRAY;
@@ -978,19 +978,19 @@ void HU_Drawer(void)
       i=4; hud_weapstr[i] = '\0';      //jff 3/7/98 make sure ammo goes away
 
       // do each weapon that exists in current gamemode
-      for (w=0;w<=wp_supershotgun;w++) //jff 3/4/98 show fists too, why not?
+      for (w=0;w <= WP_SUPERSHOTGUN; w++) //jff 3/4/98 show fists too, why not?
       {
         int ok=1;
         //jff avoid executing for weapons that do not exist
         switch (gamemode)
         {
           case shareware:
-            if (w>=wp_plasma && w!=wp_chainsaw)
+            if (w >= WP_PLASMA && w != WP_CHAINSAW)
               ok=0;
             break;
           case retail:
           case registered:
-            if (w>=wp_supershotgun)
+            if (w >= WP_SUPERSHOTGUN)
               ok=0;
             break;
           default:
@@ -1007,7 +1007,7 @@ void HU_Drawer(void)
 
         // display each weapon number in a color related to the ammo for it
         hud_weapstr[i++] = '\x1b'; //jff 3/26/98 use ESC not '\' for paths
-        if (weaponinfo[w].ammo==am_noammo) //jff 3/14/98 show berserk on HUD
+        if (weaponinfo[w].ammo == AM_NOAMMO) //jff 3/14/98 show berserk on HUD
           hud_weapstr[i++] = plr->powers[pw_strength]? '0'+CR_GREEN : '0'+CR_GRAY;
         else if (ammolevel == 0)
           hud_weapstr[i++] = '0'+CR_BROWN;

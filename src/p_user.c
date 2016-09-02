@@ -868,15 +868,15 @@ void P_PlayerThink (player_t* player)
 #else
       if (demo_compatibility)
       { // compatibility mode -- required for old demos -- killough
-         if (newweapon == wp_fist && player->weaponowned[wp_chainsaw] &&
-               (player->readyweapon != wp_chainsaw ||
+         if (newweapon == WP_FIST && player->weaponowned[WP_CHAINSAW] &&
+               (player->readyweapon != WP_CHAINSAW ||
                 !player->powers[pw_strength]))
-            newweapon = wp_chainsaw;
+            newweapon = WP_CHAINSAW;
          if (gamemode == commercial &&
-               newweapon == wp_shotgun &&
-               player->weaponowned[wp_supershotgun] &&
-               player->readyweapon != wp_supershotgun)
-            newweapon = wp_supershotgun;
+               newweapon == WP_SHOTGUN &&
+               player->weaponowned[WP_SUPERSHOTGUN] &&
+               player->readyweapon != WP_SUPERSHOTGUN)
+            newweapon = WP_SUPERSHOTGUN;
       }
 
       // killough 2/8/98, 3/22/98 -- end of weapon selection changes
@@ -886,7 +886,7 @@ void P_PlayerThink (player_t* player)
          // Do not go to plasma or BFG in shareware,
          //  even if cheated.
 
-         if ((newweapon != wp_plasma && newweapon != wp_bfg)
+         if ((newweapon != WP_PLASMA && newweapon != WP_BFG)
                || (gamemode != shareware) )
             player->pendingweapon = newweapon;
 #endif

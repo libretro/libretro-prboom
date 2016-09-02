@@ -94,7 +94,7 @@ static boolean P_GiveAmmo(player_t *player, ammotype_t ammo, int num)
 {
    int oldammo;
 
-   if (ammo == am_noammo)
+   if (ammo == AM_NOAMMO)
       return FALSE;
 
    if ( player->ammo[ammo] == player->maxammo[ammo]  )
@@ -124,32 +124,32 @@ static boolean P_GiveAmmo(player_t *player, ammotype_t ammo, int num)
 
    switch (ammo)
    {
-      case am_clip:
-         if (player->readyweapon == wp_fist)
+      case AM_CLIP:
+         if (player->readyweapon == WP_FIST)
          {
-            if (player->weaponowned[wp_chaingun])
-               player->pendingweapon = wp_chaingun;
+            if (player->weaponowned[WP_CHAINGUN])
+               player->pendingweapon = WP_CHAINGUN;
             else
-               player->pendingweapon = wp_pistol;
+               player->pendingweapon = WP_PISTOL;
          }
          break;
 
-      case am_shell:
-         if (player->readyweapon == wp_fist || player->readyweapon == wp_pistol)
-            if (player->weaponowned[wp_shotgun])
-               player->pendingweapon = wp_shotgun;
+      case AM_SHELL:
+         if (player->readyweapon == WP_FIST || player->readyweapon == WP_PISTOL)
+            if (player->weaponowned[WP_SHOTGUN])
+               player->pendingweapon = WP_SHOTGUN;
          break;
 
-      case am_cell:
-         if (player->readyweapon == wp_fist || player->readyweapon == wp_pistol)
-            if (player->weaponowned[wp_plasma])
-               player->pendingweapon = wp_plasma;
+      case AM_CELL:
+         if (player->readyweapon == WP_FIST || player->readyweapon == WP_PISTOL)
+            if (player->weaponowned[WP_PLASMA])
+               player->pendingweapon = WP_PLASMA;
          break;
 
-      case am_misl:
-         if (player->readyweapon == wp_fist)
-            if (player->weaponowned[wp_missile])
-               player->pendingweapon = wp_missile;
+      case AM_MISL:
+         if (player->readyweapon == WP_FIST)
+            if (player->weaponowned[WP_MISSILE])
+               player->pendingweapon = WP_MISSILE;
       default:
          break;
    }
@@ -186,7 +186,7 @@ static boolean P_GiveWeapon(player_t *player, weapontype_t weapon, boolean dropp
       return FALSE;
     }
 
-  if (weaponinfo[weapon].ammo != am_noammo)
+  if (weaponinfo[weapon].ammo != AM_NOAMMO)
     {
       // give one clip with a dropped weapon,
       // two clips with a found weapon
@@ -439,8 +439,8 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!P_GivePower (player, pw_strength))
         return;
       player->message = s_GOTBERSERK; // Ty 03/22/98 - externalized
-      if (player->readyweapon != wp_fist)
-        player->pendingweapon = wp_fist;
+      if (player->readyweapon != WP_FIST)
+        player->pendingweapon = WP_FIST;
       sound = sfx_getpow;
       break;
 
@@ -476,55 +476,55 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
     case SPR_CLIP:
       if (special->flags & MF_DROPPED)
         {
-          if (!P_GiveAmmo (player,am_clip,0))
+          if (!P_GiveAmmo (player,AM_CLIP,0))
             return;
         }
       else
         {
-          if (!P_GiveAmmo (player,am_clip,1))
+          if (!P_GiveAmmo (player,AM_CLIP,1))
             return;
         }
       player->message = s_GOTCLIP; // Ty 03/22/98 - externalized
       break;
 
     case SPR_AMMO:
-      if (!P_GiveAmmo (player, am_clip,5))
+      if (!P_GiveAmmo (player, AM_CLIP,5))
         return;
       player->message = s_GOTCLIPBOX; // Ty 03/22/98 - externalized
       break;
 
     case SPR_ROCK:
-      if (!P_GiveAmmo (player, am_misl,1))
+      if (!P_GiveAmmo (player, AM_MISL,1))
         return;
       player->message = s_GOTROCKET; // Ty 03/22/98 - externalized
       break;
 
     case SPR_BROK:
-      if (!P_GiveAmmo (player, am_misl,5))
+      if (!P_GiveAmmo (player, AM_MISL,5))
         return;
       player->message = s_GOTROCKBOX; // Ty 03/22/98 - externalized
       break;
 
     case SPR_CELL:
-      if (!P_GiveAmmo (player, am_cell,1))
+      if (!P_GiveAmmo (player, AM_CELL,1))
         return;
       player->message = s_GOTCELL; // Ty 03/22/98 - externalized
       break;
 
     case SPR_CELP:
-      if (!P_GiveAmmo (player, am_cell,5))
+      if (!P_GiveAmmo (player, AM_CELL,5))
         return;
       player->message = s_GOTCELLBOX; // Ty 03/22/98 - externalized
       break;
 
     case SPR_SHEL:
-      if (!P_GiveAmmo (player, am_shell,1))
+      if (!P_GiveAmmo (player, AM_SHELL,1))
         return;
       player->message = s_GOTSHELLS; // Ty 03/22/98 - externalized
       break;
 
     case SPR_SBOX:
-      if (!P_GiveAmmo (player, am_shell,5))
+      if (!P_GiveAmmo (player, AM_SHELL,5))
         return;
       player->message = s_GOTSHELLBOX; // Ty 03/22/98 - externalized
       break;
@@ -543,49 +543,49 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
 
         // weapons
     case SPR_BFUG:
-      if (!P_GiveWeapon (player, wp_bfg, FALSE) )
+      if (!P_GiveWeapon (player, WP_BFG, FALSE) )
         return;
       player->message = s_GOTBFG9000; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
       break;
 
     case SPR_MGUN:
-      if (!P_GiveWeapon (player, wp_chaingun, (special->flags&MF_DROPPED)!=0) )
+      if (!P_GiveWeapon (player, WP_CHAINGUN, (special->flags&MF_DROPPED)!=0) )
         return;
       player->message = s_GOTCHAINGUN; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
       break;
 
     case SPR_CSAW:
-      if (!P_GiveWeapon (player, wp_chainsaw, FALSE) )
+      if (!P_GiveWeapon (player, WP_CHAINSAW, FALSE) )
         return;
       player->message = s_GOTCHAINSAW; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
       break;
 
     case SPR_LAUN:
-      if (!P_GiveWeapon (player, wp_missile, FALSE) )
+      if (!P_GiveWeapon (player, WP_MISSILE, FALSE) )
         return;
       player->message = s_GOTLAUNCHER; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
       break;
 
     case SPR_PLAS:
-      if (!P_GiveWeapon (player, wp_plasma, FALSE) )
+      if (!P_GiveWeapon (player, WP_PLASMA, FALSE) )
         return;
       player->message = s_GOTPLASMA; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
       break;
 
     case SPR_SHOT:
-      if (!P_GiveWeapon (player, wp_shotgun, (special->flags&MF_DROPPED)!=0 ) )
+      if (!P_GiveWeapon (player, WP_SHOTGUN, (special->flags&MF_DROPPED)!=0 ) )
         return;
       player->message = s_GOTSHOTGUN; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
       break;
 
     case SPR_SGN2:
-      if (!P_GiveWeapon(player, wp_supershotgun, (special->flags&MF_DROPPED)!=0))
+      if (!P_GiveWeapon(player, WP_SUPERSHOTGUN, (special->flags&MF_DROPPED)!=0))
         return;
       player->message = s_GOTSHOTGUN2; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
@@ -760,7 +760,7 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
 
   if (inflictor && !(target->flags & MF_NOCLIP) &&
       (!source || !source->player ||
-       source->player->readyweapon != wp_chainsaw))
+       source->player->readyweapon != WP_CHAINSAW))
     {
       unsigned ang = R_PointToAngle2 (inflictor->x, inflictor->y,
                                       target->x,    target->y);

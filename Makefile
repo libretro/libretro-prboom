@@ -35,7 +35,7 @@ endif
 
 TARGET_NAME := prboom
 
-LIBM    := 
+LIBM    := -lm
 LDFLAGS := 
 
 ifeq ($(STATIC_LINKING),1)

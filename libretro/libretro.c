@@ -568,22 +568,20 @@ boolean HasTrailingSlash(const char* dn)
 char* I_FindFile(const char* wfname, const char* ext)
 {
   FILE *file;
-  size_t pl;
   char  * p;
-  char slash;
+#ifdef _WIN32
+  char slash = '\\';
+#else
+  char slash = '/';
+#endif
 
   /* Precalculate a length we will need in the loop */
-  pl = strlen(wfname) + strlen(ext) + 4;
+  size_t pl = strlen(wfname) + strlen(ext) + 4;
 
   if (log_cb)
      log_cb(RETRO_LOG_INFO, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
 
   p = malloc(strlen(g_wad_dir) + pl);
-#ifdef _WIN32
-  slash = '\\';
-#else
-  slash = '/';
-#endif
   if (log_cb)
      log_cb(RETRO_LOG_INFO, "%s%c%s\n", g_wad_dir, slash, wfname);
   sprintf(p, "%s%c%s", g_wad_dir, slash, wfname);
@@ -644,6 +642,7 @@ void I_Read(int fd, void* vbuf, size_t sz)
       int rc = read(fd,buf,sz);
       if (rc <= 0)
          I_Error("I_Read: read failed: %s", rc ? strerror(errno) : "EOF");
-      sz -= rc; buf += rc;
+      sz  -= rc;
+      buf += rc;
    }
 }

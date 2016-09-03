@@ -12,6 +12,7 @@
 
 #include "../src/i_sound.h"
 #include "../src/musicplayer.h"
+#include "../src/flplayer.h"
 #include "../src/oplplayer.h"
 #include "../src/madplayer.h"
 
@@ -32,7 +33,7 @@
 #define MIXBUFFERSIZE   (SAMPLECOUNT_35*BUFMUL)
 #define MAX_CHANNELS    32
 
-#if 0
+#if 1
 #define MIDI_SUPPORT
 #endif
 
@@ -218,7 +219,7 @@ void I_SetMusicVolume(int volume)
     snd_MusicVolume = volume;
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-    opl_synth_player.setvolume(volume);
+    fl_player.setvolume(volume);
 #else
     mp_player.setvolume(volume);
 #endif
@@ -402,7 +403,7 @@ void I_UpdateSound(void)
    if (music_handle)
    {
 #ifdef MIDI_SUPPORT
-      opl_synth_player.render(mad_audio_buf, out_frames);
+      fl_player.render(mad_audio_buf, out_frames);
 #else
       mp_player.render(mad_audio_buf, out_frames);
 #endif
@@ -566,8 +567,8 @@ void I_PlaySong(int handle, int looping)
 
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  opl_synth_player.play(music_handle, looping);
-  opl_synth_player.setvolume(snd_MusicVolume);
+  fl_player.play(music_handle, looping);
+  fl_player.setvolume(snd_MusicVolume);
 #else
   mp_player.play(music_handle, looping);
   mp_player.setvolume(snd_MusicVolume);
@@ -582,7 +583,7 @@ void I_PauseSong (int handle)
 
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  opl_synth_player.pause();
+  fl_player.pause();
 #else
   mp_player.pause();
 #endif
@@ -596,7 +597,7 @@ void I_ResumeSong (int handle)
 
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  opl_synth_player.resume();
+  fl_player.resume();
 #else
   mp_player.resume();
 #endif
@@ -613,7 +614,7 @@ void I_StopSong(int handle)
 
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  opl_synth_player.stop();
+  fl_player.stop();
 #else
   mp_player.stop();
 #endif
@@ -627,7 +628,7 @@ void I_UnRegisterSong(int handle)
 
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  opl_synth_player.unregistersong(music_handle);
+  fl_player.unregistersong(music_handle);
 #else
   mp_player.unregistersong(music_handle);
 #endif
@@ -654,7 +655,7 @@ int I_QrySongPlaying(int handle)
 static int RegisterSong(const void *data, size_t len)
 {
 #ifdef MIDI_SUPPORT
-   music_handle = opl_synth_player.registersong(data, len);
+   music_handle = fl_player.registersong(data, len);
 #else
    music_handle = mp_player.registersong(data, len);
 #endif
@@ -736,7 +737,7 @@ void I_MPPlayer_Init(void)
 {
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-   opl_synth_player.init(44100);
+   fl_player.init(44100);
 #else
    mp_player.init(44100);
 #endif
@@ -747,7 +748,7 @@ void I_MPPlayer_Free(void)
 {
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-   opl_synth_player.shutdown();
+   fl_player.shutdown();
 #else
    mp_player.shutdown();
 #endif

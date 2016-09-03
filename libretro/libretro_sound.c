@@ -33,10 +33,6 @@
 #define MIXBUFFERSIZE   (SAMPLECOUNT_35*BUFMUL)
 #define MAX_CHANNELS    32
 
-#ifdef HAVE_FLUIDSYNTH
-#define MIDI_SUPPORT
-#endif
-
 static const void *music_handle;
 static void *song_data;
 
@@ -224,7 +220,7 @@ void I_SetMusicVolume(int volume)
     if (music_handle)
     {
 #ifdef MUSIC_SUPPORT
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
        fl_player.setvolume(volume);
 #else
        mp_player.setvolume(volume);
@@ -407,7 +403,7 @@ void I_UpdateSound(void)
 #ifdef MUSIC_SUPPORT
    if (music_handle)
    {
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
       fl_player.render(mad_audio_buf, out_frames);
 #else
       mp_player.render(mad_audio_buf, out_frames);
@@ -573,7 +569,7 @@ void I_PlaySong(int handle, int looping)
   if (music_handle)
   {
 #ifdef MUSIC_SUPPORT
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
      fl_player.play(music_handle, looping);
      fl_player.setvolume(snd_MusicVolume);
 #else
@@ -592,7 +588,7 @@ void I_PauseSong (int handle)
   if (music_handle)
   {
 #ifdef MUSIC_SUPPORT
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
      fl_player.pause();
 #else
      mp_player.pause();
@@ -609,7 +605,7 @@ void I_ResumeSong (int handle)
   if (music_handle)
   {
 #ifdef MUSIC_SUPPORT
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
      fl_player.resume();
 #else
      mp_player.resume();
@@ -629,7 +625,7 @@ void I_StopSong(int handle)
   if (music_handle)
   {
 #ifdef MUSIC_SUPPORT
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
      fl_player.stop();
 #else
      mp_player.stop();
@@ -646,7 +642,7 @@ void I_UnRegisterSong(int handle)
   if (music_handle)
   {
 #ifdef MUSIC_SUPPORT
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
      fl_player.unregistersong(music_handle);
 #else
      mp_player.unregistersong(music_handle);
@@ -675,7 +671,7 @@ int I_QrySongPlaying(int handle)
 #ifdef MUSIC_SUPPORT
 static int RegisterSong(const void *data, size_t len)
 {
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
    music_handle = fl_player.registersong(data, len);
 #else
    music_handle = mp_player.registersong(data, len);
@@ -756,8 +752,10 @@ void I_ResampleStream (void *dest, unsigned nsamp, void (*proc)(void *dest, unsi
 
 void I_MPPlayer_Init(void)
 {
+   log_cb(RETRO_LOG_INFO, "I_MPplayer_Init\n");
+
 #ifdef MUSIC_SUPPORT
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
    fl_player.init(44100);
 #else
    mp_player.init(44100);
@@ -770,7 +768,7 @@ void I_MPPlayer_Free(void)
    if (music_handle)
    {
 #ifdef MUSIC_SUPPORT
-#ifdef MIDI_SUPPORT
+#ifdef HAVE_LIBFLUIDSYNTH
       fl_player.shutdown();
 #else
       mp_player.shutdown();

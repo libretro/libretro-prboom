@@ -73,7 +73,7 @@ const music_player_t fl_player =
 #include <stdlib.h>
 #include <string.h>
 
-const char *snd_soundfont = NULL;
+const char *snd_soundfont = "/home/squarepusher/.retroarch/soundfont";
 
 extern retro_log_printf_t log_cb;
 
@@ -361,6 +361,8 @@ static void fl_render (void *vdest, unsigned length)
 
   midi_event_t *currevent;
 
+  log_cb(RETRO_LOG_INFO, "Test 1\n");
+
   if (!f_playing || f_paused)
   { 
     // save CPU time and allow for seamless resume after pause
@@ -368,6 +370,8 @@ static void fl_render (void *vdest, unsigned length)
     //fl_writesamples_ex (vdest, length);
     return;
   }
+
+  log_cb(RETRO_LOG_INFO, "Test 2\n");
 
 
   while (1)
@@ -484,8 +488,6 @@ static void fl_render (void *vdest, unsigned length)
   { // huh?
     return;
   }
-  
-
 }  
 
 

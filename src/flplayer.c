@@ -63,13 +63,19 @@ const music_player_t fl_player =
 
 #else // HAVE_LIBFLUIDSYNTH
 
+#include "../libretro/libretro.h"
 #include <fluidsynth.h>
+#include "m_fixed.h"
 #include "i_sound.h" // for snd_soundfont, mus_fluidsynth_gain
 #include "i_system.h" // for I_FindFile()
 #include "lprintf.h"
 #include "midifile.h"
 #include <stdlib.h>
 #include <string.h>
+
+const char *snd_soundfont = NULL;
+
+extern retro_log_printf_t log_cb;
 
 static fluid_settings_t *f_set;
 static fluid_synth_t *f_syn;
@@ -103,11 +109,16 @@ static const char *fl_name (void)
 #include <delayimp.h>
 #endif
 
+static int mus_fluidsynth_gain   = 1; // NSM  fine tune fluidsynth output level
+static int mus_fluidsynth_chorus = 1;
+static int mus_fluidsynth_reverb = 1;
+
 static int fl_init (int samplerate)
 {
   const char *filename;
 
   f_soundrate = samplerate;
+
   // fluidsynth 1.1.4 supports sample rates as low as 8000hz.  earlier versions only go down to 22050hz
   // since the versions are ABI compatible, detect at runtime, not compile time
   if (1)
@@ -117,14 +128,14 @@ static int fl_init (int samplerate)
     int minor;
     int micro;
     fluid_version (&major, &minor, &micro);
-    lprintf (LO_INFO, "Fluidplayer: Fluidsynth version %i.%i.%i\n", major, minor, micro);
+    log_cb (RETRO_LOG_INFO, "Fluidplayer: Fluidsynth version %i.%i.%i\n", major, minor, micro);
     if (major >= 1 && minor >=1 && micro >= 4)
       sratemin = 8000;
     else
       sratemin = 22050;
     if (f_soundrate < sratemin)
     {
-      lprintf (LO_INFO, "Fluidplayer: samplerates under %i are not supported\n", sratemin);
+      log_cb (RETRO_LOG_INFO, "Fluidplayer: samplerates under %i are not supported\n", sratemin);
       return 0;
     }
   }
@@ -133,7 +144,7 @@ static int fl_init (int samplerate)
   f_set = new_fluid_settings ();
 
   #define FSET(a,b,c) if (!fluid_settings_set##a(f_set,b,c))\
-    lprintf (LO_INFO, "fl_init: Couldn't set " b "\n")
+    log_cb (RETRO_LOG_INFO, "fl_init: Couldn't set " b "\n")
 
   FSET (num, "synth.sample-rate", f_soundrate);
 
@@ -160,17 +171,17 @@ static int fl_init (int samplerate)
   f_syn = new_fluid_synth (f_set);
   if (!f_syn)
   {
-    lprintf (LO_WARN, "fl_init: error creating fluidsynth object\n");
+    log_cb (RETRO_LOG_WARN, "fl_init: error creating fluidsynth object\n");
     delete_fluid_settings (f_set);
     return 0;
   }
 
-  filename = I_FindFile2(snd_soundfont, ".sf2");
+  filename = I_FindFile(snd_soundfont, ".sf2");
   f_font = fluid_synth_sfload (f_syn, filename, 1);
 
   if (f_font == FLUID_FAILED)
   {
-    lprintf (LO_WARN, "fl_init: error loading soundfont %s\n", snd_soundfont);
+    log_cb (RETRO_LOG_WARN, "fl_init: error loading soundfont %s\n", snd_soundfont);
     delete_fluid_synth (f_syn);
     delete_fluid_settings (f_set);
     return 0;
@@ -212,7 +223,7 @@ static const void *fl_registersong (const void *data, unsigned len)
 
   if (!midifile)
   {
-    lprintf (LO_WARN, "fl_registersong: Failed to load MIDI.\n");
+    log_cb (RETRO_LOG_WARN, "fl_registersong: Failed to load MIDI.\n");
     return NULL;
   }
   
@@ -324,7 +335,7 @@ static void writesysex (unsigned char *data, int len)
   
   if (len + sysexbufflen > SYSEX_BUFF_SIZE)
   {
-    lprintf (LO_WARN, "fluidplayer: ignoring large or malformed sysex message\n");
+    log_cb (RETRO_LOG_WARN, "fluidplayer: ignoring large or malformed sysex message\n");
     sysexbufflen = 0;
     return;
   }
@@ -337,7 +348,7 @@ static void writesysex (unsigned char *data, int len)
   }
   if (!didrespond)
   {
-    lprintf (LO_WARN, "fluidplayer: SYSEX message received but not understood\n");
+    log_cb (RETRO_LOG_WARN, "fluidplayer: SYSEX message received but not understood\n");
   }
 }  
 

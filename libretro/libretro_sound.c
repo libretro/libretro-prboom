@@ -33,9 +33,12 @@
 #define MIXBUFFERSIZE   (SAMPLECOUNT_35*BUFMUL)
 #define MAX_CHANNELS    32
 
-#if 1
+#ifdef HAVE_FLUIDSYNTH
 #define MIDI_SUPPORT
 #endif
+
+static const void *music_handle;
+static void *song_data;
 
 extern retro_audio_sample_batch_t audio_batch_cb;
 extern retro_log_printf_t log_cb;
@@ -217,13 +220,17 @@ void I_SetSfxVolume(int volume)
 void I_SetMusicVolume(int volume)
 {
     snd_MusicVolume = volume;
+
+    if (music_handle)
+    {
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-    fl_player.setvolume(volume);
+       fl_player.setvolume(volume);
 #else
-    mp_player.setvolume(volume);
+       mp_player.setvolume(volume);
 #endif
 #endif
+    }
 }
 
 /* Retrieve the raw data lump index
@@ -361,8 +368,6 @@ boolean I_SoundIsPlaying (int handle)
 // This function currently supports only 16bit.
 //
 
-static const void *music_handle;
-static void *song_data;
 
 void I_UpdateSound(void)
 {
@@ -565,15 +570,18 @@ void I_PlaySong(int handle, int looping)
 
   (void)handle;
 
+  if (music_handle)
+  {
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  fl_player.play(music_handle, looping);
-  fl_player.setvolume(snd_MusicVolume);
+     fl_player.play(music_handle, looping);
+     fl_player.setvolume(snd_MusicVolume);
 #else
-  mp_player.play(music_handle, looping);
-  mp_player.setvolume(snd_MusicVolume);
+     mp_player.play(music_handle, looping);
+     mp_player.setvolume(snd_MusicVolume);
 #endif
 #endif
+  }
 }
 
 void I_PauseSong (int handle)
@@ -581,13 +589,16 @@ void I_PauseSong (int handle)
   handle = 0;
   (void)handle;
 
+  if (music_handle)
+  {
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  fl_player.pause();
+     fl_player.pause();
 #else
-  mp_player.pause();
+     mp_player.pause();
 #endif
 #endif
+  }
 }
 
 void I_ResumeSong (int handle)
@@ -595,13 +606,16 @@ void I_ResumeSong (int handle)
   handle = 0;
   (void)handle;
 
+  if (music_handle)
+  {
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  fl_player.resume();
+     fl_player.resume();
 #else
-  mp_player.resume();
+     mp_player.resume();
 #endif
 #endif
+  }
 }
 
 void I_StopSong(int handle)
@@ -612,13 +626,16 @@ void I_StopSong(int handle)
 
   (void)handle;
 
+  if (music_handle)
+  {
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  fl_player.stop();
+     fl_player.stop();
 #else
-  mp_player.stop();
+     mp_player.stop();
 #endif
 #endif
+  }
 }
 
 void I_UnRegisterSong(int handle)
@@ -626,15 +643,19 @@ void I_UnRegisterSong(int handle)
   handle = 0;
   (void)handle;
 
+  if (music_handle)
+  {
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-  fl_player.unregistersong(music_handle);
+     fl_player.unregistersong(music_handle);
 #else
-  mp_player.unregistersong(music_handle);
+     mp_player.unregistersong(music_handle);
 #endif
-  music_handle = NULL;
+  }
+
   free(song_data);
-  song_data = NULL;
+  music_handle = NULL;
+  song_data    = NULL;
 #endif
 }
 
@@ -746,11 +767,14 @@ void I_MPPlayer_Init(void)
 
 void I_MPPlayer_Free(void)
 {
+   if (music_handle)
+   {
 #ifdef MUSIC_SUPPORT
 #ifdef MIDI_SUPPORT
-   fl_player.shutdown();
+      fl_player.shutdown();
 #else
-   mp_player.shutdown();
+      mp_player.shutdown();
 #endif
 #endif
+   }
 }

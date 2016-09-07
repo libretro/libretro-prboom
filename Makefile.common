@@ -1,18 +1,22 @@
-INCFLAGS   = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(ROOT_DIR)/libmad -I$(ROOT_DIR)/libretro/libretro-common/include
+DEPS_DIR           = $(ROOT_DIR)/deps
+LIBRETRO_DIR       = $(ROOT_DIR)/libretro
+LIBRETRO_COMM_DIR  = $(ROOT_DIR)/libretro/libretro-common
 
-SOURCES_C := $(ROOT_DIR)/libretro/libretro.c \
-				 $(ROOT_DIR)/libretro/libretro_sound.c \
+INCFLAGS   = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(DEPS_DIR)/libmad -I$(LIBRETRO_COMM_DIR)/include
 
-SOURCES_C += $(ROOT_DIR)/libmad/bit.c \
-					 $(ROOT_DIR)/libmad/decoder.c \
-					 $(ROOT_DIR)/libmad/fixed.c \
-					 $(ROOT_DIR)/libmad/frame.c \
-					 $(ROOT_DIR)/libmad/huffman.c \
-					 $(ROOT_DIR)/libmad/layer3.c \
-					 $(ROOT_DIR)/libmad/layer12.c \
-					 $(ROOT_DIR)/libmad/stream.c \
-					 $(ROOT_DIR)/libmad/synth.c \
-					 $(ROOT_DIR)/libmad/timer.c
+SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
+				 $(LIBRETRO_DIR)/libretro_sound.c \
+
+SOURCES_C += $(DEPS_DIR)/libmad/bit.c \
+				 $(DEPS_DIR)/libmad/decoder.c \
+				 $(DEPS_DIR)/libmad/fixed.c \
+				 $(DEPS_DIR)/libmad/frame.c \
+				 $(DEPS_DIR)/libmad/huffman.c \
+				 $(DEPS_DIR)/libmad/layer3.c \
+				 $(DEPS_DIR)/libmad/layer12.c \
+				 $(DEPS_DIR)/libmad/stream.c \
+				 $(DEPS_DIR)/libmad/synth.c \
+				 $(DEPS_DIR)/libmad/timer.c
 
 SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/d_deh.c \
@@ -89,7 +93,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/madplayer.c
 
 ifeq ($(WANT_FLUIDSYNTH), 1)
-FLUIDSYNTH_DIR := $(ROOT_DIR)/fluidlite
+FLUIDSYNTH_DIR := $(DEPS_DIR)/fluidlite
 LIBVORBIS_DIR  := $(FLUIDSYNTH_DIR)/libvorbis-1.3.5
 LIBOGG_DIR     := $(FLUIDSYNTH_DIR)/libogg-1.3.2
 INCFLAGS   += -I$(FLUIDSYNTH_DIR)/include -I$(LIBVORBIS_DIR)/include -I$(LIBOGG_DIR)/include

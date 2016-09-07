@@ -160,6 +160,12 @@ else ifeq ($(platform), ctr)
 	CFLAGS += -fomit-frame-pointer -ffast-math
 	STATIC_LINKING = 1
 
+# emscripten
+else ifeq ($(platform), emscripten)
+	TARGET := $(TARGET_NAME)_libretro_$(platform).bc
+   CFLAGS += -DHAVE_STRLWR
+	STATIC_LINKING = 1
+
 else ifeq ($(platform), xenon)
 	EXT=a
    TARGET := $(TARGET_NAME)_libretro_xenon360.$(EXT)

@@ -311,6 +311,9 @@ static void mp_render_ex (void *dest, unsigned nsamp)
   // NOT REACHED
 }
 
+void I_ResampleStream (void *dest, unsigned nsamp, void (*proc)(void *dest, unsigned nsamp),
+      unsigned sratein, unsigned srateout);
+
 static void mp_render (void *dest, unsigned nsamp)
 { 
   I_ResampleStream (dest, nsamp, mp_render_ex, Header.samplerate, mp_samplerate_target);

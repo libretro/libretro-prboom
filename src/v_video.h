@@ -122,6 +122,7 @@ extern void V_CopyRect(int srcx,  int srcy,  int srcscrn,
                              int destx, int desty, int destscrn,
                              enum patch_translation_e flags);
 
+void V_FillRect(int x, int y, int width, int height, uint8_t colour);
 extern void V_FillRect_f(int x, int y,
                              int width, int height, uint8_t colour);
 

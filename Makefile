@@ -124,7 +124,7 @@ else ifeq ($(platform), sncps3)
 	STATIC_LINKING = 1
 else ifeq ($(platform), psl1ght)
 	EXT=a
-   TARGET := $(TARGET_NAME)_libretro_psl1ght.$(EXT)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
    CFLAGS += -DMSB_FIRST -DHAVE_STRLWR
@@ -133,7 +133,7 @@ else ifeq ($(platform), psl1ght)
 # PSP1
 else ifeq ($(platform), psp1)
 	EXT=a
-   TARGET := $(TARGET_NAME)_libretro_psp1.$(EXT)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = psp-gcc$(EXE_EXT)
    AR = psp-ar$(EXE_EXT)
    CFLAGS += -DHAVE_STRLWR -DPSP -G0
@@ -142,7 +142,7 @@ else ifeq ($(platform), psp1)
 # Vita
 else ifeq ($(platform), vita)
 	EXT=a
-   TARGET := $(TARGET_NAME)_libretro_vita.$(EXT)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
 	CC = arm-vita-eabi-gcc$(EXE_EXT)
 	AR = arm-vita-eabi-ar$(EXE_EXT)
    CFLAGS += -DHAVE_STRLWR -DVITA -fno-short-enums
@@ -151,7 +151,7 @@ else ifeq ($(platform), vita)
 # CTR (3DS)
 else ifeq ($(platform), ctr)
 	EXT=a
-	TARGET := $(TARGET_NAME)_libretro_ctr.$(EXT)
+	TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
 	CC = $(DEVKITARM)/bin/arm-none-eabi-gcc$(EXE_EXT)
 	AR = $(DEVKITARM)/bin/arm-none-eabi-ar$(EXE_EXT)
 	PLATFORM_DEFINES := -DARM11 -D_3DS
@@ -175,18 +175,28 @@ else ifeq ($(platform), xenon)
 	STATIC_LINKING = 1
 else ifeq ($(platform), ngc)
 	EXT=a
-   TARGET := $(TARGET_NAME)_libretro_ngc.$(EXT)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
    CFLAGS += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMEMORY_LOW -DMSB_FIRST 
 	STATIC_LINKING = 1
+
 else ifeq ($(platform), wii)
 	EXT=a
-   TARGET := $(TARGET_NAME)_libretro_wii.$(EXT)
+   TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
    CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST
 	STATIC_LINKING = 1
+
+else ifeq ($(platform), wiiu)
+	EXT=a
+   TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
+   CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
+   AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
+   CFLAGS += -DGEKKO -DHW_RVL -DWIIU -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST
+	STATIC_LINKING = 1
+
 else ifneq (,$(findstring armv,$(platform)))
 	EXT?=so
    TARGET := $(TARGET_NAME)_libretro.$(EXT)

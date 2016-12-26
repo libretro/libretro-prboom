@@ -105,7 +105,7 @@ void retro_get_system_info(struct retro_system_info *info)
 #define GIT_VERSION ""
 #endif
    info->library_version  = "v2.5.0" GIT_VERSION;
-   info->need_fullpath    = false;
+   info->need_fullpath    = true;
    info->valid_extensions = "wad|iwad";
    info->block_extract = false;
 }
@@ -287,13 +287,11 @@ bool retro_load_game(const struct retro_game_info *info)
    update_variables(true);
 
 
-   extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
-   extract_basename(g_basename, info->path, sizeof(g_basename));
-
-
    argv[argc++] = strdup("prboom");
    if(info->path)
    {
+      extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
+      extract_basename(g_basename, info->path, sizeof(g_basename));
       argv[argc++] = strdup("-iwad");
       argv[argc++] = strdup(g_basename);
    }

@@ -1,10 +1,11 @@
 LOCAL_PATH := $(call my-dir)
+
+include $(CLEAR_VARS)
+
 GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
 ifneq ($(GIT_VERSION)," unknown")
 	LOCAL_CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 endif
-
-include $(CLEAR_VARS)
 
 ifeq ($(TARGET_ARCH),arm)
 LOCAL_CFLAGS += -DANDROID_ARM

@@ -166,43 +166,46 @@ else ifeq ($(platform), ctr)
 
 # emscripten
 else ifeq ($(platform), emscripten)
-	TARGET := $(TARGET_NAME)_libretro_$(platform).bc
+   TARGET := $(TARGET_NAME)_libretro_$(platform).bc
    CFLAGS += -DHAVE_STRLWR
-	STATIC_LINKING = 1
+   STATIC_LINKING = 1
 
 else ifeq ($(platform), xenon)
-	EXT=a
+   EXT=a
    TARGET := $(TARGET_NAME)_libretro_xenon360.$(EXT)
    CC = xenon-gcc$(EXE_EXT)
    AR = xenon-ar$(EXE_EXT)
    CFLAGS += -D__LIBXENON__ -m32 -D__ppc__ -DMSB_FIRST
-	STATIC_LINKING = 1
+   STATIC_LINKING = 1
 else ifeq ($(platform), ngc)
-	EXT=a
+   EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
    CFLAGS += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMEMORY_LOW -DMSB_FIRST 
-	STATIC_LINKING = 1
+   CFLAGS += -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int
+   STATIC_LINKING = 1
 
 else ifeq ($(platform), wii)
-	EXT=a
+   EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
    CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST
-	STATIC_LINKING = 1
+   CFLAGS += -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int
+   STATIC_LINKING = 1
 
 else ifeq ($(platform), wiiu)
-	EXT=a
+   EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -DHW_RVL -DWIIU -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST
-	STATIC_LINKING = 1
+   CFLAGS += -DGEKKO -DHW_RVL -DWIIU -mwup -mcpu=750 -meabi -mhard-float -DMSB_FIRST
+   CFLAGS += -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int
+   STATIC_LINKING = 1
 
 else ifneq (,$(findstring armv,$(platform)))
-	EXT?=so
+   EXT?=so
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
    SHARED := -shared -Wl,--no-undefined
    fpic := -fPIC

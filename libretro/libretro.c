@@ -282,10 +282,12 @@ bool retro_load_game(const struct retro_game_info *info)
       { 0 },
    };
 
+   if (!info)
+      return false;
+
    environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
 
    update_variables(true);
-
 
    argv[argc++] = strdup("prboom");
    if(info->path)

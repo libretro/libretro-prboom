@@ -489,6 +489,7 @@ void W_Exit(void)
          close(wadfiles[i].handle);
 #else
          fclose(wadfiles[i].handle);
+         free(wadfiles[i].data);
 #endif
       }
 	}
@@ -506,7 +507,7 @@ void W_ReleaseAllWads(void)
 #ifdef MEMORY_LOW
 			close(wadfiles[i].handle);
 #else
-			fclose(wadfiles[i].handle);
+         fclose(wadfiles[i].handle);
 			free(wadfiles[i].data);
 #endif
 			wadfiles[i].handle = 0;

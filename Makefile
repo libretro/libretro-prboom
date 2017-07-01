@@ -274,7 +274,7 @@ include Makefile.common
 
 OBJECTS = $(SOURCES_C:.c=.o)
 
-DEFINES    = -D__LIBRETRO__ -DINLINE=inline -DFPM_DEFAULT
+DEFINES    = $(COREDEFINES)
 
 ifeq ($(platform), sncps3)
 WARNINGS_DEFINES =

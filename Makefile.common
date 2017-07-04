@@ -4,7 +4,13 @@ LIBRETRO_COMM_DIR  = $(ROOT_DIR)/libretro/libretro-common
 
 INCFLAGS    = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(DEPS_DIR)/libmad -I$(LIBRETRO_COMM_DIR)/include
 
-COREDEFINES = -D__LIBRETRO__ -DINLINE=inline -DFPM_DEFAULT
+COREDEFINES = -D__LIBRETRO__ -DFPM_DEFAULT
+
+ifneq (,$(findstring msvc,$(platform)))
+COREDEFINES += -DINLINE="_inline"
+else
+COREDEFINES += -DINLINE="inline"
+endif
 
 SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_DIR)/libretro_sound.c \

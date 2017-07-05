@@ -93,6 +93,8 @@ static double R_ceil (double x)
    return ((long)(x+(0.99999999999999997)));
 }
 
+static const double twoTo52 = 4.50359962737049600e15;              /* 0x1p52 */
+
 static double R_floor(double x)
 {
    double y;
@@ -103,9 +105,9 @@ static double R_floor(double x)
       return x;
    /* y = int(x) - x, where int(x) is an integer neighbor of x */
    if (u.i >> 63)
-      y = (double)(x - 0x1p52) + 0x1p52 - x;
+      y = (double)(x - twoTo52) + twoTo52 - x;
    else
-      y = (double)(x + 0x1p52) - 0x1p52 - x;
+      y = (double)(x + twoTo52) - twoTo52 - x;
    /* special case because of non-nearest rounding modes */
    if (e <= 0x3ff-1)
       return u.i >> 63 ? -1 : 0;

@@ -35,7 +35,7 @@
 #  define V(v, w, x, y, hlen)	{ .value = { 1, hlen, v, w, x, y } }
 # else
 #  define PTR(offs, bits)	{ { 0, bits, offs } }
-#if defined(MSB_FIRST
+#if defined(MSB_FIRST)
 #define V(v, w, x, y, hlen)	{ { 1, hlen, (v << 11) | (w << 10) |  \
                                              (x <<  9) | (y <<  8) } }
 #else

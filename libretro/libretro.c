@@ -58,6 +58,8 @@ static retro_input_state_t input_state_cb;
 #define MAX_PADS 1
 static unsigned doom_devices[1];
 
+boolean mouse_on;
+
 static void check_system_specs(void)
 {
    unsigned level = 4;
@@ -126,6 +128,7 @@ void retro_set_environment(retro_environment_t cb)
    struct retro_variable variables[] = {
       { "prboom-resolution",
          "Internal resolution; 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
+      { "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
       { NULL, NULL },
    };
 
@@ -223,6 +226,17 @@ static void update_variables(bool startup)
          SCREENWIDTH = 320;
          SCREENHEIGHT = 200;
       }
+   }
+
+   var.key = "prboom-mouse_on";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         mouse_on = true;
+      else
+         mouse_on = false;
    }
 }
 
@@ -683,33 +697,6 @@ void I_StartTic (void)
 
         case RETRO_DEVICE_KEYBOARD:
         {
-       /* Mouse Input */
-
-         event_t event_mouse = {0};
-         event_mouse.type = ev_mouse;
-
-         mx = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
-         my = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
-
-         if (mx != cur_mx || my != cur_my)
-         {
-           event_mouse.data2 = mx;
-           event_mouse.data3 = my;
-           cur_mx = mx;
-           cur_my = my;
-         }
-
-         /* TOFIX That's not identified as mouse buttons for configuration. */
-         if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))
-           event_mouse.data1 = 1;
-         if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
-           event_mouse.data1 = 2;
-         if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) && 
-               input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
-           event_mouse.data1 = 3;
-
-         D_PostEvent(&event_mouse);
-
        /* Keyboard Input */
 
          for(i = 0; i < 117; i++)
@@ -737,6 +724,36 @@ void I_StartTic (void)
         }
         break;
       }
+   }
+
+   if (mouse_on || doom_devices[0] == RETRO_DEVICE_KEYBOARD)
+   {
+     /* Mouse Input */
+
+    event_t event_mouse = {0};
+    event_mouse.type = ev_mouse;
+
+    mx = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
+    my = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
+
+    if (mx != cur_mx || my != cur_my)
+    {
+      event_mouse.data2 = mx;
+      event_mouse.data3 = my;
+      cur_mx = mx;
+      cur_my = my;
+    }
+
+    /* TOFIX That's not identified as mouse buttons for configuration. */
+    if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))
+      event_mouse.data1 = 1;
+    if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
+      event_mouse.data1 = 2;
+    if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) && 
+         input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
+      event_mouse.data1 = 3;
+
+    D_PostEvent(&event_mouse);
    }
 }
 

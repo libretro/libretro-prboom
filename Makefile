@@ -40,7 +40,7 @@ ifneq ($(GIT_VERSION)," unknown")
 	CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 endif
 
-LIBM    := -lm
+LIBS    := -lm
 LDFLAGS := 
 
 ifeq ($(STATIC_LINKING),1)
@@ -61,7 +61,7 @@ else ifeq ($(platform), linux-portable)
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
    fpic := -fPIC -nostdlib
    SHARED := -shared -Wl,--version-script=libretro/link.T
-	LIBM :=
+	LIBS =
 else ifeq ($(platform), osx)
 	EXT    ?= dylib
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
@@ -262,6 +262,7 @@ export LIB := $(LIB);$(WindowsSdkDir)
 TARGET := $(TARGET_NAME)_libretro.dll
 PSS_STYLE :=2
 LDFLAGS += -DLL
+LIBS =
 # Windows MSVC 2010 x86
 else ifeq ($(platform), windows_msvc2010_x86)
 	CC  = cl.exe
@@ -285,6 +286,7 @@ export LIB := $(LIB);$(WindowsSdkDir)
 TARGET := $(TARGET_NAME)_libretro.dll
 PSS_STYLE :=2
 LDFLAGS += -DLL
+LIBS =
 # Windows
 else
 	EXT?=dll
@@ -292,6 +294,7 @@ else
    CC = gcc
    SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=libretro/link.T
    CFLAGS += -D__WIN32__ -D__WIN32_LIBRETRO__ -Wno-missing-field-initializers -DHAVE_STRLWR
+LIBS =
 endif
 
 ifeq ($(STATIC_LINKING),1)
@@ -299,7 +302,7 @@ SHARED=
 fpic=
 endif
 
-LDFLAGS += $(LIBM)
+LDFLAGS += $(LIBS)
 
 CFLAGS += -DHAVE_LIBMAD -DMUSIC_SUPPORT
 

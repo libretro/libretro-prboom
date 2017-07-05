@@ -55,6 +55,9 @@ static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
 
+#define MAX_PADS 1
+static unsigned doom_devices[1];
+
 static void check_system_specs(void)
 {
    unsigned level = 4;
@@ -91,12 +94,6 @@ unsigned retro_api_version(void)
    return RETRO_API_VERSION;
 }
 
-void retro_set_controller_port_device(unsigned port, unsigned device)
-{
-   (void)port;
-   (void)device;
-}
-
 void retro_get_system_info(struct retro_system_info *info)
 {
    memset(info, 0, sizeof(*info));
@@ -124,15 +121,44 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
+   environ_cb = cb;
+
    struct retro_variable variables[] = {
       { "prboom-resolution",
          "Internal resolution; 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
       { NULL, NULL },
    };
 
-   environ_cb = cb;
+   static const struct retro_controller_description port[] = {
+      { "RetroPad", RETRO_DEVICE_JOYPAD },
+      { "RetroKeyboard/Mouse", RETRO_DEVICE_KEYBOARD },
+      { 0 },
+   };
+
+   static const struct retro_controller_info ports[] = {
+      { port, 2 },
+     { NULL, 0 },
+   };
 
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
+   cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
+}
+
+void retro_set_controller_port_device(unsigned port, unsigned device)
+{
+   switch (device)
+   {
+      case RETRO_DEVICE_JOYPAD:
+         doom_devices[port] = RETRO_DEVICE_JOYPAD;
+         break;
+      case RETRO_DEVICE_KEYBOARD:
+         doom_devices[port] = RETRO_DEVICE_KEYBOARD;
+         break;
+      default:
+         if (log_cb)
+            log_cb(RETRO_LOG_ERROR, "[libretro]: Invalid device, setting type to RETRO_DEVICE_JOYPAD ...\n");
+         doom_devices[port] = RETRO_DEVICE_JOYPAD;
+   }
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -256,7 +282,6 @@ bool I_PreInitGraphics(void)
    screen_buf = malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
    return true;
 }
-
 
 bool retro_load_game(const struct retro_game_info *info)
 {
@@ -414,11 +439,139 @@ static int left_analog_lut[] = {
         KEYD_LEFTARROW     /* RETRO_DEVICE_ID_JOYPAD_LEFT */
 };
 
+static int action_kb_lut[117][2] = { 
+   {RETROK_BACKSPACE      ,KEYD_BACKSPACE},
+   {RETROK_TAB            ,KEYD_TAB},
+   {RETROK_CLEAR          ,},
+   {RETROK_RETURN         ,KEYD_ENTER},
+   {RETROK_PAUSE          ,KEYD_PAUSE},
+   {RETROK_ESCAPE         ,KEYD_ESCAPE},
+   {RETROK_SPACE          ,KEYD_SPACEBAR},
+   {RETROK_EXCLAIM        ,'!'},
+   {RETROK_QUOTEDBL       ,'"'},
+   {RETROK_HASH           ,'#'},
+   {RETROK_DOLLAR         ,'$'},
+   {RETROK_AMPERSAND      ,'&'},
+   {RETROK_QUOTE          ,'\''},
+   {RETROK_LEFTPAREN      ,'('},
+   {RETROK_RIGHTPAREN     ,')'},
+   {RETROK_ASTERISK       ,'*'},
+   {RETROK_PLUS           ,'+'},
+   {RETROK_COMMA          ,','},
+   {RETROK_MINUS          ,KEYD_MINUS},
+   {RETROK_PERIOD         ,'.'},
+   {RETROK_SLASH          ,'/'},
+   {RETROK_0              ,'0'},
+   {RETROK_1              ,'1'},
+   {RETROK_2              ,'2'},
+   {RETROK_3              ,'3'},
+   {RETROK_4              ,'4'},
+   {RETROK_5              ,'5'},
+   {RETROK_6              ,'6'},
+   {RETROK_7              ,'7'},
+   {RETROK_8              ,'8'},
+   {RETROK_9              ,'9'},
+   {RETROK_COLON          ,':'},
+   {RETROK_SEMICOLON      ,';'},
+   {RETROK_LESS           ,'<'},
+   {RETROK_EQUALS         ,KEYD_EQUALS},
+   {RETROK_GREATER        ,'>'},
+   {RETROK_QUESTION       ,'?'},
+   {RETROK_AT             ,'@'},
+   {RETROK_LEFTBRACKET    ,'['},
+   {RETROK_BACKSLASH      ,'\\'},
+   {RETROK_RIGHTBRACKET   ,']'},
+   {RETROK_CARET          ,'^'},
+   {RETROK_UNDERSCORE     ,'_'},
+   {RETROK_BACKQUOTE      ,'`'},
+   {RETROK_a              ,'a'},
+   {RETROK_b              ,'b'},
+   {RETROK_c              ,'c'},
+   {RETROK_d              ,'d'},
+   {RETROK_e              ,'e'},
+   {RETROK_f              ,'f'},
+   {RETROK_g              ,'g'},
+   {RETROK_h              ,'h'},
+   {RETROK_i              ,'i'},
+   {RETROK_j              ,'j'},
+   {RETROK_k              ,'k'},
+   {RETROK_l              ,'l'},
+   {RETROK_m              ,'m'},
+   {RETROK_n              ,'n'},
+   {RETROK_o              ,'o'},
+   {RETROK_p              ,'p'},
+   {RETROK_q              ,'q'},
+   {RETROK_r              ,'r'},
+   {RETROK_s              ,'s'},
+   {RETROK_t              ,'t'},
+   {RETROK_u              ,'u'},
+   {RETROK_v              ,'v'},
+   {RETROK_w              ,'w'},
+   {RETROK_x              ,'x'},
+   {RETROK_y              ,'y'},
+   {RETROK_z              ,'z'},
+   {RETROK_DELETE         ,KEYD_DEL},
+
+   {RETROK_KP0            ,KEYD_KEYPAD0},
+   {RETROK_KP1            ,KEYD_KEYPAD1},
+   {RETROK_KP2            ,KEYD_KEYPAD2},
+   {RETROK_KP3            ,KEYD_KEYPAD3},
+   {RETROK_KP4            ,KEYD_KEYPAD4},
+   {RETROK_KP5            ,KEYD_KEYPAD5},
+   {RETROK_KP6            ,KEYD_KEYPAD6},
+   {RETROK_KP7            ,KEYD_KEYPAD7},
+   {RETROK_KP8            ,KEYD_KEYPAD8},
+   {RETROK_KP9            ,KEYD_KEYPAD9},
+   {RETROK_KP_PERIOD      ,KEYD_KEYPADPERIOD},
+   {RETROK_KP_DIVIDE      ,KEYD_KEYPADDIVIDE},
+   {RETROK_KP_MULTIPLY    ,KEYD_KEYPADMULTIPLY},
+   {RETROK_KP_MINUS       ,KEYD_KEYPADMINUS},
+   {RETROK_KP_PLUS        ,KEYD_KEYPADPLUS},
+   {RETROK_KP_ENTER       ,KEYD_KEYPADENTER},
+
+   {RETROK_UP             ,KEYD_UPARROW},
+   {RETROK_DOWN           ,KEYD_DOWNARROW},
+   {RETROK_RIGHT          ,KEYD_RIGHTARROW},
+   {RETROK_LEFT           ,KEYD_LEFTARROW},
+   {RETROK_INSERT         ,KEYD_INSERT},
+   {RETROK_HOME           ,KEYD_HOME},
+   {RETROK_END            ,KEYD_END},
+   {RETROK_PAGEUP         ,KEYD_PAGEUP},
+   {RETROK_PAGEDOWN       ,KEYD_PAGEDOWN},
+
+   {RETROK_F1             ,KEYD_F1},
+   {RETROK_F2             ,KEYD_F2},
+   {RETROK_F3             ,KEYD_F3},
+   {RETROK_F4             ,KEYD_F4},
+   {RETROK_F5             ,KEYD_F5},
+   {RETROK_F6             ,KEYD_F6},
+   {RETROK_F7             ,KEYD_F7},
+   {RETROK_F8             ,KEYD_F8},
+   {RETROK_F9             ,KEYD_F9},
+   {RETROK_F10            ,KEYD_F10},
+   {RETROK_F11            ,KEYD_F11},
+   {RETROK_F12            ,KEYD_F12},
+
+   {RETROK_NUMLOCK        ,KEYD_NUMLOCK},
+   {RETROK_CAPSLOCK       ,KEYD_CAPSLOCK},
+   {RETROK_SCROLLOCK      ,KEYD_SCROLLLOCK},
+   {RETROK_RSHIFT         ,KEYD_RSHIFT},
+   {RETROK_LSHIFT         ,KEYD_RSHIFT},
+   {RETROK_RCTRL          ,KEYD_RCTRL},
+   {RETROK_LCTRL          ,KEYD_RCTRL},
+   {RETROK_RALT           ,KEYD_RALT},
+   {RETROK_LALT           ,KEYD_LALT}
+};
+
 #define ANALOG_THRESHOLD 4096
 
 void I_StartTic (void)
 {
+   int port;
+
    unsigned i;
+   static bool old_input_kb[117];
+   bool new_input_kb[117];
    static bool old_input[20];
    bool new_input[20];
    static bool old_input_analog_l[6];
@@ -426,88 +579,163 @@ void I_StartTic (void)
 
    input_poll_cb();
 
-   for(i = 0; i < 14; i++)
+   static int cur_mx;
+   static int cur_my;
+   int mx, my;
+
+   for (port = 0; port < MAX_PADS; port++)
    {
-      event_t event = {0};
-      new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
+      if (!input_state_cb)
+         break;
 
-      if(new_input[i] && !old_input[i])
+      switch (doom_devices[port])
       {
-         event.type = ev_keydown;
-         event.data1 = action_lut[i];
-      }
+         case RETRO_DEVICE_JOYPAD:
+        {
+       /* Gamepad Input */
 
-      if(!new_input[i] && old_input[i])
-      {
-         event.type = ev_keyup;
-         event.data1 = action_lut[i];
-      }
-
-      if(event.type == ev_keydown || event.type == ev_keyup)
-         D_PostEvent(&event);
-
-      old_input[i] = new_input[i];
-   }
-
-   {
-      int lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                     RETRO_DEVICE_ID_ANALOG_X);
-      int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                     RETRO_DEVICE_ID_ANALOG_Y);
-      int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                     RETRO_DEVICE_ID_ANALOG_X);
-      int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                     RETRO_DEVICE_ID_ANALOG_Y);
-
-      if (lsx > ANALOG_THRESHOLD)
-         new_input_analog_l[0] = true;
-      else
-         new_input_analog_l[0] = false;
-
-      if (lsx < -ANALOG_THRESHOLD)
-         new_input_analog_l[1] = true;
-      else
-         new_input_analog_l[1] = false;
-
-      if (lsy > ANALOG_THRESHOLD)
-         new_input_analog_l[2] = true;
-      else
-         new_input_analog_l[2] = false;
-
-      if (lsy < -ANALOG_THRESHOLD)
-         new_input_analog_l[3] = true;
-      else
-         new_input_analog_l[3] = false;
-
-      if (rsx > ANALOG_THRESHOLD)
-         new_input_analog_l[4] = true;
-      else
-         new_input_analog_l[4] = false;
-
-      if (rsx < -ANALOG_THRESHOLD)
-         new_input_analog_l[5] = true;
-      else
-         new_input_analog_l[5] = false;
-
-      for (i = 0; i < 6; i++)
-      {
-         event_t event = {0};
-         if(new_input_analog_l[i] && !old_input_analog_l[i])
+         for(i = 0; i < 14; i++)
          {
-            event.type = ev_keydown;
-            event.data1 = left_analog_lut[i];
+           event_t event = {0};
+           new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
+
+           if(new_input[i] && !old_input[i])
+           {
+             event.type = ev_keydown;
+             event.data1 = action_lut[i];
+           }
+
+           if(!new_input[i] && old_input[i])
+           {
+             event.type = ev_keyup;
+             event.data1 = action_lut[i];
+           }
+
+           if(event.type == ev_keydown || event.type == ev_keyup)
+             D_PostEvent(&event);
+
+           old_input[i] = new_input[i];
          }
 
-         if(!new_input_analog_l[i] && old_input_analog_l[i])
          {
-            event.type = ev_keyup;
-            event.data1 = left_analog_lut[i];
+           int lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                      RETRO_DEVICE_ID_ANALOG_X);
+           int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+                      RETRO_DEVICE_ID_ANALOG_Y);
+           int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                      RETRO_DEVICE_ID_ANALOG_X);
+           int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                      RETRO_DEVICE_ID_ANALOG_Y);
+
+           if (lsx > ANALOG_THRESHOLD)
+             new_input_analog_l[0] = true;
+           else
+             new_input_analog_l[0] = false;
+
+           if (lsx < -ANALOG_THRESHOLD)
+             new_input_analog_l[1] = true;
+           else
+             new_input_analog_l[1] = false;
+
+           if (lsy > ANALOG_THRESHOLD)
+             new_input_analog_l[2] = true;
+           else
+             new_input_analog_l[2] = false;
+
+           if (lsy < -ANALOG_THRESHOLD)
+             new_input_analog_l[3] = true;
+           else
+             new_input_analog_l[3] = false;
+
+           if (rsx > ANALOG_THRESHOLD)
+             new_input_analog_l[4] = true;
+           else
+             new_input_analog_l[4] = false;
+
+           if (rsx < -ANALOG_THRESHOLD)
+             new_input_analog_l[5] = true;
+           else
+             new_input_analog_l[5] = false;
+
+           for (i = 0; i < 6; i++)
+           {
+             event_t event = {0};
+             if(new_input_analog_l[i] && !old_input_analog_l[i])
+             {
+               event.type = ev_keydown;
+               event.data1 = left_analog_lut[i];
+             }
+
+             if(!new_input_analog_l[i] && old_input_analog_l[i])
+             {
+               event.type = ev_keyup;
+               event.data1 = left_analog_lut[i];
+             }
+
+             if(event.type == ev_keydown || event.type == ev_keyup)
+               D_PostEvent(&event);
+
+             old_input_analog_l[i] = new_input_analog_l[i];
+           }
+         }
+        }
+        break;
+
+        case RETRO_DEVICE_KEYBOARD:
+        {
+       /* Mouse Input */
+
+         event_t event_mouse = {0};
+         event_mouse.type = ev_mouse;
+
+         mx = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
+         my = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
+
+         if (mx != cur_mx || my != cur_my)
+         {
+           event_mouse.data2 = mx;
+           event_mouse.data3 = my;
+           cur_mx = mx;
+           cur_my = my;
          }
 
-         if(event.type == ev_keydown || event.type == ev_keyup)
-            D_PostEvent(&event);
+         /* TOFIX That's not identified as mouse buttons for configuration. */
+         if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))
+           event_mouse.data1 = 1;
+         if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
+           event_mouse.data1 = 2;
+         if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) && 
+               input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
+           event_mouse.data1 = 3;
 
-         old_input_analog_l[i] = new_input_analog_l[i];
+         D_PostEvent(&event_mouse);
+
+       /* Keyboard Input */
+
+         for(i = 0; i < 117; i++)
+         {
+           event_t event = {0};
+           new_input_kb[i] = input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, action_kb_lut[i][0]);
+
+           if(new_input_kb[i] && !old_input_kb[i])
+           {
+             event.type = ev_keydown;
+             event.data1 = action_kb_lut[i][1];
+           }
+
+           if(!new_input_kb[i] && old_input_kb[i])
+           {
+             event.type = ev_keyup;
+             event.data1 = action_kb_lut[i][1];
+           }
+
+           if(event.type == ev_keydown || event.type == ev_keyup)
+             D_PostEvent(&event);
+
+           old_input_kb[i] = new_input_kb[i];
+         }
+        }
+        break;
       }
    }
 }
@@ -595,7 +823,7 @@ void I_EndDisplay(void)
  */
 unsigned long I_GetRandomTimeSeed(void)
 {
-	return 0;
+   return 0;
 }
 
 #ifdef PRBOOM_SERVER
@@ -665,16 +893,16 @@ char* I_FindFile(const char* wfname, const char* ext)
   file = fopen(p, "rb");
   if (!file)
   {
-	  strcat(p, ext);
-	  file = fopen(p, "rb");
+     strcat(p, ext);
+     file = fopen(p, "rb");
   }
 
   if (file)
   {
      if (log_cb)
         log_cb(RETRO_LOG_INFO, " found %s\n", p);
-	  fclose(file);
-	  return p;
+     fclose(file);
+     return p;
   }
 
   free(p);
@@ -687,8 +915,12 @@ char* I_FindFile(const char* wfname, const char* ext)
 void I_Init(void)
 {
   /* killough 2/21/98: avoid sound initialization if no sound & no music */
-  if (!(nomusicparm && nosfxparm))
-    I_InitSound();
+   if (!(nomusicparm && nosfxparm))
+     I_InitSound();
+
+   int i;
+   for (i = 0; i < MAX_PADS; i++)
+      doom_devices[i] = RETRO_DEVICE_JOYPAD;
 
 #ifndef __LIBRETRO__
   R_InitInterpolation();

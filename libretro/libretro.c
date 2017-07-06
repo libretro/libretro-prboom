@@ -746,7 +746,6 @@ void I_StartTic (void)
          cur_my = my;
       }
 
-      /* TOFIX That's not identified as mouse buttons for configuration. */
       if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))
          event_mouse.data1 = 1;
       if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))

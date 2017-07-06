@@ -888,12 +888,15 @@ void M_SaveSelect(int choice)
 
   saveSlot = choice;
   strcpy(saveOldString,savegamestrings[choice]);
-  savegamestrings[choice][0] = 'S';
-  savegamestrings[choice][1] = 'A';
-  savegamestrings[choice][2] = 'V';
-  savegamestrings[choice][3] = 'E';
-  savegamestrings[choice][4] = 0;
-  saveCharIndex = strlen(savegamestrings[choice]);
+  if (!strcmp(saveOldString, s_EMPTYSTRING))
+  {
+     savegamestrings[choice][0] = 'S';
+     savegamestrings[choice][1] = 'A';
+     savegamestrings[choice][2] = 'V';
+     savegamestrings[choice][3] = 'E';
+     savegamestrings[choice][4] = 0;
+   }
+   saveCharIndex = strlen(savegamestrings[choice]);
 }
 
 //

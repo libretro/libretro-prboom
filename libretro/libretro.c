@@ -579,6 +579,11 @@ static int action_kb_lut[117][2] = {
    {RETROK_LALT           ,KEYD_LALT}
 };
 
+static int mw_lut[] = { 
+   'm',               /* RETRO_DEVICE_ID_MOUSE_WHEELUP */
+   'n',               /* RETRO_DEVICE_ID_MOUSE_WHEELDOWN */
+};
+
 #define ANALOG_THRESHOLD 4096
 
 void I_StartTic (void)
@@ -740,21 +745,52 @@ void I_StartTic (void)
 
       if (mx != cur_mx || my != cur_my)
       {
-         event_mouse.data2 = mx;
-         event_mouse.data3 = my;
+         event_mouse.data2 = mx * 4;
+         event_mouse.data3 = my * 4;
          cur_mx = mx;
          cur_my = my;
       }
 
-      if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))
+      if (input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))
          event_mouse.data1 = 1;
-      if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
+      if (input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
          event_mouse.data1 = 2;
-      if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) && 
+      if (input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) && 
             input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
          event_mouse.data1 = 3;
-
+      
       D_PostEvent(&event_mouse);
+
+      /* Mouse Wheel */
+      static bool old_input_mw[2];
+      static bool new_input_mw[2];
+      
+      for (i = 0; i < 2; i++)
+      {
+         event_t event_mw = {0};
+         if (i == 0)
+            new_input_mw[i] = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_WHEELUP);
+         if (i == 1)
+            new_input_mw[i] = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_WHEELDOWN);
+
+         if (new_input_mw[i] && !old_input_mw[i])
+         {
+            event_mw.type = ev_keydown;
+            event_mw.data1 = mw_lut[i];
+         }
+
+         if (!new_input_mw[i] && old_input_mw[i])
+         {
+            event_mw.type = ev_keyup;
+            event_mw.data1 = mw_lut[i];
+         }
+
+         if (event_mw.type == ev_keydown || event_mw.type == ev_keyup)
+            D_PostEvent(&event_mw);
+
+         old_input_mw[i] = new_input_mw[i];
+      }
+
    }
 }
 

@@ -581,7 +581,7 @@ static int action_kb_lut[117][2] = {
 
 static int mw_lut[] = { 
    'm',               /* RETRO_DEVICE_ID_MOUSE_WHEELUP */
-   'n',               /* RETRO_DEVICE_ID_MOUSE_WHEELDOWN */
+   'n'                /* RETRO_DEVICE_ID_MOUSE_WHEELDOWN */
 };
 
 #define ANALOG_THRESHOLD 4096

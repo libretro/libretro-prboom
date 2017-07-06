@@ -140,7 +140,7 @@ void retro_set_environment(retro_environment_t cb)
 
    static const struct retro_controller_info ports[] = {
       { port, 2 },
-     { NULL, 0 },
+      { NULL, 0 },
    };
 
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
@@ -149,6 +149,8 @@ void retro_set_environment(retro_environment_t cb)
 
 void retro_set_controller_port_device(unsigned port, unsigned device)
 {
+   if (port)
+      return;
    switch (device)
    {
       case RETRO_DEVICE_JOYPAD:

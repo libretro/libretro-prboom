@@ -894,7 +894,8 @@ void M_SaveSelect(int choice)
      savegamestrings[choice][1] = 'A';
      savegamestrings[choice][2] = 'V';
      savegamestrings[choice][3] = 'E';
-     savegamestrings[choice][4] = 0;
+     savegamestrings[choice][4] = '0' + choice;
+     savegamestrings[choice][5] = 0;
    }
    saveCharIndex = strlen(savegamestrings[choice]);
 }

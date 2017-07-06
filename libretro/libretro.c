@@ -72,15 +72,15 @@ void retro_init(void)
    struct retro_log_callback log;
 
    if(environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
-      log_cb = log.log;
+   log_cb = log.log;
    else
-      log_cb = NULL;
+   log_cb = NULL;
 
    I_MPPlayer_Init();
 
    rgb565 = RETRO_PIXEL_FORMAT_RGB565;
    if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
-      log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+   log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
 
    check_system_specs();
 }
@@ -150,19 +150,19 @@ void retro_set_environment(retro_environment_t cb)
 void retro_set_controller_port_device(unsigned port, unsigned device)
 {
    if (port)
-      return;
+   return;
    switch (device)
    {
-      case RETRO_DEVICE_JOYPAD:
-         doom_devices[port] = RETRO_DEVICE_JOYPAD;
-         break;
-      case RETRO_DEVICE_KEYBOARD:
-         doom_devices[port] = RETRO_DEVICE_KEYBOARD;
-         break;
-      default:
-         if (log_cb)
-            log_cb(RETRO_LOG_ERROR, "[libretro]: Invalid device, setting type to RETRO_DEVICE_JOYPAD ...\n");
-         doom_devices[port] = RETRO_DEVICE_JOYPAD;
+   case RETRO_DEVICE_JOYPAD:
+      doom_devices[port] = RETRO_DEVICE_JOYPAD;
+      break;
+   case RETRO_DEVICE_KEYBOARD:
+      doom_devices[port] = RETRO_DEVICE_KEYBOARD;
+      break;
+   default:
+      if (log_cb)
+      log_cb(RETRO_LOG_ERROR, "[libretro]: Invalid device, setting type to RETRO_DEVICE_JOYPAD ...\n");
+      doom_devices[port] = RETRO_DEVICE_JOYPAD;
    }
 }
 
@@ -201,7 +201,7 @@ extern boolean quit_pressed;
 static void update_variables(bool startup)
 {
    struct retro_variable var;
-   
+
    if (startup)
    {
       var.key = "prboom-resolution";
@@ -215,13 +215,13 @@ static void update_variables(bool startup)
 
          pch = strtok(str, "x");
          if (pch)
-            SCREENWIDTH = strtoul(pch, NULL, 0);
+         SCREENWIDTH = strtoul(pch, NULL, 0);
          pch = strtok(NULL, "x");
          if (pch)
-            SCREENHEIGHT = strtoul(pch, NULL, 0);
+         SCREENHEIGHT = strtoul(pch, NULL, 0);
 
          if (log_cb)
-            log_cb(RETRO_LOG_INFO, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
+         log_cb(RETRO_LOG_INFO, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
       }
       else
       {
@@ -236,9 +236,9 @@ static void update_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "enabled"))
-         mouse_on = true;
+      mouse_on = true;
       else
-         mouse_on = false;
+      mouse_on = false;
    }
 }
 
@@ -248,7 +248,7 @@ void retro_run(void)
 {
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
-      update_variables(false);
+   update_variables(false);
    if (quit_pressed)
    {
       environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
@@ -263,12 +263,12 @@ static void extract_basename(char *buf, const char *path, size_t size)
 {
    const char *base = strrchr(path, '/');
    if (!base)
-      base = strrchr(path, '\\');
+   base = strrchr(path, '\\');
    if (!base)
-      base = path;
+   base = path;
 
    if (*base == '\\' || *base == '/')
-      base++;
+   base++;
 
    strncpy(buf, base, size - 1);
    buf[size - 1] = '\0';
@@ -282,10 +282,10 @@ static void extract_directory(char *buf, const char *path, size_t size)
 
    base = strrchr(buf, '/');
    if (!base)
-      base = strrchr(buf, '\\');
+   base = strrchr(buf, '\\');
 
    if (base)
-      *base = '\0';
+   *base = '\0';
    else
    {
       buf[0] = '.';
@@ -340,14 +340,14 @@ bool retro_load_game(const struct retro_game_info *info)
    myargv = argv;
 
    if (!Z_Init()) /* 1/18/98 killough: start up memory stuff first */
-      goto failed;
+   goto failed;
 
    /* cphipps - call to video specific startup code */
    if (!I_PreInitGraphics())
-      goto failed;
+   goto failed;
 
    if (!D_DoomMainSetup())
-      goto failed;
+   goto failed;
 
    return true;
 
@@ -357,14 +357,14 @@ failed:
       char msg_local[256];
 
       snprintf(msg_local, sizeof(msg_local),
-            "ROM loading failed...");
+      "ROM loading failed...");
       msg.msg    = msg_local;
       msg.frames = 360;
       if (environ_cb)
-         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
+      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
    }
    if (screen_buf)
-      free(screen_buf);
+   free(screen_buf);
    I_SafeExit(-1);
    return false;
 }
@@ -373,7 +373,7 @@ failed:
 void retro_unload_game(void)
 {
    if (screen_buf)
-      free(screen_buf);
+   free(screen_buf);
    screen_buf = NULL;
 }
 
@@ -430,29 +430,29 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
 /* i_video */
 
 static int action_lut[] = { 
-        KEYD_RALT,         /* RETRO_DEVICE_ID_JOYPAD_B */
-        KEYD_RSHIFT,       /* RETRO DEVICE_ID_JOYPAD_Y */
-        KEYD_TAB,          /* RETRO_DEVICE_ID_JOYPAD_SELECT */
-        KEYD_ESCAPE,       /* RETRO_DEVICE_ID_JOYPAD_START */
-        KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
-        KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
-        KEYD_LEFTARROW,    /* RETRO_DEVICE_ID_JOYPAD_LEFT */
-        KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
-        KEYD_SPACEBAR,     /* RETRO_DEVICE_ID_JOYPAD_A */
-        KEYD_RCTRL,        /* RETRO_DEVICE_ID_JOYPAD_X */
-        ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
-        '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
-        'n',               /* RETRO_DEVICE_ID_JOYPAD_L2 */ 
-        'm',               /* RETRO_DEVICE_ID_JOYPAD_R2 */
+   KEYD_RALT,         /* RETRO_DEVICE_ID_JOYPAD_B */
+   KEYD_RSHIFT,       /* RETRO DEVICE_ID_JOYPAD_Y */
+   KEYD_TAB,          /* RETRO_DEVICE_ID_JOYPAD_SELECT */
+   KEYD_ESCAPE,       /* RETRO_DEVICE_ID_JOYPAD_START */
+   KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
+   KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
+   KEYD_LEFTARROW,    /* RETRO_DEVICE_ID_JOYPAD_LEFT */
+   KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
+   KEYD_SPACEBAR,     /* RETRO_DEVICE_ID_JOYPAD_A */
+   KEYD_RCTRL,        /* RETRO_DEVICE_ID_JOYPAD_X */
+   ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
+   '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
+   'n',               /* RETRO_DEVICE_ID_JOYPAD_L2 */ 
+   'm',               /* RETRO_DEVICE_ID_JOYPAD_R2 */
 };
 
 static int left_analog_lut[] = { 
-        '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
-        ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
-        KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
-        KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
-        KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
-        KEYD_LEFTARROW     /* RETRO_DEVICE_ID_JOYPAD_LEFT */
+   '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
+   ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
+   KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
+   KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
+   KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
+   KEYD_LEFTARROW     /* RETRO_DEVICE_ID_JOYPAD_LEFT */
 };
 
 static int action_kb_lut[117][2] = { 
@@ -602,185 +602,185 @@ void I_StartTic (void)
    for (port = 0; port < MAX_PADS; port++)
    {
       if (!input_state_cb)
-         break;
+      break;
 
       switch (doom_devices[port])
       {
-         case RETRO_DEVICE_JOYPAD:
-        {
-       /* Gamepad Input */
-
-         for(i = 0; i < 14; i++)
+      case RETRO_DEVICE_JOYPAD:
          {
-           event_t event = {0};
-           new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
+            /* Gamepad Input */
 
-           if(new_input[i] && !old_input[i])
-           {
-             event.type = ev_keydown;
-             event.data1 = action_lut[i];
-           }
+            for(i = 0; i < 14; i++)
+            {
+               event_t event = {0};
+               new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
 
-           if(!new_input[i] && old_input[i])
-           {
-             event.type = ev_keyup;
-             event.data1 = action_lut[i];
-           }
+               if(new_input[i] && !old_input[i])
+               {
+                  event.type = ev_keydown;
+                  event.data1 = action_lut[i];
+               }
 
-           if(event.type == ev_keydown || event.type == ev_keyup)
-             D_PostEvent(&event);
+               if(!new_input[i] && old_input[i])
+               {
+                  event.type = ev_keyup;
+                  event.data1 = action_lut[i];
+               }
 
-           old_input[i] = new_input[i];
-         }
-
-         {
-           int lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                      RETRO_DEVICE_ID_ANALOG_X);
-           int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                      RETRO_DEVICE_ID_ANALOG_Y);
-           int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                      RETRO_DEVICE_ID_ANALOG_X);
-           int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                      RETRO_DEVICE_ID_ANALOG_Y);
-
-           if (lsx > ANALOG_THRESHOLD)
-             new_input_analog_l[0] = true;
-           else
-             new_input_analog_l[0] = false;
-
-           if (lsx < -ANALOG_THRESHOLD)
-             new_input_analog_l[1] = true;
-           else
-             new_input_analog_l[1] = false;
-
-           if (lsy > ANALOG_THRESHOLD)
-             new_input_analog_l[2] = true;
-           else
-             new_input_analog_l[2] = false;
-
-           if (lsy < -ANALOG_THRESHOLD)
-             new_input_analog_l[3] = true;
-           else
-             new_input_analog_l[3] = false;
-
-           if (rsx > ANALOG_THRESHOLD)
-             new_input_analog_l[4] = true;
-           else
-             new_input_analog_l[4] = false;
-
-           if (rsx < -ANALOG_THRESHOLD)
-             new_input_analog_l[5] = true;
-           else
-             new_input_analog_l[5] = false;
-
-           for (i = 0; i < 6; i++)
-           {
-             event_t event = {0};
-             if(new_input_analog_l[i] && !old_input_analog_l[i])
-             {
-               event.type = ev_keydown;
-               event.data1 = left_analog_lut[i];
-             }
-
-             if(!new_input_analog_l[i] && old_input_analog_l[i])
-             {
-               event.type = ev_keyup;
-               event.data1 = left_analog_lut[i];
-             }
-
-             if(event.type == ev_keydown || event.type == ev_keyup)
+               if(event.type == ev_keydown || event.type == ev_keyup)
                D_PostEvent(&event);
 
-             old_input_analog_l[i] = new_input_analog_l[i];
-           }
+               old_input[i] = new_input[i];
+            }
+
+            {
+               int lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+               RETRO_DEVICE_ID_ANALOG_X);
+               int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
+               RETRO_DEVICE_ID_ANALOG_Y);
+               int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+               RETRO_DEVICE_ID_ANALOG_X);
+               int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+               RETRO_DEVICE_ID_ANALOG_Y);
+
+               if (lsx > ANALOG_THRESHOLD)
+               new_input_analog_l[0] = true;
+               else
+               new_input_analog_l[0] = false;
+
+               if (lsx < -ANALOG_THRESHOLD)
+               new_input_analog_l[1] = true;
+               else
+               new_input_analog_l[1] = false;
+
+               if (lsy > ANALOG_THRESHOLD)
+               new_input_analog_l[2] = true;
+               else
+               new_input_analog_l[2] = false;
+
+               if (lsy < -ANALOG_THRESHOLD)
+               new_input_analog_l[3] = true;
+               else
+               new_input_analog_l[3] = false;
+
+               if (rsx > ANALOG_THRESHOLD)
+               new_input_analog_l[4] = true;
+               else
+               new_input_analog_l[4] = false;
+
+               if (rsx < -ANALOG_THRESHOLD)
+               new_input_analog_l[5] = true;
+               else
+               new_input_analog_l[5] = false;
+
+               for (i = 0; i < 6; i++)
+               {
+                  event_t event = {0};
+                  if(new_input_analog_l[i] && !old_input_analog_l[i])
+                  {
+                     event.type = ev_keydown;
+                     event.data1 = left_analog_lut[i];
+                  }
+
+                  if(!new_input_analog_l[i] && old_input_analog_l[i])
+                  {
+                     event.type = ev_keyup;
+                     event.data1 = left_analog_lut[i];
+                  }
+
+                  if(event.type == ev_keydown || event.type == ev_keyup)
+                  D_PostEvent(&event);
+
+                  old_input_analog_l[i] = new_input_analog_l[i];
+               }
+            }
          }
-        }
-        break;
+         break;
 
-        case RETRO_DEVICE_KEYBOARD:
-        {
-       /* Keyboard Input */
-
-         for(i = 0; i < 117; i++)
+      case RETRO_DEVICE_KEYBOARD:
          {
-           event_t event = {0};
-           new_input_kb[i] = input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, action_kb_lut[i][0]);
+            /* Keyboard Input */
 
-           if(new_input_kb[i] && !old_input_kb[i])
-           {
-             event.type = ev_keydown;
-             event.data1 = action_kb_lut[i][1];
-           }
+            for(i = 0; i < 117; i++)
+            {
+               event_t event = {0};
+               new_input_kb[i] = input_state_cb(0, RETRO_DEVICE_KEYBOARD, 0, action_kb_lut[i][0]);
 
-           if(!new_input_kb[i] && old_input_kb[i])
-           {
-             event.type = ev_keyup;
-             event.data1 = action_kb_lut[i][1];
-           }
+               if(new_input_kb[i] && !old_input_kb[i])
+               {
+                  event.type = ev_keydown;
+                  event.data1 = action_kb_lut[i][1];
+               }
 
-           if(event.type == ev_keydown || event.type == ev_keyup)
-             D_PostEvent(&event);
+               if(!new_input_kb[i] && old_input_kb[i])
+               {
+                  event.type = ev_keyup;
+                  event.data1 = action_kb_lut[i][1];
+               }
 
-           old_input_kb[i] = new_input_kb[i];
+               if(event.type == ev_keydown || event.type == ev_keyup)
+               D_PostEvent(&event);
+
+               old_input_kb[i] = new_input_kb[i];
+            }
          }
-        }
-        break;
+         break;
       }
    }
 
    if (mouse_on || doom_devices[0] == RETRO_DEVICE_KEYBOARD)
    {
-     /* Mouse Input */
+      /* Mouse Input */
 
-    event_t event_mouse = {0};
-    event_mouse.type = ev_mouse;
+      event_t event_mouse = {0};
+      event_mouse.type = ev_mouse;
 
-    mx = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
-    my = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
+      mx = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
+      my = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
 
-    if (mx != cur_mx || my != cur_my)
-    {
-      event_mouse.data2 = mx;
-      event_mouse.data3 = my;
-      cur_mx = mx;
-      cur_my = my;
-    }
+      if (mx != cur_mx || my != cur_my)
+      {
+         event_mouse.data2 = mx;
+         event_mouse.data3 = my;
+         cur_mx = mx;
+         cur_my = my;
+      }
 
-    /* TOFIX That's not identified as mouse buttons for configuration. */
-    if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))
+      /* TOFIX That's not identified as mouse buttons for configuration. */
+      if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))
       event_mouse.data1 = 1;
-    if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
+      if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
       event_mouse.data1 = 2;
-    if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) && 
-         input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
+      if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) && 
+            input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
       event_mouse.data1 = 3;
 
-    D_PostEvent(&event_mouse);
+      D_PostEvent(&event_mouse);
    }
 }
 
 static void I_UpdateVideoMode(void)
 {
    if (log_cb)
-      log_cb(RETRO_LOG_INFO, "I_UpdateVideoMode: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+   log_cb(RETRO_LOG_INFO, "I_UpdateVideoMode: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 
-  V_InitMode();
-  V_DestroyUnusedTrueColorPalettes();
-  V_FreeScreens();
+   V_InitMode();
+   V_DestroyUnusedTrueColorPalettes();
+   V_FreeScreens();
 
-  I_SetRes();
+   I_SetRes();
 
-  screens[0].not_on_heap = true;
-  screens[0].data = (unsigned char *)screen_buf;
+   screens[0].not_on_heap = true;
+   screens[0].data = (unsigned char *)screen_buf;
 
-  V_AllocScreens();
+   V_AllocScreens();
 
-  R_InitBuffer(SCREENWIDTH, SCREENHEIGHT);
+   R_InitBuffer(SCREENWIDTH, SCREENHEIGHT);
 }
 
 void I_FinishUpdate (void)
 {
-  video_cb(screen_buf, SCREENWIDTH, SCREENHEIGHT, SCREENPITCH);
+   video_cb(screen_buf, SCREENWIDTH, SCREENHEIGHT, SCREENPITCH);
 }
 
 void I_SetPalette (int pal)
@@ -789,33 +789,33 @@ void I_SetPalette (int pal)
 
 void I_InitGraphics(void)
 {
-  static int    firsttime=1;
+   static int    firsttime=1;
 
-  if (firsttime)
-  {
-    firsttime = 0;
+   if (firsttime)
+   {
+      firsttime = 0;
 
-    if (log_cb)
-       log_cb(RETRO_LOG_INFO, "I_InitGraphics: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+      if (log_cb)
+      log_cb(RETRO_LOG_INFO, "I_InitGraphics: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 
-    /* Set the video mode */
-    I_UpdateVideoMode();
+      /* Set the video mode */
+      I_UpdateVideoMode();
 
-  }
+   }
 }
 
 
 void I_SetRes(void)
 {
-  int i;
+   int i;
 
-  for (i=0; i<3; i++)
-    screens[i].height = SCREENHEIGHT;
+   for (i=0; i<3; i++)
+   screens[i].height = SCREENHEIGHT;
 
-  screens[4].height = (ST_SCALED_HEIGHT+1);
+   screens[4].height = (ST_SCALED_HEIGHT+1);
 
-  if (log_cb)
-     log_cb(RETRO_LOG_INFO, "I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+   if (log_cb)
+   log_cb(RETRO_LOG_INFO, "I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 }
 
 /* i_system - i_main */
@@ -824,22 +824,22 @@ static boolean InDisplay = false;
 
 boolean I_StartDisplay(void)
 {
-  if (InDisplay)
-    return false;
+   if (InDisplay)
+   return false;
 
-  InDisplay = true;
-  return true;
+   InDisplay = true;
+   return true;
 }
 
 void I_EndDisplay(void)
 {
-  InDisplay = false;
+   InDisplay = false;
 }
 
 /*
- * I_GetRandomTimeSeed
- *
- */
+* I_GetRandomTimeSeed
+*
+*/
 unsigned long I_GetRandomTimeSeed(void)
 {
    return 0;
@@ -848,84 +848,84 @@ unsigned long I_GetRandomTimeSeed(void)
 #ifdef PRBOOM_SERVER
 
 /* cphipps - I_SigString
- * Returns a string describing a signal number
- */
+* Returns a string describing a signal number
+*/
 const char* I_SigString(char* buf, size_t sz, int signum)
 {
 #ifdef HAVE_SNPRINTF
-    snprintf(buf,sz,"signal %d",signum);
+   snprintf(buf,sz,"signal %d",signum);
 #else
-    sprintf(buf,"signal %d",signum);
+   sprintf(buf,"signal %d",signum);
 #endif
-  return buf;
+   return buf;
 }
 
 #else
 
 const char *I_DoomExeDir(void)
 {
-  return g_wad_dir;
+   return g_wad_dir;
 }
 
 /*
- * HasTrailingSlash
- *
- * cphipps - simple test for trailing slash on dir names
- */
+* HasTrailingSlash
+*
+* cphipps - simple test for trailing slash on dir names
+*/
 
 boolean HasTrailingSlash(const char* dn)
 {
-  return ( (dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\'));
+   return ( (dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\'));
 }
 
 /*
- * I_FindFile
- *
- * proff_fs 2002-07-04 - moved to i_system
- *
- * cphipps 19/1999 - writen to unify the logic in FindIWADFile and the WAD
- *      autoloading code.
- * Searches g_wad_dir for a named WAD file
- */
+* I_FindFile
+*
+* proff_fs 2002-07-04 - moved to i_system
+*
+* cphipps 19/1999 - writen to unify the logic in FindIWADFile and the WAD
+*      autoloading code.
+* Searches g_wad_dir for a named WAD file
+*/
 
 char* I_FindFile(const char* wfname, const char* ext)
 {
-  FILE *file;
-  char  * p;
+   FILE *file;
+   char  * p;
 #ifdef _WIN32
-  char slash = '\\';
+   char slash = '\\';
 #else
-  char slash = '/';
+   char slash = '/';
 #endif
 
-  /* Precalculate a length we will need in the loop */
-  size_t pl = strlen(wfname) + strlen(ext) + 4;
+   /* Precalculate a length we will need in the loop */
+   size_t pl = strlen(wfname) + strlen(ext) + 4;
 
-  if (log_cb)
-     log_cb(RETRO_LOG_INFO, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
+   if (log_cb)
+   log_cb(RETRO_LOG_INFO, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
 
-  p = malloc(strlen(g_wad_dir) + pl);
-  if (log_cb)
-     log_cb(RETRO_LOG_INFO, "%s%c%s\n", g_wad_dir, slash, wfname);
-  sprintf(p, "%s%c%s", g_wad_dir, slash, wfname);
+   p = malloc(strlen(g_wad_dir) + pl);
+   if (log_cb)
+   log_cb(RETRO_LOG_INFO, "%s%c%s\n", g_wad_dir, slash, wfname);
+   sprintf(p, "%s%c%s", g_wad_dir, slash, wfname);
 
-  file = fopen(p, "rb");
-  if (!file)
-  {
-     strcat(p, ext);
-     file = fopen(p, "rb");
-  }
+   file = fopen(p, "rb");
+   if (!file)
+   {
+      strcat(p, ext);
+      file = fopen(p, "rb");
+   }
 
-  if (file)
-  {
-     if (log_cb)
-        log_cb(RETRO_LOG_INFO, " found %s\n", p);
-     fclose(file);
-     return p;
-  }
+   if (file)
+   {
+      if (log_cb)
+      log_cb(RETRO_LOG_INFO, " found %s\n", p);
+      fclose(file);
+      return p;
+   }
 
-  free(p);
-  return NULL;
+   free(p);
+   return NULL;
 }
 
 #endif
@@ -933,30 +933,30 @@ char* I_FindFile(const char* wfname, const char* ext)
 
 void I_Init(void)
 {
-  /* killough 2/21/98: avoid sound initialization if no sound & no music */
+   /* killough 2/21/98: avoid sound initialization if no sound & no music */
    if (!(nomusicparm && nosfxparm))
-     I_InitSound();
+   I_InitSound();
 
    int i;
    for (i = 0; i < MAX_PADS; i++)
-      doom_devices[i] = RETRO_DEVICE_JOYPAD;
+   doom_devices[i] = RETRO_DEVICE_JOYPAD;
 
 #ifndef __LIBRETRO__
-  R_InitInterpolation();
+   R_InitInterpolation();
 #endif
 }
 
 /*
- * I_Filelength
- *
- * Return length of an open file.
- */
+* I_Filelength
+*
+* Return length of an open file.
+*/
 
 int I_Filelength(int handle)
 {
    struct stat   fileinfo;
    if (fstat(handle,&fileinfo) == -1)
-      I_Error("I_Filelength: %s",strerror(errno));
+   I_Error("I_Filelength: %s",strerror(errno));
    return fileinfo.st_size;
 }
 
@@ -968,7 +968,7 @@ void I_Read(int fd, void* vbuf, size_t sz)
    {
       int rc = read(fd,buf,sz);
       if (rc <= 0)
-         I_Error("I_Read: read failed: %s", rc ? strerror(errno) : "EOF");
+      I_Error("I_Read: read failed: %s", rc ? strerror(errno) : "EOF");
       sz  -= rc;
       buf += rc;
    }

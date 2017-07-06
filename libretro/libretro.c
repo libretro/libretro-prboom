@@ -72,15 +72,15 @@ void retro_init(void)
    struct retro_log_callback log;
 
    if(environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
-   log_cb = log.log;
+      log_cb = log.log;
    else
-   log_cb = NULL;
+      log_cb = NULL;
 
    I_MPPlayer_Init();
 
    rgb565 = RETRO_PIXEL_FORMAT_RGB565;
    if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
-   log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+      log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
 
    check_system_specs();
 }
@@ -150,7 +150,7 @@ void retro_set_environment(retro_environment_t cb)
 void retro_set_controller_port_device(unsigned port, unsigned device)
 {
    if (port)
-   return;
+      return;
    switch (device)
    {
    case RETRO_DEVICE_JOYPAD:
@@ -161,7 +161,7 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
       break;
    default:
       if (log_cb)
-      log_cb(RETRO_LOG_ERROR, "[libretro]: Invalid device, setting type to RETRO_DEVICE_JOYPAD ...\n");
+         log_cb(RETRO_LOG_ERROR, "[libretro]: Invalid device, setting type to RETRO_DEVICE_JOYPAD ...\n");
       doom_devices[port] = RETRO_DEVICE_JOYPAD;
    }
 }
@@ -215,13 +215,13 @@ static void update_variables(bool startup)
 
          pch = strtok(str, "x");
          if (pch)
-         SCREENWIDTH = strtoul(pch, NULL, 0);
+            SCREENWIDTH = strtoul(pch, NULL, 0);
          pch = strtok(NULL, "x");
          if (pch)
-         SCREENHEIGHT = strtoul(pch, NULL, 0);
+            SCREENHEIGHT = strtoul(pch, NULL, 0);
 
          if (log_cb)
-         log_cb(RETRO_LOG_INFO, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
+            log_cb(RETRO_LOG_INFO, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
       }
       else
       {
@@ -236,9 +236,9 @@ static void update_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
       if (!strcmp(var.value, "enabled"))
-      mouse_on = true;
+         mouse_on = true;
       else
-      mouse_on = false;
+         mouse_on = false;
    }
 }
 
@@ -248,7 +248,7 @@ void retro_run(void)
 {
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
-   update_variables(false);
+      update_variables(false);
    if (quit_pressed)
    {
       environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
@@ -263,12 +263,12 @@ static void extract_basename(char *buf, const char *path, size_t size)
 {
    const char *base = strrchr(path, '/');
    if (!base)
-   base = strrchr(path, '\\');
+      base = strrchr(path, '\\');
    if (!base)
-   base = path;
+      base = path;
 
    if (*base == '\\' || *base == '/')
-   base++;
+      base++;
 
    strncpy(buf, base, size - 1);
    buf[size - 1] = '\0';
@@ -282,10 +282,10 @@ static void extract_directory(char *buf, const char *path, size_t size)
 
    base = strrchr(buf, '/');
    if (!base)
-   base = strrchr(buf, '\\');
+      base = strrchr(buf, '\\');
 
    if (base)
-   *base = '\0';
+      *base = '\0';
    else
    {
       buf[0] = '.';
@@ -340,14 +340,14 @@ bool retro_load_game(const struct retro_game_info *info)
    myargv = argv;
 
    if (!Z_Init()) /* 1/18/98 killough: start up memory stuff first */
-   goto failed;
+      goto failed;
 
    /* cphipps - call to video specific startup code */
    if (!I_PreInitGraphics())
-   goto failed;
+      goto failed;
 
    if (!D_DoomMainSetup())
-   goto failed;
+      goto failed;
 
    return true;
 
@@ -361,10 +361,10 @@ failed:
       msg.msg    = msg_local;
       msg.frames = 360;
       if (environ_cb)
-      environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
+         environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
    }
    if (screen_buf)
-   free(screen_buf);
+      free(screen_buf);
    I_SafeExit(-1);
    return false;
 }
@@ -373,7 +373,7 @@ failed:
 void retro_unload_game(void)
 {
    if (screen_buf)
-   free(screen_buf);
+      free(screen_buf);
    screen_buf = NULL;
 }
 
@@ -602,7 +602,7 @@ void I_StartTic (void)
    for (port = 0; port < MAX_PADS; port++)
    {
       if (!input_state_cb)
-      break;
+         break;
 
       switch (doom_devices[port])
       {
@@ -628,50 +628,50 @@ void I_StartTic (void)
                }
 
                if(event.type == ev_keydown || event.type == ev_keyup)
-               D_PostEvent(&event);
+                  D_PostEvent(&event);
 
                old_input[i] = new_input[i];
             }
 
             {
                int lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-               RETRO_DEVICE_ID_ANALOG_X);
+                     RETRO_DEVICE_ID_ANALOG_X);
                int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-               RETRO_DEVICE_ID_ANALOG_Y);
+                     RETRO_DEVICE_ID_ANALOG_Y);
                int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-               RETRO_DEVICE_ID_ANALOG_X);
+                     RETRO_DEVICE_ID_ANALOG_X);
                int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-               RETRO_DEVICE_ID_ANALOG_Y);
+                     RETRO_DEVICE_ID_ANALOG_Y);
 
                if (lsx > ANALOG_THRESHOLD)
-               new_input_analog_l[0] = true;
+                  new_input_analog_l[0] = true;
                else
-               new_input_analog_l[0] = false;
+                  new_input_analog_l[0] = false;
 
                if (lsx < -ANALOG_THRESHOLD)
-               new_input_analog_l[1] = true;
+                  new_input_analog_l[1] = true;
                else
-               new_input_analog_l[1] = false;
+                  new_input_analog_l[1] = false;
 
                if (lsy > ANALOG_THRESHOLD)
-               new_input_analog_l[2] = true;
+                  new_input_analog_l[2] = true;
                else
-               new_input_analog_l[2] = false;
+                  new_input_analog_l[2] = false;
 
                if (lsy < -ANALOG_THRESHOLD)
-               new_input_analog_l[3] = true;
+                  new_input_analog_l[3] = true;
                else
-               new_input_analog_l[3] = false;
+                  new_input_analog_l[3] = false;
 
                if (rsx > ANALOG_THRESHOLD)
-               new_input_analog_l[4] = true;
+                  new_input_analog_l[4] = true;
                else
-               new_input_analog_l[4] = false;
+                  new_input_analog_l[4] = false;
 
                if (rsx < -ANALOG_THRESHOLD)
-               new_input_analog_l[5] = true;
+                  new_input_analog_l[5] = true;
                else
-               new_input_analog_l[5] = false;
+                  new_input_analog_l[5] = false;
 
                for (i = 0; i < 6; i++)
                {
@@ -689,7 +689,7 @@ void I_StartTic (void)
                   }
 
                   if(event.type == ev_keydown || event.type == ev_keyup)
-                  D_PostEvent(&event);
+                     D_PostEvent(&event);
 
                   old_input_analog_l[i] = new_input_analog_l[i];
                }
@@ -719,7 +719,7 @@ void I_StartTic (void)
                }
 
                if(event.type == ev_keydown || event.type == ev_keyup)
-               D_PostEvent(&event);
+                  D_PostEvent(&event);
 
                old_input_kb[i] = new_input_kb[i];
             }
@@ -748,12 +748,12 @@ void I_StartTic (void)
 
       /* TOFIX That's not identified as mouse buttons for configuration. */
       if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))
-      event_mouse.data1 = 1;
+         event_mouse.data1 = 1;
       if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
-      event_mouse.data1 = 2;
+         event_mouse.data1 = 2;
       if(input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) && 
             input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
-      event_mouse.data1 = 3;
+         event_mouse.data1 = 3;
 
       D_PostEvent(&event_mouse);
    }
@@ -762,7 +762,7 @@ void I_StartTic (void)
 static void I_UpdateVideoMode(void)
 {
    if (log_cb)
-   log_cb(RETRO_LOG_INFO, "I_UpdateVideoMode: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+      log_cb(RETRO_LOG_INFO, "I_UpdateVideoMode: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 
    V_InitMode();
    V_DestroyUnusedTrueColorPalettes();
@@ -796,7 +796,7 @@ void I_InitGraphics(void)
       firsttime = 0;
 
       if (log_cb)
-      log_cb(RETRO_LOG_INFO, "I_InitGraphics: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+         log_cb(RETRO_LOG_INFO, "I_InitGraphics: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 
       /* Set the video mode */
       I_UpdateVideoMode();
@@ -810,12 +810,12 @@ void I_SetRes(void)
    int i;
 
    for (i=0; i<3; i++)
-   screens[i].height = SCREENHEIGHT;
+      screens[i].height = SCREENHEIGHT;
 
    screens[4].height = (ST_SCALED_HEIGHT+1);
 
    if (log_cb)
-   log_cb(RETRO_LOG_INFO, "I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
+      log_cb(RETRO_LOG_INFO, "I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 }
 
 /* i_system - i_main */
@@ -825,7 +825,7 @@ static boolean InDisplay = false;
 boolean I_StartDisplay(void)
 {
    if (InDisplay)
-   return false;
+      return false;
 
    InDisplay = true;
    return true;
@@ -902,11 +902,11 @@ char* I_FindFile(const char* wfname, const char* ext)
    size_t pl = strlen(wfname) + strlen(ext) + 4;
 
    if (log_cb)
-   log_cb(RETRO_LOG_INFO, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
+      log_cb(RETRO_LOG_INFO, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
 
    p = malloc(strlen(g_wad_dir) + pl);
    if (log_cb)
-   log_cb(RETRO_LOG_INFO, "%s%c%s\n", g_wad_dir, slash, wfname);
+      log_cb(RETRO_LOG_INFO, "%s%c%s\n", g_wad_dir, slash, wfname);
    sprintf(p, "%s%c%s", g_wad_dir, slash, wfname);
 
    file = fopen(p, "rb");
@@ -935,11 +935,11 @@ void I_Init(void)
 {
    /* killough 2/21/98: avoid sound initialization if no sound & no music */
    if (!(nomusicparm && nosfxparm))
-   I_InitSound();
+      I_InitSound();
 
    int i;
    for (i = 0; i < MAX_PADS; i++)
-   doom_devices[i] = RETRO_DEVICE_JOYPAD;
+      doom_devices[i] = RETRO_DEVICE_JOYPAD;
 
 #ifndef __LIBRETRO__
    R_InitInterpolation();
@@ -956,7 +956,7 @@ int I_Filelength(int handle)
 {
    struct stat   fileinfo;
    if (fstat(handle,&fileinfo) == -1)
-   I_Error("I_Filelength: %s",strerror(errno));
+      I_Error("I_Filelength: %s",strerror(errno));
    return fileinfo.st_size;
 }
 
@@ -968,7 +968,7 @@ void I_Read(int fd, void* vbuf, size_t sz)
    {
       int rc = read(fd,buf,sz);
       if (rc <= 0)
-      I_Error("I_Read: read failed: %s", rc ? strerror(errno) : "EOF");
+         I_Error("I_Read: read failed: %s", rc ? strerror(errno) : "EOF");
       sz  -= rc;
       buf += rc;
    }

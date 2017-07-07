@@ -856,13 +856,11 @@ void M_DrawSave(void)
     M_WriteText(LoadDef.x,LoadDef.y+LINEHEIGHT*i,savegamestrings[i], CR_DEFAULT);
     }
 
-#if 0
   if (saveStringEnter)
     {
     i = M_StringWidth(savegamestrings[saveSlot]);
     M_WriteText(LoadDef.x + i,LoadDef.y+LINEHEIGHT*saveSlot,"_", CR_DEFAULT);
     }
-#endif
 }
 
 //
@@ -888,12 +886,16 @@ void M_SaveSelect(int choice)
 
   saveSlot = choice;
   strcpy(saveOldString,savegamestrings[choice]);
-  savegamestrings[choice][0] = 'S';
-  savegamestrings[choice][1] = 'A';
-  savegamestrings[choice][2] = 'V';
-  savegamestrings[choice][3] = 'E';
-  savegamestrings[choice][4] = 0;
-  saveCharIndex = strlen(savegamestrings[choice]);
+  if (!strcmp(saveOldString, s_EMPTYSTRING))
+  {
+     savegamestrings[choice][0] = 'S';
+     savegamestrings[choice][1] = 'A';
+     savegamestrings[choice][2] = 'V';
+     savegamestrings[choice][3] = 'E';
+     savegamestrings[choice][4] = '0' + choice;
+     savegamestrings[choice][5] = 0;
+   }
+   saveCharIndex = strlen(savegamestrings[choice]);
 }
 
 //
@@ -3985,32 +3987,43 @@ boolean M_Responder (event_t* ev) {
 
   // Save Game string input
 
-  if (saveStringEnter) {
-      if (ch == key_use)                    // phares 3/7/98
-  {
-    saveStringEnter = 0;
-    strcpy(&savegamestrings[saveSlot][0],saveOldString);
-  }
+   if (saveStringEnter) {
+      if (ch == KEYD_ESCAPE)                    // phares 3/7/98
+      {
+         saveStringEnter = 0;
+         strcpy(&savegamestrings[saveSlot][0],saveOldString);
+      }
 
-      else if (ch == key_fire)                     // phares 3/7/98
-  {
-    saveStringEnter = 0;
-    if (savegamestrings[saveSlot][0])
-      M_DoSave(saveSlot);
-  }
+      else if (ch == key_fire || ch == KEYD_ENTER) // phares 3/7/98
+      {
+         saveStringEnter = 0;
+         if (savegamestrings[saveSlot][0])
+            M_DoSave(saveSlot);
+      }
 
       else
-  {
-  ch = toupper(ch);
-  if (ch >= 32 && ch <= 127 &&
-      saveCharIndex < SAVESTRINGSIZE-1 &&
-      M_StringWidth(savegamestrings[saveSlot]) < (SAVESTRINGSIZE-2)*8)
-    {
-    savegamestrings[saveSlot][saveCharIndex++] = ch;
-    savegamestrings[saveSlot][saveCharIndex] = 0;
-    }
-  }
-    return TRUE;
+      {
+         ch = toupper(ch);
+
+         if (ch >= 32 && ch <= 127 &&
+               saveCharIndex < SAVESTRINGSIZE-1 &&
+               M_StringWidth(savegamestrings[saveSlot]) < (SAVESTRINGSIZE-2)*8)
+         {
+            if (ch == KEYD_BACKSPACE && saveCharIndex > 0)
+            {
+               savegamestrings[saveSlot][saveCharIndex] = 0;
+               savegamestrings[saveSlot][saveCharIndex--];
+               savegamestrings[saveSlot][saveCharIndex] = 0;
+            }
+            else if (ch != KEYD_BACKSPACE)
+            {
+               savegamestrings[saveSlot][saveCharIndex++] = ch;
+               savegamestrings[saveSlot][saveCharIndex] = 0;
+            }
+
+         }
+      }
+      return TRUE;
   }
 
   // Take care of any messages that need input

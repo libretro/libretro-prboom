@@ -856,13 +856,11 @@ void M_DrawSave(void)
     M_WriteText(LoadDef.x,LoadDef.y+LINEHEIGHT*i,savegamestrings[i], CR_DEFAULT);
     }
 
-#if 0
   if (saveStringEnter)
     {
     i = M_StringWidth(savegamestrings[saveSlot]);
     M_WriteText(LoadDef.x + i,LoadDef.y+LINEHEIGHT*saveSlot,"_", CR_DEFAULT);
     }
-#endif
 }
 
 //

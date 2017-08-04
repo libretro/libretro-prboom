@@ -123,8 +123,6 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
-   environ_cb = cb;
-
    struct retro_variable variables[] = {
       { "prboom-resolution",
          "Internal resolution; 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
@@ -142,6 +140,8 @@ void retro_set_environment(retro_environment_t cb)
       { port, 2 },
       { NULL, 0 },
    };
+
+   environ_cb = cb;
 
    cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
    cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
@@ -589,8 +589,10 @@ static int mw_lut[] = {
 void I_StartTic (void)
 {
    int port;
-
    unsigned i;
+   static int cur_mx;
+   static int cur_my;
+   int mx, my;
    static bool old_input_kb[117];
    bool new_input_kb[117];
    static bool old_input[20];
@@ -599,10 +601,6 @@ void I_StartTic (void)
    bool new_input_analog_l[6];
 
    input_poll_cb();
-
-   static int cur_mx;
-   static int cur_my;
-   int mx, my;
 
    for (port = 0; port < MAX_PADS; port++)
    {
@@ -736,6 +734,8 @@ void I_StartTic (void)
    if (mouse_on || doom_devices[0] == RETRO_DEVICE_KEYBOARD)
    {
       /* Mouse Input */
+      static bool old_input_mw[2];
+      static bool new_input_mw[2];
 
       event_t event_mouse = {0};
       event_mouse.type = ev_mouse;
@@ -762,8 +762,6 @@ void I_StartTic (void)
       D_PostEvent(&event_mouse);
 
       /* Mouse Wheel */
-      static bool old_input_mw[2];
-      static bool new_input_mw[2];
       
       for (i = 0; i < 2; i++)
       {
@@ -968,11 +966,11 @@ char* I_FindFile(const char* wfname, const char* ext)
 
 void I_Init(void)
 {
+   int i;
    /* killough 2/21/98: avoid sound initialization if no sound & no music */
    if (!(nomusicparm && nosfxparm))
       I_InitSound();
 
-   int i;
    for (i = 0; i < MAX_PADS; i++)
       doom_devices[i] = RETRO_DEVICE_JOYPAD;
 

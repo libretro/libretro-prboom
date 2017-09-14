@@ -34,6 +34,11 @@ else ifneq ($(findstring MINGW,$(shell uname -a)),)
    system_platform = win
 endif
 
+prefix := /usr
+libdir := $(prefix)/lib
+
+LIBRETRO_DIR := libretro
+
 TARGET_NAME := prboom
 GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
 ifneq ($(GIT_VERSION)," unknown")
@@ -395,5 +400,11 @@ clean-objs:
 clean:
 	rm -f $(OBJECTS) $(TARGET)
 
-.PHONY: clean clean-objs
+install:
+	install -D -m 755 $(TARGET) $(DESTDIR)$(libdir)/$(LIBRETRO_DIR)/$(TARGET)
+
+uninstall:
+	rm $(DESTDIR)$(libdir)/$(LIBRETRO_DIR)/$(TARGET)
+
+.PHONY: clean clean-objs install uninstall
 endif

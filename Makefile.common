@@ -4,6 +4,10 @@ LIBRETRO_COMM_DIR  = $(ROOT_DIR)/libretro/libretro-common
 
 INCFLAGS    = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(DEPS_DIR)/libmad -I$(LIBRETRO_COMM_DIR)/include
 
+ifneq (,$(findstring msvc2003,$(platform)))
+INCFLAGS += -I$(LIBRETRO_COMM_DIR)/include/compat/msvc
+endif
+
 COREDEFINES = -D__LIBRETRO__ -DFPM_DEFAULT
 
 ifneq (,$(findstring msvc,$(platform)))

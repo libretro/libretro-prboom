@@ -95,12 +95,18 @@ ifeq ($(IOSSDK),)
    IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)
 endif
 
-   CC = clang -arch armv7 -isysroot $(IOSSDK)
-ifeq ($(platform),ios9)
-   CFLAGS +=  -miphoneos-version-min=8.0
+ifeq ($(platform),ios-arm64)
+   CC = clang -arch armv64 -isysroot $(IOSSDK)
 else
-   CFLAGS +=  -miphoneos-version-min=5.0
+   CC = clang -arch armv7 -isysroot $(IOSSDK)
 endif
+
+ifeq ($(platform),$(filter $(platform),ios9 ios-arm64))
+	CFLAGS +=  -miphoneos-version-min=8.0
+else
+  CFLAGS +=  -miphoneos-version-min=5.0
+endif
+
 else ifeq ($(platform), theos_ios)
 	# Theos iOS
 DEPLOYMENT_IOSVERSION = 5.0

@@ -35,7 +35,7 @@ extern int SCREENHEIGHT;
 #define HAVE_SNPRINTF 1
 
 /* Define to 1 if you have the `vsnprintf' function. */
-#ifndef _XBOX1
+#if !defined(_XBOX1) && _MSC_VER != 1310
 #define HAVE_VSNPRINTF 1
 #endif
 

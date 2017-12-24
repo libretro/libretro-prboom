@@ -355,6 +355,7 @@ TARGET := $(TARGET_NAME)_libretro.dll
 PSS_STYLE :=2
 LDFLAGS += -DLL
 CFLAGS += -D_CRT_SECURE_NO_DEPRECATE
+CFLAGS += -DHAVE_STRLWR
 
 # Windows MSVC 2003 x86
 else ifeq ($(platform), windows_msvc2003_x86)

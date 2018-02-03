@@ -54,6 +54,9 @@
 #define TRUE 1
 #define FALSE 0
 
+#if defined(__HAIKU__)
+#include <string.h>
+#else
 #ifndef HAVE_STRLWR
 #include <ctype.h>
 
@@ -63,6 +66,7 @@ static char* strlwr(char* str)
   for (p=str; *p; p++) *p = tolower(*p);
   return str;
 }
+#endif
 #endif
 
 // killough 10/98: new functions, to allow processing DEH files in-memory

@@ -66,6 +66,8 @@ static unsigned doom_devices[1];
 
 boolean mouse_on;
 
+char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
+
 static void check_system_specs(void)
 {
    unsigned level = 4;
@@ -299,6 +301,18 @@ static void extract_directory(char *buf, const char *path, size_t size)
    }
 }
 
+static void remove_extension(char *buf, const char *path, size_t size)
+{
+  char *base;
+  strncpy(buf, path, size - 1);
+  buf[size - 1] = '\0';
+
+  base = strrchr(buf, '.');
+
+  if (base)
+     *base = '\0';
+}
+
 static wadinfo_t get_wadinfo(const char *path)
 {
    FILE* fp = fopen(path, "rb");
@@ -367,6 +381,19 @@ bool retro_load_game(const struct retro_game_info *info)
          goto failed;
       }
       argv[argc++] = strdup(info->path);
+
+      /* Check for DEH or BEX files */
+      char *deh;
+      char name_without_ext[strlen(g_basename)];
+      remove_extension(name_without_ext, g_basename, sizeof(name_without_ext));
+
+      if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))
+         || (deh = FindFileInDir(g_wad_dir, name_without_ext, ".bex")))
+      {
+           argv[argc++] = "-deh";
+           argv[argc++] = deh;
+      };
+
    }
 
    myargc = argc;

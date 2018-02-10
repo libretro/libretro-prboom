@@ -644,6 +644,9 @@ static int mw_lut[] = {
 
 #define ANALOG_THRESHOLD 4096
 
+/* mouse movement to simulate per threshold distance increment covered by right analog */
+#define ANALOG_MOUSE_MOVEMENT 20
+
 void I_StartTic (void)
 {
    int port;
@@ -749,18 +752,18 @@ void I_StartTic (void)
                      RETRO_DEVICE_ID_ANALOG_Y);
 
                event_t event_mouse = {0};
+               /* halve the threshold for the right analog, since it supports finer movement */
                int right_analog_threshold = ANALOG_THRESHOLD / 2;
-
                if (rsx < -right_analog_threshold || rsx > right_analog_threshold)
                {
                   event_mouse.type = ev_mouse;
-                  event_mouse.data2 = rsx * 100 / ANALOG_THRESHOLD;
+                  event_mouse.data2 = rsx * ANALOG_MOUSE_MOVEMENT / ANALOG_THRESHOLD;
                }
 
                if (rsy < -right_analog_threshold || rsy > right_analog_threshold)
                {
                   event_mouse.type = ev_mouse;
-                  event_mouse.data3 = rsy * 100 / ANALOG_THRESHOLD;
+                  event_mouse.data3 = rsy * ANALOG_MOUSE_MOVEMENT / ANALOG_THRESHOLD;
                }
 
                if(event_mouse.type == ev_mouse) {

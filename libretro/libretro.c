@@ -507,12 +507,10 @@ static int action_lut[] = {
 };
 
 static int left_analog_lut[] = {
-   '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
-   ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
-   KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
-   KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
-   KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
-   KEYD_LEFTARROW     /* RETRO_DEVICE_ID_JOYPAD_LEFT */
+   '.',               /* RETRO_DEVICE_INDEX_ANALOG_LEFT +X */
+   ',',               /* RETRO_DEVICE_INDEX_ANALOG_LEFT -X */
+   KEYD_DOWNARROW,    /* RETRO_DEVICE_INDEX_ANALOG_LEFT +Y */
+   KEYD_UPARROW       /* RETRO_DEVICE_INDEX_ANALOG_LEFT -Y */
 };
 
 static int action_kb_lut[117][2] = {
@@ -701,10 +699,6 @@ void I_StartTic (void)
                      RETRO_DEVICE_ID_ANALOG_X);
                int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
                      RETRO_DEVICE_ID_ANALOG_Y);
-               int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                     RETRO_DEVICE_ID_ANALOG_X);
-               int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                     RETRO_DEVICE_ID_ANALOG_Y);
 
                if (lsx > ANALOG_THRESHOLD)
                   new_input_analog_l[0] = true;
@@ -726,16 +720,6 @@ void I_StartTic (void)
                else
                   new_input_analog_l[3] = false;
 
-               if (rsx > ANALOG_THRESHOLD)
-                  new_input_analog_l[4] = true;
-               else
-                  new_input_analog_l[4] = false;
-
-               if (rsx < -ANALOG_THRESHOLD)
-                  new_input_analog_l[5] = true;
-               else
-                  new_input_analog_l[5] = false;
-
                for (i = 0; i < 6; i++)
                {
                   event_t event = {0};
@@ -755,6 +739,32 @@ void I_StartTic (void)
                      D_PostEvent(&event);
 
                   old_input_analog_l[i] = new_input_analog_l[i];
+               }
+            }
+
+            {
+               int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                     RETRO_DEVICE_ID_ANALOG_X);
+               int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
+                     RETRO_DEVICE_ID_ANALOG_Y);
+
+               event_t event_mouse = {0};
+               int right_analog_threshold = ANALOG_THRESHOLD / 2;
+
+               if (rsx < -right_analog_threshold || rsx > right_analog_threshold)
+               {
+                  event_mouse.type = ev_mouse;
+                  event_mouse.data2 = rsx * 100 / ANALOG_THRESHOLD;
+               }
+
+               if (rsy < -right_analog_threshold || rsy > right_analog_threshold)
+               {
+                  event_mouse.type = ev_mouse;
+                  event_mouse.data3 = rsy * 100 / ANALOG_THRESHOLD;
+               }
+
+               if(event_mouse.type == ev_mouse) {
+                     D_PostEvent(&event_mouse);
                }
             }
          }

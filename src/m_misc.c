@@ -289,10 +289,10 @@ default_t defaults[] =
   {"use_mouse",{&usemouse, NULL},{1, NULL},0,1,
    def_bool,ss_none, NULL, NULL}, // enables use of mouse with DOOM
   //jff 4/3/98 allow unlimited sensitivity
-  {"mouse_sensitivity_horiz",{&mouseSensitivity_horiz, NULL},{10, NULL},0,UL,
+  {"mouse_sensitivity_horiz",{&mouseSensitivity_horiz, NULL},{40, NULL},0,UL,
    def_int,ss_none, NULL, NULL}, /* adjust horizontal (x) mouse sensitivity killough/mead */
   //jff 4/3/98 allow unlimited sensitivity
-  {"mouse_sensitivity_vert",{&mouseSensitivity_vert, NULL},{10, NULL},0,UL,
+  {"mouse_sensitivity_vert",{&mouseSensitivity_vert, NULL},{40, NULL},0,UL,
    def_int,ss_none, NULL, NULL}, /* adjust vertical (y) mouse sensitivity killough/mead */
   //jff 3/8/98 allow -1 in mouse bindings to disable mouse function
   {"mouseb_fire",{&mousebfire, NULL},{0, NULL},-1,MAX_MOUSEB,
@@ -600,15 +600,15 @@ default_t defaults[] =
    def_int,ss_weap, NULL, NULL}, // ninth choice for weapon (worst)
 
 // cournia - support for arbitrary music file (defaults are mp3)
-	
+
 	{"Music", {NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
-	
+
 	//Fixed support for Doom, Doom 2, and Doom Final
 	//You must use a seperate folder for each wad to be able to have all Dooms use their correct music
 	//In ~/RetroPie/roms/ports/ have a folder for each game, put the wad of each game in their related folder
 	//Then put all the music in their folder
 	//Also don't forget to include the prboom.wad into each game folder
-	
+
 	//An example folder structure would be like so
 	// roms
 	// +ports
@@ -627,7 +627,7 @@ default_t defaults[] =
 	//You must change the folder name and wad name for each game you want and save it as a .sh file in ~/RetroPie/roms/ports/
 
 	//Although all 3 games (Doom 2, Plutonia, TNT) use the same file names, the files are not the same
-	
+
 	//Begin Doom 1
 	{"mus_bunny", {0,&S_music_files[mus_bunny]}, {0,"bunny.mp3"},UL,UL,
    def_str,ss_none, NULL, NULL},
@@ -869,9 +869,9 @@ void M_LoadDefaults (void)
     snprintf(defaultfile, PATH_MAX,
             "%s%s%sboom.cfg", exedir,
 #ifdef _WIN32
-            HasTrailingSlash(exedir) ? "" : "\\", 
+            HasTrailingSlash(exedir) ? "" : "\\",
 #else
-            HasTrailingSlash(exedir) ? "" : "/", 
+            HasTrailingSlash(exedir) ? "" : "/",
 #endif
             "pr");
   }
@@ -944,4 +944,3 @@ void M_LoadDefaults (void)
     }
   //jff 3/4/98 redundant range checks for hud deleted here
 }
-

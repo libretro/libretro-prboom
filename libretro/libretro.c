@@ -8,6 +8,12 @@
 
 #include "libretro.h"
 
+#ifdef _WIN32
+   #define DIR_SLASH '\\'
+#else
+   #define DIR_SLASH '/'
+#endif
+
 /* prboom includes */
 
 #include "../src/d_main.h"
@@ -60,6 +66,8 @@ static unsigned doom_devices[1];
 
 boolean mouse_on;
 
+char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
+
 static void check_system_specs(void)
 {
    unsigned level = 4;
@@ -105,7 +113,7 @@ void retro_get_system_info(struct retro_system_info *info)
 #endif
    info->library_version  = "v2.5.0" GIT_VERSION;
    info->need_fullpath    = true;
-   info->valid_extensions = "wad|iwad";
+   info->valid_extensions = "wad|iwad|pwad";
    info->block_extract = false;
 }
 
@@ -293,6 +301,30 @@ static void extract_directory(char *buf, const char *path, size_t size)
    }
 }
 
+static void remove_extension(char *buf, const char *path, size_t size)
+{
+  char *base;
+  strncpy(buf, path, size - 1);
+  buf[size - 1] = '\0';
+
+  base = strrchr(buf, '.');
+
+  if (base)
+     *base = '\0';
+}
+
+static wadinfo_t get_wadinfo(const char *path)
+{
+   FILE* fp = fopen(path, "rb");
+   wadinfo_t header;
+   if (fp != NULL)
+   {
+      fread(&header, sizeof(header), 1, fp);
+      fclose(fp);
+   }
+   return header;
+}
+
 bool I_PreInitGraphics(void)
 {
    screen_buf = malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
@@ -332,12 +364,40 @@ bool retro_load_game(const struct retro_game_info *info)
    {
       extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
       extract_basename(g_basename, info->path, sizeof(g_basename));
-      argv[argc++] = strdup("-iwad");
-      argv[argc++] = strdup(g_basename);
+
+      wadinfo_t header = get_wadinfo(info->path);
+      if(header.identification == NULL)
+      {
+         I_Error("retro_load_game: couldn't read WAD header from '%s'", info->path);
+         goto failed;
+      }
+      if(!strncmp(header.identification, "IWAD", 4))
+         argv[argc++] = strdup("-iwad");
+      else if(!strncmp(header.identification, "PWAD", 4))
+         argv[argc++] = strdup("-file");
+      else
+      {
+         I_Error("retro_load_game: invalid WAD header '%s'", header.identification);
+         goto failed;
+      }
+      argv[argc++] = strdup(info->path);
+
+      /* Check for DEH or BEX files */
+      char *deh;
+      char name_without_ext[strlen(g_basename)];
+      remove_extension(name_without_ext, g_basename, sizeof(name_without_ext));
+
+      if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))
+         || (deh = FindFileInDir(g_wad_dir, name_without_ext, ".bex")))
+      {
+           argv[argc++] = "-deh";
+           argv[argc++] = deh;
+      };
+
    }
 
    myargc = argc;
-   myargv = argv;
+   myargv = (const char **) argv;
 
    if (!Z_Init()) /* 1/18/98 killough: start up memory stuff first */
       goto failed;
@@ -429,7 +489,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
 
 /* i_video */
 
-static int action_lut[] = { 
+static int action_lut[] = {
    KEYD_RALT,         /* RETRO_DEVICE_ID_JOYPAD_B */
    KEYD_RSHIFT,       /* RETRO DEVICE_ID_JOYPAD_Y */
    KEYD_TAB,          /* RETRO_DEVICE_ID_JOYPAD_SELECT */
@@ -442,20 +502,18 @@ static int action_lut[] = {
    KEYD_RCTRL,        /* RETRO_DEVICE_ID_JOYPAD_X */
    ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
    '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
-   'n',               /* RETRO_DEVICE_ID_JOYPAD_L2 */ 
+   'n',               /* RETRO_DEVICE_ID_JOYPAD_L2 */
    'm',               /* RETRO_DEVICE_ID_JOYPAD_R2 */
 };
 
-static int left_analog_lut[] = { 
-   '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
-   ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
-   KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
-   KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
-   KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
-   KEYD_LEFTARROW     /* RETRO_DEVICE_ID_JOYPAD_LEFT */
+static int left_analog_lut[] = {
+   '.',               /* RETRO_DEVICE_INDEX_ANALOG_LEFT +X */
+   ',',               /* RETRO_DEVICE_INDEX_ANALOG_LEFT -X */
+   KEYD_DOWNARROW,    /* RETRO_DEVICE_INDEX_ANALOG_LEFT +Y */
+   KEYD_UPARROW       /* RETRO_DEVICE_INDEX_ANALOG_LEFT -Y */
 };
 
-static int action_kb_lut[117][2] = { 
+static int action_kb_lut[117][2] = {
    {RETROK_BACKSPACE      ,KEYD_BACKSPACE},
    {RETROK_TAB            ,KEYD_TAB},
    {RETROK_CLEAR          ,},
@@ -579,7 +637,7 @@ static int action_kb_lut[117][2] = {
    {RETROK_LALT           ,KEYD_LALT}
 };
 
-static int mw_lut[] = { 
+static int mw_lut[] = {
    'm',               /* RETRO_DEVICE_ID_MOUSE_WHEELUP */
    'n'                /* RETRO_DEVICE_ID_MOUSE_WHEELDOWN */
 };
@@ -711,7 +769,6 @@ void I_StartTic (void)
                if(event_mouse.type == ev_mouse)
                   D_PostEvent(&event_mouse);
             }
-            
          }
          break;
 
@@ -770,14 +827,14 @@ void I_StartTic (void)
          event_mouse.data1 = 1;
       if (input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
          event_mouse.data1 = 2;
-      if (input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) && 
+      if (input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT) &&
             input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_RIGHT))
          event_mouse.data1 = 3;
-      
+
       D_PostEvent(&event_mouse);
 
       /* Mouse Wheel */
-      
+
       for (i = 0; i < 2; i++)
       {
          event_t event_mw = {0};
@@ -920,42 +977,48 @@ const char *I_DoomExeDir(void)
 *
 * cphipps - simple test for trailing slash on dir names
 */
-
 boolean HasTrailingSlash(const char* dn)
 {
    return ( (dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\'));
 }
 
 /*
-* I_FindFile
+* IsAbsolutePath
 *
-* proff_fs 2002-07-04 - moved to i_system
-*
-* cphipps 19/1999 - writen to unify the logic in FindIWADFile and the WAD
-*      autoloading code.
-* Searches g_wad_dir for a named WAD file
+* check if the given path could be absolute
 */
-
-char* I_FindFile(const char* wfname, const char* ext)
+boolean IsAbsolutePath(const char* path)
 {
-   FILE *file;
-   char  * p;
 #ifdef _WIN32
-   char slash = '\\';
+   return ((path[0] == '/') || (path[0] == '\\')
+      || (path[1] == ':' && ((path[2] == '/') || (path[2] == '\\'))));
 #else
-   char slash = '/';
+   return (path[0] == DIR_SLASH);
 #endif
+}
 
+/**
+ * FindFileInDir
+ **
+ * Checks if directory contains a file with given name and extension.
+ * If dir is NULL, just check for the given wfname itself (and extension).
+ * returns the path to the file if it exists and is readable or NULL otherwise
+ */
+char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
+{
+   FILE * file;
+   char * p;
    /* Precalculate a length we will need in the loop */
    size_t pl = strlen(wfname) + strlen(ext) + 4;
 
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "wfname: [%s], g_wad_dir: [%s]\n", wfname, g_wad_dir);
-
-   p = malloc(strlen(g_wad_dir) + pl);
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "%s%c%s\n", g_wad_dir, slash, wfname);
-   sprintf(p, "%s%c%s", g_wad_dir, slash, wfname);
+   if( dir == NULL ) {
+      p = malloc(pl);
+      sprintf(p, "%s", wfname);
+   }
+   else {
+     p = malloc(strlen(dir) + pl);
+     sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
+   }
 
    file = fopen(p, "rb");
    if (!file)
@@ -967,13 +1030,54 @@ char* I_FindFile(const char* wfname, const char* ext)
    if (file)
    {
       if (log_cb)
-      log_cb(RETRO_LOG_INFO, " found %s\n", p);
+         log_cb(RETRO_LOG_INFO, "FindFileInDir: found %s\n", p);
       fclose(file);
       return p;
    }
+   else if (log_cb)
+      log_cb(RETRO_LOG_INFO, "FindFileInDir: not found %s in %s\n", wfname, dir);
 
    free(p);
    return NULL;
+}
+
+/*
+ * I_FindFile
+ **
+ * Given a file name, search for it in g_wad_dir first, then the system folder
+ * and then scan the parent folders of g_wad_dir.
+ * If an absolute path filename is given, only check that path.
+ */
+char* I_FindFile(const char* wfname, const char* ext)
+{
+   char *p;
+   // If absolute path, check only that path
+   if (IsAbsolutePath(wfname))
+   {
+     return FindFileInDir(NULL, wfname, ext);
+   }
+   else if ((p = FindFileInDir(g_wad_dir, wfname, ext)) == NULL)
+   {
+     char * system_dir;
+     environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
+     if (!system_dir || (p = FindFileInDir(system_dir, wfname, ext)) == NULL)
+     {
+       char * dir = malloc(strlen(g_wad_dir));
+       strcpy(dir, g_wad_dir);
+       do
+       {
+         int i = strlen(dir)-1;
+         while ( i > 0 && dir[i-1] != '/' && dir[i-1] != '\\') {
+            dir[--i] = '\0';
+         }
+         dir[i-1] = '\0';
+       } while (strlen(dir) > 0 && (p = FindFileInDir(dir, wfname, ext)) == NULL);
+
+         log_cb(RETRO_LOG_INFO, "EXIT: %d %s\n", strlen(dir), p);
+       free(dir);
+     }
+   }
+   return p;
 }
 
 #endif

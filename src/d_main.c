@@ -137,7 +137,7 @@ static const int nstandard_iwads = sizeof standard_iwads/sizeof*standard_iwads;
  *
  * Called by I/O functions when an event is received.
  * Try event handlers for each code area in turn.
- * cph - in the TRUE spirit of the Boom source, let the 
+ * cph - in the TRUE spirit of the Boom source, let the
  *  short ciruit operator madness begin!
  */
 
@@ -755,7 +755,10 @@ static bool IdentifyVersion (void)
       case retail:
       case registered:
       case shareware:
+        i = strlen(iwad);
         gamemission = doom;
+        if (i>=10 && (!strnicmp(iwad+i-11,"heretic.wad",11) || !strnicmp(iwad+i-13,"hereticsr.wad",13)))
+          return I_Error("IdentifyVersion: Heretic is not supported");
         break;
       case commercial:
         i = strlen(iwad);
@@ -863,14 +866,14 @@ static bool FindResponseFile (void)
                if (size > 0) {
                   char *s = malloc(size+1);
                   char *p = s;
-                  int quoted = 0; 
+                  int quoted = 0;
 
                   while (size > 0) {
                      // Whitespace terminates the token unless quoted
                      if (!quoted && isspace(*infile)) break;
                      if (*infile == '\"') {
                         // Quotes are removed but remembered
-                        infile++; size--; quoted ^= 1; 
+                        infile++; size--; quoted ^= 1;
                      } else {
                         *p++ = *infile++; size--;
                      }
@@ -1272,7 +1275,7 @@ bool D_DoomMainSetup(void)
 
   lprintf(LO_INFO,"\n");     // killough 3/6/98: add a newline, by popular demand :)
 
-  // e6y 
+  // e6y
   // option to disable automatic loading of dehacked-in-wad lump
   if (!M_CheckParm ("-nodeh"))
     // MBF-style DeHackEd in wad support: load all lumps, not just the last one
@@ -1355,7 +1358,7 @@ bool D_DoomMainSetup(void)
       {
         AddDefaultExtension(strcpy(file, myargv[p]), ".deh");
 	fp = fopen(file, "rb");
-	
+
         if (fp == NULL)  // still nope
           I_Error("D_DoomMainSetup: Cannot find .deh or .bex file named %s",
                   myargv[p]);

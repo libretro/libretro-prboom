@@ -680,8 +680,15 @@ static void createTextureCompositePatch(int id) {
 const rpatch_t *R_CachePatchNum(int id) {
   const int locks = 1;
 
-  if (!patches)
+  if(id < 0) {
+    I_Error("R_CachePatchNum: missing patch");
+    return NULL;
+  }
+
+  if (!patches) {
     I_Error("R_CachePatchNum: Patches not initialized");
+    return NULL;
+  }
 
   if (!patches[id].data)
     createPatch(id);
@@ -756,4 +763,3 @@ const rcolumn_t *R_GetPatchColumn(const rpatch_t *patch, int columnIndex) {
   if (patch->isNotTileable) return R_GetPatchColumnClamped(patch, columnIndex);
   else return R_GetPatchColumnWrapped(patch, columnIndex);
 }
-

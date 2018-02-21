@@ -570,8 +570,11 @@ void R_PrecacheLevel(void)
 void R_SetPatchNum(patchnum_t *patchnum, const char *name)
 {
   const rpatch_t *patch = R_CachePatchName(name);
-  if (patch == NULL)
-    return I_Error("R_SetPatchNum: cannot load patch '%s'", name);
+  if (!patch)
+  {
+    I_Error("R_SetPatchNum: cannot load patch '%s'", name);
+    return;
+  }
 
   patchnum->width = patch->width;
   patchnum->height = patch->height;

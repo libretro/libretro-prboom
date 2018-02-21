@@ -362,10 +362,14 @@ bool retro_load_game(const struct retro_game_info *info)
    argv[argc++] = strdup("prboom");
    if(info->path)
    {
+      wadinfo_t header;
+      char *deh;
+      char name_without_ext[4096];
+
       extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
       extract_basename(g_basename, info->path, sizeof(g_basename));
 
-      wadinfo_t header = get_wadinfo(info->path);
+      header = get_wadinfo(info->path);
       if(header.identification == NULL)
       {
          I_Error("retro_load_game: couldn't read WAD header from '%s'", info->path);
@@ -383,8 +387,6 @@ bool retro_load_game(const struct retro_game_info *info)
       argv[argc++] = strdup(info->path);
 
       /* Check for DEH or BEX files */
-      char *deh;
-      char name_without_ext[strlen(g_basename)];
       remove_extension(name_without_ext, g_basename, sizeof(name_without_ext));
 
       if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))

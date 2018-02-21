@@ -370,7 +370,10 @@ void V_DrawNumPatch(int x, int y, int scrn, int lump,
          int cm, enum patch_translation_e flags)
 {
   if(lump < 0)
-    return I_Error("V_DrawNumPatch: missing lump won't be drawn");
+  {
+    I_Error("V_DrawNumPatch: missing lump won't be drawn");
+    return;
+  }
     
   V_DrawMemPatch(x, y, scrn, R_CachePatchNum(lump), cm, flags);
   R_UnlockPatchNum(lump);

@@ -133,7 +133,7 @@ void retro_set_environment(retro_environment_t cb)
 {
    struct retro_variable variables[] = {
       { "prboom-resolution",
-         "Internal resolution; 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
+         "Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
       { "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
       { NULL, NULL },
    };

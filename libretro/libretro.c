@@ -64,7 +64,10 @@ static retro_input_state_t input_state_cb;
 #define MAX_PADS 1
 static unsigned doom_devices[1];
 
+/* Whether mouse active when using Gamepad */
 boolean mouse_on;
+/* Whether to search for IWADs on parent folders recursively */
+boolean find_recursive_on;
 
 char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
 
@@ -135,6 +138,7 @@ void retro_set_environment(retro_environment_t cb)
       { "prboom-resolution",
          "Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
       { "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
+      { "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
       { NULL, NULL },
    };
 
@@ -247,6 +251,16 @@ static void update_variables(bool startup)
          mouse_on = true;
       else
          mouse_on = false;
+   }
+
+   var.key = "prboom-find_recursive_on";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "enabled"))
+         find_recursive_on = true;
+      else
+         find_recursive_on = false;
    }
 }
 
@@ -376,15 +390,20 @@ bool retro_load_game(const struct retro_game_info *info)
          goto failed;
       }
       if(!strncmp(header.identification, "IWAD", 4))
+      {
          argv[argc++] = strdup("-iwad");
+         argv[argc++] = strdup(g_basename);
+      }
       else if(!strncmp(header.identification, "PWAD", 4))
+      {
          argv[argc++] = strdup("-file");
+         argv[argc++] = strdup(info->path);
+      }
       else
       {
          I_Error("retro_load_game: invalid WAD header '%s'", header.identification);
          goto failed;
       }
-      argv[argc++] = strdup(info->path);
 
       /* Check for DEH or BEX files */
       remove_extension(name_without_ext, g_basename, sizeof(name_without_ext));
@@ -984,26 +1003,10 @@ boolean HasTrailingSlash(const char* dn)
    return ( (dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\'));
 }
 
-/*
-* IsAbsolutePath
-*
-* check if the given path could be absolute
-*/
-boolean IsAbsolutePath(const char* path)
-{
-#ifdef _WIN32
-   return ((path[0] == '/') || (path[0] == '\\')
-      || (path[1] == ':' && ((path[2] == '/') || (path[2] == '\\'))));
-#else
-   return (path[0] == DIR_SLASH);
-#endif
-}
-
 /**
  * FindFileInDir
  **
  * Checks if directory contains a file with given name and extension.
- * If dir is NULL, just check for the given wfname itself (and extension).
  * returns the path to the file if it exists and is readable or NULL otherwise
  */
 char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
@@ -1048,34 +1051,29 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
  **
  * Given a file name, search for it in g_wad_dir first, then the system folder
  * and then scan the parent folders of g_wad_dir.
- * If an absolute path filename is given, only check that path.
  */
 char* I_FindFile(const char* wfname, const char* ext)
 {
-   char *p;
-   // If absolute path, check only that path
-   if (IsAbsolutePath(wfname))
+   char *p, *dir, *system_dir;
+   int i;
+   if ((p = FindFileInDir(g_wad_dir, wfname, ext)) == NULL)
    {
-     return FindFileInDir(NULL, wfname, ext);
-   }
-   else if ((p = FindFileInDir(g_wad_dir, wfname, ext)) == NULL)
-   {
-     char * system_dir;
      environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
-     if (!system_dir || (p = FindFileInDir(system_dir, wfname, ext)) == NULL)
-     {
-       char * dir = malloc(strlen(g_wad_dir));
+     if ((!system_dir || (p = FindFileInDir(system_dir, wfname, ext)) == NULL)
+        && find_recursive_on)
+     { // Find recursively on parent directories
+       dir = malloc(strlen(g_wad_dir));
        strcpy(dir, g_wad_dir);
-       do
+       for (i = strlen(dir)-1; i > 1; dir[i--] = '\0')
        {
-         int i = strlen(dir)-1;
-         while ( i > 0 && dir[i-1] != '/' && dir[i-1] != '\\') {
-            dir[--i] = '\0';
+         if((dir[i] == '/' || dir[i] == '\\')
+           && dir[i-1] != dir[i])
+         {
+           dir[i] = '\0'; // remove leading slash
+           p = FindFileInDir(dir, wfname, ext);
+           if(p != NULL) break;
          }
-         dir[i-1] = '\0';
-       } while (strlen(dir) > 0 && (p = FindFileInDir(dir, wfname, ext)) == NULL);
-
-         log_cb(RETRO_LOG_INFO, "EXIT: %d %s\n", strlen(dir), p);
+       }
        free(dir);
      }
    }

@@ -125,10 +125,12 @@ const char *const standard_iwads[]=
   "doom2.wad",
   "plutonia.wad",
   "tnt.wad",
+  "freedoom2.wad",
   "doom.wad",
-  "doom1.wad",
   "doomu.wad", /* CPhipps - alow doomu.wad */
-  "freedoom.wad", /* wart@kobold.org:  added freedoom for Fedora Extras */
+  "freedoom1.wad",
+  "freedoom.wad",
+  "doom1.wad",
 };
 static const int nstandard_iwads = sizeof standard_iwads/sizeof*standard_iwads;
 

@@ -69,6 +69,15 @@ boolean mouse_on;
 /* Whether to search for IWADs on parent folders recursively */
 boolean find_recursive_on;
 
+// System analog stick range is -0x8000 to 0x8000
+#define ANALOG_RANGE 0x8000
+// This is scaled by in-game 'mouse sensitivity' option, so just choose a value
+// that has acceptable performance at the default sensitivity value
+// (i.e. user can easily change mouse speed, so absolute value here is not critical)
+#define ANALOG_MOUSE_SPEED 200
+// Default deadzone: 15%
+static int analog_deadzone = (int)(0.15f * ANALOG_RANGE);
+
 char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
 
 static void check_system_specs(void)
@@ -139,6 +148,7 @@ void retro_set_environment(retro_environment_t cb)
          "Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
       { "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
       { "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
+      { "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },
       { NULL, NULL },
    };
 
@@ -261,6 +271,13 @@ static void update_variables(bool startup)
          find_recursive_on = true;
       else
          find_recursive_on = false;
+   }
+   
+   var.key = "prboom-analog_deadzone";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+		analog_deadzone = (int)(atoi(var.value) * 0.01f * ANALOG_RANGE);
    }
 }
 
@@ -663,11 +680,6 @@ static int mw_lut[] = {
    'n'                /* RETRO_DEVICE_ID_MOUSE_WHEELDOWN */
 };
 
-#define ANALOG_THRESHOLD 4096
-
-/* mouse movement to simulate per threshold distance increment covered by right analog */
-#define ANALOG_MOUSE_MOVEMENT 20
-
 void I_StartTic (void)
 {
    int port;
@@ -724,22 +736,22 @@ void I_StartTic (void)
                int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
                      RETRO_DEVICE_ID_ANALOG_Y);
 
-               if (lsx > ANALOG_THRESHOLD)
+               if (lsx > analog_deadzone)
                   new_input_analog_l[0] = true;
                else
                   new_input_analog_l[0] = false;
 
-               if (lsx < -ANALOG_THRESHOLD)
+               if (lsx < -analog_deadzone)
                   new_input_analog_l[1] = true;
                else
                   new_input_analog_l[1] = false;
 
-               if (lsy > ANALOG_THRESHOLD)
+               if (lsy > analog_deadzone)
                   new_input_analog_l[2] = true;
                else
                   new_input_analog_l[2] = false;
 
-               if (lsy < -ANALOG_THRESHOLD)
+               if (lsy < -analog_deadzone)
                   new_input_analog_l[3] = true;
                else
                   new_input_analog_l[3] = false;
@@ -773,18 +785,25 @@ void I_StartTic (void)
                      RETRO_DEVICE_ID_ANALOG_Y);
 
                event_t event_mouse = {0};
-               /* halve the threshold for the right analog, since it supports finer movement */
-               int right_analog_threshold = ANALOG_THRESHOLD / 2;
-               if (rsx < -right_analog_threshold || rsx > right_analog_threshold)
+               
+               if (rsx < -analog_deadzone || rsx > analog_deadzone)
                {
+						if (rsx > analog_deadzone)
+							rsx = rsx - analog_deadzone;
+						if (rsx < -analog_deadzone)
+							rsx = rsx + analog_deadzone;
                   event_mouse.type = ev_mouse;
-                  event_mouse.data2 = rsx * ANALOG_MOUSE_MOVEMENT / ANALOG_THRESHOLD;
+                  event_mouse.data2 = ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone);
                }
 
-               if (rsy < -right_analog_threshold || rsy > right_analog_threshold)
+               if (rsy < -analog_deadzone || rsy > analog_deadzone)
                {
+						if (rsy > analog_deadzone)
+							rsy = rsy - analog_deadzone;
+						if (rsy < -analog_deadzone)
+							rsy = rsy + analog_deadzone;
                   event_mouse.type = ev_mouse;
-                  event_mouse.data3 = rsy * ANALOG_MOUSE_MOVEMENT / ANALOG_THRESHOLD;
+                  event_mouse.data3 = ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone);
                }
 
                if(event_mouse.type == ev_mouse)

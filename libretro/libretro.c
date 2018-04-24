@@ -680,6 +680,21 @@ static int mw_lut[] = {
    'n'                /* RETRO_DEVICE_ID_MOUSE_WHEELDOWN */
 };
 
+// Produces a pulse train with average on-time fraction amplitude/pwm_period.
+// (https://www.embeddedrelated.com/showarticle/107.php)
+// > The period here doesn't actually matter that much...
+//   Just set to '60' to match the nominal 60Hz screen refresh rate
+//   (Still works fine when in-game frame rate is set to 35/40/50)
+static int pwm_period = 60;
+static bool synthetic_pwm(int amplitude, int* modulation_state)
+{
+	*modulation_state += amplitude;
+	if (*modulation_state < pwm_period)
+		return false;
+	*modulation_state -= pwm_period;
+	return true;
+}
+
 void I_StartTic (void)
 {
    int port;
@@ -691,8 +706,10 @@ void I_StartTic (void)
    bool new_input_kb[117];
    static bool old_input[20];
    bool new_input[20];
-   static bool old_input_analog_l[6];
-   bool new_input_analog_l[6];
+   static bool old_input_analog_l[4];
+   bool new_input_analog_l[4];
+   int analog_l_amplitude[4];
+   static int analog_l_modulation_state[4];
 
    input_poll_cb();
 
@@ -735,29 +752,37 @@ void I_StartTic (void)
                      RETRO_DEVICE_ID_ANALOG_X);
                int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
                      RETRO_DEVICE_ID_ANALOG_Y);
+               
+					// Get movement 'amplitude' on each axis
+					// > x-axis
+					analog_l_amplitude[0] = 0;
+					analog_l_amplitude[1] = 0;
+					if (lsx > analog_deadzone)
+					{
+						// Add '1' to deal with float->int rounding accuracy loss...
+						// (Similarly, subtract '1' when lsx is negative...)
+						analog_l_amplitude[0] = 1 + pwm_period * (lsx - analog_deadzone) / (ANALOG_RANGE - analog_deadzone);
+					}
+					if (lsx < -analog_deadzone)
+					{
+						analog_l_amplitude[1] = -1 * (-1 + pwm_period * (lsx + analog_deadzone) / (ANALOG_RANGE - analog_deadzone));
+					}
+					// > y-axis
+					analog_l_amplitude[2] = 0;
+					analog_l_amplitude[3] = 0;
+					if (lsy > analog_deadzone)
+					{
+						analog_l_amplitude[2] = 1 + pwm_period * (lsy - analog_deadzone) / (ANALOG_RANGE - analog_deadzone);
+					}
+					if (lsy < -analog_deadzone)
+					{
+						analog_l_amplitude[3] = -1 * (-1 + pwm_period * (lsy + analog_deadzone) / (ANALOG_RANGE - analog_deadzone));
+					}
 
-               if (lsx > analog_deadzone)
-                  new_input_analog_l[0] = true;
-               else
-                  new_input_analog_l[0] = false;
-
-               if (lsx < -analog_deadzone)
-                  new_input_analog_l[1] = true;
-               else
-                  new_input_analog_l[1] = false;
-
-               if (lsy > analog_deadzone)
-                  new_input_analog_l[2] = true;
-               else
-                  new_input_analog_l[2] = false;
-
-               if (lsy < -analog_deadzone)
-                  new_input_analog_l[3] = true;
-               else
-                  new_input_analog_l[3] = false;
-
-               for (i = 0; i < 6; i++)
+               for (i = 0; i < 4; i++)
                {
+                  new_input_analog_l[i] = synthetic_pwm(analog_l_amplitude[i], &analog_l_modulation_state[i]);
+                  
                   event_t event = {0};
                   if(new_input_analog_l[i] && !old_input_analog_l[i])
                   {

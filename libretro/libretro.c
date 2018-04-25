@@ -7,6 +7,7 @@
 #include <errno.h>
 
 #include "libretro.h"
+#include <file/file_path.h>
 
 #ifdef _WIN32
    #define DIR_SLASH '\\'
@@ -43,6 +44,7 @@ static unsigned char *screen_buf;
 /* libretro */
 static char g_wad_dir[1024];
 static char g_basename[1024];
+static char g_save_dir[1024];
 
 //forward decls
 bool D_DoomMainSetup(void);
@@ -396,6 +398,8 @@ bool retro_load_game(const struct retro_game_info *info)
       wadinfo_t header;
       char *deh;
       char name_without_ext[4096];
+      bool use_external_savedir = false;
+      const char *base_save_dir = NULL;
 
       extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
       extract_basename(g_basename, info->path, sizeof(g_basename));
@@ -431,7 +435,28 @@ bool retro_load_game(const struct retro_game_info *info)
            argv[argc++] = "-deh";
            argv[argc++] = deh;
       };
-
+      
+      // Get save directory
+      if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)
+		{
+			if (strlen(base_save_dir) > 0)
+			{
+				// > Build save path
+				snprintf(g_save_dir, sizeof(g_save_dir), "%s%c%s", base_save_dir, DIR_SLASH, name_without_ext);
+				use_external_savedir = true;
+				
+				// > Create save directory, if required
+				if (!path_is_directory(g_save_dir))
+				{
+					use_external_savedir = path_mkdir(g_save_dir);
+				}
+			}
+		}
+      if (!use_external_savedir)
+		{
+			// > Use WAD directory fallback...
+			snprintf(g_save_dir, sizeof(g_save_dir), "%s", g_wad_dir);
+		}
    }
 
    myargc = argc;
@@ -1035,7 +1060,7 @@ const char* I_SigString(char* buf, size_t sz, int signum)
 
 const char *I_DoomExeDir(void)
 {
-   return g_wad_dir;
+   return g_save_dir;
 }
 
 /*

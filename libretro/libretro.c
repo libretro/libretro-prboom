@@ -781,9 +781,10 @@ void I_StartTic (void)
 
                for (i = 0; i < 4; i++)
                {
+                  event_t event = {0};
+
                   new_input_analog_l[i] = synthetic_pwm(analog_l_amplitude[i], &analog_l_modulation_state[i]);
                   
-                  event_t event = {0};
                   if(new_input_analog_l[i] && !old_input_analog_l[i])
                   {
                      event.type = ev_keydown;

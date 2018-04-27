@@ -69,6 +69,15 @@ boolean mouse_on;
 /* Whether to search for IWADs on parent folders recursively */
 boolean find_recursive_on;
 
+// System analog stick range is -0x8000 to 0x8000
+#define ANALOG_RANGE 0x8000
+// This is scaled by in-game 'mouse sensitivity' option, so just choose a value
+// that has acceptable performance at the default sensitivity value
+// (i.e. user can easily change mouse speed, so absolute value here is not critical)
+#define ANALOG_MOUSE_SPEED 200
+// Default deadzone: 15%
+static int analog_deadzone = (int)(0.15f * ANALOG_RANGE);
+
 char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
 
 static void check_system_specs(void)
@@ -139,6 +148,7 @@ void retro_set_environment(retro_environment_t cb)
          "Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
       { "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
       { "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
+      { "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },
       { NULL, NULL },
    };
 
@@ -262,6 +272,13 @@ static void update_variables(bool startup)
       else
          find_recursive_on = false;
    }
+   
+   var.key = "prboom-analog_deadzone";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+		analog_deadzone = (int)(atoi(var.value) * 0.01f * ANALOG_RANGE);
+   }
 }
 
 void I_SafeExit(int rc);
@@ -351,20 +368,20 @@ bool retro_load_game(const struct retro_game_info *info)
    static char *argv[32] = {NULL};
 
    struct retro_input_descriptor desc[] = {
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,  "D-Pad Left" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,    "D-Pad Up" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,  "D-Pad Down" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT, "D-Pad Right" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,     "Strafe" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,     "Use" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,     "Fire" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,     "Run" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,     "Strafe Left" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,     "Strafe Right" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "D-Pad Left" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Strafe" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Use" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Fire" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Toggle Run" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Strafe Left" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Strafe Right" },
       { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Previous Weapon" },
       { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Next Weapon" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT,    "Show/Hide Map" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,    "Settings" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Show/Hide Map" },
+      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Settings" },
 
       { 0 },
    };
@@ -512,7 +529,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
 
 static int action_lut[] = {
    KEYD_RALT,         /* RETRO_DEVICE_ID_JOYPAD_B */
-   KEYD_RSHIFT,       /* RETRO DEVICE_ID_JOYPAD_Y */
+   KEYD_CAPSLOCK,     /* RETRO DEVICE_ID_JOYPAD_Y */
    KEYD_TAB,          /* RETRO_DEVICE_ID_JOYPAD_SELECT */
    KEYD_ESCAPE,       /* RETRO_DEVICE_ID_JOYPAD_START */
    KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
@@ -663,10 +680,20 @@ static int mw_lut[] = {
    'n'                /* RETRO_DEVICE_ID_MOUSE_WHEELDOWN */
 };
 
-#define ANALOG_THRESHOLD 4096
-
-/* mouse movement to simulate per threshold distance increment covered by right analog */
-#define ANALOG_MOUSE_MOVEMENT 20
+// Produces a pulse train with average on-time fraction amplitude/pwm_period.
+// (https://www.embeddedrelated.com/showarticle/107.php)
+// > The period here doesn't actually matter that much...
+//   Just set to '60' to match the nominal 60Hz screen refresh rate
+//   (Still works fine when in-game frame rate is set to 35/40/50)
+static int pwm_period = 60;
+static bool synthetic_pwm(int amplitude, int* modulation_state)
+{
+	*modulation_state += amplitude;
+	if (*modulation_state < pwm_period)
+		return false;
+	*modulation_state -= pwm_period;
+	return true;
+}
 
 void I_StartTic (void)
 {
@@ -679,8 +706,10 @@ void I_StartTic (void)
    bool new_input_kb[117];
    static bool old_input[20];
    bool new_input[20];
-   static bool old_input_analog_l[6];
-   bool new_input_analog_l[6];
+   static bool old_input_analog_l[4];
+   bool new_input_analog_l[4];
+   int analog_l_amplitude[4];
+   static int analog_l_modulation_state[4];
 
    input_poll_cb();
 
@@ -723,29 +752,37 @@ void I_StartTic (void)
                      RETRO_DEVICE_ID_ANALOG_X);
                int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
                      RETRO_DEVICE_ID_ANALOG_Y);
+               
+					// Get movement 'amplitude' on each axis
+					// > x-axis
+					analog_l_amplitude[0] = 0;
+					analog_l_amplitude[1] = 0;
+					if (lsx > analog_deadzone)
+					{
+						// Add '1' to deal with float->int rounding accuracy loss...
+						// (Similarly, subtract '1' when lsx is negative...)
+						analog_l_amplitude[0] = 1 + pwm_period * (lsx - analog_deadzone) / (ANALOG_RANGE - analog_deadzone);
+					}
+					if (lsx < -analog_deadzone)
+					{
+						analog_l_amplitude[1] = -1 * (-1 + pwm_period * (lsx + analog_deadzone) / (ANALOG_RANGE - analog_deadzone));
+					}
+					// > y-axis
+					analog_l_amplitude[2] = 0;
+					analog_l_amplitude[3] = 0;
+					if (lsy > analog_deadzone)
+					{
+						analog_l_amplitude[2] = 1 + pwm_period * (lsy - analog_deadzone) / (ANALOG_RANGE - analog_deadzone);
+					}
+					if (lsy < -analog_deadzone)
+					{
+						analog_l_amplitude[3] = -1 * (-1 + pwm_period * (lsy + analog_deadzone) / (ANALOG_RANGE - analog_deadzone));
+					}
 
-               if (lsx > ANALOG_THRESHOLD)
-                  new_input_analog_l[0] = true;
-               else
-                  new_input_analog_l[0] = false;
-
-               if (lsx < -ANALOG_THRESHOLD)
-                  new_input_analog_l[1] = true;
-               else
-                  new_input_analog_l[1] = false;
-
-               if (lsy > ANALOG_THRESHOLD)
-                  new_input_analog_l[2] = true;
-               else
-                  new_input_analog_l[2] = false;
-
-               if (lsy < -ANALOG_THRESHOLD)
-                  new_input_analog_l[3] = true;
-               else
-                  new_input_analog_l[3] = false;
-
-               for (i = 0; i < 6; i++)
+               for (i = 0; i < 4; i++)
                {
+                  new_input_analog_l[i] = synthetic_pwm(analog_l_amplitude[i], &analog_l_modulation_state[i]);
+                  
                   event_t event = {0};
                   if(new_input_analog_l[i] && !old_input_analog_l[i])
                   {
@@ -773,18 +810,25 @@ void I_StartTic (void)
                      RETRO_DEVICE_ID_ANALOG_Y);
 
                event_t event_mouse = {0};
-               /* halve the threshold for the right analog, since it supports finer movement */
-               int right_analog_threshold = ANALOG_THRESHOLD / 2;
-               if (rsx < -right_analog_threshold || rsx > right_analog_threshold)
+               
+               if (rsx < -analog_deadzone || rsx > analog_deadzone)
                {
+						if (rsx > analog_deadzone)
+							rsx = rsx - analog_deadzone;
+						if (rsx < -analog_deadzone)
+							rsx = rsx + analog_deadzone;
                   event_mouse.type = ev_mouse;
-                  event_mouse.data2 = rsx * ANALOG_MOUSE_MOVEMENT / ANALOG_THRESHOLD;
+                  event_mouse.data2 = ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone);
                }
 
-               if (rsy < -right_analog_threshold || rsy > right_analog_threshold)
+               if (rsy < -analog_deadzone || rsy > analog_deadzone)
                {
+						if (rsy > analog_deadzone)
+							rsy = rsy - analog_deadzone;
+						if (rsy < -analog_deadzone)
+							rsy = rsy + analog_deadzone;
                   event_mouse.type = ev_mouse;
-                  event_mouse.data3 = rsy * ANALOG_MOUSE_MOVEMENT / ANALOG_THRESHOLD;
+                  event_mouse.data3 = ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone);
                }
 
                if(event_mouse.type == ev_mouse)

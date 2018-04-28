@@ -2766,6 +2766,7 @@ enum {
 //  general_pcx,
 //  general_diskicon,
   general_uncapped,
+  general_gamma
 };
 
 enum {
@@ -2783,6 +2784,7 @@ enum {
 #define GF_X 76
 
 static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps"};
+static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4"};
 
 setup_menu_t gen_settings1[] = { // General Settings screen1
 
@@ -2790,6 +2792,9 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
 
   {"Framerate", S_CHOICE, m_null, G_X,
   G_YA + general_uncapped*8, {"uncapped_framerate"}, 0, 0, NULL, framerates},
+  
+  {"Gamma Correction", S_CHOICE, m_null, G_X,
+  G_YA + general_gamma*8, {"usegamma"}, 0, 0, NULL, gamma_lvls},
 
 #if 0
   {"PCX instead of BMP for screenshots", S_YESNO, m_null, G_X,
@@ -5056,6 +5061,10 @@ void M_ClearMenus (void)
   menuactive = mnact_inactive;
   print_warning_about_changes = 0;     // killough 8/15/98
   default_verify = 0;                  // killough 10/98
+  
+  // Have to call this here to ensure that any changes to the
+  // gamma correction level are applied immediately...
+  V_SetPalette(0);
 
   // if (!netgame && usergame && paused)
   //     sendpause = TRUE;

@@ -80,6 +80,96 @@ boolean find_recursive_on;
 // Default deadzone: 15%
 static int analog_deadzone = (int)(0.15f * ANALOG_RANGE);
 
+#define RETROPAD_CLASSIC RETRO_DEVICE_JOYPAD
+#define RETROPAD_MODERN  RETRO_DEVICE_SUBCLASS(RETRO_DEVICE_ANALOG, 2)
+
+// (number of gamepad buttons) + 1
+#define MAX_BUTTON_BINDS 17
+
+typedef struct {
+	struct retro_input_descriptor desc[MAX_BUTTON_BINDS];
+	int action_lut[MAX_BUTTON_BINDS];
+	unsigned num_buttons;
+} gamepad_layout_t;
+
+static gamepad_layout_t gp_classic = {
+	{
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "D-Pad Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Use" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Fire" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Strafe" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Toggle Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Strafe Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Strafe Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Previous Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Next Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Show/Hide Map" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Show/Hide Menu" },
+		{ 0 },
+	},
+	{
+		KEYD_SPACEBAR,   // RETRO_DEVICE_ID_JOYPAD_B      - Use
+		KEYD_CAPSLOCK,   // RETRO DEVICE_ID_JOYPAD_Y      - Toggle Run
+		KEYD_TAB,        // RETRO_DEVICE_ID_JOYPAD_SELECT - Show/Hide Map
+		KEYD_ESCAPE,     // RETRO_DEVICE_ID_JOYPAD_START  - Show/Hide Menu
+		KEYD_UPARROW,    // RETRO_DEVICE_ID_JOYPAD_UP     - D-Pad Up
+		KEYD_DOWNARROW,  // RETRO_DEVICE_ID_JOYPAD_DOWN   - D-Pad Down
+		KEYD_LEFTARROW,  // RETRO_DEVICE_ID_JOYPAD_LEFT   - D-Pad Left
+		KEYD_RIGHTARROW, // RETRO_DEVICE_ID_JOYPAD_RIGHT  - D-Pad Right
+		KEYD_RCTRL,      // RETRO_DEVICE_ID_JOYPAD_A      - Fire
+		KEYD_RALT,       // RETRO_DEVICE_ID_JOYPAD_X      - Strafe
+		',',             // RETRO_DEVICE_ID_JOYPAD_L1     - Strafe Left
+		'.',             // RETRO_DEVICE_ID_JOYPAD_R1     - Strafe Right
+		'n',             // RETRO_DEVICE_ID_JOYPAD_L2     - Previous Weapon
+		'm',             // RETRO_DEVICE_ID_JOYPAD_R2     - Next Weapon
+	},
+	14,
+};
+
+static gamepad_layout_t gp_modern = {
+	{
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "D-Pad Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Menu Cancel" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Menu Select" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Quick Load" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Quick Save" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Previous Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Next Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Use" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Fire" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "Toggle Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "180 Turn" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Show/Hide Map" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Show/Hide Menu" },
+		{ 0 },
+	},
+	{
+		KEYD_BACKSPACE,  // RETRO_DEVICE_ID_JOYPAD_B      - Menu Cancel
+		KEYD_F6,         // RETRO DEVICE_ID_JOYPAD_Y      - Quick Save
+		KEYD_TAB,        // RETRO_DEVICE_ID_JOYPAD_SELECT - Show/Hide Map
+		KEYD_ESCAPE,     // RETRO_DEVICE_ID_JOYPAD_START  - Show/Hide Menu
+		KEYD_UPARROW,    // RETRO_DEVICE_ID_JOYPAD_UP     - D-Pad Up
+		KEYD_DOWNARROW,  // RETRO_DEVICE_ID_JOYPAD_DOWN   - D-Pad Down
+		KEYD_LEFTARROW,  // RETRO_DEVICE_ID_JOYPAD_LEFT   - D-Pad Left
+		KEYD_RIGHTARROW, // RETRO_DEVICE_ID_JOYPAD_RIGHT  - D-Pad Right
+		KEYD_ENTER,      // RETRO_DEVICE_ID_JOYPAD_A      - Menu Select
+		KEYD_F9,         // RETRO_DEVICE_ID_JOYPAD_X      - Quick Load
+		'n',             // RETRO_DEVICE_ID_JOYPAD_L1     - Previous Weapon
+		'm',             // RETRO_DEVICE_ID_JOYPAD_R1     - Next Weapon
+		KEYD_SPACEBAR,   // RETRO_DEVICE_ID_JOYPAD_L2     - Use
+		KEYD_RCTRL,      // RETRO_DEVICE_ID_JOYPAD_R2     - Fire
+		KEYD_CAPSLOCK,   // RETRO_DEVICE_ID_JOYPAD_L3     - Toggle Run
+		'/',             // RETRO_DEVICE_ID_JOYPAD_R3     - 180 Turn
+	},
+	16,
+};
+
 char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
 
 static void check_system_specs(void)
@@ -145,49 +235,60 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
-   struct retro_variable variables[] = {
-      { "prboom-resolution",
-         "Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
-      { "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
-      { "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
-      { "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },
-      { NULL, NULL },
-   };
-
+	struct retro_variable variables[] = {
+		{ "prboom-resolution",
+			"Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
+		{ "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
+		{ "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
+		{ "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },
+		{ NULL, NULL },
+	};
+	
    static const struct retro_controller_description port[] = {
-      { "RetroPad", RETRO_DEVICE_JOYPAD },
-      { "RetroKeyboard/Mouse", RETRO_DEVICE_KEYBOARD },
-      { 0 },
+		{ "Gamepad Modern", RETROPAD_MODERN },
+		{ "Gamepad Classic", RETROPAD_CLASSIC },
+		{ "RetroKeyboard/Mouse", RETRO_DEVICE_KEYBOARD },
+		{ 0 },
    };
-
-   static const struct retro_controller_info ports[] = {
-      { port, 2 },
-      { NULL, 0 },
-   };
-
-   environ_cb = cb;
-
-   cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
-   cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
+	
+	static const struct retro_controller_info ports[] = {
+		{ port, 3 },
+		{ NULL, 0 },
+	};
+	
+	environ_cb = cb;
+	
+	cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
+	cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 }
 
 void retro_set_controller_port_device(unsigned port, unsigned device)
 {
-   if (port)
-      return;
-   switch (device)
-   {
-   case RETRO_DEVICE_JOYPAD:
-      doom_devices[port] = RETRO_DEVICE_JOYPAD;
-      break;
-   case RETRO_DEVICE_KEYBOARD:
-      doom_devices[port] = RETRO_DEVICE_KEYBOARD;
-      break;
-   default:
-      if (log_cb)
-         log_cb(RETRO_LOG_ERROR, "[libretro]: Invalid device, setting type to RETRO_DEVICE_JOYPAD ...\n");
-      doom_devices[port] = RETRO_DEVICE_JOYPAD;
-   }
+	if (port)
+		return;
+	
+	switch (device)
+	{
+		case RETROPAD_CLASSIC:
+			doom_devices[port] = RETROPAD_CLASSIC;
+			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_classic.desc);
+			break;
+		case RETROPAD_MODERN:
+			doom_devices[port] = RETROPAD_MODERN;
+			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_modern.desc);
+			break;
+		case RETRO_DEVICE_KEYBOARD:
+			doom_devices[port] = RETRO_DEVICE_KEYBOARD;
+			// Input descriptors are irrelevant in this case, but don't want
+			// to leave undefined...
+			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_classic.desc);
+			break;
+		default:
+			if (log_cb)
+				log_cb(RETRO_LOG_ERROR, "[libretro]: Invalid device, setting type to RETROPAD_CLASSIC ...\n");
+			doom_devices[port] = RETROPAD_CLASSIC;
+			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_classic.desc);
+	}
 }
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
@@ -369,27 +470,6 @@ bool retro_load_game(const struct retro_game_info *info)
    int argc = 0;
    static char *argv[32] = {NULL};
 
-   struct retro_input_descriptor desc[] = {
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "D-Pad Left" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Strafe" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Use" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Fire" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Toggle Run" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Strafe Left" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Strafe Right" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Previous Weapon" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Next Weapon" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Show/Hide Map" },
-      { 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Settings" },
-
-      { 0 },
-   };
-
-   environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, desc);
-
    update_variables(true);
 
    argv[argc++] = strdup("prboom");
@@ -552,23 +632,6 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
 
 /* i_video */
 
-static int action_lut[] = {
-   KEYD_RALT,         /* RETRO_DEVICE_ID_JOYPAD_B */
-   KEYD_CAPSLOCK,     /* RETRO DEVICE_ID_JOYPAD_Y */
-   KEYD_TAB,          /* RETRO_DEVICE_ID_JOYPAD_SELECT */
-   KEYD_ESCAPE,       /* RETRO_DEVICE_ID_JOYPAD_START */
-   KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
-   KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
-   KEYD_LEFTARROW,    /* RETRO_DEVICE_ID_JOYPAD_LEFT */
-   KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
-   KEYD_SPACEBAR,     /* RETRO_DEVICE_ID_JOYPAD_A */
-   KEYD_RCTRL,        /* RETRO_DEVICE_ID_JOYPAD_X */
-   ',',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
-   '.',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
-   'n',               /* RETRO_DEVICE_ID_JOYPAD_L2 */
-   'm',               /* RETRO_DEVICE_ID_JOYPAD_R2 */
-};
-
 static int left_analog_lut[] = {
    '.',               /* RETRO_DEVICE_INDEX_ANALOG_LEFT +X */
    ',',               /* RETRO_DEVICE_INDEX_ANALOG_LEFT -X */
@@ -720,6 +783,129 @@ static bool synthetic_pwm(int amplitude, int* modulation_state)
 	return true;
 }
 
+static void process_gamepad_buttons(unsigned num_buttons, int action_lut[])
+{
+	unsigned i;
+	static bool old_input[MAX_BUTTON_BINDS];
+	bool new_input[MAX_BUTTON_BINDS];
+	
+	for(i = 0; i < num_buttons; i++)
+	{
+		event_t event = {0};
+		new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
+		
+		if(new_input[i] && !old_input[i])
+		{
+			event.type = ev_keydown;
+			event.data1 = action_lut[i];
+		}
+		
+		if(!new_input[i] && old_input[i])
+		{
+			event.type = ev_keyup;
+			event.data1 = action_lut[i];
+		}
+		
+		if(event.type == ev_keydown || event.type == ev_keyup)
+			D_PostEvent(&event);
+		
+		old_input[i] = new_input[i];
+	}
+}
+
+static void process_gamepad_left_analog(void)
+{
+	unsigned i;
+	static bool old_input_analog_l[4];
+   bool new_input_analog_l[4];
+   int analog_l_amplitude[4];
+   static int analog_l_modulation_state[4];
+	
+	int lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
+	int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
+	
+	// Get movement 'amplitude' on each axis
+	// > x-axis
+	analog_l_amplitude[0] = 0;
+	analog_l_amplitude[1] = 0;
+	if (lsx > analog_deadzone)
+	{
+		// Add '1' to deal with float->int rounding accuracy loss...
+		// (Similarly, subtract '1' when lsx is negative...)
+		analog_l_amplitude[0] = 1 + pwm_period * (lsx - analog_deadzone) / (ANALOG_RANGE - analog_deadzone);
+	}
+	if (lsx < -analog_deadzone)
+	{
+		analog_l_amplitude[1] = -1 * (-1 + pwm_period * (lsx + analog_deadzone) / (ANALOG_RANGE - analog_deadzone));
+	}
+	// > y-axis
+	analog_l_amplitude[2] = 0;
+	analog_l_amplitude[3] = 0;
+	if (lsy > analog_deadzone)
+	{
+		analog_l_amplitude[2] = 1 + pwm_period * (lsy - analog_deadzone) / (ANALOG_RANGE - analog_deadzone);
+	}
+	if (lsy < -analog_deadzone)
+	{
+		analog_l_amplitude[3] = -1 * (-1 + pwm_period * (lsy + analog_deadzone) / (ANALOG_RANGE - analog_deadzone));
+	}
+	
+	for (i = 0; i < 4; i++)
+	{
+		event_t event = {0};
+		
+		new_input_analog_l[i] = synthetic_pwm(analog_l_amplitude[i], &analog_l_modulation_state[i]);
+		
+		if(new_input_analog_l[i] && !old_input_analog_l[i])
+		{
+			event.type = ev_keydown;
+			event.data1 = left_analog_lut[i];
+		}
+		
+		if(!new_input_analog_l[i] && old_input_analog_l[i])
+		{
+			event.type = ev_keyup;
+			event.data1 = left_analog_lut[i];
+		}
+		
+		if(event.type == ev_keydown || event.type == ev_keyup)
+			D_PostEvent(&event);
+		
+		old_input_analog_l[i] = new_input_analog_l[i];
+	}
+}
+
+static void process_gamepad_right_analog(void)
+{
+	int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
+	int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
+	
+	event_t event_mouse = {0};
+	
+	if (rsx < -analog_deadzone || rsx > analog_deadzone)
+	{
+		if (rsx > analog_deadzone)
+			rsx = rsx - analog_deadzone;
+		if (rsx < -analog_deadzone)
+			rsx = rsx + analog_deadzone;
+		event_mouse.type = ev_mouse;
+		event_mouse.data2 = ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone);
+	}
+	
+	if (rsy < -analog_deadzone || rsy > analog_deadzone)
+	{
+		if (rsy > analog_deadzone)
+			rsy = rsy - analog_deadzone;
+		if (rsy < -analog_deadzone)
+			rsy = rsy + analog_deadzone;
+		event_mouse.type = ev_mouse;
+		event_mouse.data3 = ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone);
+	}
+	
+	if(event_mouse.type == ev_mouse)
+		D_PostEvent(&event_mouse);
+}
+
 void I_StartTic (void)
 {
    int port;
@@ -729,12 +915,6 @@ void I_StartTic (void)
    int mx, my;
    static bool old_input_kb[117];
    bool new_input_kb[117];
-   static bool old_input[20];
-   bool new_input[20];
-   static bool old_input_analog_l[4];
-   bool new_input_analog_l[4];
-   int analog_l_amplitude[4];
-   static int analog_l_modulation_state[4];
 
    input_poll_cb();
 
@@ -745,124 +925,14 @@ void I_StartTic (void)
 
       switch (doom_devices[port])
       {
-      case RETRO_DEVICE_JOYPAD:
-         {
-            /* Gamepad Input */
-
-            for(i = 0; i < 14; i++)
-            {
-               event_t event = {0};
-               new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
-
-               if(new_input[i] && !old_input[i])
-               {
-                  event.type = ev_keydown;
-                  event.data1 = action_lut[i];
-               }
-
-               if(!new_input[i] && old_input[i])
-               {
-                  event.type = ev_keyup;
-                  event.data1 = action_lut[i];
-               }
-
-               if(event.type == ev_keydown || event.type == ev_keyup)
-                  D_PostEvent(&event);
-
-               old_input[i] = new_input[i];
-            }
-
-            {
-               int lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                     RETRO_DEVICE_ID_ANALOG_X);
-               int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT,
-                     RETRO_DEVICE_ID_ANALOG_Y);
-               
-					// Get movement 'amplitude' on each axis
-					// > x-axis
-					analog_l_amplitude[0] = 0;
-					analog_l_amplitude[1] = 0;
-					if (lsx > analog_deadzone)
-					{
-						// Add '1' to deal with float->int rounding accuracy loss...
-						// (Similarly, subtract '1' when lsx is negative...)
-						analog_l_amplitude[0] = 1 + pwm_period * (lsx - analog_deadzone) / (ANALOG_RANGE - analog_deadzone);
-					}
-					if (lsx < -analog_deadzone)
-					{
-						analog_l_amplitude[1] = -1 * (-1 + pwm_period * (lsx + analog_deadzone) / (ANALOG_RANGE - analog_deadzone));
-					}
-					// > y-axis
-					analog_l_amplitude[2] = 0;
-					analog_l_amplitude[3] = 0;
-					if (lsy > analog_deadzone)
-					{
-						analog_l_amplitude[2] = 1 + pwm_period * (lsy - analog_deadzone) / (ANALOG_RANGE - analog_deadzone);
-					}
-					if (lsy < -analog_deadzone)
-					{
-						analog_l_amplitude[3] = -1 * (-1 + pwm_period * (lsy + analog_deadzone) / (ANALOG_RANGE - analog_deadzone));
-					}
-
-               for (i = 0; i < 4; i++)
-               {
-                  event_t event = {0};
-
-                  new_input_analog_l[i] = synthetic_pwm(analog_l_amplitude[i], &analog_l_modulation_state[i]);
-                  
-                  if(new_input_analog_l[i] && !old_input_analog_l[i])
-                  {
-                     event.type = ev_keydown;
-                     event.data1 = left_analog_lut[i];
-                  }
-
-                  if(!new_input_analog_l[i] && old_input_analog_l[i])
-                  {
-                     event.type = ev_keyup;
-                     event.data1 = left_analog_lut[i];
-                  }
-
-                  if(event.type == ev_keydown || event.type == ev_keyup)
-                     D_PostEvent(&event);
-
-                  old_input_analog_l[i] = new_input_analog_l[i];
-               }
-            }
-
-            {
-               int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                     RETRO_DEVICE_ID_ANALOG_X);
-               int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT,
-                     RETRO_DEVICE_ID_ANALOG_Y);
-
-               event_t event_mouse = {0};
-               
-               if (rsx < -analog_deadzone || rsx > analog_deadzone)
-               {
-						if (rsx > analog_deadzone)
-							rsx = rsx - analog_deadzone;
-						if (rsx < -analog_deadzone)
-							rsx = rsx + analog_deadzone;
-                  event_mouse.type = ev_mouse;
-                  event_mouse.data2 = ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone);
-               }
-
-               if (rsy < -analog_deadzone || rsy > analog_deadzone)
-               {
-						if (rsy > analog_deadzone)
-							rsy = rsy - analog_deadzone;
-						if (rsy < -analog_deadzone)
-							rsy = rsy + analog_deadzone;
-                  event_mouse.type = ev_mouse;
-                  event_mouse.data3 = ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone);
-               }
-
-               if(event_mouse.type == ev_mouse)
-                  D_PostEvent(&event_mouse);
-            }
-         }
-         break;
-
+		case RETROPAD_CLASSIC:
+			process_gamepad_buttons(gp_classic.num_buttons, gp_classic.action_lut);
+			break;
+		case RETROPAD_MODERN:
+			process_gamepad_buttons(gp_modern.num_buttons, gp_modern.action_lut);
+			process_gamepad_left_analog();
+			process_gamepad_right_analog();
+			break;
       case RETRO_DEVICE_KEYBOARD:
          {
             /* Keyboard Input */

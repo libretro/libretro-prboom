@@ -101,7 +101,7 @@ static gamepad_layout_t gp_classic = {
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Use" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Fire" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Strafe" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Toggle Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Run" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Strafe Left" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Strafe Right" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Previous Weapon" },
@@ -112,7 +112,7 @@ static gamepad_layout_t gp_classic = {
 	},
 	{
 		KEYD_SPACEBAR,   // RETRO_DEVICE_ID_JOYPAD_B      - Use
-		KEYD_CAPSLOCK,   // RETRO DEVICE_ID_JOYPAD_Y      - Toggle Run
+		KEYD_RSHIFT,     // RETRO DEVICE_ID_JOYPAD_Y      - Run
 		KEYD_TAB,        // RETRO_DEVICE_ID_JOYPAD_SELECT - Show/Hide Map
 		KEYD_ESCAPE,     // RETRO_DEVICE_ID_JOYPAD_START  - Show/Hide Menu
 		KEYD_UPARROW,    // RETRO_DEVICE_ID_JOYPAD_UP     - D-Pad Up

@@ -685,10 +685,10 @@ static char *FindIWADFile(void)
      lprintf(LO_ALWAYS, "myargv[%d]: %s\n", x, myargv[x]);
 
   if (i && (++i < myargc)) {
-    iwad = I_FindFile(myargv[i], ".wad");
+    iwad = I_FindFile(myargv[i], NULL);
   } else {
     for (i=0; !iwad && i<nstandard_iwads; i++)
-      iwad = I_FindFile(standard_iwads[i], ".wad");
+      iwad = I_FindFile(standard_iwads[i], NULL);
   }
   return iwad;
 }
@@ -1068,7 +1068,7 @@ bool D_DoomMainSetup(void)
 
   // Load prboom.wad after IWAD but before everything else
   {
-    char *data_wad_path = I_FindFile(PACKAGE ".wad", ".wad");
+    char *data_wad_path = I_FindFile(PACKAGE ".wad", NULL);
 
     if (!data_wad_path)
     {

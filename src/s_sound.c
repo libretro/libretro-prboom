@@ -496,7 +496,7 @@ void S_ChangeMusic(int musicnum, int looping)
     {
       // cournia - check to see if we can play a higher quality music file
       //           rather than the default MIDI
-      music_filename = I_FindFile(S_music_files[musicnum], "");
+      music_filename = I_FindFile(S_music_files[musicnum], NULL);
       if (music_filename)
         {
           music_file_failed = I_RegisterMusic(music_filename, music);

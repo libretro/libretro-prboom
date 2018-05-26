@@ -1154,7 +1154,7 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
    FILE * file;
    char * p;
    /* Precalculate a length we will need in the loop */
-   size_t pl = strlen(wfname) + strlen(ext) + 4;
+   size_t pl = strlen(wfname) + (ext && strlen(ext)) + 4;
 
    if( dir == NULL ) {
       p = malloc(pl);
@@ -1165,12 +1165,11 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
      sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
    }
 
-   file = fopen(p, "rb");
-   if (!file)
+   if (ext && ext[0] != '\0')
    {
       strcat(p, ext);
-      file = fopen(p, "rb");
    }
+   file = fopen(p, "rb");
 
    if (file)
    {

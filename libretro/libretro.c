@@ -87,7 +87,7 @@ static int analog_deadzone = (int)(0.15f * ANALOG_RANGE);
 // (number of gamepad buttons) + 1
 #define MAX_BUTTON_BINDS 17
 
-// Menu enter and back buttons
+// menu enter and back buttons
 boolean menu_enter_a;
 boolean menu_enter_b;
 boolean menu_enter_x;
@@ -117,8 +117,8 @@ static gamepad_layout_t gp_classic = {
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Strafe Right" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Previous Weapon" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Next Weapon" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "Toggle Run" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "180 Turn" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "Toggle Run" }, // added in case anyone want to use toggle run instead of press to run with classic layout
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "180 Turn" }, // added in case anyone want it in classic layout
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Show/Hide Map" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Show/Hide Menu" },
 		{ 0 },
@@ -138,8 +138,8 @@ static gamepad_layout_t gp_classic = {
 		'.',             // RETRO_DEVICE_ID_JOYPAD_R1     - Strafe Right
 		'n',             // RETRO_DEVICE_ID_JOYPAD_L2     - Previous Weapon
 		'm',             // RETRO_DEVICE_ID_JOYPAD_R2     - Next Weapon
-		KEYD_CAPSLOCK,   // RETRO_DEVICE_ID_JOYPAD_L3     - Toggle Run
-		'/',             // RETRO_DEVICE_ID_JOYPAD_R3     - 180 Turn
+		KEYD_CAPSLOCK,   // RETRO_DEVICE_ID_JOYPAD_L3     - Toggle Run - added in case anyone want to use toggle run instead of press to run with classic layout
+		'/',             // RETRO_DEVICE_ID_JOYPAD_R3     - 180 Turn - added in case anyone want it in classic layout
 	},
 	16,
 };
@@ -164,7 +164,7 @@ static gamepad_layout_t gp_modern = {
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Show/Hide Menu" },
 		{ 0 },
 	},
-	{
+	{ // changed to match with doom classic on ps3
 		KEYD_SPACEBAR,   // RETRO_DEVICE_ID_JOYPAD_B      - Use
 		KEYD_TAB,        // RETRO DEVICE_ID_JOYPAD_Y      - Show/Hide Map
 		KEYD_ENTER,      // RETRO_DEVICE_ID_JOYPAD_SELECT - Show Last Message
@@ -256,8 +256,8 @@ void retro_set_environment(retro_environment_t cb)
 		{ "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
 		{ "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
 		{ "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },
-        { "prboom-menu_enter_button", "Menu enter button; B|X|Y|A" },
-        { "prboom-menu_back_button", "Menu back button; A|B|X|Y" },
+        { "prboom-menu_enter_button", "Menu enter button; B|X|Y|A" }, // menu enter as core option to be able to map it independently of in-game mappings
+        { "prboom-menu_back_button", "Menu back button; A|B|X|Y" }, // menu back as core option to be able to map it independently of in-game mappings
 		{ NULL, NULL },
 	};
 	
@@ -400,6 +400,7 @@ static void update_variables(bool startup)
 		analog_deadzone = (int)(atoi(var.value) * 0.01f * ANALOG_RANGE);
    }
 
+// get menu buttons core option values
    var.key = "prboom-menu_enter_button";
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -717,6 +718,7 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
 
 /* i_video */
 
+// ensure that only the essential keys are mapped on the menu to avoid unwanted key presses
 static int menu_lut[] = {
    ' ',               /* RETRO_DEVICE_ID_JOYPAD_B */
    ' ',               /* RETRO DEVICE_ID_JOYPAD_Y */
@@ -892,36 +894,40 @@ static void process_gamepad_buttons(unsigned num_buttons, int action_lut[])
 	unsigned i;
 	static bool old_input[MAX_BUTTON_BINDS];
 	bool new_input[MAX_BUTTON_BINDS];
+    bool retro_joypad_a = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A); // shortcuts for later
+    bool retro_joypad_b = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
+    bool retro_joypad_x = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X);
+    bool retro_joypad_y = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y);
 	
 	for(i = 0; i < num_buttons; i++)
 	{
 		event_t event = {0};
 		new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
-		
+
 		if(new_input[i] && !old_input[i])
 		{
 			event.type = ev_keydown;
-            if (!menuactive)
-                event.data1 = action_lut[i];
-            else if ((menu_enter_a && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A)) || (menu_enter_b && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B)) || (menu_enter_x && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X)) || (menu_enter_y && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y)))
-                event.data1 = KEYD_ENTER;
-            else if ((menu_back_a && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A)) || (menu_back_b && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B)) || (menu_back_x && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X)) || (menu_back_y && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y)))
-                event.data1 = KEYD_BACKSPACE;
-            else
-                event.data1 = menu_lut[i];
+			if (menuactive && ((menu_enter_a && retro_joypad_a) || (menu_enter_b && retro_joypad_b) || (menu_enter_x && retro_joypad_x) || (menu_enter_y && retro_joypad_y)))
+				event.data1 = KEYD_ENTER; // press enter only in menus and according to menu enter button core option
+			else if (menuactive && ((menu_back_a && retro_joypad_a) || (menu_back_b && retro_joypad_b) || (menu_back_x && retro_joypad_x) || (menu_back_y && retro_joypad_y)))
+				event.data1 = KEYD_BACKSPACE; // press backspace only in menus and according to menu back button core option
+			else if (menuactive)
+				event.data1 = menu_lut[i]; // use menu_lut only in menus
+			else
+				event.data1 = action_lut[i];
 		}
 		
 		if(!new_input[i] && old_input[i])
 		{
 			event.type = ev_keyup;
-            if (!menuactive)
-                event.data1 = action_lut[i];
-            else if ((menuactive && menu_enter_a && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A)) || (menuactive && menu_enter_b && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B)) || (menuactive && menu_enter_x && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X)) || (menuactive && menu_enter_y && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y)))
-                event.data1 = KEYD_ENTER;
-            else if ((menuactive && menu_back_a && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A)) || (menuactive && menu_back_b && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B)) || (menuactive && menu_back_x && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X)) || (menuactive && menu_back_y && input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y)))
-                event.data1 = KEYD_BACKSPACE;
-            else
-                event.data1 = menu_lut[i];
+			if (menuactive)
+			{
+				event.data1 = KEYD_ENTER; //depress menu keys
+				event.data1 = KEYD_BACKSPACE;
+				event.data1 = menu_lut[i];
+			}
+			else
+				event.data1 = action_lut[i];
 		}
 		
 		if(event.type == ev_keydown || event.type == ev_keyup)

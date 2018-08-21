@@ -27,6 +27,7 @@
 #include "../src/w_wad.h"
 #include "../src/r_draw.h"
 #include "../src/lprintf.h"
+#include "../src/doomstat.h"
 
 void I_MPPlayer_Init(void);
 void I_MPPlayer_Free(void);
@@ -86,6 +87,16 @@ static int analog_deadzone = (int)(0.15f * ANALOG_RANGE);
 // (number of gamepad buttons) + 1
 #define MAX_BUTTON_BINDS 17
 
+// menu enter and back buttons
+boolean menu_enter_a;
+boolean menu_enter_b;
+boolean menu_enter_x;
+boolean menu_enter_y;
+boolean menu_back_a;
+boolean menu_back_b;
+boolean menu_back_x;
+boolean menu_back_y;
+
 typedef struct {
 	struct retro_input_descriptor desc[MAX_BUTTON_BINDS];
 	int action_lut[MAX_BUTTON_BINDS];
@@ -98,20 +109,22 @@ static gamepad_layout_t gp_classic = {
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Use" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Fire" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Strafe" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Strafe" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Use" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Fire" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Run" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Strafe Left" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Strafe Right" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Previous Weapon" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Next Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "Toggle Run" }, // added in case anyone want to use toggle run instead of press to run with classic layout
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "180 Turn" }, // added in case anyone want it in classic layout
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Show/Hide Map" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Show/Hide Menu" },
 		{ 0 },
 	},
 	{
-		KEYD_SPACEBAR,   // RETRO_DEVICE_ID_JOYPAD_B      - Use
+		KEYD_RALT,       // RETRO_DEVICE_ID_JOYPAD_B      - Strafe
 		KEYD_RSHIFT,     // RETRO DEVICE_ID_JOYPAD_Y      - Run
 		KEYD_TAB,        // RETRO_DEVICE_ID_JOYPAD_SELECT - Show/Hide Map
 		KEYD_ESCAPE,     // RETRO_DEVICE_ID_JOYPAD_START  - Show/Hide Menu
@@ -119,14 +132,16 @@ static gamepad_layout_t gp_classic = {
 		KEYD_DOWNARROW,  // RETRO_DEVICE_ID_JOYPAD_DOWN   - D-Pad Down
 		KEYD_LEFTARROW,  // RETRO_DEVICE_ID_JOYPAD_LEFT   - D-Pad Left
 		KEYD_RIGHTARROW, // RETRO_DEVICE_ID_JOYPAD_RIGHT  - D-Pad Right
-		KEYD_RCTRL,      // RETRO_DEVICE_ID_JOYPAD_A      - Fire
-		KEYD_RALT,       // RETRO_DEVICE_ID_JOYPAD_X      - Strafe
+		KEYD_SPACEBAR,   // RETRO_DEVICE_ID_JOYPAD_A      - Use
+		KEYD_RCTRL,      // RETRO_DEVICE_ID_JOYPAD_X      - Fire
 		',',             // RETRO_DEVICE_ID_JOYPAD_L1     - Strafe Left
 		'.',             // RETRO_DEVICE_ID_JOYPAD_R1     - Strafe Right
 		'n',             // RETRO_DEVICE_ID_JOYPAD_L2     - Previous Weapon
 		'm',             // RETRO_DEVICE_ID_JOYPAD_R2     - Next Weapon
+		KEYD_CAPSLOCK,   // RETRO_DEVICE_ID_JOYPAD_L3     - Toggle Run - added in case anyone want to use toggle run instead of press to run with classic layout
+		'/',             // RETRO_DEVICE_ID_JOYPAD_R3     - 180 Turn - added in case anyone want it in classic layout
 	},
-	14,
+	16,
 };
 
 static gamepad_layout_t gp_modern = {
@@ -135,35 +150,35 @@ static gamepad_layout_t gp_modern = {
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Menu Cancel" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Menu Select" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Quick Load" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Quick Save" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Previous Weapon" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Next Weapon" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Use" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Fire" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Use" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Next Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Previous Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Show/Hide Map" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Fire" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Quick Save" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Quick Load" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "Toggle Run" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "180 Turn" },
-		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Show/Hide Map" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Show Last Message" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Show/Hide Menu" },
 		{ 0 },
 	},
-	{
-		KEYD_BACKSPACE,  // RETRO_DEVICE_ID_JOYPAD_B      - Menu Cancel
-		KEYD_F6,         // RETRO DEVICE_ID_JOYPAD_Y      - Quick Save
-		KEYD_TAB,        // RETRO_DEVICE_ID_JOYPAD_SELECT - Show/Hide Map
+	{ // changed to match with doom classic on ps3
+		KEYD_SPACEBAR,   // RETRO_DEVICE_ID_JOYPAD_B      - Use
+		KEYD_TAB,        // RETRO DEVICE_ID_JOYPAD_Y      - Show/Hide Map
+		KEYD_ENTER,      // RETRO_DEVICE_ID_JOYPAD_SELECT - Show Last Message
 		KEYD_ESCAPE,     // RETRO_DEVICE_ID_JOYPAD_START  - Show/Hide Menu
 		KEYD_UPARROW,    // RETRO_DEVICE_ID_JOYPAD_UP     - D-Pad Up
 		KEYD_DOWNARROW,  // RETRO_DEVICE_ID_JOYPAD_DOWN   - D-Pad Down
 		KEYD_LEFTARROW,  // RETRO_DEVICE_ID_JOYPAD_LEFT   - D-Pad Left
 		KEYD_RIGHTARROW, // RETRO_DEVICE_ID_JOYPAD_RIGHT  - D-Pad Right
-		KEYD_ENTER,      // RETRO_DEVICE_ID_JOYPAD_A      - Menu Select
-		KEYD_F9,         // RETRO_DEVICE_ID_JOYPAD_X      - Quick Load
-		'n',             // RETRO_DEVICE_ID_JOYPAD_L1     - Previous Weapon
-		'm',             // RETRO_DEVICE_ID_JOYPAD_R1     - Next Weapon
-		KEYD_SPACEBAR,   // RETRO_DEVICE_ID_JOYPAD_L2     - Use
-		KEYD_RCTRL,      // RETRO_DEVICE_ID_JOYPAD_R2     - Fire
+		'm',             // RETRO_DEVICE_ID_JOYPAD_A      - Next Weapon
+		'n',             // RETRO_DEVICE_ID_JOYPAD_X      - Previous Weapon
+		KEYD_RSHIFT,     // RETRO_DEVICE_ID_JOYPAD_L1     - Run
+		KEYD_RCTRL,      // RETRO_DEVICE_ID_JOYPAD_R1     - Fire
+		KEYD_F6,         // RETRO_DEVICE_ID_JOYPAD_L2     - Quick Save
+		KEYD_F9,         // RETRO_DEVICE_ID_JOYPAD_R2     - Quick Load
 		KEYD_CAPSLOCK,   // RETRO_DEVICE_ID_JOYPAD_L3     - Toggle Run
 		'/',             // RETRO_DEVICE_ID_JOYPAD_R3     - 180 Turn
 	},
@@ -241,6 +256,8 @@ void retro_set_environment(retro_environment_t cb)
 		{ "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
 		{ "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
 		{ "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },
+        { "prboom-menu_enter_button", "Menu enter button; B|X|Y|A" }, // menu enter as core option to be able to map it independently of in-game mappings
+        { "prboom-menu_back_button", "Menu back button; A|B|X|Y" }, // menu back as core option to be able to map it independently of in-game mappings
 		{ NULL, NULL },
 	};
 	
@@ -381,6 +398,75 @@ static void update_variables(bool startup)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
    {
 		analog_deadzone = (int)(atoi(var.value) * 0.01f * ANALOG_RANGE);
+   }
+
+// get menu buttons core option values
+   var.key = "prboom-menu_enter_button";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "A"))
+         {
+         menu_enter_a = true;
+         menu_enter_b = false;
+         menu_enter_x = false;
+         menu_enter_y = false;
+         }
+      else if (!strcmp(var.value, "B"))
+         {
+         menu_enter_a = false;
+         menu_enter_b = true;
+         menu_enter_x = false;
+         menu_enter_y = false;
+         }
+      else if (!strcmp(var.value, "X"))
+         {
+         menu_enter_a = false;
+         menu_enter_b = false;
+         menu_enter_x = true;
+         menu_enter_y = false;
+         }
+      else if (!strcmp(var.value, "Y"))
+         {
+         menu_enter_a = false;
+         menu_enter_b = false;
+         menu_enter_x = false;
+         menu_enter_y = true;
+         }
+    }
+
+   var.key = "prboom-menu_back_button";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "A"))
+         {
+         menu_back_a = true;
+         menu_back_b = false;
+         menu_back_x = false;
+         menu_back_y = false;
+         }
+      else if (!strcmp(var.value, "B"))
+         {
+         menu_back_a = false;
+         menu_back_b = true;
+         menu_back_x = false;
+         menu_back_y = false;
+         }
+      else if (!strcmp(var.value, "X"))
+         {
+         menu_back_a = false;
+         menu_back_b = false;
+         menu_back_x = true;
+         menu_back_y = false;
+         }
+      else if (!strcmp(var.value, "Y"))
+         {
+         menu_back_a = false;
+         menu_back_b = false;
+         menu_back_x = false;
+         menu_back_y = true;
+         }
    }
 }
 
@@ -632,6 +718,26 @@ void retro_cheat_set(unsigned index, bool enabled, const char *code)
 
 /* i_video */
 
+// ensure that only the essential keys are mapped on the menu to avoid unwanted key presses
+static int menu_lut[] = {
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_B */
+   ' ',               /* RETRO DEVICE_ID_JOYPAD_Y */
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_SELECT */
+   KEYD_ESCAPE,       /* RETRO_DEVICE_ID_JOYPAD_START */
+   KEYD_UPARROW,      /* RETRO_DEVICE_ID_JOYPAD_UP */
+   KEYD_DOWNARROW,    /* RETRO_DEVICE_ID_JOYPAD_DOWN */
+   KEYD_LEFTARROW,    /* RETRO_DEVICE_ID_JOYPAD_LEFT */
+   KEYD_RIGHTARROW,   /* RETRO_DEVICE_ID_JOYPAD_RIGHT */
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_A */
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_X */
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_L1 */
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_R1 */
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_L2 */
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_R2 */
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_L3 */
+   ' ',               /* RETRO_DEVICE_ID_JOYPAD_R3 */
+};
+
 static int left_analog_lut[] = {
    '.',               /* RETRO_DEVICE_INDEX_ANALOG_LEFT +X */
    ',',               /* RETRO_DEVICE_INDEX_ANALOG_LEFT -X */
@@ -788,22 +894,40 @@ static void process_gamepad_buttons(unsigned num_buttons, int action_lut[])
 	unsigned i;
 	static bool old_input[MAX_BUTTON_BINDS];
 	bool new_input[MAX_BUTTON_BINDS];
+    bool retro_joypad_a = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A); // shortcuts for later
+    bool retro_joypad_b = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
+    bool retro_joypad_x = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X);
+    bool retro_joypad_y = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y);
 	
 	for(i = 0; i < num_buttons; i++)
 	{
 		event_t event = {0};
 		new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
-		
+
 		if(new_input[i] && !old_input[i])
 		{
 			event.type = ev_keydown;
-			event.data1 = action_lut[i];
+			if (menuactive && ((menu_enter_a && retro_joypad_a) || (menu_enter_b && retro_joypad_b) || (menu_enter_x && retro_joypad_x) || (menu_enter_y && retro_joypad_y)))
+				event.data1 = KEYD_ENTER; // press enter only in menus and according to menu enter button core option
+			else if (menuactive && ((menu_back_a && retro_joypad_a) || (menu_back_b && retro_joypad_b) || (menu_back_x && retro_joypad_x) || (menu_back_y && retro_joypad_y)))
+				event.data1 = KEYD_BACKSPACE; // press backspace only in menus and according to menu back button core option
+			else if (menuactive)
+				event.data1 = menu_lut[i]; // use menu_lut only in menus
+			else
+				event.data1 = action_lut[i];
 		}
 		
 		if(!new_input[i] && old_input[i])
 		{
 			event.type = ev_keyup;
-			event.data1 = action_lut[i];
+			if (menuactive)
+			{
+				event.data1 = KEYD_ENTER; //depress menu keys
+				event.data1 = KEYD_BACKSPACE;
+				event.data1 = menu_lut[i];
+			}
+			else
+				event.data1 = action_lut[i];
 		}
 		
 		if(event.type == ev_keydown || event.type == ev_keyup)

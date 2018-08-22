@@ -1003,7 +1003,24 @@ static void process_gamepad_right_analog(void)
 {
 	int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
 	int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
-	
+	bool run_key;
+	extern int autorun;
+	int analog_turn_speed;
+
+	// retrieve run key status
+	if (doom_devices[0] == RETROPAD_CLASSIC)
+		run_key = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y);
+	else if (doom_devices[0] == RETROPAD_MODERN)
+		run_key = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L);
+	else
+		run_key = 0;
+
+	// make the run key invert autorun behavior if both are active
+	if ((autorun && !run_key) || (!autorun && run_key))
+		analog_turn_speed = 2;
+	else
+		analog_turn_speed = 1;
+
 	event_t event_mouse = {0};
 	
 	if (rsx < -analog_deadzone || rsx > analog_deadzone)
@@ -1013,7 +1030,7 @@ static void process_gamepad_right_analog(void)
 		if (rsx < -analog_deadzone)
 			rsx = rsx + analog_deadzone;
 		event_mouse.type = ev_mouse;
-		event_mouse.data2 = ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone);
+		event_mouse.data2 = (ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone)) * analog_turn_speed;
 	}
 	
 	if (rsy < -analog_deadzone || rsy > analog_deadzone)
@@ -1023,7 +1040,7 @@ static void process_gamepad_right_analog(void)
 		if (rsy < -analog_deadzone)
 			rsy = rsy + analog_deadzone;
 		event_mouse.type = ev_mouse;
-		event_mouse.data3 = ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone);
+		event_mouse.data3 = (ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone)) * analog_turn_speed;
 	}
 	
 	if(event_mouse.type == ev_mouse)

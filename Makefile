@@ -333,6 +333,7 @@ PSS_STYLE :=2
 LDFLAGS += -DLL
 LIBS =
 CFLAGS += -DHAVE_STRLWR
+CFLAGS += -DFPM_64BIT
 # Windows MSVC 2010 x86
 else ifeq ($(platform), windows_msvc2010_x86)
 	CC  = cl.exe

@@ -1225,7 +1225,7 @@ bool D_DoomMainSetup(void)
 
       if (!(fname && *fname)) continue;
       // Filename is now stored as a zero terminated string
-      fpath = I_FindFile(fname, ".wad");
+      fpath = I_FindFile(fname, NULL);
       if (!fpath)
         lprintf(LO_WARN, "Failed to autoload %s\n", fname);
       else {
@@ -1307,7 +1307,7 @@ bool D_DoomMainSetup(void)
 
       if (!(fname && *fname)) continue;
       // Filename is now stored as a zero terminated string
-      fpath = I_FindFile(fname, ".bex");
+      fpath = I_FindFile(fname, NULL);
       if (!fpath)
         lprintf(LO_WARN, "Failed to autoload %s\n", fname);
       else {

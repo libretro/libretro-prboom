@@ -306,6 +306,7 @@ CFLAGS   += -D_XBOX -D_XBOX360
 CXXFLAGS += -D_XBOX -D_XBOX360
 STATIC_LINKING=1
 HAS_GCC := 0
+CFLAGS += -DHAVE_STRLWR
 
 # Windows MSVC 2010 x64
 else ifeq ($(platform), windows_msvc2010_x64)
@@ -331,6 +332,7 @@ TARGET := $(TARGET_NAME)_libretro.dll
 PSS_STYLE :=2
 LDFLAGS += -DLL
 LIBS =
+CFLAGS += -DHAVE_STRLWR
 # Windows MSVC 2010 x86
 else ifeq ($(platform), windows_msvc2010_x86)
 	CC  = cl.exe
@@ -355,6 +357,7 @@ TARGET := $(TARGET_NAME)_libretro.dll
 PSS_STYLE :=2
 LDFLAGS += -DLL
 LIBS =
+CFLAGS += -DHAVE_STRLWR
 # Windows MSVC 2005 x86
 else ifeq ($(platform), windows_msvc2005_x86)
 	CC  = cl.exe

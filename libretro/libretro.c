@@ -1006,8 +1006,9 @@ static void process_gamepad_right_analog(void)
 	bool run_key;
 	extern int autorun;
 	int analog_turn_speed;
+	event_t event_mouse = {0};
 
-	// retrieve run key status
+	/* retrieve run key status */
 	if (doom_devices[0] == RETROPAD_CLASSIC)
 		run_key = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y);
 	else if (doom_devices[0] == RETROPAD_MODERN)
@@ -1015,14 +1016,12 @@ static void process_gamepad_right_analog(void)
 	else
 		run_key = 0;
 
-	// make the run key invert autorun behavior if both are active
+	/* make the run key invert autorun behavior if both are active */
 	if ((autorun && !run_key) || (!autorun && run_key))
 		analog_turn_speed = 2;
 	else
 		analog_turn_speed = 1;
 
-	event_t event_mouse = {0};
-	
 	if (rsx < -analog_deadzone || rsx > analog_deadzone)
 	{
 		if (rsx > analog_deadzone)

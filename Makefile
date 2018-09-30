@@ -139,6 +139,20 @@ else ifeq ($(platform), qnx)
 	AR = qcc -Vgcc_ntoarmv7le
    CFLAGS += -DHAVE_STRLWR
 	CFLAGS += -D__BLACKBERRY_QNX__ -marm -mcpu=cortex-a9 -mfpu=neon -mfloat-abi=softfp
+# Nintendo Switch (libnx)
+else ifeq ($(platform), libnx)
+    include $(DEVKITPRO)/libnx/switch_rules
+    EXT=a
+    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
+    DEFINES := -DSWITCH=1 -U__linux__ -U__linux -DRARCH_INTERNAL
+    CFLAGS	:=	 $(DEFINES) -g -O3 \
+                 -fPIE -I$(LIBNX)/include/ -ffunction-sections -fdata-sections -ftls-model=local-exec -Wl,--allow-multiple-definition -specs=$(LIBNX)/switch.specs
+    CFLAGS += $(INCDIRS)
+    CFLAGS	+=	-D__SWITCH__ -DHAVE_LIBNX -march=armv8-a -mtune=cortex-a57 -mtp=soft
+    CXXFLAGS := $(ASFLAGS) $(CFLAGS) -fno-rtti -std=gnu++11
+	 CFLAGS += -DHAVE_STRLWR
+    CFLAGS += -std=gnu11
+    STATIC_LINKING = 1
 else ifeq ($(platform), ps3)
 	EXT=a
    TARGET := $(TARGET_NAME)_libretro_ps3.$(EXT)

@@ -27,7 +27,7 @@
 #define SAMPLECOUNT_35		((4 * 11025) / 35)
 #define SAMPLECOUNT_40		((4 * 11025) / 40)
 #define SAMPLECOUNT_50		((4 * 11025) / 50)
-#define SAMPLECOUNT_60		((4 * 11025) / 60)
+#define SAMPLECOUNT_60		((4 * 11025) / 120)
 #define NUM_CHANNELS		32
 #define BUFMUL           4
 #define MIXBUFFERSIZE   (SAMPLECOUNT_35*BUFMUL)

@@ -238,7 +238,7 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
-   info->timing.fps = 60.0;
+   info->timing.fps = 120.0;
    info->timing.sample_rate = 44100.0;
    info->geometry.base_width = SCREENWIDTH;
    info->geometry.base_height = SCREENHEIGHT;
@@ -1258,11 +1258,7 @@ unsigned long I_GetRandomTimeSeed(void)
 */
 const char* I_SigString(char* buf, size_t sz, int signum)
 {
-#ifdef HAVE_SNPRINTF
    snprintf(buf,sz,"signal %d",signum);
-#else
-   sprintf(buf,"signal %d",signum);
-#endif
    return buf;
 }
 

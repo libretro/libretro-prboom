@@ -31,9 +31,6 @@ extern int SCREENHEIGHT;
 
 #endif
 
-/* Define to 1 if you have the `snprintf' function. */
-#define HAVE_SNPRINTF 1
-
 /* Define to 1 if you have the `vsnprintf' function. */
 #if !defined(_XBOX1) && _MSC_VER != 1310
 #define HAVE_VSNPRINTF 1
@@ -80,7 +77,3 @@ extern int SCREENHEIGHT;
 
 /* Define to strncasecmp, if we have it */
 #define strnicmp strncasecmp
-
-#ifdef _MSC_VER
-#define snprintf _snprintf
-#endif

@@ -20,8 +20,6 @@
  * so by contacting: Underbit Technologies, Inc. <info@underbit.com>
  */
 
-# define FPM_INTEL
-
 /* Id: version.h,v 1.26 2004/01/23 09:41:33 rob Exp */
 
 # ifndef LIBMAD_VERSION_H

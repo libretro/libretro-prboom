@@ -27,7 +27,8 @@
 #define SAMPLECOUNT_35		((4 * 11025) / 35)
 #define SAMPLECOUNT_40		((4 * 11025) / 40)
 #define SAMPLECOUNT_50		((4 * 11025) / 50)
-#define SAMPLECOUNT_60		((4 * 11025) / 120)
+#define SAMPLECOUNT_60		((4 * 11025) / 60)
+#define SAMPLECOUNT_120 	((4 * 11025) / 120)
 #define NUM_CHANNELS		32
 #define BUFMUL           4
 #define MIXBUFFERSIZE   (SAMPLECOUNT_35*BUFMUL)
@@ -131,45 +132,45 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
     uint8_t *sfxlump_data, *sfxlump_sound, *padded_sfx_data;
     uint16_t orig_rate;
     float times;
-    
+
     sprintf (sfxlump_name, "DS%s", sfxname);
-    
+
     // check if the sound lump exists
     if (W_CheckNumForName(sfxlump_name) == -1)
         return 0;
-        
+
     sfxlump_num = W_GetNumForName (sfxlump_name);
     sfxlump_len = W_LumpLength (sfxlump_num);
-    
+
     // if it's not at least 9 bytes (8 byte header + at least 1 sample), it's
     // not in the correct format
     if (sfxlump_len < 9)
         return 0;
-    
+
     // load it
     sfxlump_data = W_CacheLumpNum (sfxlump_num);
     sfxlump_sound = sfxlump_data + 8;
     sfxlump_len -= 8;
-    
+
     // get original sample rate from DMX header
     memcpy (&orig_rate, sfxlump_data+2, 2);
     orig_rate = SHORT (orig_rate);
-    
+
     times = 48000.0f / (float)orig_rate;
-    
+
     padded_sfx_len = ((sfxlump_len*R_ceil(times) + (SAMPLECOUNT_35-1)) / SAMPLECOUNT_35) * SAMPLECOUNT_35;
     padded_sfx_data = (uint8_t*)malloc(padded_sfx_len);
-    
+
     for (i=0; i < padded_sfx_len; i++)
     {
         x = R_floor ((float)i/times);
-        
+
         if (x < sfxlump_len) // 8 was already subtracted
             padded_sfx_data[i] = sfxlump_sound[x];
         else
             padded_sfx_data[i] = 128; // fill the rest with silence
     }
-        
+
     Z_Free (sfxlump_data); //  free original lump
 
     *len = padded_sfx_len;
@@ -207,9 +208,9 @@ void I_SetChannels(void)
       for (j=0 ; j<256 ; j++)
          vol_lookup[i*256+j] = (i*(j-128)*256)/127;
    }
-}	
+}
 
- 
+
 void I_SetSfxVolume(int volume)
 {
     snd_SfxVolume = volume;
@@ -241,7 +242,7 @@ int I_GetSfxLumpNum(sfxinfo_t* sfx)
 void I_StopSound (int handle)
 {
     int i;
-    
+
     for (i=0; i<NUM_CHANNELS; i++)
     {
         if (channels[i].handle==handle)
@@ -286,20 +287,20 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
             slot = i;
             break;
         }
-        
+
         if (channels[i].starttic < oldesttics)
         {
             oldesttics = channels[i].starttic;
             oldestslot = i;
         }
     }
-    
+
     // No free slots, so replace the oldest sound still playing.
     if (slot == -1)
         slot = oldestslot;
-    
+
     channels[slot].handle = ++currenthandle;
-    
+
     // Set pointers to raw sound data start & end.
     channels[slot].snd_start_ptr = (uint8_t*)S_sfx[id].data;
     channels[slot].snd_end_ptr = channels[slot].snd_start_ptr + lengths[id];
@@ -314,15 +315,15 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     //  adjust volume properly.
     leftvol = vol - ((vol*sep*sep) >> 16); ///(256*256);
     sep -= 257;
-    rightvol = vol - ((vol*sep*sep) >> 16);	
+    rightvol = vol - ((vol*sep*sep) >> 16);
 
     // Sanity check, clamp volume.
     if (rightvol < 0 || rightvol > 127)
 	I_Error("addsfx: rightvol out of bounds");
-    
+
     if (leftvol < 0 || leftvol > 127)
 	I_Error("addsfx: leftvol out of bounds");
-    
+
     // Get the proper lookup table piece
     //  for this volume level???
     channels[slot].leftvol = &vol_lookup[leftvol*256];
@@ -339,7 +340,7 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
 boolean I_SoundIsPlaying (int handle)
 {
     int i;
-    
+
     for (i=0; i<NUM_CHANNELS; i++)
     {
         if (channels[i].handle==handle)
@@ -394,6 +395,9 @@ void I_UpdateSound(void)
       case 3:
          out_frames = SAMPLECOUNT_60;
          break;
+      case 4:
+         out_frames = SAMPLECOUNT_120;
+         break;
       default:
          out_frames = SAMPLECOUNT_35;
          break;
@@ -430,7 +434,7 @@ void I_UpdateSound(void)
          // Check channel, if active.
          if (channels[chan].snd_start_ptr)
          {
-            // Get the raw data from the channel. 
+            // Get the raw data from the channel.
             sample = *channels[chan].snd_start_ptr;
 
             // Add left and right part for this channel (sound) to the
@@ -488,7 +492,7 @@ void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
 
          leftvol = vol - ((vol*sep*sep) >> 16); ///(256*256);
          sep -= 257;
-         rightvol = vol - ((vol*sep*sep) >> 16);	
+         rightvol = vol - ((vol*sep*sep) >> 16);
 
          if (rightvol < 0 || rightvol > 127)
             I_Error("I_UpdateSoundParams: rightvol out of bounds.");
@@ -505,23 +509,23 @@ void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
 
 
 void I_ShutdownSound(void)
-{    
+{
 }
 
 
 void I_InitSound(void)
 {
     int i;
-    
+
     memset (&lengths, 0, sizeof(int)*NUMSFX);
     for (i=1 ; i<NUMSFX ; i++)
-    { 
+    {
         // Alias? Example is the chaingun sound linked to pistol.
         if (!S_sfx[i].link)
         {
             // Load data from WAD file.
             S_sfx[i].data = I_SndLoadSample( S_sfx[i].name, &lengths[i] );
-        }	
+        }
         else
         {
             // Previously loaded already?
@@ -531,7 +535,7 @@ void I_InitSound(void)
     }
 
     I_SetChannels();
-  
+
     if (log_cb)
        log_cb(RETRO_LOG_INFO, "I_InitSound: \n");
 }
@@ -681,7 +685,7 @@ static void Exp_PauseSong (int handle)
       break;
     default: // Default - let music continue
       break;
-  }  
+  }
   SDL_UnlockMutex (musmutex);
 }
 
@@ -689,7 +693,7 @@ static void Exp_ResumeSong (int handle)
 {
   if (!music_handle)
     return;
-  
+
   SDL_LockMutex (musmutex);
   switch (mus_pause_opt)
   {
@@ -770,7 +774,7 @@ static int Exp_RegisterSongEx (const void *data, size_t len, int try_mus2mid)
   {
     // The header has no MUS signature
     // Let's try to load this song directly
-  
+
     // go through music players in order
     int found = 0;
 
@@ -856,7 +860,7 @@ static int Exp_RegisterSongEx (const void *data, size_t len, int try_mus2mid)
       mem_fclose(outstream);
 
       if (song_data)
-      { 
+      {
         return Exp_RegisterSongEx (song_data, outbuf_len, 0);
       }
     }
@@ -1074,8 +1078,8 @@ int I_RegisterSong(const void* data, size_t len)
          size_t muslen = len;
          const unsigned char *musptr = data;
 
-         // haleyjd 04/04/10: scan forward for a MUS header. Evidently DMX was 
-         // capable of doing this, and would skip over any intervening data. That, 
+         // haleyjd 04/04/10: scan forward for a MUS header. Evidently DMX was
+         // capable of doing this, and would skip over any intervening data. That,
          // or DMX doesn't use the MUS header at all somehow.
          while (musptr < (const unsigned char*)data + len - sizeof(musheader))
          {
@@ -1234,7 +1238,7 @@ void I_ResampleStream (void *dest, unsigned nsamp, void (*proc)(void *dest, unsi
   }
   sin[0] = sin[nreq * 2];
   sin[1] = sin[nreq * 2 + 1];
-}  
+}
 
 void I_MPPlayer_Init(void)
 {

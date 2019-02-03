@@ -265,7 +265,7 @@ default_t defaults[] =
    def_int,ss_none, NULL, NULL},
   {"usegamma",{&usegamma, NULL},{0, NULL},0,4, //jff 3/6/98 fix erroneous upper limit in range
    def_int,ss_none, NULL, NULL}, // gamma correction level // killough 1/18/98
-  {"uncapped_framerate", {&movement_smooth, NULL},  {1, NULL},0,3,
+  {"uncapped_framerate", {&movement_smooth, NULL},  {1, NULL},0,4,
    def_int,ss_stat, NULL, NULL},
   {"filter_wall",{(int*)&drawvars.filterwall, NULL},{RDRAW_FILTER_POINT, NULL},
    RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_none, NULL, NULL},

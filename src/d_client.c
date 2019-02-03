@@ -378,7 +378,7 @@ void D_InitNetGame (void)
 
     do
     {
-      do { 
+      do {
 	// Send init packet
 	initpacket.pn = doom_htons(wanted_player_number);
 	packet_set(&initpacket.head, PKT_INIT, 0);
@@ -511,71 +511,56 @@ void D_InitNetGame (void)
   consoleplayer = displayplayer = doomcom->consoleplayer;
 }
 
-#if 0
+
 void D_BuildNewTiccmds(void)
 {
-    static int lastmadetic;
-    int newtics = I_GetTime() - lastmadetic;
-    lastmadetic += newtics;
-    while (newtics--)
-    {
-      I_StartTic();
-      if (maketic - gametic > BACKUPTICS/2) break;
-      G_BuildTiccmd(&localcmds[maketic%BACKUPTICS]);
-      maketic++;
-    }
-}
-#else
-void D_BuildNewTiccmds(void)
-{
-   I_StartTic();
-   G_BuildTiccmd(&localcmds[maketic % BACKUPTICS]);
-   maketic++;
-}
-#endif
-
-#if 0
-void TryRunTics (void)
-{
-  int runtics;
-
-  // Wait for tics to run
-  while (1) {
-    D_BuildNewTiccmds();
-    runtics = maketic - gametic;
-    if (runtics)
-      break;
-
-        WasRenderedInTryRunTics = TRUE;
-        if (movement_smooth && gamestate==wipegamestate)
-        {
-          isExtraDDisplay = TRUE;
-          D_Display();
-          isExtraDDisplay = FALSE;
-        }
+  static float frac;
+  int fps = 35;
+  switch(movement_smooth)
+  {
+     case 0:
+        fps = 35;
+        break;
+     case 1:
+        fps = 40;
+        break;
+     case 2:
+        fps = 50;
+        break;
+     case 3:
+        fps = 60;
+        break;
+     case 4:
+        fps = 120;
+        break;
+     default:
+        fps = 35;
+        break;
   }
-
-  if (advancedemo)
-	  D_DoAdvanceDemo ();
-  M_Ticker ();
-  I_GetTime_SaveMS();
-  G_Ticker ();
-  P_Checksum(gametic);
-  gametic++;
+  frac += 35;
+  if (frac>0)
+  {
+     frac -= fps;
+     I_StartTic();
+     G_BuildTiccmd(&localcmds[maketic % BACKUPTICS]);
+     maketic++;
+  }
 }
-#endif
 
 void TryRunTics(void)
 {
-  while (maketic <= gametic)
-     D_BuildNewTiccmds();
-
-  if (advancedemo)
-     D_DoAdvanceDemo ();
-  M_Ticker ();
-  G_Ticker ();
-  P_Checksum(gametic);
-  gametic++;
+  if (maketic <= gametic) {
+    WasRenderedInTryRunTics = TRUE;
+    if (movement_smooth && gamestate==wipegamestate)
+      D_Display();
+  } else {
+    if (advancedemo)
+       D_DoAdvanceDemo ();
+    M_Ticker ();
+    G_Ticker ();
+    P_Checksum(gametic);
+    gametic++;
+  }
 }
 
 #endif

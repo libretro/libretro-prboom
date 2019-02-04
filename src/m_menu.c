@@ -2791,7 +2791,7 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
   {"Video"       ,S_SKIP|S_TITLE, m_null, G_X, G_YA - 12},
 
   {"Framerate", S_CHOICE, m_null, G_X,
-  G_YA + general_uncapped*8, {"uncapped_framerate"}, 0, 0, NULL, framerates},
+  G_YA + general_uncapped*8, {"uncapped_framerate"}, 0, 0, R_InitInterpolation, framerates},
 
   {"Gamma Correction", S_CHOICE, m_null, G_X,
   G_YA + general_gamma*8, {"usegamma"}, 0, 0, NULL, gamma_lvls},

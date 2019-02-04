@@ -468,7 +468,6 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    fixed_t tz;
    int width;
 
-#ifndef __LIBRETRO__
    if (movement_smooth)
    {
       fx = thing->PrevX + FixedMul (tic_vars.frac, thing->x - thing->PrevX);
@@ -477,13 +476,10 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    }
    else
    {
-#endif
       fx = thing->x;
       fy = thing->y;
       fz = thing->z;
-#ifndef __LIBRETRO__
    }
-#endif
    tr_x = fx - viewx;
    tr_y = fy - viewy;
 

@@ -56,15 +56,15 @@
 
 boolean onground; // whether player is on ground or in air
 
-/* 
-================== 
-= 
-= P_Thrust 
-= 
-= moves the given origin along a given angle 
-= 
-================== 
-*/ 
+/*
+==================
+=
+= P_Thrust
+=
+= moves the given origin along a given angle
+=
+==================
+*/
 
 void P_Thrust(player_t* player,angle_t angle,fixed_t move)
 {
@@ -110,15 +110,15 @@ static void P_Bob(player_t *player, angle_t angle, fixed_t move)
   player->momy += FixedMul(move,finesine[angle]);
 }
 
-/* 
-================== 
-= 
-= P_CalcHeight 
-= 
+/*
+==================
+=
+= P_CalcHeight
+=
 = Calculate the walking / running height adjustment
 =
-================== 
-*/ 
+==================
+*/
 
 void P_CalcHeight (player_t* player)
 {
@@ -141,7 +141,7 @@ void P_CalcHeight (player_t* player)
    }
 
    //e6y
-   if (compatibility_level >= boom_202_compatibility && 
+   if (compatibility_level >= boom_202_compatibility &&
          compatibility_level <= lxdoom_1_compatibility &&
          player->mo->friction > ORIG_FRICTION) // ice?
    {
@@ -229,7 +229,7 @@ void P_MovePlayer (player_t* player)
      {
         P_Thrust(player, player->mo->angle, FRACUNIT>>8);
      }
-  }	
+  }
   if(cmd->sidemove)
   {
      if(onground || player->mo->flags2&MF2_FLY)
@@ -572,7 +572,7 @@ void P_MorphPlayerThink(player_t *player)
 		{
 			S_StartSound(pmo, SFX_PIG_ACTIVE2);
 		}
-	}		
+	}
 }
 
 //----------------------------------------------------------------------------
@@ -619,7 +619,7 @@ boolean P_UndoPlayerMorph(player_t *player)
          mo = P_SpawnMobj(x, y, z, MT_PLAYER_MAGE);
          break;
       default:
-         I_Error("P_UndoPlayerMorph:  Unknown player class %d\n", 
+         I_Error("P_UndoPlayerMorph:  Unknown player class %d\n",
                player->class);
    }
    if(P_TestMobjLocation(mo) == false)
@@ -637,7 +637,7 @@ boolean P_UndoPlayerMorph(player_t *player)
       return(false);
    }
    if(player->class == PCLASS_FIGHTER)
-   { 
+   {
       // The first type should be blue, and the third should be the
       // Fighter's original gold color
       if(playerNum == 0)
@@ -687,15 +687,13 @@ void P_PlayerThink (player_t* player)
    ticcmd_t*    cmd;
    weapontype_t newweapon;
 
-#ifndef __LIBRETRO__
    if (movement_smooth && &players[displayplayer] == player)
    {
-      original_view_vars.viewx = player->mo->x;
-      original_view_vars.viewy = player->mo->y;
-      original_view_vars.viewz = player->viewz;
-      original_view_vars.viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
+      player->mo->PrevX = player->mo->x;
+      player->mo->PrevY = player->mo->y;
+      player->prev_viewz = player->viewz;
+      player->prev_viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
    }
-#endif
    if (player->mo == 0)
    {
       //printf("player->mo == 0\n");
@@ -720,7 +718,7 @@ void P_PlayerThink (player_t* player)
    }
 
 #ifdef HEXEN
-   // messageTics is above the rest of the counters so that messages will 
+   // messageTics is above the rest of the counters so that messages will
    // 		go away, even in death.
    player->messageTics--; // Can go negative
    if(!player->messageTics || player->messageTics == -1)
@@ -771,32 +769,32 @@ void P_PlayerThink (player_t* player)
    switch(player->class)
    {
       case PCLASS_FIGHTER:
-         if(player->mo->momz <= -35*FRACUNIT 
+         if(player->mo->momz <= -35*FRACUNIT
                && player->mo->momz >= -40*FRACUNIT && !player->morphTics
                && !S_GetSoundPlayingInfo(player->mo,
                   SFX_PLAYER_FIGHTER_FALLING_SCREAM))
          {
-            S_StartSound(player->mo, 
+            S_StartSound(player->mo,
                   SFX_PLAYER_FIGHTER_FALLING_SCREAM);
          }
          break;
       case PCLASS_CLERIC:
-         if(player->mo->momz <= -35*FRACUNIT 
+         if(player->mo->momz <= -35*FRACUNIT
                && player->mo->momz >= -40*FRACUNIT && !player->morphTics
                && !S_GetSoundPlayingInfo(player->mo,
                   SFX_PLAYER_CLERIC_FALLING_SCREAM))
          {
-            S_StartSound(player->mo, 
+            S_StartSound(player->mo,
                   SFX_PLAYER_CLERIC_FALLING_SCREAM);
          }
          break;
       case PCLASS_MAGE:
-         if(player->mo->momz <= -35*FRACUNIT 
+         if(player->mo->momz <= -35*FRACUNIT
                && player->mo->momz >= -40*FRACUNIT && !player->morphTics
                && !S_GetSoundPlayingInfo(player->mo,
                   SFX_PLAYER_MAGE_FALLING_SCREAM))
          {
-            S_StartSound(player->mo, 
+            S_StartSound(player->mo,
                   SFX_PLAYER_MAGE_FALLING_SCREAM);
          }
          break;
@@ -811,12 +809,12 @@ void P_PlayerThink (player_t* player)
          {
             player->mo->momz = 6*FRACUNIT;
          }
-         else 
+         else
          {
             player->mo->momz = 9*FRACUNIT;
          }
          player->mo->flags2 &= ~MF2_ONMOBJ;
-         player->jumpTics = 18; 
+         player->jumpTics = 18;
       }
       else if(cmd->arti&AFLAG_SUICIDE)
       {
@@ -846,7 +844,7 @@ void P_PlayerThink (player_t* player)
 
    /* Check for weapon change. */
 
-   if(cmd->buttons&BT_CHANGE 
+   if(cmd->buttons&BT_CHANGE
 #ifdef HEXEN
          && !player->morphTics
 #endif
@@ -958,7 +956,7 @@ void P_PlayerThink (player_t* player)
                player->mo->flags |= MF_SHADOW;
                player->mo->flags &= ~MF_ALTSHADOW;
             }
-         }		
+         }
       }
       if(!(--player->powers[pw_invulnerability]))
       {
@@ -1020,7 +1018,7 @@ void P_PlayerThink (player_t* player)
       {
          player->poisoncount = 0;
       }
-      P_PoisonDamage(player, player->poisoner, 1, true); 
+      P_PoisonDamage(player, player->poisoner, 1, true);
    }
 #endif
 
@@ -1042,7 +1040,7 @@ void P_PlayerThink (player_t* player)
       {
          if(newtorch)
          {
-            if(player->fixedcolormap+newtorchdelta > 7 
+            if(player->fixedcolormap+newtorchdelta > 7
                   || player->fixedcolormap+newtorchdelta < 1
                   || newtorch == player->fixedcolormap)
                newtorch = 0;

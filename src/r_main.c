@@ -533,34 +533,15 @@ subsector_t *R_PointInSubsector(fixed_t x, fixed_t y)
 static void R_SetupFrame (player_t *player)
 {
   int cm;
-#ifndef __LIBRETRO__
-  boolean NoInterpolate = paused || (menuactive && !demoplayback);
-#endif
 
-  viewplayer = player;
-
-#ifndef __LIBRETRO__
-  if (player->mo != oviewer || NoInterpolate)
-  {
-    R_ResetViewInterpolation ();
-    oviewer = player->mo;
-  }
-  tic_vars.frac = I_GetTimeFrac ();
-  if (NoInterpolate)
-    tic_vars.frac = FRACUNIT;
-  R_InterpolateView (player, tic_vars.frac);
-#else
   R_InterpolateView (player);
-#endif
 
   extralight = player->extralight;
 
   viewsin = finesine[viewangle>>ANGLETOFINESHIFT];
   viewcos = finecosine[viewangle>>ANGLETOFINESHIFT];
 
-#ifndef __LIBRETRO__
   R_DoInterpolations(tic_vars.frac);
-#endif
 
   // killough 3/20/98, 4/4/98: select colormap based on player status
 

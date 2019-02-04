@@ -180,6 +180,10 @@ typedef struct player_s
   int                 resurectedkillcount;
   const char*         centermessage;
 
+  /* used for interpolation */
+  fixed_t prev_viewz;
+  angle_t prev_viewangle;
+
 } player_t;
 
 

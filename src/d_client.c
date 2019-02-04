@@ -515,32 +515,10 @@ void D_InitNetGame (void)
 void D_BuildNewTiccmds(void)
 {
   static float frac;
-  int fps = 35;
-  switch(movement_smooth)
-  {
-     case 0:
-        fps = 35;
-        break;
-     case 1:
-        fps = 40;
-        break;
-     case 2:
-        fps = 50;
-        break;
-     case 3:
-        fps = 60;
-        break;
-     case 4:
-        fps = 120;
-        break;
-     default:
-        fps = 35;
-        break;
-  }
   frac += 35;
   if (frac>0)
   {
-     frac -= fps;
+     frac -= tic_vars.fps;
      I_StartTic();
      G_BuildTiccmd(&localcmds[maketic % BACKUPTICS]);
      maketic++;
@@ -549,6 +527,11 @@ void D_BuildNewTiccmds(void)
 
 void TryRunTics(void)
 {
+  tic_vars.frac += tic_vars.frac_step;
+  if(tic_vars.frac > FRACUNIT) {
+    tic_vars.frac = FRACUNIT;
+  }
+
   if (maketic <= gametic) {
     WasRenderedInTryRunTics = TRUE;
     if (movement_smooth && gamestate==wipegamestate)
@@ -560,6 +543,7 @@ void TryRunTics(void)
     G_Ticker ();
     P_Checksum(gametic);
     gametic++;
+    tic_vars.frac = 0;
   }
 }
 

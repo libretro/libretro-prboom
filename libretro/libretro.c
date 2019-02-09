@@ -1434,12 +1434,13 @@ void R_InitInterpolation(void)
 {
   struct retro_system_av_info info;
   retro_get_system_av_info(&info);
-  // Only update av_info if changed and it's not the first run
-  if(!tic_vars.fps)
+  if(tic_vars.fps != info.timing.fps) {
+    // Only update av_info if changed and it's not the first run
+    if(tic_vars.fps)
+        environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
+    
     tic_vars.fps = info.timing.fps;
-  else if(tic_vars.fps != info.timing.fps) {
-    environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
-    tic_vars.fps = info.timing.fps;
+    tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
+    tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;
   }
-  tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
 }

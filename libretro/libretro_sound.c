@@ -378,11 +378,7 @@ void I_UpdateSound(void)
    step = 2;
    frames = 0;
 
-   if(tic_vars.fps) {
-     out_frames = SAMPLERATE / tic_vars.fps;
-   } else {
-     out_frames = SAMPLECOUNT_35;
-   }
+   out_frames = (tic_vars.sample_step)? tic_vars.sample_step : SAMPLECOUNT_35;
 
 #ifdef MUSIC_SUPPORT
    if (music_handle)

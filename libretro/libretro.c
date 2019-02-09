@@ -1059,7 +1059,8 @@ static void process_gamepad_right_analog(void)
 		if (rsx < -analog_deadzone)
 			rsx = rsx + analog_deadzone;
 		event_mouse.type = ev_mouse;
-		event_mouse.data2 = (ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone)) * analog_turn_speed;
+		event_mouse.data2 = ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone)
+                         * analog_turn_speed * TICRATE / (float)tic_vars.fps;
 	}
 
 	if (rsy < -analog_deadzone || rsy > analog_deadzone)
@@ -1069,7 +1070,8 @@ static void process_gamepad_right_analog(void)
 		if (rsy < -analog_deadzone)
 			rsy = rsy + analog_deadzone;
 		event_mouse.type = ev_mouse;
-		event_mouse.data3 = (ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone)) * analog_turn_speed;
+		event_mouse.data3 = ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone)
+                         * analog_turn_speed * TICRATE / (float)tic_vars.fps;
 	}
 
 	if(event_mouse.type == ev_mouse)
@@ -1438,7 +1440,7 @@ void R_InitInterpolation(void)
     // Only update av_info if changed and it's not the first run
     if(tic_vars.fps)
         environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
-    
+
     tic_vars.fps = info.timing.fps;
     tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
     tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;

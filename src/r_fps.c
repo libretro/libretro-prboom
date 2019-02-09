@@ -74,31 +74,6 @@ typedef fixed_t fixed2_t[2];
 static fixed2_t *oldipos;
 static fixed2_t *bakipos;
 
-void R_InitInterpolation(void)
-{
-  switch(movement_smooth)
-  {
-    case 0:
-      tic_vars.fps = 35;
-      break;
-    case 1:
-      tic_vars.fps = 40;
-      break;
-    case 2:
-      tic_vars.fps = 50;
-      break;
-    case 3:
-      tic_vars.fps = 60;
-      break;
-    case 4:
-      tic_vars.fps = 120;
-      break;
-    default:
-      tic_vars.fps = TICRATE;
-      break;
-  }
-  tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
-}
 
 void R_InterpolateView (player_t *player)
 {

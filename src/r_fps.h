@@ -43,8 +43,9 @@ extern int interpolation_maxobjects;
 
 typedef struct {
   unsigned int fps;
-  fixed_t frac;
-  fixed_t frac_step;
+  fixed_t frac;        /* current fraction of the game tic */
+  fixed_t frac_step;   /* fractional game tic increase per frame */
+  fixed_t sample_step; /* soundsamples per frame */
 } tic_vars_t;
 
 extern tic_vars_t tic_vars;

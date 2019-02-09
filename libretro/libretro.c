@@ -26,6 +26,7 @@
 #include "../src/st_stuff.h"
 #include "../src/w_wad.h"
 #include "../src/r_draw.h"
+#include "../src/r_fps.h"
 #include "../src/lprintf.h"
 #include "../src/doomstat.h"
 
@@ -238,13 +239,42 @@ void retro_get_system_info(struct retro_system_info *info)
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
 {
-   info->timing.fps = 120.0;
-   info->timing.sample_rate = 44100.0;
-   info->geometry.base_width = SCREENWIDTH;
-   info->geometry.base_height = SCREENHEIGHT;
-   info->geometry.max_width = SCREENWIDTH;
-   info->geometry.max_height = SCREENHEIGHT;
-   info->geometry.aspect_ratio = 4.0 / 3.0;
+  switch(movement_smooth)
+  {
+    case 0:
+      info->timing.fps = 35.0;
+      break;
+    case 1:
+      info->timing.fps = 40.0;
+      break;
+    case 2:
+      info->timing.fps = 50.0;
+      break;
+    case 3:
+      info->timing.fps = 60.0;
+      break;
+    case 4:
+      info->timing.fps = 70.0;
+      break;
+    case 5:
+      info->timing.fps = 100.0;
+      break;
+    case 6:
+      info->timing.fps = 120.0;
+      break;
+    case 7:
+      info->timing.fps = 140.0;
+      break;
+    default:
+      info->timing.fps = TICRATE;
+      break;
+  }
+  info->timing.sample_rate = 44100.0;
+  info->geometry.base_width = SCREENWIDTH;
+  info->geometry.base_height = SCREENHEIGHT;
+  info->geometry.max_width = SCREENWIDTH;
+  info->geometry.max_height = SCREENHEIGHT;
+  info->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
 
@@ -260,21 +290,21 @@ void retro_set_environment(retro_environment_t cb)
         { "prboom-menu_back_button", "Menu back button; A|B|X|Y" }, // menu back as core option to be able to map it independently of in-game mappings
 		{ NULL, NULL },
 	};
-	
+
    static const struct retro_controller_description port[] = {
 		{ "Gamepad Modern", RETROPAD_MODERN },
 		{ "Gamepad Classic", RETROPAD_CLASSIC },
 		{ "RetroKeyboard/Mouse", RETRO_DEVICE_KEYBOARD },
 		{ 0 },
    };
-	
+
 	static const struct retro_controller_info ports[] = {
 		{ port, 3 },
 		{ NULL, 0 },
 	};
-	
+
 	environ_cb = cb;
-	
+
 	cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
 	cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 }
@@ -283,7 +313,7 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 {
 	if (port)
 		return;
-	
+
 	switch (device)
 	{
 		case RETROPAD_CLASSIC:
@@ -392,7 +422,7 @@ static void update_variables(bool startup)
       else
          find_recursive_on = false;
    }
-   
+
    var.key = "prboom-analog_deadzone";
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
@@ -601,7 +631,7 @@ bool retro_load_game(const struct retro_game_info *info)
            argv[argc++] = "-deh";
            argv[argc++] = deh;
       };
-      
+
       // Get save directory
       if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)
 		{
@@ -610,7 +640,7 @@ bool retro_load_game(const struct retro_game_info *info)
 				// > Build save path
 				snprintf(g_save_dir, sizeof(g_save_dir), "%s%c%s", base_save_dir, DIR_SLASH, name_without_ext);
 				use_external_savedir = true;
-				
+
 				// > Create save directory, if required
 				if (!path_is_directory(g_save_dir))
 				{
@@ -898,7 +928,7 @@ static void process_gamepad_buttons(unsigned num_buttons, int action_lut[])
     bool retro_joypad_b = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B);
     bool retro_joypad_x = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X);
     bool retro_joypad_y = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y);
-	
+
 	for(i = 0; i < num_buttons; i++)
 	{
 		event_t event = {0};
@@ -916,7 +946,7 @@ static void process_gamepad_buttons(unsigned num_buttons, int action_lut[])
 			else
 				event.data1 = action_lut[i];
 		}
-		
+
 		if(!new_input[i] && old_input[i])
 		{
 			event.type = ev_keyup;
@@ -929,10 +959,10 @@ static void process_gamepad_buttons(unsigned num_buttons, int action_lut[])
 			else
 				event.data1 = action_lut[i];
 		}
-		
+
 		if(event.type == ev_keydown || event.type == ev_keyup)
 			D_PostEvent(&event);
-		
+
 		old_input[i] = new_input[i];
 	}
 }
@@ -944,10 +974,10 @@ static void process_gamepad_left_analog(void)
    bool new_input_analog_l[4];
    int analog_l_amplitude[4];
    static int analog_l_modulation_state[4];
-	
+
 	int lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
 	int lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
-	
+
 	// Get movement 'amplitude' on each axis
 	// > x-axis
 	analog_l_amplitude[0] = 0;
@@ -973,28 +1003,28 @@ static void process_gamepad_left_analog(void)
 	{
 		analog_l_amplitude[3] = -1 * (-1 + pwm_period * (lsy + analog_deadzone) / (ANALOG_RANGE - analog_deadzone));
 	}
-	
+
 	for (i = 0; i < 4; i++)
 	{
 		event_t event = {0};
-		
+
 		new_input_analog_l[i] = synthetic_pwm(analog_l_amplitude[i], &analog_l_modulation_state[i]);
-		
+
 		if(new_input_analog_l[i] && !old_input_analog_l[i])
 		{
 			event.type = ev_keydown;
 			event.data1 = left_analog_lut[i];
 		}
-		
+
 		if(!new_input_analog_l[i] && old_input_analog_l[i])
 		{
 			event.type = ev_keyup;
 			event.data1 = left_analog_lut[i];
 		}
-		
+
 		if(event.type == ev_keydown || event.type == ev_keyup)
 			D_PostEvent(&event);
-		
+
 		old_input_analog_l[i] = new_input_analog_l[i];
 	}
 }
@@ -1029,9 +1059,10 @@ static void process_gamepad_right_analog(void)
 		if (rsx < -analog_deadzone)
 			rsx = rsx + analog_deadzone;
 		event_mouse.type = ev_mouse;
-		event_mouse.data2 = (ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone)) * analog_turn_speed;
+		event_mouse.data2 = ANALOG_MOUSE_SPEED * rsx / (ANALOG_RANGE - analog_deadzone)
+                         * analog_turn_speed * TICRATE / (float)tic_vars.fps;
 	}
-	
+
 	if (rsy < -analog_deadzone || rsy > analog_deadzone)
 	{
 		if (rsy > analog_deadzone)
@@ -1039,9 +1070,10 @@ static void process_gamepad_right_analog(void)
 		if (rsy < -analog_deadzone)
 			rsy = rsy + analog_deadzone;
 		event_mouse.type = ev_mouse;
-		event_mouse.data3 = (ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone)) * analog_turn_speed;
+		event_mouse.data3 = ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone)
+                         * analog_turn_speed * TICRATE / (float)tic_vars.fps;
 	}
-	
+
 	if(event_mouse.type == ev_mouse)
 		D_PostEvent(&event_mouse);
 }
@@ -1361,6 +1393,7 @@ char* I_FindFile(const char* wfname, const char* ext)
 void I_Init(void)
 {
    int i;
+
    /* killough 2/21/98: avoid sound initialization if no sound & no music */
    if (!(nomusicparm && nosfxparm))
       I_InitSound();
@@ -1397,4 +1430,19 @@ void I_Read(int fd, void* vbuf, size_t sz)
       sz  -= rc;
       buf += rc;
    }
+}
+
+void R_InitInterpolation(void)
+{
+  struct retro_system_av_info info;
+  retro_get_system_av_info(&info);
+  if(tic_vars.fps != info.timing.fps) {
+    // Only update av_info if changed and it's not the first run
+    if(tic_vars.fps)
+        environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
+
+    tic_vars.fps = info.timing.fps;
+    tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
+    tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;
+  }
 }

@@ -24,11 +24,8 @@
 #include "../src/w_wad.h"
 #include "../src/z_zone.h"
 
-#define SAMPLECOUNT_35		((4 * 11025) / 35)
-#define SAMPLECOUNT_40		((4 * 11025) / 40)
-#define SAMPLECOUNT_50		((4 * 11025) / 50)
-#define SAMPLECOUNT_60		((4 * 11025) / 60)
-#define SAMPLECOUNT_120 	((4 * 11025) / 120)
+#define SAMPLERATE    		(4 * 11025)
+#define SAMPLECOUNT_35		(SAMPLERATE / 35)
 #define NUM_CHANNELS		32
 #define BUFMUL           4
 #define MIXBUFFERSIZE   (SAMPLECOUNT_35*BUFMUL)
@@ -381,27 +378,7 @@ void I_UpdateSound(void)
    step = 2;
    frames = 0;
 
-   switch(movement_smooth)
-   {
-      case 0:
-         out_frames = SAMPLECOUNT_35;
-         break;
-      case 1:
-         out_frames = SAMPLECOUNT_40;
-         break;
-      case 2:
-         out_frames = SAMPLECOUNT_50;
-         break;
-      case 3:
-         out_frames = SAMPLECOUNT_60;
-         break;
-      case 4:
-         out_frames = SAMPLECOUNT_120;
-         break;
-      default:
-         out_frames = SAMPLECOUNT_35;
-         break;
-   }
+   out_frames = (tic_vars.sample_step)? tic_vars.sample_step : SAMPLECOUNT_35;
 
 #ifdef MUSIC_SUPPORT
    if (music_handle)

@@ -2783,8 +2783,7 @@ enum {
 #define G_YA3 (G_YA2+5*8)
 #define GF_X 76
 
-static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps",
-  "100fps", "120fps", "140fps"};
+static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "100fps", "119fps", "120fps", "140fps", "144fps"};
 static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4"};
 
 setup_menu_t gen_settings1[] = { // General Settings screen1

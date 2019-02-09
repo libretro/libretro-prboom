@@ -257,13 +257,25 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
       info->timing.fps = 70.0;
       break;
     case 5:
-      info->timing.fps = 100.0;
+      info->timing.fps = 72.0;
       break;
     case 6:
-      info->timing.fps = 120.0;
+      info->timing.fps = 75.0;
       break;
     case 7:
+      info->timing.fps = 100.0;
+      break;
+    case 8:
+      info->timing.fps = 119.0;
+      break;
+    case 9:
+      info->timing.fps = 120.0;
+      break;
+    case 10:
       info->timing.fps = 140.0;
+      break;
+    case 11:
+      info->timing.fps = 144.0;
       break;
     default:
       info->timing.fps = TICRATE;

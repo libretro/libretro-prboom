@@ -109,8 +109,8 @@ typedef enum {
 // when multiple screen sizes are supported
 
 // proff 08/17/98: Changed for high-res
-#define MAX_SCREENWIDTH  2048
-#define MAX_SCREENHEIGHT 1536
+#define MAX_SCREENWIDTH  2560
+#define MAX_SCREENHEIGHT 1600
 
 // The maximum number of players, multiplayer/networking.
 #define MAXPLAYERS       4

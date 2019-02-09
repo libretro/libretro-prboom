@@ -282,7 +282,7 @@ void retro_set_environment(retro_environment_t cb)
 {
 	struct retro_variable variables[] = {
 		{ "prboom-resolution",
-			"Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200" },
+			"Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200|2240x1400|2560x1600" },
 		{ "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
 		{ "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
 		{ "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },

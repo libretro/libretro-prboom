@@ -39,8 +39,29 @@
 
 extern int movement_smooth;
 
-extern void R_InterpolateView (player_t *player);
+extern int interpolation_maxobjects;
+
+typedef struct {
+  unsigned int fps;
+  fixed_t frac;
+  fixed_t frac_step;
+} tic_vars_t;
+
+extern tic_vars_t tic_vars;
+
+void R_InitInterpolation(void);
+void R_InterpolateView(player_t *player);
 
 extern boolean WasRenderedInTryRunTics;
+
+void R_ResetViewInterpolation ();
+void R_UpdateInterpolations();
+void R_StopAllInterpolations(void);
+void R_DoInterpolations(fixed_t smoothratio);
+void R_RestoreInterpolations();
+void R_ActivateSectorInterpolations();
+void R_ActivateThinkerInterpolations(thinker_t *th);
+void R_StopInterpolationIfNeeded(thinker_t *th);
+
 
 #endif

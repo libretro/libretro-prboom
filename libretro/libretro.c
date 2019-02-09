@@ -1368,9 +1368,7 @@ void I_Init(void)
    for (i = 0; i < MAX_PADS; i++)
       doom_devices[i] = RETRO_DEVICE_JOYPAD;
 
-#ifndef __LIBRETRO__
    R_InitInterpolation();
-#endif
 }
 
 /*

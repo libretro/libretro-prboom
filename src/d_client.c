@@ -514,11 +514,11 @@ void D_InitNetGame (void)
 
 void D_BuildNewTiccmds(void)
 {
-  static float frac;
-  frac += 35;
-  if (frac>0)
+  static float tcount;
+  tcount += TICRATE;
+  if (tcount>0)
   {
-     frac -= tic_vars.fps;
+     tcount -= tic_vars.fps;
      I_StartTic();
      G_BuildTiccmd(&localcmds[maketic % BACKUPTICS]);
      maketic++;
@@ -531,6 +531,8 @@ void TryRunTics(void)
   if(tic_vars.frac > FRACUNIT) {
     tic_vars.frac = FRACUNIT;
   }
+
+  I_StartTic();
 
   if (maketic <= gametic) {
     WasRenderedInTryRunTics = TRUE;

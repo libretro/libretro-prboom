@@ -4211,12 +4211,6 @@ boolean M_Responder (event_t* ev) {
       // Common processing for some items
 
       if (setup_select) { // changing an entry
-  if (ch == key_menu_escape) // Exit key = no change
-    {
-    M_SelectDone(ptr1);                           // phares 4/17/98
-    setup_gather = FALSE;   // finished gathering keys, if any
-    return TRUE;
-    }
 
   if (ptr1->m_flags & S_YESNO) // yes or no setting?
     {
@@ -4374,7 +4368,8 @@ boolean M_Responder (event_t* ev) {
         *ptr1->var.def->location.ppsz = ptr1->selectstrings[value];
       }
     }
-    if (ch == key_menu_enter) {
+    if ((ch == key_menu_enter) ||
+       (ch == key_menu_escape) || (ch == key_fire)) {
       // phares 4/14/98:
       // If not in demoplayback, or netgame,
       // and there's a second variable in var2, set that
@@ -4394,6 +4389,13 @@ boolean M_Responder (event_t* ev) {
     }
     return TRUE;
     }
+
+  if(ch == key_menu_escape) // Exit key = no change
+  {
+    M_SelectDone(ptr1);                           // phares 4/17/98
+    setup_gather = FALSE;   // finished gathering keys, if any
+    return TRUE;
+  }
 
       }
 

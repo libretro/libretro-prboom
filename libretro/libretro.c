@@ -1391,6 +1391,7 @@ char* I_FindFile(const char* wfname, const char* ext)
 void I_Init(void)
 {
    int i;
+
    /* killough 2/21/98: avoid sound initialization if no sound & no music */
    if (!(nomusicparm && nosfxparm))
       I_InitSound();
@@ -1433,7 +1434,12 @@ void R_InitInterpolation(void)
 {
   struct retro_system_av_info info;
   retro_get_system_av_info(&info);
-  environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
-  tic_vars.fps = info.timing.fps;
+  // Only update av_info if changed and it's not the first run
+  if(!tic_vars.fps)
+    tic_vars.fps = info.timing.fps;
+  else if(tic_vars.fps != info.timing.fps) {
+    environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
+    tic_vars.fps = info.timing.fps;
+  }
   tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
 }

@@ -504,13 +504,13 @@ void G_RestartLevel(void)
 
 #include "z_bmalloc.h"
 
-/* 
-============== 
-= 
-= G_DoLoadLevel 
-= 
-============== 
-*/ 
+/*
+==============
+=
+= G_DoLoadLevel
+=
+==============
+*/
 
 static void G_DoLoadLevel (void)
 {
@@ -916,14 +916,14 @@ void G_Ticker (void)
 // also see P_SpawnPlayer in P_Things
 //
 
-/* 
-==================== 
-= 
-= G_PlayerFinishLevel 
-= 
-= Can when a player completes a level 
-==================== 
-*/ 
+/*
+====================
+=
+= G_PlayerFinishLevel
+=
+= Can when a player completes a level
+====================
+*/
 
 static void G_PlayerFinishLevel(int player)
 {
@@ -965,15 +965,15 @@ void G_ChangedPlayerColour(int pn, int cl)
   }
 }
 
-/* 
-==================== 
-= 
-= G_PlayerReborn 
-= 
-= Called after a player dies 
-= almost everything is cleared and initialized 
-==================== 
-*/ 
+/*
+====================
+=
+= G_PlayerReborn
+=
+= Called after a player dies
+= almost everything is cleared and initialized
+====================
+*/
 
 void G_PlayerReborn (int player)
 {
@@ -1015,15 +1015,15 @@ void G_PlayerReborn (int player)
     p->maxammo[i] = maxammo[i];
 }
 
-/* 
-==================== 
-= 
-= G_CheckSpot  
-= 
-= Returns false if the player cannot be respawned at the given mapthing_t spot  
-= because something is occupying it 
-==================== 
-*/ 
+/*
+====================
+=
+= G_CheckSpot
+=
+= Returns false if the player cannot be respawned at the given mapthing_t spot
+= because something is occupying it
+====================
+*/
 
 static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
 {
@@ -1126,15 +1126,15 @@ static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
 }
 
 
-/* 
-==================== 
-= 
-= G_DeathMatchSpawnPlayer 
-= 
-= Spawns a player at one of the random death match spots 
-= called at level load and each death 
-==================== 
-*/ 
+/*
+====================
+=
+= G_DeathMatchSpawnPlayer
+=
+= Spawns a player at one of the random death match spots
+= called at level load and each death
+====================
+*/
 
 void G_DeathMatchSpawnPlayer (int playernum)
 {
@@ -1160,13 +1160,13 @@ void G_DeathMatchSpawnPlayer (int playernum)
    P_SpawnPlayer (playernum, &playerstarts[playernum]);
 }
 
-/* 
-==================== 
-= 
-= G_DoReborn 
-= 
-==================== 
-*/ 
+/*
+====================
+=
+= G_DoReborn
+=
+====================
+*/
 
 void G_DoReborn (int playernum)
 {
@@ -1228,13 +1228,13 @@ int cpars[32] = {
 
 static boolean secretexit;
 
-/* 
-==================== 
-= 
-= G_ExitLevel 
-= 
-==================== 
-*/ 
+/*
+====================
+=
+= G_ExitLevel
+=
+====================
+*/
 
 void G_ExitLevel (void)
 {
@@ -2076,6 +2076,16 @@ void G_SetFastParms(int fast_pending)
         mobjinfo[MT_TROOPSHOT].speed = 10*FRACUNIT;
       }
   }
+}
+
+// Since input is read on each frame, the speed of
+// turns needs to be scaled. This is called whenever
+// the framerate changes.
+void G_ScaleMovementToFramerate (void)
+{
+  angleturn[0] = (320  * TICRATE) / tic_vars.fps;
+  angleturn[1] = (640 * TICRATE) / tic_vars.fps;
+  angleturn[2] = (160  * TICRATE) / tic_vars.fps;
 }
 
 //

@@ -291,6 +291,7 @@ void M_DrawMessages(void);
 void M_DrawChatStrings(void);
 void M_Compat(int);       // killough 10/98
 void M_ChangeDemoSmoothTurns(void);
+void M_ChangeFramerate(void);
 void M_General(int);      // killough 10/98
 void M_DrawCompat(void);  // killough 10/98
 void M_DrawGeneral(void); // killough 10/98
@@ -2791,7 +2792,7 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
   {"Video"       ,S_SKIP|S_TITLE, m_null, G_X, G_YA - 12},
 
   {"Framerate", S_CHOICE, m_null, G_X,
-  G_YA + general_uncapped*8, {"uncapped_framerate"}, 0, 0, R_InitInterpolation, framerates},
+  G_YA + general_uncapped*8, {"uncapped_framerate"}, 0, 0, M_ChangeFramerate, framerates},
 
   {"Gamma Correction", S_CHOICE, m_null, G_X,
   G_YA + general_gamma*8, {"usegamma"}, 0, 0, NULL, gamma_lvls},
@@ -2961,6 +2962,12 @@ void M_ChangeDemoSmoothTurns(void)
     gen_settings2[12].m_flags |= (S_SKIP|S_SELECT);
 
   R_SmoothPlaying_Reset(NULL);
+}
+
+void M_ChangeFramerate(void)
+{
+  R_InitInterpolation();
+  G_ScaleMovementToFramerate();
 }
 
 // Setting up for the General screen. Turn on flags, set pointers,
@@ -5361,6 +5368,7 @@ void M_Init(void)
   M_InitExtendedHelp(); // init extended help screens // phares 3/30/98
 
   M_ChangeDemoSmoothTurns();
+  M_ChangeFramerate();
 }
 
 //

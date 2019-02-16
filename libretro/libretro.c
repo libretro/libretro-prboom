@@ -29,6 +29,7 @@
 #include "../src/r_fps.h"
 #include "../src/lprintf.h"
 #include "../src/doomstat.h"
+#include "../src/m_cheat.h"
 
 void I_MPPlayer_Init(void);
 void I_MPPlayer_Free(void);
@@ -753,9 +754,10 @@ void retro_cheat_reset(void)
 
 void retro_cheat_set(unsigned index, bool enabled, const char *code)
 {
-   (void)index;
-   (void)enabled;
-   (void)code;
+   (void)index;(void)enabled;
+   if(code)
+	  for(int i=0; code[i] != '\0'; i++)
+		 M_FindCheats(code[i]);
 }
 
 /* i_video */

@@ -511,49 +511,42 @@ void D_InitNetGame (void)
   consoleplayer = displayplayer = doomcom->consoleplayer;
 }
 
+
 void D_BuildNewTiccmds(void)
 {
-  I_StartTic();
-
-  if (maketic <= gametic)
+  static float tcount;
+  tcount += TICRATE;
+  if (tcount>0)
   {
-	 // Create new ticcmds if running behind
-	 G_BuildTiccmd(&localcmds[maketic % BACKUPTICS]);
-	 maketic++;
-  }
-  else
-  {
-	 // Update latest ticcmd if running ahead
-	 ticcmd_t prevcmd = localcmds[(maketic-1) % BACKUPTICS];
-	 ticcmd_t *cmd = &localcmds[(maketic-1) % BACKUPTICS];
-
-	 G_BuildTiccmd(cmd);
-	 cmd->angleturn += prevcmd.angleturn;
-	 cmd->buttons |= prevcmd.buttons;
+     tcount -= tic_vars.fps;
+     I_StartTic();
+     G_BuildTiccmd(&localcmds[maketic % BACKUPTICS]);
+     maketic++;
   }
 }
 
 void TryRunTics(void)
 {
   tic_vars.frac += tic_vars.frac_step;
-
-  D_BuildNewTiccmds();
-
-  if (movement_smooth && gamestate==wipegamestate) {
-    WasRenderedInTryRunTics = TRUE;
-    D_Display();
+  if(tic_vars.frac > FRACUNIT) {
+    tic_vars.frac = FRACUNIT;
   }
 
-  if(tic_vars.frac >= FRACUNIT) {
-    tic_vars.frac -= FRACUNIT;
+  I_StartTic();
+
+  if (maketic <= gametic) {
+    WasRenderedInTryRunTics = TRUE;
+    if (movement_smooth && gamestate==wipegamestate)
+      D_Display();
+  } else {
     if (advancedemo)
-      D_DoAdvanceDemo ();
+       D_DoAdvanceDemo ();
     M_Ticker ();
     G_Ticker ();
     P_Checksum(gametic);
     gametic++;
+    tic_vars.frac = 0;
   }
-
 }
 
 #endif

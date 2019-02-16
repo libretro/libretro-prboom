@@ -79,7 +79,6 @@ void R_InterpolateView (player_t *player)
 {
 
   static mobj_t *oviewer;
-  fixed_t frac;
 
   boolean NoInterpolate = paused || (menuactive && !demoplayback);
 
@@ -92,9 +91,7 @@ void R_InterpolateView (player_t *player)
   }
 
   if (NoInterpolate)
-    frac = FRACUNIT;
-  else
-    frac = tic_vars.frac;
+    tic_vars.frac = FRACUNIT;
 
   if (movement_smooth)
   {
@@ -104,13 +101,17 @@ void R_InterpolateView (player_t *player)
 
       player->prev_viewz = player->viewz;
       player->prev_viewangle = player->mo->angle + viewangleoffset;
+      //player->prev_viewpitch = player->mo->pitch + viewpitchoffset;
+
+      //P_ResetWalkcam();
     }
 
-    viewx = player->mo->PrevX + FixedMul (frac, player->mo->x - player->mo->PrevX);
-    viewy = player->mo->PrevY + FixedMul (frac, player->mo->y - player->mo->PrevY);
-    viewz = player->prev_viewz + FixedMul (frac, player->viewz - player->prev_viewz);
+    viewx = player->mo->PrevX + FixedMul (tic_vars.frac, player->mo->x - player->mo->PrevX);
+    viewy = player->mo->PrevY + FixedMul (tic_vars.frac, player->mo->y - player->mo->PrevY);
+    viewz = player->prev_viewz + FixedMul (tic_vars.frac, player->viewz - player->prev_viewz);
 
-    viewangle = player->prev_viewangle + FixedMul (frac, R_SmoothPlaying_Get(player->mo->angle) - player->prev_viewangle) + viewangleoffset;
+    viewangle = player->prev_viewangle + FixedMul (tic_vars.frac, R_SmoothPlaying_Get(player->mo->angle) - player->prev_viewangle) + viewangleoffset;
+    //viewpitch = player->prev_viewpitch + FixedMul (frac, player->mo->pitch - player->prev_viewpitch) + viewpitchoffset;
   }
   else
   {
@@ -119,18 +120,19 @@ void R_InterpolateView (player_t *player)
     viewz = player->viewz;
 
     viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
+    //viewpitch = player->mo->pitch + viewpitchoffset;
   }
 
   if (!paused && movement_smooth)
   {
     int i;
 
-    didInterp = frac != FRACUNIT;
+    didInterp = tic_vars.frac != FRACUNIT;
     if (didInterp)
     {
       for (i = numinterpolations - 1; i >= 0; i--)
       {
-        R_DoAnInterpolation (i, frac);
+        R_DoAnInterpolation (i, tic_vars.frac);
       }
     }
   }

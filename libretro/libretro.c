@@ -1459,5 +1459,4 @@ void R_InitInterpolation(void)
     tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
     tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;
   }
-  tic_vars.frac = FRACUNIT;
 }

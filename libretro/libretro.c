@@ -754,10 +754,11 @@ void retro_cheat_reset(void)
 
 void retro_cheat_set(unsigned index, bool enabled, const char *code)
 {
+   int i;
    (void)index;(void)enabled;
    if(code)
-	  for(int i=0; code[i] != '\0'; i++)
-		 M_FindCheats(code[i]);
+      for (i=0; code[i] != '\0'; i++)
+         M_FindCheats(code[i]);
 }
 
 /* i_video */

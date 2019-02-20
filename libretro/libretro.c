@@ -80,7 +80,7 @@ boolean find_recursive_on;
 // This is scaled by in-game 'mouse sensitivity' option, so just choose a value
 // that has acceptable performance at the default sensitivity value
 // (i.e. user can easily change mouse speed, so absolute value here is not critical)
-#define ANALOG_MOUSE_SPEED 200
+#define ANALOG_MOUSE_SPEED 128
 // Default deadzone: 15%
 static int analog_deadzone = (int)(0.15f * ANALOG_RANGE);
 

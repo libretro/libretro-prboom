@@ -535,7 +535,12 @@ void D_BuildNewTiccmds(void)
 
 void TryRunTics(void)
 {
+  fixed_t overflow = 0;
   tic_vars.frac += tic_vars.frac_step;
+  if(tic_vars.frac > FRACUNIT) {
+    overflow = tic_vars.frac - FRACUNIT;
+    tic_vars.frac = FRACUNIT;
+  }
 
   D_BuildNewTiccmds();
 
@@ -544,8 +549,8 @@ void TryRunTics(void)
     D_Display();
   }
 
-  if(tic_vars.frac >= FRACUNIT) {
-    tic_vars.frac -= FRACUNIT;
+  if(tic_vars.frac == FRACUNIT) {
+    tic_vars.frac = overflow;
     if (advancedemo)
       D_DoAdvanceDemo ();
     M_Ticker ();

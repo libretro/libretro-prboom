@@ -532,7 +532,8 @@ bool retro_load_game(const struct retro_game_info *info)
    if(info->path)
    {
       wadinfo_t header;
-      char *deh, *extension;
+      char *deh, *extension, *baseconfig;
+
       char name_without_ext[4096];
       bool use_external_savedir = false;
       const char *base_save_dir = NULL;
@@ -578,6 +579,13 @@ bool retro_load_game(const struct retro_game_info *info)
           argv[argc++] = "-deh";
           argv[argc++] = deh;
         };
+
+        if((baseconfig = FindFileInDir(g_wad_dir, name_without_ext, ".prboom.cfg"))
+         || (baseconfig = I_FindFile("prboom.cfg", NULL)))
+        {
+          argv[argc++] = "-baseconfig";
+          argv[argc++] = baseconfig;
+        }
       }
 
       // Get save directory

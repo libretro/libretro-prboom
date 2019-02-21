@@ -824,10 +824,9 @@ static int keyboard_lut[117][2] = {
 
 // Produces a pulse train with average on-time fraction amplitude/pwm_period.
 // (https://www.embeddedrelated.com/showarticle/107.php)
-// > The period here doesn't actually matter that much...
-//   Just set to '60' to match the nominal 60Hz screen refresh rate
-//   (Still works fine when in-game frame rate is set to 35/40/50)
-static int pwm_period = 60;
+// > Now that we process input once per game tic, the period here must
+//   match the internal tic rate (corresponding to default 35fps)
+static const int pwm_period = TICRATE;
 static bool synthetic_pwm(int amplitude, int* modulation_state)
 {
 	*modulation_state += amplitude;

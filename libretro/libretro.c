@@ -167,10 +167,10 @@ static gamepad_layout_t gp_modern = { // Based on Original XBOX Doom 3 Collectio
 		{ &key_use,             &key_menu_enter },     // RETRO DEVICE_ID_JOYPAD_Y
 		{ &key_map,             &key_menu_backspace }, // RETRO_DEVICE_ID_JOYPAD_SELECT
 		{ &key_menu_escape,     &key_menu_escape },    // RETRO_DEVICE_ID_JOYPAD_START
-		{ &key_up,              &key_menu_up },        // RETRO_DEVICE_ID_JOYPAD_UP
-		{ &key_down,            &key_menu_down },      // RETRO_DEVICE_ID_JOYPAD_DOWN
-		{ &key_left,            &key_menu_left },      // RETRO_DEVICE_ID_JOYPAD_LEFT
-		{ &key_right,           &key_menu_right },     // RETRO_DEVICE_ID_JOYPAD_RIGHT
+		{ &key_map_up,          &key_menu_up },        // RETRO_DEVICE_ID_JOYPAD_UP
+		{ &key_map_down,        &key_menu_down },      // RETRO_DEVICE_ID_JOYPAD_DOWN
+		{ &key_map_left,        &key_menu_left },      // RETRO_DEVICE_ID_JOYPAD_LEFT
+		{ &key_map_right,       &key_menu_right },     // RETRO_DEVICE_ID_JOYPAD_RIGHT
 		{ &key_weaponcycleup,   &key_menu_enter },     // RETRO_DEVICE_ID_JOYPAD_A
 		{ &key_weaponcycledown, &key_menu_backspace }, // RETRO_DEVICE_ID_JOYPAD_X
 		{ &key_quickload,       &key_menu_left },      // RETRO_DEVICE_ID_JOYPAD_L1

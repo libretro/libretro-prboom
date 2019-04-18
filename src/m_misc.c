@@ -29,7 +29,7 @@
  * DESCRIPTION:
  *  Main loop menu stuff.
  *  Default Config File.
- *  PCX Screenshots.
+ *  Auxiliary functions.
  *
  *-----------------------------------------------------------------------------*/
 
@@ -131,6 +131,19 @@ int M_ReadFile(char const *name, uint8_t **buffer)
     * because we could have a legit 0-length file. So make it -1. */
    return -1;
 }
+
+/*
+ * M_Strupr
+ *
+ * String to Uppercase
+ */
+char* M_Strupr(char* str)
+{
+  char* p;
+  for (p=str; *p; p++) *p = toupper(*p);
+  return str;
+}
+
 
 //
 // DEFAULTS

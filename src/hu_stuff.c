@@ -512,21 +512,36 @@ void HU_Start(void)
   );
 
   // initialize the automap's level title widget
-  if (gamestate == GS_LEVEL) /* cph - stop SEGV here when not in level */
-  switch (gamemode)
+  s = NULL;
+  if (gamemapinfo != NULL)
   {
-    case shareware:
-    case registered:
-    case retail:
-      s = HU_TITLE;
-      break;
+    s = gamemapinfo->mapname;
+    while (*s)
+      HUlib_addCharToTextLine(&w_title, *(s++));
 
-    case commercial:
-    default:  // Ty 08/27/98 - modified to check mission for TNT/Plutonia
-      s = (gamemission==pack_tnt)  ? HU_TITLET :
-          (gamemission==pack_plut) ? HU_TITLEP : HU_TITLE2;
-      break;
-  } else s = "";
+    HUlib_addCharToTextLine(&w_title, ':');
+    HUlib_addCharToTextLine(&w_title, ' ');
+    s = gamemapinfo->levelname;
+  }
+  else
+  {
+    if (gamestate == GS_LEVEL) /* cph - stop SEGV here when not in level */
+    switch (gamemode)
+    {
+      case shareware:
+      case registered:
+      case retail:
+        s = HU_TITLE;
+        break;
+
+      case commercial:
+      default:  // Ty 08/27/98 - modified to check mission for TNT/Plutonia
+        s = (gamemission==pack_tnt)  ? HU_TITLET :
+            (gamemission==pack_plut) ? HU_TITLEP : HU_TITLE2;
+        break;
+    }
+  }
+  if (!s) s = "Unnamed";
   while (*s)
     HUlib_addCharToTextLine(&w_title, *(s++));
 

@@ -2088,7 +2088,22 @@ void A_BossDeath(mobj_t *mo)
   line_t    junk;
   int       i;
 
-  if (gamemode == commercial)
+  // numbossactions == 0 means to use the defaults.
+  // numbossactions == -1 means to do nothing.
+  // positive values mean to check the list of boss actions and run all that apply.
+  if (gamemapinfo && gamemapinfo->numbossactions != 0)
+  {
+    if (gamemapinfo->numbossactions < 0) return; // -1 clears all bossaction
+
+    for (i = 0; i < gamemapinfo->numbossactions; i++)
+    {
+      if (gamemapinfo->bossactions[i].type == mo->type)
+        break;
+    }
+    if (i >= gamemapinfo->numbossactions)
+      return;	// no matches found
+  }
+  else if (gamemode == commercial)
     {
       if (gamemap != 7)
         return;
@@ -2193,8 +2208,27 @@ void A_BossDeath(mobj_t *mo)
           return;         // other boss not dead
       }
 
-  // victory!
-  if ( gamemode == commercial)
+  // victory! apply BossDeath effect
+  if (gamemapinfo && gamemapinfo->numbossactions != 0)
+  {
+    for (i = 0; i < gamemapinfo->numbossactions; i++)
+      if (gamemapinfo->bossactions[i].type == mo->type)
+      {
+        player_t fakeplayer = {0};
+        fakeplayer.health = 1; // non-zombie fake player
+        fakeplayer.mo = NULL;  // don't play sounds, teleport, etc
+        junk = *lines;
+        junk.special = (short)gamemapinfo->bossactions[i].special;
+        junk.tag = (short)gamemapinfo->bossactions[i].tag;
+        // Treat the boss as a temporary fake player to activate the special
+        // it'll be excluded from teleportation since fakeplayer->mo == NULL
+        mo->player = &fakeplayer;
+        if (!P_UseSpecialLine(mo, &junk, 0))
+          P_CrossSpecialLine(&junk, 0, mo);
+        mo->player = NULL;
+      }
+  }
+  else if ( gamemode == commercial)
     {
       if (gamemap == 7)
         {

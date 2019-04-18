@@ -68,6 +68,7 @@ void    F_CastDrawer (void);
 
 void WI_checkForAccelerate(void);    // killough 3/28/98: used to
 extern int acceleratestage;          // accelerate intermission screens
+extern boolean secretexit;           // whether we've entered a secret map
 static int midstage;                 // whether we're in "mid-stage"
 
 /*
@@ -82,10 +83,23 @@ void F_StartFinale (void)
   // killough 3/28/98: clear accelerative text flags
   acceleratestage = midstage = 0;
 
+  if (gamemapinfo)
+  {
+    if (gamemapinfo->intertextsecret && secretexit
+       && gamemapinfo->intertextsecret[0] != '-') // '-' means that any default intermission was cleared.
+      finaletext = gamemapinfo->intertextsecret;
+    else if (gamemapinfo->intertext && !secretexit
+            && gamemapinfo->intertext[0] != '-') // '-' means that any default intermission was cleared.
+      finaletext = gamemapinfo->intertext;
+
+    if (!finaletext) finaletext = "The End";	// this is to avoid a crash on a missing text in the last map.
+
+    finaleflat = gamemapinfo->interbackdrop[0] ? gamemapinfo->interbackdrop : "FLOOR4_8";	// use a single fallback for all maps.
+  }
   /* Okay - IWAD dependent stuff.
    * This has been changed severely, and
    *  some stuff might have changed in the process. */
-  switch ( gamemode )
+  else switch ( gamemode )
   {
      /* DOOM 1 - E1, E3 or E4, but each nine missions */
      case shareware:
@@ -239,31 +253,69 @@ void F_Ticker(void)
     F_CastTicker();
 
   if (!FinaleStage)
-    {
-      float speed = demo_compatibility ? TEXTSPEED : Get_TextSpeed();
-      /* killough 2/28/98: changed to allow acceleration */
-      if (FinaleCount > strlen(finaletext)*speed +
-          (midstage ? NEWTEXTWAIT : TEXTWAIT) ||
-          (midstage && acceleratestage)) {
-        if (gamemode != commercial)       // Doom 1 / Ultimate Doom episode end
-          {                               // with enough time, it's automatic
+  {
+    float speed = demo_compatibility ? TEXTSPEED : Get_TextSpeed();
+    /* killough 2/28/98: changed to allow acceleration */
+    if (FinaleCount > strlen(finaletext)*speed +
+        (midstage ? NEWTEXTWAIT : TEXTWAIT) ||
+        (midstage && acceleratestage)) {
+      if (gamemapinfo)
+      {
+         if (gamemapinfo->endpic[0])
+         {
+           if (!stricmp(gamemapinfo->endpic, "$CAST"))
+             F_StartCast();
+           else
+           {
+             FinaleCount = 0;
+             FinaleStage = 1;
+             wipegamestate = -1;         // force a wipe
+             if (!stricmp(gamemapinfo->endpic, "$BUNNY"))
+               S_StartMusic(mus_bunny);
+           }
+         }
+         else
+           gameaction = ga_worlddone;
+      }
+      else if (gamemode != commercial)       // Doom 1 / Ultimate Doom episode end
+      {                               // with enough time, it's automatic
+        FinaleCount = 0;
+        FinaleStage = 1;
+        wipegamestate = -1;         // force a wipe
+        if (gameepisode == 3)
+          S_StartMusic(mus_bunny);
+      }
+
+      // you must press a button to continue in Doom 2
+      else if (!demo_compatibility && midstage)
+      {
+        next_level:
+        if (gamemapinfo && gamemapinfo->endpic[0])
+        {
+          if (!strcasecmp(gamemapinfo->endpic, "$CAST"))
+          {
+            F_StartCast();
+            //using_FMI = false;
+           }
+           else
+          {
             FinaleCount = 0;
             FinaleStage = 1;
             wipegamestate = -1;         // force a wipe
-            if (gameepisode == 3)
-              S_StartMusic(mus_bunny);
-          }
-        else   // you must press a button to continue in Doom 2
-          if (!demo_compatibility && midstage)
+            if (!strcasecmp(gamemapinfo->endpic, "$BUNNY"))
             {
-            next_level:
-              if (gamemap == 30)
-                F_StartCast();              // cast of Doom 2 characters
-              else
-                gameaction = ga_worlddone;  // next level, e.g. MAP07
+              S_StartMusic(mus_bunny);
+              //using_FMI = false;
             }
+          }
+        }
+        if (gamemap == 30)
+          F_StartCast();              // cast of Doom 2 characters
+        else
+          gameaction = ga_worlddone;  // next level, e.g. MAP07
       }
     }
+  }
 }
 
 //
@@ -647,31 +699,44 @@ static void F_BunnyScroll (void)
 */
 void F_Drawer (void)
 {
-  if (FinaleStage == 2)
-  {
-    F_CastDrawer ();
+  if (gamemapinfo) {
+    if (!FinaleStage || !gamemapinfo->endpic[0])
+    {
+      F_TextWrite();
+    }
+    else
+    {
+      V_DrawNamePatch(0, 0, 0, gamemapinfo->endpic, CR_DEFAULT, VPT_STRETCH);
+      // e6y: wide-res
+      //V_FillBorder(-1, 0);
+    }
     return;
   }
 
   if (!FinaleStage)
     F_TextWrite ();
+  else if (FinaleStage == 2)
+  {
+    F_CastDrawer ();
+    return;
+  }
   else
   {
     switch (gameepisode)
     {
       // CPhipps - patch drawing updated
       case 1:
-           if ( gamemode == retail )
-             V_DrawNamePatch(0, 0, 0, "CREDIT", CR_DEFAULT, VPT_STRETCH);
-           else
-             V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
-           break;
+        if ( gamemode == retail )
+          V_DrawNamePatch(0, 0, 0, "CREDIT", CR_DEFAULT, VPT_STRETCH);
+        else
+          V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
+        break;
       case 2:
-           V_DrawNamePatch(0, 0, 0, "VICTORY2", CR_DEFAULT, VPT_STRETCH);
-           break;
+        V_DrawNamePatch(0, 0, 0, "VICTORY2", CR_DEFAULT, VPT_STRETCH);
+        break;
       case 3:
-           F_BunnyScroll ();
-           break;
+        F_BunnyScroll ();
+        break;
       case 4:
            V_DrawNamePatch(0, 0, 0, "ENDPIC", CR_DEFAULT, VPT_STRETCH);
            break;

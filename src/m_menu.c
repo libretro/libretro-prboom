@@ -515,8 +515,10 @@ menuitem_t EpisodeMenu[]=
   {1,"M_EPI3", M_Episode,'i',"Episode 3"},
   {1,"M_EPI4", M_Episode,'t',"Episode 4"},
   {1,"M_EPI5", M_Episode,'s',"Episode 5"},
+  // Some extra empty episodes for extensibility through UMAPINFO
   {1,"M_EPI6", M_Episode,'6',"Episode 6"},
-  {1,"M_EPI7", M_Episode,'7',"Episode 7"}
+  {1,"M_EPI7", M_Episode,'7',"Episode 7"},
+  {1,"M_EPI8", M_Episode,'8',"Episode 8"}
 };
 
 menu_t EpiDef =
@@ -529,10 +531,52 @@ menu_t EpiDef =
   0              // lastOn
 };
 
+// This is for customized episode menus
+int EpiCustom;
+short EpiMenuEpi[8], EpiMenuMap[8];
+
 //
 //    M_Episode
 //
 int epi;
+
+void M_AddEpisode(const char *map, char *def)
+{
+  if (!EpiCustom) {
+     EpiCustom = true;
+     // No more than 4 Eps expected when having UMAPINFO (prevent SIGILv1.2 from showing twice)
+     if (EpiDef.numitems > 4)
+        EpiDef.numitems = 4;
+  }
+  if (*def == '-')	// means 'clear'
+  {
+    EpiDef.numitems = 0;
+  }
+  else
+  {
+    const char *gfx = strtok(def, "\n");
+    const char *txt = strtok(NULL, "\n");
+    const char *alpha = strtok(NULL, "\n");
+    if (EpiDef.numitems >= 8) return;
+    int episodenum, mapnum;
+    G_ValidateMapName(map, &episodenum, &mapnum);
+    EpiMenuEpi[EpiDef.numitems] = episodenum;
+    EpiMenuMap[EpiDef.numitems] = mapnum;
+    strncpy(EpisodeMenu[EpiDef.numitems].name, gfx, 8);
+    EpisodeMenu[EpiDef.numitems].name[8] = 0;
+    EpisodeMenu[EpiDef.numitems].alttext = txt;
+    EpisodeMenu[EpiDef.numitems].alphaKey = alpha ? *alpha : 0;
+    EpiDef.numitems++;
+  }
+  if (EpiDef.numitems <= 4)
+  {
+    EpiDef.y = 63;
+  }
+  else
+  {
+    EpiDef.y = 63 - (EpiDef.numitems - 4) * (LINEHEIGHT / 2);
+  }
+}
 
 void M_DrawEpisode(void)
 {
@@ -646,7 +690,8 @@ void M_ChooseSkill(int choice)
       return;
     }
 
-  G_DeferedInitNew(choice,epi+1,1);
+  if (!EpiCustom) G_DeferedInitNew(choice,epi+1,1);
+  else G_DeferedInitNew(choice, EpiMenuEpi[epi], EpiMenuMap[epi]);
   M_ClearMenus ();
 }
 

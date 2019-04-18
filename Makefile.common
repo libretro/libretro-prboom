@@ -112,7 +112,10 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/oplplayer.c \
 				 $(CORE_DIR)/flplayer.c \
 				 $(CORE_DIR)/midifile.c \
-				 $(CORE_DIR)/madplayer.c
+				 $(CORE_DIR)/madplayer.c \
+				 $(CORE_DIR)/u_mapinfo.c \
+				 $(CORE_DIR)/u_scanner.c \
+
 
 ifeq ($(WANT_FLUIDSYNTH), 1)
 FLUIDSYNTH_DIR := $(DEPS_DIR)/fluidlite

@@ -307,6 +307,7 @@ static void W_CoalesceMarkedResource(const char *start_marker,
 unsigned W_LumpNameHash(const char *s)
 {
   unsigned hash;
+  if (!s[0]) return 0;
   (void) ((hash =        toupper(s[0]), s[1]) &&
           (hash = hash*3+toupper(s[1]), s[2]) &&
           (hash = hash*2+toupper(s[2]), s[3]) &&

@@ -161,30 +161,30 @@ default_t defaults[] =
    {-1, NULL},-1,MAX_COMPATIBILITY_LEVEL-1,
    def_int,ss_none, NULL, NULL}, // compatibility level" - CPhipps
   {"menu_background", {(int*)&menu_background, NULL}, {1, NULL}, 0, 1,
-   def_bool,ss_none, NULL, NULL}, // do Boom fullscreen menus have backgrounds?
+   def_bool,ss_gen, NULL, NULL}, // do Boom fullscreen menus have backgrounds?
   {"max_player_corpse", {&bodyquesize, NULL}, {32, NULL},-1,UL,   // killough 2/8/98
-   def_int,ss_none, NULL, NULL}, // number of dead bodies in view supported (-1 = no limit)
+   def_int,ss_gen, NULL, NULL}, // number of dead bodies in view supported (-1 = no limit)
   {"flashing_hom",{&flashing_hom, NULL},{0, NULL},0,1,
-   def_bool,ss_none, NULL, NULL}, // killough 10/98 - enable flashing HOM indicator
+   def_bool,ss_gen, NULL, NULL}, // killough 10/98 - enable flashing HOM indicator
   {"demo_insurance",{&default_demo_insurance, NULL},{2, NULL},0,2,  // killough 3/31/98
    def_int,ss_none, NULL, NULL}, // 1=take special steps ensuring demo sync, 2=only during recordings
   {"level_precache",{(int*)&precache, NULL},{0, NULL},0,1,
    def_bool,ss_none, NULL, NULL}, // precache level data?
   {"demo_smoothturns", {&demo_smoothturns, NULL},  {0, NULL},0,1,
-   def_bool,ss_stat, NULL, NULL},
+   def_bool,ss_gen, NULL, NULL},
   {"demo_smoothturnsfactor", {&demo_smoothturnsfactor, NULL},  {6, NULL},1,SMOOTH_PLAYING_MAXFACTOR,
-   def_int,ss_stat, NULL, NULL},
+   def_int,ss_gen, NULL, NULL},
 
   {"Files",{NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
   /* cph - MBF-like wad/deh/bex autoload code */
-  {"wadfile_1",{NULL,&wad_files[0]},{0,""},UL,UL,def_str,ss_none, NULL, NULL},
-  {"wadfile_2",{NULL,&wad_files[1]},{0,""},UL,UL,def_str,ss_none, NULL, NULL},
-  {"dehfile_1",{NULL,&deh_files[0]},{0,""},UL,UL,def_str,ss_none, NULL, NULL},
-  {"dehfile_2",{NULL,&deh_files[1]},{0,""},UL,UL,def_str,ss_none, NULL, NULL},
+  {"wadfile_1",{NULL,&wad_files[0]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_2",{NULL,&wad_files[1]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"dehfile_1",{NULL,&deh_files[0]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"dehfile_2",{NULL,&deh_files[1]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
 
   {"Game settings",{NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
   {"default_skill",{&defaultskill, NULL},{3, NULL},1,5, // jff 3/24/98 allow default skill setting
-   def_int,ss_none, NULL, NULL}, // selects default skill 1=TYTD 2=NTR 3=HMP 4=UV 5=NM
+   def_int,ss_gen, NULL, NULL}, // selects default skill 1=TYTD 2=NTR 3=HMP 4=UV 5=NM
   {"weapon_recoil",{&default_weapon_recoil, NULL},{0, NULL},0,1,
    def_bool,ss_weap, &weapon_recoil, NULL},
   /* killough 10/98 - toggle between SG/SSG and Fist/Chainsaw */
@@ -257,38 +257,38 @@ default_t defaults[] =
   {"music_card",{&mus_card, NULL},{-1, NULL},-1,9,       //  to be set,  -1 = autodetect
    def_int,ss_none, NULL, NULL}, // select music driver (DOS), -1 is autodetect, 0 is none"; in Linux, non-zero enables music
   {"pitched_sounds",{&pitched_sounds, NULL},{0, NULL},0,1, // killough 2/21/98
-   def_bool,ss_none, NULL, NULL}, // enables variable pitch in sound effects (from id's original code)
+   def_bool,ss_gen, NULL, NULL}, // enables variable pitch in sound effects (from id's original code)
   {"samplerate",{&snd_samplerate, NULL},{11025, NULL},11025,48000, def_int,ss_none, NULL, NULL},
   {"sfx_volume",{&snd_SfxVolume, NULL},{8, NULL},0,15, def_int,ss_none, NULL, NULL},
   {"music_volume",{&snd_MusicVolume, NULL},{8, NULL},0,15, def_int,ss_none, NULL, NULL},
   {"mus_pause_opt",{&mus_pause_opt, NULL},{2, NULL},0,2, // CPhipps - music pausing
    def_int, ss_none, NULL, NULL}, // 0 = kill music when paused, 1 = pause music, 2 = let music continue
   {"snd_channels",{&default_numChannels, NULL},{8, NULL},1,32,
-   def_int,ss_none, NULL, NULL}, // number of audio events simultaneously // killough
+   def_int,ss_gen, NULL, NULL}, // number of audio events simultaneously // killough
 
   {"Video settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},
   {"screenblocks",{&screenblocks, NULL},{10, NULL},3,11,  // killough 2/21/98: default to 10
    def_int,ss_none, NULL, NULL},
   {"usegamma",{&usegamma, NULL},{0, NULL},0,4, //jff 3/6/98 fix erroneous upper limit in range
-   def_int,ss_none, NULL, NULL}, // gamma correction level // killough 1/18/98
+   def_int,ss_gen, NULL, NULL}, // gamma correction level // killough 1/18/98
   {"uncapped_framerate", {&movement_smooth, NULL},  {3, NULL},0,11,
-   def_int,ss_stat, NULL, NULL},
+   def_int,ss_gen, NULL, NULL},
   {"filter_wall",{(int*)&drawvars.filterwall, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_gen, NULL, NULL},
   {"filter_floor",{(int*)&drawvars.filterfloor, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_gen, NULL, NULL},
   {"filter_sprite",{(int*)&drawvars.filtersprite, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_gen, NULL, NULL},
   {"filter_z",{(int*)&drawvars.filterz, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_LINEAR, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_LINEAR, def_int,ss_gen, NULL, NULL},
   {"filter_patch",{(int*)&drawvars.filterpatch, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_gen, NULL, NULL},
   {"filter_threshold",{(int*)&drawvars.mag_threshold, NULL},{49152, NULL},
    0, UL, def_int,ss_none, NULL, NULL},
   {"sprite_edges",{(int*)&drawvars.sprite_edges, NULL},{RDRAW_MASKEDCOLUMNEDGE_SQUARE, NULL},
-   RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_none, NULL, NULL},
+   RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
   {"patch_edges",{(int*)&drawvars.patch_edges, NULL},{RDRAW_MASKEDCOLUMNEDGE_SQUARE, NULL},
-   RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_none, NULL, NULL},
+   RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
 
 
   {"Mouse settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},

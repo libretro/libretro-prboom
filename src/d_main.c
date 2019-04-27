@@ -469,12 +469,12 @@ void D_DoAdvanceDemo(void)
 
 #ifdef HAVE_NET
   if (netgame && !demoplayback) {
-#else
-  if (!demoplayback) {
-#endif
     demosequence = 0;
-  } else
-   if (!demostates[++demosequence][gamemode].func)
+    return;
+  }
+#endif
+
+  if (!demostates[++demosequence][gamemode].func)
     demosequence = 0;
   demostates[demosequence][gamemode].func
     (demostates[demosequence][gamemode].name);

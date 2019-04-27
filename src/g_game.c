@@ -2173,26 +2173,26 @@ void G_ReadDemoTiccmd (ticcmd_t* cmd)
     G_CheckDemoStatus();
   }
   else
-    {
-      cmd->forwardmove = ((signed char)*demo_p++);
-      cmd->sidemove = ((signed char)*demo_p++);
-      if (!longtics) {
-        cmd->angleturn = ((unsigned char)(at = *demo_p++))<<8;
-      } else {
-	unsigned int lowbyte = (unsigned char)*demo_p++;
-        cmd->angleturn = (((signed int)(*demo_p++))<<8) + lowbyte;
-      }
-      cmd->buttons = (unsigned char)*demo_p++;
-      // e6y: ability to play tasdoom demos directly
-      if (compatibility_level == tasdoom_compatibility)
-      {
-        signed char k = cmd->forwardmove;
-        cmd->forwardmove = cmd->sidemove;
-        cmd->sidemove = (signed char)at;
-        cmd->angleturn = ((unsigned char)cmd->buttons)<<8;
-        cmd->buttons = (uint8_t)k;
-      }
+  {
+    cmd->forwardmove = ((signed char)*demo_p++);
+    cmd->sidemove = ((signed char)*demo_p++);
+    if (!longtics) {
+      cmd->angleturn = ((unsigned char)(at = *demo_p++))<<8;
+    } else {
+      unsigned int lowbyte = (unsigned char)*demo_p++;
+      cmd->angleturn = (((signed int)(*demo_p++))<<8) + lowbyte;
     }
+    cmd->buttons = (unsigned char)*demo_p++;
+    // e6y: ability to play tasdoom demos directly
+    if (compatibility_level == tasdoom_compatibility)
+    {
+      signed char k = cmd->forwardmove;
+      cmd->forwardmove = cmd->sidemove;
+      cmd->sidemove = (signed char)at;
+      cmd->angleturn = ((unsigned char)cmd->buttons)<<8;
+      cmd->buttons = (uint8_t)k;
+    }
+  }
 }
 
 // These functions are used to read and write game-specific options in demos
@@ -2659,18 +2659,18 @@ boolean G_CheckDemoStatus (void)
   P_ChecksumFinal();
 
   if (demoplayback)
-    {
-      if (demolumpnum != -1) {
-  // cph - unlock the demo lump
-  W_UnlockLumpNum(demolumpnum);
-  demolumpnum = -1;
-      }
-      G_ReloadDefaults();    // killough 3/1/98
-      netgame = FALSE;       // killough 3/29/98
-      deathmatch = FALSE;
-      D_AdvanceDemo ();
-      return TRUE;
+  {
+    if (demolumpnum != -1) {
+      // cph - unlock the demo lump
+      W_UnlockLumpNum(demolumpnum);
+      demolumpnum = -1;
     }
+    G_ReloadDefaults();    // killough 3/1/98
+    netgame = FALSE;       // killough 3/29/98
+    deathmatch = FALSE;
+    D_AdvanceDemo ();
+    return TRUE;
+  }
   return FALSE;
 }
 

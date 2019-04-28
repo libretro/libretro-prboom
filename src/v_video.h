@@ -51,8 +51,16 @@
 // Screen 0 is the screen updated by I_Update screen.
 // Screen 1 is an extra buffer.
 
-// array of pointers to color translation tables
-extern const uint8_t *colrngs[];
+typedef struct {
+  uint8_t *data;       // pointer to the screen content
+  boolean not_on_heap; // if set, no malloc or free is preformed and
+                       // data never set to NULL. Used i.e. with SDL doublebuffer.
+  int height;          // the height of the surface, used when mallocing
+} screeninfo_t;
+
+#define NUM_SCREENS 6
+extern screeninfo_t screens[NUM_SCREENS];
+extern int          usegamma;
 
 // symbolic indices into color translation table pointer array
 typedef enum
@@ -73,17 +81,6 @@ typedef enum
 //jff 1/16/98 end palette color range additions
 
 #define CR_DEFAULT CR_RED   /* default value for out of range colors */
-
-typedef struct {
-  uint8_t *data;       // pointer to the screen content
-  boolean not_on_heap; // if set, no malloc or free is preformed and
-                       // data never set to NULL. Used i.e. with SDL doublebuffer.
-  int height;          // the height of the surface, used when mallocing
-} screeninfo_t;
-
-#define NUM_SCREENS 6
-extern screeninfo_t screens[NUM_SCREENS];
-extern int          usegamma;
 
 // Varying bit-depth support -POPE
 //

@@ -324,14 +324,18 @@ static void R_InitSpriteLumps(void)
 static void R_InitColormaps(void)
 {
   int i;
-  firstcolormaplump = W_GetNumForName("C_START");
-  lastcolormaplump  = W_GetNumForName("C_END");
+  firstcolormaplump = W_CheckNumForName("C_START");
+  lastcolormaplump  = W_CheckNumForName("C_END");
   numcolormaps = lastcolormaplump - firstcolormaplump;
-  colormaps = Z_Malloc(sizeof(*colormaps) * numcolormaps, PU_STATIC, 0);
+  colormaps = Z_Malloc(sizeof(*colormaps) * MAX(1,numcolormaps), PU_STATIC, 0);
   colormaps[0] = (const lighttable_t *)W_CacheLumpName("COLORMAP");
   for (i=1; i<numcolormaps; i++)
     colormaps[i] = (const lighttable_t *)W_CacheLumpNum(i+firstcolormaplump);
-  // cph - always lock
+
+  if(numcolormaps == 0) {
+    colormaps[1] = (const lighttable_t *) {1};
+    numcolormaps = 2;
+  }
 }
 
 // killough 4/4/98: get colormap number from name
@@ -407,6 +411,7 @@ void R_InitData(void)
   R_InitFlats();
   lprintf(LO_INFO, "Sprites ");
   R_InitSpriteLumps();
+  lprintf(LO_INFO, "Colormaps ");
   R_InitColormaps();                    // killough 3/20/98
 }
 

@@ -2048,7 +2048,7 @@ static void M_DrawInstructions(void)
 // X,Y position of reset button. This is the same for every screen, and is
 // only defined once here.
 
-#define X_BUTTON 301
+#define X_BUTTON 300
 #define Y_BUTTON   3
 
 // Definitions of the (in this case) four key binding screens.
@@ -5369,6 +5369,13 @@ void M_Init(void)
 
   M_ChangeDemoSmoothTurns();
   M_ChangeFramerate();
+
+  // Check if M_BUTT1 / M_BUTT2 exists, use fallback otherwise
+  if ( W_CheckNumForName(ResetButtonName[0]) == -1 ||  W_CheckNumForName(ResetButtonName[1]) == -1 )
+  {
+    strcpy(ResetButtonName[0], "WARNB0");
+    strcpy(ResetButtonName[1], "WARNA0");
+  }
 }
 
 //

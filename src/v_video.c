@@ -741,3 +741,38 @@ void V_DrawLine(fline_t* fl, int color)
     }
   }
 }
+
+// V_DrawBox()
+//
+// Draw a box in the frame buffer, stretched to current resolution.
+//
+// Pass the coordinates of diagonal line of the box, and the color to be drawn
+// Returns nothing
+//
+void V_DrawBox(fline_t* fl, int color)
+{
+  int x, y, ax, ay, bx, by;
+
+  if (fl->a.x > fl->b.x) {
+    ax = fl->b.x;
+    bx = fl->a.x;
+  } else {
+    ax = fl->a.x;
+    bx = fl->b.x;
+  }
+  if (fl->a.y > fl->b.y) {
+    ay = fl->b.y;
+    by = fl->a.y;
+  } else {
+    ay = fl->a.y;
+    by = fl->b.y;
+  }
+  ax = ax * SCREENWIDTH / 320;
+  bx = bx * SCREENWIDTH / 320;
+  ay = ay * SCREENHEIGHT / 200;
+  by = by * SCREENHEIGHT / 200;
+
+  for (x = ax; x < bx; x++)
+	 for (y = ay; y < by; y++)
+        V_PlotPixel(0, x,y, (uint8_t)color);
+}

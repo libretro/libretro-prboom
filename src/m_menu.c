@@ -1961,11 +1961,20 @@ static void M_DrawScreenItems(const setup_menu_t* src)
 
 static void M_DrawDefVerify(void)
 {
-  // proff 12/6/98: Drawing of verify box changed for hi-res, it now uses a patch
-  V_DrawNamePatch(VERIFYBOXXORG,VERIFYBOXYORG,0,"M_VBOX",CR_DEFAULT,VPT_STRETCH);
+  // Dialog background will use a patch if available, otherwise draw a black box
+  int lump = W_CheckNumForName("M_VBOX");
+  if ( lump != -1 )
+    V_DrawNumPatch(VERIFYBOXXORG,VERIFYBOXYORG,0,lump,CR_DEFAULT,VPT_STRETCH);
+  else {
+    fline_t boxdiag = {
+      { VERIFYBOXXORG, 	VERIFYBOXYORG },
+      { VERIFYBOXXORG+187,	VERIFYBOXYORG+23 },
+    };
+    V_DrawBox(&boxdiag, 0);
+  }
+
   // The blinking messages is keyed off of the blinking of the
   // cursor skull.
-
   if (whichSkull) { // blink the text
     strcpy(menu_buffer,"Reset to defaults? (Y or N)");
     M_DrawMenuString(VERIFYBOXXORG+8,VERIFYBOXYORG+8,CR_RED);

@@ -120,6 +120,9 @@ static float fast_sqrt(float n)
 	float		prev = 0.0f;
 	float		cur  = 1.0f;
 
+	if (n == 0)
+		return 0;
+
 	while (prev != cur)
 	{
 		prev = cur;

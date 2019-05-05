@@ -957,7 +957,7 @@ static void process_gamepad_right_analog(void)
 	if (doom_devices[0] == RETROPAD_CLASSIC)
 		run_key = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y);
 	else if (doom_devices[0] == RETROPAD_MODERN)
-		run_key = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L);
+		run_key = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2);
 	else
 		run_key = 0;
 

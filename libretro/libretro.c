@@ -230,7 +230,7 @@ void retro_get_system_info(struct retro_system_info *info)
 #endif
    info->library_version  = "v2.5.0" GIT_VERSION;
    info->need_fullpath    = true;
-   info->valid_extensions = "wad|iwad|pwad";
+   info->valid_extensions = "wad|iwad|pwad|lmp";
    info->block_extract = false;
 }
 
@@ -489,7 +489,7 @@ static void extract_directory(char *buf, const char *path, size_t size)
    }
 }
 
-static void remove_extension(char *buf, const char *path, size_t size)
+static char* remove_extension(char *buf, const char *path, size_t size)
 {
   char *base;
   strncpy(buf, path, size - 1);
@@ -499,6 +499,8 @@ static void remove_extension(char *buf, const char *path, size_t size)
 
   if (base)
      *base = '\0';
+
+  return base+1;
 }
 
 static wadinfo_t get_wadinfo(const char *path)
@@ -530,45 +532,53 @@ bool retro_load_game(const struct retro_game_info *info)
    if(info->path)
    {
       wadinfo_t header;
-      char *deh;
+      char *deh, *extension;
       char name_without_ext[4096];
       bool use_external_savedir = false;
       const char *base_save_dir = NULL;
 
       extract_directory(g_wad_dir, info->path, sizeof(g_wad_dir));
       extract_basename(g_basename, info->path, sizeof(g_basename));
+      extension = remove_extension(name_without_ext, g_basename, sizeof(name_without_ext));
 
-      header = get_wadinfo(info->path);
-      if(header.identification == NULL)
+      if(strcasecmp(extension,"lmp") == 0)
       {
-         I_Error("retro_load_game: couldn't read WAD header from '%s'", info->path);
-         goto failed;
-      }
-      if(!strncmp(header.identification, "IWAD", 4))
-      {
-         argv[argc++] = strdup("-iwad");
-         argv[argc++] = strdup(g_basename);
-      }
-      else if(!strncmp(header.identification, "PWAD", 4))
-      {
-         argv[argc++] = strdup("-file");
-         argv[argc++] = strdup(info->path);
+        // Play as a demo file lump
+        argv[argc++] = strdup("-playdemo");
+        argv[argc++] = strdup(info->path);
       }
       else
       {
-         I_Error("retro_load_game: invalid WAD header '%s'", header.identification);
-         goto failed;
+        header = get_wadinfo(info->path);
+        if(header.identification == NULL)
+        {
+          I_Error("retro_load_game: couldn't read WAD header from '%s'", info->path);
+          goto failed;
+        }
+        if(!strncmp(header.identification, "IWAD", 4))
+        {
+          argv[argc++] = strdup("-iwad");
+          argv[argc++] = strdup(g_basename);
+        }
+        else if(!strncmp(header.identification, "PWAD", 4))
+        {
+          argv[argc++] = strdup("-file");
+          argv[argc++] = strdup(info->path);
+        }
+        else
+        {
+          I_Error("retro_load_game: invalid WAD header '%s'", header.identification);
+          goto failed;
+        }
+
+        /* Check for DEH or BEX files */
+        if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))
+           || (deh = FindFileInDir(g_wad_dir, name_without_ext, ".bex")))
+        {
+          argv[argc++] = "-deh";
+          argv[argc++] = deh;
+        };
       }
-
-      /* Check for DEH or BEX files */
-      remove_extension(name_without_ext, g_basename, sizeof(name_without_ext));
-
-      if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))
-         || (deh = FindFileInDir(g_wad_dir, name_without_ext, ".bex")))
-      {
-           argv[argc++] = "-deh";
-           argv[argc++] = deh;
-      };
 
       // Get save directory
       if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)

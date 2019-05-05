@@ -112,6 +112,7 @@ boolean autostart;
 int ffmap;
 
 boolean advancedemo;
+boolean singledemo;
 
 char    wadfile[PATH_MAX+1];       // primary wad file
 char    mapdir[PATH_MAX+1];        // directory of development maps
@@ -356,7 +357,8 @@ static void D_PageDrawer(void)
 //
 void D_AdvanceDemo (void)
 {
-  advancedemo = TRUE;
+  if(!singledemo)
+    advancedemo = TRUE;
 }
 
 /* killough 11/98: functions to perform demo sequences
@@ -469,12 +471,12 @@ void D_DoAdvanceDemo(void)
 
 #ifdef HAVE_NET
   if (netgame && !demoplayback) {
-#else
-  if (!demoplayback) {
-#endif
     demosequence = 0;
-  } else
-   if (!demostates[++demosequence][gamemode].func)
+    return;
+  }
+#endif
+
+  if (!demostates[++demosequence][gamemode].func)
     demosequence = 0;
   demostates[demosequence][gamemode].func
     (demostates[demosequence][gamemode].name);
@@ -986,6 +988,16 @@ static void DoLooseFiles(void)
     }
   }
 
+  if ((p = M_CheckParm ("-playdemo")))
+  {
+    skip[p] = true;    // nuke the entry
+    while (++p != myargc && *myargv[p] != '-')
+    {
+      lmps[lmpcount++] = strdup(myargv[p]);
+      skip[p] = true;  // null any we find and save
+    }
+  }
+
   // Now go back and redo the whole myargv array with our stuff in it.
   // First, create a new myargv array to copy into
   tmyargv = calloc(sizeof(char *),MAXARGVS);
@@ -1006,6 +1018,14 @@ static void DoLooseFiles(void)
     tmyargv[tmyargc++] = strdup("-deh");
     for (i=0;i<dehcount;)
       tmyargv[tmyargc++] = dehs[i++];
+  }
+
+  // for -playdemo
+  if (lmpcount > 0)
+  {
+    tmyargv[tmyargc++] = strdup("-playdemo");
+    for (i=0;i<lmpcount;)
+      tmyargv[tmyargc++] = lmps[i++];
   }
 
   // then copy everything that's there now
@@ -1242,27 +1262,27 @@ bool D_DoomMainSetup(void)
   // killough 1/31/98, 5/2/98: reload hack removed, -wart same as -warp now.
 
   if ((p = M_CheckParm ("-file")))
-    {
-      // the parms after p are wadfile/lump names,
-      // until end of parms or another - preceded parm
-      modifiedgame = TRUE;            // homebrew levels
-      while (++p != myargc && *myargv[p] != '-')
-        D_AddFile(myargv[p],source_pwad);
-    }
+  {
+    // the parms after p are wadfile/lump names,
+    // until end of parms or another - preceded parm
+    modifiedgame = TRUE;            // homebrew levels
+    while (++p != myargc && *myargv[p] != '-')
+      D_AddFile(myargv[p],source_pwad);
+  }
 
+  p = M_CheckParm("-playdemo");
   if (p && p < myargc-1)
-    {
-      char file[PATH_MAX+1];      // cph - localised
-      strcpy(file,myargv[p+1]);
-      AddDefaultExtension(file,".lmp");     // killough
-      D_AddFile (file,source_lmp);
-      //jff 9/3/98 use logical output routine
-      lprintf(LO_CONFIRM,"Playing demo %s\n",file);
-      if ((p = M_CheckParm ("-ffmap")) && p < myargc-1) {
-        ffmap = atoi(myargv[p+1]);
-      }
-
+  {
+    char file[PATH_MAX+1];      // cph - localised
+    strcpy(file,myargv[p+1]);
+    AddDefaultExtension(file,".lmp");     // killough
+    D_AddFile (file,source_lmp);
+    //jff 9/3/98 use logical output routine
+    lprintf(LO_CONFIRM,"Playing demo %s\n",file);
+    if ((p = M_CheckParm ("-ffmap")) && p < myargc-1) {
+      ffmap = atoi(myargv[p+1]);
     }
+  }
 
   // 1/18/98 killough: Z_Init() call moved to i_main.c
 
@@ -1297,7 +1317,8 @@ bool D_DoomMainSetup(void)
       }
     }
 
-  if (!M_CheckParm("-noload")) {
+  if (!M_CheckParm("-noload"))
+  {
     // now do autoloaded dehacked patches, after IWAD patches but before PWAD
     int i;
 
@@ -1423,35 +1444,28 @@ bool D_DoomMainSetup(void)
 
   idmusnum = -1; //jff 3/17/98 insure idmus number is blank
 
+
+  if ((p = M_CheckParm("-playdemo")) && ++p < myargc)
+  {
+	singledemo = TRUE;
+	G_DeferedPlayDemo(myargv[p]);
+  }
+
   // start the apropriate game based on parms
 
-  // killough 12/98:
-
-  if ((p = M_CheckParm ("-checksum")) && ++p < myargc)
-    {
-      P_RecordChecksum (myargv[p]);
-    }
-
-#if 0
-  if (slot && ++slot < myargc)
-    {
-      slot = atoi(myargv[slot]);        // killough 3/16/98: add slot info
-      G_LoadGame(slot, TRUE);           // killough 5/15/98: add command flag // cph - no filename
-    }
-  else
-#endif
+  if (gameaction != ga_playdemo)
 #ifdef HAVE_NET
-      if (autostart || netgame)
+    if (autostart || netgame)
 #else
-      if (autostart)
+    if (autostart)
 #endif
-  {
-    // sets first map and first episode if unknown
-    GetFirstMap(&startepisode, &startmap);
-    G_InitNew(startskill, startepisode, startmap);
-  }
-      else
-  D_StartTitle();                 // start up intro loop
+    {
+      // sets first map and first episode if unknown
+      GetFirstMap(&startepisode, &startmap);
+      G_InitNew(startskill, startepisode, startmap);
+    }
+    else
+      D_StartTitle(); // start up intro loop
 
   return true;
 

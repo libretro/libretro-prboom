@@ -70,7 +70,7 @@ void D_DoomMain(void);
 void D_AddFile (const char *file, wad_source_t source);
 
 /* cph - MBF-like wad/deh/bex autoload code */
-#define MAXLOADFILES 2
+#define MAXLOADFILES 8
 extern const char *wad_files[MAXLOADFILES], *deh_files[MAXLOADFILES];
 
 #endif

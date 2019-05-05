@@ -179,6 +179,12 @@ default_t defaults[] =
   /* cph - MBF-like wad/deh/bex autoload code */
   {"wadfile_1",{NULL,&wad_files[0]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
   {"wadfile_2",{NULL,&wad_files[1]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_3",{NULL,&wad_files[2]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_4",{NULL,&wad_files[3]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_5",{NULL,&wad_files[4]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_6",{NULL,&wad_files[5]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_7",{NULL,&wad_files[6]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_8",{NULL,&wad_files[7]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
   {"dehfile_1",{NULL,&deh_files[0]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
   {"dehfile_2",{NULL,&deh_files[1]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
 

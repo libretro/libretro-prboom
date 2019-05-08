@@ -934,7 +934,6 @@ enum
   messages,
   /*    detail, obsolete -- killough */
   scrnsize,
-  option_empty1,
   mousesens,
   /* option_empty2, submenu now -- killough */
   soundvol,

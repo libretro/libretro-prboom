@@ -878,11 +878,21 @@ static void ST_loadGraphics(boolean doload)
   R_SetPatchNum(&tallpercent,"STTPRCNT");
 
   // key cards
-  for (i=0;i<NUMCARDS+3;i++)  //jff 2/23/98 show both keys too
+  for (i=0;i<NUMCARDS;i++)
     {
       sprintf(namebuf, "STKEYS%d", i);
       R_SetPatchNum(&keys[i], namebuf);
     }
+  // if there are graphics for the combined keycard+skullkeys, use them
+  // otherwise fallback to skullkeys like in vanilla Doom.
+  for (i=0;i<3;i++)
+  {
+    sprintf(namebuf, "STKEYS%d", NUMCARDS+i);
+    if (W_CheckNumForName(namebuf) != -1)
+      R_SetPatchNum(&keys[NUMCARDS+i], namebuf);
+    else
+      keys[NUMCARDS+i] = keys[3+i];
+  }
 
   //e6y: status bar background
   R_SetPatchNum(&stbarbg, "STBAR");

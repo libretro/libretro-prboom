@@ -108,6 +108,40 @@ static anim_t*  lastanim;
 static anim_t*  anims;                // new structure w/o limits -- killough
 static size_t maxanims;
 
+// Default animation definitions for Doom
+const animdef_t doom_animdefs[] =
+{
+  {FALSE,	"NUKAGE3",	"NUKAGE1",	8},
+  {FALSE,	"FWATER4",	"FWATER1",	8},
+  {FALSE,	"SWATER4",	"SWATER1", 	8},
+  {FALSE,	"LAVA4",	"LAVA1",	8},
+  {FALSE,	"BLOOD3",	"BLOOD1",	8},
+
+  // DOOM II flat animations.
+  {FALSE,	"RROCK08",	"RROCK05",	8},
+  {FALSE,	"SLIME04",	"SLIME01",	8},
+  {FALSE,	"SLIME08",	"SLIME05",	8},
+  {FALSE,	"SLIME12",	"SLIME09",	8},
+
+  {TRUE,	"BLODGR4",	"BLODGR1",	8},
+  {TRUE,	"SLADRIP3",	"SLADRIP1",	8},
+
+  {TRUE,	"BLODRIP4",	"BLODRIP1",	8},
+  {TRUE,	"FIREWALL",	"FIREWALA",	8},
+  {TRUE,	"GSTFONT3",	"GSTFONT1",	8},
+  {TRUE,	"FIRELAVA",	"FIRELAV3",	8},
+  {TRUE,	"FIREMAG3",	"FIREMAG1",	8},
+  {TRUE,	"FIREBLU2",	"FIREBLU1",	8},
+  {TRUE,	"ROCKRED3",	"ROCKRED1",	8},
+
+  {TRUE,	"BFALL4",	"BFALL1",	8},
+  {TRUE,	"SFALL4",	"SFALL1",	8},
+  {TRUE,	"WFALL4",	"WFALL1",	8},
+  {TRUE,	"DBRAIN4",	"DBRAIN1",	8},
+
+  {-1,        "",             "",	0},
+};
+
 // killough 3/7/98: Initialize generalized scrolling
 static void P_SpawnScrollers(void);
 
@@ -140,11 +174,14 @@ void P_InitPicAnims (void)
 {
   int         i;
   const animdef_t *animdefs; //jff 3/23/98 pointer to animation lump
-  int         lump = W_GetNumForName("ANIMATED"); // cph - new wad lump handling
+  int         lump = W_CheckNumForName("ANIMATED"); // cph - new wad lump handling
   //  Init animation
 
-  //jff 3/23/98 read from predefined or wad lump instead of table
-  animdefs = (const animdef_t *)W_CacheLumpNum(lump);
+  // read from predefined or wad lump if available, otherwise use known table
+  if (lump == -1)
+    animdefs = doom_animdefs;
+  else
+    animdefs = (const animdef_t *)W_CacheLumpNum(lump);
 
   lastanim = anims;
   for (i=0 ; animdefs[i].istexture != -1 ; i++)

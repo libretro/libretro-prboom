@@ -1091,12 +1091,9 @@ bool D_DoomMainSetup(void)
     char *data_wad_path = I_FindFile(PACKAGE ".wad", NULL);
 
     if (!data_wad_path)
-    {
-      I_Error(PACKAGE ".wad not found - cannot continue");
-      goto failed;
-    }
-
-    D_AddFile(data_wad_path, source_pre);
+      lprintf(LO_INFO, PACKAGE ".wad not found - internal default data will be used\n");
+    else
+      D_AddFile(data_wad_path, source_pre);
     free(data_wad_path);
   }
 

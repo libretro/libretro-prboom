@@ -48,6 +48,56 @@ static int numswitches;                           // killough
 
 button_t  buttonlist[MAXBUTTONS];
 
+// Default switch definitions for Doom
+const switchlist_t doom_alphSwitchList[] =
+{
+  // Doom shareware episode 1 switches
+  {"SW1BRCOM",	"SW2BRCOM",	1},
+  {"SW1BRN1",	"SW2BRN1",	1},
+  {"SW1BRN2",	"SW2BRN2",	1},
+  {"SW1BRNGN",	"SW2BRNGN",	1},
+  {"SW1BROWN",	"SW2BROWN",	1},
+  {"SW1COMM",	"SW2COMM",	1},
+  {"SW1COMP",	"SW2COMP",	1},
+  {"SW1DIRT",	"SW2DIRT",	1},
+  {"SW1EXIT",	"SW2EXIT",	1},
+  {"SW1GRAY",	"SW2GRAY",	1},
+  {"SW1GRAY1",	"SW2GRAY1",	1},
+  {"SW1METAL",	"SW2METAL",	1},
+  {"SW1PIPE",	"SW2PIPE",	1},
+  {"SW1SLAD",	"SW2SLAD",	1},
+  {"SW1STARG",	"SW2STARG",	1},
+  {"SW1STON1",	"SW2STON1",	1},
+  {"SW1STON2",	"SW2STON2",	1},
+  {"SW1STONE",	"SW2STONE",	1},
+  {"SW1STRTN",	"SW2STRTN",	1},
+
+  // Doom registered episodes 2&3 switches
+  {"SW1BLUE",	"SW2BLUE",	2},
+  {"SW1CMT",	"SW2CMT",	2},
+  {"SW1GARG",	"SW2GARG",	2},
+  {"SW1GSTON",	"SW2GSTON",	2},
+  {"SW1HOT",	"SW2HOT",	2},
+  {"SW1LION",	"SW2LION",	2},
+  {"SW1SATYR",	"SW2SATYR",	2},
+  {"SW1SKIN",	"SW2SKIN",	2},
+  {"SW1VINE",	"SW2VINE",	2},
+  {"SW1WOOD",	"SW2WOOD",	2},
+
+  // Doom II switches
+  {"SW1PANEL",	"SW2PANEL",	3},
+  {"SW1ROCK",	"SW2ROCK",	3},
+  {"SW1MET2",	"SW2MET2",	3},
+  {"SW1WDMET",	"SW2WDMET",	3},
+  {"SW1BRIK",	"SW2BRIK",	3},
+  {"SW1MOD1",	"SW2MOD1",	3},
+  {"SW1ZIM",	"SW2ZIM",	3},
+  {"SW1STON6",	"SW2STON6",	3},
+  {"SW1TEK",	"SW2TEK",	3},
+  {"SW1MARB",	"SW2MARB",	3},
+  {"SW1SKULL",	"SW2SKULL",	3},
+};
+
 //
 // P_InitSwitchList()
 //
@@ -69,48 +119,51 @@ button_t  buttonlist[MAXBUTTONS];
 //
 void P_InitSwitchList(void)
 {
-   int i, index = 0;
-   int episode = (gamemode == registered || gamemode==retail) ?
-      2 : gamemode == commercial ? 3 : 1;
-   const switchlist_t *alphSwitchList;         //jff 3/23/98 pointer to switch table
-   int lump = W_GetNumForName("SWITCHES"); // cph - new wad lump handling
+  int i, index = 0;
+  int episode = (gamemode == registered || gamemode==retail) ?
+    2 : gamemode == commercial ? 3 : 1;
+  const switchlist_t *alphSwitchList;         //jff 3/23/98 pointer to switch table
 
-   //jff 3/23/98 read the switch table from a predefined lump
-   alphSwitchList = (const switchlist_t *)W_CacheLumpNum(lump);
+  // It a predefined SWITCHES lump exists use it, otherwise use fallback
+  int lump = W_CheckNumForName("SWITCHES");
+  if (lump == -1)
+    alphSwitchList = doom_alphSwitchList;
+  else
+    alphSwitchList = (const switchlist_t *)W_CacheLumpNum(lump);
 
-   for (i=0;;i++)
-   {
-      if (index+1 >= max_numswitches)
-         switchlist = realloc(switchlist, sizeof *switchlist *
-               (max_numswitches = max_numswitches ? max_numswitches*2 : 8));
+  for (i=0;;i++)
+  {
+    if (index+1 >= max_numswitches)
+      switchlist = realloc(switchlist, sizeof *switchlist *
+        (max_numswitches = max_numswitches ? max_numswitches*2 : 8));
 
-      if (SHORT(alphSwitchList[i].episode) <= episode)
-      {
-         int texture1, texture2;
+    if (SHORT(alphSwitchList[i].episode) <= episode)
+    {
+      int texture1, texture2;
 
-         if (!SHORT(alphSwitchList[i].episode))
-            break;
+      if (!SHORT(alphSwitchList[i].episode))
+        break;
 
-         // Ignore switches referencing unknown texture names, instead of exiting.
-         // Warn if either one is missing, but only add if both are valid.
-         texture1 = R_CheckTextureNumForName(alphSwitchList[i].name1);
-         if (texture1 == -1)
-            lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
-                  alphSwitchList[i].name1);
-         texture2 = R_CheckTextureNumForName(alphSwitchList[i].name2);
-         if (texture2 == -1)
-            lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
-                  alphSwitchList[i].name2);
-         if (texture1 != -1 && texture2 != -1) {
-            switchlist[index++] = texture1;
-            switchlist[index++] = texture2;
-         }
+      // Ignore switches referencing unknown texture names, instead of exiting.
+      // Warn if either one is missing, but only add if both are valid.
+      texture1 = R_CheckTextureNumForName(alphSwitchList[i].name1);
+      if (texture1 == -1)
+        lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
+          alphSwitchList[i].name1);
+      texture2 = R_CheckTextureNumForName(alphSwitchList[i].name2);
+      if (texture2 == -1)
+        lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
+          alphSwitchList[i].name2);
+      if (texture1 != -1 && texture2 != -1) {
+        switchlist[index++] = texture1;
+        switchlist[index++] = texture2;
       }
-   }
+    }
+  }
 
-   numswitches = index/2;
-   switchlist[index] = -1;
-   W_UnlockLumpNum(lump);
+  numswitches = index/2;
+  switchlist[index] = -1;
+  W_UnlockLumpNum(lump);
 }
 
 //

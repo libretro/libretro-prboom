@@ -300,66 +300,30 @@ void HU_Init(void)
   j = HU_FONTSTART;
   for (i=0;i<HU_FONTSIZE;i++,j++)
   {
-    if ('0'<=j && j<='9')
-    {
-      sprintf(buffer, "DIG%.1d",j-48);
-      R_SetPatchNum(&hu_font2[i], buffer);
-      sprintf(buffer, "STCFN%.3d",j);
-      R_SetPatchNum(&hu_font[i], buffer);
-    }
-    else if ('A'<=j && j<='Z')
-    {
-      sprintf(buffer, "DIG%c",j);
-      R_SetPatchNum(&hu_font2[i], buffer);
-      sprintf(buffer, "STCFN%.3d",j);
-      R_SetPatchNum(&hu_font[i], buffer);
-    }
-    else if (j=='-')
-    {
-      R_SetPatchNum(&hu_font2[i], "DIG45");
-      R_SetPatchNum(&hu_font[i], "STCFN045");
-    }
-    else if (j=='/')
-    {
-      R_SetPatchNum(&hu_font2[i], "DIG47");
-      R_SetPatchNum(&hu_font[i], "STCFN047");
-    }
-    else if (j==':')
-    {
-      R_SetPatchNum(&hu_font2[i], "DIG58");
-      R_SetPatchNum(&hu_font[i], "STCFN058");
-    }
-    else if (j=='[')
-    {
-      R_SetPatchNum(&hu_font2[i], "DIG91");
-      R_SetPatchNum(&hu_font[i], "STCFN091");
-    }
-    else if (j==']')
-    {
-      R_SetPatchNum(&hu_font2[i], "DIG93");
-      R_SetPatchNum(&hu_font[i], "STCFN093");
-    }
-    else if (j<97)
-    {
-      sprintf(buffer, "STCFN%.3d",j);
-      R_SetPatchNum(&hu_font2[i], buffer);
-      R_SetPatchNum(&hu_font[i], buffer);
-      //jff 2/23/98 make all font chars defined, useful or not
-    }
-    else if (j>122)
-    {
-      sprintf(buffer, "STBR%.3d",j);
-      R_SetPatchNum(&hu_font2[i], buffer);
-      R_SetPatchNum(&hu_font[i], buffer);
-    }
-    else
-      hu_font[i] = hu_font[0]; //jff 2/16/98 account for gap
+     // IWAD Status font
+     sprintf(buffer, "STCFN%.3d",j);
+     if (W_CheckNumForName(buffer) != -1)
+       R_SetPatchNum(&hu_font[i], buffer);
+
+     // DIG PrBoom font
+     if ('A'<=j && j<='Z') // letters will use the letter
+       sprintf(buffer, "DIG%c",j);
+     else if ('0'<=j && j<='9') // 0-9 numbers will use the number
+       sprintf(buffer, "DIG%.1d",j-48);
+     else // Otherwise, use the ASCII code
+       sprintf(buffer, "DIG%.1d",j);
+
+     if (W_CheckNumForName(buffer) != -1)
+       R_SetPatchNum(&hu_font2[i], buffer);
+     else
+       hu_font2[i] = hu_font[i]; // fallback to IWAD font
   }
 
   // CPhipps - load patches for message background
   for (i=0; i<9; i++) {
     sprintf(buffer, "BOX%c%c", "UCL"[i/3], "LCR"[i%3]);
-    R_SetPatchNum(&hu_msgbg[i], buffer);
+    if (W_CheckNumForName(buffer) != -1)
+      R_SetPatchNum(&hu_msgbg[i], buffer);
   }
 
   // CPhipps - load patches for keys and double keys

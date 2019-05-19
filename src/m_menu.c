@@ -934,7 +934,6 @@ enum
   messages,
   /*    detail, obsolete -- killough */
   scrnsize,
-  option_empty1,
   mousesens,
   /* option_empty2, submenu now -- killough */
   soundvol,
@@ -1961,11 +1960,20 @@ static void M_DrawScreenItems(const setup_menu_t* src)
 
 static void M_DrawDefVerify(void)
 {
-  // proff 12/6/98: Drawing of verify box changed for hi-res, it now uses a patch
-  V_DrawNamePatch(VERIFYBOXXORG,VERIFYBOXYORG,0,"M_VBOX",CR_DEFAULT,VPT_STRETCH);
+  // Dialog background will use a patch if available, otherwise draw a black box
+  int lump = W_CheckNumForName("M_VBOX");
+  if ( lump != -1 )
+    V_DrawNumPatch(VERIFYBOXXORG,VERIFYBOXYORG,0,lump,CR_DEFAULT,VPT_STRETCH);
+  else {
+    fline_t boxdiag = {
+      { VERIFYBOXXORG, 	VERIFYBOXYORG },
+      { VERIFYBOXXORG+187,	VERIFYBOXYORG+23 },
+    };
+    V_DrawBox(&boxdiag, 0);
+  }
+
   // The blinking messages is keyed off of the blinking of the
   // cursor skull.
-
   if (whichSkull) { // blink the text
     strcpy(menu_buffer,"Reset to defaults? (Y or N)");
     M_DrawMenuString(VERIFYBOXXORG+8,VERIFYBOXYORG+8,CR_RED);
@@ -2048,7 +2056,7 @@ static void M_DrawInstructions(void)
 // X,Y position of reset button. This is the same for every screen, and is
 // only defined once here.
 
-#define X_BUTTON 301
+#define X_BUTTON 300
 #define Y_BUTTON   3
 
 // Definitions of the (in this case) four key binding screens.
@@ -5369,6 +5377,13 @@ void M_Init(void)
 
   M_ChangeDemoSmoothTurns();
   M_ChangeFramerate();
+
+  // Check if M_BUTT1 / M_BUTT2 exists, use fallback otherwise
+  if ( W_CheckNumForName(ResetButtonName[0]) == -1 ||  W_CheckNumForName(ResetButtonName[1]) == -1 )
+  {
+    strcpy(ResetButtonName[0], "WARNB0");
+    strcpy(ResetButtonName[1], "WARNA0");
+  }
 }
 
 //

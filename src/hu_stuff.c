@@ -322,7 +322,8 @@ void HU_Init(void)
   // CPhipps - load patches for message background
   for (i=0; i<9; i++) {
     sprintf(buffer, "BOX%c%c", "UCL"[i/3], "LCR"[i%3]);
-    R_SetPatchNum(&hu_msgbg[i], buffer);
+    if (W_CheckNumForName(buffer) != -1)
+      R_SetPatchNum(&hu_msgbg[i], buffer);
   }
 
   // CPhipps - load patches for keys and double keys

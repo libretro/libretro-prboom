@@ -76,7 +76,8 @@ typedef enum
   CR_ORANGE,  //8
   CR_YELLOW,  //9
   CR_BLUE2,   //10 // proff
-  CR_LIMIT    //11 //jff 2/27/98 added for range check
+  CR_LIGHT,   //11
+  CR_LIMIT    //12 //jff 2/27/98 added for range check
 } crange_idx_e;
 //jff 1/16/98 end palette color range additions
 

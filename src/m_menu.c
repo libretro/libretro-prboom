@@ -1638,7 +1638,7 @@ void M_Setup(int choice)
 #define CR_TITLE  CR_GOLD
 #define CR_SET    CR_GREEN
 #define CR_ITEM   CR_RED
-#define CR_HILITE CR_ORANGE
+#define CR_HILITE CR_LIGHT
 #define CR_SELECT CR_GRAY
 
 // Data used by the Automap color selection code

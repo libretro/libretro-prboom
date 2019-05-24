@@ -532,7 +532,8 @@ bool retro_load_game(const struct retro_game_info *info)
    if(info->path)
    {
       wadinfo_t header;
-      char *deh, *extension;
+      char *deh, *extension, *baseconfig;
+
       char name_without_ext[4096];
       bool use_external_savedir = false;
       const char *base_save_dir = NULL;
@@ -578,6 +579,13 @@ bool retro_load_game(const struct retro_game_info *info)
           argv[argc++] = "-deh";
           argv[argc++] = deh;
         };
+
+        if((baseconfig = FindFileInDir(g_wad_dir, name_without_ext, ".prboom.cfg"))
+         || (baseconfig = I_FindFile("prboom.cfg", NULL)))
+        {
+          argv[argc++] = "-baseconfig";
+          argv[argc++] = baseconfig;
+        }
       }
 
       // Get save directory
@@ -1276,14 +1284,27 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
  */
 char* I_FindFile(const char* wfname, const char* ext)
 {
-   char *p, *dir, *system_dir;
+   char *p, *dir, *system_dir, *prboom_system_dir;
    int i;
+
+   // First, check on WAD directory
    if ((p = FindFileInDir(g_wad_dir, wfname, ext)) == NULL)
    {
+     // Then check on system dir (both under prboom subfolder and directly)
      environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
-     if ((!system_dir || (p = FindFileInDir(system_dir, wfname, ext)) == NULL)
-        && find_recursive_on)
-     { // Find recursively on parent directories
+     if (system_dir)
+     {
+       prboom_system_dir = malloc(strlen(system_dir) + 7);
+       sprintf(prboom_system_dir, "%s%c%s", system_dir, DIR_SLASH, "prboom");
+       p = FindFileInDir(prboom_system_dir, wfname, ext);
+       free(prboom_system_dir);
+       if(p == NULL)
+         p = FindFileInDir(system_dir, wfname, ext);
+     }
+
+     // If not found, check on parent folders recursively (if configured to do so)
+     if ( p == NULL && find_recursive_on)
+     {
        dir = malloc(strlen(g_wad_dir));
        strcpy(dir, g_wad_dir);
        for (i = strlen(dir)-1; i > 1; dir[i--] = '\0')

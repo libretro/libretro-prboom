@@ -46,6 +46,8 @@ boolean M_WriteFile (char const* name,void* source,int length);
 
 int M_ReadFile (char const* name, uint8_t** buffer);
 
+void M_LoadDefaultsFile (char *file, boolean basedefault);
+
 void M_LoadDefaults (void);
 
 void M_SaveDefaults (void);

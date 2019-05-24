@@ -4209,19 +4209,21 @@ boolean M_Responder (event_t* ev) {
     // Catch the response to the 'reset to default?' verification
     // screen
 
-    if (default_verify)
-      {
-  if (toupper(ch) == 'Y') {
-    M_ResetDefaults();
-    default_verify = FALSE;
-    M_SelectDone(ptr1);
-  }
-  else if (toupper(ch) == 'N') {
-    default_verify = FALSE;
-    M_SelectDone(ptr1);
-  }
-  return TRUE;
+    if (default_verify) {
+      if (toupper(ch) == 'Y'
+		  || ch == key_menu_enter) {
+        M_ResetDefaults();
+        default_verify = FALSE;
+        M_SelectDone(ptr1);
       }
+      else if (toupper(ch) == 'N'
+               || ch == key_menu_escape
+               || ch == key_menu_backspace) {
+        default_verify = FALSE;
+        M_SelectDone(ptr1);
+      }
+      return TRUE;
+    }
 
       // Common processing for some items
 

@@ -67,6 +67,12 @@
 #include "r_demo.h"
 #include "r_fps.h"
 
+#ifdef _WIN32
+   #define DIR_SLASH_STR "\\"
+#else
+   #define DIR_SLASH_STR "/"
+#endif
+
 /*
  * M_WriteFile
  *
@@ -155,30 +161,36 @@ default_t defaults[] =
    {-1, NULL},-1,MAX_COMPATIBILITY_LEVEL-1,
    def_int,ss_none, NULL, NULL}, // compatibility level" - CPhipps
   {"menu_background", {(int*)&menu_background, NULL}, {1, NULL}, 0, 1,
-   def_bool,ss_none, NULL, NULL}, // do Boom fullscreen menus have backgrounds?
+   def_bool,ss_gen, NULL, NULL}, // do Boom fullscreen menus have backgrounds?
   {"max_player_corpse", {&bodyquesize, NULL}, {32, NULL},-1,UL,   // killough 2/8/98
-   def_int,ss_none, NULL, NULL}, // number of dead bodies in view supported (-1 = no limit)
+   def_int,ss_gen, NULL, NULL}, // number of dead bodies in view supported (-1 = no limit)
   {"flashing_hom",{&flashing_hom, NULL},{0, NULL},0,1,
-   def_bool,ss_none, NULL, NULL}, // killough 10/98 - enable flashing HOM indicator
+   def_bool,ss_gen, NULL, NULL}, // killough 10/98 - enable flashing HOM indicator
   {"demo_insurance",{&default_demo_insurance, NULL},{2, NULL},0,2,  // killough 3/31/98
    def_int,ss_none, NULL, NULL}, // 1=take special steps ensuring demo sync, 2=only during recordings
   {"level_precache",{(int*)&precache, NULL},{0, NULL},0,1,
    def_bool,ss_none, NULL, NULL}, // precache level data?
   {"demo_smoothturns", {&demo_smoothturns, NULL},  {0, NULL},0,1,
-   def_bool,ss_stat, NULL, NULL},
+   def_bool,ss_gen, NULL, NULL},
   {"demo_smoothturnsfactor", {&demo_smoothturnsfactor, NULL},  {6, NULL},1,SMOOTH_PLAYING_MAXFACTOR,
-   def_int,ss_stat, NULL, NULL},
+   def_int,ss_gen, NULL, NULL},
 
   {"Files",{NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
   /* cph - MBF-like wad/deh/bex autoload code */
-  {"wadfile_1",{NULL,&wad_files[0]},{0,""},UL,UL,def_str,ss_none, NULL, NULL},
-  {"wadfile_2",{NULL,&wad_files[1]},{0,""},UL,UL,def_str,ss_none, NULL, NULL},
-  {"dehfile_1",{NULL,&deh_files[0]},{0,""},UL,UL,def_str,ss_none, NULL, NULL},
-  {"dehfile_2",{NULL,&deh_files[1]},{0,""},UL,UL,def_str,ss_none, NULL, NULL},
+  {"wadfile_1",{NULL,&wad_files[0]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_2",{NULL,&wad_files[1]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_3",{NULL,&wad_files[2]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_4",{NULL,&wad_files[3]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_5",{NULL,&wad_files[4]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_6",{NULL,&wad_files[5]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_7",{NULL,&wad_files[6]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"wadfile_8",{NULL,&wad_files[7]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"dehfile_1",{NULL,&deh_files[0]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
+  {"dehfile_2",{NULL,&deh_files[1]},{0,""},UL,UL,def_str,ss_gen, NULL, NULL},
 
   {"Game settings",{NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
   {"default_skill",{&defaultskill, NULL},{3, NULL},1,5, // jff 3/24/98 allow default skill setting
-   def_int,ss_none, NULL, NULL}, // selects default skill 1=TYTD 2=NTR 3=HMP 4=UV 5=NM
+   def_int,ss_gen, NULL, NULL}, // selects default skill 1=TYTD 2=NTR 3=HMP 4=UV 5=NM
   {"weapon_recoil",{&default_weapon_recoil, NULL},{0, NULL},0,1,
    def_bool,ss_weap, &weapon_recoil, NULL},
   /* killough 10/98 - toggle between SG/SSG and Fist/Chainsaw */
@@ -251,38 +263,38 @@ default_t defaults[] =
   {"music_card",{&mus_card, NULL},{-1, NULL},-1,9,       //  to be set,  -1 = autodetect
    def_int,ss_none, NULL, NULL}, // select music driver (DOS), -1 is autodetect, 0 is none"; in Linux, non-zero enables music
   {"pitched_sounds",{&pitched_sounds, NULL},{0, NULL},0,1, // killough 2/21/98
-   def_bool,ss_none, NULL, NULL}, // enables variable pitch in sound effects (from id's original code)
+   def_bool,ss_gen, NULL, NULL}, // enables variable pitch in sound effects (from id's original code)
   {"samplerate",{&snd_samplerate, NULL},{11025, NULL},11025,48000, def_int,ss_none, NULL, NULL},
   {"sfx_volume",{&snd_SfxVolume, NULL},{8, NULL},0,15, def_int,ss_none, NULL, NULL},
   {"music_volume",{&snd_MusicVolume, NULL},{8, NULL},0,15, def_int,ss_none, NULL, NULL},
   {"mus_pause_opt",{&mus_pause_opt, NULL},{2, NULL},0,2, // CPhipps - music pausing
    def_int, ss_none, NULL, NULL}, // 0 = kill music when paused, 1 = pause music, 2 = let music continue
   {"snd_channels",{&default_numChannels, NULL},{8, NULL},1,32,
-   def_int,ss_none, NULL, NULL}, // number of audio events simultaneously // killough
+   def_int,ss_gen, NULL, NULL}, // number of audio events simultaneously // killough
 
   {"Video settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},
   {"screenblocks",{&screenblocks, NULL},{10, NULL},3,11,  // killough 2/21/98: default to 10
    def_int,ss_none, NULL, NULL},
   {"usegamma",{&usegamma, NULL},{0, NULL},0,4, //jff 3/6/98 fix erroneous upper limit in range
-   def_int,ss_none, NULL, NULL}, // gamma correction level // killough 1/18/98
+   def_int,ss_gen, NULL, NULL}, // gamma correction level // killough 1/18/98
   {"uncapped_framerate", {&movement_smooth, NULL},  {3, NULL},0,11,
-   def_int,ss_stat, NULL, NULL},
+   def_int,ss_gen, NULL, NULL},
   {"filter_wall",{(int*)&drawvars.filterwall, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_gen, NULL, NULL},
   {"filter_floor",{(int*)&drawvars.filterfloor, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_gen, NULL, NULL},
   {"filter_sprite",{(int*)&drawvars.filtersprite, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_gen, NULL, NULL},
   {"filter_z",{(int*)&drawvars.filterz, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_LINEAR, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_LINEAR, def_int,ss_gen, NULL, NULL},
   {"filter_patch",{(int*)&drawvars.filterpatch, NULL},{RDRAW_FILTER_POINT, NULL},
-   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_none, NULL, NULL},
+   RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_gen, NULL, NULL},
   {"filter_threshold",{(int*)&drawvars.mag_threshold, NULL},{49152, NULL},
    0, UL, def_int,ss_none, NULL, NULL},
   {"sprite_edges",{(int*)&drawvars.sprite_edges, NULL},{RDRAW_MASKEDCOLUMNEDGE_SQUARE, NULL},
-   RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_none, NULL, NULL},
+   RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
   {"patch_edges",{(int*)&drawvars.patch_edges, NULL},{RDRAW_MASKEDCOLUMNEDGE_SQUARE, NULL},
-   RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_none, NULL, NULL},
+   RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
 
 
   {"Mouse settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},
@@ -779,6 +791,7 @@ void M_SaveDefaults (void)
 {
   int   i;
   FILE* f;
+  boolean isdefaultvalue;
 
   f = fopen (defaultfile, "w");
   if (!f)
@@ -786,30 +799,41 @@ void M_SaveDefaults (void)
 
   // 3/3/98 explain format of file
 
-  fprintf(f,"# Doom config file\n");
-  fprintf(f,"# Format:\n");
-  fprintf(f,"# variable   value\n");
+  fprintf(f,"# Doom config file\n"
+          "#\n"
+          "# Format:\n"
+          "#  variable   value\n"
+          "#\n"
+          "# Lines starting with '#' are comments\n"
+          "# When saved, default values are commented out\n");
 
   for (i = 0 ; i < numdefaults ; i++) {
     if (defaults[i].type == def_none) {
       // CPhipps - pure headers
-      fprintf(f, "\n# %s\n", defaults[i].name);
-    } else
-    // CPhipps - modified for new default_t form
-    if (!IS_STRING(defaults[i])) //jff 4/10/98 kill super-hack on pointer value
+      fprintf(f, "\n## %s\n", defaults[i].name);
+    } else {
+      // CPhipps - modified for new default_t form
+      if (!IS_STRING(defaults[i])) //jff 4/10/98 kill super-hack on pointer value
       {
-      // CPhipps - remove keycode hack
-      // killough 3/6/98: use spaces instead of tabs for uniform justification
-      if (defaults[i].type == def_hex)
-  fprintf (f,"%-25s 0x%x\n",defaults[i].name,*(defaults[i].location.pi));
-      else
-  fprintf (f,"%-25s %5i\n",defaults[i].name,*(defaults[i].location.pi));
+        // CPhipps - remove keycode hack
+        // killough 3/6/98: use spaces instead of tabs for uniform justification
+        if (defaults[i].type == def_hex)
+          fprintf (f,"%s%-25s 0x%x\n",
+                   (defaults[i].defaultvalue.i == *(defaults[i].location.pi))?"#":"",
+                   defaults[i].name,*(defaults[i].location.pi));
+        else
+          fprintf (f,"%s%-25s %5i\n",
+                   (defaults[i].defaultvalue.i == *(defaults[i].location.pi))?"#":"",
+                   defaults[i].name,*(defaults[i].location.pi));
       }
-    else
+      else
       {
-      fprintf (f,"%-25s \"%s\"\n",defaults[i].name,*(defaults[i].location.ppsz));
+        fprintf (f,"%s%-25s \"%s\"\n",
+                 (strcmp(defaults[i].defaultvalue.psz,*(defaults[i].location.ppsz)) == 0)?"#":"",
+                 defaults[i].name,*(defaults[i].location.ppsz));
       }
     }
+  }
 
   fclose (f);
 }
@@ -830,13 +854,15 @@ struct default_s *M_LookupDefault(const char *name)
   return NULL;
 }
 
-//
-// M_LoadDefaults
-//
-
 #define NUMCHATSTRINGS 10 // phares 4/13/98
 
-void M_LoadDefaults (void)
+/*
+ * M_LoadDefaultsFile
+ *
+ * Load configuration file
+ */
+
+void M_LoadDefaultsFile (char *file, boolean basedefault)
 {
   int   i;
   int   len;
@@ -847,48 +873,15 @@ void M_LoadDefaults (void)
   int   parm;
   boolean isstring;
 
-  // set everything to base values
-
-  numdefaults = sizeof(defaults)/sizeof(defaults[0]);
-  for (i = 0 ; i < numdefaults ; i++) {
-    if (defaults[i].location.ppsz)
-      *defaults[i].location.ppsz = strdup(defaults[i].defaultvalue.psz);
-    if (defaults[i].location.pi)
-      *defaults[i].location.pi = defaults[i].defaultvalue.i;
-  }
-
-  // check for a custom default file
-
-  i = M_CheckParm ("-config");
-  if (i && i < myargc-1)
-    defaultfile = strdup(myargv[i+1]);
-  else {
-    const char* exedir = I_DoomExeDir();
-    defaultfile = malloc(PATH_MAX+1);
-    /* get config file from same directory as executable */
-    snprintf(defaultfile, PATH_MAX,
-            "%s%s%sboom.cfg", exedir,
-#ifdef _WIN32
-            HasTrailingSlash(exedir) ? "" : "\\",
-#else
-            HasTrailingSlash(exedir) ? "" : "/",
-#endif
-            "pr");
-  }
-
-  lprintf (LO_CONFIRM, " default file: %s\n",defaultfile);
-
   // read the file in, overriding any set defaults
-
-  f = fopen (defaultfile, "r");
+  f = fopen (file, "r");
   if (f)
-    {
+  {
     while (!feof(f))
-      {
+    {
       isstring = FALSE;
       if (fscanf (f, "%79s %[^\n]\n", def, strparm) == 2)
-        {
-
+      {
         //jff 3/3/98 skip lines not starting with an alphanum
 
         if (!isalnum(def[0]))
@@ -902,45 +895,99 @@ void M_LoadDefaults (void)
           newstring = (char *) malloc(len);
           strparm[len-1] = 0; // clears trailing double-quote mark
           strcpy(newstring, strparm+1); // clears leading double-quote mark
-  } else if ((strparm[0] == '0') && (strparm[1] == 'x')) {
-    // CPhipps - allow ints to be specified in hex
-    sscanf(strparm+2, "%x", &parm);
-  } else {
+        } else if ((strparm[0] == '0') && (strparm[1] == 'x')) {
+          // CPhipps - allow ints to be specified in hex
+          sscanf(strparm+2, "%x", &parm);
+        } else {
           sscanf(strparm, "%i", &parm);
-    // Keycode hack removed
-  }
+          // Keycode hack removed
+        }
 
         for (i = 0 ; i < numdefaults ; i++)
           if ((defaults[i].type != def_none) && !strcmp(def, defaults[i].name))
-            {
-      // CPhipps - safety check
+          {
+            // CPhipps - safety check
             if (isstring != IS_STRING(defaults[i])) {
-        lprintf(LO_WARN, "M_LoadDefaults: Type mismatch reading %s\n", defaults[i].name);
-        continue;
-      }
+              lprintf(LO_WARN, "M_LoadDefaults: Type mismatch reading %s\n", defaults[i].name);
+              continue;
+            }
             if (!isstring)
-              {
-
+            {
               //jff 3/4/98 range check numeric parameters
-
               if ((defaults[i].minvalue==UL || defaults[i].minvalue<=parm) &&
                   (defaults[i].maxvalue==UL || defaults[i].maxvalue>=parm))
-                *(defaults[i].location.pi) = parm;
-              }
-            else
               {
-                union { const char **c; char **s; } u; // type punning via unions
-
-                u.c = defaults[i].location.ppsz;
-                free(*(u.s));
-                *(u.s) = newstring;
+                *(defaults[i].location.pi) = parm;
+                if(basedefault)
+                  defaults[i].defaultvalue.i = parm;
               }
-            break;
             }
-        }
-      }
+            else
+            {
+              union { const char **c; char **s; } u; // type punning via unions
 
-    fclose (f);
+              u.c = defaults[i].location.ppsz;
+              free(*(u.s));
+              *(u.s) = newstring;
+
+              if(basedefault)
+                defaults[i].defaultvalue.psz = strdup(newstring);
+            }
+            break;
+          }
+      }
     }
+    fclose (f);
+  }
   //jff 3/4/98 redundant range checks for hud deleted here
+}
+
+//
+// M_LoadDefaults
+//
+
+void M_LoadDefaults (void)
+{
+  int   i;
+  char* basefile;
+
+  // set everything to base values
+
+  numdefaults = sizeof(defaults)/sizeof(defaults[0]);
+  for (i = 0 ; i < numdefaults ; i++) {
+    if (defaults[i].location.ppsz)
+      *defaults[i].location.ppsz = strdup(defaults[i].defaultvalue.psz);
+    if (defaults[i].location.pi)
+      *defaults[i].location.pi = defaults[i].defaultvalue.i;
+  }
+
+
+  // check if a base default file was provided, to load as base values
+
+  i = M_CheckParm ("-baseconfig");
+  if (i && i < myargc-1)
+  {
+    basefile = strdup(myargv[i+1]);
+    lprintf (LO_CONFIRM, " default file with base values: %s\n", basefile);
+    M_LoadDefaultsFile(basefile, TRUE);
+  }
+
+  // check for a custom default file
+
+  i = M_CheckParm ("-config");
+  if (i && i < myargc-1)
+    defaultfile = strdup(myargv[i+1]);
+  else {
+    const char* exedir = I_DoomExeDir();
+    defaultfile = malloc(PATH_MAX+1);
+    /* get config file from same directory as executable */
+    snprintf(defaultfile, PATH_MAX,
+            "%s%s%sboom.cfg", exedir,
+            HasTrailingSlash(exedir) ? "" : DIR_SLASH_STR,
+            "pr");
+  }
+
+  lprintf (LO_CONFIRM, " default file: %s\n",defaultfile);
+
+  M_LoadDefaultsFile(defaultfile, FALSE);
 }

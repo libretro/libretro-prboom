@@ -427,7 +427,7 @@ static void cheat_clev(char buf[3])
 
   // Catch invalid maps.
   if (epsd < 1 || map < 1 ||   // Ohmygod - this is not going to work.
-      (gamemode == retail     && (epsd > 4 || map > 9  )) ||
+      (gamemode == retail     && (epsd > 5 || map > 9  )) || // allow sigil
       (gamemode == registered && (epsd > 3 || map > 9  )) ||
       (gamemode == shareware  && (epsd > 1 || map > 9  )) ||
       (gamemode == commercial && (epsd > 1 || map > 33 )) )  //jff no 33 and 34

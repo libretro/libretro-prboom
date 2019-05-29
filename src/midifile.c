@@ -173,7 +173,7 @@ static boolean ReadMultipleBytes (void *dest, size_t len, midimem_t *mf)
 static boolean ReadVariableLength(unsigned int *result, midimem_t *mf)
 {
     int i;
-    unsigned char b;
+    unsigned char b = 0;
 
     *result = 0;
 
@@ -248,7 +248,7 @@ static boolean ReadChannelEvent(midi_event_t *event,
                                 unsigned char event_type, boolean two_param,
                                 midimem_t *mf)
 {
-    unsigned char b;
+    unsigned char b = 0;
 
     // Set basics:
 
@@ -314,7 +314,7 @@ static boolean ReadSysExEvent(midi_event_t *event, int event_type,
 
 static boolean ReadMetaEvent(midi_event_t *event, midimem_t *mf)
 {
-    unsigned char b;
+    unsigned char b = 0;
 
     event->event_type = MIDI_EVENT_META;
 
@@ -353,7 +353,7 @@ static boolean ReadMetaEvent(midi_event_t *event, midimem_t *mf)
 static boolean ReadEvent(midi_event_t *event, unsigned int *last_event_type,
                           midimem_t *mf)
 {
-    unsigned char event_type;
+    unsigned char event_type = 0;
 
     if (!ReadVariableLength(&event->delta_time, mf))
     {

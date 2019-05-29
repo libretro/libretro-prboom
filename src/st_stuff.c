@@ -860,7 +860,7 @@ void ST_Drawer(boolean statusbaron, boolean refresh, boolean fullmenu)
 //
 static void ST_loadGraphics(boolean doload)
 {
-  int  i, facenum;
+  unsigned short i, facenum;
   char namebuf[9];
   // cph - macro that either acquires a pointer and lock for a lump, or
   // unlocks it. var is referenced exactly once in either case, so ++ in arg works

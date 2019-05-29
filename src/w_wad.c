@@ -246,7 +246,8 @@ static int IsMarker(const char *marker, const char *name)
 // killough 4/17/98: add namespace tags
 
 static void W_CoalesceMarkedResource(const char *start_marker,
-                                     const char *end_marker, int li_namespace)
+                                     const char *end_marker,
+                                     lumpinfo_namespace_t li_namespace)
 {
   lumpinfo_t *marked = malloc(sizeof(*marked) * numlumps);
   size_t i, num_marked = 0, num_unmarked = 0;
@@ -339,7 +340,7 @@ unsigned W_LumpNameHash(const char *s)
 // W_FindNumFromName, an iterative version of W_CheckNumForName
 // returns list of lump numbers for a given name (latest first)
 //
-int (W_FindNumFromName)(const char *name, int li_namespace, int i)
+int (W_FindNumFromName)(const char *name, lumpinfo_namespace_t li_namespace, int i)
 {
   // Hash function maps the name to one of possibly numlump chains.
   // It has been tuned so that the average chain length never exceeds 2.

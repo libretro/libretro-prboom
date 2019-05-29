@@ -207,13 +207,15 @@ unsigned short mad_bit_crc(struct mad_bitptr bitptr, unsigned int len,
   switch (len / 8) {
   case 3: crc = (crc << 8) ^
 	    crc_table[((crc >> 8) ^ mad_bit_read(&bitptr, 8)) & 0xff];
+  // fall through
   case 2: crc = (crc << 8) ^
 	    crc_table[((crc >> 8) ^ mad_bit_read(&bitptr, 8)) & 0xff];
+  // fall through
   case 1: crc = (crc << 8) ^
 	    crc_table[((crc >> 8) ^ mad_bit_read(&bitptr, 8)) & 0xff];
 
   len %= 8;
-
+  // fall through
   case 0: break;
   }
 

@@ -165,7 +165,8 @@ typedef struct
   fpoint_t a, b;
 } fline_t;
 
-extern void V_DrawLine(fline_t* fl, int color);
+void V_DrawLine(fline_t* fl, int color);
+void V_DrawBox(fline_t* fl, int color);
 
 void V_AllocScreen(screeninfo_t *scrn);
 void V_AllocScreens();

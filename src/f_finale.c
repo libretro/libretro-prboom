@@ -116,8 +116,14 @@ void F_StartFinale (void)
                  finaleflat = bgflatE4;
                  finaletext = s_E4TEXT;
                  break;
+              case 5:
+                 finaleflat = bgflatE5;
+                 finaletext = s_E5TEXT;
+                 break;
               default:
-                 // Ouch.
+                 // Some default values to avoid crashing on extra episodes
+                 finaleflat = bgflatE5;
+                 finaletext = "The End";
                  break;
            }
            break;
@@ -668,6 +674,9 @@ void F_Drawer (void)
            break;
       case 4:
            V_DrawNamePatch(0, 0, 0, "ENDPIC", CR_DEFAULT, VPT_STRETCH);
+           break;
+      case 5:
+           V_DrawNamePatch(0, 0, 0, "SIGILEND", CR_DEFAULT, VPT_STRETCH);
            break;
     }
   }

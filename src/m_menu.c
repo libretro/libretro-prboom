@@ -495,21 +495,6 @@ void M_DrawReadThis2(void)
 // EPISODE SELECT
 //
 
-//
-// episodes_e provides numbers for the episode menu items. The default is
-// 4, to accomodate Ultimate Doom. If the user is running anything else,
-// this is accounted for in the code.
-//
-
-enum
-{
-  ep1,
-  ep2,
-  ep3,
-  ep4,
-  ep_end
-} episodes_e;
-
 // The definitions of the Episodes menu
 
 menuitem_t EpisodeMenu[]=
@@ -517,17 +502,20 @@ menuitem_t EpisodeMenu[]=
   {1,"M_EPI1", M_Episode,'k'},
   {1,"M_EPI2", M_Episode,'t'},
   {1,"M_EPI3", M_Episode,'i'},
-  {1,"M_EPI4", M_Episode,'t'}
+  {1,"M_EPI4", M_Episode,'t'},
+  {1,"M_EPI5", M_Episode,'s'},
+  {1,"M_EPI6", M_Episode,'6'},
+  {1,"M_EPI7", M_Episode,'7'}
 };
 
 menu_t EpiDef =
 {
-  ep_end,        // # of menu items
+  0,             // # of menu items ( will be set in M_Init )
   &MainDef,      // previous menu
   EpisodeMenu,   // menuitem_t ->
   M_DrawEpisode, // drawing routine ->
   48,63,         // x,y
-  ep1            // lastOn
+  0              // lastOn
 };
 
 //
@@ -538,7 +526,7 @@ int epi;
 void M_DrawEpisode(void)
 {
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(54, 38, 0, "M_EPISOD", CR_DEFAULT, VPT_STRETCH);
+  V_DrawNamePatch(54, EpiDef.y - 25, 0, "M_EPISOD", CR_DEFAULT, VPT_STRETCH);
 }
 
 void M_Episode(int choice)
@@ -548,14 +536,6 @@ void M_Episode(int choice)
     M_SetupNextMenu(&ReadDef1);
     return;
   }
-
-  // Yet another hack...
-  if ( (gamemode == registered) && (choice > 2))
-    {
-    lprintf( LO_WARN,
-     "M_Episode: 4th episode requires UltimateDOOM\n");
-    choice = 0;
-    }
 
   epi = choice;
   M_SetupNextMenu(&NewDef);
@@ -5364,12 +5344,21 @@ void M_Init(void)
       // killough 10/98: moved to second screen, moved up to the top
       ReadDef2.y = 15;
 
-    case shareware:
-      // We need to remove the fourth episode.
-      EpiDef.numitems--;
-      break;
+      // fall through
     case retail:
-      // We are fine.
+      // Check until which episode are there maps available
+      for(EpiDef.numitems = 0; EpiDef.numitems < MAX_EPISODE_NUM; EpiDef.numitems++) {
+        char mapname[9];
+        sprintf(mapname, "E%dM1", EpiDef.numitems + 1);
+        if (W_CheckNumForName(mapname) == -1) {
+           break;
+        }
+      }
+      break;
+    case shareware:
+      // Shareware version should only have 3 entries
+      EpiDef.numitems = 3;
+      break;
     default:
       break;
     }

@@ -418,6 +418,15 @@ static void WI_slamBackground(void)
   else
     sprintf(name, "WIMAP%d", wbs->epsd);
 
+
+  if (W_CheckNumForName(name) == -1) {
+    if ((wbs->epsd == 4) && (W_CheckNumForName("SIGILINT") != -1))
+      // SIGIL support
+      strcpy(name, "SIGILINT");
+    else
+      // default intermission for extra custom episodes
+      strcpy(name, "INTERPIC");
+  }
   // background
   V_DrawNamePatch(0, 0, FB, name, CR_DEFAULT, VPT_STRETCH);
 }

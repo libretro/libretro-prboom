@@ -43,6 +43,9 @@
 // killough 5/2/98: number of bytes reserved for saving options
 #define GAME_OPTION_SIZE 64
 
+// maximum number of episodes
+#define MAX_EPISODE_NUM 7
+
 boolean G_Responder(event_t *ev);
 boolean G_CheckDemoStatus(void);
 void G_DeathMatchSpawnPlayer(int playernum);

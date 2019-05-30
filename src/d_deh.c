@@ -249,6 +249,15 @@ const char *s_HUSTR_E4M6  = HUSTR_E4M6;
 const char *s_HUSTR_E4M7  = HUSTR_E4M7;
 const char *s_HUSTR_E4M8  = HUSTR_E4M8;
 const char *s_HUSTR_E4M9  = HUSTR_E4M9;
+const char *s_HUSTR_E5M1  = HUSTR_E5M1;
+const char *s_HUSTR_E5M2  = HUSTR_E5M2;
+const char *s_HUSTR_E5M3  = HUSTR_E5M3;
+const char *s_HUSTR_E5M4  = HUSTR_E5M4;
+const char *s_HUSTR_E5M5  = HUSTR_E5M5;
+const char *s_HUSTR_E5M6  = HUSTR_E5M6;
+const char *s_HUSTR_E5M7  = HUSTR_E5M7;
+const char *s_HUSTR_E5M8  = HUSTR_E5M8;
+const char *s_HUSTR_E5M9  = HUSTR_E5M9;
 const char *s_HUSTR_1     = HUSTR_1;
 const char *s_HUSTR_2     = HUSTR_2;
 const char *s_HUSTR_3     = HUSTR_3;
@@ -395,6 +404,7 @@ const char *s_E1TEXT     = E1TEXT;
 const char *s_E2TEXT     = E2TEXT;
 const char *s_E3TEXT     = E3TEXT;
 const char *s_E4TEXT     = E4TEXT;
+const char *s_E5TEXT     = E5TEXT;
 const char *s_C1TEXT     = C1TEXT;
 const char *s_C2TEXT     = C2TEXT;
 const char *s_C3TEXT     = C3TEXT;
@@ -436,6 +446,7 @@ const char *bgflatE1     = "FLOOR4_8"; // end of DOOM Episode 1
 const char *bgflatE2     = "SFLR6_1";  // end of DOOM Episode 2
 const char *bgflatE3     = "MFLR8_4";  // end of DOOM Episode 3
 const char *bgflatE4     = "MFLR8_3";  // end of DOOM Episode 4
+const char *bgflatE5     = "FLOOR4_8"; // end of DOOM Episode 5 (SIGIL)
 const char *bgflat06     = "SLIME16";  // DOOM2 after MAP06
 const char *bgflat11     = "RROCK14";  // DOOM2 after MAP11
 const char *bgflat20     = "RROCK07";  // DOOM2 after MAP20
@@ -591,6 +602,15 @@ static deh_strs deh_strlookup[] = { // not const any more, because of orig.
   {&s_HUSTR_E4M7,"HUSTR_E4M7", NULL},
   {&s_HUSTR_E4M8,"HUSTR_E4M8", NULL},
   {&s_HUSTR_E4M9,"HUSTR_E4M9", NULL},
+  {&s_HUSTR_E5M1,"HUSTR_E5M1", NULL},
+  {&s_HUSTR_E5M2,"HUSTR_E5M2", NULL},
+  {&s_HUSTR_E5M3,"HUSTR_E5M3", NULL},
+  {&s_HUSTR_E5M4,"HUSTR_E5M4", NULL},
+  {&s_HUSTR_E5M5,"HUSTR_E5M5", NULL},
+  {&s_HUSTR_E5M6,"HUSTR_E5M6", NULL},
+  {&s_HUSTR_E5M7,"HUSTR_E5M7", NULL},
+  {&s_HUSTR_E5M8,"HUSTR_E5M8", NULL},
+  {&s_HUSTR_E5M9,"HUSTR_E5M9", NULL},
   {&s_HUSTR_1,"HUSTR_1", NULL},
   {&s_HUSTR_2,"HUSTR_2", NULL},
   {&s_HUSTR_3,"HUSTR_3", NULL},
@@ -736,6 +756,7 @@ static deh_strs deh_strlookup[] = { // not const any more, because of orig.
   {&s_E2TEXT,"E2TEXT", NULL},
   {&s_E3TEXT,"E3TEXT", NULL},
   {&s_E4TEXT,"E4TEXT", NULL},
+  {&s_E5TEXT,"E5TEXT", NULL},
   {&s_C1TEXT,"C1TEXT", NULL},
   {&s_C2TEXT,"C2TEXT", NULL},
   {&s_C3TEXT,"C3TEXT", NULL},
@@ -775,6 +796,7 @@ static deh_strs deh_strlookup[] = { // not const any more, because of orig.
   {&bgflatE2,"BGFLATE2", NULL},
   {&bgflatE3,"BGFLATE3", NULL},
   {&bgflatE4,"BGFLATE4", NULL},
+  {&bgflatE5,"BGFLATE5", NULL},
   {&bgflat06,"BGFLAT06", NULL},
   {&bgflat11,"BGFLAT11", NULL},
   {&bgflat20,"BGFLAT20", NULL},

@@ -539,22 +539,16 @@ static void G_DoLoadLevel (void)
          if (gamemap < 21)
             skytexture = R_TextureNumForName ("SKY2");
    }
-   else /* jff 3/27/98 and lets not forget about DOOM and Ultimate DOOM huh? */
-      switch (gameepisode)
-      {
-         case 1:
-            skytexture = R_TextureNumForName ("SKY1");
-            break;
-         case 2:
-            skytexture = R_TextureNumForName ("SKY2");
-            break;
-         case 3:
-            skytexture = R_TextureNumForName ("SKY3");
-            break;
-         case 4: // Special Edition sky
-            skytexture = R_TextureNumForName ("SKY4");
-            break;
-      }//jff 3/27/98 end sky setting fix
+   else /* and lets not forget about DOOM, Ultimate DOOM, SIGIL & extra Eps */
+   {
+     // Each episode has its own sky, numbered after it
+     char skyname[9];
+     sprintf(skyname, "SKY%d", gameepisode);
+     skytexture = R_CheckTextureNumForName(skyname);
+     if (skytexture == -1)
+       // default sky, in case of custom episodes with missing SKY
+       skytexture = R_TextureNumForName ("SKY1");
+   }
 
    /* cph 2006/07/31 - took out unused levelstarttic variable */
 
@@ -1334,6 +1328,9 @@ void G_DoCompleted (void)
               case 4:
                 wminfo.next = 2;
                 break;
+              case 5:
+                wminfo.next = 6;
+                break;
               }
           }
         else
@@ -2112,8 +2109,8 @@ void G_InitNew(skill_t skill, int episode, int map)
 
   if (gamemode == retail)
     {
-      if (episode > 4)
-        episode = 4;
+      if (episode > MAX_EPISODE_NUM)
+        episode = MAX_EPISODE_NUM;
     }
   else
     if (gamemode == shareware)

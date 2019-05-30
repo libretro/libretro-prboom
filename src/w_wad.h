@@ -71,6 +71,16 @@ typedef enum {
   source_net        // CPhipps
 } wad_source_t;
 
+// killough 4/17/98: namespace tags, to prevent conflicts between resources
+typedef enum {
+  ns_global=0,
+  ns_sprites,
+  ns_flats,
+  ns_colormaps,
+  ns_hires,
+  ns_prboom
+} lumpinfo_namespace_t;
+
 // CPhipps - changed wad init
 // We _must_ have the wadfiles[] the same as those actually loaded, so there 
 // is no point having these separate entities. This belongs here.
@@ -106,15 +116,8 @@ typedef struct
   // killough 1/31/98: hash table fields, used for ultra-fast hash table lookup
   int index, next;
 
-  // killough 4/17/98: namespace tags, to prevent conflicts between resources
-  enum {
-    ns_global=0,
-    ns_sprites,
-    ns_flats,
-    ns_colormaps,
-    ns_hires,
-    ns_prboom
-  } li_namespace; // haleyjd 05/21/02: renamed from "namespace"
+  // haleyjd 05/21/02: renamed from "namespace"
+  lumpinfo_namespace_t li_namespace;
 
   wadfile_info_t *wadfile;
   int position;
@@ -128,7 +131,7 @@ extern int        numlumps;
 // one argument, pass ns_global as the default namespace
 
 #define W_FindNumFromName(name, lump) (W_FindNumFromName)(name, ns_global, lump)
-int     (W_FindNumFromName)(const char *name, int ns, int lump);
+int     (W_FindNumFromName)(const char *name, lumpinfo_namespace_t ns, int lump);
 int     W_ListNumFromName(const char *name, int lump);
 #define W_CheckNumForName(name) (W_CheckNumForName)(name, ns_global)
 static INLINE int     (W_CheckNumForName)(const char *name, int ns)

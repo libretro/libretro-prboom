@@ -135,10 +135,10 @@ typedef struct
   animenum_t  type;
 
   // period in tics between animations
-  int   period;
+  int period;
 
   // number of animation frames
-  int   nanims;
+  int nanims;
 
   // location of animation
   point_t loc;
@@ -167,7 +167,7 @@ typedef struct
   int   lastdrawn;
 
   // next frame number to animate
-  int   ctr;
+  int ctr;
 
   // used by RANDOM and LEVEL when animating
   int   state;
@@ -259,7 +259,7 @@ static anim_t epsd2animinfo[] =
   { ANIM_ALWAYS, TICRATE/4, 3, { 40, 0 }, 0, 0, {{ 0, 0, 0, 0, 0}}, 0, 0, 0, 0 }
 };
 
-static int NUMANIMS[NUMEPISODES] =
+static unsigned int NUMANIMS[NUMEPISODES] =
 {
   sizeof(epsd0animinfo)/sizeof(anim_t),
   sizeof(epsd1animinfo)/sizeof(anim_t),
@@ -574,8 +574,8 @@ WI_drawOnLnode  // draw stuff at a location by episode/map#
 //
 void WI_initAnimatedBack(void)
 {
-  int   i;
-  anim_t* a;
+  unsigned i;
+  anim_t*  a;
 
   if (gamemode == commercial)  // no animation for DOOM2
     return;
@@ -611,8 +611,8 @@ void WI_initAnimatedBack(void)
 //
 void WI_updateAnimatedBack(void)
 {
-  int   i;
-  anim_t* a;
+  unsigned i;
+  anim_t*  a;
 
   if (gamemode == commercial)
     return;
@@ -668,7 +668,7 @@ void WI_updateAnimatedBack(void)
 //
 void WI_drawAnimatedBack(void)
 {
-  int     i;
+  unsigned  i;
   anim_t*   a;
 
   if (gamemode==commercial) //jff 4/25/98 Someone forgot commercial an enum
@@ -1889,10 +1889,10 @@ void WI_Ticker(void)
 
 void WI_loadData(void)
 {
-  int   i;
-  int   j;
-  char  name[9];  // limited to 8 characters
-  anim_t* a;
+  unsigned i;
+  unsigned j;
+  char     name[9];  // limited to 8 characters
+  anim_t*  a;
 
   if (gamemode != commercial)
   {
@@ -1901,7 +1901,7 @@ void WI_loadData(void)
       for (j=0;j<NUMANIMS[wbs->epsd];j++)
       {
         a = &anims[wbs->epsd][j];
-        for (i=0;i<a->nanims;i++)
+        for (i=0;i<((unsigned)a->nanims);i++)
         {
           // MONDO HACK!
           if (wbs->epsd != 1 || j != 8)

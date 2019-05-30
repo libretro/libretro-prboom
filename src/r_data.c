@@ -333,7 +333,8 @@ static void R_InitColormaps(void)
     colormaps[i] = (const lighttable_t *)W_CacheLumpNum(i+firstcolormaplump);
 
   if(numcolormaps == 0) {
-    colormaps[1] = (const lighttable_t *) {1};
+    const lighttable_t defaultmap[1] = {1};
+    colormaps[1] = defaultmap;
     numcolormaps = 2;
   }
 }

@@ -42,7 +42,7 @@ extern int gametic;
 extern int snd_SfxVolume;
 extern int snd_MusicVolume;
 
-int 		lengths[NUMSFX];
+int lengths[NUMSFX];
 int snd_card = 1;
 int mus_card = 0;
 int snd_samplerate= 11025;
@@ -227,19 +227,16 @@ void I_SetChannels(void)
 
 void I_SetSfxVolume(int volume)
 {
-    snd_SfxVolume = volume;
+  snd_SfxVolume = volume;
 }
 
 void I_SetMusicVolume(int volume)
 {
-   snd_MusicVolume = volume;
+  snd_MusicVolume = volume;
 
 #ifdef MUSIC_SUPPORT
-#ifdef HAVE_LIBFLUIDSYNTH
-   fl_player.setvolume(volume);
-#else
-   mp_player.setvolume(volume);
-#endif
+  if (current_player)
+    current_player->setvolume(volume);
 #endif
 }
 
@@ -297,7 +294,7 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
 
     for (i=0; i<NUM_CHANNELS; i++)
     {
-	if (!channels[i].snd_start_ptr)  // not playing
+        if (!channels[i].snd_start_ptr)  // not playing
         {
             slot = i;
             break;

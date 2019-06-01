@@ -523,14 +523,18 @@ static void SetVoiceVolume(opl_voice_t *voice, unsigned int volume)
                    * volume_mapping_table[voice->channel->volume]
                    * volume_mapping_table[current_music_volume]) / (127 * 127);
 
-    // The volume of each instrument can be controlled via GENMIDI:
+    if (full_volume > 0)
+    {
+       // The volume of each instrument can be controlled via GENMIDI:
+       op_volume = 0x3f - opl_voice->carrier.level;
 
-    op_volume = 0x3f - opl_voice->carrier.level;
+       // The volume value to use in the register:
 
-    // The volume value to use in the register:
-
-    reg_volume = (op_volume * full_volume) / 128;
-    reg_volume = (0x3f - reg_volume) | opl_voice->carrier.scale;
+       reg_volume = (op_volume * full_volume) / 128;
+       reg_volume = (0x3f - reg_volume) | opl_voice->carrier.scale;
+    }
+    else
+       reg_volume = 0xff;
 
     // Update the volume register(s) if necessary.
 

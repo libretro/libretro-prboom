@@ -102,7 +102,8 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/p_checksum.c \
 				 $(CORE_DIR)/md5.c \
 				 $(CORE_DIR)/d_client.c \
-				 $(CORE_DIR)/mmus2mid.c \
+				 $(CORE_DIR)/memio.c \
+				 $(CORE_DIR)/mus2mid.c \
 				 $(CORE_DIR)/dbopl.c \
 				 $(CORE_DIR)/opl.c \
 				 $(CORE_DIR)/opl_queue.c \

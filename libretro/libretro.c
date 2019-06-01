@@ -32,9 +32,6 @@
 #include "../src/m_cheat.h"
 #include "../src/g_game.h"
 
-void I_MPPlayer_Init(void);
-void I_MPPlayer_Free(void);
-
 //i_system
 int ms_to_next_tick;
 int mus_opl_gain = 50; // NSM  fine tune OPL output level
@@ -201,8 +198,6 @@ void retro_init(void)
    else
       log_cb = NULL;
 
-   I_MPPlayer_Init();
-
    rgb565 = RETRO_PIXEL_FORMAT_RGB565;
    if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
       log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
@@ -212,7 +207,6 @@ void retro_init(void)
 
 void retro_deinit(void)
 {
-   I_MPPlayer_Free();
    D_DoomDeinit();
 }
 
@@ -1270,7 +1264,7 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
       return p;
    }
    else if (log_cb)
-      log_cb(RETRO_LOG_INFO, "FindFileInDir: not found %s in %s\n", wfname, dir);
+      log_cb(RETRO_LOG_DEBUG, "FindFileInDir: not found %s in %s\n", wfname, dir);
 
    free(p);
    return NULL;
@@ -1330,9 +1324,11 @@ void I_Init(void)
 {
    int i;
 
-   /* killough 2/21/98: avoid sound initialization if no sound & no music */
-   if (!(nomusicparm && nosfxparm))
+   if (!nosfxparm)
       I_InitSound();
+
+   if (!nomusicparm)
+     I_InitMusic();
 
    for (i = 0; i < MAX_PADS; i++)
       doom_devices[i] = RETRO_DEVICE_JOYPAD;

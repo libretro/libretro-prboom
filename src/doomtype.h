@@ -76,6 +76,8 @@
 #define PATH_MAX 4096
 #endif
 
+typedef unsigned char byte;
+
 /* cph - move compatibility levels here so we can use them in d_server.c */
 typedef enum {
   doom_12_compatibility,   /* Doom v1.2 */

@@ -483,35 +483,36 @@ void S_ChangeMusic(int musicnum, int looping)
 
   // get lumpnum if neccessary
   if (!music->lumpnum)
-    {
-      char namebuf[9];
-      sprintf(namebuf, "d_%s", music->name);
-      music->lumpnum = W_GetNumForName(namebuf);
-    }
-
+  {
+    char namebuf[9];
+    sprintf(namebuf, "d_%s", music->name);
+    music->lumpnum = W_GetNumForName(namebuf);
+  }
   music_file_failed = 1;
 
   // proff_fs - only load when from IWAD
   if (lumpinfo[music->lumpnum].source == source_iwad)
+  {
+    // cournia - check to see if we can play a higher quality music file
+    //           rather than the default MIDI
+    music_filename = I_FindFile(S_music_files[musicnum], NULL);
+    if (music_filename)
     {
-      // cournia - check to see if we can play a higher quality music file
-      //           rather than the default MIDI
-      music_filename = I_FindFile(S_music_files[musicnum], NULL);
-      if (music_filename)
-        {
-          music_file_failed = I_RegisterMusic(music_filename, music);
-          free(music_filename);
-        }
+      lprintf(LO_INFO, "S_ChangeMusic: playing %s from file '%s'\n",
+                       music->name, music_filename);
+      music_file_failed = I_RegisterMusicFile(music_filename, music);
+      free(music_filename);
     }
+  }
 
   if (music_file_failed)
-    {
-      //cournia - could not load music file, play default MIDI music
-
-      // load & register it
-      music->data = W_CacheLumpNum(music->lumpnum);
-      music->handle = I_RegisterSong(music->data, W_LumpLength(music->lumpnum));
-    }
+  {
+    //cournia - could not load music file, play default MIDI music
+    // load & register it
+    lprintf(LO_INFO, "S_ChangeMusic: playing '%s'\n", music->name);
+    music->data = W_CacheLumpNum(music->lumpnum);
+    music->handle = I_RegisterSong(music->data, W_LumpLength(music->lumpnum));
+  }
 
   // play it
   I_PlaySong(music->handle, looping);

@@ -244,6 +244,7 @@ int P_SwitchWeapon(player_t *player)
       case 1:
         if (!player->powers[pw_strength])      // allow chainsaw override
           break;
+        // fall through
       case 0:
         newweapon = WP_FIST;
         break;
@@ -703,7 +704,7 @@ void A_Saw(player_t *player, pspdef_t *psp)
                           linetarget->x, linetarget->y);
 
   if (angle - player->mo->angle > ANG180) {
-    if (angle - player->mo->angle < -ANG90/20)
+    if (angle - player->mo->angle < ((angle_t) -ANG90/20))
       player->mo->angle = angle + ANG90/21;
     else
       player->mo->angle -= ANG90/20;

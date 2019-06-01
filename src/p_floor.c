@@ -498,6 +498,7 @@ int EV_DoFloor
 
          case FLEV_RAISEFLOORCRUSH:
             floor->crush = TRUE;
+            // fall through
          case FLEV_RAISEFLOOR:
             floor->direction = 1;
             floor->sector = sec;

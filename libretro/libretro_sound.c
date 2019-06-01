@@ -283,7 +283,8 @@ static int currenthandle = 0;
 
 int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority)
 {
-    int	i, oldestslot, oldesttics, slot, rightvol, leftvol;
+    unsigned int i, oldestslot, oldesttics;
+    int slot, rightvol, leftvol;
 
     // this effect was not loaded.
     if (!S_sfx[id].data)

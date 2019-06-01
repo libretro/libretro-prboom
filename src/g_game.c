@@ -902,6 +902,9 @@ void G_Ticker (void)
     case GS_DEMOSCREEN:
       D_PageTicker ();
       break;
+
+    default:
+      break;
     }
 }
 
@@ -1392,6 +1395,7 @@ void G_WorldDone (void)
         case 31:
           if (!secretexit)
             break;
+          // fall through
         case 6:
         case 11:
         case 20:
@@ -2022,7 +2026,7 @@ void G_ReloadDefaults(void)
       if (l >= -1) compatibility_level = l;
     }
   }
-  if (compatibility_level == -1)
+  if (compatibility_level == (unsigned) -1)
     compatibility_level = best_compatibility;
 
   if (mbf_features)

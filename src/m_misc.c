@@ -827,7 +827,6 @@ void M_SaveDefaults (void)
 {
   int   i;
   FILE* f;
-  boolean isdefaultvalue;
 
   f = fopen (defaultfile, "w");
   if (!f)

@@ -1030,8 +1030,6 @@ static void M_QuitResponse(int ch)
 
 void M_QuitDOOM(int choice)
 {
-  static char endstring[160];
-
   // We pick index 0 which is language sensitive,
   // or one at random, between 1 and maximum number.
   // Ty 03/27/98 - externalized DOSY as a string s_DOSY that's in the sprintf
@@ -1318,8 +1316,8 @@ void M_EndGame(int choice)
 
 void M_ChangeMessages(int choice)
 {
-  // warning: unused parameter `int choice'
-  choice = 0;
+  (void)choice; // unused, but needed in method signature due to menu logic
+
   showMessages = 1 - showMessages;
 
   if (!showMessages)
@@ -3567,7 +3565,8 @@ menu_t ExtHelpDef =
 
 void M_ExtHelpNextScreen(int choice)
 {
-  choice = 0;
+  (void)choice; // unused, but needed in method signature due to menu logic
+
   if (++extended_help_index > extended_help_count)
     {
 
@@ -3614,7 +3613,7 @@ void M_InitExtendedHelp(void)
 
 void M_ExtHelp(int choice)
 {
-  choice = 0;
+  (void)choice; // unused, but needed in method signature due to menu logic
   extended_help_index = 1; // Start with first extended help screen
   M_SetupNextMenu(&ExtHelpDef);
 }
@@ -4012,7 +4011,7 @@ boolean M_Responder (event_t* ev) {
             if (ch == KEYD_BACKSPACE && saveCharIndex > 0)
             {
                savegamestrings[saveSlot][saveCharIndex] = 0;
-               savegamestrings[saveSlot][saveCharIndex--];
+               (void) savegamestrings[saveSlot][saveCharIndex--];
                savegamestrings[saveSlot][saveCharIndex] = 0;
             }
             else if (ch != KEYD_BACKSPACE)
@@ -4403,7 +4402,7 @@ boolean M_Responder (event_t* ev) {
     {
       if (ev->type == ev_mouse)
         {
-    int i,oldbutton,group;
+    unsigned int i,oldbutton,group;
     boolean search = TRUE;
 
     if (!ptr1->m_mouse)
@@ -4440,7 +4439,7 @@ boolean M_Responder (event_t* ev) {
         }
       else  // keyboard key
         {
-    int i,oldkey,group;
+    unsigned int i,oldkey,group;
     boolean search = TRUE;
 
     // see if 'ch' is already bound elsewhere. if so, you have
@@ -5349,7 +5348,7 @@ void M_Init(void)
       // Check until which episode are there maps available
       for(EpiDef.numitems = 0; EpiDef.numitems < MAX_EPISODE_NUM; EpiDef.numitems++) {
         char mapname[9];
-        sprintf(mapname, "E%dM1", EpiDef.numitems + 1);
+        sprintf(mapname, "E%uM1", EpiDef.numitems + 1);
         if (W_CheckNumForName(mapname) == -1) {
            break;
         }

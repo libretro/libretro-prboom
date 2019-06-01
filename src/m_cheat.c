@@ -85,6 +85,9 @@ static void cheat_smart();
 static void cheat_pitch();
 static void cheat_megaarmour();
 static void cheat_health();
+static void cheat_exitl();
+static void cheat_exits();
+
 
 //-----------------------------------------------------------------------------
 //
@@ -167,6 +170,12 @@ struct cheat_s cheat[] = {
 
   {"idrate",     "Frame rate",        0,
    cheat_rate, 0, 0, 0     },
+
+  {"idxitl",     "Exit level",        not_net | not_demo | not_menu,
+   cheat_exitl, 0, 0, 0     },
+
+  {"idxits",     "Exit to secret",    not_net | not_demo | not_menu,
+   cheat_exits, 0, 0, 0     },
 
   {"tntcomp",    NULL,                not_net | not_demo,
    cheat_comp, 0, 0, 0     },     // phares
@@ -415,25 +424,24 @@ static void cheat_clev(char buf[3])
   int epsd, map;
 
   if (gamemode == commercial)
-    {
-      epsd = 1; //jff was 0, but espd is 1-based
-      map = (buf[0] - '0')*10 + buf[1] - '0';
-    }
+  {
+    epsd = 1; //jff was 0, but espd is 1-based
+    map = (buf[0] - '0')*10 + buf[1] - '0';
+  }
   else
-    {
-      epsd = buf[0] - '0';
-      map = buf[1] - '0';
-    }
+  {
+    epsd = buf[0] - '0';
+    map = buf[1] - '0';
+  }
 
   // Catch invalid maps.
   if (epsd < 1 || map < 1 ||   // Ohmygod - this is not going to work.
-      (gamemode == retail     && (epsd > 5 || map > 9  )) || // allow sigil
-      (gamemode == registered && (epsd > 3 || map > 9  )) ||
-      (gamemode == shareware  && (epsd > 1 || map > 9  )) ||
-      (gamemode == commercial && (epsd > 1 || map > 33 )) )  //jff no 33 and 34
-    return;                                                  //8/14/98 allowed
+     (epsd > MAX_EPISODE_NUM) || // allow sigil & custom episodes
+     (gamemode == shareware  && (epsd > 1 || map > 9  )))
+    return;
 
-  if (!bfgedition && map == 33)
+  // Check if map exists
+  if (G_CheckNumForLevel(epsd, map) == -1)
     return;
 
   // So be it.
@@ -443,6 +451,19 @@ static void cheat_clev(char buf[3])
   plyr->message = s_STSTR_CLEV; // Ty 03/27/98 - externalized
 
   G_DeferedInitNew(gameskill, epsd, map);
+}
+
+// 'idxitl' Exit level cheat
+static void cheat_exitl()
+{
+  G_ExitLevel ();
+}
+
+
+// 'idxits' Exit level secret
+static void cheat_exits()
+{
+  G_SecretExitLevel ();
 }
 
 // 'mypos' for player position

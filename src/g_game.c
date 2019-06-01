@@ -494,6 +494,22 @@ void G_BuildTiccmd(ticcmd_t* cmd)
 }
 
 //
+// G_CheckNumForLevel
+//
+// Returns the level lump number if it exists, -1 otherwise
+//
+int G_CheckNumForLevel(int episode, int map)
+{
+  char mapname[9];
+  if (gamemode == commercial)
+    sprintf(mapname, "MAP%.2d", map);
+  else
+    sprintf(mapname, "E%dM%d", episode, map);
+
+  return W_CheckNumForName(mapname);
+}
+
+//
 // G_RestartLevel
 //
 

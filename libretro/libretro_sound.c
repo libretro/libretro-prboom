@@ -501,7 +501,6 @@ void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
 
 void I_ShutdownSound(void)
 {
-  I_ShutdownMusic();
 }
 
 

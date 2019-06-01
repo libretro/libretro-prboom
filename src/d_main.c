@@ -149,14 +149,14 @@ void D_PostEvent(event_t *ev)
   /* cph - suppress all input events at game start
    * FIXME: This is a lousy kludge */
   if (gametic < 3) return;
-  M_Responder(ev) ||
-	  (gamestate == GS_LEVEL && (
-				     HU_Responder(ev) ||
-				     ST_Responder(ev) ||
-				     AM_Responder(ev)
-				     )
-	  ) ||
-	G_Responder(ev);
+  (void)(
+    M_Responder(ev) ||
+      (gamestate == GS_LEVEL && (
+        HU_Responder(ev) ||
+        ST_Responder(ev) ||
+        AM_Responder(ev)
+      )) ||
+    G_Responder(ev));
 }
 
 //
@@ -188,7 +188,7 @@ extern int     showMessages;
 
 void D_Display (void)
 {
-  boolean wipe, viewactive, isborder;
+  boolean wipe, viewactive, isborder = FALSE;
   static boolean isborderstate        = FALSE;
   static boolean borderwillneedredraw = FALSE;
   static gamestate_t oldgamestate = -1;
@@ -209,7 +209,7 @@ void D_Display (void)
 
   if (gamestate != GS_LEVEL) { // Not a level
     switch (oldgamestate) {
-    case -1:
+    case GS_UNDEFINED:
     case GS_LEVEL:
       V_SetPalette(0); // cph - use default (basic) palette
     default:
@@ -1451,6 +1451,7 @@ bool D_DoomMainSetup(void)
   // start the apropriate game based on parms
 
   if (gameaction != ga_playdemo)
+  {
 #ifdef HAVE_NET
     if (autostart || netgame)
 #else
@@ -1463,7 +1464,7 @@ bool D_DoomMainSetup(void)
     }
     else
       D_StartTitle(); // start up intro loop
-
+  }
   return true;
 
 failed:
@@ -1527,7 +1528,7 @@ void D_DoomDeinit(void)
 
 void GetFirstMap(int *ep, int *map)
 {
-  int i,j; // used to generate map name
+  short int i,j; // used to generate map name
   boolean done = FALSE;  // Ty 09/13/98 - to exit inner loops
   char test[6];  // MAPxx or ExMx plus terminator for testing
   char name[6];  // MAPxx or ExMx plus terminator for display

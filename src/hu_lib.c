@@ -47,9 +47,11 @@ extern int  key_enter;                                              // phares
 // not used currently
 // code to initialize HUlib would go here if needed
 //
+/*
 static void HUlib_init(void)
 {
 }
+*/
 
 ////////////////////////////////////////////////////////
 //
@@ -511,7 +513,7 @@ void HUlib_drawMBg
 //
 void HUlib_drawMText(hu_mtext_t* m)
 {
-  int i, idx, y;
+  int i, idx;
   hu_textline_t *l;
 
   if (!*m->on)
@@ -520,7 +522,6 @@ void HUlib_drawMText(hu_mtext_t* m)
   // draw everything
   if (hud_list_bgon)
     HUlib_drawMBg(m->x,m->y,m->w,m->h,m->bg);
-  y = m->y + HU_REFRESHSPACING;
   for (i=0 ; i<m->nl ; i++)
   {
     idx = m->cl - i;

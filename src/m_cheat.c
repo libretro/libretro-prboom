@@ -85,6 +85,9 @@ static void cheat_smart();
 static void cheat_pitch();
 static void cheat_megaarmour();
 static void cheat_health();
+static void cheat_exitl();
+static void cheat_exits();
+
 
 //-----------------------------------------------------------------------------
 //
@@ -167,6 +170,12 @@ struct cheat_s cheat[] = {
 
   {"idrate",     "Frame rate",        0,
    cheat_rate, 0, 0, 0     },
+
+  {"idxitl",     "Exit level",        not_net | not_demo | not_menu,
+   cheat_exitl, 0, 0, 0     },
+
+  {"idxits",     "Exit to secret",    not_net | not_demo | not_menu,
+   cheat_exits, 0, 0, 0     },
 
   {"tntcomp",    NULL,                not_net | not_demo,
    cheat_comp, 0, 0, 0     },     // phares
@@ -442,6 +451,19 @@ static void cheat_clev(char buf[3])
   plyr->message = s_STSTR_CLEV; // Ty 03/27/98 - externalized
 
   G_DeferedInitNew(gameskill, epsd, map);
+}
+
+// 'idxitl' Exit level cheat
+static void cheat_exitl()
+{
+  G_ExitLevel ();
+}
+
+
+// 'idxits' Exit level secret
+static void cheat_exits()
+{
+  G_SecretExitLevel ();
 }
 
 // 'mypos' for player position

@@ -498,7 +498,7 @@ static void extract_directory(char *buf, const char *path, size_t size)
 static char* remove_extension(char *buf, const char *path, size_t size)
 {
   char *base;
-  strncpy(buf, path, size - 1);
+  memcpy(buf, path, size - 1);
   buf[size - 1] = '\0';
 
   base = strrchr(buf, '.');
@@ -515,7 +515,8 @@ static wadinfo_t get_wadinfo(const char *path)
    wadinfo_t header;
    if (fp != NULL)
    {
-      fread(&header, sizeof(header), 1, fp);
+      if(fread(&header, sizeof(header), 1, fp) != 1)
+         I_Error("get_wadinfo: error reading file header");
       fclose(fp);
    }
    else
@@ -542,7 +543,7 @@ bool retro_load_game(const struct retro_game_info *info)
       wadinfo_t header;
       char *deh, *extension, *baseconfig;
 
-      char name_without_ext[4096];
+      char name_without_ext[1023];
       bool use_external_savedir = false;
       const char *base_save_dir = NULL;
 
@@ -559,7 +560,8 @@ bool retro_load_game(const struct retro_game_info *info)
       else
       {
         header = get_wadinfo(info->path);
-        if(header.identification == NULL)
+        // header.identification is static array, always non-NULL, but it might be empty if it couldn't be read
+        if(header.identification[0] == 0)
         {
           I_Error("retro_load_game: couldn't read WAD header from '%s'", info->path);
           goto failed;
@@ -574,9 +576,8 @@ bool retro_load_game(const struct retro_game_info *info)
           argv[argc++] = strdup("-file");
           argv[argc++] = strdup(info->path);
         }
-        else
-        {
-          I_Error("retro_load_game: invalid WAD header '%s'", header.identification);
+        else {
+          I_Error("retro_load_game: invalid WAD header '%.*s'", 4, header.identification);
           goto failed;
         }
 

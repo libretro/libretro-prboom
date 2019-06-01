@@ -1182,7 +1182,7 @@ void HU_Drawer(void)
         }
         // if we have keys and the line was hidden, show the KEY prefixing text
         if (haskeys && hud_keysstr[0] != 'K')
-          strncpy(hud_keysstr, "KEY ", 4);
+          memcpy(hud_keysstr, "KEY ", 4);
       }
     }
     // display the keys/frags line each frame

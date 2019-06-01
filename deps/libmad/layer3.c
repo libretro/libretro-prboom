@@ -880,7 +880,7 @@ mad_fixed_t III_requantize(unsigned int value, signed int exp)
   exp += power->exponent;
 
   if (exp < 0) {
-    if (-exp >= sizeof(mad_fixed_t) * CHAR_BIT) {
+    if (-exp >= (int)sizeof(mad_fixed_t) * CHAR_BIT) {
       /* underflow */
       requantized = 0;
     }
@@ -1035,7 +1035,7 @@ enum mad_error III_huffdecode(struct mad_bitptr *ptr, mad_fixed_t xr[576],
 	  break;
 
 	case 15:
-	  if (cachesz < linbits + 2) {
+	  if (cachesz < (int)linbits + 2) {
 	    bitcache   = (bitcache << 16) | mad_bit_read(&peek, 16);
 	    cachesz   += 16;
 	    bits_left -= 16;
@@ -1070,7 +1070,7 @@ enum mad_error III_huffdecode(struct mad_bitptr *ptr, mad_fixed_t xr[576],
 	  break;
 
 	case 15:
-	  if (cachesz < linbits + 1) {
+	  if (cachesz < (int)linbits + 1) {
 	    bitcache   = (bitcache << 16) | mad_bit_read(&peek, 16);
 	    cachesz   += 16;
 	    bits_left -= 16;

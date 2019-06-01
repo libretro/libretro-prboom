@@ -143,7 +143,8 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
 {
     int i, x, padded_sfx_len, sfxlump_num, sfxlump_len;
     char sfxlump_name[20];
-    uint8_t *sfxlump_data, *sfxlump_sound, *padded_sfx_data;
+    const uint8_t *sfxlump_data, *sfxlump_sound;
+    uint8_t *padded_sfx_data;
     uint16_t orig_rate;
     float times;
 
@@ -185,7 +186,7 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
             padded_sfx_data[i] = 128; // fill the rest with silence
     }
 
-    Z_Free (sfxlump_data); //  free original lump
+    Z_Free ((void*) sfxlump_data); //  free original lump
 
     *len = padded_sfx_len;
     return (void *)(padded_sfx_data);
@@ -619,7 +620,7 @@ int I_RegisterSong(const void* data, size_t len)
     {
       music_handle = music_players[i]->registersong(data, len);
       if (music_handle) {
-        current_player = music_players[i];
+        current_player = (music_player_t*)music_players[i];
         break;
       }
     }
@@ -673,7 +674,7 @@ int I_RegisterSong(const void* data, size_t len)
       mem_get_buf(outstream, &outbuf, &outbuf_len);
       music_handle = opl_synth_player.registersong(outbuf, outbuf_len);
       if(music_handle)
-        current_player = &opl_synth_player;
+        current_player = (music_player_t*)&opl_synth_player;
     }
 
     mem_fclose(instream);

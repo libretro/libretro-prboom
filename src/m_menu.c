@@ -65,6 +65,10 @@
 
 #include <libretro.h>
 
+// It'd mess code clarity if we have to fully initialize all menu entries
+// compiler already fills them up with zeroes anyway, so make it shut up!
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+
 extern patchnum_t hu_font[HU_FONTSIZE];
 extern boolean  message_dontfuckwithme;
 
@@ -826,7 +830,8 @@ void M_ReadSaveStrings(void)
       LoadMenue[i].status = 0;
       continue;
     }
-    fread(&savegamestrings[i], SAVESTRINGSIZE, 1, fp);
+    if ( fread(&savegamestrings[i], SAVESTRINGSIZE, 1, fp) != 1)
+      I_Error("M_ReadSaveStrings: can't read savegame file '%s'", name);
     fclose(fp);
     LoadMenue[i].status = 1;
   }

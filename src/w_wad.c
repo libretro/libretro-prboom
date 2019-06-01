@@ -121,7 +121,7 @@ char *AddDefaultExtension(char *path, const char *ext)
 // CPhipps - source is an enum
 //
 // proff - changed using pointer to wadfile_info_t
-static void W_AddFile(wadfile_info_t *wadfile) 
+static void W_AddFile(wadfile_info_t *wadfile)
 // killough 1/31/98: static, const
 {
    wadinfo_t   header;
@@ -141,12 +141,12 @@ static void W_AddFile(wadfile_info_t *wadfile)
 #ifdef MEMORY_LOW
    wadfile->handle = open(wadfile->name, O_RDONLY | O_BINARY);
 
-   if (wadfile->handle == -1) 
+   if (wadfile->handle == -1)
 #else
       //precache into memory instead of reading from disk
       wadfile->handle = fopen(wadfile->name, "rb");
 
-   if (wadfile->handle == 0) 
+   if (wadfile->handle == 0)
 #endif
    {
       if (  strlen(wadfile->name)<=4 ||      // add error check -- killough
@@ -161,16 +161,17 @@ static void W_AddFile(wadfile_info_t *wadfile)
    stat(wadfile->name, &statbuf);
    wadfile->length = statbuf.st_size;
    wadfile->data = malloc(statbuf.st_size);
-   fread(wadfile->data, statbuf.st_size, 1, wadfile->handle);
+   if ( fread(wadfile->data, statbuf.st_size, 1, wadfile->handle) != 1)
+     I_Error("W_AddFile: couldn't read wad data");
 #endif
 
    //jff 8/3/98 use logical output routine
    lprintf (LO_INFO," adding %s\n",wadfile->name);
    startlump = numlumps;
 
-   if (  strlen(wadfile->name)<=4 || 
+   if (  strlen(wadfile->name)<=4 ||
          (
-          strcasecmp(wadfile->name+strlen(wadfile->name)-4,".wad") && 
+          strcasecmp(wadfile->name+strlen(wadfile->name)-4,".wad") &&
           strcasecmp(wadfile->name+strlen(wadfile->name)-4,".gwa")
          )
       )
@@ -450,7 +451,7 @@ void W_Init(void)
 
   numlumps = 0; lumpinfo = NULL;
 
-  { // CPhipps - new wadfiles array used 
+  { // CPhipps - new wadfiles array used
     // open all the files, load headers, and count lumps
     unsigned i;
     for (i=0; i < numwadfiles; i++)
@@ -556,4 +557,3 @@ void W_ReadLump(int lump, void *dest)
       }
     }
 }
-

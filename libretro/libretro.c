@@ -34,7 +34,7 @@
 
 //i_system
 int ms_to_next_tick;
-int mus_opl_gain = 50; // NSM  fine tune OPL output level
+int mus_opl_gain = 250; // fine tune OPL output level
 
 int SCREENWIDTH  = 320;
 int SCREENHEIGHT = 200;

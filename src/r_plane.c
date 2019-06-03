@@ -403,6 +403,12 @@ static void R_DoDrawPlane(visplane_t *pl)
             // allow old sky textures to be used.
 
             flip = l->special==272 ? 0u : ~0u;
+
+            if (skystretch)
+            {
+              int skyheight = textureheight[texture]>>FRACBITS;
+              dcvars.texturemid = (int64_t)dcvars.texturemid * skyheight / SKYSTRETCH_HEIGHT;
+            }
          }
          else
          {    // Normal Doom sky, only one allowed per level
@@ -421,8 +427,8 @@ static void R_DoDrawPlane(visplane_t *pl)
          dcvars.nextcolormap = dcvars.colormap; // for filtering -- POPE
 
          //dcvars.texturemid = skytexturemid;
-         dcvars.texheight = textureheight[skytexture]>>FRACBITS; // killough
-         dcvars.iscale = pspriteiscale;
+         dcvars.texheight = textureheight[texture]>>FRACBITS; // killough
+         dcvars.iscale = skyiscale;
 
          tex_patch = R_CacheTextureCompositePatchNum(texture);
 

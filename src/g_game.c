@@ -206,6 +206,7 @@ int     mousebfire;
 int     mousebstrafe;
 int     mousebforward;
 int     mousebbackward;
+int     mlooky;
 
 #define MAXPLMOVE   (forwardmove[1])
 #define TURBOTHRESHOLD  0x32
@@ -471,6 +472,14 @@ void G_BuildTiccmd(ticcmd_t* cmd)
   else
     cmd->angleturn -= mousex; /* mead now have enough dynamic range 2-10-00 */
 
+  // if mouselook enabled, set pitch without affecting the tic cmds
+  if (movement_mouselook) {
+     if (movement_mouseinvert)
+        mlooky -= mousey;
+     else
+        mlooky += mousey;
+  }
+
   mousex = mousey = 0;
 
   if (forward > MAXPLMOVE)
@@ -605,6 +614,7 @@ static void G_DoLoadLevel (void)
    /* clear cmd building stuff */
    memset (gamekeydown, 0, sizeof(gamekeydown));
    mousex = mousey = 0;
+   mlooky = 0;
    special_event = 0; paused = FALSE;
    memset (mousebuttons, 0, sizeof(*mousebuttons));
 

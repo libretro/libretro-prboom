@@ -270,7 +270,8 @@ typedef struct mobj_s
     struct mobj_s**     sprev; // killough 8/10/98: change to ptr-to-ptr
 
     //More drawing info: to determine current sprite.
-    angle_t             angle;  // orientation
+    angle_t             angle;  // orientation (yaw)
+    angle_t             pitch;  // looking up/down angle
     spritenum_t         sprite; // used to find patch_t and flip value
     int                 frame;  // might be ORed with FF_FULLBRIGHT
 

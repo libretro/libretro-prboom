@@ -180,6 +180,7 @@ extern  boolean paused;        // Game Pause?
 // This one is related to the 3-screen display mode.
 // ANG90 = left side, ANG270 = right
 extern  int viewangleoffset;
+extern  int viewpitchoffset;
 
 // Player taking events, and displaying.
 extern  int consoleplayer;
@@ -247,6 +248,9 @@ extern  gamestate_t     wipegamestate;
 
 extern  int             mouseSensitivity_horiz; // killough
 extern  int             mouseSensitivity_vert;
+
+extern  boolean         movement_mouselook;
+extern  boolean         movement_mouseinvert;
 
 extern  int             bodyqueslot;
 

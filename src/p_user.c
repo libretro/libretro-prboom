@@ -41,6 +41,7 @@
 #include "p_user.h"
 #include "r_demo.h"
 #include "r_fps.h"
+#include "g_game.h"
 
 // Index of the special effects (INVUL inverse) map.
 
@@ -55,6 +56,11 @@
 #define MAXBOB  0x100000
 
 boolean onground; // whether player is on ground or in air
+
+// max/min values for pitch angle
+angle_t viewpitch_min;
+angle_t viewpitch_max;
+
 
 /*
 ==================
@@ -196,6 +202,64 @@ void P_CalcHeight (player_t* player)
 
    if (player->viewz > player->mo->ceilingz-4*FRACUNIT)
       player->viewz = player->mo->ceilingz-4*FRACUNIT;
+}
+
+/*
+=================
+=
+= P_CheckPitch
+=
+= Corrects the pitch so it's within the set limits
+=
+=================
+*/
+void P_CheckPitch(angle_t *pitch)
+{
+  if((int)*pitch > (int)viewpitch_max)
+    *pitch = viewpitch_max;
+  else if((int)*pitch < (int)viewpitch_min)
+    *pitch = viewpitch_min;
+}
+
+/*
+=================
+=
+= P_SetPitch
+=
+= Free Look Stuff
+=
+=================
+*/
+void P_SetPitch(player_t *player)
+{
+  mobj_t *mo = player->mo;
+
+  if (player == &players[consoleplayer])
+  {
+    if (!(demoplayback))
+    {
+      if (!mo->reactiontime && (!(automapmode & am_active) || (automapmode & am_overlay)))
+      {
+        mo->pitch += (mlooky << 16);
+        P_CheckPitch(&mo->pitch);
+        mlooky = 0;
+      }
+      else
+      {
+        mo->pitch = 0;
+      }
+      //R_DemoEx_WriteMLook(mo->pitch);
+    }
+    else
+    {
+      //mo->pitch = R_DemoEx_ReadMLook();
+      //P_CheckPitch((signed int *)&mo->pitch);
+    }
+  }
+  else
+  {
+    mo->pitch = 0;
+  }
 }
 
 /*
@@ -693,6 +757,7 @@ void P_PlayerThink (player_t* player)
       player->mo->PrevY = player->mo->y;
       player->prev_viewz = player->viewz;
       player->prev_viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
+      player->prev_viewpitch = player->mo->pitch + viewpitchoffset;
    }
    if (player->mo == 0)
    {
@@ -754,6 +819,8 @@ void P_PlayerThink (player_t* player)
       player->mo->reactiontime--;
    else
       P_MovePlayer (player);
+
+   P_SetPitch(player); /* Determines view pitch */
    P_CalcHeight (player); /* Determines view height and bobbing */
 
    // Determine if there's anything about the sector you're in that's

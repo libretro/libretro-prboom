@@ -46,6 +46,7 @@
 #include "v_video.h"
 #include "w_wad.h"
 #include "r_main.h"
+#include "r_sky.h"
 #include "hu_stuff.h"
 #include "g_game.h"
 #include "s_sound.h"
@@ -70,12 +71,20 @@ extern boolean  message_dontfuckwithme;
 extern boolean chat_on;          // in heads-up code
 extern int has_exited;
 
+extern angle_t viewpitch_max;
+extern angle_t viewpitch_min;
+
 //
 // defaulted values
 //
 
 int mouseSensitivity_horiz; // has default   //  killough
 int mouseSensitivity_vert;  // has default
+
+// Freelook settings
+boolean movement_mouselook;
+boolean movement_mouseinvert;
+int     movement_maxviewpitch;
 
 int showMessages;    // Show messages has default, 0 = off, 1 = on
 
@@ -292,6 +301,8 @@ void M_DrawChatStrings(void);
 void M_Compat(int);       // killough 10/98
 void M_ChangeDemoSmoothTurns(void);
 void M_ChangeFramerate(void);
+void M_ChangeMouseLook(void);
+void M_ChangeMaxViewPitch(void);
 void M_General(int);      // killough 10/98
 void M_DrawCompat(void);  // killough 10/98
 void M_DrawGeneral(void); // killough 10/98
@@ -2821,10 +2832,6 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
 };
 
 enum {
-  general_leds
-};
-
-enum {
   general_wad1,
   general_wad2,
   general_deh1,
@@ -2833,11 +2840,15 @@ enum {
 
 enum {
   general_corpse,
-  general_realtic,
   general_smooth,
   general_smoothfactor,
   general_defskill,
-  general_menubg,
+};
+
+enum {
+  general_mouselook,
+  general_mouseinvert,
+  general_maxviewpitch,
 };
 
 #define G_YB  44
@@ -2852,32 +2863,37 @@ static const char *gen_skillstrings[] = {
 setup_menu_t gen_settings2[] = { // General Settings screen2
 
   {"Files Preloaded at Game Startup",S_SKIP|S_TITLE, m_null, G_X,
-   G_YB1 - 12},
+   G_YB - 12},
 
-  {"WAD # 1", S_FILE, m_null, GF_X, G_YB1 + general_wad1*8, {"wadfile_1"}},
+  {"WAD # 1",     S_FILE, m_null, GF_X, G_YB + general_wad1*8, {"wadfile_1"}},
+  {"WAD #2",      S_FILE, m_null, GF_X, G_YB + general_wad2*8, {"wadfile_2"}},
+  {"DEH/BEX # 1", S_FILE, m_null, GF_X, G_YB + general_deh1*8, {"dehfile_1"}},
+  {"DEH/BEX #2",  S_FILE, m_null, GF_X, G_YB + general_deh2*8, {"dehfile_2"}},
 
-  {"WAD #2", S_FILE, m_null, GF_X, G_YB1 + general_wad2*8, {"wadfile_2"}},
-
-  {"DEH/BEX # 1", S_FILE, m_null, GF_X, G_YB1 + general_deh1*8, {"dehfile_1"}},
-
-  {"DEH/BEX #2", S_FILE, m_null, GF_X, G_YB1 + general_deh2*8, {"dehfile_2"}},
-
-  {"Miscellaneous"  ,S_SKIP|S_TITLE, m_null, G_X, G_YB2 - 12},
+  {"Miscellaneous"  ,S_SKIP|S_TITLE, m_null, G_X, G_YB1 - 12},
 
   {"Maximum number of player corpses", S_NUM|S_PRGWARN, m_null, G_X,
-   G_YB2 + general_corpse*8, {"max_player_corpse"}},
+   G_YB1 + general_corpse*8, {"max_player_corpse"}},
 
   {"Smooth Demo Playback", S_YESNO, m_null, G_X,
-   G_YB2 + general_smooth*8, {"demo_smoothturns"}, 0, 0, M_ChangeDemoSmoothTurns},
+   G_YB1 + general_smooth*8, {"demo_smoothturns"}, 0, 0, M_ChangeDemoSmoothTurns},
 
   {"Smooth Demo Playback Factor", S_NUM, m_null, G_X,
-   G_YB2 + general_smoothfactor*8, {"demo_smoothturnsfactor"}, 0, 0, M_ChangeDemoSmoothTurns},
+   G_YB1 + general_smoothfactor*8, {"demo_smoothturnsfactor"}, 0, 0, M_ChangeDemoSmoothTurns},
 
   {"Default skill level", S_CHOICE, m_null, G_X,
-    G_YB2 + general_defskill*8, {"default_skill"}, 0, 0, NULL, gen_skillstrings},
+    G_YB1 + general_defskill*8, {"default_skill"}, 0, 0, NULL, gen_skillstrings},
 
-  {"Fullscreen menu background", S_YESNO, m_null, G_X,
-    G_YB2 + general_menubg*8, {"menu_background"}},
+  {"Freelook"  ,S_SKIP|S_TITLE, m_null, G_X, G_YB2 - 12},
+
+  {"Enable Vertical Mouse Look", S_YESNO, m_null, G_X,
+   G_YB2 + general_mouselook*8, {"movement_mouselook"}, 0, 0, M_ChangeMouseLook},
+
+  {"Invert Vertical Mouse", S_YESNO, m_null, G_X,
+   G_YB2 + general_mouseinvert*8, {"movement_mouseinvert"}, 0, 0, NULL},
+
+  {"Maximum Vertical Pitch", S_NUM, m_null, G_X,
+   G_YB2 + general_maxviewpitch*8, {"movement_maxviewpitch"}, 0, 0, M_ChangeMaxViewPitch},
 
   {"<- PREV",S_SKIP|S_PREV, m_null, KB_PREV, KB_Y+20*8, {gen_settings1}},
 
@@ -2898,7 +2914,11 @@ enum {
   general_spriteedges,
   general_patchedges,
   general_hom,
+  general_skystretch,
+  general_gap_settings3,
+  general_menubg,
 };
+
 
 #define G_YC  44
 
@@ -2907,7 +2927,7 @@ static const char *edgetypes[] = {"jagged", "sloped"};
 
 setup_menu_t gen_settings3[] = { // General Settings screen2
 
-  {"Renderer settings"     ,S_SKIP|S_TITLE, m_null, G_X, G_YB - 12},
+  {"Display options"     ,S_SKIP|S_TITLE, m_null, G_X, G_YB - 12},
 
   {"Filter for walls", S_CHOICE, m_null, G_X,
    G_YC + general_filterwall*8, {"filter_wall"}, 0, 0, NULL, renderfilters},
@@ -2933,6 +2953,12 @@ setup_menu_t gen_settings3[] = { // General Settings screen2
   {"Flashing HOM indicator", S_YESNO, m_null, G_X,
    G_YC + general_hom*8, {"flashing_hom"}},
 
+  {"Stretch sky on freelook", S_YESNO, m_null, G_X,
+   G_YC + general_skystretch*8, {"render_stretchsky"}, 0, 0, M_ChangeMouseLook},
+
+  {"Fullscreen menu background", S_YESNO, m_null, G_X,
+   G_YC + general_menubg*8, {"menu_background"}},
+
   {"<- PREV",S_SKIP|S_PREV, m_null, KB_PREV, KB_Y+20*8, {gen_settings2}},
 
   // Final entry
@@ -2954,6 +2980,22 @@ void M_ChangeFramerate(void)
 {
   R_InitInterpolation();
   G_ScaleMovementToFramerate();
+}
+
+void M_ChangeMouseLook(void)
+{
+  R_InitSkyMap();
+  viewpitch = 0;
+}
+
+void M_ChangeMaxViewPitch(void)
+{
+  angle_t angle = (angle_t)((float)movement_maxviewpitch / 45.0f * ANG45);
+
+  viewpitch_max = (+angle - (1<<ANGLETOFINESHIFT));
+  viewpitch_min = (-angle + (1<<ANGLETOFINESHIFT));
+
+  viewpitch = 0;
 }
 
 // Setting up for the General screen. Turn on flags, set pointers,
@@ -5367,6 +5409,8 @@ void M_Init(void)
 
   M_ChangeDemoSmoothTurns();
   M_ChangeFramerate();
+  M_ChangeMouseLook();
+  M_ChangeMaxViewPitch();
 
   // Check if M_BUTT1 / M_BUTT2 exists, use fallback otherwise
   if ( W_CheckNumForName(ResetButtonName[0]) == -1 ||  W_CheckNumForName(ResetButtonName[1]) == -1 )

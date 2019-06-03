@@ -45,6 +45,12 @@
 extern int skytexture;
 extern int skytexturemid;
 
+#define SKYSTRETCH_HEIGHT 228
+extern int skystretch;
+
+// user option to stretch the sky (see https://zdoom.org/wiki/Sky_stretching )
+extern boolean r_stretchsky;
+
 /* Called whenever the view size changes. */
 void R_InitSkyMap(void);
 

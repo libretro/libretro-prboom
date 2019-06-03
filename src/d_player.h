@@ -183,9 +183,9 @@ typedef struct player_s
   /* used for interpolation */
   fixed_t prev_viewz;
   angle_t prev_viewangle;
+  angle_t prev_viewpitch;
 
 } player_t;
-
 
 //
 // INTERMISSION

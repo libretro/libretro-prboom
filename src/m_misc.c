@@ -66,6 +66,7 @@
 #include "r_draw.h"
 #include "r_demo.h"
 #include "r_fps.h"
+#include "r_sky.h"
 
 #ifdef _WIN32
    #define DIR_SLASH_STR "\\"
@@ -142,6 +143,8 @@ extern int tran_filter_pct;            // killough 2/21/98
 
 extern int screenblocks;
 extern int showMessages;
+
+extern int movement_maxviewpitch;
 
 int         mus_pause_opt; // 0 = kill music, 1 = pause, 2 = continue
 
@@ -295,11 +298,10 @@ default_t defaults[] =
    RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
   {"patch_edges",{(int*)&drawvars.patch_edges, NULL},{RDRAW_MASKEDCOLUMNEDGE_SQUARE, NULL},
    RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
-
+  {"render_stretchsky",{&r_stretchsky, NULL},{1, NULL},0,1,
+   def_bool,ss_gen,NULL, NULL},
 
   {"Mouse settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},
-  {"use_mouse",{&usemouse, NULL},{1, NULL},0,1,
-   def_bool,ss_none, NULL, NULL}, // enables use of mouse with DOOM
   //jff 4/3/98 allow unlimited sensitivity
   {"mouse_sensitivity_horiz",{&mouseSensitivity_horiz, NULL},{40, NULL},0,UL,
    def_int,ss_none, NULL, NULL}, /* adjust horizontal (x) mouse sensitivity killough/mead */
@@ -315,6 +317,13 @@ default_t defaults[] =
    def_int,ss_keys, NULL, NULL}, // mouse button number to use for forward motion
   {"mouseb_backward",{&mousebbackward, NULL},{-1, NULL},-1,MAX_MOUSEB,
    def_int,ss_keys, NULL, NULL}, // mouse button number to use for backward motion
+  // Freelook settings
+  {"movement_mouselook",{&movement_mouselook, NULL},{1, NULL},0,1,
+   def_bool,ss_gen, NULL, NULL}, // enables use of mouselook
+  {"movement_mouseinvert",{&movement_mouseinvert, NULL},{0, NULL},0,1,
+   def_bool,ss_gen, NULL, NULL}, // whether to invert the mouse vertical 
+  {"movement_maxviewpitch",{&movement_maxviewpitch, NULL},{36, NULL},0,80,
+   def_int,ss_gen, NULL, NULL}, // maximum/minimum pitch when looking up and down
 
 // For key bindings, the values stored in the key_* variables       // phares
 // are the internal Doom Codes. The values stored in the default.cfg

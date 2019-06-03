@@ -318,7 +318,7 @@ default_t defaults[] =
    def_bool,ss_gen, NULL, NULL}, // enables use of mouselook
   {"movement_mouseinvert",{&movement_mouseinvert, NULL},{0, NULL},0,1,
    def_bool,ss_gen, NULL, NULL}, // whether to invert the mouse vertical 
-  {"movement_maxviewpitch",{&movement_maxviewpitch, NULL},{36, NULL},0,80,
+  {"movement_maxviewpitch",{&movement_maxviewpitch, NULL},{32, NULL},0,80,
    def_int,ss_gen, NULL, NULL}, // maximum/minimum pitch when looking up and down
 
 // For key bindings, the values stored in the key_* variables       // phares

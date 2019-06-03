@@ -218,6 +218,16 @@
 #define MF_BOUNCES         LONGLONG(0x0000000200000000)
 #define MF_FRIEND          LONGLONG(0x0000000400000000)
 
+#define MF_RESURRECTED     LONGLONG(0x0000001000000000)
+// unused, just for prboom-plus compatibility (see https://github.com/coelckers/prboom-plus/commit/ec2c18 )
+#define MF_NO_DEPTH_TEST   LONGLONG(0x0000002000000000)
+// unused, just for prboom-plus compatibility (see https://github.com/coelckers/prboom-plus/commit/865329 )
+#define MF_FOREGROUND      LONGLONG(0x0000004000000000)
+
+#define MF_PLAYERSPRITE LONGLONG(0x0000008000000000)
+
+#define ALIVE(thing) ((thing->health > 0) && ((thing->flags & (MF_COUNTKILL | MF_CORPSE | MF_RESURRECTED)) == MF_COUNTKILL))
+
 // killough 9/15/98: Same, but internal flags, not intended for .deh
 // (some degree of opaqueness is good, to avoid compatibility woes)
 

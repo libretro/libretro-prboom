@@ -1675,10 +1675,12 @@ void A_VileChase(mobj_t* actor)
       corpsehit->flags =
         (info->flags & ~MF_FRIEND) | (actor->flags & MF_FRIEND);
 
-		  if (!((corpsehit->flags ^ MF_COUNTKILL) & (MF_FRIEND | MF_COUNTKILL)))
-		    totallive++;
-		  
-                  corpsehit->health = info->spawnhealth;
+      corpsehit->flags = corpsehit->flags | MF_RESURRECTED;//mark as resurrected
+
+      if (!((corpsehit->flags ^ MF_COUNTKILL) & (MF_FRIEND | MF_COUNTKILL)))
+          totallive++;
+
+      corpsehit->health = info->spawnhealth;
       P_SetTarget(&corpsehit->target, NULL);  // killough 11/98
 
       if (mbf_features)

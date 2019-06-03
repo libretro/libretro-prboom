@@ -387,7 +387,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
    enum draw_filter_type_e filterz;
 
    R_SetDefaultDrawColumnVars(&dcvars);
-   if (vis->isplayersprite) {
+   if (vis->mobjflags & MF_PLAYERSPRITE) {
       dcvars.edgetype = drawvars.patch_edges;
       filter = drawvars.filterpatch;
       filterz = RDRAW_FILTER_POINT;
@@ -667,8 +667,6 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    int           width;
    fixed_t       topoffset;
 
-   avis.isplayersprite = TRUE;
-
    // decide which patch to use
 
    sprdef = &sprites[psp->state->sprite];
@@ -701,7 +699,7 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
 
    // store information in a vissprite
    vis = &avis;
-   vis->mobjflags = 0;
+   vis->mobjflags = MF_PLAYERSPRITE;
    // killough 12/98: fix psprite positioning problem
    vis->texturemid = (BASEYCENTER<<FRACBITS) /* +  FRACUNIT/2 */ -
       (psp->sy-topoffset);

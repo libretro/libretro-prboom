@@ -261,10 +261,6 @@ default_t defaults[] =
      0,1,def_bool,ss_comp,&comp[comp_maskedanim], NULL},
 
   {"Sound settings",{NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
-  {"sound_card",{&snd_card, NULL},{-1, NULL},-1,7,       // jff 1/18/98 allow Allegro drivers
-   def_int,ss_none, NULL, NULL}, // select sounds driver (DOS), -1 is autodetect, 0 is none; in Linux, non-zero enables sound
-  {"music_card",{&mus_card, NULL},{-1, NULL},-1,9,       //  to be set,  -1 = autodetect
-   def_int,ss_none, NULL, NULL}, // select music driver (DOS), -1 is autodetect, 0 is none"; in Linux, non-zero enables music
   {"pitched_sounds",{&pitched_sounds, NULL},{0, NULL},0,1, // killough 2/21/98
    def_bool,ss_gen, NULL, NULL}, // enables variable pitch in sound effects (from id's original code)
   {"samplerate",{&snd_samplerate, NULL},{11025, NULL},11025,48000, def_int,ss_none, NULL, NULL},
@@ -318,7 +314,7 @@ default_t defaults[] =
   {"mouseb_backward",{&mousebbackward, NULL},{-1, NULL},-1,MAX_MOUSEB,
    def_int,ss_keys, NULL, NULL}, // mouse button number to use for backward motion
   // Freelook settings
-  {"movement_mouselook",{&movement_mouselook, NULL},{1, NULL},0,1,
+  {"movement_mouselook",{&movement_mouselook, NULL},{0, NULL},0,1,
    def_bool,ss_gen, NULL, NULL}, // enables use of mouselook
   {"movement_mouseinvert",{&movement_mouseinvert, NULL},{0, NULL},0,1,
    def_bool,ss_gen, NULL, NULL}, // whether to invert the mouse vertical 

@@ -2759,26 +2759,24 @@ setup_menu_t* gen_settings[] =
 };
 
 enum {
-  general_trans,
-  general_transpct,
-//  general_pcx,
-//  general_diskicon,
-  general_uncapped,
-  general_gamma
-};
+  general_title_video,
+  general_fps,
+  general_gamma,
 
-enum {
-//  general_sndcard,
-//  general_muscard,
-//  general_detvoices,
+  general_title_sound,
   general_sndchan,
-  general_pitch
+  general_pitch,
+
+  general_title_freelook,
+  general_mouselook,
+  general_mouseinvert,
+  general_maxviewpitch,
 };
 
 #define G_X 250
 #define G_YA  44
-#define G_YA2 (G_YA+9*8)
-#define G_YA3 (G_YA2+5*8)
+#define G_YA2 (G_YA + 16)
+#define G_YA3 (G_YA2 + 16)
 #define GF_X 76
 
 static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "100fps", "119fps", "120fps", "140fps", "144fps"};
@@ -2786,41 +2784,34 @@ static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4"};
 
 setup_menu_t gen_settings1[] = { // General Settings screen1
 
-  {"Video"       ,S_SKIP|S_TITLE, m_null, G_X, G_YA - 12},
+  {"Video"       ,S_SKIP|S_TITLE, m_null, G_X, G_YA - 2},
 
   {"Framerate", S_CHOICE, m_null, G_X,
-  G_YA + general_uncapped*8, {"uncapped_framerate"}, 0, 0, M_ChangeFramerate, framerates},
+  G_YA + general_fps*8, {"uncapped_framerate"}, 0, 0, M_ChangeFramerate, framerates},
 
   {"Gamma Correction", S_CHOICE, m_null, G_X,
   G_YA + general_gamma*8, {"usegamma"}, 0, 0, NULL, gamma_lvls},
 
-#if 0
-  {"PCX instead of BMP for screenshots", S_YESNO, m_null, G_X,
-   G_YA + general_pcx*8, {"screenshot_pcx"}},
-#endif
 
-#if 0 // MBF
-  {"Flash Icon During Disk IO", S_YESNO, m_null, G_X,
-   G_YA + general_diskicon*8, {"disk_icon"}},
-#endif
-
-  {"Sound & Music", S_SKIP|S_TITLE, m_null, G_X, G_YA3 - 12},
-#if 0 // MBF
-  {"Sound Card", S_NUM|S_PRGWARN, m_null, G_X,
-   G_YA2 + general_sndcard*8, {"sound_card"}},
-
-  {"Music Card", S_NUM|S_PRGWARN, m_null, G_X,
-   G_YA2 + general_muscard*8, {"music_card"}},
-
-  {"Autodetect Number of Voices", S_YESNO|S_PRGWARN, m_null, G_X,
-   G_YA2 + general_detvoices*8, {"detect_voices"}},
-#endif
+  {"Sound & Music", S_SKIP|S_TITLE, m_null, G_X, G_YA2 + general_title_sound*8 - 2},
 
   {"Number of Sound Channels", S_NUM|S_PRGWARN, m_null, G_X,
-   G_YA3 + general_sndchan*8, {"snd_channels"}},
+   G_YA2 + general_sndchan*8, {"snd_channels"}},
 
   {"Enable v1.1 Pitch Effects", S_YESNO, m_null, G_X,
-   G_YA3 + general_pitch*8, {"pitched_sounds"}},
+   G_YA2 + general_pitch*8, {"pitched_sounds"}},
+
+
+  {"Freelook"  ,S_SKIP|S_TITLE, m_null, G_X, G_YA3 + general_title_freelook*8 - 2},
+
+  {"Enable Vertical Mouse Look", S_YESNO, m_null, G_X,
+   G_YA3 + general_mouselook*8, {"movement_mouselook"}, 0, 0, M_ChangeMouseLook},
+
+  {"Invert Vertical Mouse", S_YESNO, m_null, G_X,
+   G_YA3 + general_mouseinvert*8, {"movement_mouseinvert"}, 0, 0, NULL},
+
+  {"Maximum Vertical Pitch", S_NUM, m_null, G_X,
+   G_YA3 + general_maxviewpitch*8, {"movement_maxviewpitch"}, 0, 0, M_ChangeMaxViewPitch},
 
   // Button for resetting to defaults
   {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
@@ -2832,28 +2823,22 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
 };
 
 enum {
+  general_title_preload,
   general_wad1,
   general_wad2,
   general_deh1,
-  general_deh2
-};
+  general_deh2,
 
-enum {
+  general_title_misc,
   general_corpse,
   general_smooth,
   general_smoothfactor,
   general_defskill,
 };
 
-enum {
-  general_mouselook,
-  general_mouseinvert,
-  general_maxviewpitch,
-};
 
-#define G_YB  44
-#define G_YB1 (G_YB+44)
-#define G_YB2 (G_YB1+52)
+#define G_YB  60
+#define G_YB1 (G_YB+20)
 
 static const char *gen_skillstrings[] = {
   // Dummy first option because defaultskill is 1-based
@@ -2862,15 +2847,14 @@ static const char *gen_skillstrings[] = {
 
 setup_menu_t gen_settings2[] = { // General Settings screen2
 
-  {"Files Preloaded at Game Startup",S_SKIP|S_TITLE, m_null, G_X,
-   G_YB - 12},
+  {"Files Preloaded at Game Startup",S_SKIP|S_TITLE, m_null, G_X, G_YB - 2},
 
   {"WAD # 1",     S_FILE, m_null, GF_X, G_YB + general_wad1*8, {"wadfile_1"}},
   {"WAD #2",      S_FILE, m_null, GF_X, G_YB + general_wad2*8, {"wadfile_2"}},
   {"DEH/BEX # 1", S_FILE, m_null, GF_X, G_YB + general_deh1*8, {"dehfile_1"}},
   {"DEH/BEX #2",  S_FILE, m_null, GF_X, G_YB + general_deh2*8, {"dehfile_2"}},
 
-  {"Miscellaneous"  ,S_SKIP|S_TITLE, m_null, G_X, G_YB1 - 12},
+  {"Miscellaneous"  ,S_SKIP|S_TITLE, m_null, G_X, G_YB1 + general_title_misc*8 - 2},
 
   {"Maximum number of player corpses", S_NUM|S_PRGWARN, m_null, G_X,
    G_YB1 + general_corpse*8, {"max_player_corpse"}},
@@ -2884,17 +2868,6 @@ setup_menu_t gen_settings2[] = { // General Settings screen2
   {"Default skill level", S_CHOICE, m_null, G_X,
     G_YB1 + general_defskill*8, {"default_skill"}, 0, 0, NULL, gen_skillstrings},
 
-  {"Freelook"  ,S_SKIP|S_TITLE, m_null, G_X, G_YB2 - 12},
-
-  {"Enable Vertical Mouse Look", S_YESNO, m_null, G_X,
-   G_YB2 + general_mouselook*8, {"movement_mouselook"}, 0, 0, M_ChangeMouseLook},
-
-  {"Invert Vertical Mouse", S_YESNO, m_null, G_X,
-   G_YB2 + general_mouseinvert*8, {"movement_mouseinvert"}, 0, 0, NULL},
-
-  {"Maximum Vertical Pitch", S_NUM, m_null, G_X,
-   G_YB2 + general_maxviewpitch*8, {"movement_maxviewpitch"}, 0, 0, M_ChangeMaxViewPitch},
-
   {"<- PREV",S_SKIP|S_PREV, m_null, KB_PREV, KB_Y+20*8, {gen_settings1}},
 
   {"NEXT ->",S_SKIP|S_NEXT,m_null,KB_NEXT,KB_Y+20*8, {gen_settings3}},
@@ -2905,29 +2878,30 @@ setup_menu_t gen_settings2[] = { // General Settings screen2
 };
 
 enum {
+  general_title_display,
   general_filterwall,
   general_filterfloor,
   general_filtersprite,
   general_filterpatch,
   general_filterz,
-  general_filter_threshold,
   general_spriteedges,
   general_patchedges,
   general_hom,
   general_skystretch,
-  general_gap_settings3,
   general_menubg,
 };
 
 
 #define G_YC  44
+#define G_YC2 (G_YC+6)
+#define G_YC3 (G_YC2+6)
 
 static const char *renderfilters[] = {"none", "point", "linear", "rounded"};
 static const char *edgetypes[] = {"jagged", "sloped"};
 
 setup_menu_t gen_settings3[] = { // General Settings screen2
 
-  {"Display options"     ,S_SKIP|S_TITLE, m_null, G_X, G_YB - 12},
+  {"Display options"     ,S_SKIP|S_TITLE, m_null, G_X, G_YC - 2},
 
   {"Filter for walls", S_CHOICE, m_null, G_X,
    G_YC + general_filterwall*8, {"filter_wall"}, 0, 0, NULL, renderfilters},
@@ -2951,13 +2925,13 @@ setup_menu_t gen_settings3[] = { // General Settings screen2
    G_YC + general_patchedges*8, {"patch_edges"}, 0, 0, NULL, edgetypes},
 
   {"Flashing HOM indicator", S_YESNO, m_null, G_X,
-   G_YC + general_hom*8, {"flashing_hom"}},
+   G_YC2 + general_hom*8, {"flashing_hom"}},
 
   {"Stretch sky on freelook", S_YESNO, m_null, G_X,
-   G_YC + general_skystretch*8, {"render_stretchsky"}, 0, 0, M_ChangeMouseLook},
+   G_YC2 + general_skystretch*8, {"render_stretchsky"}, 0, 0, M_ChangeMouseLook},
 
   {"Fullscreen menu background", S_YESNO, m_null, G_X,
-   G_YC + general_menubg*8, {"menu_background"}},
+   G_YC3 + general_menubg*8, {"menu_background"}},
 
   {"<- PREV",S_SKIP|S_PREV, m_null, KB_PREV, KB_Y+20*8, {gen_settings2}},
 
@@ -2969,9 +2943,9 @@ setup_menu_t gen_settings3[] = { // General Settings screen2
 void M_ChangeDemoSmoothTurns(void)
 {
   if (demo_smoothturns)
-    gen_settings2[12].m_flags &= ~(S_SKIP|S_SELECT);
+    gen_settings2[general_smoothfactor].m_flags &= ~(S_SKIP|S_SELECT);
   else
-    gen_settings2[12].m_flags |= (S_SKIP|S_SELECT);
+    gen_settings2[general_smoothfactor].m_flags |= (S_SKIP|S_SELECT);
 
   R_SmoothPlaying_Reset(NULL);
 }
@@ -2984,6 +2958,15 @@ void M_ChangeFramerate(void)
 
 void M_ChangeMouseLook(void)
 {
+  if (movement_mouselook) {
+    gen_settings1[general_mouseinvert].m_flags  &= ~(S_SKIP|S_SELECT);
+    gen_settings1[general_maxviewpitch].m_flags &= ~(S_SKIP|S_SELECT);
+    gen_settings3[general_skystretch].m_flags   &= ~(S_SKIP|S_SELECT);
+  } else {
+    gen_settings1[general_mouseinvert].m_flags  |= (S_SKIP|S_SELECT);
+    gen_settings1[general_maxviewpitch].m_flags |= (S_SKIP|S_SELECT);
+    gen_settings3[general_skystretch].m_flags   |= (S_SKIP|S_SELECT);
+  }
   R_InitSkyMap();
   viewpitch = 0;
 }

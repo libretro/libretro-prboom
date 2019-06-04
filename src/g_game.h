@@ -166,6 +166,7 @@ extern int  mousebstrafe;
 extern int  mousebforward;
 extern int  mousebbackward;
 extern int  mouse_double_click_use;
+extern int  mlooky;
 
 extern int  defaultskill;      //jff 3/24/98 default skill
 extern boolean haswolflevels;  //jff 4/18/98 wolf levels present

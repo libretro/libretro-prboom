@@ -66,6 +66,7 @@
 #include "r_draw.h"
 #include "r_demo.h"
 #include "r_fps.h"
+#include "r_sky.h"
 
 #ifdef _WIN32
    #define DIR_SLASH_STR "\\"
@@ -142,6 +143,8 @@ extern int tran_filter_pct;            // killough 2/21/98
 
 extern int screenblocks;
 extern int showMessages;
+
+extern int movement_maxviewpitch;
 
 int         mus_pause_opt; // 0 = kill music, 1 = pause, 2 = continue
 
@@ -258,10 +261,6 @@ default_t defaults[] =
      0,1,def_bool,ss_comp,&comp[comp_maskedanim], NULL},
 
   {"Sound settings",{NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
-  {"sound_card",{&snd_card, NULL},{-1, NULL},-1,7,       // jff 1/18/98 allow Allegro drivers
-   def_int,ss_none, NULL, NULL}, // select sounds driver (DOS), -1 is autodetect, 0 is none; in Linux, non-zero enables sound
-  {"music_card",{&mus_card, NULL},{-1, NULL},-1,9,       //  to be set,  -1 = autodetect
-   def_int,ss_none, NULL, NULL}, // select music driver (DOS), -1 is autodetect, 0 is none"; in Linux, non-zero enables music
   {"pitched_sounds",{&pitched_sounds, NULL},{0, NULL},0,1, // killough 2/21/98
    def_bool,ss_gen, NULL, NULL}, // enables variable pitch in sound effects (from id's original code)
   {"samplerate",{&snd_samplerate, NULL},{11025, NULL},11025,48000, def_int,ss_none, NULL, NULL},
@@ -295,11 +294,10 @@ default_t defaults[] =
    RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
   {"patch_edges",{(int*)&drawvars.patch_edges, NULL},{RDRAW_MASKEDCOLUMNEDGE_SQUARE, NULL},
    RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
-
+  {"render_stretchsky",{&r_stretchsky, NULL},{1, NULL},0,1,
+   def_bool,ss_gen,NULL, NULL},
 
   {"Mouse settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},
-  {"use_mouse",{&usemouse, NULL},{1, NULL},0,1,
-   def_bool,ss_none, NULL, NULL}, // enables use of mouse with DOOM
   //jff 4/3/98 allow unlimited sensitivity
   {"mouse_sensitivity_horiz",{&mouseSensitivity_horiz, NULL},{40, NULL},0,UL,
    def_int,ss_none, NULL, NULL}, /* adjust horizontal (x) mouse sensitivity killough/mead */
@@ -315,6 +313,13 @@ default_t defaults[] =
    def_int,ss_keys, NULL, NULL}, // mouse button number to use for forward motion
   {"mouseb_backward",{&mousebbackward, NULL},{-1, NULL},-1,MAX_MOUSEB,
    def_int,ss_keys, NULL, NULL}, // mouse button number to use for backward motion
+  // Freelook settings
+  {"movement_mouselook",{&movement_mouselook, NULL},{0, NULL},0,1,
+   def_bool,ss_gen, NULL, NULL}, // enables use of mouselook
+  {"movement_mouseinvert",{&movement_mouseinvert, NULL},{0, NULL},0,1,
+   def_bool,ss_gen, NULL, NULL}, // whether to invert the mouse vertical 
+  {"movement_maxviewpitch",{&movement_maxviewpitch, NULL},{32, NULL},0,80,
+   def_int,ss_gen, NULL, NULL}, // maximum/minimum pitch when looking up and down
 
 // For key bindings, the values stored in the key_* variables       // phares
 // are the internal Doom Codes. The values stored in the default.cfg

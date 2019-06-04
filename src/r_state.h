@@ -95,10 +95,12 @@ extern fixed_t          viewx;
 extern fixed_t          viewy;
 extern fixed_t          viewz;
 extern angle_t          viewangle;
+extern angle_t          viewpitch;
 extern player_t         *viewplayer;
 extern angle_t          clipangle;
 extern int              viewangletox[FINEANGLES/2];
 extern angle_t          xtoviewangle[MAX_SCREENWIDTH+1];  // killough 2/8/98
+extern int              fieldofview;
 extern fixed_t          rw_distance;
 extern angle_t          rw_normalangle;
 

@@ -329,46 +329,46 @@ void R_DrawMaskedColumn(
       const rcolumn_t *nextcolumn
       )
 {
-   int     i;
-   int     topscreen;
-   int     bottomscreen;
-   fixed_t basetexturemid = dcvars->texturemid;
+  int     i;
+  int     topscreen;
+  int     bottomscreen;
+  fixed_t basetexturemid = dcvars->texturemid;
 
-   dcvars->texheight = patch->height; // killough 11/98
-   for (i=0; i<column->numPosts; i++) {
-      const rpost_t *post = &column->posts[i];
+  dcvars->texheight = patch->height; // killough 11/98
+  for (i=0; i<column->numPosts; i++) {
+    const rpost_t *post = &column->posts[i];
 
-      // calculate unclipped screen coordinates for post
-      topscreen = sprtopscreen + spryscale*post->topdelta;
-      bottomscreen = topscreen + spryscale*post->length;
+    // calculate unclipped screen coordinates for post
+    topscreen = sprtopscreen + spryscale*post->topdelta;
+    bottomscreen = topscreen + spryscale*post->length;
 
-      dcvars->yl = (topscreen+FRACUNIT-1)>>FRACBITS;
-      dcvars->yh = (bottomscreen-1)>>FRACBITS;
+    dcvars->yl = (topscreen+FRACUNIT-1)>>FRACBITS;
+    dcvars->yh = (bottomscreen-1)>>FRACBITS;
 
-      if (dcvars->yh >= mfloorclip[dcvars->x])
-         dcvars->yh = mfloorclip[dcvars->x]-1;
+    if (dcvars->yh >= mfloorclip[dcvars->x])
+      dcvars->yh = mfloorclip[dcvars->x]-1;
 
-      if (dcvars->yl <= mceilingclip[dcvars->x])
-         dcvars->yl = mceilingclip[dcvars->x]+1;
+    if (dcvars->yl <= mceilingclip[dcvars->x])
+      dcvars->yl = mceilingclip[dcvars->x]+1;
 
-      // killough 3/2/98, 3/27/98: Failsafe against overflow/crash:
-      if (dcvars->yl <= dcvars->yh && dcvars->yh < viewheight)
-      {
-         dcvars->source = column->pixels + post->topdelta;
-         dcvars->prevsource = prevcolumn->pixels + post->topdelta;
-         dcvars->nextsource = nextcolumn->pixels + post->topdelta;
+    // killough 3/2/98, 3/27/98: Failsafe against overflow/crash:
+    if (dcvars->yl <= dcvars->yh && dcvars->yh < viewheight)
+    {
+      dcvars->source = column->pixels + post->topdelta;
+      dcvars->prevsource = prevcolumn->pixels + post->topdelta;
+      dcvars->nextsource = nextcolumn->pixels + post->topdelta;
 
-         dcvars->texturemid = basetexturemid - (post->topdelta<<FRACBITS);
+      dcvars->texturemid = basetexturemid - (post->topdelta<<FRACBITS);
 
-         dcvars->edgeslope = post->slope;
-         // Drawn by either R_DrawColumn
-         //  or (SHADOW) R_DrawFuzzColumn.
-         dcvars->drawingmasked = 1; // POPE
-         colfunc (dcvars);
-         dcvars->drawingmasked = 0; // POPE
-      }
-   }
-   dcvars->texturemid = basetexturemid;
+      dcvars->edgeslope = post->slope;
+      // Drawn by either R_DrawColumn
+      //  or (SHADOW) R_DrawFuzzColumn.
+      dcvars->drawingmasked = 1; // POPE
+      colfunc (dcvars);
+      dcvars->drawingmasked = 0; // POPE
+    }
+  }
+  dcvars->texturemid = basetexturemid;
 }
 
 //
@@ -378,67 +378,74 @@ void R_DrawMaskedColumn(
 // CPhipps - new wad lump handling, *'s to const*'s
 static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 {
-   int      texturecolumn;
-   fixed_t  frac;
-   const rpatch_t *patch = R_CachePatchNum(vis->patch+firstspritelump);
-   R_DrawColumn_f colfunc;
-   draw_column_vars_t dcvars;
-   enum draw_filter_type_e filter;
-   enum draw_filter_type_e filterz;
+  int      texturecolumn;
+  fixed_t  frac;
+  const rpatch_t *patch = R_CachePatchNum(vis->patch+firstspritelump);
+  R_DrawColumn_f colfunc;
+  draw_column_vars_t dcvars;
+  enum draw_filter_type_e filter;
+  enum draw_filter_type_e filterz;
 
-   R_SetDefaultDrawColumnVars(&dcvars);
-   if (vis->isplayersprite) {
-      dcvars.edgetype = drawvars.patch_edges;
-      filter = drawvars.filterpatch;
-      filterz = RDRAW_FILTER_POINT;
-   } else {
-      dcvars.edgetype = drawvars.sprite_edges;
-      filter = drawvars.filtersprite;
-      filterz = drawvars.filterz;
-   }
+  R_SetDefaultDrawColumnVars(&dcvars);
+  if (vis->mobjflags & MF_PLAYERSPRITE) {
+    dcvars.edgetype = drawvars.patch_edges;
+    filter = drawvars.filterpatch;
+    filterz = RDRAW_FILTER_POINT;
+  } else {
+    dcvars.edgetype = drawvars.sprite_edges;
+    filter = drawvars.filtersprite;
+    filterz = drawvars.filterz;
+  }
 
-   dcvars.colormap = vis->colormap;
-   dcvars.nextcolormap = dcvars.colormap; // for filtering -- POPE
+  dcvars.colormap = vis->colormap;
+  dcvars.nextcolormap = dcvars.colormap; // for filtering -- POPE
 
-   // killough 4/11/98: rearrange and handle translucent sprites
-   // mixed with translucent/non-translucenct 2s normals
+  // killough 4/11/98: rearrange and handle translucent sprites
+  // mixed with translucent/non-translucenct 2s normals
 
-   if (!dcvars.colormap)   // NULL colormap = shadow draw
-      colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_FUZZ, filter, filterz);    // killough 3/14/98
-   else
-      if (vis->mobjflags & MF_TRANSLATION)
-      {
-         colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED, filter, filterz);
-         dcvars.translation = translationtables - 256 +
-            ((vis->mobjflags & MF_TRANSLATION) >> (MF_TRANSSHIFT-8) );
-      }
-      else
-         colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, filter, filterz); // killough 3/14/98, 4/11/98
+  if (!dcvars.colormap)   // NULL colormap = shadow draw
+    colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_FUZZ, filter, filterz);    // killough 3/14/98
+  else
+    if (vis->mobjflags & MF_TRANSLATION)
+    {
+      colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED, filter, filterz);
+      dcvars.translation = translationtables - 256 +
+        ((vis->mobjflags & MF_TRANSLATION) >> (MF_TRANSSHIFT-8) );
+    }
+    else
+      colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, filter, filterz); // killough 3/14/98, 4/11/98
 
-   // proff 11/06/98: Changed for high-res
-   dcvars.iscale = FixedDiv (FRACUNIT, vis->scale);
-   dcvars.texturemid = vis->texturemid;
-   frac = vis->startfrac;
-   if (filter == RDRAW_FILTER_LINEAR)
-      frac -= (FRACUNIT>>1);
-   spryscale = vis->scale;
-   sprtopscreen = centeryfrac - FixedMul(dcvars.texturemid,spryscale);
+  // proff 11/06/98: Changed for high-res
+  dcvars.iscale = FixedDiv (FRACUNIT, vis->scale);
+  dcvars.texturemid = vis->texturemid;
+  frac = vis->startfrac;
+  if (filter == RDRAW_FILTER_LINEAR)
+    frac -= (FRACUNIT>>1);
+  spryscale = vis->scale;
+  sprtopscreen = centeryfrac - FixedMul(dcvars.texturemid,spryscale);
 
-   for (dcvars.x=vis->x1 ; dcvars.x<=vis->x2 ; dcvars.x++, frac += vis->xiscale)
-   {
-      texturecolumn = frac>>FRACBITS;
-      dcvars.texu = frac;
+  // make sure the player weapon is in a static position on the screen
+  if(vis->mobjflags & MF_PLAYERSPRITE)
+  {
+    dcvars.texturemid += FixedMul(((centery - viewheight/2)<<FRACBITS), dcvars.iscale);
+    sprtopscreen += (viewheight/2 - centery)<<FRACBITS;
+  }
 
-      R_DrawMaskedColumn(
-            patch,
-            colfunc,
-            &dcvars,
-            R_GetPatchColumnClamped(patch, texturecolumn),
-            R_GetPatchColumnClamped(patch, texturecolumn-1),
-            R_GetPatchColumnClamped(patch, texturecolumn+1)
-            );
-   }
-   R_UnlockPatchNum(vis->patch+firstspritelump); // cph - release lump
+  for (dcvars.x=vis->x1 ; dcvars.x<=vis->x2 ; dcvars.x++, frac += vis->xiscale)
+  {
+    texturecolumn = frac>>FRACBITS;
+    dcvars.texu = frac;
+
+    R_DrawMaskedColumn(
+      patch,
+      colfunc,
+      &dcvars,
+      R_GetPatchColumnClamped(patch, texturecolumn),
+      R_GetPatchColumnClamped(patch, texturecolumn-1),
+      R_GetPatchColumnClamped(patch, texturecolumn+1)
+    );
+  }
+  R_UnlockPatchNum(vis->patch+firstspritelump); // cph - release lump
 }
 
 //
@@ -667,8 +674,6 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    int           width;
    fixed_t       topoffset;
 
-   avis.isplayersprite = TRUE;
-
    // decide which patch to use
 
    sprdef = &sprites[psp->state->sprite];
@@ -701,7 +706,7 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
 
    // store information in a vissprite
    vis = &avis;
-   vis->mobjflags = 0;
+   vis->mobjflags = MF_PLAYERSPRITE;
    // killough 12/98: fix psprite positioning problem
    vis->texturemid = (BASEYCENTER<<FRACBITS) /* +  FRACUNIT/2 */ -
       (psp->sy-topoffset);
@@ -992,6 +997,6 @@ void R_DrawMasked(void)
 
    // draw the psprites on top of everything
    //  but does not draw on side views
-   if (!viewangleoffset)
+   if (!viewangleoffset && !viewpitchoffset)
       R_DrawPlayerSprites ();
 }

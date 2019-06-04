@@ -50,10 +50,12 @@ extern int      centery;
 extern fixed_t  centerxfrac;
 extern fixed_t  centeryfrac;
 extern fixed_t  viewheightfrac; //e6y: for correct clipping of things
+extern fixed_t  freelookviewheight;
 extern fixed_t  projection;
 // proff 11/06/98: Added for high-res
 extern fixed_t  projectiony;
 extern int      validcount;
+extern fixed_t skyiscale;
 
 //
 // Rendering stats

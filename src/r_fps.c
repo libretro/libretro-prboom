@@ -111,6 +111,7 @@ void R_InterpolateView (player_t *player)
     viewz = player->prev_viewz + FixedMul (frac, player->viewz - player->prev_viewz);
 
     viewangle = player->prev_viewangle + FixedMul (frac, R_SmoothPlaying_Get(player->mo->angle) - player->prev_viewangle) + viewangleoffset;
+    viewpitch = player->prev_viewpitch + FixedMul (frac, player->mo->pitch - player->prev_viewpitch) + viewpitchoffset;
   }
   else
   {
@@ -119,6 +120,7 @@ void R_InterpolateView (player_t *player)
     viewz = player->viewz;
 
     viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
+    viewpitch = R_SmoothPlaying_Get(player->mo->pitch) + viewpitchoffset;
   }
 
   if (!paused && movement_smooth)

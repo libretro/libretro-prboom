@@ -63,7 +63,7 @@
 // had Left/Mid/Right viewing. +/-ANG90 offsets were placed here on each
 // node, by d_net.c, to set up a L/M/R session.
 
-int viewangleoffset;
+int viewangleoffset, viewpitchoffset;
 int validcount = 1;         // increment every time a check is made
 const lighttable_t *fixedcolormap;
 int      centerx, centery;
@@ -72,10 +72,15 @@ fixed_t  viewheightfrac; //e6y: for correct clipping of things
 fixed_t  projection;
 // proff 11/06/98: Added for high-res
 fixed_t  projectiony;
+fixed_t  skyiscale;
 fixed_t  viewx, viewy, viewz;
 angle_t  viewangle;
+angle_t  viewpitch;
 fixed_t  viewcos, viewsin;
 player_t *viewplayer;
+fixed_t  focallength;
+int      fieldofview;
+fixed_t  freelookviewheight;
 extern lighttable_t **walllights;
 
 #ifndef __LIBRETRO__
@@ -296,8 +301,8 @@ angle_t R_PointToAngle2(fixed_t x1, fixed_t y1, fixed_t x2, fixed_t y2)
 
 static void R_InitTextureMapping (void)
 {
-  register int i,x;
-  fixed_t focallength;
+  int i,x;
+  fieldofview = FIELDOFVIEW;
 
   // Use tangent table to generate viewangletox:
   //  viewangletox will give the next greatest x
@@ -306,15 +311,16 @@ static void R_InitTextureMapping (void)
   // Calc focallength
   //  so FIELDOFVIEW angles covers SCREENWIDTH.
 
-  focallength = FixedDiv(centerxfrac, finetangent[FINEANGLES/4+FIELDOFVIEW/2]);
+  focallength = FixedDiv(centerxfrac, finetangent[FINEANGLES/4 + fieldofview/2]);
 
   for (i=0 ; i<FINEANGLES/2 ; i++)
     {
       int t;
-      if (finetangent[i] > FRACUNIT*2)
+      int limit = finetangent[FINEANGLES/4 + fieldofview/2];
+      if (finetangent[i] > limit)
         t = -1;
       else
-        if (finetangent[i] < -FRACUNIT*2)
+        if (finetangent[i] < -limit)
           t = viewwidth+1;
       else
         {
@@ -450,6 +456,12 @@ void R_ExecuteSetViewSize (void)
 // proff 11/06/98: Added for high-res
   pspriteyscale = (((SCREENHEIGHT*viewwidth)/SCREENWIDTH) << FRACBITS) / 200;
 
+  // sky scaling
+  skyiscale = (fixed_t)(((uint64_t)FRACUNIT * SCREENWIDTH * 200) / (viewwidth * SCREENHEIGHT));
+
+  // [RH] Sky height fix for screens not 200 (or 240) pixels tall
+  R_InitSkyMap();
+
   // thing clipping
   for (i=0 ; i<viewwidth ; i++)
     screenheightarray[i] = viewheight;
@@ -527,9 +539,48 @@ subsector_t *R_PointInSubsector(fixed_t x, fixed_t y)
 }
 
 //
+// R_SetupFreelook
+//
+void R_SetupFreelook(void)
+{
+  static int old_centery = 0;
+  fixed_t dy;
+  int i;
+
+  //if (camera != NULL)
+  {
+    dy = FixedMul(focallength, finetangent[(ANG90-viewpitch)>>ANGLETOFINESHIFT]);
+  }
+  /*else
+  {
+    dy = 0;
+  }*/
+
+  if (movement_mouselook){
+    centeryfrac = (viewheight << (FRACBITS-1)) + dy;
+    centery = centeryfrac >> FRACBITS;
+  }
+  else
+  {
+    centery = viewheight / 2;
+    centeryfrac = centery<<FRACBITS;
+  }
+
+  if (centery != old_centery)
+  {
+    old_centery = centery;
+    for (i=0 ; i<viewheight ; i++)
+    {   // killough 5/2/98: reformatted
+      fixed_t dy = D_abs(((i-centery)<<FRACBITS)+FRACUNIT/2);
+      // proff 08/17/98: Changed for high-res
+      yslope[i] = FixedDiv(projectiony, dy);
+    }
+  }
+}
+
+//
 // R_SetupFrame
 //
-
 static void R_SetupFrame (player_t *player)
 {
   int cm;
@@ -540,6 +591,8 @@ static void R_SetupFrame (player_t *player)
 
   viewsin = finesine[viewangle>>ANGLETOFINESHIFT];
   viewcos = finecosine[viewangle>>ANGLETOFINESHIFT];
+
+  R_SetupFreelook();
 
   R_DoInterpolations(tic_vars.frac);
 

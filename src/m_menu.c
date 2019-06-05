@@ -2745,7 +2745,6 @@ void M_DrawEnemy(void)
 // The General table.
 // killough 10/10/98
 
-extern int usemouse, default_mus_card, default_snd_card;
 extern int detect_voices, tran_filter_pct;
 
 setup_menu_t gen_settings1[], gen_settings2[], gen_settings3[];

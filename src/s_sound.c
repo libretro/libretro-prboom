@@ -121,7 +121,7 @@ void S_Init(int sfxVolume, int musicVolume)
 {
   //jff 1/22/98 skip sound init if sound not enabled
   numChannels = default_numChannels;
-  if (snd_card && !nosfxparm)
+  if (!nosfxparm)
   {
     int i;
 
@@ -145,7 +145,7 @@ void S_Init(int sfxVolume, int musicVolume)
   }
 
   // CPhipps - music init reformatted
-  if (mus_card && !nomusicparm) {
+  if (!nomusicparm) {
     S_SetMusicVolume(musicVolume);
 
     // no sounds are playing, and they are not mus_paused
@@ -158,7 +158,7 @@ void S_Stop(void)
   int cnum;
 
   //jff 1/22/98 skip sound init if sound not enabled
-  if (snd_card && !nosfxparm)
+  if (!nosfxparm)
     for (cnum=0 ; cnum<numChannels ; cnum++)
       if (channels[cnum].sfxinfo)
         S_StopChannel(cnum);
@@ -179,7 +179,7 @@ void S_Start(void)
   S_Stop();
 
   //jff 1/22/98 return if music is not enabled
-  if (!mus_card || nomusicparm)
+  if (nomusicparm)
     return;
 
   // start new music for the level
@@ -203,7 +203,7 @@ void S_StartSoundAtVolume(void *origin_p, int sfx_id, int volume)
   mobj_t *origin = (mobj_t *) origin_p;
 
   //jff 1/22/98 return if sound is not enabled
-  if (!snd_card || nosfxparm)
+  if (nosfxparm)
     return;
 
   is_pickup = sfx_id & PICKUP_SOUND || sfx_id == sfx_oof || (compatibility_level >= prboom_2_compatibility && sfx_id == sfx_noway); // killough 4/25/98
@@ -303,7 +303,7 @@ void S_StopSound(void *origin)
   int cnum;
 
   //jff 1/22/98 return if sound is not enabled
-  if (!snd_card || nosfxparm)
+  if (nosfxparm)
     return;
 
   for (cnum=0 ; cnum<numChannels ; cnum++)
@@ -321,7 +321,7 @@ void S_StopSound(void *origin)
 void S_PauseSound(void)
 {
   //jff 1/22/98 return if music is not enabled
-  if (!mus_card || nomusicparm)
+  if (nomusicparm)
     return;
 
   if (mus_playing && !mus_paused)
@@ -334,7 +334,7 @@ void S_PauseSound(void)
 void S_ResumeSound(void)
 {
   //jff 1/22/98 return if music is not enabled
-  if (!mus_card || nomusicparm)
+  if (nomusicparm)
     return;
 
   if (mus_playing && mus_paused)
@@ -354,7 +354,7 @@ void S_UpdateSounds(void* listener_p)
   int cnum;
 
   //jff 1/22/98 return if sound is not enabled
-  if (!snd_card || nosfxparm)
+  if (nosfxparm)
     return;
 
 #ifdef UPDATE_MUSIC
@@ -409,7 +409,7 @@ void S_UpdateSounds(void* listener_p)
 void S_SetMusicVolume(int volume)
 {
   //jff 1/22/98 return if music is not enabled
-  if (!mus_card || nomusicparm)
+  if (nomusicparm)
     return;
   if (volume < 0 || volume > 15)
     I_Error("S_SetMusicVolume: Attempt to set music volume at %d", volume);
@@ -422,7 +422,7 @@ void S_SetMusicVolume(int volume)
 void S_SetSfxVolume(int volume)
 {
   //jff 1/22/98 return if sound is not enabled
-  if (!snd_card || nosfxparm)
+  if (nosfxparm)
     return;
   if (volume < 0 || volume > 127)
     I_Error("S_SetSfxVolume: Attempt to set sfx volume at %d", volume);
@@ -436,7 +436,7 @@ void S_SetSfxVolume(int volume)
 void S_StartMusic(int m_id)
 {
   //jff 1/22/98 return if music is not enabled
-  if (!mus_card || nomusicparm)
+  if (nomusicparm)
     return;
   S_ChangeMusic(m_id, FALSE);
 }
@@ -450,7 +450,7 @@ void S_ChangeMusic(int musicnum, int looping)
   char* music_filename;  // cournia
 
   //jff 1/22/98 return if music is not enabled
-  if (!mus_card || nomusicparm)
+  if (nomusicparm)
     return;
 
   if (musicnum <= mus_None || musicnum >= NUMMUSIC)
@@ -507,7 +507,7 @@ void S_ChangeMusic(int musicnum, int looping)
 void S_StopMusic(void)
 {
   //jff 1/22/98 return if music is not enabled
-  if (!mus_card || nomusicparm)
+  if (nomusicparm)
     return;
 
   if (mus_playing)
@@ -533,7 +533,7 @@ void S_StopChannel(int cnum)
   channel_t *c = &channels[cnum];
 
   //jff 1/22/98 return if sound is not enabled
-  if (!snd_card || nosfxparm)
+  if (nosfxparm)
     return;
 
   if (c->sfxinfo)
@@ -568,7 +568,7 @@ int S_AdjustSoundParams(mobj_t *listener, mobj_t *source,
   angle_t angle;
 
   //jff 1/22/98 return if sound is not enabled
-  if (!snd_card || nosfxparm)
+  if (nosfxparm)
     return 0;
 
   // e6y
@@ -640,7 +640,7 @@ static int S_getChannel(void *origin, sfxinfo_t *sfxinfo, int is_pickup)
   channel_t *c;
 
   //jff 1/22/98 return if sound is not enabled
-  if (!snd_card || nosfxparm)
+  if (nosfxparm)
     return -1;
 
   // Find an open channel

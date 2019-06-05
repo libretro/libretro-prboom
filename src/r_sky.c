@@ -111,7 +111,6 @@ void R_InitSkyMap (void)
     {
       skyiscale = (fixed_t)((int64_t)skyiscale * skyheight / SKYSTRETCH_HEIGHT);
       skytexturemid = (int)((int64_t)skytexturemid * skyheight / SKYSTRETCH_HEIGHT);
-      I_Error("stretch!!! iscale:%d mid:%d", skyiscale,skytexturemid);
     }
     else
     {

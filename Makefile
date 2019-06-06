@@ -51,8 +51,6 @@ ifeq (,$(findstring msvc,$(platform)))
 LIBS    += -lm
 endif
 
-LDFLAGS := 
-
 ifeq ($(STATIC_LINKING),1)
 EXT=a
 

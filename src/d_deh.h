@@ -29,7 +29,7 @@
  * DESCRIPTION:
  *  Dehacked file support
  *  New for the TeamTNT "Boom" engine
- * 
+ *
  *  Author: Ty Halderman, TeamTNT
  *
  *  Description: This file translates the #defined string constants
@@ -1115,7 +1115,7 @@ extern const char* bgflatE2;
 extern const char* bgflatE3;
 // char*        bgflatE4 = "MFLR8_3";
 extern const char* bgflatE4;
-// char*        bgflatE5 = "FLOOR4_8";
+// char*        bgflatE5 = "FLOOR7_2";
 extern const char* bgflatE5;
 
 // char*        bgflat06 = "SLIME16";

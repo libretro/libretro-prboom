@@ -2765,6 +2765,7 @@ enum {
   general_title_sound,
   general_sndchan,
   general_pitch,
+  general_mus_external,
 
   general_title_freelook,
   general_mouselook,
@@ -2780,6 +2781,7 @@ enum {
 
 static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "100fps", "119fps", "120fps", "140fps", "144fps"};
 static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4"};
+static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD"};
 
 setup_menu_t gen_settings1[] = { // General Settings screen1
 
@@ -2799,6 +2801,9 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
 
   {"Enable v1.1 Pitch Effects", S_YESNO, m_null, G_X,
    G_YA2 + general_pitch*8, {"pitched_sounds"}},
+
+  {"Play external MP3 files", S_CHOICE, m_null, G_X,
+   G_YA2 + general_mus_external*8, {"mus_load_external"}, 0, 0, NULL, mus_external_opts},
 
 
   {"Freelook"  ,S_SKIP|S_TITLE, m_null, G_X, G_YA3 + general_title_freelook*8 - 2},

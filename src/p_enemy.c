@@ -2107,7 +2107,7 @@ void A_BossDeath(mobj_t *mo)
   else
     {
       // e6y
-      // Additional check of gameepisode is necessary, because 
+      // Additional check of gameepisode is necessary, because
       // there is no right or wrong solution for E4M6 in original EXEs,
       // there's nothing to emulate.
       if (comp[comp_666] && gameepisode < 4)
@@ -2119,7 +2119,7 @@ void A_BossDeath(mobj_t *mo)
         // http://www.doomworld.com/idgames/index.php?id=6909
         if (gamemap != 8)
           return;
-        if (mo->type == MT_BRUISER && gameepisode != 1) 
+        if (mo->type == MT_BRUISER && gameepisode != 1)
           return;
       }
       else
@@ -2169,6 +2169,9 @@ void A_BossDeath(mobj_t *mo)
               break;
             }
           break;
+
+        case 5: // sigil
+          return;
 
         default:
           if (gamemap != 8)

@@ -147,6 +147,7 @@ extern int showMessages;
 extern int movement_maxviewpitch;
 
 int         mus_pause_opt; // 0 = kill music, 1 = pause, 2 = continue
+int         mus_load_external; // 0 = never load external music files, 1 = always load it, 2 = only from iwads
 
 extern const char* chat_macros[];
 
@@ -268,6 +269,8 @@ default_t defaults[] =
   {"music_volume",{&snd_MusicVolume, NULL},{8, NULL},0,15, def_int,ss_none, NULL, NULL},
   {"mus_pause_opt",{&mus_pause_opt, NULL},{2, NULL},0,2, // CPhipps - music pausing
    def_int, ss_none, NULL, NULL}, // 0 = kill music when paused, 1 = pause music, 2 = let music continue
+  {"mus_load_external", {&mus_load_external, NULL},  {2, NULL},0,2,
+    def_int,ss_gen, NULL, NULL}, // 0 = never load external music files, 1 = always load it, 2 = only from iwads
   {"snd_channels",{&default_numChannels, NULL},{8, NULL},1,32,
    def_int,ss_gen, NULL, NULL}, // number of audio events simultaneously // killough
 
@@ -317,7 +320,7 @@ default_t defaults[] =
   {"movement_mouselook",{&movement_mouselook, NULL},{0, NULL},0,1,
    def_bool,ss_gen, NULL, NULL}, // enables use of mouselook
   {"movement_mouseinvert",{&movement_mouseinvert, NULL},{0, NULL},0,1,
-   def_bool,ss_gen, NULL, NULL}, // whether to invert the mouse vertical 
+   def_bool,ss_gen, NULL, NULL}, // whether to invert the mouse vertical
   {"movement_maxviewpitch",{&movement_maxviewpitch, NULL},{32, NULL},0,80,
    def_int,ss_gen, NULL, NULL}, // maximum/minimum pitch when looking up and down
 

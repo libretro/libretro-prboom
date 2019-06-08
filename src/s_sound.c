@@ -66,6 +66,7 @@
 #define S_STEREO_SWING (96<<FRACBITS)
 
 const char* S_music_files[NUMMUSIC]; // cournia - stores music file names
+extern int mus_load_external; // value for the "Load external MP3 files" setting
 
 typedef struct
 {
@@ -473,8 +474,10 @@ void S_ChangeMusic(int musicnum, int looping)
   }
   music_file_failed = 1;
 
-  // proff_fs - only load when from IWAD
-  if (lumpinfo[music->lumpnum].source == source_iwad)
+  // Look for external music files (eg. mp3) according to the settings
+  // 0 = never load external music files, 1 = always load it, 2 = only from iwads
+  if ((mus_load_external == 2 && lumpinfo[music->lumpnum].source == source_iwad)
+     || (mus_load_external == 1))
   {
     // cournia - check to see if we can play a higher quality music file
     //           rather than the default MIDI

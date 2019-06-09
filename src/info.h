@@ -1484,6 +1484,9 @@ typedef struct
   int raisestate;   /* The first state for an Archvile or respawn
            resurrection.  Zero means it won't come
            back to life. */
+  int meleethreshold; /* Distance to switch from missile to melee attack */
+  int maxattackrange; /* Maximum distance range to start shooting */
+  int minmissilechance; /* Minimum chance for firing a missile */
 } mobjinfo_t;
 
 /* See p_mobj_h for addition more technical info */

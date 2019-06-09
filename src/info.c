@@ -1240,7 +1240,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_DROPOFF|MF_PICKUP|MF_NOTDMATCH,    // flags
-    S_NULL    // raisestate
+    S_NULL,    // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_POSSESSED
@@ -1267,7 +1270,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_posact,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_POSS_RAISE1   // raisestate
+    S_POSS_RAISE1,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    0,    // minmissilechance
   },
 
   {   // MT_SHOTGUY
@@ -1294,7 +1300,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_posact,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_SPOS_RAISE1   // raisestate
+    S_SPOS_RAISE1,   // raisestateraisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_VILE
@@ -1321,7 +1330,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_vilact,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestateraisestate
+    0,     // meleethreshold
+    14*64, // maxattackrange
+    200,   // minmissilechance
   },
 
   {   // MT_FIRE
@@ -1348,7 +1360,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOGRAVITY|MF_TRANSLUCENT,   // flags  // killough 2/21/98
-    S_NULL    // raisestate
+    S_NULL,   // raisestateraisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_UNDEAD
@@ -1375,7 +1390,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_skeact,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_SKEL_RAISE1   // raisestate
+    S_SKEL_RAISE1,  // raisestateraisestate
+    196,  // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_TRACER
@@ -1402,7 +1420,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     10,   // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestateraisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_SMOKE
@@ -1429,7 +1450,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOGRAVITY|MF_TRANSLUCENT,   // flags             // phares
-    S_NULL    // raisestate
+    S_NULL,   // raisestateraisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_FATSO
@@ -1456,7 +1480,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_posact,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_FATT_RAISE1   // raisestate
+    S_FATT_RAISE1,  // raisestateraisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_FATSHOT
@@ -1483,7 +1510,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     8,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_TRANSLUCENT,   // flags \\ killough 2/21/98
-    S_NULL    // raisestate
+    S_NULL,   // raisestateraisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_CHAINGUY
@@ -1510,7 +1540,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_posact,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_CPOS_RAISE1   // raisestate
+    S_CPOS_RAISE1,  // raisestateraisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_TROOP
@@ -1537,7 +1570,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_bgact,    // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL, // killough |MF_TRANSLUCENT,   // flags     // phares
-    S_TROO_RAISE1   // raisestate
+    S_TROO_RAISE1,  // raisestateraisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_SERGEANT
@@ -1564,7 +1600,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_dmact,    // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_SARG_RAISE1   // raisestate
+    S_SARG_RAISE1,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_SHADOWS
@@ -1591,7 +1630,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_dmact,    // activesound
     MF_SOLID|MF_SHOOTABLE|MF_SHADOW|MF_COUNTKILL,   // flags
-    S_SARG_RAISE1   // raisestate
+    S_SARG_RAISE1,  // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_HEAD
@@ -1618,7 +1660,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_dmact,    // activesound
     MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_COUNTKILL,   // flags
-    S_HEAD_RAISE1   // raisestate
+    S_HEAD_RAISE1,  // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_BRUISER
@@ -1645,7 +1690,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_dmact,    // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_BOSS_RAISE1   // raisestate
+    S_BOSS_RAISE1,  // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_BRUISERSHOT
@@ -1672,7 +1720,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     8,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_TRANSLUCENT,   // flags  killough 2/21/98
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_KNIGHT
@@ -1699,7 +1750,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_dmact,    // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_BOS2_RAISE1   // raisestate
+    S_BOS2_RAISE1,  // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_SKULL
@@ -1725,8 +1779,11 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     50,   // mass
     3,    // damage
     sfx_dmact,    // activesound
-    MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_MISSILEMORE, // flags
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_SPIDER
@@ -1752,8 +1809,11 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     1000,   // mass
     0,    // damage
     sfx_dmact,    // activesound
-    MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_NULL    // raisestate
+    MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_MISSILEMORE,   // flags
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_BABY
@@ -1780,7 +1840,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_bspact,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_BSPI_RAISE1   // raisestate
+    S_BSPI_RAISE1,  // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_CYBORG
@@ -1806,8 +1869,11 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     1000,   // mass
     0,    // damage
     sfx_dmact,    // activesound
-    MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_NULL    // raisestate
+    MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_MISSILEMORE,   // flags
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    160,  // minmissilechance
   },
 
   {   // MT_PAIN
@@ -1834,7 +1900,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_dmact,    // activesound
     MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_COUNTKILL,   // flags
-    S_PAIN_RAISE1   // raisestate
+    S_PAIN_RAISE1,  // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_WOLFSS
@@ -1861,7 +1930,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_posact,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
-    S_SSWV_RAISE1   // raisestate
+    S_SSWV_RAISE1,  // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_KEEN
@@ -1888,7 +1960,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY|MF_SHOOTABLE|MF_COUNTKILL,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_BOSSBRAIN
@@ -1915,7 +1990,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SHOOTABLE,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_BOSSSPIT
@@ -1942,7 +2020,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOSECTOR,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_BOSSTARGET
@@ -1969,7 +2050,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOSECTOR,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_SPAWNSHOT
@@ -1996,7 +2080,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     3,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_NOCLIP,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_SPAWNFIRE
@@ -2023,7 +2110,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOGRAVITY|MF_TRANSLUCENT,   // flags             // phares
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_BARREL
@@ -2050,7 +2140,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SHOOTABLE|MF_NOBLOOD,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_TROOPSHOT
@@ -2077,7 +2170,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     3,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_TRANSLUCENT, // flags // phares
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_HEADSHOT
@@ -2104,7 +2200,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     5,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_TRANSLUCENT, // flags // phares,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_ROCKET
@@ -2131,7 +2230,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     20,   // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_PLASMA
@@ -2158,7 +2260,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     5,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_TRANSLUCENT, // flags // phares
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_BFG
@@ -2185,7 +2290,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     100,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_TRANSLUCENT, // flags // phares
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_ARACHPLAZ
@@ -2212,7 +2320,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     5,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_TRANSLUCENT, // flags // phares
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_PUFF
@@ -2239,7 +2350,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOGRAVITY|MF_TRANSLUCENT, // flags // phares
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_BLOOD
@@ -2266,7 +2380,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_TFOG
@@ -2293,7 +2410,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOGRAVITY|MF_TRANSLUCENT, // flags // phares
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_IFOG
@@ -2320,7 +2440,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOGRAVITY|MF_TRANSLUCENT, // flags // phares
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_TELEPORTMAN
@@ -2347,7 +2470,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOSECTOR,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_EXTRABFG
@@ -2374,7 +2500,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP|MF_NOGRAVITY,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC0
@@ -2401,7 +2530,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC1
@@ -2428,7 +2560,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC2
@@ -2455,7 +2590,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_COUNTITEM,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC3
@@ -2482,7 +2620,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_COUNTITEM,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC4
@@ -2509,7 +2650,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_NOTDMATCH,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC5
@@ -2536,7 +2680,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_NOTDMATCH,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC6
@@ -2563,7 +2710,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_NOTDMATCH,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC7
@@ -2590,7 +2740,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_NOTDMATCH,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC8
@@ -2617,7 +2770,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_NOTDMATCH,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC9
@@ -2644,7 +2800,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_NOTDMATCH,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC10
@@ -2671,7 +2830,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC11
@@ -2698,7 +2860,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC12
@@ -2725,7 +2890,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_COUNTITEM|MF_TRANSLUCENT,    // flags   // killough 2/21/98
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_INV
@@ -2752,7 +2920,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_COUNTITEM|MF_TRANSLUCENT,    // flags // killough 2/21/98
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC13
@@ -2779,7 +2950,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_COUNTITEM,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_INS
@@ -2806,7 +2980,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_COUNTITEM|MF_TRANSLUCENT,    // flags // killough 2/21/98
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC14
@@ -2833,7 +3010,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC15
@@ -2860,7 +3040,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_COUNTITEM,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC16
@@ -2887,7 +3070,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_COUNTITEM,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MEGA
@@ -2914,7 +3100,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL|MF_COUNTITEM|MF_TRANSLUCENT,    // flags // killough 2/21/98
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_CLIP
@@ -2941,7 +3130,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC17
@@ -2968,7 +3160,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC18
@@ -2995,7 +3190,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC19
@@ -3022,7 +3220,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC20
@@ -3049,7 +3250,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC21
@@ -3076,7 +3280,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC22
@@ -3103,7 +3310,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC23
@@ -3130,7 +3340,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC24
@@ -3157,7 +3370,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC25
@@ -3184,7 +3400,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_CHAINGUN
@@ -3211,7 +3430,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC26
@@ -3238,7 +3460,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC27
@@ -3265,7 +3490,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC28
@@ -3292,7 +3520,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_SHOTGUN
@@ -3319,7 +3550,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_SUPERSHOTGUN
@@ -3346,7 +3580,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPECIAL,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC29
@@ -3373,7 +3610,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC30
@@ -3400,7 +3640,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC31
@@ -3427,7 +3670,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC32
@@ -3454,7 +3700,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC33
@@ -3481,7 +3730,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC34
@@ -3508,7 +3760,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC35
@@ -3535,7 +3790,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC36
@@ -3562,7 +3820,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC37
@@ -3589,7 +3850,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC38
@@ -3616,7 +3880,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC39
@@ -3643,7 +3910,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC40
@@ -3670,7 +3940,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC41
@@ -3697,7 +3970,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC42
@@ -3724,7 +4000,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC43
@@ -3751,7 +4030,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC44
@@ -3778,7 +4060,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC45
@@ -3805,7 +4090,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC46
@@ -3832,7 +4120,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC47
@@ -3859,7 +4150,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC48
@@ -3886,7 +4180,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC49
@@ -3913,7 +4210,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC50
@@ -3940,7 +4240,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC51
@@ -3967,7 +4270,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC52
@@ -3994,7 +4300,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC53
@@ -4021,7 +4330,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC54
@@ -4048,7 +4360,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC55
@@ -4075,7 +4390,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC56
@@ -4102,7 +4420,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPAWNCEILING|MF_NOGRAVITY,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC57
@@ -4129,7 +4450,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPAWNCEILING|MF_NOGRAVITY,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC58
@@ -4156,7 +4480,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPAWNCEILING|MF_NOGRAVITY,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC59
@@ -4183,7 +4510,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPAWNCEILING|MF_NOGRAVITY,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC60
@@ -4210,7 +4540,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SPAWNCEILING|MF_NOGRAVITY,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC61
@@ -4237,7 +4570,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC62
@@ -4264,7 +4600,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC63
@@ -4291,7 +4630,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC64
@@ -4318,7 +4660,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC65
@@ -4345,7 +4690,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC66
@@ -4372,7 +4720,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC67
@@ -4399,7 +4750,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC68
@@ -4426,7 +4780,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC69
@@ -4453,7 +4810,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC70
@@ -4480,7 +4840,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC71
@@ -4507,7 +4870,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     0,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC72
@@ -4534,7 +4900,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC73
@@ -4561,7 +4930,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC74
@@ -4588,7 +4960,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC75
@@ -4615,7 +4990,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC76
@@ -4642,7 +5020,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC77
@@ -4669,7 +5050,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID,   // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC78
@@ -4696,7 +5080,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC79
@@ -4723,7 +5110,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC80
@@ -4750,7 +5140,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC81
@@ -4777,7 +5170,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC82
@@ -4804,7 +5200,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC83
@@ -4831,7 +5230,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_SOLID|MF_SPAWNCEILING|MF_NOGRAVITY,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC84
@@ -4858,7 +5260,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC85
@@ -4883,9 +5288,11 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     16*FRACUNIT,    // height
     100,    // mass
     0,    // damage
-    sfx_None,   // activesound
     MF_NOBLOCKMAP,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   {   // MT_MISC86
@@ -4912,7 +5319,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,    // damage
     sfx_None,   // activesound
     MF_NOBLOCKMAP,    // flags
-    S_NULL    // raisestate
+    S_NULL,   // raisestate
+    0,    // meleethreshold
+    0,    // maxattackrange
+    200,  // minmissilechance
   },
 
   // For use with wind and current effects
@@ -4940,7 +5350,10 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,              // damage
     sfx_None,       // activesound
     MF_NOBLOCKMAP,  // flags
-    S_NULL          // raisestate
+    S_NULL,         // raisestate
+    0,               // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
   },
 
   // For use with wind and current effects
@@ -4968,6 +5381,9 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,              // damage
     sfx_None,       // activesound
     MF_NOBLOCKMAP,  // flags
-    S_NULL          // raisestate
+    S_NULL,         // raisestate
+    0,               // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
   },
 };

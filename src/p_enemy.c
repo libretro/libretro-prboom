@@ -208,28 +208,19 @@ static boolean P_CheckMissileRange(mobj_t *actor)
 
   dist >>= FRACBITS;
 
-  if (actor->type == MT_VILE)
-    if (dist > 14*64)
-      return FALSE;     // too far away
+  if (actor->info->maxattackrange > 0 && dist > actor->info->maxattackrange)
+    return FALSE;     // too far away
 
+  if (actor->info->meleestate != S_NULL && dist < actor->info->meleethreshold)
+    return false;     // close enough for melee attack, don't fire
 
-  if (actor->type == MT_UNDEAD)
-    {
-      if (dist < 196)
-        return FALSE;   // close for fist attack
-      dist >>= 1;
-    }
-
-  if (actor->type == MT_CYBORG ||
-      actor->type == MT_SPIDER ||
-      actor->type == MT_SKULL)
+  // higher attack probability like Cyberdemon, Spiderboss, Revenant and Lost Soul
+  if (actor->flags & MF_MISSILEMORE)
     dist >>= 1;
 
-  if (dist > 200)
-    dist = 200;
-
-  if (actor->type == MT_CYBORG && dist > 160)
-    dist = 160;
+  // Some mobs (eg. Cyberdemon) have a minimum attack chance
+  if (dist > actor->info->minmissilechance)
+    dist = actor->info->minmissilechance;
 
   if (P_Random(pr_missrange) < dist)
     return FALSE;
@@ -2107,7 +2098,7 @@ void A_BossDeath(mobj_t *mo)
   else
     {
       // e6y
-      // Additional check of gameepisode is necessary, because 
+      // Additional check of gameepisode is necessary, because
       // there is no right or wrong solution for E4M6 in original EXEs,
       // there's nothing to emulate.
       if (comp[comp_666] && gameepisode < 4)
@@ -2119,7 +2110,7 @@ void A_BossDeath(mobj_t *mo)
         // http://www.doomworld.com/idgames/index.php?id=6909
         if (gamemap != 8)
           return;
-        if (mo->type == MT_BRUISER && gameepisode != 1) 
+        if (mo->type == MT_BRUISER && gameepisode != 1)
           return;
       }
       else

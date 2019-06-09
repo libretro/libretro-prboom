@@ -1036,7 +1036,7 @@ typedef struct
 // killough 8/9/98: make DEH_BLOCKMAX self-adjusting
 #define DEH_BLOCKMAX (sizeof deh_blocks/sizeof*deh_blocks)  // size of array
 #define DEH_MAXKEYLEN 32 // as much of any key as we'll look at
-#define DEH_MOBJINFOMAX 25 // number of ints in the mobjinfo_t structure (!)
+#define DEH_MOBJINFOMAX 28 // number of ints in the mobjinfo_t structure (!)
 
 // Put all the block header values, and the function to be called when that
 // one is encountered, in this array:
@@ -1102,6 +1102,9 @@ static const char *deh_mobjinfo[DEH_MOBJINFOMAX] =
   "Bits",                // .flags
   "Bits2",               // .flags
   "Respawn frame"        // .raisestate
+  "Melee threshold "     // .meleethreshold
+  "Max target range"     // .maxattackrange
+  "Min missile chance"   // .minmissilechance
 };
 
 // Strings that are used to indicate flags ("Bits" in mobjinfo)
@@ -1162,6 +1165,8 @@ static const struct deh_mobjflags_s deh_mobjflags[] = {
   {"TOUCHY",       MF_TOUCHY},       // dies on contact with solid objects (MBF)
   {"BOUNCES",      MF_BOUNCES},      // bounces off floors, ceilings and maybe walls (MBF)
   {"FRIEND",       MF_FRIEND},       // a friend of the player(s) (MBF)
+
+  {"MISSILEMORE",  MF_MISSILEMORE},  // more often missile attacks from far away (like Cyber)
 };
 
 // STATE - Dehacked block name = "Frame" and "Pointer"
@@ -1706,6 +1711,9 @@ static void setMobjInfoValue(int mobjInfoIndex, int keyIndex, uint64_t value) {
     case 22: mi->flags = value; return;
     case 23: return; // "Bits2", unused
     case 24: mi->raisestate = (int)value; return;
+    case 25: mi->meleethreshold = (int)value; return;
+    case 26: mi->maxattackrange = (int)value; return;
+    case 27: mi->minmissilechance = (int)value; return;
     default: return;
   }
 }

@@ -1426,7 +1426,8 @@ typedef enum {
   MT_STEALTHSHOTGUY,
   MT_STEALTHZOMBIE,
 
-  NUMMOBJTYPES  // Counter of how many there are
+  NUMMOBJTYPES,  // Counter of how many there are
+  MT_NULL = -1
 } mobjtype_t;
 
 /********************************************************************
@@ -1467,6 +1468,7 @@ typedef struct
   int deathsound;   /* The death sound.  See also A_Scream() in
            p_enemy.c for some tweaking that goes on
            for certain monsters */
+  mobjtype_t droppeditem; /* Mobj to drop after death */
   int speed;        /* How fast it moves.  Too fast and it can miss
            collision logic. */
   int radius;       /* An often incorrect radius */

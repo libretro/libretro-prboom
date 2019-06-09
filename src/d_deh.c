@@ -1036,7 +1036,7 @@ typedef struct
 // killough 8/9/98: make DEH_BLOCKMAX self-adjusting
 #define DEH_BLOCKMAX (sizeof deh_blocks/sizeof*deh_blocks)  // size of array
 #define DEH_MAXKEYLEN 32 // as much of any key as we'll look at
-#define DEH_MOBJINFOMAX 24 // number of ints in the mobjinfo_t structure (!)
+#define DEH_MOBJINFOMAX 25 // number of ints in the mobjinfo_t structure (!)
 
 // Put all the block header values, and the function to be called when that
 // one is encountered, in this array:
@@ -1092,6 +1092,7 @@ static const char *deh_mobjinfo[DEH_MOBJINFOMAX] =
   "Death frame",         // .deathstate
   "Exploding frame",     // .xdeathstate
   "Death sound",         // .deathsound
+  "Dropped item",        // .droppeditem
   "Speed",               // .speed
   "Width",               // .radius
   "Height",              // .height
@@ -1695,15 +1696,16 @@ static void setMobjInfoValue(int mobjInfoIndex, int keyIndex, uint64_t value) {
     case 12: mi->deathstate = (int)value; return;
     case 13: mi->xdeathstate = (int)value; return;
     case 14: mi->deathsound = (int)value; return;
-    case 15: mi->speed = (int)value; return;
-    case 16: mi->radius = (int)value; return;
-    case 17: mi->height = (int)value; return;
-    case 18: mi->mass = (int)value; return;
-    case 19: mi->damage = (int)value; return;
-    case 20: mi->activesound = (int)value; return;
-    case 21: mi->flags = value; return;
-    case 22: return; // "Bits2", unused
-    case 23: mi->raisestate = (int)value; return;
+    case 15: mi->droppeditem = (int)value; return;
+    case 16: mi->speed = (int)value; return;
+    case 17: mi->radius = (int)value; return;
+    case 18: mi->height = (int)value; return;
+    case 19: mi->mass = (int)value; return;
+    case 20: mi->damage = (int)value; return;
+    case 21: mi->activesound = (int)value; return;
+    case 22: mi->flags = value; return;
+    case 23: return; // "Bits2", unused
+    case 24: mi->raisestate = (int)value; return;
     default: return;
   }
 }

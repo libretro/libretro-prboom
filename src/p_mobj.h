@@ -226,6 +226,24 @@
 
 #define MF_PLAYERSPRITE LONGLONG(0x0000008000000000)
 
+// This actor not targetted when it hurts something else
+#define MF_NOTARGET     LONGLONG(0x0000010000000000)
+#define MF_FLY          LONGLONG(0x0000020000000000) // unused, prboom+ compat
+
+// higher attack probability like Cyberdemon, Spiderboss, Revenant and Lost Soul
+#define MF_MISSILEMORE  LONGLONG(0x0000040000000000)
+// play full volume sounds on player sight and death (eg. Spider & Cyberdemon)
+#define MF_FULLVOLSIGHT    LONGLONG(0x0000080000000000)
+#define MF_FULLVOLDEATH    LONGLONG(0x0000100000000000)
+// make immunity to radius damage
+#define MF_NORADIUSDMG     LONGLONG(0x0000200000000000)
+// Arch Viles will immediately switch target if being attacked.
+#define MF_QUICKTORETALIATE LONGLONG(0x0000400000000000)
+// flag for monsters since there can be some without MF_COUNTKILL (Lost Souls)
+#define MF_ISMONSTER		    LONGLONG(0x0000800000000000)
+// doesn't fall down after being killed (for the Lost Soul)
+#define MF_DONTFALL		      LONGLONG(0x0001000000000000)
+
 #define ALIVE(thing) ((thing->health > 0) && ((thing->flags & (MF_COUNTKILL | MF_CORPSE | MF_RESURRECTED)) == MF_COUNTKILL))
 
 // killough 9/15/98: Same, but internal flags, not intended for .deh
@@ -411,4 +429,3 @@ void    P_SpawnPlayer(int n, const mapthing_t *mthing);
 void    P_CheckMissileSpawn(mobj_t*);  // killough 8/2/98
 void    P_ExplodeMissile(mobj_t*);    // killough
 #endif
-

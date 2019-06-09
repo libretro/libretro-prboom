@@ -1046,7 +1046,7 @@ typedef struct
 // killough 8/9/98: make DEH_BLOCKMAX self-adjusting
 #define DEH_BLOCKMAX (sizeof deh_blocks/sizeof*deh_blocks)  // size of array
 #define DEH_MAXKEYLEN 32 // as much of any key as we'll look at
-#define DEH_MOBJINFOMAX 24 // number of ints in the mobjinfo_t structure (!)
+#define DEH_MOBJINFOMAX 28 // number of ints in the mobjinfo_t structure (!)
 
 // Put all the block header values, and the function to be called when that
 // one is encountered, in this array:
@@ -1102,6 +1102,7 @@ static const char *deh_mobjinfo[DEH_MOBJINFOMAX] =
   "Death frame",         // .deathstate
   "Exploding frame",     // .xdeathstate
   "Death sound",         // .deathsound
+  "Dropped item",        // .droppeditem
   "Speed",               // .speed
   "Width",               // .radius
   "Height",              // .height
@@ -1111,6 +1112,9 @@ static const char *deh_mobjinfo[DEH_MOBJINFOMAX] =
   "Bits",                // .flags
   "Bits2",               // .flags
   "Respawn frame"        // .raisestate
+  "Melee threshold "     // .meleethreshold
+  "Max target range"     // .maxattackrange
+  "Min missile chance"   // .minmissilechance
 };
 
 // Strings that are used to indicate flags ("Bits" in mobjinfo)
@@ -1171,6 +1175,15 @@ static const struct deh_mobjflags_s deh_mobjflags[] = {
   {"TOUCHY",       MF_TOUCHY},       // dies on contact with solid objects (MBF)
   {"BOUNCES",      MF_BOUNCES},      // bounces off floors, ceilings and maybe walls (MBF)
   {"FRIEND",       MF_FRIEND},       // a friend of the player(s) (MBF)
+
+  {"NOTARGET",     MF_NOTARGET},     // won't be targetted even if it hurts someone else
+  {"MISSILEMORE",  MF_MISSILEMORE},  // more often missile attacks from far away (like Cyber)
+  {"FULLVOLSIGHT", MF_FULLVOLSIGHT}, // plays its alert sound at full volume
+  {"FULLVOLDEATH", MF_FULLVOLDEATH},    // plays its death sound at full volume
+  {"NORADIUSDMG",  MF_NORADIUSDMG},  // radius (explosive) damage doesnt harm it
+  {"QUICKTORETALIATE", MF_QUICKTORETALIATE}, // immediately switch target if attacked
+  {"ISMONSTER",    MF_ISMONSTER},    // for all monsters, even those that don't count in kill%
+  {"DONTFALL",     MF_DONTFALL},     // doesn't fall down after being killed (for the Lost Soul)
 };
 
 // STATE - Dehacked block name = "Frame" and "Pointer"
@@ -1705,15 +1718,19 @@ static void setMobjInfoValue(int mobjInfoIndex, int keyIndex, uint64_t value) {
     case 12: mi->deathstate = (int)value; return;
     case 13: mi->xdeathstate = (int)value; return;
     case 14: mi->deathsound = (int)value; return;
-    case 15: mi->speed = (int)value; return;
-    case 16: mi->radius = (int)value; return;
-    case 17: mi->height = (int)value; return;
-    case 18: mi->mass = (int)value; return;
-    case 19: mi->damage = (int)value; return;
-    case 20: mi->activesound = (int)value; return;
-    case 21: mi->flags = value; return;
-    case 22: return; // "Bits2", unused
-    case 23: mi->raisestate = (int)value; return;
+    case 15: mi->droppeditem = (int)value; return;
+    case 16: mi->speed = (int)value; return;
+    case 17: mi->radius = (int)value; return;
+    case 18: mi->height = (int)value; return;
+    case 19: mi->mass = (int)value; return;
+    case 20: mi->damage = (int)value; return;
+    case 21: mi->activesound = (int)value; return;
+    case 22: mi->flags = value; return;
+    case 23: return; // "Bits2", unused
+    case 24: mi->raisestate = (int)value; return;
+    case 25: mi->meleethreshold = (int)value; return;
+    case 26: mi->maxattackrange = (int)value; return;
+    case 27: mi->minmissilechance = (int)value; return;
     default: return;
   }
 }
@@ -1827,6 +1844,14 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
                 fprintf(fpout, "Could not find bit mnemonic %s\n", strval);
               }
             }
+
+            // the MF_COUNTKILL flag used to be indicative of the Mobj being a
+            // monster, but this is no longer true after the logic for monsters_infight
+            // that don't count towards limit was dehardcoded.
+            // Let's make sure that any actor that has MF_COUNTKILL is considered
+            // a monster, avoid incompatibility with older DEH files
+            if (value & MF_COUNTKILL)
+              value |= MF_ISMONSTER;
 
             // Don't worry about conversion -- simply print values
             if (fpout) {

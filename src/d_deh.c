@@ -1172,6 +1172,8 @@ static const struct deh_mobjflags_s deh_mobjflags[] = {
   {"FULLVOLDEATH", MF_FULLVOLDEATH},    // plays its death sound at full volume
   {"NORADIUSDMG",  MF_NORADIUSDMG},  // radius (explosive) damage doesnt harm it
   {"QUICKTORETALIATE", MF_QUICKTORETALIATE}, // immediately switch target if attacked
+  {"ISMONSTER",    MF_ISMONSTER},    // for all monsters, even those that don't count in kill%
+  {"DONTFALL",     MF_DONTFALL},     // doesn't fall down after being killed (for the Lost Soul)
 };
 
 // STATE - Dehacked block name = "Frame" and "Pointer"
@@ -1832,6 +1834,14 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
                 fprintf(fpout, "Could not find bit mnemonic %s\n", strval);
               }
             }
+
+            // the MF_COUNTKILL flag used to be indicative of the Mobj being a
+            // monster, but this is no longer true after the logic for monsters_infight
+            // that don't count towards limit was dehardcoded.
+            // Let's make sure that any actor that has MF_COUNTKILL is considered
+            // a monster, avoid incompatibility with older DEH files
+            if (value & MF_COUNTKILL)
+              value |= MF_ISMONSTER;
 
             // Don't worry about conversion -- simply print values
             if (fpout) {

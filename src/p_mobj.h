@@ -239,6 +239,10 @@
 #define MF_NORADIUSDMG     LONGLONG(0x0000200000000000)
 // Arch Viles will immediately switch target if being attacked.
 #define MF_QUICKTORETALIATE LONGLONG(0x0000400000000000)
+// flag for monsters since there can be some without MF_COUNTKILL (Lost Souls)
+#define MF_ISMONSTER		    LONGLONG(0x0000800000000000)
+// doesn't fall down after being killed (for the Lost Soul)
+#define MF_DONTFALL		      LONGLONG(0x0001000000000000)
 
 #define ALIVE(thing) ((thing->health > 0) && ((thing->flags & (MF_COUNTKILL | MF_CORPSE | MF_RESURRECTED)) == MF_COUNTKILL))
 

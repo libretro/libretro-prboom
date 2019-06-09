@@ -1166,10 +1166,12 @@ static const struct deh_mobjflags_s deh_mobjflags[] = {
   {"BOUNCES",      MF_BOUNCES},      // bounces off floors, ceilings and maybe walls (MBF)
   {"FRIEND",       MF_FRIEND},       // a friend of the player(s) (MBF)
 
+  {"NOTARGET",     MF_NOTARGET},     // won't be targetted even if it hurts someone else
   {"MISSILEMORE",  MF_MISSILEMORE},  // more often missile attacks from far away (like Cyber)
   {"FULLVOLSIGHT", MF_FULLVOLSIGHT}, // plays its alert sound at full volume
   {"FULLVOLDEATH", MF_FULLVOLDEATH},    // plays its death sound at full volume
   {"NORADIUSDMG",  MF_NORADIUSDMG},  // radius (explosive) damage doesnt harm it
+  {"QUICKTORETALIATE", MF_QUICKTORETALIATE}, // immediately switch target if attacked
 };
 
 // STATE - Dehacked block name = "Frame" and "Pointer"

@@ -1329,7 +1329,7 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     500,    // mass
     0,    // damage
     sfx_vilact,   // activesound
-    MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL,   // flags
+    MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL|MF_NOTARGET|MF_QUICKTORETALIATE,   // flags
     S_NULL,   // raisestateraisestate
     0,     // meleethreshold
     14*64, // maxattackrange

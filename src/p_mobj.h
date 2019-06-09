@@ -226,7 +226,8 @@
 
 #define MF_PLAYERSPRITE LONGLONG(0x0000008000000000)
 
-#define MF_NOTARGET     LONGLONG(0x0000010000000000) // unused, prboom+ compat
+// This actor not targetted when it hurts something else
+#define MF_NOTARGET     LONGLONG(0x0000010000000000)
 #define MF_FLY          LONGLONG(0x0000020000000000) // unused, prboom+ compat
 
 // higher attack probability like Cyberdemon, Spiderboss, Revenant and Lost Soul
@@ -236,6 +237,8 @@
 #define MF_FULLVOLDEATH    LONGLONG(0x0000100000000000)
 // make immunity to radius damage
 #define MF_NORADIUSDMG     LONGLONG(0x0000200000000000)
+// Arch Viles will immediately switch target if being attacked.
+#define MF_QUICKTORETALIATE LONGLONG(0x0000400000000000)
 
 #define ALIVE(thing) ((thing->health > 0) && ((thing->flags & (MF_COUNTKILL | MF_CORPSE | MF_RESURRECTED)) == MF_COUNTKILL))
 

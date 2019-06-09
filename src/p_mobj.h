@@ -231,6 +231,11 @@
 
 // higher attack probability like Cyberdemon, Spiderboss, Revenant and Lost Soul
 #define MF_MISSILEMORE  LONGLONG(0x0000040000000000)
+// play full volume sounds on player sight and death (eg. Spider & Cyberdemon)
+#define MF_FULLVOLSIGHT    LONGLONG(0x0000080000000000)
+#define MF_FULLVOLDEATH    LONGLONG(0x0000100000000000)
+// make immunity to radius damage
+#define MF_NORADIUSDMG     LONGLONG(0x0000200000000000)
 
 #define ALIVE(thing) ((thing->health > 0) && ((thing->flags & (MF_COUNTKILL | MF_CORPSE | MF_RESURRECTED)) == MF_COUNTKILL))
 

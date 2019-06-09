@@ -1167,6 +1167,9 @@ static const struct deh_mobjflags_s deh_mobjflags[] = {
   {"FRIEND",       MF_FRIEND},       // a friend of the player(s) (MBF)
 
   {"MISSILEMORE",  MF_MISSILEMORE},  // more often missile attacks from far away (like Cyber)
+  {"FULLVOLSIGHT", MF_FULLVOLSIGHT}, // plays its alert sound at full volume
+  {"FULLVOLDEATH", MF_FULLVOLDEATH},    // plays its death sound at full volume
+  {"NORADIUSDMG",  MF_NORADIUSDMG},  // radius (explosive) damage doesnt harm it
 };
 
 // STATE - Dehacked block name = "Frame" and "Pointer"

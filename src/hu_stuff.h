@@ -88,7 +88,8 @@ extern int hudcolor_list;   /* color of list of past messages                  *
 extern int hud_list_bgon;   /* solid window background for list of messages    */
 extern int hud_msg_lines;   /* number of message lines in window up to 16      */
 /* jff 2/18/98 hud/status control */
-extern int hud_active;      /* hud mode 0=off, 1=small, 2=full          */
-extern int hud_nosecrets;   /* status does not list secrets/items/kills */
+extern boolean hud_showstats;   /* show secrets/items/kills stats */
+extern boolean hud_showkeys;    /* show keys HUD line */
+extern boolean hud_showweapons; /* show weapons HUD line */
 
 #endif

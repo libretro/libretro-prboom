@@ -587,14 +587,15 @@ default_t defaults[] =
   {"ammo_yellow",   {&ammo_yellow, NULL}  , {50, NULL},0,100, // below 50% is yellow, above green
    def_int,ss_stat, NULL, NULL}, // percent of ammo for yellow to green transition
 
-  //jff 2/16/98 HUD and status feature controls
-  {"hud_active",    {&hud_active, NULL}, {2, NULL},0,2, // 0=off, 1=small, 2=full
-   def_int,ss_none, NULL, NULL}, // 0 for HUD off, 1 for HUD small, 2 for full HUD
-  //jff 2/23/98
+  // HUD and status feature controls
   {"hud_mode", {(int*)&hud_mode, NULL},  {0, NULL},0,2, // whether & how hud is displayed
    def_int,ss_none, NULL, NULL}, // enables and selects display mode of HUD
-  {"hud_nosecrets", {&hud_nosecrets, NULL},  {0, NULL},0,1, // no secrets/items/kills HUD line
-   def_bool,ss_stat, NULL, NULL}, // disables display of kills/items/secrets on HUD
+  {"hud_showstats", {&hud_showstats, NULL},  {1, NULL},0,1, // show secrets/items/kills HUD line
+   def_bool,ss_stat, NULL, NULL}, // enables display of kills/items/secrets on HUD
+  {"hud_showkeys", {&hud_showkeys, NULL},  {1, NULL},0,1, // show keys HUD line
+   def_bool,ss_stat, NULL, NULL}, // enables the display of keys on HUD
+  {"hud_showweapons", {&hud_showweapons, NULL},  {1, NULL},0,1, // show weapons HUD line
+   def_bool,ss_stat, NULL, NULL}, // enables the display of weapons on HUD
 
   {"Weapon preferences",{NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
   // killough 2/8/98: weapon preferences set by user:

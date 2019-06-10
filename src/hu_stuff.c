@@ -47,11 +47,10 @@
 
 // global heads up display controls
 
-int hud_active;       //jff 2/17/98 controls heads-up display mode
-int hud_displayed;    //jff 2/23/98 turns heads-up display on/off
+int hud_active;       //jff 2/17/98 controls screen size
 int hud_nosecrets;    //jff 2/18/98 allows secrets line to be disabled in HUD
-int hud_distributed;  //jff 3/4/98 display HUD in different places on screen
 int hud_graph_keys=1; //jff 3/7/98 display HUD keys as graphics
+hud_mode_t hud_mode;
 
 //
 // Locally used constants, shortcuts.
@@ -104,21 +103,21 @@ int hud_graph_keys=1; //jff 3/7/98 display HUD keys as graphics
 #define HU_HUDX_LR (320-120)
 #define HU_HUDY_LR (200-2*HU_GAPY-1)
 // proff/nicolas 09/20/98: Changed for high-res
-#define HU_HUDX_UR (320-96)
+#define HU_HUDX_UR (320-15*8)
 #define HU_HUDY_UR 2
-#define HU_MONSECX_D (HU_HUDX_LL)
-#define HU_MONSECY_D (HU_HUDY_LL+0*HU_GAPY)
-#define HU_KEYSX_D   (HU_HUDX_LL)
-#define HU_KEYSGX_D  (HU_HUDX_LL+4*hu_font2['A'-HU_FONTSTART].width)
-#define HU_KEYSY_D   (HU_HUDY_LL+1*HU_GAPY)
+#define HU_MONSECX_D (HU_HUDX_UR)
+#define HU_MONSECY_D (HU_HUDY_UR+0*HU_GAPY)
+#define HU_KEYSX_D   (HU_HUDX_UR)
+#define HU_KEYSGX_D  (HU_HUDX_UR+4*hu_font2['A'-HU_FONTSTART].width)
+#define HU_KEYSY_D   (HU_HUDY_UR+1*HU_GAPY)
 #define HU_WEAPX_D   (HU_HUDX_LR)
 #define HU_WEAPY_D   (HU_HUDY_LR+0*HU_GAPY)
 #define HU_AMMOX_D   (HU_HUDX_LR)
 #define HU_AMMOY_D   (HU_HUDY_LR+1*HU_GAPY)
-#define HU_HEALTHX_D (HU_HUDX_UR)
-#define HU_HEALTHY_D (HU_HUDY_UR+0*HU_GAPY)
-#define HU_ARMORX_D  (HU_HUDX_UR)
-#define HU_ARMORY_D  (HU_HUDY_UR+1*HU_GAPY)
+#define HU_HEALTHX_D (HU_HUDX_LL)
+#define HU_HEALTHY_D (HU_HUDY_LL+0*HU_GAPY)
+#define HU_ARMORX_D  (HU_HUDX_LL)
+#define HU_ARMORY_D  (HU_HUDY_LL+1*HU_GAPY)
 
 //#define HU_INPUTTOGGLE  't' // not used                           // phares
 #define HU_INPUTX HU_MSGX
@@ -361,6 +360,7 @@ void HU_Start(void)
 
   int   i;
   const char* s; /* cph - const */
+  boolean is_distributed = (hud_mode == hud_distributed);
 
   if (headsupactive)                    // stop before starting
     HU_Stop();
@@ -403,8 +403,8 @@ void HU_Start(void)
   HUlib_initTextLine
   (
     &w_health,
-    hud_distributed? HU_HEALTHX_D : HU_HEALTHX,  //3/4/98 distribute
-    hud_distributed? HU_HEALTHY_D : HU_HEALTHY,
+    is_distributed? HU_HEALTHX_D : HU_HEALTHX,  //3/4/98 distribute
+    is_distributed? HU_HEALTHY_D : HU_HEALTHY,
     hu_font2,
     HU_FONTSTART,
     CR_GREEN
@@ -416,8 +416,8 @@ void HU_Start(void)
   HUlib_initTextLine
   (
     &w_armor,
-    hud_distributed? HU_ARMORX_D : HU_ARMORX,    //3/4/98 distribute
-    hud_distributed? HU_ARMORY_D : HU_ARMORY,
+    is_distributed? HU_ARMORX_D : HU_ARMORX,    //3/4/98 distribute
+    is_distributed? HU_ARMORY_D : HU_ARMORY,
     hu_font2,
     HU_FONTSTART,
     CR_GREEN
@@ -429,8 +429,8 @@ void HU_Start(void)
   HUlib_initTextLine
   (
     &w_ammo,
-    hud_distributed? HU_AMMOX_D : HU_AMMOX,      //3/4/98 distribute
-    hud_distributed? HU_AMMOY_D : HU_AMMOY,
+    is_distributed? HU_AMMOX_D : HU_AMMOX,      //3/4/98 distribute
+    is_distributed? HU_AMMOY_D : HU_AMMOY,
     hu_font2,
     HU_FONTSTART,
     CR_GOLD
@@ -442,8 +442,8 @@ void HU_Start(void)
   HUlib_initTextLine
   (
     &w_weapon,
-    hud_distributed? HU_WEAPX_D : HU_WEAPX,      //3/4/98 distribute
-    hud_distributed? HU_WEAPY_D : HU_WEAPY,
+    is_distributed? HU_WEAPX_D : HU_WEAPX,      //3/4/98 distribute
+    is_distributed? HU_WEAPY_D : HU_WEAPY,
     hu_font2,
     HU_FONTSTART,
     CR_GRAY
@@ -455,8 +455,8 @@ void HU_Start(void)
   HUlib_initTextLine
   (
     &w_keys,
-    hud_distributed? HU_KEYSX_D : HU_KEYSX,      //3/4/98 distribute
-    hud_distributed? HU_KEYSY_D : HU_KEYSY,
+    is_distributed? HU_KEYSX_D : HU_KEYSX,      //3/4/98 distribute
+    is_distributed? HU_KEYSY_D : HU_KEYSY,
     hu_font2,
     HU_FONTSTART,
     CR_GRAY
@@ -468,8 +468,8 @@ void HU_Start(void)
   HUlib_initTextLine
   (
     &w_gkeys,
-    hud_distributed? HU_KEYSGX_D : HU_KEYSGX,    //3/4/98 distribute
-    hud_distributed? HU_KEYSY_D : HU_KEYSY,
+    is_distributed? HU_KEYSGX_D : HU_KEYSGX,    //3/4/98 distribute
+    is_distributed? HU_KEYSY_D : HU_KEYSY,
     hu_fontk,
     HU_FONTSTART,
     CR_RED
@@ -481,8 +481,8 @@ void HU_Start(void)
   HUlib_initTextLine
   (
     &w_monsec,
-    hud_distributed? HU_MONSECX_D : HU_MONSECX,  //3/4/98 distribute
-    hud_distributed? HU_MONSECY_D : HU_MONSECY,
+    is_distributed? HU_MONSECX_D : HU_MONSECX,  //3/4/98 distribute
+    is_distributed? HU_MONSECY_D : HU_MONSECY,
     hu_font2,
     HU_FONTSTART,
     CR_GRAY
@@ -603,10 +603,10 @@ void HU_Start(void)
     HUlib_addCharToTextLine(&w_weapon, *(s++));
 
   //jff 2/17/98 initialize keys widget
-  if (!deathmatch) //jff 3/17/98 show frags in deathmatch mode
-    strcpy(hud_keysstr,"KEY ");
-  else
+  if (deathmatch) //jff 3/17/98 show frags in deathmatch mode
     strcpy(hud_keysstr,"FRG ");
+  else
+    hud_keysstr[0] = '\0'; // without keys, empty to save screen space
   s = hud_keysstr;
   while (*s)
     HUlib_addCharToTextLine(&w_keys, *(s++));
@@ -617,8 +617,8 @@ void HU_Start(void)
   while (*s)
     HUlib_addCharToTextLine(&w_gkeys, *(s++));
 
-  //jff 2/17/98 initialize kills/items/secret widget
-  strcpy(hud_monsecstr,"STS ");
+  // initialize kills/items/secret widget as empty string to save screen space
+  hud_monsecstr[0] = '\0';
   s = hud_monsecstr;
   while (*s)
     HUlib_addCharToTextLine(&w_monsec, *(s++));
@@ -664,27 +664,28 @@ void HU_Start(void)
 //
 void HU_MoveHud(void)
 {
-  static int ohud_distributed=-1;
+  static boolean was_distributed=-1;
+  boolean is_distributed = (hud_mode == hud_distributed);
 
   //jff 3/4/98 move displays around on F5 changing hud_distributed
-  if (hud_distributed!=ohud_distributed)
+  if (is_distributed != was_distributed)
   {
-    w_ammo.x =    hud_distributed? HU_AMMOX_D   : HU_AMMOX;
-    w_ammo.y =    hud_distributed? HU_AMMOY_D   : HU_AMMOY;
-    w_weapon.x =  hud_distributed? HU_WEAPX_D   : HU_WEAPX;
-    w_weapon.y =  hud_distributed? HU_WEAPY_D   : HU_WEAPY;
-    w_keys.x =    hud_distributed? HU_KEYSX_D   : HU_KEYSX;
-    w_keys.y =    hud_distributed? HU_KEYSY_D   : HU_KEYSY;
-    w_gkeys.x =   hud_distributed? HU_KEYSGX_D  : HU_KEYSGX;
-    w_gkeys.y =   hud_distributed? HU_KEYSY_D   : HU_KEYSY;
-    w_monsec.x =  hud_distributed? HU_MONSECX_D : HU_MONSECX;
-    w_monsec.y =  hud_distributed? HU_MONSECY_D : HU_MONSECY;
-    w_health.x =  hud_distributed? HU_HEALTHX_D : HU_HEALTHX;
-    w_health.y =  hud_distributed? HU_HEALTHY_D : HU_HEALTHY;
-    w_armor.x =   hud_distributed? HU_ARMORX_D  : HU_ARMORX;
-    w_armor.y =   hud_distributed? HU_ARMORY_D  : HU_ARMORY;
+    w_ammo.x =    is_distributed? HU_AMMOX_D   : HU_AMMOX;
+    w_ammo.y =    is_distributed? HU_AMMOY_D   : HU_AMMOY;
+    w_weapon.x =  is_distributed? HU_WEAPX_D   : HU_WEAPX;
+    w_weapon.y =  is_distributed? HU_WEAPY_D   : HU_WEAPY;
+    w_keys.x =    is_distributed? HU_KEYSX_D   : HU_KEYSX;
+    w_keys.y =    is_distributed? HU_KEYSY_D   : HU_KEYSY;
+    w_gkeys.x =   is_distributed? HU_KEYSGX_D  : HU_KEYSGX;
+    w_gkeys.y =   is_distributed? HU_KEYSY_D   : HU_KEYSY;
+    w_monsec.x =  is_distributed? HU_MONSECX_D : HU_MONSECX;
+    w_monsec.y =  is_distributed? HU_MONSECY_D : HU_MONSECY;
+    w_health.x =  is_distributed? HU_HEALTHX_D : HU_HEALTHX;
+    w_health.y =  is_distributed? HU_HEALTHY_D : HU_HEALTHY;
+    w_armor.x =   is_distributed? HU_ARMORX_D  : HU_ARMORX;
+    w_armor.y =   is_distributed? HU_ARMORY_D  : HU_ARMORY;
   }
-  ohud_distributed = hud_distributed;
+  was_distributed = is_distributed;
 }
 
 //
@@ -752,7 +753,7 @@ void HU_Drawer(void)
   if
   (
     hud_active>0 &&                  // hud optioned on
-    hud_displayed &&                 // hud on from fullscreen key
+    hud_mode!=hud_off &&             // hud on from fullscreen key
     viewheight==SCREENHEIGHT &&      // fullscreen mode is active
     !(automapmode & am_active)       // automap is not active
   )
@@ -999,6 +1000,7 @@ void HU_Drawer(void)
     if (doit && hud_active>1)
     {
       int k;
+      boolean haskeys = FALSE;
 
       hud_keysstr[4] = '\0';    //jff 3/7/98 make sure deleted keys go away
       //jff add case for graphic key display
@@ -1018,6 +1020,7 @@ void HU_Drawer(void)
           hud_gkeysstr[i++] = ' ';
         }
         hud_gkeysstr[i]='\0';
+        if (i>0) haskeys = TRUE;
       }
       else // not possible in current code, unless deathmatching,
       {
@@ -1167,9 +1170,12 @@ void HU_Drawer(void)
                 break;
             }
             hud_keysstr[i]='\0';
+            if (i>4) haskeys = TRUE;
           }
         }
       }
+      if (haskeys && hud_keysstr[0] != 'K')
+        strncpy(hud_keysstr, "KEY ", 4);
     }
     // display the keys/frags line each frame
     if (hud_active>1)
@@ -1207,9 +1213,9 @@ void HU_Drawer(void)
         sprintf
         (
           hud_monsecstr,
-          "STS \x1b\x36K \x1b\x33%d \x1b\x36M \x1b\x33%d \x1b\x37I \x1b\x33%d/%d \x1b\x35S \x1b\x33%d/%d",
+          "\x1b\x36K\x1b\x33%d\x1b\x36M\x1b\x33%d \x1b\x37I\x1b\x33%d \x1b\x35S\x1b\x33%d/%d",
           plr->killcount,totallive,
-          plr->itemcount,totalitems,
+          totalitems-plr->itemcount,
           plr->secretcount,totalsecret
         );
         // transfer the init string to the widget

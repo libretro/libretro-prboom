@@ -569,8 +569,6 @@ default_t defaults[] =
    def_int,ss_mess, NULL, NULL}, // number of messages in review display (1=disable)
   {"hud_list_bgon", {&hud_list_bgon, NULL}, {0, NULL},0,1,  // solid window bg ena //jff 2/26/98
    def_bool,ss_mess, NULL, NULL}, // enables background window behind message review
-  {"hud_distributed",{&hud_distributed, NULL},{0, NULL},0,1, // hud broken up into 3 displays //jff 3/4/98
-   def_bool,ss_none, NULL, NULL}, // splits HUD into three 2 line displays
 
   {"health_red",    {&health_red, NULL}   , {25, NULL},0,200, // below is red
    def_int,ss_stat, NULL, NULL}, // amount of health for red to yellow transition
@@ -593,8 +591,8 @@ default_t defaults[] =
   {"hud_active",    {&hud_active, NULL}, {2, NULL},0,2, // 0=off, 1=small, 2=full
    def_int,ss_none, NULL, NULL}, // 0 for HUD off, 1 for HUD small, 2 for full HUD
   //jff 2/23/98
-  {"hud_displayed", {&hud_displayed, NULL},  {0, NULL},0,1, // whether hud is displayed
-   def_bool,ss_none, NULL, NULL}, // enables display of HUD
+  {"hud_mode", {(int*)&hud_mode, NULL},  {0, NULL},0,2, // whether & how hud is displayed
+   def_int,ss_none, NULL, NULL}, // enables and selects display mode of HUD
   {"hud_nosecrets", {&hud_nosecrets, NULL},  {0, NULL},0,1, // no secrets/items/kills HUD line
    def_bool,ss_stat, NULL, NULL}, // disables display of kills/items/secrets on HUD
 

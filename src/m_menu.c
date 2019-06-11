@@ -1343,15 +1343,17 @@ void M_ChangeMessages(int choice)
 //
 // CHANGE DISPLAY SIZE
 //
-// jff 2/23/98 restored to pre-HUD state
-// hud_active controlled soley by F5=key_detail (key_hud)
-// hud_displayed is toggled by + or = in fullscreen
-// hud_displayed is cleared by -
+//
 
 void M_SizeDisplay(int choice)
 {
-  screenblocks = choice;
-  R_SetViewSize (screenblocks);
+  if (screenblocks == choice && choice == 1) {
+    // If it's already on full screen, cycle the hud_mode instead
+    hud_mode = (hud_mode>1)? 0 : hud_mode+1;
+  } else {
+    screenblocks = choice;
+    R_SetViewSize (screenblocks);
+  }
 }
 
 //
@@ -4181,7 +4183,7 @@ boolean M_Responder (event_t* ev) {
       return TRUE;
       }
 
-    if (ch == key_zoomin)               // zoom in
+    if (ch == key_zoomin || ch == key_hud)     // zoom in
       {                                 // jff 2/23/98
       if ((automapmode & am_active) || chat_on)     // allow
         return FALSE;                   // key_hud==key_zoomin

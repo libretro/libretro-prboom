@@ -249,7 +249,7 @@ static void R_InitTextures (void)
       totalwidth += texture->width;
     }
 
-  free(patchlookup);         // killough
+  Z_Free(patchlookup);         // killough
 
   for (i=0; i<2; i++) // cph - release the TEXTUREx lumps
     if (maptex_lump[i] != -1)
@@ -569,7 +569,7 @@ void R_PrecacheLevel(void)
             while (--k >= 0);
           }
       }
-  free(hitlist);
+  Z_Free(hitlist);
 }
 
 // Proff - Added for OpenGL

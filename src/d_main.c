@@ -580,8 +580,7 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
         length = header.numlumps;
         fileinfo = malloc(length*sizeof(filelump_t));
         if (fseek (fp, header.infotableofs, SEEK_SET) ||
-            fread (fileinfo, sizeof(filelump_t), length, fp) != length ||
-            fclose(fp))
+            fread (fileinfo, sizeof(filelump_t), length, fp) != length)
           I_Error("CheckIWAD: failed to read directory %s",iwadname);
 
         // scan directory for levelname lumps
@@ -614,7 +613,12 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
         free(fileinfo);
       }
       else // missing IWAD tag in header
+      {
+        fclose(fp);
         return I_Error("CheckIWAD: IWAD tag %s not present", iwadname);
+      }
+
+      fclose(fp);
     }
     else // error from open call
       return I_Error("CheckIWAD: Can't open IWAD %s", iwadname);

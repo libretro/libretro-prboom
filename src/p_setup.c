@@ -1701,7 +1701,10 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
     const line_t *l;
 
     if (segs[i].miniseg == TRUE)        //figgi -- skip minisegs
+    {
+      free(hit);
       return;
+    }
 
     l = segs[i].linedef;            // The parent linedef
     if (l->dx && l->dy)                     // We can ignore orthogonal lines

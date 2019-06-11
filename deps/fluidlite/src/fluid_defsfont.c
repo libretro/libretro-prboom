@@ -474,15 +474,18 @@ fluid_defsfont_load_sampledata(fluid_defsfont_t* sfont)
   if (FLUID_FSEEK(fd, sfont->samplepos, SEEK_SET) == -1) {
     perror("error");
     FLUID_LOG(FLUID_ERR, "Failed to seek position in data file");
+    FLUID_FCLOSE(fd);
     return FLUID_FAILED;
   }
   sfont->sampledata = (short*) FLUID_MALLOC(sfont->samplesize);
   if (sfont->sampledata == NULL) {
     FLUID_LOG(FLUID_ERR, "Out of memory");
+    FLUID_FCLOSE(fd);
     return FLUID_FAILED;
   }
   if (FLUID_FREAD(sfont->sampledata, 1, sfont->samplesize, fd) < sfont->samplesize) {
     FLUID_LOG(FLUID_ERR, "Failed to read sample data");
+    FLUID_FCLOSE(fd);
     return FLUID_FAILED;
   }
   FLUID_FCLOSE(fd);
@@ -538,9 +541,9 @@ fluid_sample_t* fluid_defsfont_get_sample(fluid_defsfont_t* sfont, char *s)
                 int section = 0;
                 do {
                     numberRead = ov_read(&vf, buffer, 4096, 0, 2, 1, &section);
-                    sampledata_ogg=realloc(sampledata_ogg,sampledata_size+numberRead);
                     if(numberRead>0)
                     {
+                        sampledata_ogg=realloc(sampledata_ogg,sampledata_size+numberRead);
                         memcpy((char*)(sampledata_ogg)+sampledata_size,buffer,numberRead);
                         sampledata_size+=numberRead;
                     }

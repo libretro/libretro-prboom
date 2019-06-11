@@ -275,7 +275,7 @@ default_t defaults[] =
    def_int,ss_gen, NULL, NULL}, // number of audio events simultaneously // killough
 
   {"Video settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},
-  {"screenblocks",{&screenblocks, NULL},{10, NULL},3,11,  // killough 2/21/98: default to 10
+  {"screenblocks",{&screenblocks, NULL},{0, NULL},0,1,  // used to be int 3-11 (now just boolean)
    def_int,ss_none, NULL, NULL},
   {"usegamma",{&usegamma, NULL},{0, NULL},0,4, //jff 3/6/98 fix erroneous upper limit in range
    def_int,ss_gen, NULL, NULL}, // gamma correction level // killough 1/18/98

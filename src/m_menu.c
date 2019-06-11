@@ -5348,7 +5348,6 @@ void M_Init(void)
   whichSkull = 0;
   skullAnimCounter = 10;
   messageToPrint = 0;
-  screenblocks = 0;
   messageString = NULL;
   messageLastMenuActive = menuactive;
   quickSaveSlot = -1;

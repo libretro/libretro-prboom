@@ -1111,10 +1111,10 @@ static const char *deh_mobjinfo[DEH_MOBJINFOMAX] =
   "Action sound",        // .activesound
   "Bits",                // .flags
   "Bits2",               // .flags
-  "Respawn frame"        // .raisestate
-  "Melee threshold "     // .meleethreshold
-  "Max target range"     // .maxattackrange
-  "Min missile chance"   // .minmissilechance
+  "Respawn frame",       // .raisestate
+  "Melee threshold",     // .meleethreshold
+  "Max target range",    // .maxattackrange
+  "Min missile chance",  // .minmissilechance
 };
 
 // Strings that are used to indicate flags ("Bits" in mobjinfo)

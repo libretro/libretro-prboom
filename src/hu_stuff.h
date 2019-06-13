@@ -68,6 +68,13 @@ char HU_dequeueChatChar(void);
 void HU_Erase(void);
 void HU_MoveHud(void); // jff 3/9/98 avoid glitch in HUD display
 
+typedef enum {
+  hud_off,         /* don't display any HUD */
+  hud_compact,     /* place all HUD widgets on lower left side */
+  hud_distributed, /* distribute HUD widgets across the scrreen */
+} hud_mode_t;
+extern hud_mode_t hud_mode;
+
 /* killough 5/2/98: moved from m_misc.c: */
 
 /* jff 2/16/98 hud supported automap colors added */
@@ -80,11 +87,9 @@ extern int hudcolor_chat;   /* color range of chat lines            */
 extern int hudcolor_list;   /* color of list of past messages                  */
 extern int hud_list_bgon;   /* solid window background for list of messages    */
 extern int hud_msg_lines;   /* number of message lines in window up to 16      */
-extern int hud_distributed; /* whether hud is all in lower left or distributed */
-/* jff 2/23/98 hud is currently displayed */
-extern int hud_displayed;   /* hud is displayed */
 /* jff 2/18/98 hud/status control */
-extern int hud_active;      /* hud mode 0=off, 1=small, 2=full          */
-extern int hud_nosecrets;   /* status does not list secrets/items/kills */
+extern boolean hud_showstats;   /* show secrets/items/kills stats */
+extern boolean hud_showkeys;    /* show keys HUD line */
+extern boolean hud_showweapons; /* show weapons HUD line */
 
 #endif

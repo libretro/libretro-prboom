@@ -1343,15 +1343,17 @@ void M_ChangeMessages(int choice)
 //
 // CHANGE DISPLAY SIZE
 //
-// jff 2/23/98 restored to pre-HUD state
-// hud_active controlled soley by F5=key_detail (key_hud)
-// hud_displayed is toggled by + or = in fullscreen
-// hud_displayed is cleared by -
+//
 
 void M_SizeDisplay(int choice)
 {
-  screenblocks = choice;
-  R_SetViewSize (screenblocks);
+  if (screenblocks == choice && choice == 1) {
+    // If it's already on full screen, cycle the hud_mode instead
+    hud_mode = (hud_mode>1)? 0 : hud_mode+1;
+  } else {
+    screenblocks = choice;
+    R_SetViewSize (screenblocks);
+  }
 }
 
 //
@@ -2407,6 +2409,8 @@ setup_menu_t* stat_settings[] =
   NULL
 };
 
+static const char *hud_modes[] = {"OFF", "COMPACT", "DISTRIBUTED"};
+
 setup_menu_t stat_settings1[] =  // Status Bar and HUD Settings screen
 {
   {"STATUS BAR"        ,S_SKIP|S_TITLE,m_null,ST_X,ST_Y+ 1*8 },
@@ -2417,15 +2421,18 @@ setup_menu_t stat_settings1[] =  // Status Bar and HUD Settings screen
 
   {"HEADS-UP DISPLAY"  ,S_SKIP|S_TITLE,m_null,ST_X,ST_Y+ 6*8},
 
-  {"HIDE SECRETS"      ,S_YESNO     ,m_null,ST_X,ST_Y+ 7*8, {"hud_nosecrets"}},
-  {"HEALTH LOW/OK"     ,S_NUM       ,m_null,ST_X,ST_Y+ 8*8, {"health_red"}},
-  {"HEALTH OK/GOOD"    ,S_NUM       ,m_null,ST_X,ST_Y+ 9*8, {"health_yellow"}},
-  {"HEALTH GOOD/EXTRA" ,S_NUM       ,m_null,ST_X,ST_Y+10*8, {"health_green"}},
-  {"ARMOR LOW/OK"      ,S_NUM       ,m_null,ST_X,ST_Y+11*8, {"armor_red"}},
-  {"ARMOR OK/GOOD"     ,S_NUM       ,m_null,ST_X,ST_Y+12*8, {"armor_yellow"}},
-  {"ARMOR GOOD/EXTRA"  ,S_NUM       ,m_null,ST_X,ST_Y+13*8, {"armor_green"}},
-  {"AMMO LOW/OK"       ,S_NUM       ,m_null,ST_X,ST_Y+14*8, {"ammo_red"}},
-  {"AMMO OK/GOOD"      ,S_NUM       ,m_null,ST_X,ST_Y+15*8, {"ammo_yellow"}},
+  {"HUD DISPLAY MODE"  ,S_CHOICE    ,m_null,ST_X,ST_Y+ 7*8, {"hud_mode"}, 0, 0, NULL, hud_modes},
+  {"SHOW KILL/ITEM/SECRET", S_YESNO ,m_null,ST_X,ST_Y+ 8*8, {"hud_showstats"}},
+  {"SHOW WEAPONS"      ,S_YESNO     ,m_null,ST_X,ST_Y+ 9*8, {"hud_showweapons"}},
+  {"SHOW KEYS"         ,S_YESNO     ,m_null,ST_X,ST_Y+10*8, {"hud_showkeys"}},
+  {"HEALTH LOW/OK"     ,S_NUM       ,m_null,ST_X,ST_Y+11*8, {"health_red"}},
+  {"HEALTH OK/GOOD"    ,S_NUM       ,m_null,ST_X,ST_Y+12*8, {"health_yellow"}},
+  {"HEALTH GOOD/EXTRA" ,S_NUM       ,m_null,ST_X,ST_Y+13*8, {"health_green"}},
+  {"ARMOR LOW/OK"      ,S_NUM       ,m_null,ST_X,ST_Y+14*8, {"armor_red"}},
+  {"ARMOR OK/GOOD"     ,S_NUM       ,m_null,ST_X,ST_Y+15*8, {"armor_yellow"}},
+  {"ARMOR GOOD/EXTRA"  ,S_NUM       ,m_null,ST_X,ST_Y+16*8, {"armor_green"}},
+  {"AMMO LOW/OK"       ,S_NUM       ,m_null,ST_X,ST_Y+17*8, {"ammo_red"}},
+  {"AMMO OK/GOOD"      ,S_NUM       ,m_null,ST_X,ST_Y+18*8, {"ammo_yellow"}},
 
   // Button for resetting to defaults
   {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
@@ -4176,7 +4183,7 @@ boolean M_Responder (event_t* ev) {
       return TRUE;
       }
 
-    if (ch == key_zoomin)               // zoom in
+    if (ch == key_zoomin || ch == key_hud)     // zoom in
       {                                 // jff 2/23/98
       if ((automapmode & am_active) || chat_on)     // allow
         return FALSE;                   // key_hud==key_zoomin
@@ -5341,7 +5348,6 @@ void M_Init(void)
   whichSkull = 0;
   skullAnimCounter = 10;
   messageToPrint = 0;
-  screenblocks = 0;
   messageString = NULL;
   messageLastMenuActive = menuactive;
   quickSaveSlot = -1;

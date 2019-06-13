@@ -275,7 +275,7 @@ default_t defaults[] =
    def_int,ss_gen, NULL, NULL}, // number of audio events simultaneously // killough
 
   {"Video settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},
-  {"screenblocks",{&screenblocks, NULL},{10, NULL},3,11,  // killough 2/21/98: default to 10
+  {"screenblocks",{&screenblocks, NULL},{0, NULL},0,1,  // used to be int 3-11 (now just boolean)
    def_int,ss_none, NULL, NULL},
   {"usegamma",{&usegamma, NULL},{0, NULL},0,4, //jff 3/6/98 fix erroneous upper limit in range
    def_int,ss_gen, NULL, NULL}, // gamma correction level // killough 1/18/98
@@ -569,8 +569,6 @@ default_t defaults[] =
    def_int,ss_mess, NULL, NULL}, // number of messages in review display (1=disable)
   {"hud_list_bgon", {&hud_list_bgon, NULL}, {0, NULL},0,1,  // solid window bg ena //jff 2/26/98
    def_bool,ss_mess, NULL, NULL}, // enables background window behind message review
-  {"hud_distributed",{&hud_distributed, NULL},{0, NULL},0,1, // hud broken up into 3 displays //jff 3/4/98
-   def_bool,ss_none, NULL, NULL}, // splits HUD into three 2 line displays
 
   {"health_red",    {&health_red, NULL}   , {25, NULL},0,200, // below is red
    def_int,ss_stat, NULL, NULL}, // amount of health for red to yellow transition
@@ -589,14 +587,15 @@ default_t defaults[] =
   {"ammo_yellow",   {&ammo_yellow, NULL}  , {50, NULL},0,100, // below 50% is yellow, above green
    def_int,ss_stat, NULL, NULL}, // percent of ammo for yellow to green transition
 
-  //jff 2/16/98 HUD and status feature controls
-  {"hud_active",    {&hud_active, NULL}, {2, NULL},0,2, // 0=off, 1=small, 2=full
-   def_int,ss_none, NULL, NULL}, // 0 for HUD off, 1 for HUD small, 2 for full HUD
-  //jff 2/23/98
-  {"hud_displayed", {&hud_displayed, NULL},  {0, NULL},0,1, // whether hud is displayed
-   def_bool,ss_none, NULL, NULL}, // enables display of HUD
-  {"hud_nosecrets", {&hud_nosecrets, NULL},  {0, NULL},0,1, // no secrets/items/kills HUD line
-   def_bool,ss_stat, NULL, NULL}, // disables display of kills/items/secrets on HUD
+  // HUD and status feature controls
+  {"hud_mode", {(int*)&hud_mode, NULL},  {0, NULL},0,2, // whether & how hud is displayed
+   def_int,ss_none, NULL, NULL}, // enables and selects display mode of HUD
+  {"hud_showstats", {&hud_showstats, NULL},  {1, NULL},0,1, // show secrets/items/kills HUD line
+   def_bool,ss_stat, NULL, NULL}, // enables display of kills/items/secrets on HUD
+  {"hud_showkeys", {&hud_showkeys, NULL},  {1, NULL},0,1, // show keys HUD line
+   def_bool,ss_stat, NULL, NULL}, // enables the display of keys on HUD
+  {"hud_showweapons", {&hud_showweapons, NULL},  {1, NULL},0,1, // show weapons HUD line
+   def_bool,ss_stat, NULL, NULL}, // enables the display of weapons on HUD
 
   {"Weapon preferences",{NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
   // killough 2/8/98: weapon preferences set by user:

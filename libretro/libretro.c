@@ -506,6 +506,8 @@ static wadinfo_t get_wadinfo(const char *path)
       fread(&header, sizeof(header), 1, fp);
       fclose(fp);
    }
+   else
+      memset(&header, 0, sizeof(header));
    return header;
 }
 
@@ -1239,7 +1241,7 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
    FILE * file;
    char * p;
    /* Precalculate a length we will need in the loop */
-   size_t pl = strlen(wfname) + (ext && strlen(ext)) + 4;
+   size_t pl = strlen(wfname) + (ext ? strlen(ext) : 0) + 4;
 
    if( dir == NULL ) {
       p = malloc(pl);
@@ -1288,7 +1290,7 @@ char* I_FindFile(const char* wfname, const char* ext)
      environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
      if (system_dir)
      {
-       prboom_system_dir = malloc(strlen(system_dir) + 7);
+       prboom_system_dir = malloc(strlen(system_dir) + 8);
        sprintf(prboom_system_dir, "%s%c%s", system_dir, DIR_SLASH, "prboom");
        p = FindFileInDir(prboom_system_dir, wfname, ext);
        free(prboom_system_dir);
@@ -1299,7 +1301,7 @@ char* I_FindFile(const char* wfname, const char* ext)
      // If not found, check on parent folders recursively (if configured to do so)
      if ( p == NULL && find_recursive_on)
      {
-       dir = malloc(strlen(g_wad_dir));
+       dir = malloc(strlen(g_wad_dir) + 1);
        strcpy(dir, g_wad_dir);
        for (i = strlen(dir)-1; i > 1; dir[i--] = '\0')
        {

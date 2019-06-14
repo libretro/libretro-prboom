@@ -1,6 +1,6 @@
-DEBUG=0
-STATIC_LINKING=0
-WANT_FLUIDSYNTH=0
+DEBUG ?= 0
+STATIC_LINKING ?= 0
+WANT_FLUIDSYNTH ?= 0
 
 ifeq ($(platform),)
 platform = unix
@@ -74,7 +74,8 @@ ifeq ($(platform), unix)
 	EXT    ?= so
    TARGET := $(TARGET_NAME)_libretro$(PLAT).$(EXT)
    fpic := -fPIC
-   SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
+   SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,--no-undefined -Wl,--as-needed
+   CFLAGS += -std=c99
 else ifeq ($(platform), linux-portable)
 	EXT    ?= so
    TARGET := $(TARGET_NAME)_libretro.$(EXT)

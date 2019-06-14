@@ -248,6 +248,8 @@ static boolean P_IsOnLift(const mobj_t *actor)
   line_t line;
   int l;
 
+  memset(&line, 0, sizeof(line));
+
   // Short-circuit: it's on a lift which is active.
   if (sec->floordata && ((thinker_t *) sec->floordata)->function==T_PlatRaise)
     return TRUE;

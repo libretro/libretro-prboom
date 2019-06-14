@@ -512,7 +512,7 @@ char *find_last_slash(const char *str)
 #ifdef _WIN32
    const char *backslash = strrchr(str, '\\');
 
-   if (backslash && ((slash && backslash > slash) || !slash))
+   if (!slash || (backslash > slash))
       slash = backslash;
 #endif
 
@@ -647,11 +647,18 @@ bool fill_pathname_parent_dir_name(char *out_dir,
    char *last = find_last_slash(temp);
    bool ret = false;
 
-   *last = '\0';
+   if (last && last[1] == 0)
+   {
+      *last = '\0';
+      last = find_last_slash(temp);
+   }
+
+   if (last)
+      *last = '\0';
 
    in_dir = find_last_slash(temp);
 
-   if (in_dir && in_dir + 1)
+   if (in_dir && in_dir[1])
    {
       strlcpy(out_dir, in_dir + 1, size);
       ret = true;

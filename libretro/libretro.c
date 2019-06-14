@@ -6,7 +6,7 @@
 #endif
 #include <errno.h>
 
-#include "libretro.h"
+#include <libretro.h>
 #include <file/file_path.h>
 
 #ifdef _WIN32

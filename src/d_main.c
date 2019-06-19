@@ -374,6 +374,8 @@ static void D_DrawTitle1(const char *name)
 {
   S_StartMusic(mus_intro);
   pagetic = (TICRATE*170)/35;
+  if (W_CheckNumForName("SIGILINT")) // Sigil: Longer wait before playing a demo to give the title theme time to end.
+    pagetic = (TICRATE*404)/35;
   D_SetPageName(name);
 }
 

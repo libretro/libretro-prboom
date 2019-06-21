@@ -9,6 +9,10 @@
 #include <libretro.h>
 #include <file/file_path.h>
 
+#if _MSC_VER
+#include <compat/msvc.h>
+#endif
+
 #ifdef _WIN32
    #define DIR_SLASH '\\'
 #else
@@ -188,6 +192,8 @@ static void check_system_specs(void)
    environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
 }
 
+static bool libretro_supports_bitmasks = false;
+
 void retro_init(void)
 {
    enum retro_pixel_format rgb565;
@@ -202,12 +208,16 @@ void retro_init(void)
    if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
       log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
 
+   if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
+      libretro_supports_bitmasks = true;
+
    check_system_specs();
 }
 
 void retro_deinit(void)
 {
    D_DoomDeinit();
+   libretro_supports_bitmasks = false;
 }
 
 unsigned retro_api_version(void)
@@ -856,28 +866,58 @@ static void process_gamepad_buttons(unsigned num_buttons, action_lut_t action_lu
 	static bool old_input[MAX_BUTTON_BINDS];
 	bool new_input[MAX_BUTTON_BINDS];
 
-	for(i = 0; i < num_buttons; i++)
-	{
-		event_t event = {0};
-		new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
+   if (libretro_supports_bitmasks)
+   {
+      int16_t ret = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
 
-		if(new_input[i] && !old_input[i])
-		{
-			event.type = ev_keydown;
-			event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
-		}
+      for (i = 0; i < num_buttons; i++)
+      {
+         event_t event = {0};
+         new_input[i]  = ret & (1 << i);
 
-		if(!new_input[i] && old_input[i])
-		{
-			event.type = ev_keyup;
-			event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
-		}
+         if(new_input[i] && !old_input[i])
+         {
+            event.type = ev_keydown;
+            event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
+         }
 
-		if(event.type == ev_keydown || event.type == ev_keyup)
-			D_PostEvent(&event);
+         if(!new_input[i] && old_input[i])
+         {
+            event.type = ev_keyup;
+            event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
+         }
 
-		old_input[i] = new_input[i];
-	}
+         if(event.type == ev_keydown || event.type == ev_keyup)
+            D_PostEvent(&event);
+
+         old_input[i] = new_input[i];
+      }
+   }
+   else
+   {
+      for(i = 0; i < num_buttons; i++)
+      {
+         event_t event = {0};
+         new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
+
+         if(new_input[i] && !old_input[i])
+         {
+            event.type = ev_keydown;
+            event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
+         }
+
+         if(!new_input[i] && old_input[i])
+         {
+            event.type = ev_keyup;
+            event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
+         }
+
+         if(event.type == ev_keydown || event.type == ev_keyup)
+            D_PostEvent(&event);
+
+         old_input[i] = new_input[i];
+      }
+   }
 }
 
 static void process_gamepad_left_analog(void)

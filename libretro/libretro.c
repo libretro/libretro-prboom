@@ -957,7 +957,7 @@ static void process_gamepad_right_analog(bool pressed_y, bool pressed_l2)
 	extern int autorun;
 	int rsx               = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
 	int rsy               = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
-	bool run_key          = false;;
+	bool run_key          = false;
 	int analog_turn_speed = 0;
 	event_t event_mouse   = {0};
 

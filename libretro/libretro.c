@@ -860,63 +860,33 @@ static bool synthetic_pwm(int amplitude, int* modulation_state)
 	return true;
 }
 
-static void process_gamepad_buttons(unsigned num_buttons, action_lut_t action_lut[])
+static void process_gamepad_buttons(int16_t ret, unsigned num_buttons, action_lut_t action_lut[])
 {
-	unsigned i;
-	static bool old_input[MAX_BUTTON_BINDS];
-	bool new_input[MAX_BUTTON_BINDS];
+   unsigned i;
+   static bool old_input[MAX_BUTTON_BINDS];
+   bool new_input[MAX_BUTTON_BINDS];
 
-   if (libretro_supports_bitmasks)
+   for (i = 0; i < num_buttons; i++)
    {
-      int16_t ret = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+      event_t event = {0};
+      new_input[i]  = ret & (1 << i);
 
-      for (i = 0; i < num_buttons; i++)
+      if(new_input[i] && !old_input[i])
       {
-         event_t event = {0};
-         new_input[i]  = ret & (1 << i);
-
-         if(new_input[i] && !old_input[i])
-         {
-            event.type = ev_keydown;
-            event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
-         }
-
-         if(!new_input[i] && old_input[i])
-         {
-            event.type = ev_keyup;
-            event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
-         }
-
-         if(event.type == ev_keydown || event.type == ev_keyup)
-            D_PostEvent(&event);
-
-         old_input[i] = new_input[i];
+         event.type = ev_keydown;
+         event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
       }
-   }
-   else
-   {
-      for(i = 0; i < num_buttons; i++)
+
+      if(!new_input[i] && old_input[i])
       {
-         event_t event = {0};
-         new_input[i] = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i);
-
-         if(new_input[i] && !old_input[i])
-         {
-            event.type = ev_keydown;
-            event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
-         }
-
-         if(!new_input[i] && old_input[i])
-         {
-            event.type = ev_keyup;
-            event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
-         }
-
-         if(event.type == ev_keydown || event.type == ev_keyup)
-            D_PostEvent(&event);
-
-         old_input[i] = new_input[i];
+         event.type = ev_keyup;
+         event.data1 = *((menuactive)? action_lut[i].menukey : action_lut[i].gamekey);
       }
+
+      if(event.type == ev_keydown || event.type == ev_keyup)
+         D_PostEvent(&event);
+
+      old_input[i] = new_input[i];
    }
 }
 
@@ -948,20 +918,14 @@ static void process_gamepad_left_analog(void)
 		analog_l_amplitude[0] = 1 + pwm_period * (lsx - analog_deadzone) / (analog_range - analog_deadzone);
 	}
 	if (lsx < -analog_deadzone)
-	{
 		analog_l_amplitude[1] = -1 * (-1 + pwm_period * (lsx + analog_deadzone) / (analog_range - analog_deadzone));
-	}
 	// > y-axis
 	analog_l_amplitude[2] = 0;
 	analog_l_amplitude[3] = 0;
 	if (lsy > analog_deadzone)
-	{
 		analog_l_amplitude[2] = 1 + pwm_period * (lsy - analog_deadzone) / (analog_range - analog_deadzone);
-	}
 	if (lsy < -analog_deadzone)
-	{
 		analog_l_amplitude[3] = -1 * (-1 + pwm_period * (lsy + analog_deadzone) / (analog_range - analog_deadzone));
-	}
 
 	for (i = 0; i < 4; i++)
 	{
@@ -988,22 +952,20 @@ static void process_gamepad_left_analog(void)
 	}
 }
 
-static void process_gamepad_right_analog(void)
+static void process_gamepad_right_analog(bool pressed_y, bool pressed_l2)
 {
-	int rsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
-	int rsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
-	bool run_key;
 	extern int autorun;
-	int analog_turn_speed;
-	event_t event_mouse = {0};
+	int rsx               = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X);
+	int rsy               = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y);
+	bool run_key          = false;;
+	int analog_turn_speed = 0;
+	event_t event_mouse   = {0};
 
 	/* retrieve run key status */
 	if (doom_devices[0] == RETROPAD_CLASSIC)
-		run_key = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y);
+		run_key            = pressed_y;
 	else if (doom_devices[0] == RETROPAD_MODERN)
-		run_key = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2);
-	else
-		run_key = 0;
+		run_key            = pressed_l2;
 
 	/* make the run key invert autorun behavior if both are active */
 	if ((autorun && !run_key) || (!autorun && run_key))
@@ -1046,6 +1008,7 @@ void I_StartTic (void)
    int mx, my;
    static bool old_input_kb[117];
    bool new_input_kb[117];
+   int16_t ret = 0;
 
    input_poll_cb();
 
@@ -1057,12 +1020,30 @@ void I_StartTic (void)
       switch (doom_devices[port])
       {
 		case RETROPAD_CLASSIC:
-			process_gamepad_buttons(gp_classic.num_buttons, gp_classic.action_lut);
+         if (libretro_supports_bitmasks)
+            ret = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+         else
+         {
+            unsigned i;
+            for (i = 0; i < gp_classic.num_buttons; i++)
+               if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i))
+                  ret |= (1 << i);
+         }
+			process_gamepad_buttons(ret, gp_classic.num_buttons, gp_classic.action_lut);
 			break;
 		case RETROPAD_MODERN:
-			process_gamepad_buttons(gp_modern.num_buttons, gp_modern.action_lut);
+         if (libretro_supports_bitmasks)
+            ret = input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_MASK);
+         else
+         {
+            unsigned i;
+            for (i = 0; i < gp_modern.num_buttons; i++)
+               if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i))
+                  ret |= (1 << i);
+         }
+			process_gamepad_buttons(ret, gp_modern.num_buttons, gp_modern.action_lut);
 			process_gamepad_left_analog();
-			process_gamepad_right_analog();
+			process_gamepad_right_analog(ret & (1 << RETRO_DEVICE_ID_JOYPAD_Y), ret & (1 << RETRO_DEVICE_ID_JOYPAD_L2));
 			break;
       case RETRO_DEVICE_KEYBOARD:
          {

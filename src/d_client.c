@@ -544,11 +544,6 @@ void TryRunTics(void)
 
   D_BuildNewTiccmds();
 
-  if (movement_smooth && gamestate==wipegamestate) {
-    WasRenderedInTryRunTics = TRUE;
-    D_Display();
-  }
-
   if(tic_vars.frac == FRACUNIT) {
     tic_vars.frac = overflow;
     if (advancedemo)
@@ -558,7 +553,6 @@ void TryRunTics(void)
     P_Checksum(gametic);
     gametic++;
   }
-
 }
 
 #endif

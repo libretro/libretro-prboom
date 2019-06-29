@@ -122,20 +122,6 @@ void R_InterpolateView (player_t *player)
     viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
     viewpitch = R_SmoothPlaying_Get(player->mo->pitch) + viewpitchoffset;
   }
-
-  if (!paused && movement_smooth)
-  {
-    int i;
-
-    didInterp = frac != FRACUNIT;
-    if (didInterp)
-    {
-      for (i = numinterpolations - 1; i >= 0; i--)
-      {
-        R_DoAnInterpolation (i, frac);
-      }
-    }
-  }
 }
 
 void R_ResetViewInterpolation ()

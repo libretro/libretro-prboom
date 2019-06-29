@@ -536,18 +536,17 @@ void D_BuildNewTiccmds(void)
 void TryRunTics(void)
 {
   fixed_t overflow = 0;
-  tic_vars.frac += tic_vars.frac_step;
-  if(tic_vars.frac > FRACUNIT) {
-    overflow = tic_vars.frac - FRACUNIT;
-    tic_vars.frac = FRACUNIT;
+  // Increment tic fraction if game is ongoing
+  if ((demoplayback || !menuactive) && !paused)
+  {
+     tic_vars.frac += tic_vars.frac_step;
+     if(tic_vars.frac > FRACUNIT) {
+        overflow = tic_vars.frac - FRACUNIT;
+        tic_vars.frac = FRACUNIT;
+     }
   }
 
   D_BuildNewTiccmds();
-
-  if (movement_smooth && gamestate==wipegamestate) {
-    WasRenderedInTryRunTics = TRUE;
-    D_Display();
-  }
 
   if(tic_vars.frac == FRACUNIT) {
     tic_vars.frac = overflow;
@@ -558,7 +557,6 @@ void TryRunTics(void)
     P_Checksum(gametic);
     gametic++;
   }
-
 }
 
 #endif

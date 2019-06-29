@@ -83,8 +83,6 @@ angle_t R_SmoothPlaying_Get(angle_t defangle)
 
 void R_ResetAfterTeleport(player_t *player)
 {
-#ifndef __LIBRETRO__
   R_ResetViewInterpolation();
-#endif
   R_SmoothPlaying_Reset(player);
 }

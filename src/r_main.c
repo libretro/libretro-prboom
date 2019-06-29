@@ -83,10 +83,6 @@ int      fieldofview;
 fixed_t  freelookviewheight;
 extern lighttable_t **walllights;
 
-#ifndef __LIBRETRO__
-static mobj_t *oviewer;
-#endif
-
 //
 // precalculated math tables
 //
@@ -680,7 +676,5 @@ void R_RenderPlayerView (player_t* player)
   NetUpdate ();
 #endif
 
-#ifndef __LIBRETRO__
   R_RestoreInterpolations();
-#endif
 }

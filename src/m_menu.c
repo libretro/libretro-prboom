@@ -2899,6 +2899,7 @@ enum {
   general_patchedges,
   general_hom,
   general_skystretch,
+  general_wigglefix,
   general_menubg,
 };
 
@@ -2940,6 +2941,9 @@ setup_menu_t gen_settings3[] = { // General Settings screen2
 
   {"Stretch sky on freelook", S_YESNO, m_null, G_X,
    G_YC2 + general_skystretch*8, {"render_stretchsky"}, 0, 0, M_ChangeMouseLook},
+
+  {"Wiggle geometry fix", S_YESNO, m_null, G_X,
+   G_YC2 + general_wigglefix*8, {"r_wiggle_fix"}},
 
   {"Fullscreen menu background", S_YESNO, m_null, G_X,
    G_YC3 + general_menubg*8, {"menu_background"}},

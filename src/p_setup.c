@@ -650,6 +650,8 @@ static void P_LoadSectors (int lump)
       sector_t *ss = sectors + i;
       const mapsector_t *ms = (const mapsector_t *) data + i;
 
+      // [kb] for R_FixWiggle()
+		ss->cachedheight = 0;
       ss->iSectorID=i; // proff 04/05/2000: needed for OpenGL
       ss->floorheight = SHORT(ms->floorheight)<<FRACBITS;
       ss->ceilingheight = SHORT(ms->ceilingheight)<<FRACBITS;

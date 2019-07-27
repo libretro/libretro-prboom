@@ -86,6 +86,10 @@ typedef struct
 
 typedef struct
 {
+  // [kb] for R_FixWiggle()
+  int	cachedheight;
+  int	scaleindex;
+
   int iSectorID; // proff 04/05/2000: needed for OpenGL and used in debugmode by the HUD to draw sectornum
   boolean no_toptextures;
   boolean no_bottomtextures;

@@ -74,6 +74,8 @@
    #define DIR_SLASH_STR "/"
 #endif
 
+extern boolean r_wigglefix;
+
 /*
  * M_WriteFile
  *
@@ -298,6 +300,8 @@ default_t defaults[] =
   {"patch_edges",{(int*)&drawvars.patch_edges, NULL},{RDRAW_MASKEDCOLUMNEDGE_SQUARE, NULL},
    RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
   {"render_stretchsky",{&r_stretchsky, NULL},{1, NULL},0,1,
+   def_bool,ss_gen,NULL, NULL},
+  {"r_wiggle_fix",{(int*)&r_wiggle_fix, NULL},{1, NULL},0,1,
    def_bool,ss_gen,NULL, NULL},
 
   {"Mouse settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},

@@ -83,6 +83,7 @@ void M_DrawCredits(void);    // killough 11/98
 extern int warning_about_changes, print_warning_about_changes;
 
 extern boolean menu_background;
+extern boolean r_wiggle_fix;
 
 /****************************
  *

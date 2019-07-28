@@ -52,9 +52,9 @@ extern fixed_t  centeryfrac;
 extern fixed_t  viewheightfrac; //e6y: for correct clipping of things
 extern fixed_t  freelookviewheight;
 extern fixed_t  projection;
-// proff 11/06/98: Added for high-res
-extern fixed_t  projectiony;
+extern fixed_t  projectiony; /* proff 11/06/98: Added for high-res */
 extern int      validcount;
+extern float    viewfocratio; /* e6y: for more precise flat drawing */
 extern fixed_t skyiscale;
 
 //

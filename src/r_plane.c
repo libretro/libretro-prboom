@@ -104,6 +104,9 @@ static fixed_t xoffs,yoffs;    // killough 2/28/98: flat offsets
 
 fixed_t yslope[MAX_SCREENHEIGHT], distscale[MAX_SCREENWIDTH];
 
+/* forward declarations */
+extern boolean r_wiggle_fix;
+
 //
 // R_InitPlanes
 // Only at game startup.
@@ -134,26 +137,43 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
    fixed_t distance, length;
    unsigned index;
 
-   if (planeheight != cachedheight[y])
+   if (!r_wiggle_fix)
    {
-      cachedheight[y] = planeheight;
-      distance = cacheddistance[y] = FixedMul (planeheight, yslope[y]);
-      dsvars->xstep = cachedxstep[y] = FixedMul (distance,basexscale);
-      dsvars->ystep = cachedystep[y] = FixedMul (distance,baseyscale);
+      if (planeheight != cachedheight[y])
+      {
+         cachedheight[y] = planeheight;
+         distance = cacheddistance[y] = FixedMul (planeheight, yslope[y]);
+         dsvars->xstep = cachedxstep[y] = FixedMul (distance,basexscale);
+         dsvars->ystep = cachedystep[y] = FixedMul (distance,baseyscale);
+      }
+      else
+      {
+         distance = cacheddistance[y];
+         dsvars->xstep = cachedxstep[y];
+         dsvars->ystep = cachedystep[y];
+      }
+
+      length = FixedMul (distance,distscale[x1]);
+      angle = (viewangle + xtoviewangle[x1])>>ANGLETOFINESHIFT;
+
+      // killough 2/28/98: Add offsets
+      dsvars->xfrac =  viewx + FixedMul(finecosine[angle], length) + xoffs;
+      dsvars->yfrac = -viewy - FixedMul(finesine[angle],   length) + yoffs;
    }
    else
    {
-      distance = cacheddistance[y];
-      dsvars->xstep = cachedxstep[y];
-      dsvars->ystep = cachedystep[y];
+      float slope, realy;
+
+      distance = FixedMul (planeheight, yslope[y]);
+      slope = (float)(planeheight / 65535.0f / D_abs(centery - y));
+      realy = (float)distance / 65536.0f;
+
+      dsvars->xstep = (unsigned int)(viewsin * slope * viewfocratio);
+      dsvars->ystep = (unsigned int)(viewcos * slope * viewfocratio);
+
+      dsvars->xfrac =  viewx + xoffs + (int)(viewcos * realy) + (x1 - centerx) * dsvars->xstep;
+      dsvars->yfrac = -viewy + yoffs - (int)(viewsin * realy) + (x1 - centerx) * dsvars->ystep;
    }
-
-   length = FixedMul (distance,distscale[x1]);
-   angle = (viewangle + xtoviewangle[x1])>>ANGLETOFINESHIFT;
-
-   // killough 2/28/98: Add offsets
-   dsvars->xfrac =  viewx + FixedMul(finecosine[angle], length) + xoffs;
-   dsvars->yfrac = -viewy - FixedMul(finesine[angle],   length) + yoffs;
 
    if (drawvars.filterfloor == RDRAW_FILTER_LINEAR) {
       dsvars->xfrac -= (FRACUNIT>>1);

@@ -19,6 +19,8 @@
    #define DIR_SLASH '/'
 #endif
 
+#include "libretro_core_options.h"
+
 /* prboom includes */
 
 #include "../src/d_main.h"
@@ -302,15 +304,6 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
-	struct retro_variable variables[] = {
-		{ "prboom-resolution",
-			"Internal resolution (restart); 320x200|640x400|960x600|1280x800|1600x1000|1920x1200|2240x1400|2560x1600" },
-		{ "prboom-mouse_on", "Mouse active when using Gamepad; disabled|enabled" },
-		{ "prboom-find_recursive_on", "Look on parent folders for IWADs; enabled|disabled" },
-		{ "prboom-analog_deadzone", "Analog Deadzone (percent); 15|20|25|30|0|5|10" },
-		{ NULL, NULL },
-	};
-
    static const struct retro_controller_description port[] = {
 		{ "Gamepad Modern", RETROPAD_MODERN },
 		{ "Gamepad Classic", RETROPAD_CLASSIC },
@@ -325,7 +318,7 @@ void retro_set_environment(retro_environment_t cb)
 
 	environ_cb = cb;
 
-	cb(RETRO_ENVIRONMENT_SET_VARIABLES, variables);
+   libretro_set_core_options(environ_cb);
 	cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 }
 

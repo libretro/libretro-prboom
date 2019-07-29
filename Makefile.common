@@ -118,7 +118,7 @@ ifeq ($(WANT_FLUIDSYNTH), 1)
 FLUIDSYNTH_DIR := $(DEPS_DIR)/fluidlite
 LIBVORBIS_DIR  := $(FLUIDSYNTH_DIR)/libvorbis-1.3.5
 LIBOGG_DIR     := $(FLUIDSYNTH_DIR)/libogg-1.3.2
-INCFLAGS   += -I$(FLUIDSYNTH_DIR)/include -I$(LIBVORBIS_DIR)/include -I$(LIBOGG_DIR)/include
+INCFLAGS   += -I$(FLUIDSYNTH_DIR)/include -I$(DEPS_DIR)/fluidsynth/include -I$(LIBVORBIS_DIR)/include -I$(LIBOGG_DIR)/include
 
 SOURCES_C += $(FLUIDSYNTH_DIR)/src/fluid_chan.c \
 				 $(FLUIDSYNTH_DIR)/src/fluid_chorus.c \

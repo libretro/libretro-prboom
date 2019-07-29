@@ -63,7 +63,7 @@ const music_player_t fl_player =
 
 #else // HAVE_LIBFLUIDSYNTH
 
-#include "../libretro/libretro.h"
+#include <libretro.h>
 #include <fluidsynth.h>
 #include "m_fixed.h"
 #include "i_sound.h" // for snd_soundfont, mus_fluidsynth_gain

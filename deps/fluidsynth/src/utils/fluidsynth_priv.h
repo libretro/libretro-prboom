@@ -122,8 +122,7 @@
 #ifdef MINGW32
 
 #include <stdint.h>
-#define snprintf _snprintf
-#define vsnprintf _vsnprintf
+#include <compat/msvc.h>
 
 #define DSOUND_SUPPORT 1
 #define WINMIDI_SUPPORT 1

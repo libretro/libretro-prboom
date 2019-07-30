@@ -43,6 +43,7 @@
 #define    W_OK    2    /* Check for write permission */
 #define    R_OK    4    /* Check for read permission */
 #include <io.h>
+#include <compat/msvc.h>
 #endif
 
 #include <boolean.h>

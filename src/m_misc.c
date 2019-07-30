@@ -41,6 +41,7 @@
 #include <errno.h>
 #ifdef _MSC_VER
 #include <io.h>
+#include <compat/msvc.h>
 #endif
 #include <fcntl.h>
 #include <sys/stat.h>

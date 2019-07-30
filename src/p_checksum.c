@@ -9,6 +9,10 @@
 #include "doomstat.h" /* players{,ingame} */
 #include "lprintf.h"
 
+#ifdef _MSC_VER
+#include <compat/msvc.h>
+#endif
+
 /* forward decls */
 void checksum_gamestate(int tic);
 

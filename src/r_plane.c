@@ -137,7 +137,9 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
    fixed_t distance, length;
    unsigned index;
 
+#ifndef ANDROID
    if (!r_wiggle_fix)
+#endif
    {
       if (planeheight != cachedheight[y])
       {
@@ -160,6 +162,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
       dsvars->xfrac =  viewx + FixedMul(finecosine[angle], length) + xoffs;
       dsvars->yfrac = -viewy - FixedMul(finesine[angle],   length) + yoffs;
    }
+#ifndef ANDROID
    else
    {
       float slope, realy;
@@ -174,6 +177,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
       dsvars->xfrac =  viewx + xoffs + (int)(viewcos * realy) + (x1 - centerx) * dsvars->xstep;
       dsvars->yfrac = -viewy + yoffs - (int)(viewsin * realy) + (x1 - centerx) * dsvars->ystep;
    }
+#endif
 
    if (drawvars.filterfloor == RDRAW_FILTER_LINEAR) {
       dsvars->xfrac -= (FRACUNIT>>1);

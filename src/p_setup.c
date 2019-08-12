@@ -50,6 +50,7 @@
 #include "v_video.h"
 #include "r_demo.h"
 #include "r_fps.h"
+#include "u_musinfo.h"
 
 //
 // MAP related Lookup tables.
@@ -1879,6 +1880,9 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    // killough 3/26/98: Spawn icon landings:
    if (gamemode==commercial)
       P_SpawnBrainTargets();
+
+    // load MUSINFO from the map, if it exists
+    U_ParseMusInfo(lumpname);
 
    // clear special respawning que
    iquehead = iquetail = 0;

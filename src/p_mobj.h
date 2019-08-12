@@ -324,7 +324,7 @@ typedef struct mobj_s
 
     int                 tics;   // state tic counter
     state_t*            state;
-    uint64_t           flags;
+    uint64_t            flags;
     int                 intflags;  // killough 9/15/98: internal flags
     int                 health;
 
@@ -379,6 +379,9 @@ typedef struct mobj_s
     fixed_t             PrevX;
     fixed_t             PrevY;
     fixed_t             PrevZ;
+
+    // Extra id based on thing type that's used in MUSINFO
+    short               iden_num;
 
     fixed_t             pad; // cph - needed so I can get the size unambiguously on amd64
 

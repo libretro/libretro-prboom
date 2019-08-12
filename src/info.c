@@ -5526,4 +5526,36 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     0,              // maxattackrange
     200,            // minmissilechance
   },
+
+  // Will change music according to MUSINFO lump
+  {   // MT_MUSICCHANGER
+    "MusicChanger", // actorname
+    14165,          // doomednum // 14100-14164 should also be reserved
+    S_TNT1,         // spawnstate
+    1000,           // spawnhealth
+    S_NULL,         // seestate
+    sfx_None,       // seesound
+    8,              // reactiontime
+    sfx_None,       // attacksound
+    S_NULL,         // painstate
+    0,              // painchance
+    sfx_None,       // painsound
+    S_NULL,         // meleestate
+    S_NULL,         // missilestate
+    S_NULL,         // deathstate
+    S_NULL,         // xdeathstate
+    sfx_None,       // deathsound
+    MT_NULL,        // droppeditem
+    0,              // speed
+    16,             // radius
+    16,             // height
+    100,            // mass
+    0,              // damage
+    sfx_None,       // activesound
+    MF_NOBLOCKMAP,  // flags
+    S_NULL,         // raisestate
+    0,              // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
+  },
 };

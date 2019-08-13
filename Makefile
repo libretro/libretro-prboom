@@ -108,7 +108,7 @@ ifeq ($(IOSSDK),)
 endif
 
 ifeq ($(platform),ios-arm64)
-   CC = clang -arch armv64 -isysroot $(IOSSDK)
+   CC = clang -arch arm64 -isysroot $(IOSSDK)
 else
    CC = clang -arch armv7 -isysroot $(IOSSDK)
 endif

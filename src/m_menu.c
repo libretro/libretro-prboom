@@ -2419,7 +2419,7 @@ setup_menu_t* stat_settings[] =
   NULL
 };
 
-static const char *hud_modes[] = {"OFF", "COMPACT", "DISTRIBUTED"};
+static const char *hud_modes[] = {"OFF", "COMPACT", "DISTRIBUTED", NULL};
 
 setup_menu_t stat_settings1[] =  // Status Bar and HUD Settings screen
 {
@@ -2792,9 +2792,9 @@ enum {
 #define G_YA3 (G_YA2 + 16)
 #define GF_X 76
 
-static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "90fps", "100fps", "119fps", "120fps", "140fps", "144fps", "240fps", "244fps"};
-static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4"};
-static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD"};
+static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "90fps", "100fps", "119fps", "120fps", "140fps", "144fps", "240fps", "244fps", NULL};
+static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4", NULL};
+static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD", NULL};
 
 setup_menu_t gen_settings1[] = { // General Settings screen1
 
@@ -2912,8 +2912,8 @@ enum {
 #define G_YC2 (G_YC+6)
 #define G_YC3 (G_YC2+6)
 
-static const char *renderfilters[] = {"none", "point", "linear", "rounded"};
-static const char *edgetypes[] = {"jagged", "sloped"};
+static const char *renderfilters[] = {"none", "point", "linear", "rounded", NULL};
+static const char *edgetypes[] = {"jagged", "sloped", NULL};
 
 setup_menu_t gen_settings3[] = { // General Settings screen2
 

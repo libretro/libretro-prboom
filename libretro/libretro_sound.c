@@ -89,7 +89,9 @@ static const music_player_t *music_players[] =
   &fl_player, // flplayer.h
 #endif
   &opl_synth_player, // oplplayer.h
+#ifdef HAVE_LIBMAD
   &mp_player, // madplayer.h
+#endif
   NULL
 };
 #define NUM_MUS_PLAYERS ((int)(sizeof (music_players) / sizeof (music_player_t *) - 1))

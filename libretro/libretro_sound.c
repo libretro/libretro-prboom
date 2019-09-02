@@ -385,7 +385,7 @@ void I_UpdateSound(void)
    // Mix current sound data. Data, from raw sound, for right and left.
    uint8_t sample;
    int dl, dr, frames, out_frames, step, chan;
-   int16_t mad_audio_buf[SAMPLECOUNT_35 * 2];
+   int16_t mad_audio_buf[SAMPLECOUNT_35 * 2] = { 0 }; // initialize all zero
 
    // Pointers in global mixbuffer, left, right, end.
    int16_t *leftout, *rightout, *leftend;

@@ -596,7 +596,7 @@ static void AM_maxOutWindowScale(void)
 boolean AM_Responder
 ( event_t*  ev )
 {
-   static int cheatstate=0;
+   //static int cheatstate=0;
    static int bigstate=0;
    int ch;                                                       // phares
    int rc = FALSE;
@@ -694,7 +694,7 @@ boolean AM_Responder
       }
       else                                                        // phares
       {
-         cheatstate=0;
+         //cheatstate=0;
          rc = FALSE;
       }
    }

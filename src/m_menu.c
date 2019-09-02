@@ -344,13 +344,13 @@ enum
 
 menuitem_t MainMenu[]=
 {
-  {1,"M_NGAME", M_NewGame, 'n'},
-  {1,"M_OPTION",M_Options, 'o'},
-  {1,"M_LOADG", M_LoadGame,'l'},
-  {1,"M_SAVEG", M_SaveGame,'s'},
+  {1,"M_NGAME", M_NewGame, 'n', "New Game"},
+  {1,"M_OPTION",M_Options, 'o', "Options"},
+  {1,"M_LOADG", M_LoadGame,'l', "Load Game"},
+  {1,"M_SAVEG", M_SaveGame,'s', "Save Game"},
   // Another hickup with Special edition.
-  {1,"M_RDTHIS",M_ReadThis,'r'},
-  {1,"M_QUITG", M_QuitDOOM,'q'}
+  {1,"M_RDTHIS",M_ReadThis,'r', "Read This!"},
+  {1,"M_QUITG", M_QuitDOOM,'q', "Quit Game"}
 };
 
 menu_t MainDef =
@@ -404,17 +404,17 @@ enum               // killough 10/98
 
 menuitem_t ReadMenu1[] =
 {
-  {1,"",M_ReadThis2,0}
+  {1,"",M_ReadThis2,0,NULL}
 };
 
 menuitem_t ReadMenu2[]=
 {
-  {1,"",M_FinishReadThis,0}
+  {1,"",M_FinishReadThis,0,NULL}
 };
 
 menuitem_t HelpMenu[]=    // killough 10/98
 {
-  {1,"",M_FinishHelp,0}
+  {1,"",M_FinishHelp,0,NULL}
 };
 
 menu_t ReadDef1 =
@@ -510,13 +510,13 @@ void M_DrawReadThis2(void)
 
 menuitem_t EpisodeMenu[]=
 {
-  {1,"M_EPI1", M_Episode,'k'},
-  {1,"M_EPI2", M_Episode,'t'},
-  {1,"M_EPI3", M_Episode,'i'},
-  {1,"M_EPI4", M_Episode,'t'},
-  {1,"M_EPI5", M_Episode,'s'},
-  {1,"M_EPI6", M_Episode,'6'},
-  {1,"M_EPI7", M_Episode,'7'}
+  {1,"M_EPI1", M_Episode,'k',"Episode 1"},
+  {1,"M_EPI2", M_Episode,'t',"Episode 2"},
+  {1,"M_EPI3", M_Episode,'i',"Episode 3"},
+  {1,"M_EPI4", M_Episode,'t',"Episode 4"},
+  {1,"M_EPI5", M_Episode,'s',"Episode 5"},
+  {1,"M_EPI6", M_Episode,'6',"Episode 6"},
+  {1,"M_EPI7", M_Episode,'7',"Episode 7"}
 };
 
 menu_t EpiDef =
@@ -573,11 +573,11 @@ enum
 
 menuitem_t NewGameMenu[]=
 {
-  {1,"M_JKILL", M_ChooseSkill, 'i'},
-  {1,"M_ROUGH", M_ChooseSkill, 'h'},
-  {1,"M_HURT",  M_ChooseSkill, 'h'},
-  {1,"M_ULTRA", M_ChooseSkill, 'u'},
-  {1,"M_NMARE", M_ChooseSkill, 'n'}
+  {1,"M_JKILL", M_ChooseSkill, 'i', "I'm too young to die."},
+  {1,"M_ROUGH", M_ChooseSkill, 'h', "Hey, not too rough."},
+  {1,"M_HURT",  M_ChooseSkill, 'h', "Hurt me plenty."},
+  {1,"M_ULTRA", M_ChooseSkill, 'u', "Ultra-Violence."},
+  {1,"M_NMARE", M_ChooseSkill, 'n', "Nightmare!"}
 };
 
 menu_t NewDef =
@@ -674,14 +674,14 @@ enum
 
 menuitem_t LoadMenue[]=
 {
-  {1,"", M_LoadSelect,'1'},
-  {1,"", M_LoadSelect,'2'},
-  {1,"", M_LoadSelect,'3'},
-  {1,"", M_LoadSelect,'4'},
-  {1,"", M_LoadSelect,'5'},
-  {1,"", M_LoadSelect,'6'},
-  {1,"", M_LoadSelect,'7'}, //jff 3/15/98 extend number of slots
-  {1,"", M_LoadSelect,'8'},
+  {1,"", M_LoadSelect,'1',NULL},
+  {1,"", M_LoadSelect,'2',NULL},
+  {1,"", M_LoadSelect,'3',NULL},
+  {1,"", M_LoadSelect,'4',NULL},
+  {1,"", M_LoadSelect,'5',NULL},
+  {1,"", M_LoadSelect,'6',NULL},
+  {1,"", M_LoadSelect,'7',NULL}, //jff 3/15/98 extend number of slots
+  {1,"", M_LoadSelect,'8',NULL},
 };
 
 menu_t LoadDef =
@@ -785,14 +785,14 @@ void M_LoadGame (int choice)
 
 menuitem_t SaveMenu[]=
 {
-  {1,"", M_SaveSelect,'1'},
-  {1,"", M_SaveSelect,'2'},
-  {1,"", M_SaveSelect,'3'},
-  {1,"", M_SaveSelect,'4'},
-  {1,"", M_SaveSelect,'5'},
-  {1,"", M_SaveSelect,'6'},
-  {1,"", M_SaveSelect,'7'}, //jff 3/15/98 extend number of slots
-  {1,"", M_SaveSelect,'8'},
+  {1,"", M_SaveSelect,'1',NULL},
+  {1,"", M_SaveSelect,'2',NULL},
+  {1,"", M_SaveSelect,'3',NULL},
+  {1,"", M_SaveSelect,'4',NULL},
+  {1,"", M_SaveSelect,'5',NULL},
+  {1,"", M_SaveSelect,'6',NULL},
+  {1,"", M_SaveSelect,'7',NULL}, //jff 3/15/98 extend number of slots
+  {1,"", M_SaveSelect,'8',NULL},
 };
 
 menu_t SaveDef =
@@ -826,7 +826,8 @@ void M_ReadSaveStrings(void)
       LoadMenue[i].status = 0;
       continue;
     }
-    fread(&savegamestrings[i], SAVESTRINGSIZE, 1, fp);
+    if ( fread(&savegamestrings[i], SAVESTRINGSIZE, 1, fp) != 1)
+      I_Error("M_ReadSaveStrings: can't read savegame file '%s'", name);
     fclose(fp);
     LoadMenue[i].status = 1;
   }
@@ -1069,10 +1070,10 @@ enum
 
 menuitem_t SoundMenu[]=
 {
-  {2,"M_SFXVOL",M_SfxVol,'s'},
-  {-1,"",0},
-  {2,"M_MUSVOL",M_MusicVol,'m'},
-  {-1,"",0}
+  {2,"M_SFXVOL",M_SfxVol,'s',"Sfx Volume"},
+  {-1,"",NULL,0,NULL},
+  {2,"M_MUSVOL",M_MusicVol,'m', "Music Volume"},
+  {-1,"",NULL,0,NULL}
 };
 
 menu_t SoundDef =
@@ -1160,9 +1161,9 @@ enum
 menuitem_t MouseMenu[]=
 {
   {2,"M_HORSEN",M_MouseHoriz,'h', "HORIZONTAL"},
-  {-1,"",0},
+  {-1,"",NULL,0,NULL},
   {2,"M_VERSEN",M_MouseVert,'v', "VERTICAL"},
-  {-1,"",0}
+  {-1,"",NULL,0,NULL}
 };
 
 menu_t MouseDef =
@@ -1381,6 +1382,19 @@ void M_SizeDisplay(int choice)
 
 /////////////////////////////
 //
+// Some utility macros for initializing setup_menu_t items
+
+#define SETUP_MENU(T,F,G,X,Y,V)     {T        ,F                         ,G     ,X,Y,V     ,0,0,NULL,NULL}
+#define SETUP_MENU_KEY(T,G,X,Y,K,M) {T        ,S_KEY                     ,G     ,X,Y,{K}   ,M,0,NULL,NULL}
+#define SETUP_MENU_TITLE(T,X,Y)     {T        ,S_SKIP|S_TITLE            ,m_null,X,Y,{NULL},0,0,NULL,NULL}
+#define SETUP_MENU_CREDIT(T,X,Y)    {T        ,S_SKIP|S_CREDIT|S_LEFTJUST,m_null,X,Y,{NULL},0,0,NULL,NULL}
+#define SETUP_MENU_PREV(G,X,Y)      {"<- PREV",S_SKIP|S_PREV             ,m_null,X,Y,{G}   ,0,0,NULL,NULL}
+#define SETUP_MENU_NEXT(G,X,Y)      {"NEXT ->",S_SKIP|S_NEXT             ,m_null,X,Y,{G}   ,0,0,NULL,NULL}
+#define SETUP_MENU_RESET            {NULL     ,S_RESET     ,m_null,X_BUTTON,Y_BUTTON,{NULL},0,0,NULL,NULL}
+#define SETUP_MENU_END              {NULL     ,S_SKIP|S_END              ,m_null,0,0,{NULL},0,0,NULL,NULL}
+
+/////////////////////////////
+//
 // booleans for setup screens
 // these tell you what state the setup screens are in, and whether any of
 // the overlay screens (automap colors, reset button message) should be
@@ -1483,7 +1497,7 @@ enum
 
 menuitem_t Generic_Setup[] =
 {
-  {1,"",M_DoNothing,0}
+  {1,"",M_DoNothing,0,NULL}
 };
 
 /////////////////////////////
@@ -2105,41 +2119,40 @@ int mult_screens_index; // the index of the current screen in a set
 
 setup_menu_t keys_settings1[] =  // Key Binding screen strings
 {
-  {"MOVEMENT"    ,S_SKIP|S_TITLE,m_null,KB_X,KB_Y},
-  {"FORWARD"     ,S_KEY       ,m_scrn,KB_X,KB_Y+1*8,{&key_up},&mousebforward},
-  {"BACKWARD"    ,S_KEY       ,m_scrn,KB_X,KB_Y+2*8,{&key_down},&mousebbackward},
-  {"TURN LEFT"   ,S_KEY       ,m_scrn,KB_X,KB_Y+3*8,{&key_left}},
-  {"TURN RIGHT"  ,S_KEY       ,m_scrn,KB_X,KB_Y+4*8,{&key_right}},
-  {"RUN"         ,S_KEY       ,m_scrn,KB_X,KB_Y+5*8,{&key_speed},0},
-  {"STRAFE LEFT" ,S_KEY       ,m_scrn,KB_X,KB_Y+6*8,{&key_strafeleft}},
-  {"STRAFE RIGHT",S_KEY       ,m_scrn,KB_X,KB_Y+7*8,{&key_straferight}},
-  {"STRAFE"      ,S_KEY       ,m_scrn,KB_X,KB_Y+8*8,{&key_strafe},&mousebstrafe},
-  {"AUTORUN"     ,S_KEY       ,m_scrn,KB_X,KB_Y+9*8,{&key_autorun}},
-  {"180 TURN"    ,S_KEY       ,m_scrn,KB_X,KB_Y+10*8,{&key_reverse}},
-  {"USE"         ,S_KEY       ,m_scrn,KB_X,KB_Y+11*8,{&key_use},&mousebforward},
+  SETUP_MENU_TITLE("MOVEMENT"         ,KB_X,KB_Y),
+  SETUP_MENU_KEY("FORWARD"     ,m_scrn,KB_X,KB_Y+1*8,&key_up         ,&mousebforward),
+  SETUP_MENU_KEY("BACKWARD"    ,m_scrn,KB_X,KB_Y+2*8,&key_down       ,&mousebbackward),
+  SETUP_MENU_KEY("TURN LEFT"   ,m_scrn,KB_X,KB_Y+3*8,&key_left       ,0),
+  SETUP_MENU_KEY("TURN RIGHT"  ,m_scrn,KB_X,KB_Y+4*8,&key_right      ,0),
+  SETUP_MENU_KEY("RUN"         ,m_scrn,KB_X,KB_Y+5*8,&key_speed      ,0),
+  SETUP_MENU_KEY("STRAFE LEFT" ,m_scrn,KB_X,KB_Y+6*8,&key_strafeleft ,0),
+  SETUP_MENU_KEY("STRAFE RIGHT",m_scrn,KB_X,KB_Y+7*8,&key_straferight,0),
+  SETUP_MENU_KEY("STRAFE"      ,m_scrn,KB_X,KB_Y+8*8,&key_strafe     ,&mousebstrafe),
+  SETUP_MENU_KEY("AUTORUN"     ,m_scrn,KB_X,KB_Y+9*8,&key_autorun    ,0),
+  SETUP_MENU_KEY("180 TURN"    ,m_scrn,KB_X,KB_Y+10*8,&key_reverse   ,0),
+  SETUP_MENU_KEY("USE"         ,m_scrn,KB_X,KB_Y+11*8,&key_use       ,&mousebforward),
 
-  {"MENUS"       ,S_SKIP|S_TITLE,m_null,KB_X,KB_Y+12*8},
-  {"NEXT ITEM"   ,S_KEY       ,m_menu,KB_X,KB_Y+13*8,{&key_menu_down}},
-  {"PREV ITEM"   ,S_KEY       ,m_menu,KB_X,KB_Y+14*8,{&key_menu_up}},
-  {"LEFT"        ,S_KEY       ,m_menu,KB_X,KB_Y+15*8,{&key_menu_left}},
-  {"RIGHT"       ,S_KEY       ,m_menu,KB_X,KB_Y+16*8,{&key_menu_right}},
-  {"BACKSPACE"   ,S_KEY       ,m_menu,KB_X,KB_Y+17*8,{&key_menu_backspace}},
-  {"SELECT ITEM" ,S_KEY       ,m_menu,KB_X,KB_Y+18*8,{&key_menu_enter}},
-  {"EXIT"        ,S_KEY       ,m_menu,KB_X,KB_Y+19*8,{&key_menu_escape}},
+  SETUP_MENU_TITLE("MENUS"           ,KB_X,KB_Y+12*8),
+  SETUP_MENU_KEY("NEXT ITEM"  ,m_menu,KB_X,KB_Y+13*8,&key_menu_down     ,0),
+  SETUP_MENU_KEY("PREV ITEM"  ,m_menu,KB_X,KB_Y+14*8,&key_menu_up       ,0),
+  SETUP_MENU_KEY("LEFT"       ,m_menu,KB_X,KB_Y+15*8,&key_menu_left     ,0),
+  SETUP_MENU_KEY("RIGHT"      ,m_menu,KB_X,KB_Y+16*8,&key_menu_right    ,0),
+  SETUP_MENU_KEY("BACKSPACE"  ,m_menu,KB_X,KB_Y+17*8,&key_menu_backspace,0),
+  SETUP_MENU_KEY("SELECT ITEM",m_menu,KB_X,KB_Y+18*8,&key_menu_enter    ,0),
+  SETUP_MENU_KEY("EXIT"       ,m_menu,KB_X,KB_Y+19*8,&key_menu_escape   ,0),
 
   // Button for resetting to defaults
-  {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
+  SETUP_MENU_RESET,
 
-  {"NEXT ->",S_SKIP|S_NEXT,m_null,KB_NEXT,KB_Y+20*8, {keys_settings2}},
+  SETUP_MENU_NEXT(keys_settings2, KB_NEXT, KB_Y+20*8),
 
   // Final entry
-  {0,S_SKIP|S_END,m_null}
-
+  SETUP_MENU_END
 };
 
 setup_menu_t keys_settings2[] =  // Key Binding screen strings
 {
-  {"SCREEN"      ,S_SKIP|S_TITLE,m_null,KB_X,KB_Y},
+   SETUP_MENU_TITLE("SCREEN"      ,KB_X,KB_Y),
 
   // phares 4/13/98:
   // key_help and key_escape can no longer be rebound. This keeps the
@@ -2151,91 +2164,89 @@ setup_menu_t keys_settings2[] =  // Key Binding screen strings
   // functions. Introduce an S_KEEP flag to show that you cannot swap this
   // key with other keys in the same 'group'. (m_scrn, etc.)
 
-  {"HELP"        ,S_SKIP|S_KEEP ,m_scrn,0   ,0    ,{&key_help}},
-  {"MENU"        ,S_SKIP|S_KEEP ,m_scrn,0   ,0    ,{&key_escape}},
+  SETUP_MENU("HELP",S_SKIP|S_KEEP,m_scrn,0,0,{&key_help}),
+  SETUP_MENU("MENU",S_SKIP|S_KEEP,m_scrn,0,0,{&key_escape}),
+
   // killough 10/98: hotkey for entering setup menu:
-  {"SETUP"       ,S_KEY       ,m_scrn,KB_X,KB_Y+ 1*8,{&key_setup}},
-  {"PAUSE"       ,S_KEY       ,m_scrn,KB_X,KB_Y+ 2*8,{&key_pause}},
-  {"AUTOMAP"     ,S_KEY       ,m_scrn,KB_X,KB_Y+ 3*8,{&key_map}},
-  {"VOLUME"      ,S_KEY       ,m_scrn,KB_X,KB_Y+ 4*8,{&key_soundvolume}},
-  {"HUD"         ,S_KEY       ,m_scrn,KB_X,KB_Y+ 5*8,{&key_hud}},
-  {"MESSAGES"    ,S_KEY       ,m_scrn,KB_X,KB_Y+ 6*8,{&key_messages}},
-  {"GAMMA FIX"   ,S_KEY       ,m_scrn,KB_X,KB_Y+ 7*8,{&key_gamma}},
-  {"SPY"         ,S_KEY       ,m_scrn,KB_X,KB_Y+ 8*8,{&key_spy}},
-  {"LARGER VIEW" ,S_KEY       ,m_scrn,KB_X,KB_Y+ 9*8,{&key_zoomin}},
-  {"SMALLER VIEW",S_KEY       ,m_scrn,KB_X,KB_Y+10*8,{&key_zoomout}},
-  {"SCREENSHOT"  ,S_KEY       ,m_scrn,KB_X,KB_Y+11*8,{&key_screenshot}},
-  {"GAME"        ,S_SKIP|S_TITLE,m_null,KB_X,KB_Y+12*8},
-  {"SAVE"        ,S_KEY       ,m_scrn,KB_X,KB_Y+13*8,{&key_savegame}},
-  {"LOAD"        ,S_KEY       ,m_scrn,KB_X,KB_Y+14*8,{&key_loadgame}},
-  {"QUICKSAVE"   ,S_KEY       ,m_scrn,KB_X,KB_Y+15*8,{&key_quicksave}},
-  {"QUICKLOAD"   ,S_KEY       ,m_scrn,KB_X,KB_Y+16*8,{&key_quickload}},
-  {"END GAME"    ,S_KEY       ,m_scrn,KB_X,KB_Y+17*8,{&key_endgame}},
-  {"QUIT"        ,S_KEY       ,m_scrn,KB_X,KB_Y+18*8,{&key_quit}},
-  {"<- PREV", S_SKIP|S_PREV,m_null,KB_PREV,KB_Y+20*8, {keys_settings1}},
-  {"NEXT ->", S_SKIP|S_NEXT,m_null,KB_NEXT,KB_Y+20*8, {keys_settings3}},
+  SETUP_MENU_KEY("SETUP"      ,m_scrn,KB_X,KB_Y+ 1*8,&key_setup,0),
+  SETUP_MENU_KEY("PAUSE"      ,m_scrn,KB_X,KB_Y+ 2*8,&key_pause,0),
+  SETUP_MENU_KEY("AUTOMAP"    ,m_scrn,KB_X,KB_Y+ 3*8,&key_map,0),
+  SETUP_MENU_KEY("VOLUME"     ,m_scrn,KB_X,KB_Y+ 4*8,&key_soundvolume,0),
+  SETUP_MENU_KEY("HUD"        ,m_scrn,KB_X,KB_Y+ 5*8,&key_hud,0),
+  SETUP_MENU_KEY("MESSAGES"   ,m_scrn,KB_X,KB_Y+ 6*8,&key_messages,0),
+  SETUP_MENU_KEY("GAMMA FIX"  ,m_scrn,KB_X,KB_Y+ 7*8,&key_gamma,0),
+  SETUP_MENU_KEY("SPY"        ,m_scrn,KB_X,KB_Y+ 8*8,&key_spy,0),
+  SETUP_MENU_KEY("LARGER VIEW",m_scrn,KB_X,KB_Y+ 9*8,&key_zoomin,0),
+  SETUP_MENU_KEY("SMALLER VIEW",m_scrn,KB_X,KB_Y+10*8,&key_zoomout,0),
+  SETUP_MENU_KEY("SCREENSHOT" ,m_scrn,KB_X,KB_Y+11*8,&key_screenshot,0),
+
+  SETUP_MENU_TITLE("GAME"            ,KB_X,KB_Y+12*8),
+  SETUP_MENU_KEY("SAVE"       ,m_scrn,KB_X,KB_Y+13*8,&key_savegame,0),
+  SETUP_MENU_KEY("LOAD"       ,m_scrn,KB_X,KB_Y+14*8,&key_loadgame,0),
+  SETUP_MENU_KEY("QUICKSAVE"  ,m_scrn,KB_X,KB_Y+15*8,&key_quicksave,0),
+  SETUP_MENU_KEY("QUICKLOAD"  ,m_scrn,KB_X,KB_Y+16*8,&key_quickload,0),
+  SETUP_MENU_KEY("END GAME"   ,m_scrn,KB_X,KB_Y+17*8,&key_endgame,0),
+  SETUP_MENU_KEY("QUIT"       ,m_scrn,KB_X,KB_Y+18*8,&key_quit,0),
+
+  SETUP_MENU_PREV(keys_settings1,KB_PREV,KB_Y+20*8),
+  SETUP_MENU_NEXT(keys_settings3,KB_NEXT,KB_Y+20*8),
 
   // Final entry
-
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 setup_menu_t keys_settings3[] =  // Key Binding screen strings
 {
-  {"WEAPONS" ,S_SKIP|S_TITLE,m_null,KB_X,KB_Y},
-  {"FIST"    ,S_KEY       ,m_scrn,KB_X,KB_Y+ 1*8,{&key_weapon1}},
-  {"PISTOL"  ,S_KEY       ,m_scrn,KB_X,KB_Y+ 2*8,{&key_weapon2}},
-  {"SHOTGUN" ,S_KEY       ,m_scrn,KB_X,KB_Y+ 3*8,{&key_weapon3}},
-  {"CHAINGUN",S_KEY       ,m_scrn,KB_X,KB_Y+ 4*8,{&key_weapon4}},
-  {"ROCKET"  ,S_KEY       ,m_scrn,KB_X,KB_Y+ 5*8,{&key_weapon5}},
-  {"PLASMA"  ,S_KEY       ,m_scrn,KB_X,KB_Y+ 6*8,{&key_weapon6}},
-  {"BFG",     S_KEY       ,m_scrn,KB_X,KB_Y+ 7*8,{&key_weapon7}},
-  {"CHAINSAW",S_KEY       ,m_scrn,KB_X,KB_Y+ 8*8,{&key_weapon8}},
-  {"SSG"     ,S_KEY       ,m_scrn,KB_X,KB_Y+ 9*8,{&key_weapon9}},
-  {"BEST"    ,S_KEY       ,m_scrn,KB_X,KB_Y+10*8,{&key_weapontoggle}},
-  {"FIRE"    ,S_KEY       ,m_scrn,KB_X,KB_Y+11*8,{&key_fire},&mousebfire},
-  {"NEXT"    ,S_KEY       ,m_scrn,KB_X,KB_Y+12*8,{&key_weaponcycleup}},
-  {"PREV"    ,S_KEY       ,m_scrn,KB_X,KB_Y+13*8,{&key_weaponcycledown}},
+  SETUP_MENU_TITLE("WEAPONS"      ,KB_X,KB_Y),
+  SETUP_MENU_KEY("FIST"    ,m_scrn,KB_X,KB_Y+ 1*8,&key_weapon1,0),
+  SETUP_MENU_KEY("PISTOL"  ,m_scrn,KB_X,KB_Y+ 2*8,&key_weapon2,0),
+  SETUP_MENU_KEY("SHOTGUN" ,m_scrn,KB_X,KB_Y+ 3*8,&key_weapon3,0),
+  SETUP_MENU_KEY("CHAINGUN",m_scrn,KB_X,KB_Y+ 4*8,&key_weapon4,0),
+  SETUP_MENU_KEY("ROCKET"  ,m_scrn,KB_X,KB_Y+ 5*8,&key_weapon5,0),
+  SETUP_MENU_KEY("PLASMA"  ,m_scrn,KB_X,KB_Y+ 6*8,&key_weapon6,0),
+  SETUP_MENU_KEY("BFG"     ,m_scrn,KB_X,KB_Y+ 7*8,&key_weapon7,0),
+  SETUP_MENU_KEY("CHAINSAW",m_scrn,KB_X,KB_Y+ 8*8,&key_weapon8,0),
+  SETUP_MENU_KEY("SSG"     ,m_scrn,KB_X,KB_Y+ 9*8,&key_weapon9,0),
+  SETUP_MENU_KEY("BEST"    ,m_scrn,KB_X,KB_Y+10*8,&key_weapontoggle,0),
+  SETUP_MENU_KEY("FIRE"    ,m_scrn,KB_X,KB_Y+11*8,&key_fire,&mousebfire),
+  SETUP_MENU_KEY("NEXT"    ,m_scrn,KB_X,KB_Y+12*8,&key_weaponcycleup,0),
+  SETUP_MENU_KEY("PREV"    ,m_scrn,KB_X,KB_Y+13*8,&key_weaponcycledown,0),
 
-  {"<- PREV",S_SKIP|S_PREV,m_null,KB_PREV,KB_Y+20*8, {keys_settings2}},
-  {"NEXT ->",S_SKIP|S_NEXT,m_null,KB_NEXT,KB_Y+20*8, {keys_settings4}},
+  SETUP_MENU_PREV(keys_settings2,KB_PREV,KB_Y+20*8),
+  SETUP_MENU_NEXT(keys_settings4,KB_NEXT,KB_Y+20*8),
 
   // Final entry
-
-  {0,S_SKIP|S_END,m_null}
-
+  SETUP_MENU_END
 };
 
 setup_menu_t keys_settings4[] =  // Key Binding screen strings
 {
-  {"AUTOMAP"    ,S_SKIP|S_TITLE,m_null,KB_X,KB_Y},
-  {"FOLLOW"     ,S_KEY       ,m_map ,KB_X,KB_Y+ 1*8,{&key_map_follow}},
-  {"ZOOM IN"    ,S_KEY       ,m_map ,KB_X,KB_Y+ 2*8,{&key_map_zoomin}},
-  {"ZOOM OUT"   ,S_KEY       ,m_map ,KB_X,KB_Y+ 3*8,{&key_map_zoomout}},
-  {"SHIFT UP"   ,S_KEY       ,m_map ,KB_X,KB_Y+ 4*8,{&key_map_up}},
-  {"SHIFT DOWN" ,S_KEY       ,m_map ,KB_X,KB_Y+ 5*8,{&key_map_down}},
-  {"SHIFT LEFT" ,S_KEY       ,m_map ,KB_X,KB_Y+ 6*8,{&key_map_left}},
-  {"SHIFT RIGHT",S_KEY       ,m_map ,KB_X,KB_Y+ 7*8,{&key_map_right}},
-  {"MARK PLACE" ,S_KEY       ,m_map ,KB_X,KB_Y+ 8*8,{&key_map_mark}},
-  {"CLEAR MARKS",S_KEY       ,m_map ,KB_X,KB_Y+ 9*8,{&key_map_clear}},
-  {"FULL/ZOOM"  ,S_KEY       ,m_map ,KB_X,KB_Y+10*8,{&key_map_gobig}},
-  {"GRID"       ,S_KEY       ,m_map ,KB_X,KB_Y+11*8,{&key_map_grid}},
+  SETUP_MENU_TITLE("AUTOMAP"        ,KB_X,KB_Y),
+  SETUP_MENU_KEY("FOLLOW"    ,m_map ,KB_X,KB_Y+ 1*8,&key_map_follow,0),
+  SETUP_MENU_KEY("ZOOM IN"   ,m_map ,KB_X,KB_Y+ 2*8,&key_map_zoomin,0),
+  SETUP_MENU_KEY("ZOOM OUT"  ,m_map ,KB_X,KB_Y+ 3*8,&key_map_zoomout,0),
+  SETUP_MENU_KEY("SHIFT UP"  ,m_map ,KB_X,KB_Y+ 4*8,&key_map_up,0),
+  SETUP_MENU_KEY("SHIFT DOWN",m_map ,KB_X,KB_Y+ 5*8,&key_map_down,0),
+  SETUP_MENU_KEY("SHIFT LEFT",m_map ,KB_X,KB_Y+ 6*8,&key_map_left,0),
+  SETUP_MENU_KEY("SHIFT RIGHT",m_map ,KB_X,KB_Y+ 7*8,&key_map_right,0),
+  SETUP_MENU_KEY("MARK PLACE",m_map ,KB_X,KB_Y+ 8*8,&key_map_mark,0),
+  SETUP_MENU_KEY("CLEAR MARKS",m_map ,KB_X,KB_Y+ 9*8,&key_map_clear,0),
+  SETUP_MENU_KEY("FULL/ZOOM" ,m_map ,KB_X,KB_Y+10*8,&key_map_gobig,0),
+  SETUP_MENU_KEY("GRID"      ,m_map ,KB_X,KB_Y+11*8,&key_map_grid,0),
 
-  {"CHATTING"   ,S_SKIP|S_TITLE,m_null,KB_X,KB_Y+12*8},
-  {"BEGIN CHAT" ,S_KEY       ,m_scrn,KB_X,KB_Y+13*8,{&key_chat}},
-  {"PLAYER 1"   ,S_KEY       ,m_scrn,KB_X,KB_Y+14*8,{&destination_keys[0]}},
-  {"PLAYER 2"   ,S_KEY       ,m_scrn,KB_X,KB_Y+15*8,{&destination_keys[1]}},
-  {"PLAYER 3"   ,S_KEY       ,m_scrn,KB_X,KB_Y+16*8,{&destination_keys[2]}},
-  {"PLAYER 4"   ,S_KEY       ,m_scrn,KB_X,KB_Y+17*8,{&destination_keys[3]}},
-  {"BACKSPACE"  ,S_KEY       ,m_scrn,KB_X,KB_Y+18*8,{&key_backspace}},
-  {"ENTER"      ,S_KEY       ,m_scrn,KB_X,KB_Y+19*8,{&key_enter}},
+  SETUP_MENU_TITLE("CHATTING"       ,KB_X,KB_Y+12*8),
+  SETUP_MENU_KEY("BEGIN CHAT",m_scrn,KB_X,KB_Y+13*8,&key_chat,0),
+  SETUP_MENU_KEY("PLAYER 1"  ,m_scrn,KB_X,KB_Y+14*8,&destination_keys[0],0),
+  SETUP_MENU_KEY("PLAYER 2"  ,m_scrn,KB_X,KB_Y+15*8,&destination_keys[1],0),
+  SETUP_MENU_KEY("PLAYER 3"  ,m_scrn,KB_X,KB_Y+16*8,&destination_keys[2],0),
+  SETUP_MENU_KEY("PLAYER 4"  ,m_scrn,KB_X,KB_Y+17*8,&destination_keys[3],0),
+  SETUP_MENU_KEY("BACKSPACE" ,m_scrn,KB_X,KB_Y+18*8,&key_backspace,0),
+  SETUP_MENU_KEY("ENTER"     ,m_scrn,KB_X,KB_Y+19*8,&key_enter,0),
 
-  {"<- PREV" ,S_SKIP|S_PREV,m_null,KB_PREV,KB_Y+20*8, {keys_settings3}},
+  SETUP_MENU_PREV(keys_settings3,KB_PREV,KB_Y+20*8),
 
   // Final entry
-
-  {0,S_SKIP|S_END,m_null}
-
+  SETUP_MENU_END
 };
 
 // Setting up for the Key Binding screen. Turn on flags, set pointers,
@@ -2325,28 +2336,27 @@ setup_menu_t* weap_settings[] =
 
 setup_menu_t weap_settings1[] =  // Weapons Settings screen
 {
-  {"ENABLE RECOIL", S_YESNO,m_null,WP_X, WP_Y+ weap_recoil*8, {"weapon_recoil"}},
-  {"ENABLE BOBBING",S_YESNO,m_null,WP_X, WP_Y+weap_bobbing*8, {"player_bobbing"}},
+  SETUP_MENU("ENABLE RECOIL", S_YESNO,m_null,WP_X, WP_Y+ weap_recoil*8, {"weapon_recoil"}),
+  SETUP_MENU("ENABLE BOBBING",S_YESNO,m_null,WP_X, WP_Y+weap_bobbing*8, {"player_bobbing"}),
 
-  {"1ST CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref1*8, {"weapon_choice_1"}},
-  {"2nd CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref2*8, {"weapon_choice_2"}},
-  {"3rd CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref3*8, {"weapon_choice_3"}},
-  {"4th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref4*8, {"weapon_choice_4"}},
-  {"5th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref5*8, {"weapon_choice_5"}},
-  {"6th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref6*8, {"weapon_choice_6"}},
-  {"7th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref7*8, {"weapon_choice_7"}},
-  {"8th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref8*8, {"weapon_choice_8"}},
-  {"9th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref9*8, {"weapon_choice_9"}},
+  SETUP_MENU("1ST CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref1*8, {"weapon_choice_1"}),
+  SETUP_MENU("2nd CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref2*8, {"weapon_choice_2"}),
+  SETUP_MENU("3rd CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref3*8, {"weapon_choice_3"}),
+  SETUP_MENU("4th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref4*8, {"weapon_choice_4"}),
+  SETUP_MENU("5th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref5*8, {"weapon_choice_5"}),
+  SETUP_MENU("6th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref6*8, {"weapon_choice_6"}),
+  SETUP_MENU("7th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref7*8, {"weapon_choice_7"}),
+  SETUP_MENU("8th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref8*8, {"weapon_choice_8"}),
+  SETUP_MENU("9th CHOICE WEAPON",S_WEAP,m_null,WP_X,WP_Y+weap_pref9*8, {"weapon_choice_9"}),
 
-  {"Enable Fist/Chainsaw\n& SG/SSG toggle", S_YESNO, m_null, WP_X,
-   WP_Y+ weap_toggle*8, {"doom_weapon_toggles"}},
+  SETUP_MENU("Enable Fist/Chainsaw\n& SG/SSG toggle", S_YESNO, m_null, WP_X,
+  WP_Y+ weap_toggle*8, {"doom_weapon_toggles"}),
 
   // Button for resetting to defaults
-  {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
+  SETUP_MENU_RESET,
 
   // Final entry
-  {0,S_SKIP|S_END,m_null}
-
+  SETUP_MENU_END
 };
 
 // Setting up for the Weapons screen. Turn on flags, set pointers,
@@ -2409,36 +2419,36 @@ setup_menu_t* stat_settings[] =
   NULL
 };
 
-static const char *hud_modes[] = {"OFF", "COMPACT", "DISTRIBUTED"};
+static const char *hud_modes[] = {"OFF", "COMPACT", "DISTRIBUTED", NULL};
 
 setup_menu_t stat_settings1[] =  // Status Bar and HUD Settings screen
 {
-  {"STATUS BAR"        ,S_SKIP|S_TITLE,m_null,ST_X,ST_Y+ 1*8 },
+  SETUP_MENU_TITLE("STATUS BAR"        ,ST_X,ST_Y+ 1*8 ),
 
-  {"USE RED NUMBERS"   ,S_YESNO, m_null,ST_X,ST_Y+ 2*8, {"sts_always_red"}},
-  {"GRAY %"            ,S_YESNO, m_null,ST_X,ST_Y+ 3*8, {"sts_pct_always_gray"}},
-  {"SINGLE KEY DISPLAY",S_YESNO, m_null,ST_X,ST_Y+ 4*8, {"sts_traditional_keys"}},
+  {"USE RED NUMBERS"   ,S_YESNO, m_null,ST_X,ST_Y+ 2*8, {"sts_always_red"}, 0, 0, NULL, NULL},
+  {"GRAY %"            ,S_YESNO, m_null,ST_X,ST_Y+ 3*8, {"sts_pct_always_gray"}, 0, 0, NULL, NULL},
+  {"SINGLE KEY DISPLAY",S_YESNO, m_null,ST_X,ST_Y+ 4*8, {"sts_traditional_keys"}, 0, 0, NULL, NULL},
 
-  {"HEADS-UP DISPLAY"  ,S_SKIP|S_TITLE,m_null,ST_X,ST_Y+ 6*8},
+  SETUP_MENU_TITLE("HEADS-UP DISPLAY"  ,ST_X,ST_Y+ 6*8),
 
   {"HUD DISPLAY MODE"  ,S_CHOICE    ,m_null,ST_X,ST_Y+ 7*8, {"hud_mode"}, 0, 0, NULL, hud_modes},
-  {"SHOW KILL/ITEM/SECRET", S_YESNO ,m_null,ST_X,ST_Y+ 8*8, {"hud_showstats"}},
-  {"SHOW WEAPONS"      ,S_YESNO     ,m_null,ST_X,ST_Y+ 9*8, {"hud_showweapons"}},
-  {"SHOW KEYS"         ,S_YESNO     ,m_null,ST_X,ST_Y+10*8, {"hud_showkeys"}},
-  {"HEALTH LOW/OK"     ,S_NUM       ,m_null,ST_X,ST_Y+11*8, {"health_red"}},
-  {"HEALTH OK/GOOD"    ,S_NUM       ,m_null,ST_X,ST_Y+12*8, {"health_yellow"}},
-  {"HEALTH GOOD/EXTRA" ,S_NUM       ,m_null,ST_X,ST_Y+13*8, {"health_green"}},
-  {"ARMOR LOW/OK"      ,S_NUM       ,m_null,ST_X,ST_Y+14*8, {"armor_red"}},
-  {"ARMOR OK/GOOD"     ,S_NUM       ,m_null,ST_X,ST_Y+15*8, {"armor_yellow"}},
-  {"ARMOR GOOD/EXTRA"  ,S_NUM       ,m_null,ST_X,ST_Y+16*8, {"armor_green"}},
-  {"AMMO LOW/OK"       ,S_NUM       ,m_null,ST_X,ST_Y+17*8, {"ammo_red"}},
-  {"AMMO OK/GOOD"      ,S_NUM       ,m_null,ST_X,ST_Y+18*8, {"ammo_yellow"}},
+  {"SHOW KILL/ITEM/SECRET", S_YESNO ,m_null,ST_X,ST_Y+ 8*8, {"hud_showstats"}, 0, 0, NULL, NULL},
+  {"SHOW WEAPONS"      ,S_YESNO     ,m_null,ST_X,ST_Y+ 9*8, {"hud_showweapons"}, 0, 0, NULL, NULL},
+  {"SHOW KEYS"         ,S_YESNO     ,m_null,ST_X,ST_Y+10*8, {"hud_showkeys"}, 0, 0, NULL, NULL},
+  {"HEALTH LOW/OK"     ,S_NUM       ,m_null,ST_X,ST_Y+11*8, {"health_red"}, 0, 0, NULL, NULL},
+  {"HEALTH OK/GOOD"    ,S_NUM       ,m_null,ST_X,ST_Y+12*8, {"health_yellow"}, 0, 0, NULL, NULL},
+  {"HEALTH GOOD/EXTRA" ,S_NUM       ,m_null,ST_X,ST_Y+13*8, {"health_green"}, 0, 0, NULL, NULL},
+  {"ARMOR LOW/OK"      ,S_NUM       ,m_null,ST_X,ST_Y+14*8, {"armor_red"}, 0, 0, NULL, NULL},
+  {"ARMOR OK/GOOD"     ,S_NUM       ,m_null,ST_X,ST_Y+15*8, {"armor_yellow"}, 0, 0, NULL, NULL},
+  {"ARMOR GOOD/EXTRA"  ,S_NUM       ,m_null,ST_X,ST_Y+16*8, {"armor_green"}, 0, 0, NULL, NULL},
+  {"AMMO LOW/OK"       ,S_NUM       ,m_null,ST_X,ST_Y+17*8, {"ammo_red"}, 0, 0, NULL, NULL},
+  {"AMMO OK/GOOD"      ,S_NUM       ,m_null,ST_X,ST_Y+18*8, {"ammo_yellow"}, 0, 0, NULL, NULL},
 
   // Button for resetting to defaults
-  {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
+  SETUP_MENU_RESET,
 
   // Final entry
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 // Setting up for the Status Bar / HUD screen. Turn on flags, set pointers,
@@ -2506,59 +2516,56 @@ setup_menu_t* auto_settings[] =
 
 setup_menu_t auto_settings1[] =  // 1st AutoMap Settings screen
 {
-  {"background", S_COLOR, m_null, AU_X, AU_Y, {"mapcolor_back"}},
-  {"grid lines", S_COLOR, m_null, AU_X, AU_Y + 1*8, {"mapcolor_grid"}},
-  {"normal 1s wall", S_COLOR, m_null,AU_X,AU_Y+ 2*8, {"mapcolor_wall"}},
-  {"line at floor height change", S_COLOR, m_null, AU_X, AU_Y+ 3*8, {"mapcolor_fchg"}},
-  {"line at ceiling height change"      ,S_COLOR,m_null,AU_X,AU_Y+ 4*8, {"mapcolor_cchg"}},
-  {"line at sector with floor = ceiling",S_COLOR,m_null,AU_X,AU_Y+ 5*8, {"mapcolor_clsd"}},
-  {"red key"                            ,S_COLOR,m_null,AU_X,AU_Y+ 6*8, {"mapcolor_rkey"}},
-  {"blue key"                           ,S_COLOR,m_null,AU_X,AU_Y+ 7*8, {"mapcolor_bkey"}},
-  {"yellow key"                         ,S_COLOR,m_null,AU_X,AU_Y+ 8*8, {"mapcolor_ykey"}},
-  {"red door"                           ,S_COLOR,m_null,AU_X,AU_Y+ 9*8, {"mapcolor_rdor"}},
-  {"blue door"                          ,S_COLOR,m_null,AU_X,AU_Y+10*8, {"mapcolor_bdor"}},
-  {"yellow door"                        ,S_COLOR,m_null,AU_X,AU_Y+11*8, {"mapcolor_ydor"}},
+  SETUP_MENU("background", S_COLOR, m_null, AU_X, AU_Y, {"mapcolor_back"}),
+  SETUP_MENU("grid lines", S_COLOR, m_null, AU_X, AU_Y + 1*8, {"mapcolor_grid"}),
+  SETUP_MENU("normal 1s wall", S_COLOR, m_null,AU_X,AU_Y+ 2*8, {"mapcolor_wall"}),
+  SETUP_MENU("line at floor height change", S_COLOR, m_null, AU_X, AU_Y+ 3*8, {"mapcolor_fchg"}),
+  SETUP_MENU("line at ceiling height change"      ,S_COLOR,m_null,AU_X,AU_Y+ 4*8, {"mapcolor_cchg"}),
+  SETUP_MENU("line at sector with floor = ceiling",S_COLOR,m_null,AU_X,AU_Y+ 5*8, {"mapcolor_clsd"}),
+  SETUP_MENU("red key"                            ,S_COLOR,m_null,AU_X,AU_Y+ 6*8, {"mapcolor_rkey"}),
+  SETUP_MENU("blue key"                           ,S_COLOR,m_null,AU_X,AU_Y+ 7*8, {"mapcolor_bkey"}),
+  SETUP_MENU("yellow key"                         ,S_COLOR,m_null,AU_X,AU_Y+ 8*8, {"mapcolor_ykey"}),
+  SETUP_MENU("red door"                           ,S_COLOR,m_null,AU_X,AU_Y+ 9*8, {"mapcolor_rdor"}),
+  SETUP_MENU("blue door"                          ,S_COLOR,m_null,AU_X,AU_Y+10*8, {"mapcolor_bdor"}),
+  SETUP_MENU("yellow door"                        ,S_COLOR,m_null,AU_X,AU_Y+11*8, {"mapcolor_ydor"}),
 
-  {"AUTOMAP LEVEL TITLE COLOR"      ,S_CRITEM,m_null,AU_X,AU_Y+13*8, {"hudcolor_titl"}},
-  {"AUTOMAP COORDINATES COLOR"      ,S_CRITEM,m_null,AU_X,AU_Y+14*8, {"hudcolor_xyco"}},
+  SETUP_MENU("AUTOMAP LEVEL TITLE COLOR"      ,S_CRITEM,m_null,AU_X,AU_Y+13*8, {"hudcolor_titl"}),
+  SETUP_MENU("AUTOMAP COORDINATES COLOR"      ,S_CRITEM,m_null,AU_X,AU_Y+14*8, {"hudcolor_xyco"}),
 
-  {"Show Secrets only after entering",S_YESNO,m_null,AU_X,AU_Y+15*8, {"map_secret_after"}},
+  SETUP_MENU("Show Secrets only after entering",S_YESNO,m_null,AU_X,AU_Y+15*8, {"map_secret_after"}),
 
-  {"Show coordinates of automap pointer",S_YESNO,m_null,AU_X,AU_Y+16*8, {"map_point_coord"}},  // killough 10/98
+  SETUP_MENU("Show coordinates of automap pointer",S_YESNO,m_null,AU_X,AU_Y+16*8, {"map_point_coord"}),
 
   // Button for resetting to defaults
-  {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
+  SETUP_MENU_RESET,
 
-  {"NEXT ->",S_SKIP|S_NEXT,m_null,AU_NEXT,AU_Y+20*8, {auto_settings2}},
+  SETUP_MENU_NEXT(auto_settings2, AU_NEXT, AU_Y+20*8),
 
   // Final entry
-  {0,S_SKIP|S_END,m_null}
-
+  SETUP_MENU_END
 };
 
 setup_menu_t auto_settings2[] =  // 2nd AutoMap Settings screen
 {
-  {"teleporter line"                ,S_COLOR ,m_null,AU_X,AU_Y, {"mapcolor_tele"}},
-  {"secret sector boundary"         ,S_COLOR ,m_null,AU_X,AU_Y+ 1*8, {"mapcolor_secr"}},
+  SETUP_MENU("teleporter line"                ,S_COLOR ,m_null,AU_X,AU_Y, {"mapcolor_tele"}),
+  SETUP_MENU("secret sector boundary"         ,S_COLOR ,m_null,AU_X,AU_Y+ 1*8, {"mapcolor_secr"}),
   //jff 4/23/98 add exit line to automap
-  {"exit line"                      ,S_COLOR ,m_null,AU_X,AU_Y+ 2*8, {"mapcolor_exit"}},
-  {"computer map unseen line"       ,S_COLOR ,m_null,AU_X,AU_Y+ 3*8, {"mapcolor_unsn"}},
-  {"line w/no floor/ceiling changes",S_COLOR ,m_null,AU_X,AU_Y+ 4*8, {"mapcolor_flat"}},
-  {"general sprite"                 ,S_COLOR ,m_null,AU_X,AU_Y+ 5*8, {"mapcolor_sprt"}},
-  {"countable enemy sprite"         ,S_COLOR ,m_null,AU_X,AU_Y+ 6*8, {"mapcolor_enemy"}},      // cph 2006/06/30
-  {"countable item sprite"          ,S_COLOR ,m_null,AU_X,AU_Y+ 7*8, {"mapcolor_item"}},       // mead 3/4/2003
-  {"crosshair"                      ,S_COLOR ,m_null,AU_X,AU_Y+ 8*8, {"mapcolor_hair"}},
-  {"single player arrow"            ,S_COLOR ,m_null,AU_X,AU_Y+ 9*8, {"mapcolor_sngl"}},
-  {"your colour in multiplayer"     ,S_COLOR ,m_null,AU_X,AU_Y+10*8, {"mapcolor_me"}},
+  SETUP_MENU("exit line"                      ,S_COLOR ,m_null,AU_X,AU_Y+ 2*8, {"mapcolor_exit"}),
+  SETUP_MENU("computer map unseen line"       ,S_COLOR ,m_null,AU_X,AU_Y+ 3*8, {"mapcolor_unsn"}),
+  SETUP_MENU("line w/no floor/ceiling changes",S_COLOR ,m_null,AU_X,AU_Y+ 4*8, {"mapcolor_flat"}),
+  SETUP_MENU("general sprite"                 ,S_COLOR ,m_null,AU_X,AU_Y+ 5*8, {"mapcolor_sprt"}),
+  SETUP_MENU("countable enemy sprite"         ,S_COLOR ,m_null,AU_X,AU_Y+ 6*8, {"mapcolor_enemy"}),  // cph 2006/06/30
+  SETUP_MENU("countable item sprite"          ,S_COLOR ,m_null,AU_X,AU_Y+ 7*8, {"mapcolor_item"}),   // mead 3/4/2003
+  SETUP_MENU("crosshair"                      ,S_COLOR ,m_null,AU_X,AU_Y+ 8*8, {"mapcolor_hair"}),
+  SETUP_MENU("single player arrow"            ,S_COLOR ,m_null,AU_X,AU_Y+ 9*8, {"mapcolor_sngl"}),
+  SETUP_MENU("your colour in multiplayer"     ,S_COLOR ,m_null,AU_X,AU_Y+10*8, {"mapcolor_me"}),
 
-  {"friends"                        ,S_COLOR ,m_null,AU_X,AU_Y+12*8, {"mapcolor_frnd"}},        // killough 8/8/98
+  SETUP_MENU("friends"                        ,S_COLOR ,m_null,AU_X,AU_Y+12*8, {"mapcolor_frnd"}),   // killough 8/8/98
 
-  {"<- PREV",S_SKIP|S_PREV,m_null,AU_PREV,AU_Y+20*8, {auto_settings1}},
+  SETUP_MENU_PREV(auto_settings1, AU_PREV,AU_Y+20*8),
 
   // Final entry
-
-  {0,S_SKIP|S_END,m_null}
-
+  SETUP_MENU_END
 };
 
 
@@ -2677,29 +2684,28 @@ enum {
 setup_menu_t enem_settings1[] =  // Enemy Settings screen
 {
   // killough 7/19/98
-  {"Monster Infighting When Provoked",S_YESNO,m_null,E_X,E_Y+ enem_infighting*8, {"monster_infighting"}},
+  SETUP_MENU("Monster Infighting When Provoked",S_YESNO,m_null,E_X,E_Y+ enem_infighting*8, {"monster_infighting"}),
 
-  {"Remember Previous Enemy",S_YESNO,m_null,E_X,E_Y+ enem_remember*8, {"monsters_remember"}},
+  SETUP_MENU("Remember Previous Enemy",S_YESNO,m_null,E_X,E_Y+ enem_remember*8, {"monsters_remember"}),
 
   // killough 9/8/98
-  {"Monster Backing Out",S_YESNO,m_null,E_X,E_Y+ enem_backing*8, {"monster_backing"}},
+  SETUP_MENU("Monster Backing Out",S_YESNO,m_null,E_X,E_Y+ enem_backing*8, {"monster_backing"}),
 
-  {"Climb Steep Stairs", S_YESNO,m_null,E_X,E_Y+enem_monkeys*8, {"monkeys"}},
+  SETUP_MENU("Climb Steep Stairs", S_YESNO,m_null,E_X,E_Y+enem_monkeys*8, {"monkeys"}),
 
   // killough 9/9/98
-  {"Intelligently Avoid Hazards",S_YESNO,m_null,E_X,E_Y+ enem_avoid_hazards*8, {"monster_avoid_hazards"}},
+  SETUP_MENU("Intelligently Avoid Hazards",S_YESNO,m_null,E_X,E_Y+ enem_avoid_hazards*8, {"monster_avoid_hazards"}),
 
   // killough 10/98
-  {"Affected by Friction",S_YESNO,m_null,E_X,E_Y+ enem_friction*8, {"monster_friction"}},
+  SETUP_MENU("Affected by Friction",S_YESNO,m_null,E_X,E_Y+ enem_friction*8, {"monster_friction"}),
 
-  {"Rescue Dying Friends",S_YESNO,m_null,E_X,E_Y+ enem_help_friends*8, {"help_friends"}},
+  SETUP_MENU("Rescue Dying Friends",S_YESNO,m_null,E_X,E_Y+ enem_help_friends*8, {"help_friends"}),
 
   // Button for resetting to defaults
-  {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
+  SETUP_MENU_RESET,
 
   // Final entry
-  {0,S_SKIP|S_END,m_null}
-
+  SETUP_MENU_END
 };
 
 /////////////////////////////
@@ -2786,13 +2792,13 @@ enum {
 #define G_YA3 (G_YA2 + 16)
 #define GF_X 76
 
-static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "90fps", "100fps", "119fps", "120fps", "140fps", "144fps", "240fps", "244fps"};
-static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4"};
-static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD"};
+static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "90fps", "100fps", "119fps", "120fps", "140fps", "144fps", "240fps", "244fps", NULL};
+static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4", NULL};
+static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD", NULL};
 
 setup_menu_t gen_settings1[] = { // General Settings screen1
 
-  {"Video"       ,S_SKIP|S_TITLE, m_null, G_X, G_YA - 2},
+  SETUP_MENU_TITLE("Video", G_X, G_YA - 2),
 
   {"Framerate", S_CHOICE, m_null, G_X,
   G_YA + general_fps*8, {"uncapped_framerate"}, 0, 0, M_ChangeFramerate, framerates},
@@ -2801,36 +2807,36 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
   G_YA + general_gamma*8, {"usegamma"}, 0, 0, NULL, gamma_lvls},
 
 
-  {"Sound & Music", S_SKIP|S_TITLE, m_null, G_X, G_YA2 + general_title_sound*8 - 2},
+  SETUP_MENU_TITLE("Sound & Music", G_X, G_YA2 + general_title_sound*8 - 2),
 
   {"Number of Sound Channels", S_NUM|S_PRGWARN, m_null, G_X,
-   G_YA2 + general_sndchan*8, {"snd_channels"}},
+   G_YA2 + general_sndchan*8, {"snd_channels"}, 0, 0, NULL, NULL},
 
   {"Enable v1.1 Pitch Effects", S_YESNO, m_null, G_X,
-   G_YA2 + general_pitch*8, {"pitched_sounds"}},
+   G_YA2 + general_pitch*8, {"pitched_sounds"}, 0, 0, NULL, NULL},
 
   {"Play external MP3 files", S_CHOICE, m_null, G_X,
    G_YA2 + general_mus_external*8, {"mus_load_external"}, 0, 0, NULL, mus_external_opts},
 
 
-  {"Freelook"  ,S_SKIP|S_TITLE, m_null, G_X, G_YA3 + general_title_freelook*8 - 2},
+  SETUP_MENU_TITLE("Freelook", G_X, G_YA3 + general_title_freelook*8 - 2),
 
   {"Enable Vertical Mouse Look", S_YESNO, m_null, G_X,
-   G_YA3 + general_mouselook*8, {"movement_mouselook"}, 0, 0, M_ChangeMouseLook},
+   G_YA3 + general_mouselook*8, {"movement_mouselook"}, 0, 0, M_ChangeMouseLook, NULL},
 
   {"Invert Vertical Mouse", S_YESNO, m_null, G_X,
-   G_YA3 + general_mouseinvert*8, {"movement_mouseinvert"}, 0, 0, NULL},
+   G_YA3 + general_mouseinvert*8, {"movement_mouseinvert"}, 0, 0, NULL, NULL},
 
   {"Maximum Vertical Pitch", S_NUM, m_null, G_X,
-   G_YA3 + general_maxviewpitch*8, {"movement_maxviewpitch"}, 0, 0, M_ChangeMaxViewPitch},
+   G_YA3 + general_maxviewpitch*8, {"movement_maxviewpitch"}, 0, 0, M_ChangeMaxViewPitch, NULL},
 
   // Button for resetting to defaults
-  {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
+  SETUP_MENU_RESET,
 
-  {"NEXT ->",S_SKIP|S_NEXT,m_null,KB_NEXT,KB_Y+20*8, {gen_settings2}},
+  SETUP_MENU_NEXT(gen_settings2, KB_NEXT,KB_Y+20*8),
 
   // Final entry
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 enum {
@@ -2858,34 +2864,32 @@ static const char *gen_skillstrings[] = {
 
 setup_menu_t gen_settings2[] = { // General Settings screen2
 
-  {"Files Preloaded at Game Startup",S_SKIP|S_TITLE, m_null, G_X, G_YB - 2},
+  SETUP_MENU_TITLE("Files Preloaded at Game Startup", G_X, G_YB - 2),
 
-  {"WAD # 1",     S_FILE, m_null, GF_X, G_YB + general_wad1*8, {"wadfile_1"}},
-  {"WAD #2",      S_FILE, m_null, GF_X, G_YB + general_wad2*8, {"wadfile_2"}},
-  {"DEH/BEX # 1", S_FILE, m_null, GF_X, G_YB + general_deh1*8, {"dehfile_1"}},
-  {"DEH/BEX #2",  S_FILE, m_null, GF_X, G_YB + general_deh2*8, {"dehfile_2"}},
+  {"WAD # 1",     S_FILE, m_null, GF_X, G_YB + general_wad1*8, {"wadfile_1"}, 0,0,NULL,NULL},
+  {"WAD #2",      S_FILE, m_null, GF_X, G_YB + general_wad2*8, {"wadfile_2"}, 0,0,NULL,NULL},
+  {"DEH/BEX # 1", S_FILE, m_null, GF_X, G_YB + general_deh1*8, {"dehfile_1"}, 0,0,NULL,NULL},
+  {"DEH/BEX #2",  S_FILE, m_null, GF_X, G_YB + general_deh2*8, {"dehfile_2"}, 0,0,NULL,NULL},
 
-  {"Miscellaneous"  ,S_SKIP|S_TITLE, m_null, G_X, G_YB1 + general_title_misc*8 - 2},
+  SETUP_MENU_TITLE("Miscellaneous", G_X, G_YB1 + general_title_misc*8 - 2),
 
   {"Maximum number of player corpses", S_NUM|S_PRGWARN, m_null, G_X,
-   G_YB1 + general_corpse*8, {"max_player_corpse"}},
+   G_YB1 + general_corpse*8, {"max_player_corpse"}, 0, 0, NULL, NULL},
 
   {"Smooth Demo Playback", S_YESNO, m_null, G_X,
-   G_YB1 + general_smooth*8, {"demo_smoothturns"}, 0, 0, M_ChangeDemoSmoothTurns},
+   G_YB1 + general_smooth*8, {"demo_smoothturns"}, 0, 0, M_ChangeDemoSmoothTurns, NULL},
 
   {"Smooth Demo Playback Factor", S_NUM, m_null, G_X,
-   G_YB1 + general_smoothfactor*8, {"demo_smoothturnsfactor"}, 0, 0, M_ChangeDemoSmoothTurns},
+   G_YB1 + general_smoothfactor*8, {"demo_smoothturnsfactor"}, 0, 0, M_ChangeDemoSmoothTurns, NULL},
 
   {"Default skill level", S_CHOICE, m_null, G_X,
     G_YB1 + general_defskill*8, {"default_skill"}, 0, 0, NULL, gen_skillstrings},
 
-  {"<- PREV",S_SKIP|S_PREV, m_null, KB_PREV, KB_Y+20*8, {gen_settings1}},
-
-  {"NEXT ->",S_SKIP|S_NEXT,m_null,KB_NEXT,KB_Y+20*8, {gen_settings3}},
+  SETUP_MENU_PREV(gen_settings1, KB_PREV, KB_Y+20*8),
+  SETUP_MENU_NEXT(gen_settings3, KB_NEXT, KB_Y+20*8),
 
   // Final entry
-
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 enum {
@@ -2908,12 +2912,12 @@ enum {
 #define G_YC2 (G_YC+6)
 #define G_YC3 (G_YC2+6)
 
-static const char *renderfilters[] = {"none", "point", "linear", "rounded"};
-static const char *edgetypes[] = {"jagged", "sloped"};
+static const char *renderfilters[] = {"none", "point", "linear", "rounded", NULL};
+static const char *edgetypes[] = {"jagged", "sloped", NULL};
 
 setup_menu_t gen_settings3[] = { // General Settings screen2
 
-  {"Display options"     ,S_SKIP|S_TITLE, m_null, G_X, G_YC - 2},
+  SETUP_MENU_TITLE("Display options",    G_X, G_YC - 2),
 
   {"Filter for walls", S_CHOICE, m_null, G_X,
    G_YC + general_filterwall*8, {"filter_wall"}, 0, 0, NULL, renderfilters},
@@ -2937,22 +2941,21 @@ setup_menu_t gen_settings3[] = { // General Settings screen2
    G_YC + general_patchedges*8, {"patch_edges"}, 0, 0, NULL, edgetypes},
 
   {"Flashing HOM indicator", S_YESNO, m_null, G_X,
-   G_YC2 + general_hom*8, {"flashing_hom"}},
+   G_YC2 + general_hom*8, {"flashing_hom"}, 0, 0, NULL, NULL},
 
   {"Stretch sky on freelook", S_YESNO, m_null, G_X,
-   G_YC2 + general_skystretch*8, {"render_stretchsky"}, 0, 0, M_ChangeMouseLook},
+   G_YC2 + general_skystretch*8, {"render_stretchsky"}, 0, 0, M_ChangeMouseLook, NULL},
 
   {"Wiggle geometry fix", S_YESNO, m_null, G_X,
-   G_YC2 + general_wigglefix*8, {"r_wiggle_fix"}},
+   G_YC2 + general_wigglefix*8, {"r_wiggle_fix"}, 0, 0, NULL, NULL},
 
   {"Fullscreen menu background", S_YESNO, m_null, G_X,
-   G_YC3 + general_menubg*8, {"menu_background"}},
+   G_YC3 + general_menubg*8, {"menu_background"}, 0, 0, NULL, NULL},
 
-  {"<- PREV",S_SKIP|S_PREV, m_null, KB_PREV, KB_Y+20*8, {gen_settings2}},
+  SETUP_MENU_PREV(gen_settings2, KB_PREV, KB_Y+20*8),
 
   // Final entry
-
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 void M_ChangeDemoSmoothTurns(void)
@@ -3089,104 +3092,101 @@ enum
 setup_menu_t comp_settings1[] =  // Compatibility Settings screen #1
 {
   {"Any monster can telefrag on MAP30", S_YESNO, m_null, C_X,
-   C_Y + compat_telefrag * COMP_SPC, {"comp_telefrag"}},
+   C_Y + compat_telefrag * COMP_SPC, {"comp_telefrag"}, 0, 0, NULL, NULL},
 
   {"Some objects never hang over tall ledges", S_YESNO, m_null, C_X,
-   C_Y + compat_dropoff * COMP_SPC, {"comp_dropoff"}},
+   C_Y + compat_dropoff * COMP_SPC, {"comp_dropoff"}, 0, 0, NULL, NULL},
 
   {"Objects don't fall under their own weight", S_YESNO, m_null, C_X,
-   C_Y + compat_falloff * COMP_SPC, {"comp_falloff"}},
+   C_Y + compat_falloff * COMP_SPC, {"comp_falloff"}, 0, 0, NULL, NULL},
 
   {"Monsters randomly walk off of moving lifts", S_YESNO, m_null, C_X,
-   C_Y + compat_staylift * COMP_SPC, {"comp_staylift"}},
+   C_Y + compat_staylift * COMP_SPC, {"comp_staylift"}, 0, 0, NULL, NULL},
 
   {"Monsters get stuck on doortracks", S_YESNO, m_null, C_X,
-   C_Y + compat_doorstuck * COMP_SPC, {"comp_doorstuck"}},
+   C_Y + compat_doorstuck * COMP_SPC, {"comp_doorstuck"}, 0, 0, NULL, NULL},
 
   {"Monsters don't give up pursuit of targets", S_YESNO, m_null, C_X,
-   C_Y + compat_pursuit * COMP_SPC, {"comp_pursuit"}},
+   C_Y + compat_pursuit * COMP_SPC, {"comp_pursuit"}, 0, 0, NULL, NULL},
 
   {"Arch-Vile resurrects invincible ghosts", S_YESNO, m_null, C_X,
-   C_Y + compat_vile * COMP_SPC, {"comp_vile"}},
+   C_Y + compat_vile * COMP_SPC, {"comp_vile"}, 0, 0, NULL, NULL},
 
   {"Pain Elementals limited to 21 lost souls", S_YESNO, m_null, C_X,
-   C_Y + compat_pain * COMP_SPC, {"comp_pain"}},
+   C_Y + compat_pain * COMP_SPC, {"comp_pain"}, 0, 0, NULL, NULL},
 
   {"Lost souls get stuck behind walls", S_YESNO, m_null, C_X,
-   C_Y + compat_skull * COMP_SPC, {"comp_skull"}},
+   C_Y + compat_skull * COMP_SPC, {"comp_skull"}, 0, 0, NULL, NULL},
 
   {"Blazing doors make double closing sounds", S_YESNO, m_null, C_X,
-   C_Y + compat_blazing * COMP_SPC, {"comp_blazing"}},
+   C_Y + compat_blazing * COMP_SPC, {"comp_blazing"}, 0, 0, NULL, NULL},
 
   // Button for resetting to defaults
-  {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
+  SETUP_MENU_RESET,
 
-  {"NEXT ->",S_SKIP|S_NEXT, m_null, KB_NEXT, C_Y+C_NEXTPREV, {comp_settings2}},
+  SETUP_MENU_NEXT(comp_settings2, KB_NEXT, C_Y+C_NEXTPREV),
 
   // Final entry
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 setup_menu_t comp_settings2[] =  // Compatibility Settings screen #2
 {
   {"Tagged doors don't trigger special lighting", S_YESNO, m_null, C_X,
-   C_Y + compat_doorlight * COMP_SPC, {"comp_doorlight"}},
+   C_Y + compat_doorlight * COMP_SPC, {"comp_doorlight"}, 0, 0, NULL, NULL},
 
   {"God mode isn't absolute", S_YESNO, m_null, C_X,
-   C_Y + compat_god * COMP_SPC, {"comp_god"}},
+   C_Y + compat_god * COMP_SPC, {"comp_god"}, 0, 0, NULL, NULL},
 
   {"Powerup cheats are not infinite duration", S_YESNO, m_null, C_X,
-   C_Y + compat_infcheat * COMP_SPC, {"comp_infcheat"}},
+   C_Y + compat_infcheat * COMP_SPC, {"comp_infcheat"}, 0, 0, NULL, NULL},
 
   {"Dead players can exit levels", S_YESNO, m_null, C_X,
-   C_Y + compat_zombie * COMP_SPC, {"comp_zombie"}},
+   C_Y + compat_zombie * COMP_SPC, {"comp_zombie"}, 0, 0, NULL, NULL},
 
   {"Sky is unaffected by invulnerability", S_YESNO, m_null, C_X,
-   C_Y + compat_skymap * COMP_SPC, {"comp_skymap"}},
+   C_Y + compat_skymap * COMP_SPC, {"comp_skymap"}, 0, 0, NULL, NULL},
 
   {"Use exactly Doom's stairbuilding method", S_YESNO, m_null, C_X,
-   C_Y + compat_stairs * COMP_SPC, {"comp_stairs"}},
+   C_Y + compat_stairs * COMP_SPC, {"comp_stairs"}, 0, 0, NULL, NULL},
 
   {"Use exactly Doom's floor motion behavior", S_YESNO, m_null, C_X,
-   C_Y + compat_floors * COMP_SPC, {"comp_floors"}},
+   C_Y + compat_floors * COMP_SPC, {"comp_floors"}, 0, 0, NULL, NULL},
 
   {"Use exactly Doom's movement clipping code", S_YESNO, m_null, C_X,
-   C_Y + compat_moveblock * COMP_SPC, {"comp_moveblock"}},
+   C_Y + compat_moveblock * COMP_SPC, {"comp_moveblock"}, 0, 0, NULL, NULL},
 
   {"Use exactly Doom's linedef trigger model", S_YESNO, m_null, C_X,
-   C_Y + compat_model * COMP_SPC, {"comp_model"}},
+   C_Y + compat_model * COMP_SPC, {"comp_model"}, 0, 0, NULL, NULL},
 
   {"Linedef effects work with sector tag = 0", S_YESNO, m_null, C_X,
-   C_Y + compat_zerotags * COMP_SPC, {"comp_zerotags"}},
+   C_Y + compat_zerotags * COMP_SPC, {"comp_zerotags"}, 0, 0, NULL, NULL},
 
-  {"<- PREV", S_SKIP|S_PREV, m_null, KB_PREV, C_Y+C_NEXTPREV,{comp_settings1}},
-
-  {"NEXT ->",S_SKIP|S_NEXT, m_null, KB_NEXT, C_Y+C_NEXTPREV, {comp_settings3}},
+  SETUP_MENU_PREV(comp_settings1, KB_PREV, C_Y+C_NEXTPREV),
+  SETUP_MENU_NEXT(comp_settings3, KB_NEXT, C_Y+C_NEXTPREV),
 
   // Final entry
-
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 setup_menu_t comp_settings3[] =  // Compatibility Settings screen #2
 {
   {"All boss types can trigger tag 666 at ExM8", S_YESNO, m_null, C_X,
-   C_Y + compat_666 * COMP_SPC, {"comp_666"}},
+   C_Y + compat_666 * COMP_SPC, {"comp_666"}, 0, 0, NULL, NULL},
 
   {"Lost souls don't bounce off flat surfaces", S_YESNO, m_null, C_X,
-   C_Y + compat_soul * COMP_SPC, {"comp_soul"}},
+   C_Y + compat_soul * COMP_SPC, {"comp_soul"}, 0, 0, NULL, NULL},
 
   {"2S middle textures do not animate", S_YESNO, m_null, C_X,
-   C_Y + compat_maskedanim * COMP_SPC, {"comp_maskedanim"}},
+   C_Y + compat_maskedanim * COMP_SPC, {"comp_maskedanim"}, 0, 0, NULL, NULL},
 
   {"Use exactly Doom's sound code behavior", S_YESNO, m_null, C_X,
-   C_Y + compat_sound * COMP_SPC, {"comp_sound"}},
+   C_Y + compat_sound * COMP_SPC, {"comp_sound"}, 0, 0, NULL, NULL},
 
-  {"<- PREV", S_SKIP|S_PREV, m_null, KB_PREV, C_Y+C_NEXTPREV,{comp_settings2}},
+  SETUP_MENU_PREV(comp_settings2, KB_PREV, C_Y+C_NEXTPREV),
 
   // Final entry
-
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 // Setting up for the Compatibility screen. Turn on flags, set pointers,
@@ -3263,49 +3263,48 @@ setup_menu_t* mess_settings[] =
 setup_menu_t mess_settings1[] =  // Messages screen
 {
   {"Message Color During Play", S_CRITEM, m_null, M_X,
-   M_Y + mess_color_play*8, {"hudcolor_mesg"}},
+   M_Y + mess_color_play*8, {"hudcolor_mesg"}, 0, 0, NULL, NULL},
 
 #if 0
   {"Message Duration During Play (ms)", S_NUM, m_null, M_X,
-   M_Y  + mess_timer*8, {"message_timer"}},
+   M_Y  + mess_timer*8, {"message_timer"}, 0, 0, NULL, NULL},
 #endif
 
   {"Chat Message Color", S_CRITEM, m_null, M_X,
-   M_Y + mess_color_chat*8, {"hudcolor_chat"}},
+   M_Y + mess_color_chat*8, {"hudcolor_chat"}, 0, 0, NULL, NULL},
 
 #if 0
   {"Chat Message Duration (ms)", S_NUM, m_null, M_X,
-   M_Y  + mess_chat_timer*8, {"chat_msg_timer"}},
+   M_Y  + mess_chat_timer*8, {"chat_msg_timer"}, 0, 0, NULL, NULL},
 #endif
 
   {"Message Review Color", S_CRITEM, m_null, M_X,
-   M_Y + mess_color_review*8, {"hudcolor_list"}},
+   M_Y + mess_color_review*8, {"hudcolor_list"}, 0, 0, NULL, NULL},
 
 #if 0
   {"Message Listing Review is Temporary",  S_YESNO,  m_null,  M_X,
-   M_Y + mess_timed*8, {"hud_msg_timed"}},
+   M_Y + mess_timed*8, {"hud_msg_timed"}, 0, 0, NULL, NULL},
 
   {"Message Review Duration (ms)", S_NUM, m_null, M_X,
-   M_Y  + mess_hud_timer*8, {"hud_msg_timer"}},
+   M_Y  + mess_hud_timer*8, {"hud_msg_timer"}, 0, 0, NULL, NULL},
 #endif
 
   {"Number of Review Message Lines", S_NUM, m_null,  M_X,
-   M_Y + mess_lines*8, {"hud_msg_lines"}},
+   M_Y + mess_lines*8, {"hud_msg_lines"}, 0, 0, NULL, NULL},
 
 #if 0
   {"Message Listing Scrolls Upwards",  S_YESNO,  m_null,  M_X,
-   M_Y + mess_scrollup*8, {"hud_msg_scrollup"}},
+   M_Y + mess_scrollup*8, {"hud_msg_scrollup"}, 0, 0, NULL, NULL},
 #endif
 
   {"Message Background",  S_YESNO,  m_null,  M_X,
-   M_Y + mess_background*8, {"hud_list_bgon"}},
+   M_Y + mess_background*8, {"hud_list_bgon"}, 0, 0, NULL, NULL},
 
   // Button for resetting to defaults
-  {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
+  SETUP_MENU_RESET,
 
   // Final entry
-
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 
@@ -3366,23 +3365,22 @@ setup_menu_t* chat_settings[] =
 
 setup_menu_t chat_settings1[] =  // Chat Strings screen
 {
-  {"1",S_CHAT,m_null,CS_X,CS_Y+ 1*8, {"chatmacro1"}},
-  {"2",S_CHAT,m_null,CS_X,CS_Y+ 2*8, {"chatmacro2"}},
-  {"3",S_CHAT,m_null,CS_X,CS_Y+ 3*8, {"chatmacro3"}},
-  {"4",S_CHAT,m_null,CS_X,CS_Y+ 4*8, {"chatmacro4"}},
-  {"5",S_CHAT,m_null,CS_X,CS_Y+ 5*8, {"chatmacro5"}},
-  {"6",S_CHAT,m_null,CS_X,CS_Y+ 6*8, {"chatmacro6"}},
-  {"7",S_CHAT,m_null,CS_X,CS_Y+ 7*8, {"chatmacro7"}},
-  {"8",S_CHAT,m_null,CS_X,CS_Y+ 8*8, {"chatmacro8"}},
-  {"9",S_CHAT,m_null,CS_X,CS_Y+ 9*8, {"chatmacro9"}},
-  {"0",S_CHAT,m_null,CS_X,CS_Y+10*8, {"chatmacro0"}},
+  {"1",S_CHAT,m_null,CS_X,CS_Y+ 1*8, {"chatmacro1"},0,0,NULL,NULL},
+  {"2",S_CHAT,m_null,CS_X,CS_Y+ 2*8, {"chatmacro2"},0,0,NULL,NULL},
+  {"3",S_CHAT,m_null,CS_X,CS_Y+ 3*8, {"chatmacro3"},0,0,NULL,NULL},
+  {"4",S_CHAT,m_null,CS_X,CS_Y+ 4*8, {"chatmacro4"},0,0,NULL,NULL},
+  {"5",S_CHAT,m_null,CS_X,CS_Y+ 5*8, {"chatmacro5"},0,0,NULL,NULL},
+  {"6",S_CHAT,m_null,CS_X,CS_Y+ 6*8, {"chatmacro6"},0,0,NULL,NULL},
+  {"7",S_CHAT,m_null,CS_X,CS_Y+ 7*8, {"chatmacro7"},0,0,NULL,NULL},
+  {"8",S_CHAT,m_null,CS_X,CS_Y+ 8*8, {"chatmacro8"},0,0,NULL,NULL},
+  {"9",S_CHAT,m_null,CS_X,CS_Y+ 9*8, {"chatmacro9"},0,0,NULL,NULL},
+  {"0",S_CHAT,m_null,CS_X,CS_Y+10*8, {"chatmacro0"},0,0,NULL,NULL},
 
   // Button for resetting to defaults
-  {0,S_RESET,m_null,X_BUTTON,Y_BUTTON},
+  SETUP_MENU_RESET,
 
   // Final entry
-  {0,S_SKIP|S_END,m_null}
-
+  SETUP_MENU_END
 };
 
 // Setting up for the Chat Strings screen. Turn on flags, set pointers,
@@ -3587,7 +3585,7 @@ int extended_help_index;   // index of current extended help screen
 
 menuitem_t ExtHelpMenu[] =
 {
-  {1,"",M_ExtHelpNextScreen,0}
+   {1,"",M_ExtHelpNextScreen,0,NULL}
 };
 
 menu_t ExtHelpDef =
@@ -3781,67 +3779,67 @@ int M_GetKeyString(int c,int offset)
 
 setup_menu_t helpstrings[] =  // HELP screen strings
 {
-  {"SCREEN"      ,S_SKIP|S_TITLE,m_null,KT_X1,KT_Y1},
-  {"HELP"        ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+ 1*8,{&key_help}},
-  {"MENU"        ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+ 2*8,{&key_escape}},
-  {"SETUP"       ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+ 3*8,{&key_setup}},
-  {"PAUSE"       ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+ 4*8,{&key_pause}},
-  {"AUTOMAP"     ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+ 5*8,{&key_map}},
-  {"SOUND VOLUME",S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+ 6*8,{&key_soundvolume}},
-  {"HUD"         ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+ 7*8,{&key_hud}},
-  {"MESSAGES"    ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+ 8*8,{&key_messages}},
-  {"GAMMA FIX"   ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+ 9*8,{&key_gamma}},
-  {"SPY"         ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+10*8,{&key_spy}},
-  {"LARGER VIEW" ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+11*8,{&key_zoomin}},
-  {"SMALLER VIEW",S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+12*8,{&key_zoomout}},
-  {"SCREENSHOT"  ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y1+13*8,{&key_screenshot}},
+  SETUP_MENU_TITLE("SCREEN"           ,KT_X1,KT_Y1),
+  SETUP_MENU_KEY("HELP"        ,m_null,KT_X1,KT_Y1+ 1*8,&key_help,0),
+  SETUP_MENU_KEY("MENU"        ,m_null,KT_X1,KT_Y1+ 2*8,&key_escape,0),
+  SETUP_MENU_KEY("SETUP"       ,m_null,KT_X1,KT_Y1+ 3*8,&key_setup,0),
+  SETUP_MENU_KEY("PAUSE"       ,m_null,KT_X1,KT_Y1+ 4*8,&key_pause,0),
+  SETUP_MENU_KEY("AUTOMAP"     ,m_null,KT_X1,KT_Y1+ 5*8,&key_map,0),
+  SETUP_MENU_KEY("SOUND VOLUME",m_null,KT_X1,KT_Y1+ 6*8,&key_soundvolume,0),
+  SETUP_MENU_KEY("HUD"         ,m_null,KT_X1,KT_Y1+ 7*8,&key_hud,0),
+  SETUP_MENU_KEY("MESSAGES"    ,m_null,KT_X1,KT_Y1+ 8*8,&key_messages,0),
+  SETUP_MENU_KEY("GAMMA FIX"   ,m_null,KT_X1,KT_Y1+ 9*8,&key_gamma,0),
+  SETUP_MENU_KEY("SPY"         ,m_null,KT_X1,KT_Y1+10*8,&key_spy,0),
+  SETUP_MENU_KEY("LARGER VIEW" ,m_null,KT_X1,KT_Y1+11*8,&key_zoomin,0),
+  SETUP_MENU_KEY("SMALLER VIEW",m_null,KT_X1,KT_Y1+12*8,&key_zoomout,0),
+  SETUP_MENU_KEY("SCREENSHOT"  ,m_null,KT_X1,KT_Y1+13*8,&key_screenshot,0),
 
-  {"AUTOMAP"     ,S_SKIP|S_TITLE,m_null,KT_X1,KT_Y2},
-  {"FOLLOW MODE" ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y2+ 1*8,{&key_map_follow}},
-  {"ZOOM IN"     ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y2+ 2*8,{&key_map_zoomin}},
-  {"ZOOM OUT"    ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y2+ 3*8,{&key_map_zoomout}},
-  {"MARK PLACE"  ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y2+ 4*8,{&key_map_mark}},
-  {"CLEAR MARKS" ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y2+ 5*8,{&key_map_clear}},
-  {"FULL/ZOOM"   ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y2+ 6*8,{&key_map_gobig}},
-  {"GRID"        ,S_SKIP|S_KEY,m_null,KT_X1,KT_Y2+ 7*8,{&key_map_grid}},
+  SETUP_MENU_TITLE("AUTOMAP"          ,KT_X1,KT_Y2),
+  SETUP_MENU_KEY("FOLLOW MODE" ,m_null,KT_X1,KT_Y2+ 1*8,&key_map_follow,0),
+  SETUP_MENU_KEY("ZOOM IN"     ,m_null,KT_X1,KT_Y2+ 2*8,&key_map_zoomin,0),
+  SETUP_MENU_KEY("ZOOM OUT"    ,m_null,KT_X1,KT_Y2+ 3*8,&key_map_zoomout,0),
+  SETUP_MENU_KEY("MARK PLACE"  ,m_null,KT_X1,KT_Y2+ 4*8,&key_map_mark,0),
+  SETUP_MENU_KEY("CLEAR MARKS" ,m_null,KT_X1,KT_Y2+ 5*8,&key_map_clear,0),
+  SETUP_MENU_KEY("FULL/ZOOM"   ,m_null,KT_X1,KT_Y2+ 6*8,&key_map_gobig,0),
+  SETUP_MENU_KEY("GRID"        ,m_null,KT_X1,KT_Y2+ 7*8,&key_map_grid,0),
 
-  {"WEAPONS"     ,S_SKIP|S_TITLE,m_null,KT_X3,KT_Y1},
-  {"FIST"        ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+ 1*8,{&key_weapon1}},
-  {"PISTOL"      ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+ 2*8,{&key_weapon2}},
-  {"SHOTGUN"     ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+ 3*8,{&key_weapon3}},
-  {"CHAINGUN"    ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+ 4*8,{&key_weapon4}},
-  {"ROCKET"      ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+ 5*8,{&key_weapon5}},
-  {"PLASMA"      ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+ 6*8,{&key_weapon6}},
-  {"BFG 9000"    ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+ 7*8,{&key_weapon7}},
-  {"CHAINSAW"    ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+ 8*8,{&key_weapon8}},
-  {"SSG"         ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+ 9*8,{&key_weapon9}},
-  {"BEST"        ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+10*8,{&key_weapontoggle}},
-  {"FIRE"        ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y1+11*8,{&key_fire},&mousebfire},
+  SETUP_MENU_TITLE("WEAPONS"          ,KT_X3,KT_Y1),
+  SETUP_MENU_KEY("FIST"        ,m_null,KT_X3,KT_Y1+ 1*8,&key_weapon1,0),
+  SETUP_MENU_KEY("PISTOL"      ,m_null,KT_X3,KT_Y1+ 2*8,&key_weapon2,0),
+  SETUP_MENU_KEY("SHOTGUN"     ,m_null,KT_X3,KT_Y1+ 3*8,&key_weapon3,0),
+  SETUP_MENU_KEY("CHAINGUN"    ,m_null,KT_X3,KT_Y1+ 4*8,&key_weapon4,0),
+  SETUP_MENU_KEY("ROCKET"      ,m_null,KT_X3,KT_Y1+ 5*8,&key_weapon5,0),
+  SETUP_MENU_KEY("PLASMA"      ,m_null,KT_X3,KT_Y1+ 6*8,&key_weapon6,0),
+  SETUP_MENU_KEY("BFG 9000"    ,m_null,KT_X3,KT_Y1+ 7*8,&key_weapon7,0),
+  SETUP_MENU_KEY("CHAINSAW"    ,m_null,KT_X3,KT_Y1+ 8*8,&key_weapon8,0),
+  SETUP_MENU_KEY("SSG"         ,m_null,KT_X3,KT_Y1+ 9*8,&key_weapon9,0),
+  SETUP_MENU_KEY("BEST"        ,m_null,KT_X3,KT_Y1+10*8,&key_weapontoggle,0),
+  SETUP_MENU_KEY("FIRE"        ,m_null,KT_X3,KT_Y1+11*8,&key_fire,&mousebfire),
 
-  {"MOVEMENT"    ,S_SKIP|S_TITLE,m_null,KT_X3,KT_Y3},
-  {"FORWARD"     ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+ 1*8,{&key_up},&mousebforward},
-  {"BACKWARD"    ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+ 2*8,{&key_down},&mousebbackward},
-  {"TURN LEFT"   ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+ 3*8,{&key_left}},
-  {"TURN RIGHT"  ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+ 4*8,{&key_right}},
-  {"RUN"         ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+ 5*8,{&key_speed},0},
-  {"STRAFE LEFT" ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+ 6*8,{&key_strafeleft}},
-  {"STRAFE RIGHT",S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+ 7*8,{&key_straferight}},
-  {"STRAFE"      ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+ 8*8,{&key_strafe},&mousebstrafe},
-  {"AUTORUN"     ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+ 9*8,{&key_autorun}},
-  {"180 TURN"    ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+10*8,{&key_reverse}},
-  {"USE"         ,S_SKIP|S_KEY,m_null,KT_X3,KT_Y3+11*8,{&key_use},&mousebforward},
+  SETUP_MENU_TITLE("MOVEMENT"         ,KT_X3,KT_Y3),
+  SETUP_MENU_KEY("FORWARD"     ,m_null,KT_X3,KT_Y3+ 1*8,&key_up,&mousebforward),
+  SETUP_MENU_KEY("BACKWARD"    ,m_null,KT_X3,KT_Y3+ 2*8,&key_down,&mousebbackward),
+  SETUP_MENU_KEY("TURN LEFT"   ,m_null,KT_X3,KT_Y3+ 3*8,&key_left,0),
+  SETUP_MENU_KEY("TURN RIGHT"  ,m_null,KT_X3,KT_Y3+ 4*8,&key_right,0),
+  SETUP_MENU_KEY("RUN"         ,m_null,KT_X3,KT_Y3+ 5*8,&key_speed,0),
+  SETUP_MENU_KEY("STRAFE LEFT" ,m_null,KT_X3,KT_Y3+ 6*8,&key_strafeleft,0),
+  SETUP_MENU_KEY("STRAFE RIGHT",m_null,KT_X3,KT_Y3+ 7*8,&key_straferight,0),
+  SETUP_MENU_KEY("STRAFE"      ,m_null,KT_X3,KT_Y3+ 8*8,&key_strafe,&mousebstrafe),
+  SETUP_MENU_KEY("AUTORUN"     ,m_null,KT_X3,KT_Y3+ 9*8,&key_autorun,0),
+  SETUP_MENU_KEY("180 TURN"    ,m_null,KT_X3,KT_Y3+10*8,&key_reverse,0),
+  SETUP_MENU_KEY("USE"         ,m_null,KT_X3,KT_Y3+11*8,&key_use,&mousebforward),
 
-  {"GAME"        ,S_SKIP|S_TITLE,m_null,KT_X2,KT_Y1},
-  {"SAVE"        ,S_SKIP|S_KEY,m_null,KT_X2,KT_Y1+ 1*8,{&key_savegame}},
-  {"LOAD"        ,S_SKIP|S_KEY,m_null,KT_X2,KT_Y1+ 2*8,{&key_loadgame}},
-  {"QUICKSAVE"   ,S_SKIP|S_KEY,m_null,KT_X2,KT_Y1+ 3*8,{&key_quicksave}},
-  {"END GAME"    ,S_SKIP|S_KEY,m_null,KT_X2,KT_Y1+ 4*8,{&key_endgame}},
-  {"QUICKLOAD"   ,S_SKIP|S_KEY,m_null,KT_X2,KT_Y1+ 5*8,{&key_quickload}},
-  {"QUIT"        ,S_SKIP|S_KEY,m_null,KT_X2,KT_Y1+ 6*8,{&key_quit}},
+  SETUP_MENU_TITLE("GAME"             ,KT_X2,KT_Y1),
+  SETUP_MENU_KEY("SAVE"        ,m_null,KT_X2,KT_Y1+ 1*8,&key_savegame,0),
+  SETUP_MENU_KEY("LOAD"        ,m_null,KT_X2,KT_Y1+ 2*8,&key_loadgame,0),
+  SETUP_MENU_KEY("QUICKSAVE"   ,m_null,KT_X2,KT_Y1+ 3*8,&key_quicksave,0),
+  SETUP_MENU_KEY("END GAME"    ,m_null,KT_X2,KT_Y1+ 4*8,&key_endgame,0),
+  SETUP_MENU_KEY("QUICKLOAD"   ,m_null,KT_X2,KT_Y1+ 5*8,&key_quickload,0),
+  SETUP_MENU_KEY("QUIT"        ,m_null,KT_X2,KT_Y1+ 6*8,&key_quit,0),
 
   // Final entry
 
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 #define SPACEWIDTH 4
@@ -3953,23 +3951,23 @@ enum {
 
 setup_menu_t cred_settings[]={
 
-  {"Programmers",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X, CR_Y + CR_S*prog + CR_SH*cr_prog},
-  {"Florian 'Proff' Schulze",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(prog+1) + CR_SH*cr_prog},
-  {"Colin Phipps",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(prog+2) + CR_SH*cr_prog},
-  {"Neil Stevens",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(prog+3) + CR_SH*cr_prog},
-  {"Andrey Budko",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(prog+4) + CR_SH*cr_prog},
+  SETUP_MENU_CREDIT("Programmers", CR_X, CR_Y + CR_S*prog + CR_SH*cr_prog),
+  SETUP_MENU_CREDIT("Florian 'Proff' Schulze", CR_X2, CR_Y + CR_S*(prog+1) + CR_SH*cr_prog),
+  SETUP_MENU_CREDIT("Colin Phipps", CR_X2, CR_Y + CR_S*(prog+2) + CR_SH*cr_prog),
+  SETUP_MENU_CREDIT("Neil Stevens", CR_X2, CR_Y + CR_S*(prog+3) + CR_SH*cr_prog),
+  SETUP_MENU_CREDIT("Andrey Budko", CR_X2, CR_Y + CR_S*(prog+4) + CR_SH*cr_prog),
 
-  {"Additional Credit To",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X, CR_Y + CR_S*adcr + CR_SH*cr_adcr},
-  {"id Software for DOOM",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(adcr+1)+CR_SH*cr_adcr},
-  {"TeamTNT for BOOM",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(adcr+2)+CR_SH*cr_adcr},
-  {"Lee Killough for MBF",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(adcr+3)+CR_SH*cr_adcr},
-  {"The DOSDoom-Team for DOSDOOM",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(adcr+4)+CR_SH*cr_adcr},
-  {"Randy Heit for ZDOOM",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(adcr+5)+CR_SH*cr_adcr},
-  {"Michael 'Kodak' Ryssen for DOOMGL",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(adcr+6)+CR_SH*cr_adcr},
-  {"Jess Haas for lSDLDoom",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(adcr+7) + CR_SH*cr_adcr},
-  {"all others who helped (see AUTHORS file)",S_SKIP|S_CREDIT|S_LEFTJUST,m_null, CR_X2, CR_Y + CR_S*(adcr+8)+CR_SH*cr_adcr},
+  SETUP_MENU_CREDIT("Additional Credit To", CR_X, CR_Y + CR_S*adcr + CR_SH*cr_adcr),
+  SETUP_MENU_CREDIT("id Software for DOOM", CR_X2, CR_Y + CR_S*(adcr+1)+CR_SH*cr_adcr),
+  SETUP_MENU_CREDIT("TeamTNT for BOOM", CR_X2, CR_Y + CR_S*(adcr+2)+CR_SH*cr_adcr),
+  SETUP_MENU_CREDIT("Lee Killough for MBF", CR_X2, CR_Y + CR_S*(adcr+3)+CR_SH*cr_adcr),
+  SETUP_MENU_CREDIT("The DOSDoom-Team for DOSDOOM", CR_X2, CR_Y + CR_S*(adcr+4)+CR_SH*cr_adcr),
+  SETUP_MENU_CREDIT("Randy Heit for ZDOOM", CR_X2, CR_Y + CR_S*(adcr+5)+CR_SH*cr_adcr),
+  SETUP_MENU_CREDIT("Michael 'Kodak' Ryssen for DOOMGL", CR_X2, CR_Y + CR_S*(adcr+6)+CR_SH*cr_adcr),
+  SETUP_MENU_CREDIT("Jess Haas for lSDLDoom", CR_X2, CR_Y + CR_S*(adcr+7) + CR_SH*cr_adcr),
+  SETUP_MENU_CREDIT("all others who helped (see AUTHORS file)", CR_X2, CR_Y + CR_S*(adcr+8)+CR_SH*cr_adcr),
 
-  {0,S_SKIP|S_END,m_null}
+  SETUP_MENU_END
 };
 
 void M_DrawCredits(void)     // killough 10/98: credit screen

@@ -44,6 +44,12 @@
 #include "custombool.h"
 #endif
 
+#include <inttypes.h>
+
+#ifndef PRIu64
+#define PRIu64 "I64u"
+#endif
+
 //e6y
 #ifndef MAX
 #define MAX(a,b) ((a)>(b)?(a):(b))
@@ -58,13 +64,13 @@
 #ifndef _MSC_VER
 // define compiled-specific long-long contstant notation here
 #define LONGLONG(num)   (uint64_t)num ## ll
+// for strcasecmp in POSIX/BSD systems
+#include <strings.h>
 #else
 // define compiled-specific long-long contstant notation here
 #define LONGLONG(num) (uint64_t)num
 #undef PATH_MAX
 #define PATH_MAX 1024
-#define strcasecmp _stricmp
-#define strncasecmp _strnicmp
 #define S_ISDIR(x) (((sbuf.st_mode & S_IFDIR)==S_IFDIR)?1:0)
 #endif
 

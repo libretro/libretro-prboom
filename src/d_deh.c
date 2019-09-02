@@ -1449,7 +1449,7 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
 {
   static FILE *fileout;       // In case -dehout was used
   DEHFILE infile, *filein = &infile;    // killough 10/98
-  char inbuffer[DEH_BUFFERMAX];  // Place to put the primary infostring
+  char inbuffer[DEH_BUFFERMAX+1];  // Place to put the primary infostring
   const char *file_or_lump;
 
   // Open output file if we're writing output
@@ -1510,7 +1510,7 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
       // killough 10/98: INCLUDE code rewritten to allow arbitrary nesting,
       // and to greatly simplify code, fix memory leaks, other bugs
 
-      if (!strnicmp(inbuffer,"INCLUDE",7)) // include a file
+      if (!strncasecmp(inbuffer,"INCLUDE",7)) // include a file
         {
           // preserve state while including a file
           // killough 10/98: moved to here
@@ -1532,7 +1532,7 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
           // check for no-text directive, used when including a DEH
           // file but using the BEX format to handle strings
 
-          if (!strnicmp(nextfile = ptr_lstrip(inbuffer+7),"NOTEXT",6))
+          if (!strncasecmp(nextfile = ptr_lstrip(inbuffer+7),"NOTEXT",6))
             includenotext = TRUE, nextfile = ptr_lstrip(nextfile+6);
 
           if (fileout)
@@ -1583,7 +1583,7 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
 static void deh_procBexCodePointers(DEHFILE *fpin, FILE* fpout, char *line)
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   int indexnum;
   char mnemonic[DEH_MAXKEYLEN];  // to hold the codepointer mnemonic
   int i; // looper
@@ -1601,7 +1601,7 @@ static void deh_procBexCodePointers(DEHFILE *fpin, FILE* fpout, char *line)
 
       // killough 8/98: allow hex numbers in input:
       if ( (3 != sscanf(inbuffer,"%s %i = %s", key, &indexnum, mnemonic))
-           || (stricmp(key,"FRAME")) )  // NOTE: different format from normal
+           || (strcasecmp(key,"FRAME")) )  // NOTE: different format from normal
         {
           if (fpout) fprintf(fpout,
                              "Invalid BEX codepointer line - must start with 'FRAME': '%s'\n",
@@ -1625,7 +1625,7 @@ static void deh_procBexCodePointers(DEHFILE *fpin, FILE* fpout, char *line)
       do  // Ty 05/16/98 - fix loop logic to look for null ending entry
         {
           ++i;
-          if (!stricmp(key,deh_bexptrs[i].lookup))
+          if (!strcasecmp(key,deh_bexptrs[i].lookup))
             {  // Ty 06/01/98  - add  to states[].action for new djgcc version
               states[indexnum].action = deh_bexptrs[i].cptr; // assign
               if (fpout) fprintf(fpout,
@@ -1750,7 +1750,7 @@ static void setMobjInfoValue(int mobjInfoIndex, int keyIndex, uint64_t value) {
 static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
   int indexnum;
   int ix;
@@ -1887,7 +1887,7 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
 static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
   int indexnum;
 
@@ -1911,25 +1911,25 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
         }
       if (!strcasecmp(key,deh_state[0]))  // Sprite number
         {
-          if (fpout) fprintf(fpout," - sprite = %lld\n",(unsigned long long)value);
+          if (fpout) fprintf(fpout," - sprite = %"PRIu64"\n",(uint64_t)value);
           states[indexnum].sprite = (spritenum_t)value;
         }
       else
         if (!strcasecmp(key,deh_state[1]))  // Sprite subnumber
           {
-            if (fpout) fprintf(fpout," - frame = %lld\n",(unsigned long long)value);
+            if (fpout) fprintf(fpout," - frame = %"PRIu64"\n",(uint64_t)value);
             states[indexnum].frame = (long)value; // long
           }
         else
           if (!strcasecmp(key,deh_state[2]))  // Duration
             {
-              if (fpout) fprintf(fpout," - tics = %lld\n",(unsigned long long)value);
+              if (fpout) fprintf(fpout," - tics = %"PRIu64"\n",(uint64_t)value);
               states[indexnum].tics = (long)value; // long
             }
           else
             if (!strcasecmp(key,deh_state[3]))  // Next frame
               {
-                if (fpout) fprintf(fpout," - nextstate = %lld\n",(unsigned long long)value);
+                if (fpout) fprintf(fpout," - nextstate = %"PRIu64"\n",(uint64_t)value);
                 states[indexnum].nextstate = (statenum_t)value;
               }
             else
@@ -1941,13 +1941,13 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
               else
                 if (!strcasecmp(key,deh_state[5]))  // Unknown 1
                   {
-                    if (fpout) fprintf(fpout," - misc1 = %lld\n",(unsigned long long)value);
+                    if (fpout) fprintf(fpout," - misc1 = %"PRIu64"\n",(uint64_t)value);
                     states[indexnum].misc1 = (long)value; // long
                   }
                 else
                   if (!strcasecmp(key,deh_state[6]))  // Unknown 2
                     {
-                      if (fpout) fprintf(fpout," - misc2 = %lld\n",(unsigned long long)value);
+                      if (fpout) fprintf(fpout," - misc2 = %"PRIu64"\n",(uint64_t)value);
                       states[indexnum].misc2 = (long)value; // long
                     }
                   else
@@ -1967,7 +1967,7 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
 static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
   int indexnum;
   unsigned i; // looper
@@ -2004,16 +2004,16 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
       if (value >= NUMSTATES)
         {
           if (fpout)
-            fprintf(fpout,"Bad pointer number %lld of %d\n",
-                  (unsigned long long)value, NUMSTATES);
+            fprintf(fpout,"Bad pointer number %"PRIu64" of %d\n",
+                  (uint64_t)value, NUMSTATES);
           return;
         }
 
       if (!strcasecmp(key,deh_state[4]))  // Codep frame (not set in Frame deh block)
         {
           states[indexnum].action = deh_codeptr[value];
-          if (fpout) fprintf(fpout," - applied from codeptr[%lld] to states[%d]\n",
-           (unsigned long long)value,indexnum);
+          if (fpout) fprintf(fpout," - applied from codeptr[%"PRIu64"] to states[%d]\n",
+           (uint64_t)value,indexnum);
           // Write BEX-oriented line to match:
           // for (i=0;i<NUMSTATES;i++) could go past the end of the array
           for (i=0;i<sizeof(deh_bexptrs)/sizeof(*deh_bexptrs);i++)
@@ -2029,8 +2029,8 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
             }
         }
       else
-        if (fpout) fprintf(fpout,"Invalid frame pointer index for '%s' at %lld\n",
-                           key, (unsigned long long)value);
+        if (fpout) fprintf(fpout,"Invalid frame pointer index for '%s' at %"PRIu64"\n",
+                           key, (uint64_t)value);
     }
 }
 
@@ -2045,7 +2045,7 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
 static void deh_procSounds(DEHFILE *fpin, FILE* fpout, char *line)
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
   int indexnum;
 
@@ -2113,7 +2113,7 @@ static void deh_procSounds(DEHFILE *fpin, FILE* fpout, char *line)
 static void deh_procAmmo(DEHFILE *fpin, FILE* fpout, char *line)
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
   int indexnum;
 
@@ -2159,7 +2159,7 @@ static void deh_procAmmo(DEHFILE *fpin, FILE* fpout, char *line)
 static void deh_procWeapon(DEHFILE *fpin, FILE* fpout, char *line)
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
   int indexnum;
 
@@ -2217,7 +2217,7 @@ static void deh_procWeapon(DEHFILE *fpin, FILE* fpout, char *line)
 static void deh_procSprite(DEHFILE *fpin, FILE* fpout, char *line) // Not supported
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   int indexnum;
 
   // Too little is known about what this is supposed to do, and
@@ -2251,7 +2251,7 @@ static void deh_procSprite(DEHFILE *fpin, FILE* fpout, char *line) // Not suppor
 static void deh_procPars(DEHFILE *fpin, FILE* fpout, char *line) // extension
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   int indexnum;
   int episode, level, partime, oldpar;
 
@@ -2337,7 +2337,7 @@ static void deh_procPars(DEHFILE *fpin, FILE* fpout, char *line) // extension
 static void deh_procCheat(DEHFILE *fpin, FILE* fpout, char *line) // done
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
   char ch = 0; // CPhipps - `writable' null string to initialise...
   char *strval = &ch;  // pointer to the value area
@@ -2364,7 +2364,7 @@ static void deh_procCheat(DEHFILE *fpin, FILE* fpout, char *line) // done
       for (ix=0; cheat[ix].cheat; ix++)
         if (cheat[ix].deh_cheat)   // killough 4/18/98: skip non-deh
           {
-            if (!stricmp(key,cheat[ix].deh_cheat))  // found the cheat, ignored case
+            if (!strcasecmp(key,cheat[ix].deh_cheat))  // found the cheat, ignored case
               {
                 // replace it but don't overflow it.  Use current length as limit.
                 // Ty 03/13/98 - add 0xff code
@@ -2414,7 +2414,7 @@ static void deh_procCheat(DEHFILE *fpin, FILE* fpout, char *line) // done
 static void deh_procMisc(DEHFILE *fpin, FILE* fpout, char *line) // done
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
@@ -2558,7 +2558,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
       i=0;
       while (sprnames[i])  // null terminated list in info.c //jff 3/19/98
         {                                                      //check pointer
-          if (!strnicmp(sprnames[i],inbuffer,fromlen) && !sprnames_state[i])         //not first char
+          if (!strncasecmp(sprnames[i],inbuffer,fromlen) && !sprnames_state[i])         //not first char
             {
               if (fpout) fprintf(fpout,
                                  "Changing name of sprite at index %d from %s to %*s\n",
@@ -2596,7 +2596,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
           {
             // avoid short prefix erroneous match
             if (strlen(S_sfx[i].name) != (size_t)fromlen) continue;
-            if (!strnicmp(S_sfx[i].name,inbuffer,fromlen) && !S_sfx_state[i])
+            if (!strncasecmp(S_sfx[i].name,inbuffer,fromlen) && !S_sfx_state[i])
               {
                 if (fpout) fprintf(fpout,
                                    "Changing name of sfx from %s to %*s\n",
@@ -2618,7 +2618,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
               {
                 // avoid short prefix erroneous match
                 if (strlen(S_music[i].name) != (size_t)fromlen) continue;
-                if (!strnicmp(S_music[i].name,inbuffer,fromlen) && !S_music_state[i])
+                if (!strncasecmp(S_music[i].name,inbuffer,fromlen) && !S_music_state[i])
                   {
                     if (fpout) fprintf(fpout,
                                        "Changing name of music from %s to %*s\n",
@@ -2653,7 +2653,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
 
 static void deh_procError(DEHFILE *fpin, FILE* fpout, char *line)
 {
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
   if (fpout) fprintf(fpout,"Unmatched Block: '%s'\n",inbuffer);
@@ -2671,7 +2671,7 @@ static void deh_procError(DEHFILE *fpin, FILE* fpout, char *line)
 static void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;    // All deh values are ints or longs
   char *strval;      // holds the string value of the line
   static int maxstrlen = 128; // maximum string length, bumped 128 at
@@ -2760,8 +2760,8 @@ boolean deh_procStringSub(char *key, char *lookfor, char *newstring, FILE *fpout
         deh_strlookup[i].orig = *deh_strlookup[i].ppstr;
 
       found = lookfor ?
-        !stricmp(deh_strlookup[i].orig,lookfor) :
-        !stricmp(deh_strlookup[i].lookup,key);
+        !strcasecmp(deh_strlookup[i].orig,lookfor) :
+        !strcasecmp(deh_strlookup[i].lookup,key);
 
       if (found)
         {
@@ -2821,7 +2821,7 @@ boolean deh_procStringSub(char *key, char *lookfor, char *newstring, FILE *fpout
 static void deh_procHelperThing(DEHFILE *fpin, FILE *fpout, char *line)
 {
   char key[DEH_MAXKEYLEN];
-  char inbuffer[DEH_BUFFERMAX];
+  char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
@@ -2856,7 +2856,7 @@ static void deh_procHelperThing(DEHFILE *fpin, FILE *fpout, char *line)
 static void deh_procBexSprites(DEHFILE *fpin, FILE *fpout, char *line)
 {
    char key[DEH_MAXKEYLEN];
-   char inbuffer[DEH_BUFFERMAX];
+   char inbuffer[DEH_BUFFERMAX+1];
    uint64_t value;    // All deh values are ints or longs
    char *strval;  // holds the string value of the line
    char candidate[5];
@@ -2914,7 +2914,7 @@ static void deh_procBexSprites(DEHFILE *fpin, FILE *fpout, char *line)
 static void deh_procBexSounds(DEHFILE *fpin, FILE *fpout, char *line)
 {
    char key[DEH_MAXKEYLEN];
-   char inbuffer[DEH_BUFFERMAX];
+   char inbuffer[DEH_BUFFERMAX+1];
    uint64_t value;    // All deh values are ints or longs
    char *strval;  // holds the string value of the line
    char candidate[7];
@@ -2973,7 +2973,7 @@ static void deh_procBexSounds(DEHFILE *fpin, FILE *fpout, char *line)
 static void deh_procBexMusic(DEHFILE *fpin, FILE *fpout, char *line)
 {
    char key[DEH_MAXKEYLEN];
-   char inbuffer[DEH_BUFFERMAX];
+   char inbuffer[DEH_BUFFERMAX+1];
    uint64_t value;    // All deh values are ints or longs
    char *strval;  // holds the string value of the line
    char candidate[7];

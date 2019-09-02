@@ -767,17 +767,17 @@ static bool IdentifyVersion (void)
       case shareware:
         i = strlen(iwad);
         gamemission = doom;
-        if (i>=10 && (!strnicmp(iwad+i-11,"heretic.wad",11) || !strnicmp(iwad+i-13,"hereticsr.wad",13)))
+        if (i>=10 && (!strncasecmp(iwad+i-11,"heretic.wad",11) || !strncasecmp(iwad+i-13,"hereticsr.wad",13)))
           return I_Error("IdentifyVersion: Heretic is not supported");
         break;
       case commercial:
         i = strlen(iwad);
         gamemission = doom2;
-        if (i>=10 && !strnicmp(iwad+i-10,"doom2f.wad",10))
+        if (i>=10 && !strncasecmp(iwad+i-10,"doom2f.wad",10))
           language=french;
-        else if (i>=7 && !strnicmp(iwad+i-7,"tnt.wad",7))
+        else if (i>=7 && !strncasecmp(iwad+i-7,"tnt.wad",7))
           gamemission = pack_tnt;
-        else if (i>=12 && !strnicmp(iwad+i-12,"plutonia.wad",12))
+        else if (i>=12 && !strncasecmp(iwad+i-12,"plutonia.wad",12))
           gamemission = pack_plut;
         break;
       default:
@@ -958,13 +958,13 @@ static void DoLooseFiles(void)
 
     // so now we must have a loose file.  Find out what kind and store it.
     j = strlen(myargv[i]);
-    if (!stricmp(&myargv[i][j-4],".wad"))
+    if (!strcasecmp(&myargv[i][j-4],".wad"))
       wads[wadcount++] = strdup(myargv[i]);
-    if (!stricmp(&myargv[i][j-4],".lmp"))
+    if (!strcasecmp(&myargv[i][j-4],".lmp"))
       lmps[lmpcount++] = strdup(myargv[i]);
-    if (!stricmp(&myargv[i][j-4],".deh"))
+    if (!strcasecmp(&myargv[i][j-4],".deh"))
       dehs[dehcount++] = strdup(myargv[i]);
-    if (!stricmp(&myargv[i][j-4],".bex"))
+    if (!strcasecmp(&myargv[i][j-4],".bex"))
       dehs[dehcount++] = strdup(myargv[i]);
     if (myargv[i][j-4] != '.')  // assume wad if no extension
       wads[wadcount++] = strdup(myargv[i]);
@@ -1536,8 +1536,8 @@ void GetFirstMap(int *ep, int *map)
 {
   short int i,j; // used to generate map name
   boolean done = FALSE;  // Ty 09/13/98 - to exit inner loops
-  char test[6];  // MAPxx or ExMx plus terminator for testing
-  char name[6];  // MAPxx or ExMx plus terminator for display
+  char test[9];  // MAPxx or ExMx plus terminator for testing
+  char name[9];  // MAPxx or ExMx plus terminator for display
   boolean newlevel = FALSE;  // Ty 10/04/98 - to test for new level
   int ix;  // index for lookup
 

@@ -767,7 +767,8 @@ static bool IdentifyVersion (void)
       case shareware:
         i = strlen(iwad);
         gamemission = doom;
-        if (i>=10 && (!strncasecmp(iwad+i-11,"heretic.wad",11) || !strncasecmp(iwad+i-13,"hereticsr.wad",13)))
+        if ( (i>=11 && !strncasecmp(iwad+i-11,"heretic.wad",11)) ||
+             (i>=13 && (!strncasecmp(iwad+i-13,"hereticsr.wad",13))) )
           return I_Error("IdentifyVersion: Heretic is not supported");
         break;
       case commercial:

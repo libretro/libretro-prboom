@@ -527,7 +527,7 @@ static wadinfo_t get_wadinfo(const char *path)
 bool I_PreInitGraphics(void)
 {
    screen_buf = malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
-   return true;
+   return (screen_buf != NULL);
 }
 
 bool retro_load_game(const struct retro_game_info *info)
@@ -600,7 +600,7 @@ bool retro_load_game(const struct retro_game_info *info)
       // Get save directory
       if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)
 		{
-			if (strlen(base_save_dir) > 0)
+			if (base_save_dir && strlen(base_save_dir) > 0)
 			{
 				// > Build save path
 				snprintf(g_save_dir, sizeof(g_save_dir), "%s%c%s", base_save_dir, DIR_SLASH, name_without_ext);
@@ -1251,7 +1251,7 @@ const char *I_DoomExeDir(void)
 */
 boolean HasTrailingSlash(const char* dn)
 {
-   return ( (dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\'));
+  return ( dn && ((dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\')));
 }
 
 /**
@@ -1268,12 +1268,16 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
    size_t pl = strlen(wfname) + (ext ? strlen(ext) : 0) + 4;
 
    if( dir == NULL ) {
-      p = malloc(pl);
-      sprintf(p, "%s", wfname);
+     if ((p = malloc(pl)) != NULL)
+       sprintf(p, "%s", wfname);
+     else
+       return NULL;
    }
    else {
-     p = malloc(strlen(dir) + pl);
-     sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
+     if ((p = malloc(strlen(dir) + pl)) != NULL)
+       sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
+     else
+       return NULL;
    }
 
    if (ext && ext[0] != '\0')
@@ -1312,9 +1316,8 @@ char* I_FindFile(const char* wfname, const char* ext)
    {
      // Then check on system dir (both under prboom subfolder and directly)
      environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
-     if (system_dir)
+     if (system_dir && (prboom_system_dir = malloc(strlen(system_dir) + 8)))
      {
-       prboom_system_dir = malloc(strlen(system_dir) + 8);
        sprintf(prboom_system_dir, "%s%c%s", system_dir, DIR_SLASH, "prboom");
        p = FindFileInDir(prboom_system_dir, wfname, ext);
        free(prboom_system_dir);
@@ -1323,21 +1326,23 @@ char* I_FindFile(const char* wfname, const char* ext)
      }
 
      // If not found, check on parent folders recursively (if configured to do so)
-     if ( p == NULL && find_recursive_on)
+     if (p == NULL && find_recursive_on)
      {
-       dir = malloc(strlen(g_wad_dir) + 1);
-       strcpy(dir, g_wad_dir);
-       for (i = strlen(dir)-1; i > 1; dir[i--] = '\0')
+       if ((dir = malloc(strlen(g_wad_dir) + 1)) != NULL)
        {
-         if((dir[i] == '/' || dir[i] == '\\')
-           && dir[i-1] != dir[i])
+         strcpy(dir, g_wad_dir);
+         for (i = strlen(dir)-1; i > 1; dir[i--] = '\0')
          {
-           dir[i] = '\0'; // remove leading slash
-           p = FindFileInDir(dir, wfname, ext);
-           if(p != NULL) break;
+           if((dir[i] == '/' || dir[i] == '\\')
+              && dir[i-1] != dir[i])
+           {
+             dir[i] = '\0'; // remove leading slash
+             p = FindFileInDir(dir, wfname, ext);
+             if(p != NULL) break;
+           }
          }
+         free(dir);
        }
-       free(dir);
      }
    }
    return p;

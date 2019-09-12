@@ -1451,7 +1451,7 @@ static void P_LoadBlockMap (int lump)
     }
 
   // clear out mobj chains - CPhipps - use calloc
-  blocklinks = Z_Calloc (bmapwidth*bmapheight,sizeof(*blocklinks),PU_LEVEL,0);
+  blocklinks = Z_Calloc ((size_t) bmapwidth*bmapheight, sizeof(*blocklinks), PU_LEVEL, 0);
   blockmap = blockmaplump+4;
 }
 
@@ -1718,9 +1718,9 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
     hit[v - vertexes] = 1;        // Mark this vertex as processed
     if (v != l->v1 && v != l->v2) // Exclude endpoints of linedefs
       { // Project the vertex back onto the parent linedef
-        int64_t dx2 = (l->dx >> FRACBITS) * (l->dx >> FRACBITS);
-        int64_t dy2 = (l->dy >> FRACBITS) * (l->dy >> FRACBITS);
-        int64_t dxy = (l->dx >> FRACBITS) * (l->dy >> FRACBITS);
+        int64_t dx2 = (int64_t) (l->dx >> FRACBITS) * (l->dx >> FRACBITS);
+        int64_t dy2 = (int64_t) (l->dy >> FRACBITS) * (l->dy >> FRACBITS);
+        int64_t dxy = (int64_t) (l->dx >> FRACBITS) * (l->dy >> FRACBITS);
         int64_t s = dx2 + dy2;
         int x0 = v->x, y0 = v->y, x1 = l->v1->x, y1 = l->v1->y;
         v->x = (int)((dx2 * x0 + dy2 * x1 + dxy * (y0 - y1)) / s);

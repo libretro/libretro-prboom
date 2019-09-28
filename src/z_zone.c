@@ -294,7 +294,15 @@ void *Z_Realloc(void *ptr, size_t n, int tag, void **user)
    if (ptr)
    {
       memblock_t *block = (memblock_t *)((uint8_t*) ptr - HEADER_SIZE);
-      memcpy(p, ptr, n <= block->size ? n : block->size);
+
+      if (n <= block->size)
+        memcpy(p, ptr, n);
+      else
+      {
+        memcpy(p, ptr, block->size);
+        memset(p+block->size, 0, n - block->size);
+      }
+
       (Z_Free)(ptr DA(file, line));
       if (user) // in case Z_Free nullified same user
          *user=p;

@@ -1440,6 +1440,7 @@ typedef enum {
 
 typedef struct
 {
+  const char * actorname; /* Doom actor name, meant to match ZDoom's */
   int doomednum;    /* Thing number used in id's editor, and now
        probably by every other editor too */
   int spawnstate;   /* The state (frame) index when this Thing is

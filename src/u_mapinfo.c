@@ -24,171 +24,12 @@
 #include <assert.h>
 
 #include "doomdef.h"
+#include "info.h"
 #include "m_misc.h"
 #include "g_game.h"
 #include "u_scanner.h"
 
 #include "u_mapinfo.h"
-
-
-//==========================================================================
-//
-// The Doom actors in their original order
-// Names are the same as in ZDoom.
-//
-//==========================================================================
-
-static const int actornum = 144;
-static const char * const ActorNames[] =
-{
-  "DoomPlayer",
-  "ZombieMan",
-  "ShotgunGuy",
-  "Archvile",
-  "ArchvileFire",
-  "Revenant",
-  "RevenantTracer",
-  "RevenantTracerSmoke",
-  "Fatso",
-  "FatShot",
-  "ChaingunGuy",
-  "DoomImp",
-  "Demon",
-  "Spectre",
-  "Cacodemon",
-  "BaronOfHell",
-  "BaronBall",
-  "HellKnight",
-  "LostSoul",
-  "SpiderMastermind",
-  "Arachnotron",
-  "Cyberdemon",
-  "PainElemental",
-  "WolfensteinSS",
-  "CommanderKeen",
-  "BossBrain",
-  "BossEye",
-  "BossTarget",
-  "SpawnShot",
-  "SpawnFire",
-  "ExplosiveBarrel",
-  "DoomImpBall",
-  "CacodemonBall",
-  "Rocket",
-  "PlasmaBall",
-  "BFGBall",
-  "ArachnotronPlasma",
-  "BulletPuff",
-  "Blood",
-  "TeleportFog",
-  "ItemFog",
-  "TeleportDest",
-  "BFGExtra",
-  "GreenArmor",
-  "BlueArmor",
-  "HealthBonus",
-  "ArmorBonus",
-  "BlueCard",
-  "RedCard",
-  "YellowCard",
-  "YellowSkull",
-  "RedSkull",
-  "BlueSkull",
-  "Stimpack",
-  "Medikit",
-  "Soulsphere",
-  "InvulnerabilitySphere",
-  "Berserk",
-  "BlurSphere",
-  "RadSuit",
-  "Allmap",
-  "Infrared",
-  "Megasphere",
-  "Clip",
-  "ClipBox",
-  "RocketAmmo",
-  "RocketBox",
-  "Cell",
-  "CellPack",
-  "Shell",
-  "ShellBox",
-  "Backpack",
-  "BFG9000",
-  "Chaingun",
-  "Chainsaw",
-  "RocketLauncher",
-  "PlasmaRifle",
-  "Shotgun",
-  "SuperShotgun",
-  "TechLamp",
-  "TechLamp2",
-  "Column",
-  "TallGreenColumn",
-  "ShortGreenColumn",
-  "TallRedColumn",
-  "ShortRedColumn",
-  "SkullColumn",
-  "HeartColumn",
-  "EvilEye",
-  "FloatingSkull",
-  "TorchTree",
-  "BlueTorch",
-  "GreenTorch",
-  "RedTorch",
-  "ShortBlueTorch",
-  "ShortGreenTorch",
-  "ShortRedTorch",
-  "Slalagtite",
-  "TechPillar",
-  "CandleStick",
-  "Candelabra",
-  "BloodyTwitch",
-  "Meat2",
-  "Meat3",
-  "Meat4",
-  "Meat5",
-  "NonsolidMeat2",
-  "NonsolidMeat4",
-  "NonsolidMeat3",
-  "NonsolidMeat5",
-  "NonsolidTwitch",
-  "DeadCacodemon",
-  "DeadMarine",
-  "DeadZombieMan",
-  "DeadDemon",
-  "DeadLostSoul",
-  "DeadDoomImp",
-  "DeadShotgunGuy",
-  "GibbedMarine",
-  "GibbedMarineExtra",
-  "HeadsOnAStick",
-  "Gibs",
-  "HeadOnAStick",
-  "HeadCandles",
-  "DeadStick",
-  "LiveStick",
-  "BigTree",
-  "BurningBarrel",
-  "HangNoGuts",
-  "HangBNoBrain",
-  "HangTLookingDown",
-  "HangTSkull",
-  "HangTLookingUp",
-  "HangTNoBrain",
-  "ColonGibs",
-  "SmallBloodPool",
-  "BrainStem",
-  //Boom/MBF additions
-  "PointPusher",
-  "PointPuller",
-  "MBFHelperDog",
-  "PlasmaBall1",
-  "PlasmaBall2",
-  "EvilSceptre",
-  "UnholyBible",
-  NULL
-};
-
 
 void M_AddEpisode(const char *map, char *def);
 
@@ -401,32 +242,32 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
     else
     {
       int i;
-      for (i = 0; i < actornum; i++)
+      for (i = 0; i < NUMMOBJTYPES; i++)
       {
-        if (!strcasecmp(s->string, ActorNames[i])) break;
+        if (mobjinfo[i].actorname != NULL && !strcasecmp(s->string, mobjinfo[i].actorname))
+        {
+          U_MustGetToken(s, ',');
+          U_MustGetInteger(s);
+          special = s->number;
+          U_MustGetToken(s, ',');
+          U_MustGetInteger(s);
+          tag = s->number;
+          // allow no 0-tag specials here, unless a level exit.
+          if (tag != 0 || special == 11 || special == 51 || special == 52 || special == 124)
+          {
+            if (mape->numbossactions == -1) mape->numbossactions = 1;
+            else mape->numbossactions++;
+            mape->bossactions = (bossaction_t *)realloc(mape->bossactions,
+                                                        sizeof(bossaction_t)*mape->numbossactions);
+            mape->bossactions[mape->numbossactions - 1].type = i;
+            mape->bossactions[mape->numbossactions - 1].special = special;
+            mape->bossactions[mape->numbossactions - 1].tag = tag;
+          }
+          break;
+        }
       }
-      if (ActorNames[i] == NULL)
-      {
-        U_Error(s, "Unknown thing type %s", s->string);
-        return 0;
-      }
-
-      U_MustGetToken(s, ',');
-      U_MustGetInteger(s);
-      special = s->number;
-      U_MustGetToken(s, ',');
-      U_MustGetInteger(s);
-      tag = s->number;
-      // allow no 0-tag specials here, unless a level exit.
-      if (tag != 0 || special == 11 || special == 51 || special == 52 || special == 124)
-      {
-        if (mape->numbossactions == -1) mape->numbossactions = 1;
-        else mape->numbossactions++;
-        mape->bossactions = (bossaction_t *)realloc(mape->bossactions, sizeof(bossaction_t) * mape->numbossactions);
-        mape->bossactions[mape->numbossactions - 1].type = i;
-        mape->bossactions[mape->numbossactions - 1].special = special;
-        mape->bossactions[mape->numbossactions - 1].tag = tag;
-      }
+      U_Error(s, "Unknown thing type %s", s->string);
+      return 0;
     }
   }
   else do

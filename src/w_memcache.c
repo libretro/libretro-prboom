@@ -103,6 +103,10 @@ const void *W_LockLumpNum(int lump)
 void W_UnlockLumpNum(int lump)
 {
   const int unlocks = 1;
+
+  // invalid lump, ignore unlock
+  if (lump < 0) return;
+
   cachelump[lump].locks -= unlocks;
   /* cph - Note: must only tell z_zone to make purgeable if currently locked,
    * else it might already have been purged

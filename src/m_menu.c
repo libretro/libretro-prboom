@@ -666,7 +666,7 @@ void M_NewGame(int choice)
     return;
   }
 
-  if ( gamemode == commercial )
+  if ( EpiDef.numitems == 0 )
     M_SetupNextMenu(&NewDef);
   else
     M_SetupNextMenu(&EpiDef);
@@ -5416,6 +5416,7 @@ void M_Init(void)
       ReadDef1.x = 330;
       ReadDef1.y = 165;
       ReadMenu1[0].routine = M_FinishReadThis;
+      EpiDef.numitems = 0;
       break;
     case registered:
       // Episode 2 and 3 are handled,

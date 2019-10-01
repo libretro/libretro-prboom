@@ -28,7 +28,7 @@
  *
  * DESCRIPTION:
  *  External non-system-specific stuff, like storing config settings,
- *  simple file handling, and saving screnshots.
+ *  simple file handling, and auxiliary string functions.
  *
  *-----------------------------------------------------------------------------*/
 
@@ -53,6 +53,8 @@ void M_LoadDefaults (void);
 void M_SaveDefaults (void);
 
 struct default_s *M_LookupDefault(const char *name);     /* killough 11/98 */
+
+char* M_Strupr(char* str);
 
 // phares 4/21/98:
 // Moved from m_misc.c so m_menu.c could see it.

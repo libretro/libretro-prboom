@@ -82,6 +82,7 @@
 #include "d_deh.h"  // Ty 04/08/98 - Externalizations
 #include "lprintf.h"  // jff 08/03/98 - declaration of lprintf
 #include "am_map.h"
+#include "u_mapinfo.h"
 
 void GetFirstMap(int *ep, int *map); // Ty 08/29/98 - add "-warp x" functionality
 static void D_PageDrawer(void);
@@ -1414,6 +1415,17 @@ bool D_DoomMainSetup(void)
   lprintf(LO_INFO,"M_Init: Init miscellaneous info.\n");
   M_Init();
 
+  // if not explicitly disabled, load UMAPINFO
+  if (!M_CheckParm("-nomapinfo"))
+  {
+    for (p = -1; (p = W_ListNumFromName("UMAPINFO", p)) >= 0; )
+    {
+      const char *data = (const char *)W_CacheLumpNum(p);
+      U_ParseMapInfo(data, W_LumpLength(p));
+    }
+  }
+
+
 #ifdef HAVE_NET
   // CPhipps - now wait for netgame start
   D_CheckNetGame();
@@ -1522,6 +1534,7 @@ void D_DoomDeinit(void)
 #endif
   M_SaveDefaults ();
   W_Exit();
+  U_FreeMapInfo();
   I_ShutdownSound();
   I_ShutdownMusic();
   p_checksum_cleanup();

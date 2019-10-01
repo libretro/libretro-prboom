@@ -43,6 +43,7 @@
 #include "sounds.h"
 #include "lprintf.h"  // jff 08/03/98 - declaration of lprintf
 #include "r_draw.h"
+#include "hu_stuff.h" // for using the hud font
 
 // Ty 03/17/98: flag that new par times have been loaded in d_deh
 extern boolean deh_pars;
@@ -298,6 +299,10 @@ static anim_t *anims[NUMEPISODES] =
 #define SHOWNEXTLOCDELAY  4
 //#define SHOWLASTLOCDELAY  SHOWNEXTLOCDELAY
 
+// font for the fallback text and width of space character
+#define SPACEWIDTH 4
+#define FONTHEIGHT 8
+extern patchnum_t hu_font[HU_FONTSIZE];
 
 // used to accelerate or skip a stage
 int   acceleratestage;           // killough 3/28/98: made global
@@ -379,6 +384,9 @@ static const char bstar[] = {"STFDEAD0"};
 // "red P[1..MAXPLAYERS]"
 static const char facebackp[] = {"STPB0"};
 
+// map exit and enter pictures
+static const char *exitpic, *enterpic;
+
 //
 // CODE
 //
@@ -390,17 +398,25 @@ static void WI_endNetgameStats(void);
 /* ====================================================================
  * WI_levelNameLump
  * Purpore: Returns the name of the graphic lump containing the name of
- *          the given level.
- * Args:    Episode and level, and buffer (must by 9 chars) to write to
+ *          either the last level or the next one.
+ * Args:    Buffer (must by 9 chars) to write to, and whether to give Next level
  * Returns: void
  */
-void WI_levelNameLump(int epis, int map, char* buf)
+void WI_levelNameLump(char* buf, boolean isNextLevel)
 {
-  if (gamemode == commercial) {
-    sprintf(buf, "CWILV%2.2d", map);
-  } else {
-    sprintf(buf, "WILV%d%d", epis, map);
+   mapentry_t *mapinfo = ((isNextLevel)? wbs->nextmapinfo : wbs->lastmapinfo);
+  // use the lump name from the levelpic mapinfo if available
+  if (mapinfo == NULL) {
+    int map = isNextLevel? wbs->next : wbs->last;
+    if (gamemode == commercial)
+      sprintf(buf, "CWILV%2.2d", map);
+    else
+      sprintf(buf, "WILV%d%d", wbs->epsd, map);
   }
+  else if (mapinfo->levelpic[0])
+    strcpy(buf, mapinfo->levelpic);
+  else
+    buf[0] = 0; // No levelname image provided for custom level
 }
 
 // ====================================================================
@@ -413,10 +429,12 @@ static void WI_slamBackground(void)
 {
   char  name[9];  // limited to 8 characters
 
-  if (gamemode == commercial || (gamemode == retail && wbs->epsd == 3))
+  if (state != StatCount && enterpic) strcpy(name, enterpic);
+  else if (exitpic) strcpy(name, exitpic);
+  else if (gamemode == commercial || (gamemode == retail && wbs->epsd == 3))
     strcpy(name, "INTERPIC");
   else
-    sprintf(name, "WIMAP%d", wbs->epsd);
+    sprintf(name, "WIMAP%d", state == StatCount? wbs->epsd : wbs->nextep);
 
 
   if (W_CheckNumForName(name) == -1) {
@@ -447,6 +465,54 @@ boolean WI_Responder(event_t* ev)
 
 
 // ====================================================================
+// WI_DrawString
+// Purpose: Draw a string of text using the game's font
+// Args:    cx    -- X coordinates for the text
+//          cy    -- Y coordinates for the text
+//          ch    -- string of text to draw.
+// Returns: void
+//
+static void WI_DrawString(int cx, int cy, const char* ch)
+{
+  int   w;
+  int   c;
+  const char *cc = ch;
+  int width = 0;
+
+  // center the text.
+  while (*cc) {
+    c = *cc++;         // get next char
+    c = toupper(c) - HU_FONTSTART;
+    if (c < 0 || c> HU_FONTSIZE)
+    {
+      width += SPACEWIDTH;    // space
+      continue;
+    }
+    width += hu_font[c].width;
+  }
+  cx -= width / 2;
+  if (cx < 0) cx = 0;
+
+
+  while (*ch) {
+    c = *ch++;         // get next char
+    c = toupper(c) - HU_FONTSTART;
+    if (c < 0 || c> HU_FONTSIZE)
+    {
+      cx += SPACEWIDTH;    // space
+      continue;
+    }
+    w = hu_font[c].width;
+    if (cx + w > 320)
+      break;
+
+    V_DrawNumPatch(cx, cy, 0, hu_font[c].lumpnum, CR_GRAY, VPT_STRETCH | VPT_TRANS);
+    cx += w;
+  }
+}
+
+
+// ====================================================================
 // WI_drawLF
 // Purpose: Draw the "Finished" level name before showing stats
 // Args:    none
@@ -458,20 +524,26 @@ void WI_drawLF(void)
   char lname[9];
 
   // draw <LevelName>
-  /* cph - get the graphic lump name and use it */
-  WI_levelNameLump(wbs->epsd, wbs->last, lname);
+  /* get the graphic lump name and use it */
+  WI_levelNameLump(lname, FALSE);
 
   if (W_CheckNumForName(lname) >= 0) // don't die on missing level names
   {
     // CPhipps - patch drawing updated
     V_DrawNamePatch((320 - V_NamePatchWidth(lname))/2, y,
        FB, lname, CR_DEFAULT, VPT_STRETCH);
-
-    // draw "Finished!"
+    // spacing
     y += (5*V_NamePatchHeight(lname))/4;
   }
+  else if (wbs->nextmapinfo != NULL && wbs->nextmapinfo->levelname != NULL)
+  {
+     // fallback to drawing string if no lump found but name is defined
+     WI_DrawString(160, y, wbs->nextmapinfo->levelname);
+     // spacing
+     y += (5*FONTHEIGHT)/4;
+  }
 
-  // CPhipps - patch drawing updated
+  // draw "Finished!"
   V_DrawNamePatch((320 - V_NamePatchWidth(finished))/2, y,
      FB, finished, CR_DEFAULT, VPT_STRETCH);
 }
@@ -488,23 +560,29 @@ void WI_drawEL(void)
   int y = WI_TITLEY;
   char lname[9];
 
-  /* cph - get the graphic lump name */
-  WI_levelNameLump(wbs->epsd, wbs->next, lname);
-
   // draw "Entering"
   // CPhipps - patch drawing updated
   V_DrawNamePatch((320 - V_NamePatchWidth(entering))/2,
       y, FB, entering, CR_DEFAULT, VPT_STRETCH);
 
-  if (W_CheckNumForName(lname) < 0) // don't die on missing level names
-    return;
 
-  // draw level
-  y += (5*V_NamePatchHeight(lname))/4;
+  /* get the graphic lump name */
+  WI_levelNameLump(lname, TRUE);
+  if (W_CheckNumForName(lname) >= 0) // draw it only if exists
+  {
+    // draw level picture
+    y += (5*V_NamePatchHeight(lname))/4;
 
-  // CPhipps - patch drawing updated
-  V_DrawNamePatch((320 - V_NamePatchWidth(lname))/2, y, FB,
-     lname, CR_DEFAULT, VPT_STRETCH);
+    // CPhipps - patch drawing updated
+    V_DrawNamePatch((320 - V_NamePatchWidth(lname))/2, y, FB,
+      lname, CR_DEFAULT, VPT_STRETCH);
+  }
+  else if (wbs->nextmapinfo != NULL && wbs->nextmapinfo->levelname != NULL)
+  {
+    // fallback to drawing string if no lump found but levelname is defined
+    y += (5 * V_NamePatchHeight(entering)) / 4;
+    WI_DrawString(160, y, wbs->nextmapinfo->levelname);
+  }
 }
 
 
@@ -569,13 +647,16 @@ WI_drawOnLnode  // draw stuff at a location by episode/map#
 // ====================================================================
 // WI_initAnimatedBack
 // Purpose: Initialize pointers and styles for background animation
-// Args:    none
+// Args:    isEntering - TRUE if entering a new level, FALSE otherwise
 // Returns: void
 //
-void WI_initAnimatedBack(void)
+void WI_initAnimatedBack(boolean isEntering)
 {
   unsigned i;
   anim_t*  a;
+
+  // mapinfo enter/exit pictures are static
+  if (exitpic || (enterpic && isEntering)) return;
 
   if (gamemode == commercial)  // no animation for DOOM2
     return;
@@ -614,6 +695,9 @@ void WI_updateAnimatedBack(void)
   unsigned i;
   anim_t*  a;
 
+  // mapinfo enter/exit pictures are static
+  if (exitpic || (enterpic && state != StatCount)) return;
+
   if (gamemode == commercial)
     return;
 
@@ -629,31 +713,31 @@ void WI_updateAnimatedBack(void)
       switch (a->type)
       {
         case ANIM_ALWAYS:
-             if (++a->ctr >= a->nanims) a->ctr = 0;
-             a->nexttic = bcnt + a->period;
-             break;
+          if (++a->ctr >= a->nanims) a->ctr = 0;
+            a->nexttic = bcnt + a->period;
+          break;
 
         case ANIM_RANDOM:
-             a->ctr++;
-             if (a->ctr == a->nanims)
-             {
-               a->ctr = -1;
-               a->nexttic = bcnt+a->data2+(M_Random()%a->data1);
-             }
-             else
-               a->nexttic = bcnt + a->period;
-             break;
+          a->ctr++;
+          if (a->ctr == a->nanims)
+          {
+            a->ctr = -1;
+            a->nexttic = bcnt+a->data2+(M_Random()%a->data1);
+          }
+          else
+            a->nexttic = bcnt + a->period;
+          break;
 
         case ANIM_LEVEL:
-             // gawd-awful hack for level anims
-             if (!(state == StatCount && i == 7)
-                && wbs->next == a->data1)
-             {
-               a->ctr++;
-               if (a->ctr == a->nanims) a->ctr--;
-               a->nexttic = bcnt + a->period;
-             }
-             break;
+          // gawd-awful hack for level anims
+          if (!(state == StatCount && i == 7)
+             && wbs->next == a->data1)
+          {
+            a->ctr++;
+            if (a->ctr == a->nanims) a->ctr--;
+              a->nexttic = bcnt + a->period;
+          }
+          break;
       }
     }
   }
@@ -670,6 +754,9 @@ void WI_drawAnimatedBack(void)
 {
   unsigned  i;
   anim_t*   a;
+
+  // mapinfo enter/exit pictures are static
+  if (exitpic || (enterpic && state != StatCount)) return;
 
   if (gamemode==commercial) //jff 4/25/98 Someone forgot commercial an enum
     return;
@@ -893,14 +980,16 @@ static boolean    snl_pointeron = FALSE;
 //
 void WI_initShowNextLoc(void)
 {
-  if ((gamemode != commercial) && (gamemap == 8)) {
+  if ((gamemapinfo != NULL && gamemapinfo->endpic[0])
+      || ((gamemode != commercial) && (gamemap == 8)))
+  {
     G_WorldDone();
     return;
   }
 
   state = ShowNextLoc;
   acceleratestage = 0;
-  
+
   // e6y: That was pretty easy - only a HEX editor and luck
   // There is no more desync on ddt-tas.zip\e4tux231.lmp
   // --------- tasdoom.idb ---------
@@ -914,7 +1003,7 @@ void WI_initShowNextLoc(void)
   else
     cnt = SHOWNEXTLOCDELAY * TICRATE;
 
-  WI_initAnimatedBack();
+  WI_initAnimatedBack(TRUE);
 }
 
 
@@ -951,6 +1040,13 @@ void WI_drawShowNextLoc(void)
   // draw animated background
   WI_drawAnimatedBack();
 
+  // custom interpic.
+  if (exitpic || (enterpic && state != StatCount))
+  {
+    WI_drawEL();
+    return;
+  }
+
   if ( gamemode != commercial)
   {
     if (wbs->epsd > 2)
@@ -977,7 +1073,7 @@ void WI_drawShowNextLoc(void)
   // draws which level you are entering..
   if ( (gamemode != commercial)
      || wbs->next != 30)  // check for MAP30 end game
-  WI_drawEL();
+    WI_drawEL();
 }
 
 // ====================================================================
@@ -1056,7 +1152,7 @@ void WI_initDeathmatchStats(void)
       dm_totals[i] = 0;
     }
   }
-  WI_initAnimatedBack();
+  WI_initAnimatedBack(FALSE);
 }
 
 // ====================================================================
@@ -1337,7 +1433,7 @@ void WI_initNetgameStats(void)
 
   dofrags = !!dofrags; // set to TRUE or FALSE - did we have frags?
 
-  WI_initAnimatedBack();
+  WI_initAnimatedBack(FALSE);
 }
 
 
@@ -1605,7 +1701,7 @@ void WI_initStats(void)
   cnt_time = cnt_par = cnt_total_time = -1;
   cnt_pause = TICRATE;
 
-  WI_initAnimatedBack();
+  WI_initAnimatedBack(FALSE);
 }
 
 // ====================================================================
@@ -1987,6 +2083,9 @@ void WI_initVariables(wbstartstruct_t* wbstartstruct)
   if ( gamemode != retail )
     if (wbs->epsd > 2)
       wbs->epsd -= 3;
+
+  exitpic = (wbs->lastmapinfo && wbs->lastmapinfo->exitpic[0]) ? wbs->lastmapinfo->exitpic : NULL;
+  enterpic = (wbs->nextmapinfo && wbs->nextmapinfo->enterpic[0]) ? wbs->nextmapinfo->enterpic : NULL;
 }
 
 // ====================================================================

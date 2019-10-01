@@ -107,6 +107,7 @@ skill_t         gameskill;
 boolean         respawnmonsters;
 int             gameepisode;
 int             gamemap;
+mapentry_t*     gamemapinfo;
 boolean         paused;
 // CPhipps - moved *_loadgame vars here
 static boolean forced_loadgame = FALSE;
@@ -244,6 +245,7 @@ mobj_t **bodyque = 0;                   // phares 8/10/98
 
 static void G_DoSaveGame (boolean menu);
 static const uint8_t* G_ReadDemoHeader(const uint8_t* demo_p, size_t size, boolean failonerror);
+static mapentry_t *G_LookupMapinfo(int episode, int map);
 
 //
 // G_BuildTiccmd
@@ -540,88 +542,98 @@ void G_RestartLevel(void)
 
 static void G_DoLoadLevel (void)
 {
-   int i;
+  int i;
 
-   /* Set the sky map for the episode.
-    * First thing, we have a dummy sky texture name,
-    *  a flat. The data is in the WAD only because
-    *  we look for an actual index, instead of simply
-    *  setting one.
-    */
+  lprintf(LO_ALWAYS,
+          "---------------------------------\n"
+          "G_DoLoadLevel: Episode %d - Map %.2d\n"
+          "---------------------------------\n",
+          gameepisode, gamemap);
 
-   skyflatnum = R_FlatNumForName ( SKYFLATNAME );
+  /* Set the sky map for the episode.
+   * First thing, we have a dummy sky texture name,
+   *  a flat. The data is in the WAD only because
+   *  we look for an actual index, instead of simply
+   *  setting one.
+   */
+  skyflatnum = R_FlatNumForName ( SKYFLATNAME );
 
-   /* DOOM determines the sky texture to be used
-    * depending on the current episode, and the game version.
-    */
-   if (gamemode == commercial)
-      // || gamemode == pack_tnt   //jff 3/27/98 sorry guys pack_tnt,pack_plut
-      // || gamemode == pack_plut) //aren't gamemodes, this was matching retail
-   {
-      skytexture = R_TextureNumForName ("SKY3");
-      if (gamemap < 12)
-         skytexture = R_TextureNumForName ("SKY1");
-      else
-         if (gamemap < 21)
-            skytexture = R_TextureNumForName ("SKY2");
-   }
-   else /* and lets not forget about DOOM, Ultimate DOOM, SIGIL & extra Eps */
-   {
-     // Each episode has its own sky, numbered after it
-     char skyname[9];
-     sprintf(skyname, "SKY%d", gameepisode);
-     skytexture = R_CheckTextureNumForName(skyname);
-     if (skytexture == -1)
-       // default sky, in case of custom episodes with missing SKY
-       skytexture = R_TextureNumForName ("SKY1");
-   }
+  /* skytexture set through UMAPINFO */
+  if (gamemapinfo && gamemapinfo->skytexture[0])
+  {
+    skytexture = R_TextureNumForName(gamemapinfo->skytexture);
+  }
+  /* DOOM determines the sky texture to be used
+   * depending on the current episode, and the game version.
+   */
+  else if (gamemode == commercial)
+     // || gamemode == pack_tnt   //jff 3/27/98 sorry guys pack_tnt,pack_plut
+     // || gamemode == pack_plut) //aren't gamemodes, this was matching retail
+  {
+    skytexture = R_TextureNumForName ("SKY3");
+    if (gamemap < 12)
+      skytexture = R_TextureNumForName ("SKY1");
+    else
+      if (gamemap < 21)
+        skytexture = R_TextureNumForName ("SKY2");
+  }
+  else /* and lets not forget about DOOM, Ultimate DOOM, SIGIL & extra Eps */
+  {
+    // Each episode has its own sky, numbered after it
+    char skyname[9];
+    sprintf(skyname, "SKY%d", gameepisode);
+    skytexture = R_CheckTextureNumForName(skyname);
+    if (skytexture == -1)
+      // default sky, in case of custom episodes with missing SKY
+      skytexture = R_TextureNumForName ("SKY1");
+  }
 
-   /* cph 2006/07/31 - took out unused levelstarttic variable */
+  /* cph 2006/07/31 - took out unused levelstarttic variable */
 
-   if (!demo_compatibility && !mbf_features)   // killough 9/29/98
-      basetic = gametic;
+  if (!demo_compatibility && !mbf_features)   // killough 9/29/98
+     basetic = gametic;
 
-   if (wipegamestate == GS_LEVEL && (gameaction == ga_newgame || gameaction == ga_completed))
-      wipegamestate = -1;             // force a wipe
+  if (wipegamestate == GS_LEVEL && (gameaction == ga_newgame || gameaction == ga_completed))
+     wipegamestate = -1;             // force a wipe
 
-   gamestate = GS_LEVEL;
+  gamestate = GS_LEVEL;
 
-   for (i=0 ; i<MAXPLAYERS ; i++)
-   {
-      if (playeringame[i] && players[i].playerstate == PST_DEAD)
-         players[i].playerstate = PST_REBORN;
-      memset (players[i].frags,0,sizeof(players[i].frags));
-   }
+  for (i=0 ; i<MAXPLAYERS ; i++)
+  {
+    if (playeringame[i] && players[i].playerstate == PST_DEAD)
+      players[i].playerstate = PST_REBORN;
+    memset (players[i].frags,0,sizeof(players[i].frags));
+  }
 
-   // initialize the msecnode_t freelist.                     phares 3/25/98
-   // any nodes in the freelist are gone by now, cleared
-   // by Z_FreeTags() when the previous level ended or player
-   // died.
+  // initialize the msecnode_t freelist.                     phares 3/25/98
+  // any nodes in the freelist are gone by now, cleared
+  // by Z_FreeTags() when the previous level ended or player
+  // died.
 
-   {
-      DECLARE_BLOCK_MEMORY_ALLOC_ZONE(secnodezone);
-      NULL_BLOCK_MEMORY_ALLOC_ZONE(secnodezone);
-      //extern msecnode_t *headsecnode; // phares 3/25/98
-      //headsecnode = NULL;
-   }
+  {
+    DECLARE_BLOCK_MEMORY_ALLOC_ZONE(secnodezone);
+    NULL_BLOCK_MEMORY_ALLOC_ZONE(secnodezone);
+    //extern msecnode_t *headsecnode; // phares 3/25/98
+    //headsecnode = NULL;
+  }
 
-   P_SetupLevel (gameepisode, gamemap, 0, gameskill);
-   if (!demoplayback) /* Don't switch views if playing a demo */
-      displayplayer = consoleplayer;    /* view the guy you are playing */
-   gameaction = ga_nothing;
+  P_SetupLevel (gameepisode, gamemap, 0, gameskill);
+  if (!demoplayback) /* Don't switch views if playing a demo */
+    displayplayer = consoleplayer;    /* view the guy you are playing */
+  gameaction = ga_nothing;
 
-   Z_CheckHeap ();
+  Z_CheckHeap ();
 
-   /* clear cmd building stuff */
-   memset (gamekeydown, 0, sizeof(gamekeydown));
-   mousex = mousey = 0;
-   mlooky = 0;
-   special_event = 0; paused = FALSE;
-   memset (mousebuttons, 0, sizeof(*mousebuttons));
+  /* clear cmd building stuff */
+  memset (gamekeydown, 0, sizeof(gamekeydown));
+  mousex = mousey = 0;
+  mlooky = 0;
+  special_event = 0; paused = FALSE;
+  memset (mousebuttons, 0, sizeof(*mousebuttons));
 
-   // killough 5/13/98: in case netdemo has consoleplayer other than green
-   ST_Start();
-   HU_Start();
+  // killough 5/13/98: in case netdemo has consoleplayer other than green
+  ST_Start();
+  HU_Start();
 }
 
 
@@ -1249,7 +1261,7 @@ int cpars[32] = {
   120,30          // 31-32
 };
 
-static boolean secretexit;
+boolean secretexit;
 
 /*
 ====================
@@ -1294,18 +1306,41 @@ void G_DoCompleted (void)
   if (automapmode & am_active)
     AM_Stop();
 
+  wminfo.lastmapinfo = gamemapinfo;
+  wminfo.nextmapinfo = NULL;
+  if (gamemapinfo)
+  {
+    if (gamemapinfo->endpic[0])
+    {
+      gameaction = ga_victory;
+      return;
+    }
+    const char *next = "";
+    if (secretexit) next = gamemapinfo->nextsecret;
+    if (next[0] == 0) next = gamemapinfo->nextmap;
+    if (next[0])
+    {
+      G_ValidateMapName(next, &wminfo.nextep, &wminfo.next);
+      wminfo.nextep--;
+      wminfo.next--;
+      wminfo.didsecret = players[consoleplayer].didsecret;
+      wminfo.partime = gamemapinfo->partime;
+      goto frommapinfo;	// skip past the default setup.
+    }
+  }
+
   if (gamemode != commercial) // kilough 2/7/98
     switch(gamemap)
-      {
-  // cph - Remove ExM8 special case, so it gets summary screen displayed
+    {
+      // cph - Remove ExM8 special case, so it gets summary screen displayed
       case 9:
         for (i=0 ; i<MAXPLAYERS ; i++)
           players[i].didsecret = TRUE;
         break;
-      }
+    }
 
   wminfo.didsecret = players[consoleplayer].didsecret;
-  wminfo.epsd = gameepisode -1;
+  wminfo.nextep = wminfo.epsd = gameepisode -1;
   wminfo.last = gamemap -1;
 
   // wminfo.next is 0 biased, unlike gamemap
@@ -1366,16 +1401,17 @@ void G_DoCompleted (void)
           wminfo.next = gamemap;          // go to next level
     }
 
-  wminfo.maxkills = totalkills;
-  wminfo.maxitems = totalitems;
-  wminfo.maxsecret = totalsecret;
-  wminfo.maxfrags = 0;
-
   if ( gamemode == commercial )
     wminfo.partime = TICRATE*cpars[gamemap-1];
   else
     wminfo.partime = TICRATE*pars[gameepisode][gamemap];
 
+frommapinfo:
+  wminfo.nextmapinfo = G_LookupMapinfo(wminfo.nextep+1, wminfo.next+1);
+  wminfo.maxkills = totalkills;
+  wminfo.maxitems = totalitems;
+  wminfo.maxsecret = totalsecret;
+  wminfo.maxfrags = 0;
   wminfo.pnum = consoleplayer;
 
   for (i=0 ; i<MAXPLAYERS ; i++)
@@ -1413,6 +1449,29 @@ void G_WorldDone (void)
   if (secretexit)
     players[consoleplayer].didsecret = TRUE;
 
+  if (gamemapinfo)
+  {
+    if (gamemapinfo->intertextsecret && secretexit)
+    {
+      if (gamemapinfo->intertextsecret[0] != '-') // '-' means that any default intermission was cleared.
+        F_StartFinale();
+      return;
+    }
+    else if (gamemapinfo->intertext && !secretexit)
+    {
+      if (gamemapinfo->intertext[0] != '-') // '-' means that any default intermission was cleared.
+        F_StartFinale();
+      return;
+    }
+    else if (gamemapinfo->endpic && gamemapinfo->endpic[0] && gamemapinfo->nointermission)
+    {
+      // game ends without a status screen.
+      gameaction = ga_victory;
+      return;
+    }
+    // if nothing applied, use the defaults.
+  }
+
   if (gamemode == commercial)
     {
       switch (gamemap)
@@ -1438,7 +1497,9 @@ void G_DoWorldDone (void)
 {
   idmusnum = -1;             //jff 3/17/98 allow new level's music to be loaded
   gamestate = GS_LEVEL;
-  gamemap = wminfo.next+1;
+  gameepisode = wminfo.nextep + 1;
+  gamemap = wminfo.next + 1;
+  gamemapinfo = G_LookupMapinfo(gameepisode, gamemap);
   G_DoLoadLevel();
   gameaction = ga_nothing;
   AM_clearMarks();           //jff 4/12/98 clear any marks on the automap
@@ -1648,6 +1709,7 @@ void G_DoLoadGame(void)
   gameskill = *save_p++;
   gameepisode = *save_p++;
   gamemap = *save_p++;
+  gamemapinfo = G_LookupMapinfo(gameepisode, gamemap);
 
   for (i=0 ; i<MAXPLAYERS ; i++)
     playeringame[i] = *save_p++;
@@ -2116,6 +2178,66 @@ void G_ScaleMovementToFramerate (void)
 }
 
 //
+//
+//
+mapentry_t *G_LookupMapinfo(int episode, int map)
+{
+  char lumpname[9];
+  unsigned i;
+  if (gamemode == commercial) snprintf(lumpname, 9, "MAP%02d", map);
+  else snprintf(lumpname, 9, "E%dM%d", episode, map);
+  for (i = 0; i < U_mapinfo.mapcount; i++)
+  {
+    if (!stricmp(lumpname, U_mapinfo.maps[i].mapname))
+    {
+      return &U_mapinfo.maps[i];
+    }
+  }
+  return NULL;
+}
+
+//
+//
+//
+mapentry_t *G_LookupMapinfoByName(const char *lumpname)
+{
+  unsigned i;
+  for (i = 0; i < U_mapinfo.mapcount; i++)
+  {
+    if (!stricmp(lumpname, U_mapinfo.maps[i].mapname))
+    {
+      return &U_mapinfo.maps[i];
+    }
+  }
+  return NULL;
+}
+
+
+int G_ValidateMapName(const char *mapname, int *pEpi, int *pMap)
+{
+  // Check if the given map name can be expressed as a gameepisode/gamemap pair and be reconstructed from it.
+  char lumpname[9], mapuname[9];
+  int epi = -1, map = -1;
+
+  if (strlen(mapname) > 8) return 0;
+  strncpy(mapuname, mapname, 8);
+  mapuname[8] = 0;
+  M_Strupr(mapuname);
+
+
+  if (sscanf(mapuname, "MAP%d", &map) == 1)
+    snprintf(lumpname, 9, "MAP%02d", map);
+  else if (sscanf(mapuname, "E%dM%d", &epi, &map) == 2)
+    snprintf(lumpname, 9, "E%dM%d", epi, map);
+  else return 0;
+
+  if (pEpi) *pEpi = epi;
+  if (pMap) *pMap = map;
+  return !strcmp(mapuname, lumpname);
+}
+
+
+//
 // G_InitNew
 // Can be called by the startup code or the menu task,
 // consoleplayer, displayplayer, playeringame[] should be set.
@@ -2173,6 +2295,7 @@ void G_InitNew(skill_t skill, int episode, int map)
   gameepisode = episode;
   gamemap = map;
   gameskill = skill;
+  gamemapinfo = G_LookupMapinfo(gameepisode, gamemap);
 
   totalleveltimes = 0; // cph
 

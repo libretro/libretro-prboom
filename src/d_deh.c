@@ -95,7 +95,7 @@ static char *dehfgets(char *buf, size_t n, DEHFILE *fp)
   else
     {                                                // copy buffer
       char *p = buf;
-      while (n>1 && *fp->inp && fp->size &&
+      while (n>1 && fp->size && *fp->inp &&
              (n--, fp->size--, *p++ = *fp->inp++) != '\n')
         ;
       *p = 0;
@@ -105,7 +105,7 @@ static char *dehfgets(char *buf, size_t n, DEHFILE *fp)
 
 static int dehfeof(DEHFILE *fp)
 {
-  return !fp->lump ? feof(fp->f) : !*fp->inp || fp->size<=0;
+  return !fp->lump ? feof(fp->f) : fp->size<=0 || !*fp->inp;
 }
 
 static int dehfgetc(DEHFILE *fp)

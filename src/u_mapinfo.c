@@ -120,8 +120,9 @@ static int ParseLumpName(u_scanner_t* s, char *buffer)
 // -----------------------------------------------
 static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
 {
+  char *pname;
   U_MustGetToken(s, TK_Identifier);
-  char *pname = strdup(s->string);
+  pname = strdup(s->string);
   U_MustGetToken(s, '=');
 
   if (!strcasecmp(pname, "levelname"))
@@ -229,8 +230,8 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
   }
   else if (!strcasecmp(pname, "bossaction"))
   {
-    U_MustGetToken(s, TK_Identifier);
     int special, tag;
+    U_MustGetToken(s, TK_Identifier);
     if (!strcasecmp(s->string, "clear"))
     {
       // mark level free of boss actions
@@ -266,17 +267,14 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
           break;
         }
       }
-      U_Error(s, "Unknown thing type %s", s->string);
+      U_Error(s, "bossaction: unknown thing type '%s'", s->string);
       return 0;
     }
   }
-  else do
+  // If no known property name was given, skip all comma-separated values after the = sign
+  else if (s->token == '=') do
   {
-    if (!U_CheckFloat(s)) U_GetNextToken(s, TRUE);
-    if (s->token > TK_BoolConst)
-    {
-      U_ErrorToken(s, TK_Identifier);
-    }
+    U_GetNextToken(s, TRUE);
   } while (U_CheckToken(s, ','));
 
   free(pname);

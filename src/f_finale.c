@@ -295,9 +295,8 @@ void F_Ticker(void)
           if (!strcasecmp(gamemapinfo->endpic, "$CAST"))
           {
             F_StartCast();
-            //using_FMI = false;
-           }
-           else
+          }
+          else
           {
             FinaleCount = 0;
             FinaleStage = 1;
@@ -305,7 +304,6 @@ void F_Ticker(void)
             if (!strcasecmp(gamemapinfo->endpic, "$BUNNY"))
             {
               S_StartMusic(mus_bunny);
-              //using_FMI = false;
             }
           }
         }
@@ -453,14 +451,22 @@ void F_CastTicker (void)
   if (caststate->tics == -1 || caststate->nextstate == S_NULL)
   {
     // switch from deathstate to next monster
-    castnum++;
     castdeath = FALSE;
-    if (castorder[castnum].name == NULL)
-      castnum = 0;
-    if (mobjinfo[castorder[castnum].type].seesound)
-      S_StartSound (NULL, mobjinfo[castorder[castnum].type].seesound);
-    caststate = &states[mobjinfo[castorder[castnum].type].seestate];
     castframes = 0;
+
+    // find the next cast member with valid sprite frames
+    do
+    {
+       castnum++;
+       if (castorder[castnum].name == NULL)
+          castnum = 0;
+       caststate = &states[mobjinfo[castorder[castnum].type].seestate];
+    }
+    while(!sprites[caststate->sprite].numframes && castorder[castnum].name && castnum);
+
+    // Play its see sound
+    if (mobjinfo[castorder[castnum].type].seesound)
+       S_StartSound (NULL, mobjinfo[castorder[castnum].type].seesound);
   }
   else
   {
@@ -629,6 +635,7 @@ void F_CastDrawer (void)
 {
   spritedef_t*        sprdef;
   spriteframe_t*      sprframe;
+  int                 sprframenum;
   int                 lump;
   boolean             flip;
 
@@ -640,13 +647,17 @@ void F_CastDrawer (void)
 
   // draw the current frame in the middle of the screen
   sprdef = &sprites[caststate->sprite];
-  sprframe = &sprdef->spriteframes[ caststate->frame & FF_FRAMEMASK];
-  lump = sprframe->lump[0];
-  flip = (boolean)sprframe->flip[0];
+  sprframenum = caststate->frame & FF_FRAMEMASK;
+  if (sprframenum < sprdef->numframes)
+  {
+    sprframe = &sprdef->spriteframes[ caststate->frame & FF_FRAMEMASK];
+    lump = sprframe->lump[0];
+    flip = (boolean)sprframe->flip[0];
 
-  // CPhipps - patch drawing updated
-  V_DrawNumPatch(160, 170, 0, lump+firstspritelump, CR_DEFAULT,
-     VPT_STRETCH | (flip ? VPT_FLIP : 0));
+    // CPhipps - patch drawing updated
+    V_DrawNumPatch(160, 170, 0, lump+firstspritelump, CR_DEFAULT,
+       VPT_STRETCH | (flip ? VPT_FLIP : 0));
+  }
 }
 
 //

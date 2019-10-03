@@ -87,6 +87,7 @@ static void cheat_megaarmour();
 static void cheat_health();
 static void cheat_exitl();
 static void cheat_exits();
+static void cheat_summon();
 
 
 //-----------------------------------------------------------------------------
@@ -176,6 +177,9 @@ struct cheat_s cheat[] = {
 
   {"idxits",     "Exit to secret",    not_net | not_demo | not_menu,
    cheat_exits, 0, 0, 0     },
+
+  {"idsumm",     "Spawn an actor",    not_net | not_demo | not_menu,
+   cheat_summon, -3, 0, 0     },
 
   {"tntcomp",    NULL,                not_net | not_demo,
    cheat_comp, 0, 0, 0     },     // phares
@@ -464,6 +468,36 @@ static void cheat_exitl()
 static void cheat_exits()
 {
   G_SecretExitLevel ();
+}
+
+
+// 'idsumm' Summon a mob (using dehacked thing ids)
+static void cheat_summon(char buf[4])
+{
+  int mobid = 100 * (buf[0] - '0') + 10 * (buf[1] - '0') + (buf[2] - '0');
+  mobid--; // Thing ids in dehacked start with 1, but mobjinfo array is base zero
+  if (mobid < 0 || mobid >= NUMMOBJTYPES)
+     doom_printf("Unknown object id '%s'", buf);
+  else
+  {
+     mobj_t *newmobj, *playmobj;
+     angle_t angle;
+     int prestep, x, y, z;
+
+     doom_printf("Summon %d: %s", mobid+1, mobjinfo[mobid].actorname);
+
+     playmobj = players[consoleplayer].mo;
+     angle = playmobj->angle >> ANGLETOFINESHIFT;
+     prestep = 4*FRACUNIT + 3*(playmobj->info->radius + mobjinfo[MT_SKULL].radius)/2;
+
+     x = playmobj->x + FixedMul(prestep, finecosine[angle]);
+     y = playmobj->y + FixedMul(prestep, finesine[angle]);
+     z = playmobj->z + 8*FRACUNIT;
+
+     newmobj = P_SpawnMobj(x, y, z, mobid);
+     newmobj->flags |= MF_FRIEND; // make it friendly
+     P_UpdateThinker(&newmobj->thinker);
+  }
 }
 
 // 'mypos' for player position

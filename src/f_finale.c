@@ -699,26 +699,22 @@ static void F_BunnyScroll (void)
 */
 void F_Drawer (void)
 {
-  if (gamemapinfo) {
-    if (!FinaleStage || !gamemapinfo->endpic[0])
-    {
-      F_TextWrite();
-    }
-    else
-    {
-      V_DrawNamePatch(0, 0, 0, gamemapinfo->endpic, CR_DEFAULT, VPT_STRETCH);
-      // e6y: wide-res
-      //V_FillBorder(-1, 0);
-    }
-    return;
-  }
-
   if (!FinaleStage)
     F_TextWrite ();
   else if (FinaleStage == 2)
   {
     F_CastDrawer ();
     return;
+  }
+  else if (gamemapinfo) {
+    if (!gamemapinfo->endpic[0])
+      F_TextWrite();
+    else
+    {
+      V_DrawNamePatch(0, 0, 0, gamemapinfo->endpic, CR_DEFAULT, VPT_STRETCH);
+      // e6y: wide-res
+      //V_FillBorder(-1, 0);
+    }
   }
   else
   {

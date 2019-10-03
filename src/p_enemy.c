@@ -1912,6 +1912,40 @@ void A_SkullAttack(mobj_t *actor)
 }
 
 //
+// A_BetaSkullAttack
+// The flying skull had different behavior on Beta Doom
+//
+
+void A_BetaSkullAttack(mobj_t *actor)
+{
+  int damage;
+
+  if (compatibility_level < mbf_compatibility)
+    return;
+
+  if (!actor->target || actor->target->type == MT_SKULL)
+    return;
+
+  S_StartSound(actor, actor->info->attacksound);
+  A_FaceTarget(actor);
+  damage = (P_Random(pr_skullfly)%8+1)*actor->info->damage;
+  P_DamageMobj(actor->target, actor, actor, damage);
+}
+
+//
+// A_Stop
+// The flying skull had different behavior on Beta Doom
+//
+
+void A_Stop(mobj_t *actor)
+{
+  if (compatibility_level < mbf_compatibility)
+    return;
+
+  actor->momx = actor->momy = actor->momz = 0;
+}
+
+//
 // A_PainShootSkull
 // Spawn a lost soul and launch it at the target
 //

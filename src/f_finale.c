@@ -724,6 +724,8 @@ void F_Drawer (void)
   else if (gamemapinfo) {
     if (!gamemapinfo->endpic[0])
       F_TextWrite();
+    else if (!stricmp(gamemapinfo->endpic, "$BUNNY"))
+       F_BunnyScroll ();
     else
     {
       V_DrawNamePatch(0, 0, 0, gamemapinfo->endpic, CR_DEFAULT, VPT_STRETCH);

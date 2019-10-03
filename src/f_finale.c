@@ -432,6 +432,10 @@ void F_StartCast (void)
   castonmelee = 0;
   castattacking = FALSE;
   S_ChangeMusic(mus_evil, TRUE);
+
+  // Fallback to CREDIT if Cast background is missing (eg. Doom1)
+  if (W_CheckNumForName(bgcastcall) == -1)
+     bgcastcall = "CREDIT";
 }
 
 

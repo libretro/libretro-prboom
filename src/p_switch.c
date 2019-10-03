@@ -148,11 +148,11 @@ void P_InitSwitchList(void)
       // Warn if either one is missing, but only add if both are valid.
       texture1 = R_CheckTextureNumForName(alphSwitchList[i].name1);
       if (texture1 == -1)
-        lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
+        lprintf(LO_WARN, "P_InitSwitchList: unknown texture %.8s\n",
           alphSwitchList[i].name1);
       texture2 = R_CheckTextureNumForName(alphSwitchList[i].name2);
       if (texture2 == -1)
-        lprintf(LO_WARN, "P_InitSwitchList: unknown texture %s\n",
+        lprintf(LO_WARN, "P_InitSwitchList: unknown texture %.8s\n",
           alphSwitchList[i].name2);
       if (texture1 != -1 && texture2 != -1) {
         switchlist[index++] = texture1;

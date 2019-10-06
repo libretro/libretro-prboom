@@ -1489,7 +1489,8 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
     }
 
   lprintf(LO_INFO, "Loading DEH %s %s\n",file_or_lump,filename);
-  if (fileout) fprintf(fileout,"\nLoading DEH %s %s\n\n",file_or_lump,filename);
+  if (fileout) fprintf(fileout,"--------------------------\n"
+                       "Loading DEH %s %s\n\n",file_or_lump,filename);
 
   // move deh_codeptr initialisation to D_BuildBEXTables
 
@@ -1500,7 +1501,6 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
       unsigned i;
 
       lfstrip(inbuffer);
-      if (fileout) fprintf(fileout,"Line='%s'\n",inbuffer);
       if (!*inbuffer || *inbuffer == '#' || *inbuffer == ' ')
         continue; /* Blank line or comment line */
 
@@ -1548,15 +1548,18 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
           continue;
         }
 
+      // Execute the matching deh_blocks processing function
       for (i=0; i<DEH_BLOCKMAX; i++)
-        if (!strncasecmp(inbuffer,deh_blocks[i].key,strlen(deh_blocks[i].key)))
-          { // matches one
-            if (fileout)
-              fprintf(fileout,"Processing function [%d] for %s\n",
-                      i, deh_blocks[i].key);
-            deh_blocks[i].fptr(filein,fileout,inbuffer);  // call function
-            break;  // we got one, that's enough for this block
-          }
+      {
+        const char *key = deh_blocks[i].key;
+        if (!strncasecmp(inbuffer,key,strlen(key)))
+        {
+          if (fileout && key[0])
+            fprintf(fileout,"---\n-- Processing %s block\n", key);
+          deh_blocks[i].fptr(filein,fileout,inbuffer);  // call function
+          break;  // we got one, that's enough for this block
+        }
+      }
     }
 
   if (infile.lump)
@@ -1757,15 +1760,20 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
   char *strval;
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
-  if (fpout) fprintf(fpout,"Thing line: '%s'\n",inbuffer);
 
   // killough 8/98: allow hex numbers in input:
   ix = sscanf(inbuffer,"%s %i",key, &indexnum);
-  if (fpout) fprintf(fpout,"count=%d, Thing %d\n",ix, indexnum);
+  if (ix != 2)
+     I_Error("Error reading Thing index!\n");
 
   // Note that the mobjinfo[] array is base zero, but object numbers
   // in the dehacked file start with one.  Grumble.
   --indexnum;
+
+  if (fpout) fprintf(fpout,"Thing %d (%s) -> line: '%s'\n", indexnum+1,
+                     ((indexnum >= 0 && indexnum < NUMMOBJTYPES)?
+                      mobjinfo[indexnum].actorname : "invalid"),
+                     inbuffer);
 
   // now process the stuff
   // Note that for Things we can look up the key and use its offset

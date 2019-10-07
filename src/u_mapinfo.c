@@ -88,7 +88,7 @@ static char *ParseMultiString(u_scanner_t* s, int error)
       build = (char*)realloc(build, newlen);
       build[oldlen] = '\n';
       strcpy(build + oldlen + 1, s->string);
-      build[newlen] = 0;
+      build[newlen-1] = 0;
     }
   } while (U_CheckToken(s, ','));
   return build;
@@ -97,14 +97,20 @@ static char *ParseMultiString(u_scanner_t* s, int error)
 
 // -----------------------------------------------
 // Parses a lump name. The buffer must be at least 9 characters.
+// If parsed name is longer than 8 chars, sets NULL pointer.
+//
+// returns 1 on successfully parsing an element
+//         0 on parse error in last read token
 // -----------------------------------------------
 static int ParseLumpName(u_scanner_t* s, char *buffer)
 {
-  U_MustGetToken(s, TK_StringConst);
+  if (!U_MustGetToken(s, TK_StringConst))
+    return 0;
+
   if (strlen(s->string) > 8)
   {
     U_Error(s, "String too long. Maximum size is 8 characters.");
-    return 0;
+    return 1; // not a parse error
   }
   strncpy(buffer, s->string, 8);
   buffer[8] = 0;
@@ -117,57 +123,64 @@ static int ParseLumpName(u_scanner_t* s, char *buffer)
 // Parses a standard property that is already known
 // These do not get stored in the property list
 // but in dedicated struct member variables.
+//
+// returns 1 on successfully parsing an element
+//         0 on parse error in last read token
 // -----------------------------------------------
 static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
 {
-  U_MustGetToken(s, TK_Identifier);
-  char *pname = strdup(s->string);
+  char *pname;
+  int status = 1; // 1 for success, 0 for parse error
+  if (!U_MustGetToken(s, TK_Identifier))
+    return 0;
+
+  pname = strdup(s->string);
   U_MustGetToken(s, '=');
 
   if (!strcasecmp(pname, "levelname"))
   {
-    U_MustGetToken(s, TK_StringConst);
-    ReplaceString(&mape->levelname, s->string);
+    if (U_MustGetToken(s, TK_StringConst))
+      ReplaceString(&mape->levelname, s->string);
   }
   else if (!strcasecmp(pname, "episode"))
   {
     char *lname = ParseMultiString(s, 1);
-    if (!lname) return 0;
-    M_AddEpisode(mape->mapname, lname);
+    if (lname)
+      M_AddEpisode(mape->mapname, lname);
   }
   else if (!strcasecmp(pname, "next"))
   {
-    ParseLumpName(s, mape->nextmap);
+    status = ParseLumpName(s, mape->nextmap);
     if (!G_ValidateMapName(mape->nextmap, NULL, NULL))
     {
       U_Error(s, "Invalid map name %s.", mape->nextmap);
-      return 0;
+      status = 0;
     }
   }
   else if (!strcasecmp(pname, "nextsecret"))
   {
-    ParseLumpName(s, mape->nextsecret);
+    status = ParseLumpName(s, mape->nextsecret);
     if (!G_ValidateMapName(mape->nextsecret, NULL, NULL))
     {
       U_Error(s, "Invalid map name %s", mape->nextmap);
-      return 0;
+      status = 0;
     }
   }
   else if (!strcasecmp(pname, "levelpic"))
   {
-    ParseLumpName(s, mape->levelpic);
+    status = ParseLumpName(s, mape->levelpic);
   }
   else if (!strcasecmp(pname, "skytexture"))
   {
-    ParseLumpName(s, mape->skytexture);
+    status = ParseLumpName(s, mape->skytexture);
   }
   else if (!strcasecmp(pname, "music"))
   {
-    ParseLumpName(s, mape->music);
+    status = ParseLumpName(s, mape->music);
   }
   else if (!strcasecmp(pname, "endpic"))
   {
-    ParseLumpName(s, mape->endpic);
+    status = ParseLumpName(s, mape->endpic);
   }
   else if (!strcasecmp(pname, "endcast"))
   {
@@ -189,21 +202,21 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
   }
   else if (!strcasecmp(pname, "exitpic"))
   {
-    ParseLumpName(s, mape->exitpic);
+    status = ParseLumpName(s, mape->exitpic);
   }
   else if (!strcasecmp(pname, "enterpic"))
   {
-    ParseLumpName(s, mape->enterpic);
+    status = ParseLumpName(s, mape->enterpic);
   }
   else if (!strcasecmp(pname, "nointermission"))
   {
-    U_MustGetToken(s, TK_BoolConst);
-    mape->nointermission = s->boolean;
+    if (U_MustGetToken(s, TK_BoolConst))
+      mape->nointermission = s->boolean;
   }
   else if (!strcasecmp(pname, "partime"))
   {
-    U_MustGetInteger(s);
-    mape->partime = TICRATE * s->number;
+    if (U_MustGetInteger(s))
+      mape->partime = TICRATE * s->number;
   }
   else if (!strcasecmp(pname, "intertext"))
   {
@@ -221,66 +234,63 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
   }
   else if (!strcasecmp(pname, "interbackdrop"))
   {
-    ParseLumpName(s, mape->interbackdrop);
+    status = ParseLumpName(s, mape->interbackdrop);
   }
   else if (!strcasecmp(pname, "intermusic"))
   {
-    ParseLumpName(s, mape->intermusic);
+    status = ParseLumpName(s, mape->intermusic);
   }
   else if (!strcasecmp(pname, "bossaction"))
   {
-    U_MustGetToken(s, TK_Identifier);
-    int special, tag;
-    if (!strcasecmp(s->string, "clear"))
+    if (U_MustGetToken(s, TK_Identifier))
     {
-      // mark level free of boss actions
-      special = tag = -1;
-      if (mape->bossactions) free(mape->bossactions);
-      mape->bossactions = NULL;
-      mape->numbossactions = -1;
-    }
-    else
-    {
-      int i;
-      for (i = 0; i < NUMMOBJTYPES; i++)
+      if (!strcasecmp(s->string, "clear"))
       {
-        if (mobjinfo[i].actorname != NULL && !strcasecmp(s->string, mobjinfo[i].actorname))
-        {
-          U_MustGetToken(s, ',');
-          U_MustGetInteger(s);
-          special = s->number;
-          U_MustGetToken(s, ',');
-          U_MustGetInteger(s);
-          tag = s->number;
-          // allow no 0-tag specials here, unless a level exit.
-          if (tag != 0 || special == 11 || special == 51 || special == 52 || special == 124)
-          {
-            if (mape->numbossactions == -1) mape->numbossactions = 1;
-            else mape->numbossactions++;
-            mape->bossactions = (bossaction_t *)realloc(mape->bossactions,
-                                                        sizeof(bossaction_t)*mape->numbossactions);
-            mape->bossactions[mape->numbossactions - 1].type = i;
-            mape->bossactions[mape->numbossactions - 1].special = special;
-            mape->bossactions[mape->numbossactions - 1].tag = tag;
-          }
-          break;
-        }
+        // mark level free of boss actions
+        if (mape->bossactions) free(mape->bossactions);
+        mape->bossactions = NULL;
+        mape->numbossactions = -1;
       }
-      U_Error(s, "Unknown thing type %s", s->string);
-      return 0;
+      else
+      {
+        int i, special, tag;
+        for (i = 0; i < NUMMOBJTYPES; i++)
+        {
+          if (mobjinfo[i].actorname != NULL && !strcasecmp(s->string, mobjinfo[i].actorname))
+          {
+            U_MustGetToken(s, ',');
+            U_MustGetInteger(s);
+            special = s->number;
+            U_MustGetToken(s, ',');
+            U_MustGetInteger(s);
+            tag = s->number;
+            // allow no 0-tag specials here, unless a level exit.
+            if (tag != 0 || special == 11 || special == 51 || special == 52 || special == 124)
+            {
+              if (mape->numbossactions == -1) mape->numbossactions = 1;
+              else mape->numbossactions++;
+              mape->bossactions = (bossaction_t *)realloc(mape->bossactions,
+                                                        sizeof(bossaction_t)*mape->numbossactions);
+              mape->bossactions[mape->numbossactions - 1].type = i;
+              mape->bossactions[mape->numbossactions - 1].special = special;
+              mape->bossactions[mape->numbossactions - 1].tag = tag;
+            }
+            break;
+          }
+        }
+        if (i == NUMMOBJTYPES)
+          U_Error(s, "bossaction: unknown thing type '%s'", s->string);
+      }
     }
   }
-  else do
+  // If no known property name was given, skip all comma-separated values after the = sign
+  else if (s->token == '=') do
   {
-    if (!U_CheckFloat(s)) U_GetNextToken(s, TRUE);
-    if (s->token > TK_BoolConst)
-    {
-      U_ErrorToken(s, TK_Identifier);
-    }
+    U_GetNextToken(s, TRUE);
   } while (U_CheckToken(s, ','));
 
   free(pname);
-  return 1;
+  return status;
 }
 
 // -----------------------------------------------
@@ -306,7 +316,8 @@ static int ParseMapEntry(u_scanner_t *s, mapentry_t *val)
   U_MustGetToken(s, '{');
   while(!U_CheckToken(s, '}'))
   {
-    ParseStandardProperty(s, val);
+    if(!ParseStandardProperty(s, val))
+      U_GetNextToken(s, TRUE); // If there was an error parsing, skip to next token
   }
   return 1;
 }

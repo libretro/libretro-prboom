@@ -2583,6 +2583,17 @@ static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, boole
    demover = *demo_p++;
    longtics = 0;
 
+   if (demover == 255) // UMAPINFO flag set
+   {
+     // Uses UMAPINFO. The real version will be in the second byte.
+     // This prepended 255 is here to prevent non-UMAPINFO ports from recognizing the demo.
+     demover = *demo_p++;
+     if (!U_mapinfo.mapcount)
+       I_Error("UMAPINFO not loaded but trying to play a demo recorded with it");
+   }
+   else if (U_mapinfo.mapcount)
+     I_Error("UMAPINFO loaded but trying to play a demo recorded without it");
+
    // e6y
    // Handling of unrecognized demo formats
    // Versions up to 1.2 use a 7-byte header - first byte is a skill level.

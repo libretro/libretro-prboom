@@ -1655,7 +1655,7 @@ static void deh_procBexCodePointers(DEHFILE *fpin, FILE* fpout, char *line)
 // to prboom types - POPE
 //---------------------------------------------------------------------------
 static uint64_t getConvertedDEHBits(uint64_t bits) {
-  static const uint64_t bitMap[32] = {
+  static const uint64_t bitMap[40] = {
     /* cf linuxdoom-1.10 p_mobj.h */
     MF_SPECIAL, // 0 Can be picked up - When touched the thing can be picked up.
     MF_SOLID, // 1 Obstacle - The thing is solid and will not let you (or others) pass through it
@@ -1690,12 +1690,22 @@ static uint64_t getConvertedDEHBits(uint64_t bits) {
     MF_TOUCHY, // 28 - explodes on contact (MBF)
     MF_BOUNCES, // 29 - bounces off walls and floors (MBF)
     MF_FRIEND, // 30 - friendly monster helps players (MBF)
-    MF_TRANSLUCENT // e6y: Translucency via dehacked/bex doesn't work without it
+    MF_TRANSLUCENT, // 31 - e6y: Translucency via dehacked/bex doesn't work without it
+
+    // Bits2 fields below
+    MF_NOTARGET, // 32 - won't be targetted even on accidental infight
+    MF_MISSILEMORE, // 33 - shoots missiles more often from far away
+    MF_FULLVOLSIGHT, // 34 - plays its alert sound at full volume
+    MF_FULLVOLDEATH, // 35 - plays its death sound at full volume
+    MF_NORADIUSDMG, // 36 - radius (explosive) damage doesnt harm it
+    MF_QUICKTORETALIATE, // 37 - immediately switch target if attacked
+    MF_ISMONSTER, // 38 - for all monsters, even if don't count in kill%
+    MF_DONTFALL, // 39 - don't fall down after killed (like Lost Soul)
   };
   int i;
   uint64_t shiftBits = bits;
   uint64_t convertedBits = 0;
-  for (i=0; i<32; i++) {
+  for (i=0; i<40; i++) {
     if (shiftBits & 0x1) convertedBits |= bitMap[i];
     shiftBits >>= 1;
   }
@@ -1732,8 +1742,8 @@ static void setMobjInfoValue(int mobjInfoIndex, int keyIndex, uint64_t value) {
     case 19: mi->mass = (int)value; return;
     case 20: mi->damage = (int)value; return;
     case 21: mi->activesound = (int)value; return;
-    case 22: mi->flags = value; return;
-    case 23: return; // "Bits2", unused
+    case 22: mi->flags = (mi->flags & 0xFFFFFFFF00000000)|value; return; // Bits
+    case 23: mi->flags = (mi->flags & 0x00000000FFFFFFFF)|value; return; // Bits2
     case 24: mi->raisestate = (int)value; return;
     case 25: mi->meleethreshold = (int)value; return;
     case 26: mi->maxattackrange = (int)value; return;
@@ -1809,7 +1819,7 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
       for (ix=0; ix<DEH_MOBJINFOMAX; ix++) {
         if (strcasecmp(key,deh_mobjinfo[ix])) continue;
 
-        if (strcasecmp(key,"bits")) {
+        if (strcasecmp(key,"bits") && strcasecmp(key,"bits2")) {
           // standard value set
 
           // The old code here was the cause of a DEH-related bug in prboom.
@@ -1826,8 +1836,11 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
           // bit set
           // e6y: Correction of wrong processing of Bits parameter if its value is equal to zero
           // No more desync on HACX demos.
-          if (bGetData==1) { // proff
-            value = getConvertedDEHBits(value);
+          if (bGetData==1) {
+             // shift flags if we are using 'Bits2'
+             if (key[3] == '2')
+                value = value << 32;
+             value = getConvertedDEHBits(value);
             mobjinfo[indexnum].flags = value;
           }
           else {

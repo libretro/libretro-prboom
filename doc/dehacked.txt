@@ -143,40 +143,49 @@ translucent)
                                   Color 1 (gray/red)
   TRANSLATION2, 0x08000000 - second bit for selecting translation table
                                   Color 2 (brown/red)
-  TRANSLATION,  0x04000000 - for compatibility, same as TRANSLATION1
-  UNUSED1,      0x08000000 - undefined or same as TRANSLATION2
-  UNUSED2,      0x10000000 - undefined
-  UNUSED3,      0x20000000 - undefined
-  UNUSED4,      0x40000000 - undefined
+  TOUCHY,       0x10000000 - dies on contact with solid objects (MBF)
+  BOUNCES,      0x20000000 - bounces off floors, ceilings and maybe walls (MBF)
+  FRIEND,       0x40000000 - a friend of the player(s) (MBF)
   TRANSLUCENT,  0x80000000 - apply translucency to sprite (BOOM)
-  
-The previous table pertains to the first (lower) byte, as used in
-vanilla Doom with some Boom extensions.
 
-However, many ports have extended this bit mask doubling its size,
-which means there's space to have potetially up to 32 new flags.
-Many of the most common flags have been adopted in this PrBoom port.
+  TRANSLATION,  0x04000000 - for compatibility, same as TRANSLATION1
+  UNUSED1,      0x08000000 - for compatibility, same as TRANSLATION2
+  UNUSED2,      0x10000000 - for compatibility, same as TOUCHY
+  UNUSED3,      0x20000000 - for compatibility, same as BOUNCES
+  UNUSED4,      0x40000000 - for compatibility, same as FRIEND
 
-One important note, however, is that in order to keep compatibility
-it'd be much preferable to use the mnemonics rather than the actual
-bit numbers since this way engines that do not support it will simply
-ignore them, or those that do support it but use an incompatible bit
-mask sequence will interpret it correctly.
-  
+The previous table pertains to the first (lower) 32 bits, as used in
+vanilla Doom with some popular extensions.
+
+In addition to the flags above, the field was expanded so that it's
+possible to have additional flags to have finer control of behavior
+that was previously hardcoded to some specific enemies, such as the
+way the cyberdemon is immune to splash damage from explosions.
+
+Because these flags are not common between ports, it's recomended
+to use in this case always the mnemonics to ensure that they are
+properly ignored in ports that don't support it.
+
+If a monster has already had any of these flags set, you won't be
+able to unset it by using the "Bits" field, you'll need to use the
+"Bits2" field, this is so it's possible to keep compatibility.
+For example:
+
+  Bits2 = ISMONSTER+MISSILEMORE+NOTARGET
+
+If a number was to be given instead (which is not recomended), the
+bits will be shifted so only the extended flags are affected.
+
   Mnemonic          Bit(2) mask  Meaning
   ----------------------------------------------------------------------------
-  TOUCHY,           0x00000001 - dies on contact with solid objects
-  BOUNCES,          0x00000002 - bounces off floors, ceilings and maybe walls
-  FRIEND,           0x00000004 - a friend of the player(s)
-
-  NOTARGET,         0x00000100 - won't be targetted even on accidental infight
-  MISSILEMORE,      0x00000400 - shoots missiles more often from far away
-  FULLVOLSIGHT,     0x00000800 - plays its alert sound at full volume
-  FULLVOLDEATH,     0x00001000 - plays its death sound at full volume
-  NORADIUSDMG,      0x00002000 - radius (explosive) damage doesnt harm it
-  QUICKTORETALIATE, 0x00004000 - immediately switch target if attacked
-  ISMONSTER,        0x00008000 - for all monsters, even if don't count in kill%
-  DONTFALL,         0x00010000 - don't fall down after killed (like Lost Soul)
+  NOTARGET,         0x00000001 - won't be targetted even on accidental infight
+  MISSILEMORE,      0x00000002 - shoots missiles more often from far away
+  FULLVOLSIGHT,     0x00000004 - plays its alert sound at full volume
+  FULLVOLDEATH,     0x00000008 - plays its death sound at full volume
+  NORADIUSDMG,      0x00000010 - radius (explosive) damage doesnt harm it
+  QUICKTORETALIATE, 0x00000020 - immediately switch target if attacked
+  ISMONSTER,        0x00000040 - for all monsters, even if don't count in kill%
+  DONTFALL,         0x00000080 - don't fall down after killed (like Lost Soul)
 
 
 ----------------------------CODE POINTERS-------------------------
@@ -2163,19 +2172,19 @@ the two Things for PUSH and PULL wind sources at the end.
     SOLID+SHOOTABLE+DROPOFF+PICKUP+NOTDMATCH    
   
 2   POSSESSED
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 3   SHOTGUY
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 4   VILE
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER+NOTARGET+QUICKTORETALIATE
   
 5   FIRE
     NOBLOCKMAP+NOGRAVITY+TRANSLUCENT    
   
 6   UNDEAD
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 7   TRACER
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY   
@@ -2184,55 +2193,55 @@ the two Things for PUSH and PULL wind sources at the end.
     NOBLOCKMAP+NOGRAVITY+TRANSLUCENT    
   
 9   FATSO
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 10  FATSHOT
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+TRANSLUCENT    
   
 11  CHAINGUY
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 12  TROOP
-    SOLID+SHOOTABLE+COUNTKILL
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 13  SERGEANT
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 14  SHADOWS
-    SOLID+SHOOTABLE+SHADOW+COUNTKILL   
+    SOLID+SHOOTABLE+SHADOW+COUNTKILL+ISMONSTER
   
 15  HEAD
-    SOLID+SHOOTABLE+FLOAT+NOGRAVITY+COUNTKILL   
+    SOLID+SHOOTABLE+FLOAT+NOGRAVITY+COUNTKILL+ISMONSTER
   
 16  BRUISER
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 17  BRUISERSHOT
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+TRANSLUCENT   
   
 18  KNIGHT
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 19  SKULL
-    SOLID+SHOOTABLE+FLOAT+NOGRAVITY    
+    SOLID+SHOOTABLE+FLOAT+NOGRAVITY+ISMONSTER+MISSILEMORE
   
 20  SPIDER
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER+MISSILEMORE+FULLVOLSIGHT+FULLVOLDEATH+NORADIUSDMG
   
 21  BABY
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 22  CYBORG
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER+MISSILEMORE+FULLVOLSIGHT+FULLVOLDEATH+NORADIUSDMG
   
 23  PAIN
-    SOLID+SHOOTABLE+FLOAT+NOGRAVITY+COUNTKILL   
+    SOLID+SHOOTABLE+FLOAT+NOGRAVITY+COUNTKILL+ISMONSTER
   
 24  WOLFSS
-    SOLID+SHOOTABLE+COUNTKILL   
+    SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
 25  KEEN
-    SOLID+SPAWNCEILING+NOGRAVITY+SHOOTABLE+COUNTKILL    
+    SOLID+SPAWNCEILING+NOGRAVITY+SHOOTABLE+COUNTKILL+ISMONSTER
   
 26  BOSSBRAIN
     SOLID+SHOOTABLE    

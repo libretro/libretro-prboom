@@ -204,55 +204,52 @@
 // Hmm ???.
 #define MF_TRANSSHIFT 26
 
-#define MF_UNUSED2      (uint64_t)(0x0000000010000000)
-#define MF_UNUSED3      (uint64_t)(0x0000000020000000)
+// Flags added by MBF port
+#define MF_TOUCHY       (uint64_t)(0x0000000010000000)
+#define MF_BOUNCES      (uint64_t)(0x0000000020000000)
+#define MF_FRIEND       (uint64_t)(0x0000000040000000)
+// Translucent sprite (BOOM)
+#define MF_TRANSLUCENT  (uint64_t)(0x0000000080000000)
 
-    // Translucent sprite?                                          // phares
-#define MF_TRANSLUCENT  (uint64_t)(0x0000000040000000)
-
-// this is free            LONGLONG(0x0000000100000000)
-
-// these are greater than an int. That's why the flags below are now uint64_t
-
-#define MF_TOUCHY          LONGLONG(0x0000000100000000)
-#define MF_BOUNCES         LONGLONG(0x0000000200000000)
-#define MF_FRIEND          LONGLONG(0x0000000400000000)
-
-#define MF_RESURRECTED     LONGLONG(0x0000001000000000)
-// unused, just for prboom-plus compatibility (see https://github.com/coelckers/prboom-plus/commit/ec2c18 )
-#define MF_NO_DEPTH_TEST   LONGLONG(0x0000002000000000)
-// unused, just for prboom-plus compatibility (see https://github.com/coelckers/prboom-plus/commit/865329 )
-#define MF_FOREGROUND      LONGLONG(0x0000004000000000)
-
-#define MF_PLAYERSPRITE LONGLONG(0x0000008000000000)
+// these are greater than an int. That's why the flags are now uint64_t
 
 // This actor not targetted when it hurts something else
-#define MF_NOTARGET     LONGLONG(0x0000010000000000)
-#define MF_FLY          LONGLONG(0x0000020000000000) // unused, prboom+ compat
-
+#define MF_NOTARGET         LONGLONG(0x0000000100000000)
 // higher attack probability like Cyberdemon, Spiderboss, Revenant and Lost Soul
-#define MF_MISSILEMORE  LONGLONG(0x0000040000000000)
+#define MF_MISSILEMORE      LONGLONG(0x0000000200000000)
 // play full volume sounds on player sight and death (eg. Spider & Cyberdemon)
-#define MF_FULLVOLSIGHT    LONGLONG(0x0000080000000000)
-#define MF_FULLVOLDEATH    LONGLONG(0x0000100000000000)
+#define MF_FULLVOLSIGHT     LONGLONG(0x0000000400000000)
+#define MF_FULLVOLDEATH     LONGLONG(0x0000000800000000)
 // make immunity to radius damage
-#define MF_NORADIUSDMG     LONGLONG(0x0000200000000000)
+#define MF_NORADIUSDMG      LONGLONG(0x0000001000000000)
 // Arch Viles will immediately switch target if being attacked.
-#define MF_QUICKTORETALIATE LONGLONG(0x0000400000000000)
+#define MF_QUICKTORETALIATE LONGLONG(0x0000002000000000)
 // flag for monsters since there can be some without MF_COUNTKILL (Lost Souls)
-#define MF_ISMONSTER		    LONGLONG(0x0000800000000000)
+#define MF_ISMONSTER        LONGLONG(0x0000004000000000)
 // doesn't fall down after being killed (for the Lost Soul)
-#define MF_DONTFALL		      LONGLONG(0x0001000000000000)
+#define MF_DONTFALL         LONGLONG(0x0000008000000000)
 
-#define ALIVE(thing) ((thing->health > 0) && ((thing->flags & (MF_COUNTKILL | MF_CORPSE | MF_RESURRECTED)) == MF_COUNTKILL))
 
-// killough 9/15/98: Same, but internal flags, not intended for .deh
+// The flags below are switching order, starting from the most significant bit,
+// since they do not reflect the expected dehacked order of the flags.
+// See getConvertedDEHBits() in d_deh.c for the real mapping order.
+
+// These were free flags in BOOM
+// (for compatibility, placed outside of dehacked reach so they aren't used by it)
+#define MF_UNUSED2        LONGLONG(0x8000000000000000)
+#define MF_UNUSED3        LONGLONG(0x4000000000000000)
+
+// Meant to be internal but included in flags so it's usable from vissprite_t
+#define MF_PLAYERSPRITE   LONGLONG(0x8000000000000000) // player graphic (eg. wielded weapon)
+
+// These are internal flags not exposed in dehacked
 // (some degree of opaqueness is good, to avoid compatibility woes)
-
 enum {
-  MIF_FALLING = 1,      // Object is falling
-  MIF_ARMED = 2,        // Object is armed (for MF_TOUCHY objects)
+  MIF_FALLING     = 0x00000001, // Object is falling
+  MIF_ARMED       = 0x00000002, // Object is armed (for MF_TOUCHY objects)
+  MIF_RESURRECTED = 0x00000004, // Object has been resurrected
 };
+
 
 // Map Object definition.
 //

@@ -1164,17 +1164,18 @@ static const struct deh_mobjflags_s deh_mobjflags[] = {
 
   // killough 10/98: TRANSLATION consists of 2 bits, not 1:
 
-  {"TRANSLATION",  MF_TRANSLATION1}, // for Boom bug-compatibility
   {"TRANSLATION1", MF_TRANSLATION1}, // use translation table for color (players)
   {"TRANSLATION2", MF_TRANSLATION2}, // use translation table for color (players)
+  {"TOUCHY",       MF_TOUCHY},       // dies on contact with solid objects (MBF)
+  {"BOUNCES",      MF_BOUNCES},      // bounces off floors, ceilings and maybe walls (MBF)
+  {"FRIEND",       MF_FRIEND},       // a friend of the player(s) (MBF)
+  {"TRANSLUCENT",  MF_TRANSLUCENT},  // apply translucency to sprite (BOOM)
+  // extra flags for compatibility (BOOM flag names)
+  {"TRANSLATION",  MF_TRANSLATION1}, // for Boom bug-compatibility
   {"UNUSED1",      MF_TRANSLATION2}, // unused bit # 1 -- For Boom bug-compatibility
   {"UNUSED2",      MF_UNUSED2},      // unused bit # 2 -- For Boom compatibility
   {"UNUSED3",      MF_UNUSED3},      // unused bit # 3 -- For Boom compatibility
   {"UNUSED4",      MF_TRANSLUCENT},  // unused bit # 4 -- For Boom compatibility
-  {"TRANSLUCENT",  MF_TRANSLUCENT},  // apply translucency to sprite (BOOM)
-  {"TOUCHY",       MF_TOUCHY},       // dies on contact with solid objects (MBF)
-  {"BOUNCES",      MF_BOUNCES},      // bounces off floors, ceilings and maybe walls (MBF)
-  {"FRIEND",       MF_FRIEND},       // a friend of the player(s) (MBF)
 
   {"NOTARGET",     MF_NOTARGET},     // won't be targetted even if it hurts someone else
   {"MISSILEMORE",  MF_MISSILEMORE},  // more often missile attacks from far away (like Cyber)

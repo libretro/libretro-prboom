@@ -1668,7 +1668,7 @@ void A_VileChase(mobj_t* actor)
       corpsehit->flags =
         (info->flags & ~MF_FRIEND) | (actor->flags & MF_FRIEND);
 
-      corpsehit->flags = corpsehit->flags | MF_RESURRECTED;//mark as resurrected
+      corpsehit->intflags = corpsehit->intflags | MIF_RESURRECTED;//mark as resurrected
 
       if (!((corpsehit->flags ^ MF_COUNTKILL) & (MF_FRIEND | MF_COUNTKILL)))
           totallive++;

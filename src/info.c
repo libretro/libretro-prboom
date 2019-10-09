@@ -5547,7 +5547,7 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     100,            // mass
     0,              // damage
     sfx_dgact,      // activesound
-    MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL, // flags
+    MF_ISMONSTER|MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL, // flags
     S_DOGS_RAISE1,  // raisestate
     0,              // meleethreshold
     0,              // maxattackrange

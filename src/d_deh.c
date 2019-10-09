@@ -1736,7 +1736,7 @@ static void setMobjInfoValue(int mobjInfoIndex, int keyIndex, uint64_t value) {
     case 12: mi->deathstate = (int)value; return;
     case 13: mi->xdeathstate = (int)value; return;
     case 14: mi->deathsound = (int)value; return;
-    case 15: mi->droppeditem = (int)value; return;
+    case 15: mi->droppeditem = (int)(value-1); return; // make it base zero (deh is 1-based)
     case 16: mi->speed = (int)value; return;
     case 17: mi->radius = (int)value; return;
     case 18: mi->height = (int)value; return;

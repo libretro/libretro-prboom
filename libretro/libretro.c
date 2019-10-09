@@ -244,54 +244,60 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 {
   switch(movement_smooth)
   {
-    case 0:
+    case 1:
       info->timing.fps = 35.0;
       break;
-    case 1:
+    case 2:
       info->timing.fps = 40.0;
       break;
-    case 2:
+    case 3:
       info->timing.fps = 50.0;
       break;
-    case 3:
+    case 4:
       info->timing.fps = 60.0;
       break;
-    case 4:
+    case 5:
       info->timing.fps = 70.0;
       break;
-    case 5:
+    case 6:
       info->timing.fps = 72.0;
       break;
-    case 6:
+    case 7:
       info->timing.fps = 75.0;
       break;
-    case 7:
+    case 8:
       info->timing.fps = 90.0;
       break;
-    case 8:
+    case 9:
       info->timing.fps = 100.0;
       break;
-    case 9:
+    case 10:
       info->timing.fps = 119.0;
       break;
-    case 10:
+    case 11:
       info->timing.fps = 120.0;
       break;
-    case 11:
+    case 12:
       info->timing.fps = 140.0;
       break;
-    case 12:
+    case 13:
       info->timing.fps = 144.0;
       break;
-    case 13:
+    case 14:
       info->timing.fps = 240.0;
       break;
-    case 14:
+    case 15:
       info->timing.fps = 244.0;
       break;
+    case 0: // Auto
     default:
-      info->timing.fps = TICRATE;
+    {
+      float target_framerate = 0.0f;
+      if (!environ_cb(RETRO_ENVIRONMENT_GET_TARGET_REFRESH_RATE, &target_framerate))
+        target_framerate = 60.0f;
+      info->timing.fps = target_framerate;
       break;
+    }
   }
   info->timing.sample_rate = 44100.0;
   info->geometry.base_width = SCREENWIDTH;
@@ -1413,6 +1419,9 @@ void R_InitInterpolation(void)
     tic_vars.fps = info.timing.fps;
     tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
     tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;
+
+    if (log_cb)
+      log_cb(RETRO_LOG_INFO, "[libretro]: Framerate set to %.2f FPS\n", info.timing.fps);
   }
   tic_vars.frac = FRACUNIT;
 }

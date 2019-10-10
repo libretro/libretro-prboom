@@ -1743,8 +1743,7 @@ static void setMobjInfoValue(int mobjInfoIndex, int keyIndex, uint64_t value) {
     case 19: mi->mass = (int)value; return;
     case 20: mi->damage = (int)value; return;
     case 21: mi->activesound = (int)value; return;
-    case 22: mi->flags = (mi->flags & 0xFFFFFFFF00000000)|value; return; // Bits
-    case 23: mi->flags = (mi->flags & 0x00000000FFFFFFFF)|value; return; // Bits2
+    case 22: case 23: mi->flags = value; return; // Bits, Bits2
     case 24: mi->raisestate = (int)value; return;
     case 25: mi->meleethreshold = (int)value; return;
     case 26: mi->maxattackrange = (int)value; return;
@@ -1779,15 +1778,21 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
   // killough 8/98: allow hex numbers in input:
   ix = sscanf(inbuffer,"%s %i",key, &indexnum);
   if (ix != 2)
-     I_Error("Error reading Thing index!\n");
+     fprintf(fpout,"Error reading Thing index!\n");
 
   // Note that the mobjinfo[] array is base zero, but object numbers
   // in the dehacked file start with one.  Grumble.
   --indexnum;
 
+  if (indexnum >= NUMMOBJTYPES || indexnum < 0)
+  {
+    fprintf(fpout,"Invalid Thing id: %d", indexnum+1);
+    return;
+  }
+
   if (fpout) fprintf(fpout,"Thing %d (%s) -> line: '%s'\n", indexnum+1,
                      ((indexnum >= 0 && indexnum < NUMMOBJTYPES)?
-                      mobjinfo[indexnum].actorname : "invalid"),
+                      mobjinfo[indexnum].actorname : "undefined"),
                      inbuffer);
 
   // now process the stuff
@@ -1797,108 +1802,101 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
   // get a line until a blank or end of file--it's not
   // blank now because it has our incoming key in it
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
-    {
-      // e6y: Correction of wrong processing of Bits parameter if its value is equal to zero
-      // No more desync on HACX demos.
-      int bGetData;
+  {
+    // e6y: Correction of wrong processing of Bits parameter if its value is equal to zero
+    // No more desync on HACX demos.
+    int bGetData;
 
-      if (!dehfgets(inbuffer, sizeof(inbuffer), fpin)) break;
+    if (!dehfgets(inbuffer, sizeof(inbuffer), fpin)) break;
       lfstrip(inbuffer);  // toss the end of line
 
-      // killough 11/98: really bail out on blank lines (break != continue)
-      if (!*inbuffer) break;  // bail out with blank line between sections
+    // killough 11/98: really bail out on blank lines (break != continue)
+    if (!*inbuffer) break;  // bail out with blank line between sections
 
-      // e6y: Correction of wrong processing of Bits parameter if its value is equal to zero
-      // No more desync on HACX demos.
-      bGetData = deh_GetData(inbuffer,key,&value,&strval,fpout);
-      if (!bGetData)
-      // Old code: if (!deh_GetData(inbuffer,key,&value,&strval,fpout)) // returns TRUE if ok
-        {
-          if (fpout) fprintf(fpout,"Bad data pair in '%s'\n",inbuffer);
-          continue;
-        }
-      for (ix=0; ix<DEH_MOBJINFOMAX; ix++) {
-        if (strcasecmp(key,deh_mobjinfo[ix])) continue;
+    // e6y: Correction of wrong processing of Bits parameter if its value is equal to zero
+    // No more desync on HACX demos.
+    bGetData = deh_GetData(inbuffer,key,&value,&strval,fpout);
+    if (!bGetData)
+    // Old code: if (!deh_GetData(inbuffer,key,&value,&strval,fpout)) // returns TRUE if ok
+    {
+      if (fpout) fprintf(fpout,"Bad data pair in '%s'\n",inbuffer);
+      continue;
+    }
+    for (ix=0; ix<DEH_MOBJINFOMAX; ix++) {
+      if (strcasecmp(key,deh_mobjinfo[ix])) continue;
 
-        if (strcasecmp(key,"bits") && strcasecmp(key,"bits2")) {
-          // standard value set
-
-          // The old code here was the cause of a DEH-related bug in prboom.
-          // When the mobjinfo_t.flags member was graduated to an int64, this
-          // code was caught unawares and was indexing each property of the
-          // mobjinfo as if it were still an int32. This caused sets of the
-          // "raisestate" member to partially overwrite the "flags" member,
-          // thus screwing everything up and making most DEH patches result in
-          // unshootable enemy types. Moved to a separate function above
-          // and stripped of all hairy struct address indexing. - POPE
-          setMobjInfoValue(indexnum, ix, value);
+      // Special processing for "Bits"/"Bits2" fields
+      if (!strcasecmp(key,"bits") || !strcasecmp(key,"bits2")) {
+        // bit set
+        // e6y: Correction of wrong processing of Bits parameter if its value is equal to zero
+        // No more desync on HACX demos.
+        if (bGetData==1) {
+          // when not using mnemonics, shift values for 'Bits2'
+          if (key[4] == '2')
+            value = value<<32;
+          value = getConvertedDEHBits(value);
         }
         else {
-          // bit set
-          // e6y: Correction of wrong processing of Bits parameter if its value is equal to zero
-          // No more desync on HACX demos.
-          if (bGetData==1) {
-             // shift flags if we are using 'Bits2'
-             if (key[3] == '2')
-                value = value << 32;
-             value = getConvertedDEHBits(value);
-            mobjinfo[indexnum].flags = value;
-          }
-          else {
-            // figure out what the bits are
-            value = 0;
+          // figure out what the bits are
+          value = 0;
 
-            // killough 10/98: replace '+' kludge with strtok() loop
-            // Fix error-handling case ('found' var wasn't being reset)
-            //
-            // Use OR logic instead of addition, to allow repetition
-            for (;(strval = strtok(strval,",+| \t\f\r")); strval = NULL) {
-              size_t iy;
-              for (iy=0; iy < DEH_MOBJFLAGMAX; iy++) {
-                if (strcasecmp(strval,deh_mobjflags[iy].name)) continue;
-                if (fpout) {
-                  fprintf(fpout,
-                    "ORed value 0x%08lX%08lX %s\n",
-                    (unsigned long)(deh_mobjflags[iy].value>>32) & 0xffffffff,
-                    (unsigned long)deh_mobjflags[iy].value & 0xffffffff, strval
-                  );
-                }
-                value |= deh_mobjflags[iy].value;
-                break;
+          // killough 10/98: replace '+' kludge with strtok() loop
+          // Fix error-handling case ('found' var wasn't being reset)
+          //
+          // Use OR logic instead of addition, to allow repetition
+          for (;(strval = strtok(strval,",+| \t\f\r")); strval = NULL) {
+            size_t iy;
+            for (iy=0; iy < DEH_MOBJFLAGMAX; iy++) {
+              if (strcasecmp(strval,deh_mobjflags[iy].name)) continue;
+              if (fpout) {
+                fprintf(fpout,
+                  "ORed value 0x%08lX%08lX %s\n",
+                  (unsigned long)(deh_mobjflags[iy].value>>32) & 0xffffffff,
+                  (unsigned long)deh_mobjflags[iy].value & 0xffffffff, strval
+                );
               }
-              if (iy >= DEH_MOBJFLAGMAX && fpout) {
-                fprintf(fpout, "Could not find bit mnemonic %s\n", strval);
-              }
+              value |= deh_mobjflags[iy].value;
+              break;
             }
-
-            // the MF_COUNTKILL flag used to be indicative of the Mobj being a
-            // monster, but this is no longer true after the logic for monsters_infight
-            // that don't count towards limit was dehardcoded.
-            // Let's make sure that any actor that has MF_COUNTKILL is considered
-            // a monster, avoid incompatibility with older DEH files
-            if (value & MF_COUNTKILL)
-              value |= MF_ISMONSTER;
-
-            // Don't worry about conversion -- simply print values
-            if (fpout) {
-              fprintf(fpout,
-                "Bits = 0x%08lX%08lX\n",
-                (unsigned long)(value>>32) & 0xffffffff,
-                (unsigned long)value & 0xffffffff
-              );
+            if (iy >= DEH_MOBJFLAGMAX && fpout) {
+              fprintf(fpout, "Could not find bit mnemonic %s\n", strval);
             }
-            mobjinfo[indexnum].flags = value; // e6y
           }
-        }
-        if (fpout) {
-          fprintf(fpout,
-            "Assigned 0x%08lx%08lx to %s(%d) at index %d\n",
-            (unsigned long)(value>>32) & 0xffffffff,
-            (unsigned long)value & 0xffffffff, key, indexnum, ix
-          );
+
+          // the MF_COUNTKILL flag used to be indicative of the Mobj being a
+          // monster, but this is no longer true after the logic for monsters_infight
+          // that don't count towards limit was dehardcoded.
+          // Let's make sure that any actor that has MF_COUNTKILL is considered
+          // a monster, avoid incompatibility with older DEH files
+          if (value & MF_COUNTKILL)
+            value |= MF_ISMONSTER;
+
+          if (fpout)
+            fprintf(fpout,
+                    "Result  =  0x%016lX\n"
+                    "Current    0x%016lX\n",
+                    value, mobjinfo[indexnum].flags);
+
+          // Each "Bits" field can use any mnemonic, but it won't overwrite the values
+          // from fields outside of the corresponding ones, this way a wad can keep using "Bits"
+          // for setting values in "Bits2" without affecting the default values that might be
+          // configured in the future.
+          if (key[4] == '2')
+            value = (mobjinfo[indexnum].flags & 0x00000000FFFFFFFF)|value; // Bits2
+          else
+            value = (mobjinfo[indexnum].flags & 0xFFFFFFFF00000000)|value; // Bits
         }
       }
+      setMobjInfoValue(indexnum, ix, value);
+      if (fpout) {
+        fprintf(fpout,
+          "Assigned 0x%08lx%08lx to %s(%d) at index %d\n",
+          (unsigned long)(value>>32) & 0xffffffff,
+          (unsigned long)value & 0xffffffff, key, indexnum, ix
+        );
+      }
     }
+  }
   return;
 }
 

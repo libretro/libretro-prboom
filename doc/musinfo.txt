@@ -1,0 +1,53 @@
+
+=====================================================
+MUSINFO support in PrBoom libretro
+=====================================================
+
+MUSINFO is a control lump originating from Risen3D and also supported by many
+other ports. It is used to associate music lumps to numbers, which are then
+referenced by "music changer" things with an editor number in the 14101—14164
+range.
+
+The syntax is as follows:
+
+<MAPNAME>
+<number> <MUSICLUMP>
+<number> <MUSICLUMP>
+...
+<MAPNAME>
+<number> <MUSICLUMP>
+<number> <MUSICLUMP>
+...
+etc.
+
+
+For example:
+
+MAP01
+1 D_ROMERO
+2 D_STALKS
+MAP02
+1 D_RUNNIN
+7 D_MESSAG
+
+
+Valid numbers for music lumps are in the 1—64 range. The value 0 was not
+originally supported by the Risen3D spec but it has come to be used by several
+source ports to switch to the default music of the map. This behavior has also
+been added to this source port.
+
+
+Within a map, each song is associated to MusicChangers mapthings with an editor
+number equal to 14100 + number. So in the above example, a thing 14107 in MAP02
+would trigger a music change to D_MESSAG, and a thing 14100 would trigger a
+return to the default music for the level.
+
+Music changer things are triggered when a player enters the sector in which they
+are placed. A 30-tics delay before the music changes is used to prevent the
+soundtrack from resetting constantly if the player moves quickly back and forth
+between two sectors with different music changers.
+
+ZDoom/Eternity based source ports use also the doomednum 14165 for Hexen-style
+format version of the MusicChanger actor which uses one of its Hexen-style args
+to define the actual number.
+

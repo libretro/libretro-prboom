@@ -137,6 +137,7 @@ int     W_ListNumFromName(const char *name, int lump);
 static INLINE int     (W_CheckNumForName)(const char *name, lumpinfo_namespace_t ns)
         { return (W_FindNumFromName)(name, ns, -1); }
 int     W_GetNumForName (const char* name);
+char*   W_GetNameForNum (const int lump);
 int     W_LumpLength (int lump);
 void    W_ReadLump (int lump, void *dest);
 // CPhipps - modified for 'new' lump locking

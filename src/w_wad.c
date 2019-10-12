@@ -411,7 +411,13 @@ int W_GetNumForName (const char* name)     // killough -- const added
   return i;
 }
 
-
+// W_GetNameForNum
+// Returns the name for the giiven lump number
+//
+char* W_GetNameForNum (const int lump)
+{
+  return (lump >=0 && lump < numlumps)? lumpinfo[lump].name : NULL;
+}
 
 // W_ListNumFromName
 // calls W_FindNumFromName and returns the lumps in ascending order

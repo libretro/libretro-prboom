@@ -112,7 +112,6 @@ int S_AdjustSoundParams(mobj_t *listener, mobj_t *source,
                         int *vol, int *sep, int *pitch);
 
 static int S_getChannel(void *origin, sfxinfo_t *sfxinfo, int is_pickup);
-static void S_ChangeMusicByName(char* lumpname, int looping);
 
 // Initializes sound stuff, including volume
 // Sets channels, SFX and music volume,

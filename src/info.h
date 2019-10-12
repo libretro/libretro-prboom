@@ -184,6 +184,15 @@ typedef enum
   SPR_TLP2,
   SPR_TNT1, /* add invisible sprite              phares 3/8/98 */
 
+  /* MBF sprites */
+
+  SPR_DOGS, /* killough 7/19/98: Marine's best friend :) */
+
+  SPR_PLS1, // killough 7/19/98: first  of two plasma fireballs in the beta
+  SPR_PLS2, // killough 7/19/98: second of two plasma fireballs in the beta
+  SPR_BON3, // killough 7/11/98: evil sceptre in beta version
+  SPR_BON4, // killough 7/11/98: unholy bible in beta version
+
   NUMSPRITES  /* counter of how many there are */
 
 } spritenum_t;
@@ -1242,6 +1251,17 @@ typedef enum
 
   S_MUSHROOM,  /* killough 10/98: mushroom explosion effect */
 
+  // prboom-plus player gibbed death
+  S_PLAY_GDIE1,
+  S_PLAY_GDIE2,
+  S_PLAY_GDIE3,
+  S_PLAY_GDIE4,
+  S_PLAY_GDIE5,
+  S_PLAY_GDIE6,
+  S_PLAY_GDIE7,
+  S_PLAY_GDIE8,
+  S_PLAY_GDIE9,
+
   NUMSTATES  /* Counter of how many there are */
 
 } statenum_t;
@@ -1408,8 +1428,20 @@ typedef enum {
   MT_MISC84,
   MT_MISC85,
   MT_MISC86,
+  /* End of official Doom actors, Boom/MBF/PrBoom+ extras below */
   MT_PUSH,    /* controls push source - phares */
   MT_PULL,    /* controls pull source - phares 3/20/98 */
+
+  MT_DOGS,    /* killough 7/19/98: Marine's best friend */
+
+  MT_PLASMA1, // killough 7/11/98: first  of alternating beta plasma fireballs
+  MT_PLASMA2, // killough 7/11/98: second of alternating beta plasma fireballs
+  MT_SCEPTRE, // killough 7/11/98: evil sceptre in beta version
+  MT_BIBLE,   // killough 7/11/98: unholy bible in beta version
+
+  MT_MUSICCHANGER, /* MUSINFO Music Changer thing */
+
+  MT_GIBDTH, // prboom-plus gibbed human skull
 
   /* proff 11/22/98: Andy Baker's stealth monsters (next 12)
    * cph - moved below the MBF stuff, no need to displace them */

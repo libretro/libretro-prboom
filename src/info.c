@@ -75,6 +75,13 @@ const char *sprnames[NUMSPRITES+1] = {
   "COL5","TBLU","TGRN","TRED","SMBT","SMGT","SMRT","HDB1","HDB2","HDB3",
   "HDB4","HDB5","HDB6","POB1","POB2","BRS1","TLMP","TLP2",
   "TNT1", // invisible sprite                                 phares 3/9/98
+
+  "DOGS", /* killough 7/19/98: Marine's best friend :) */
+
+  "PLS1", // killough 7/19/98: first  of two plasma fireballs in the beta
+  "PLS2", // killough 7/19/98: second of two plasma fireballs in the beta
+  "BON3", // killough 7/11/98: evil sceptre in the beta version
+  "BON4", // killough 7/11/98: unholy bible in the beta version
   NULL
 };
 
@@ -1075,120 +1082,108 @@ state_t states[NUMSTATES] = {
   {SPR_MISL,32770,6,A_Detonate,S_DETONATE3,0,0},  // S_DETONATE2
   {SPR_MISL,32771,10,NULL,S_NULL,0,0},            // S_DETONATE3
 
-  // if dogs are disabled, dummy states are required for dehacked compatibility
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_STND
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_STND2
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RUN1
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RUN2
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RUN3
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RUN4
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RUN5
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RUN6
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RUN7
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RUN8
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_ATK1
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_ATK2
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_ATK3
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_PAIN
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_PAIN2
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_DIE1
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_DIE2
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_DIE3
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_DIE4
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_DIE5
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_DIE6
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RAISE1
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RAISE2
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RAISE3
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RAISE4
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RAISE5
-  {0,0,-1,NULL,S_NULL,0,0}, // S_DOGS_RAISE6
+  // killough 7/19/98: Marine's best friend :)
+  {SPR_DOGS,0,10,A_Look,S_DOGS_STND2,0,0},  // S_DOGS_STND
+  {SPR_DOGS,1,10,A_Look,S_DOGS_STND,0,0},   // S_DOGS_STND2
+  {SPR_DOGS,0,2,A_Chase,S_DOGS_RUN2,0,0},   // S_DOGS_RUN1
+  {SPR_DOGS,0,2,A_Chase,S_DOGS_RUN3,0,0},   // S_DOGS_RUN2
+  {SPR_DOGS,1,2,A_Chase,S_DOGS_RUN4,0,0},   // S_DOGS_RUN3
+  {SPR_DOGS,1,2,A_Chase,S_DOGS_RUN5,0,0},   // S_DOGS_RUN4
+  {SPR_DOGS,2,2,A_Chase,S_DOGS_RUN6,0,0},   // S_DOGS_RUN5
+  {SPR_DOGS,2,2,A_Chase,S_DOGS_RUN7,0,0},   // S_DOGS_RUN6
+  {SPR_DOGS,3,2,A_Chase,S_DOGS_RUN8,0,0},   // S_DOGS_RUN7
+  {SPR_DOGS,3,2,A_Chase,S_DOGS_RUN1,0,0},   // S_DOGS_RUN8
+  {SPR_DOGS,4,8,A_FaceTarget,S_DOGS_ATK2,0,0}, // S_DOGS_ATK1
+  {SPR_DOGS,5,8,A_FaceTarget,S_DOGS_ATK3,0,0}, // S_DOGS_ATK2
+  {SPR_DOGS,6,8,A_SargAttack,S_DOGS_RUN1,0,0}, // S_DOGS_ATK3
+  {SPR_DOGS,7,2,NULL,S_DOGS_PAIN2,0,0},     // S_DOGS_PAIN
+  {SPR_DOGS,7,2,A_Pain,S_DOGS_RUN1,0,0},    // S_DOGS_PAIN2
+  {SPR_DOGS,8,8,NULL,S_DOGS_DIE2,0,0},      // S_DOGS_DIE1
+  {SPR_DOGS,9,8,A_Scream,S_DOGS_DIE3,0,0},  // S_DOGS_DIE2
+  {SPR_DOGS,10,4,NULL,S_DOGS_DIE4,0,0},     // S_DOGS_DIE3
+  {SPR_DOGS,11,4,A_Fall,S_DOGS_DIE5,0,0},   // S_DOGS_DIE4
+  {SPR_DOGS,12,4,NULL,S_DOGS_DIE6,0,0},     // S_DOGS_DIE5
+  {SPR_DOGS,13,-1,NULL,S_NULL,0,0},         // S_DOGS_DIE6
+  {SPR_DOGS,13,5,NULL,S_DOGS_RAISE2,0,0},   // S_DOGS_RAISE1
+  {SPR_DOGS,12,5,NULL,S_DOGS_RAISE3,0,0},   // S_DOGS_RAISE2
+  {SPR_DOGS,11,5,NULL,S_DOGS_RAISE4,0,0},   // S_DOGS_RAISE3
+  {SPR_DOGS,10,5,NULL,S_DOGS_RAISE5,0,0},   // S_DOGS_RAISE4
+  {SPR_DOGS,9,5,NULL,S_DOGS_RAISE6,0,0},    // S_DOGS_RAISE5
+  {SPR_DOGS,8,5,NULL,S_DOGS_RUN1,0,0},      // S_DOGS_RAISE6
 
   // add dummy beta bfg / lost soul frames for dehacked compatibility
   // fixes bug #1576151 (part 2)
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG1
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG2
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG3
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG4
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG5
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG6
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG7
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG8
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG9
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG10
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG11
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG12
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG13
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG14
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG15
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG16
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG17
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG18
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG19
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG20
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG21
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG22
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG23
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG24
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG25
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG26
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG27
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG28
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG29
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG30
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG31
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG32
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG33
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG34
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG35
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG36
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG37
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG38
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG39
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG40
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG41
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG42
-  {0,0,-1,NULL,S_NULL,0,0},  // S_OLDBFG43
+#define BFGDELAY 1
+#define OLDBFG_1FRAMES(x) {SPR_BFGG,1,BFGDELAY,A_FireOldBFG,x+S_OLDBFG1+2,0,0},
+#define OLDBFG_2FRAMES(x) OLDBFG_1FRAMES(x) OLDBFG_1FRAMES(x+1)
+#define OLDBFG_4FRAMES(x) OLDBFG_2FRAMES(x) OLDBFG_2FRAMES(x+2)
+#define OLDBFG_8FRAMES(x) OLDBFG_4FRAMES(x) OLDBFG_4FRAMES(x+4)
+  {SPR_BFGG,0,10,A_BFGsound,S_OLDBFG1+1,0,0},  // S_OLDBFG1
+  OLDBFG_8FRAMES(0)
+  OLDBFG_8FRAMES(8)
+  OLDBFG_8FRAMES(16)
+  OLDBFG_8FRAMES(24)
+  OLDBFG_8FRAMES(32)
+  {SPR_BFGG,1,0,A_Light0,S_OLDBFG43,0,0}, // S_OLDBFG42
+  {SPR_BFGG,1,20,A_ReFire,S_BFG,0,0},   // S_OLDBFG43
+  // killough 7/11/98: end of beta BFG
 
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS1BALL
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS1BALL2
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS1EXP
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS1EXP2
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS1EXP3
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS1EXP4
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS1EXP5
+  // killough 7/19/98: First plasma fireball in the beta:
+  {SPR_PLS1,32768,6,NULL,S_PLS1BALL2,0,0}, // S_PLS1BALL
+  {SPR_PLS1,32769,6,NULL,S_PLS1BALL,0,0},  // S_PLS1BALL2
+  {SPR_PLS1,32770,4,NULL,S_PLS1EXP2,0,0},  // S_PLS1EXP
+  {SPR_PLS1,32771,4,NULL,S_PLS1EXP3,0,0},  // S_PLS1EXP2
+  {SPR_PLS1,32772,4,NULL,S_PLS1EXP4,0,0},  // S_PLS1EXP3
+  {SPR_PLS1,32773,4,NULL,S_PLS1EXP5,0,0},  // S_PLS1EXP4
+  {SPR_PLS1,32774,4,NULL,S_NULL,0,0},      // S_PLS1EXP5
 
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS2BALL
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS2BALL2
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS2BALLX1
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS2BALLX2
-  {0,0,-1,NULL,S_NULL,0,0},  // S_PLS2BALLX3
+  // killough 7/19/98: Second plasma fireball in the beta:
+  {SPR_PLS2,32768,4,NULL,S_PLS2BALL2,0,0},  // S_PLS2BALL
+  {SPR_PLS2,32769,4,NULL,S_PLS2BALL,0,0},   // S_PLS2BALL2
+  {SPR_PLS2,32770,6,NULL,S_PLS2BALLX2,0,0}, // S_PLS2BALLX1
+  {SPR_PLS2,32771,6,NULL,S_PLS2BALLX3,0,0}, // S_PLS2BALLX2
+  {SPR_PLS2,32772,6,NULL,S_NULL,0,0},       // S_PLS2BALLX3
 
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BON3
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BON4
+  // Beta bonus items (evil sceptre & unholy bible)
+  {SPR_BON3,0,6,NULL,S_BON3,0,0}, // S_BON3
+  {SPR_BON4,0,6,NULL,S_BON4,0,0}, // S_BON4
 
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_STND
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_RUN1
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_RUN2
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_RUN3
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_RUN4
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_ATK1
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_ATK2
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_ATK3
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_PAIN1
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_PAIN2
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_PAIN3
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_DIE1
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_DIE2
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_DIE3
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_DIE4
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_DIE5
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_DIE6
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_DIE7
-  {0,0,-1,NULL,S_NULL,0,0},  // S_BSKUL_DIE8
+  // killough 10/98: beta lost souls attacked from a distance,
+  // animated with colors, and stayed in the air when killed.
+  // This is an approximation, but I'm sure it can be improved.
+  {SPR_SKUL,0,10,A_Look,S_BSKUL_STND,0,0},  // S_BSKUL_STND
+  {SPR_SKUL,1,5,A_Chase,S_BSKUL_RUN2,0,0},  // S_BSKUL_RUN1
+  {SPR_SKUL,2,5,A_Chase,S_BSKUL_RUN3,0,0},  // S_BSKUL_RUN2
+  {SPR_SKUL,3,5,A_Chase,S_BSKUL_RUN4,0,0},  // S_BSKUL_RUN3
+  {SPR_SKUL,0,5,A_Chase,S_BSKUL_RUN1,0,0},  // S_BSKUL_RUN4
+  {SPR_SKUL,4,4,A_FaceTarget,S_BSKUL_ATK2,0,0},      // S_BSKUL_ATK1
+  {SPR_SKUL,5,5,A_BetaSkullAttack,S_BSKUL_ATK3,0,0}, // S_BSKUL_ATK2
+  {SPR_SKUL,5,4,NULL,S_BSKUL_RUN1,0,0},              // S_BSKUL_ATK3
+  {SPR_SKUL,6,4,NULL,S_BSKUL_PAIN2,0,0},     // S_BSKUL_PAIN1
+  {SPR_SKUL,7,2,A_Pain,S_BSKUL_RUN1,0,0},    // S_BSKUL_PAIN2
+  {SPR_SKUL,8,4,NULL,S_BSKUL_RUN1,0,0},      // S_BSKUL_PAIN3
+  {SPR_SKUL, 9,5,NULL,S_BSKUL_DIE2,0,0},     // S_BSKUL_DIE1
+  {SPR_SKUL,10,5,NULL,S_BSKUL_DIE3,0,0},     // S_BSKUL_DIE2
+  {SPR_SKUL,11,5,NULL,S_BSKUL_DIE4,0,0},     // S_BSKUL_DIE3
+  {SPR_SKUL,12,5,NULL,S_BSKUL_DIE5,0,0},     // S_BSKUL_DIE4
+  {SPR_SKUL,13,5,A_Scream,S_BSKUL_DIE6,0,0}, // S_BSKUL_DIE5
+  {SPR_SKUL,14,5,NULL,S_BSKUL_DIE7,0,0},     // S_BSKUL_DIE6
+  {SPR_SKUL,15,5,A_Fall,S_BSKUL_DIE8,0,0},   // S_BSKUL_DIE7
+  {SPR_SKUL,16,5,A_Stop,S_BSKUL_DIE8,0,0},   // S_BSKUL_DIE8
 
   // killough 10/98: mushroom effect
   {SPR_MISL,32769,8,A_Mushroom,S_EXPLODE2,0,0},  // S_MUSHROOM
+
+  // prboom-plus player gibbed death
+  {SPR_PLAY,14,5,NULL,S_PLAY_GDIE2,0,0},        // S_PLAY_GDIE1
+  {SPR_PLAY,15,5,NULL,S_PLAY_GDIE3,0,0},        // S_PLAY_GDIE2
+  {SPR_PLAY,16,5,A_Fall,S_PLAY_GDIE4,0,0},      // S_PLAY_GDIE3
+  {SPR_PLAY,17,5,NULL,S_PLAY_GDIE5,0,0},        // S_PLAY_GDIE4
+  {SPR_PLAY,18,5,NULL,S_PLAY_GDIE6,0,0},        // S_PLAY_GDIE5
+  {SPR_PLAY,19,5,NULL,S_PLAY_GDIE7,0,0},        // S_PLAY_GDIE6
+  {SPR_PLAY,20,5,NULL,S_PLAY_GDIE8,0,0},        // S_PLAY_GDIE7
+  {SPR_PLAY,21,5,NULL,S_PLAY_GDIE9,0,0},        // S_PLAY_GDIE8
+  {SPR_PLAY,22,-1,NULL,S_NULL,0,0},             // S_PLAY_GDIE9
 };
 
 // ********************************************************************
@@ -1798,7 +1793,7 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     50,   // mass
     3,    // damage
     sfx_dmact,    // activesound
-    MF_ISMONSTER|MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_MISSILEMORE, // flags
+    MF_ISMONSTER|MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_MISSILEMORE|MF_DONTFALL, // flags
     S_NULL,   // raisestate
     0,    // meleethreshold
     0,    // maxattackrange
@@ -5523,6 +5518,229 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     MF_NOBLOCKMAP,  // flags
     S_NULL,         // raisestate
     0,               // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
+  },
+
+  // Marine's best friend :)      // killough 7/19/98
+  {   // MT_DOGS
+    "MBFHelperDog", // actorname
+    888,            // doomednum
+    S_DOGS_STND,    // spawnstate
+    500,            // spawnhealth
+    S_DOGS_RUN1,    // seestate
+    sfx_dgsit,      // seesound
+    8,              // reactiontime
+    sfx_dgatk,      // attacksound
+    S_DOGS_PAIN,    // painstate
+    180,            // painchance
+    sfx_dgpain,     // painsound
+    S_DOGS_ATK1,    // meleestate
+    0,              // missilestate
+    S_DOGS_DIE1,    // deathstate
+    S_NULL,         // xdeathstate
+    sfx_dgdth,      // deathsound
+    MT_NULL,        // droppeditem
+    10,             // speed
+    12*FRACUNIT,    // radius
+    28*FRACUNIT,    // height
+    100,            // mass
+    0,              // damage
+    sfx_dgact,      // activesound
+    MF_ISMONSTER|MF_SOLID|MF_SHOOTABLE|MF_COUNTKILL, // flags
+    S_DOGS_RAISE1,  // raisestate
+    0,              // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
+  },
+
+  // killough 7/11/98: this is the first of two plasma fireballs in the beta
+  {   // MT_PLASMA1
+    "PlasmaBall1",  // actorname
+    -1,             // doomednum
+    S_PLS1BALL,     // spawnstate
+    1000,           // spawnhealth
+    S_NULL,         // seestate
+    sfx_plasma,     // seesound
+    8,              // reactiontime
+    sfx_None,       // attacksound
+    S_NULL,         // painstate
+    0,              // painchance
+    sfx_None,       // painsound
+    S_NULL,         // meleestate
+    S_NULL,         // missilestate
+    S_PLS1EXP,      // deathstate
+    S_NULL,         // xdeathstate
+    sfx_firxpl,     // deathsound
+    MT_NULL,        // droppeditem
+    25*FRACUNIT,    // speed
+    13*FRACUNIT,    // radius
+    8*FRACUNIT,     // height
+    100,            // mass
+    4,              // damage
+    sfx_None,       // activesound
+    MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_BOUNCES, // flags
+    S_NULL,         // raisestate
+    0,              // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
+  },
+
+  // killough 7/11/98: this is the second of two plasma fireballs in the beta
+  {   // MT_PLASMA2
+    "PlasmaBall2",  // actorname
+    -1,             // doomednum
+    S_PLS2BALL,     // spawnstate
+    1000,           // spawnhealth
+    S_NULL,         // seestate
+    sfx_plasma,     // seesound
+    8,              // reactiontime
+    sfx_None,       // attacksound
+    S_NULL,         // painstate
+    0,              // painchance
+    sfx_None,       // painsound
+    S_NULL,         // meleestate
+    S_NULL,         // missilestate
+    S_PLS2BALLX1,   // deathstate
+    S_NULL,         // xdeathstate
+    sfx_firxpl,     // deathsound
+    MT_NULL,        // droppeditem
+    25*FRACUNIT,    // speed
+    6*FRACUNIT,     // radius
+    8*FRACUNIT,     // height
+    100,            // mass
+    4,              // damage
+    sfx_None,       // activesound
+    MF_NOBLOCKMAP|MF_MISSILE|MF_DROPOFF|MF_NOGRAVITY|MF_BOUNCES, // flags
+    S_NULL,         // raisestate
+    0,              // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
+  },
+
+  // killough 7/11/98: this is the evil sceptre in the beta version
+  {   // MT_SCEPTRE
+    "EvilSceptre",  // actorname
+    2016,           // doomednum
+    S_BON3,         // spawnstate
+    1000,           // spawnhealth
+    S_NULL,         // seestate
+    sfx_None,       // seesound
+    8,              // reactiontime
+    sfx_None,       // attacksound
+    S_NULL,         // painstate
+    0,              // painchance
+    sfx_None,       // painsound
+    S_NULL,         // meleestate
+    S_NULL,         // missilestate
+    S_NULL,         // deathstate
+    S_NULL,         // xdeathstate
+    sfx_None,       // deathsound
+    MT_NULL,        // droppeditem
+    0,              // speed
+    10*FRACUNIT,    // radius
+    16*FRACUNIT,    // height
+    100,            // mass
+    0,              // damage
+    sfx_None,       // activesound
+    MF_SPECIAL|MF_COUNTITEM, // flags
+    S_NULL,         // raisestate
+    0,              // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
+  },
+
+  // killough 7/11/98: this is the unholy bible in the beta version
+  {   // MT_BIBLE
+    "UnholyBible",  // actorname
+    2017,           // doomednum
+    S_BON4,         // spawnstate
+    1000,           // spawnhealth
+    S_NULL,         // seestate
+    sfx_None,       // seesound
+    8,              // reactiontime
+    sfx_None,       // attacksound
+    S_NULL,         // painstate
+    0,              // painchance
+    sfx_None,       // painsound
+    S_NULL,         // meleestate
+    S_NULL,         // missilestate
+    S_NULL,         // deathstate
+    S_NULL,         // xdeathstate
+    sfx_None,       // deathsound
+    MT_NULL,        // droppeditem
+    0,              // speed
+    20*FRACUNIT,    // radius
+    10*FRACUNIT,    // height
+    100,            // mass
+    0,              // damage
+    sfx_None,       // activesound
+    MF_SPECIAL|MF_COUNTITEM, // flags
+    S_NULL,         // raisestate
+    0,              // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
+  },
+
+  // Will change music according to MUSINFO lump
+  {   // MT_MUSICCHANGER
+    "MusicChanger", // actorname
+    14165,          // doomednum // 14100-14164 should also be reserved
+    S_TNT1,         // spawnstate
+    1000,           // spawnhealth
+    S_NULL,         // seestate
+    sfx_None,       // seesound
+    8,              // reactiontime
+    sfx_None,       // attacksound
+    S_NULL,         // painstate
+    0,              // painchance
+    sfx_None,       // painsound
+    S_NULL,         // meleestate
+    S_NULL,         // missilestate
+    S_NULL,         // deathstate
+    S_NULL,         // xdeathstate
+    sfx_None,       // deathsound
+    MT_NULL,        // droppeditem
+    0,              // speed
+    16,             // radius
+    16,             // height
+    100,            // mass
+    0,              // damage
+    sfx_None,       // activesound
+    MF_NOBLOCKMAP,  // flags
+    S_NULL,         // raisestate
+    0,              // meleethreshold
+    0,              // maxattackrange
+    200,            // minmissilechance
+  },
+
+  {   // MT_GIBDTH
+    "GibDeath",     // actorname
+    -1,             // doomednum
+    S_TNT1,         // spawnstate
+    1000,           // spawnhealth
+    S_NULL,         // seestate
+    sfx_None,       // seesound
+    8,              // reactiontime
+    sfx_None,       // attacksound
+    S_NULL,         // painstate
+    0,              // painchance
+    sfx_None,       // painsound
+    S_NULL,         // meleestate
+    S_NULL,         // missilestate
+    S_NULL,         // deathstate
+    S_NULL,         // xdeathstate
+    sfx_None,       // deathsound
+    MT_NULL,        // droppeditem
+    0,              // speed
+    4*FRACUNIT,     // radius
+    4*FRACUNIT,     // height
+    100,            // mass
+    0,              // damage
+    sfx_None,       // activesound
+    MF_NOBLOCKMAP|MF_DROPOFF, // flags
+    S_NULL,         // raisestate
+    0,              // meleethreshold
     0,              // maxattackrange
     200,            // minmissilechance
   },

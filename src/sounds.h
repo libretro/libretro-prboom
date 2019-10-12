@@ -586,6 +586,17 @@ typedef enum
    sfx_skesit,
    sfx_skeatk,
    sfx_radio,
+
+   /* killough 11/98: dog sounds */
+   sfx_dgsit,
+   sfx_dgatk,
+   sfx_dgact,
+   sfx_dgdth,
+   sfx_dgpain,
+
+   //e6y
+   sfx_secret,
+   sfx_gibdth,
 #endif
    NUMSFX
 } sfxenum_t;

@@ -1668,7 +1668,7 @@ void A_VileChase(mobj_t* actor)
       corpsehit->flags =
         (info->flags & ~MF_FRIEND) | (actor->flags & MF_FRIEND);
 
-      corpsehit->flags = corpsehit->flags | MF_RESURRECTED;//mark as resurrected
+      corpsehit->intflags = corpsehit->intflags | MIF_RESURRECTED;//mark as resurrected
 
       if (!((corpsehit->flags ^ MF_COUNTKILL) & (MF_FRIEND | MF_COUNTKILL)))
           totallive++;
@@ -1909,6 +1909,40 @@ void A_SkullAttack(mobj_t *actor)
   if (dist < 1)
     dist = 1;
   actor->momz = (dest->z+(dest->height>>1) - actor->z) / dist;
+}
+
+//
+// A_BetaSkullAttack
+// The flying skull had different behavior on Beta Doom
+//
+
+void A_BetaSkullAttack(mobj_t *actor)
+{
+  int damage;
+
+  if (compatibility_level < mbf_compatibility)
+    return;
+
+  if (!actor->target || actor->target->type == MT_SKULL)
+    return;
+
+  S_StartSound(actor, actor->info->attacksound);
+  A_FaceTarget(actor);
+  damage = (P_Random(pr_skullfly)%8+1)*actor->info->damage;
+  P_DamageMobj(actor->target, actor, actor, damage);
+}
+
+//
+// A_Stop
+// The flying skull had different behavior on Beta Doom
+//
+
+void A_Stop(mobj_t *actor)
+{
+  if (compatibility_level < mbf_compatibility)
+    return;
+
+  actor->momx = actor->momy = actor->momz = 0;
 }
 
 //

@@ -63,6 +63,8 @@ typedef struct
 
 typedef struct
 {
+  const char* name;
+
   u_parserstate_t  nextState;
 
   char*             data;
@@ -86,7 +88,7 @@ typedef struct
 } u_scanner_t;
 
 
-u_scanner_t  U_ScanOpen(const char* data, int length);
+u_scanner_t  U_ScanOpen(const char* data, int length, const char *name);
 void         U_ScanClose(u_scanner_t* scanner);
 boolean      U_GetNextToken(u_scanner_t* scanner, boolean expandState);
 boolean      U_HasTokensLeft(u_scanner_t* scanner);

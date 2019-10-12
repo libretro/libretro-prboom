@@ -47,6 +47,7 @@
 #include "p_inter.h"
 #include "lprintf.h"
 #include "r_demo.h"
+#include "u_musinfo.h"
 
 //
 // P_SetMobjState
@@ -729,45 +730,50 @@ void P_MobjThinker (mobj_t* mobj)
   // removed old code which looked at target references
   // (we use pointer reference counting now)
 
+  if (mobj->type == MT_MUSICCHANGER)
+  {
+    P_MusInfoMobjThinker(mobj);
+    return;
+  }
+
   mobj->PrevX = mobj->x;
   mobj->PrevY = mobj->y;
   mobj->PrevZ = mobj->z;
 
   // momentum movement
   if (mobj->momx | mobj->momy || mobj->flags & MF_SKULLFLY)
-    {
-      P_XYMovement(mobj);
-      if (mobj->thinker.function != P_MobjThinker) // cph - Must've been removed
-  return;       // killough - mobj was removed
-    }
+  {
+    P_XYMovement(mobj);
+    if (mobj->thinker.function != P_MobjThinker) // cph - Must've been removed
+      return;       // killough - mobj was removed
+  }
 
   if (mobj->z != mobj->floorz || mobj->momz)
-    {
-      P_ZMovement(mobj);
-      if (mobj->thinker.function != P_MobjThinker) // cph - Must've been removed
-  return;       // killough - mobj was removed
-    }
-  else
-    if (!(mobj->momx | mobj->momy) && !sentient(mobj))
-      {                                  // non-sentient objects at rest
-  mobj->intflags |= MIF_ARMED;     // arm a mine which has come to rest
+  {
+    P_ZMovement(mobj);
+    if (mobj->thinker.function != P_MobjThinker) // cph - Must've been removed
+      return;       // killough - mobj was removed
+  }
+  else if (!(mobj->momx | mobj->momy) && !sentient(mobj))
+  {                                 // non-sentient objects at rest
+    mobj->intflags |= MIF_ARMED;     // arm a mine which has come to rest
 
-  // killough 9/12/98: objects fall off ledges if they are hanging off
-  // slightly push off of ledge if hanging more than halfway off
+    // killough 9/12/98: objects fall off ledges if they are hanging off
+    // slightly push off of ledge if hanging more than halfway off
 
-  if (mobj->z > mobj->dropoffz &&      // Only objects contacting dropoff
-      !(mobj->flags & MF_NOGRAVITY) && // Only objects which fall
-      !comp[comp_falloff]) // Not in old demos
-    P_ApplyTorque(mobj);               // Apply torque
-  else
-    mobj->intflags &= ~MIF_FALLING, mobj->gear = 0;  // Reset torque
-      }
+    if (mobj->z > mobj->dropoffz &&      // Only objects contacting dropoff
+        !(mobj->flags & MF_NOGRAVITY) && // Only objects which fall
+        !comp[comp_falloff]) // Not in old demos
+      P_ApplyTorque(mobj);               // Apply torque
+    else
+      mobj->intflags &= ~MIF_FALLING, mobj->gear = 0;  // Reset torque
+  }
 
   // cycle through states,
   // calling action functions at transitions
 
   if (mobj->tics != -1)
-    {
+  {
     mobj->tics--;
 
     // you can cycle through multiple states in a tic
@@ -775,9 +781,9 @@ void P_MobjThinker (mobj_t* mobj)
     if (!mobj->tics)
       if (!P_SetMobjState (mobj, mobj->state->nextstate) )
         return;     // freed itself
-    }
+  }
   else
-    {
+  {
 
     // check for nightmare respawn
 
@@ -799,7 +805,7 @@ void P_MobjThinker (mobj_t* mobj)
       return;
 
     P_NightmareRespawn (mobj);
-    }
+  }
 
 }
 
@@ -1156,19 +1162,21 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   fixed_t y;
   fixed_t z;
   int options = mthing->options; /* cph 2001/07/07 - make writable copy */
+  short thingtype = mthing->type;
+  int iden_num = 0;
 
   // killough 2/26/98: Ignore type-0 things as NOPs
   // phares 5/14/98: Ignore Player 5-8 starts (for now)
 
-  switch(mthing->type)
-    {
-  case 0:
-  case DEN_PLAYER5:
-  case DEN_PLAYER6:
-  case DEN_PLAYER7:
-  case DEN_PLAYER8:
-    return;
-    }
+  switch(thingtype)
+  {
+    case 0:
+    case DEN_PLAYER5:
+    case DEN_PLAYER6:
+    case DEN_PLAYER7:
+    case DEN_PLAYER8:
+      return;
+  }
 
   // killough 11/98: clear flags unused by Doom
   //
@@ -1183,54 +1191,54 @@ void P_SpawnMapThing (const mapthing_t* mthing)
        options & MTF_RESERVED)) {
     if (!demo_compatibility) // cph - Add warning about bad thing flags
       lprintf(LO_WARN, "P_SpawnMapThing: correcting bad flags (%u) (thing type %d)\n",
-        options, mthing->type);
+        options, thingtype);
     options &= MTF_EASY|MTF_NORMAL|MTF_HARD|MTF_AMBUSH|MTF_NOTSINGLE;
   }
 
   // count deathmatch start positions
 
   // doom2.exe has at most 10 deathmatch starts
-  if (mthing->type == 11)
-    {
+  if (thingtype == 11)
+  {
     if (!(!compatibility || deathmatch_p-deathmatchstarts < 10)) {
-		return;
-	} else {
-    // 1/11/98 killough -- new code removes limit on deathmatch starts:
+      return;
+    } else {
+      // 1/11/98 killough -- new code removes limit on deathmatch starts:
 
-    size_t offset = deathmatch_p - deathmatchstarts;
+      size_t offset = deathmatch_p - deathmatchstarts;
 
-    if (offset >= num_deathmatchstarts)
+      if (offset >= num_deathmatchstarts)
       {
-      num_deathmatchstarts = num_deathmatchstarts ?
+        num_deathmatchstarts = num_deathmatchstarts ?
                  num_deathmatchstarts*2 : 16;
-      deathmatchstarts = realloc(deathmatchstarts,
+        deathmatchstarts = realloc(deathmatchstarts,
                    num_deathmatchstarts *
                    sizeof(*deathmatchstarts));
-      deathmatch_p = deathmatchstarts + offset;
+        deathmatch_p = deathmatchstarts + offset;
       }
-    memcpy(deathmatch_p++, mthing, sizeof(*mthing));
-    (deathmatch_p-1)->options = 1;
-    return;
-	}
+      memcpy(deathmatch_p++, mthing, sizeof(*mthing));
+      (deathmatch_p-1)->options = 1;
+      return;
     }
+  }
 
   // check for players specially
 
-  if (mthing->type <= 4 && mthing->type > 0)  // killough 2/26/98 -- fix crashes
-    {
+  if (thingtype <= 4 && thingtype > 0)  // killough 2/26/98 -- fix crashes
+  {
 
     // save spots for respawning in coop games
-    playerstarts[mthing->type-1] = *mthing;
+    playerstarts[thingtype-1] = *mthing;
     /* cph 2006/07/24 - use the otherwise-unused options field to flag that
      * this start is present (so we know which elements of the array are filled
      * in, in effect). Also note that the call below to P_SpawnPlayer must use
      * the playerstarts version with this field set */
-    playerstarts[mthing->type-1].options = 1;
+    playerstarts[thingtype-1].options = 1;
 
     if (!deathmatch)
-      P_SpawnPlayer (mthing->type-1, &playerstarts[mthing->type-1]);
+      P_SpawnPlayer (thingtype-1, &playerstarts[thingtype-1]);
     return;
-    }
+  }
 
   // check for apropriate skill level
 
@@ -1257,18 +1265,27 @@ void P_SpawnMapThing (const mapthing_t* mthing)
 
   // find which type to spawn
 
-  // killough 8/23/98: use table for faster lookup
-  i = P_FindDoomedNum(mthing->type);
+  // Thing types from 14100 to 14164 are used for MUSINFO entities
+  // this means they are actually the same MusicChanger thingtype but
+  // each different type should have a different ambient music id.
+  // -- See https://doomwiki.org/wiki/MUSINFO --
+  if (thingtype >= 14100 && thingtype <= 14164)
+  {
+    iden_num = thingtype - 14100; // Ambient music to change
+    i = MT_MUSICCHANGER;
+  }
+  else // killough 8/23/98: use table for faster lookup
+    i = P_FindDoomedNum(thingtype);
 
   // phares 5/16/98:
   // Do not abort because of an unknown thing. Ignore it, but post a
   // warning message for the player.
 
   if (i == NUMMOBJTYPES)
-    {
+  {
     doom_printf("Unknown Thing type %i at (%i, %i)",mthing->type,mthing->x,mthing->y);
     return;
-    }
+  }
 
   // don't spawn keycards and players in deathmatch
 
@@ -1292,6 +1309,7 @@ void P_SpawnMapThing (const mapthing_t* mthing)
 
   mobj = P_SpawnMobj (x,y,z, i);
   mobj->spawnpoint = *mthing;
+  mobj->iden_num = iden_num;
 
   if (mobj->tics > 0)
     mobj->tics = 1 + (P_Random (pr_spawnthing) % mobj->tics);
@@ -1299,10 +1317,10 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   if (!(mobj->flags & MF_FRIEND) &&
       options & MTF_FRIEND &&
       mbf_features)
-    {
-      mobj->flags |= MF_FRIEND;            // killough 10/98:
-      P_UpdateThinker(&mobj->thinker);     // transfer friendliness flag
-    }
+  {
+    mobj->flags |= MF_FRIEND;            // killough 10/98:
+    P_UpdateThinker(&mobj->thinker);     // transfer friendliness flag
+  }
 
   /* killough 7/20/98: exclude friends */
   if (!((mobj->flags ^ MF_COUNTKILL) & (MF_FRIEND | MF_COUNTKILL)))

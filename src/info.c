@@ -1793,7 +1793,7 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     50,   // mass
     3,    // damage
     sfx_dmact,    // activesound
-    MF_ISMONSTER|MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_MISSILEMORE, // flags
+    MF_ISMONSTER|MF_SOLID|MF_SHOOTABLE|MF_FLOAT|MF_NOGRAVITY|MF_MISSILEMORE|MF_DONTFALL, // flags
     S_NULL,   // raisestate
     0,    // meleethreshold
     0,    // maxattackrange

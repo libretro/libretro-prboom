@@ -2161,449 +2161,455 @@ entry for the NULL pointer is available using mnemonic "NULL"
 THING DEFAULT "BITS" VALUES
 ###########################
 
-This comes directly from the source code, with Thing numbers added.
-The item names are those used in the source code, not necessarily
-what Dehacked might call them.  They should all be identical to the
-defaults in DOOM(2) except where translucency has been added and for
-the two Things for PUSH and PULL wind sources at the end.
+This comes directly from the source code, with Thing numbers added,
+as well as the name in the code, the actorname (based on ZDoom),
+and, when existing, the doomednum used to identify the Thing in maps.
+
+The second line corresponds to the Bit flags.
+They should all be identical to the defaults in DOOM(2) except where
+translucency has been added in Boom and the additional Bits2 options
+added for dehardcoding monster behavior.
+
+Original Doom only had 137 Thing types, this port has been expanded
+with Things added in Boom, MBF and PrBoom-plus.
 
 
-1   PLAYER
+1   PLAYER            DoomPlayer
     SOLID+SHOOTABLE+DROPOFF+PICKUP+NOTDMATCH    
   
-2   POSSESSED
+2   POSSESSED         ZombieMan                  3004
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-3   SHOTGUY
+3   SHOTGUY           ShotgunGuy                    9
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-4   VILE
+4   VILE              Archvile                     64
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER+NOTARGET+QUICKTORETALIATE
   
-5   FIRE
+5   FIRE              ArchvileFire
     NOBLOCKMAP+NOGRAVITY+TRANSLUCENT    
   
-6   UNDEAD
+6   UNDEAD            Revenant                     66
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-7   TRACER
+7   TRACER            RevenantTracer
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY   
   
-8   SMOKE
+8   SMOKE             RevenantTracerSmoke
     NOBLOCKMAP+NOGRAVITY+TRANSLUCENT    
   
-9   FATSO
+9   FATSO             Fatso                        67
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-10  FATSHOT
+10  FATSHOT           FatShot
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+TRANSLUCENT    
   
-11  CHAINGUY
+11  CHAINGUY          ChaingunGuy                  65
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-12  TROOP
+12  TROOP             DoomImp                    3001
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-13  SERGEANT
+13  SERGEANT          Demon                      3002
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-14  SHADOWS
+14  SHADOWS           Spectre                      58
     SOLID+SHOOTABLE+SHADOW+COUNTKILL+ISMONSTER
   
-15  HEAD
+15  HEAD              Cacodemon                  3005
     SOLID+SHOOTABLE+FLOAT+NOGRAVITY+COUNTKILL+ISMONSTER
   
-16  BRUISER
+16  BRUISER           BaronOfHell                3003
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-17  BRUISERSHOT
+17  BRUISERSHOT       BaronBall
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+TRANSLUCENT   
   
-18  KNIGHT
+18  KNIGHT            HellKnight                   69
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-19  SKULL
+19  SKULL             LostSoul                   3006
     SOLID+SHOOTABLE+FLOAT+NOGRAVITY+ISMONSTER+MISSILEMORE+DONTFALL
   
-20  SPIDER
+20  SPIDER            SpiderMastermind              7
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER+MISSILEMORE+FULLVOLSIGHT+FULLVOLDEATH+NORADIUSDMG
   
-21  BABY
+21  BABY              Arachnotron                  68
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-22  CYBORG
+22  CYBORG            Cyberdemon                   16
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER+MISSILEMORE+FULLVOLSIGHT+FULLVOLDEATH+NORADIUSDMG
   
-23  PAIN
+23  PAIN              PainElemental                71
     SOLID+SHOOTABLE+FLOAT+NOGRAVITY+COUNTKILL+ISMONSTER
   
-24  WOLFSS
+24  WOLFSS            WolfensteinSS                84
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
   
-25  KEEN
+25  KEEN              CommanderKeen                72
     SOLID+SPAWNCEILING+NOGRAVITY+SHOOTABLE+COUNTKILL+ISMONSTER
   
-26  BOSSBRAIN
+26  BOSSBRAIN         BossBrain                    88
     SOLID+SHOOTABLE    
   
-27  BOSSSPIT
+27  BOSSSPIT          BossEye                      89
     NOBLOCKMAP+NOSECTOR    
   
-28  BOSSTARGET
+28  BOSSTARGET        BossTarget                   87
     NOBLOCKMAP+NOSECTOR    
   
-29  SPAWNSHOT
+29  SPAWNSHOT         SpawnShot
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+NOCLIP   
   
-30  SPAWNFIRE
+30  SPAWNFIRE         SpawnFire
     NOBLOCKMAP+NOGRAVITY+TRANSLUCENT
   
-31  BARREL
+31  BARREL            ExplosiveBarrel            2035
     SOLID+SHOOTABLE+NOBLOOD   
   
-32  TROOPSHOT
+32  TROOPSHOT         DoomImpBall
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+TRANSLUCENT
   
-33  HEADSHOT
+33  HEADSHOT          CacodemonBall
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+TRANSLUCENT  
   
-34  ROCKET
+34  ROCKET            Rocket
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY   
   
-35  PLASMA
+35  PLASMA            PlasmaBall
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+TRANSLUCENT
   
-36  BFG
+36  BFG               BFGBall
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+TRANSLUCENT
   
-37  ARACHPLAZ
+37  ARACHPLAZ         ArachnotronPlasma
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+TRANSLUCENT
   
-38  PUFF
+38  PUFF              BulletPuff
     NOBLOCKMAP+NOGRAVITY+TRANSLUCENT
   
-39  BLOOD
+39  BLOOD             Blood
     NOBLOCKMAP    
   
-40  TFOG
+40  TFOG              TeleportFog
     NOBLOCKMAP+NOGRAVITY+TRANSLUCENT
   
-41  IFOG
+41  IFOG              ItemFog
     NOBLOCKMAP+NOGRAVITY+TRANSLUCENT
   
-42  TELEPORTMAN
+42  TELEPORTMAN       TeleportDest                 14
     NOBLOCKMAP+NOSECTOR    
   
-43  EXTRABFG
+43  EXTRABFG          BFGExtra
     NOBLOCKMAP+NOGRAVITY   
   
-44  MISC0
+44  MISC0             GreenArmor                 2018
     SPECIAL   
   
-45  MISC1
+45  MISC1             BlueArmor                  2019
     SPECIAL   
   
-46  MISC2
+46  MISC2             HealthBonus                2014
     SPECIAL+COUNTITEM    
   
-47  MISC3
+47  MISC3             ArmorBonus                 2015
     SPECIAL+COUNTITEM    
   
-48  MISC4
+48  MISC4             BlueCard                      5
     SPECIAL+NOTDMATCH    
   
-49  MISC5
+49  MISC5             RedCard                      13
     SPECIAL+NOTDMATCH    
   
-50  MISC6
+50  MISC6             YellowCard                    6
     SPECIAL+NOTDMATCH    
   
-51  MISC7
+51  MISC7             YellowSkull                  39
     SPECIAL+NOTDMATCH    
   
-52  MISC8
+52  MISC8             RedSkull                     38
     SPECIAL+NOTDMATCH    
   
-53  MISC9
+53  MISC9             BlueSkull                    40
     SPECIAL+NOTDMATCH    
   
-54  MISC10
+54  MISC10            Stimpack                   2011
     SPECIAL   
   
-55  MISC11
+55  MISC11            Medikit                    2012
     SPECIAL   
   
-56  MISC12
+56  MISC12            Souldsphere                2013
     SPECIAL+COUNTITEM+TRANSLUCENT
   
-57  INV
+57  INV               InvulnerabilitySphere      2022
     SPECIAL+COUNTITEM+TRANSLUCENT
   
-58  MISC13
+58  MISC13            Berserk                    2013
     SPECIAL+COUNTITEM    
   
-59  INS
+59  INS               BlurSphere                 2024
     SPECIAL+COUNTITEM+TRANSLUCENT
   
-60  MISC14
+60  MISC14            RadSuit                    2025
     SPECIAL   
   
-61  MISC15
+61  MISC15            AllMap                     2026
     SPECIAL+COUNTITEM    
   
-62  MISC16
+62  MISC16            Infrared                   2045
     SPECIAL+COUNTITEM    
   
-63  MEGA
+63  MEGA              Megasphere                   83
     SPECIAL+COUNTITEM+TRANSLUCENT
   
-64  CLIP
+64  CLIP              Clip                       2007
     SPECIAL   
   
-65  MISC17
+65  MISC17            Clipbox                    2048
     SPECIAL   
   
-66  MISC18
+66  MISC18            RocketAmmo                 2010
     SPECIAL   
   
-67  MISC19
+67  MISC19            RocketBox                  2046
     SPECIAL   
   
-68  MISC20
+68  MISC20            Cell                       2047
     SPECIAL   
   
-69  MISC21
+69  MISC21            CellPack                     17
     SPECIAL   
   
-70  MISC22
+70  MISC22            Shell                      2008
     SPECIAL   
   
-71  MISC23
+71  MISC23            ShellBox                   2049
     SPECIAL   
   
-72  MISC24
+72  MISC24            Backpack                      8
     SPECIAL   
   
-73  MISC25
+73  MISC25            BFG9000                    2006
     SPECIAL   
   
-74  CHAINGUN
+74  CHAINGUN          Chaingun                   2002
     SPECIAL   
   
-75  MISC26
+75  MISC26            Chainsaw                   2005
     SPECIAL   
   
-76  MISC27
+76  MISC27            RocketLauncher             2003
     SPECIAL   
   
-77  MISC28
+77  MISC28            PlasmaRifle                2004
     SPECIAL   
   
-78  SHOTGUN
+78  SHOTGUN           Shotgun                    2001
     SPECIAL   
   
-79  SUPERSHOTGUN
+79  SUPERSHOTGUN      SuperShotgun                 82
     SPECIAL   
   
-80  MISC29
+80  MISC29            TechLamp                     85
     SOLID   
   
-81  MISC30
+81  MISC30            Techlamp2                    86
     SOLID   
   
-82  MISC31
+82  MISC31            Column                     2028
     SOLID   
   
-83  MISC32
+83  MISC32            TellGreenColumn              30
     SOLID   
   
-84  MISC33
+84  MISC33            ShortGreenColumn             31
     SOLID   
   
-85  MISC34
+85  MISC34            TallRedColumn                32
     SOLID   
   
-86  MISC35
+86  MISC35            ShortRedColumn               33
     SOLID   
   
-87  MISC36
+87  MISC36            SkullColumn                  37
     SOLID   
   
-88  MISC37
+88  MISC37            HeartColumn                  36
     SOLID   
   
-89  MISC38
+89  MISC38            EvilEye                      41
     SOLID   
   
-90  MISC39
+90  MISC39            FloatingSkull                42
     SOLID   
   
-91  MISC40
+91  MISC40            TorchTree                    43
     SOLID   
   
-92  MISC41
+92  MISC41            BlueTorch                    44
     SOLID   
   
-93  MISC42
+93  MISC42            GreenTorch                   45
     SOLID   
   
-94  MISC43
+94  MISC43            RedTorch                     46
     SOLID   
   
-95  MISC44
+95  MISC44            ShortBlueTorch               55
     SOLID   
   
-96  MISC45
+96  MISC45            ShortGreenTorch              56
     SOLID   
   
-97  MISC46
+97  MISC46            ShortRedTorch                57
     SOLID   
   
-98  MISC47
+98  MISC47            Stalagtite                   47
     SOLID   
   
-99  MISC48
+99  MISC48            TechPillar                   48
     SOLID   
   
-100 MISC49
+100 MISC49            CandleStick                  34
     0    
   
-101 MISC50
+101 MISC50            Candelabra                   35
     SOLID   
   
-102 MISC51
+102 MISC51            BloodyTwitch                 49
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-103 MISC52
+103 MISC52            Meat2                        50
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-104 MISC53
+104 MISC53            Meat3                        51
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-105 MISC54
+105 MISC54            Meat4                        52
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-106 MISC55
+106 MISC55            Meat5                        53
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-107 MISC56
+107 MISC56            NonsolidMeat2                59
     SPAWNCEILING+NOGRAVITY   
   
-108 MISC57
+108 MISC57            NonsolidMeat4                60
     SPAWNCEILING+NOGRAVITY   
   
-109 MISC58
+109 MISC58            NonsolidMeat3                61
     SPAWNCEILING+NOGRAVITY   
   
-110 MISC59
+110 MISC59            NonsolidMeat5                62
     SPAWNCEILING+NOGRAVITY   
   
-111 MISC60
+111 MISC60            NonsolidTwitch               63
     SPAWNCEILING+NOGRAVITY   
   
-112 MISC61
+112 MISC61            DeadCacodemon                22
     0    
   
-113 MISC62
+113 MISC62            DeadMarine                   15
     0    
   
-114 MISC63
+114 MISC63            DeadZombieMan                18
     0    
   
-115 MISC64
+115 MISC64            DeadDemon                    21
     0    
   
-116 MISC65
+116 MISC65            DeadLostSoul                 23
     0    
   
-117 MISC66
+117 MISC66            DeadDoomImp                  20
     0    
   
-118 MISC67
+118 MISC67            DeadShotgunGuy               19
     0    
   
-119 MISC68
+119 MISC68            GibbedMarine                 10
     0    
   
-120 MISC69
+120 MISC69            GibbedMarineExtra            12
     0    
   
-121 MISC70
+121 MISC70            HeadsOnAStick                28
     SOLID   
   
-122 MISC71
+122 MISC71            Gibs                         24
     0    
   
-123 MISC72
+123 MISC72            HeadOnAStick                 27
     SOLID   
   
-124 MISC73
+124 MISC73            HeadCandles                  29
     SOLID   
   
-125 MISC74
+125 MISC74            DeadStick                    25
     SOLID   
   
-126 MISC75
+126 MISC75            LiveStick                    26
     SOLID   
   
-127 MISC76
+127 MISC76            BigTree                      54
     SOLID   
   
-128 MISC77
+128 MISC77            BuirningBarrel               70
     SOLID   
   
-129 MISC78
+129 MISC78            HangNoGuts                   73
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-130 MISC79
+130 MISC79            HangBNoBrain                 74
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-131 MISC80
+131 MISC80            HangTLookingDown             75
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-132 MISC81
+132 MISC81            HangTSkull                   76
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-133 MISC82
+133 MISC82            HangTLookingUp               77
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-134 MISC83
+134 MISC83            HangTNoBrain                 78
     SOLID+SPAWNCEILING+NOGRAVITY    
   
-135 MISC84
+135 MISC84            ColonGibs                    79
     NOBLOCKMAP    
   
-136 MISC85
+136 MISC85            SmallBloodPool               80
     NOBLOCKMAP    
   
-137 MISC86
+137 MISC86            BrainStem                    81
     NOBLOCKMAP    
 
-138 PUSH
+138 PUSH              PointPusher                5001
     NOBLOCKMAP  
 
-139 PULL
+139 PULL              PointPuller                5002
     NOBLOCKMAP  
 
-140 DOGS
+140 DOGS              MBFHelperDog                888
     SOLID+SHOOTABLE+COUNTKILL+ISMONSTER
 
-141 PLASMA1
+141 PLASMA1           PlasmaBall1
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+BOUNCES
 
-142 PLASMA2
+142 PLASMA2           PlasmaBall2
     NOBLOCKMAP+MISSILE+DROPOFF+NOGRAVITY+BOUNCES
 
-143 SCEPTRE
+143 SCEPTRE           EvilSceptre                2016
     SPECIAL+COUNTITEM
 
-143 BIBLE
+143 BIBLE             UnholyBible                2017
     SPECIAL+COUNTITEM
 
-144 MUSICCHANGER
+144 MUSICCHANGER      MusicChanger              14165
     NOBLOCKMAP
 
-145 GIBDTH
+145 GIBDTH            GibDeath
     NOBLOCKMAP+DROPOFF
 
 /// end of file

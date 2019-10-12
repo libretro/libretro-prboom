@@ -54,7 +54,7 @@ void U_ExpandState(u_scanner_t* scanner);
 void U_Unescape(char *str);
 void U_SetString(char **ptr, const char *start, int length);
 
-u_scanner_t U_ScanOpen(const char* data, int length)
+u_scanner_t U_ScanOpen(const char* data, int length, const char* name)
 {
   u_scanner_t scanner;
   scanner.lineStart = scanner.logicalPosition = scanner.scanPos = scanner.tokenLinePosition = 0;
@@ -62,6 +62,7 @@ u_scanner_t U_ScanOpen(const char* data, int length)
   scanner.needNext = TRUE;
   scanner.string = NULL;
   scanner.nextState.string = NULL;
+  scanner.name = name;
 
   if(length == -1)
     length = strlen(data);
@@ -470,7 +471,7 @@ void U_Error(u_scanner_t* s, const char *msg, ...)
   va_start(ap, msg);
   vsnprintf(buffer, 1024, msg, ap);
   va_end(ap);
-  I_Error("%d:%d:%s.", s->tokenLine, s->tokenLinePosition, buffer);
+  I_Error("%s:%d:%d:%s.", s->name, s->tokenLine, s->tokenLinePosition, buffer);
 }
 
 boolean U_MustGetToken(u_scanner_t* s, char token)

@@ -332,7 +332,7 @@ static int ParseMapEntry(u_scanner_t *s, mapentry_t *val)
 int U_ParseMapInfo(const char *buffer, size_t length)
 {
   unsigned int i;
-  u_scanner_t scanner = U_ScanOpen(buffer, length);
+  u_scanner_t scanner = U_ScanOpen(buffer, length, "UMAPINFO");
 
   while (U_HasTokensLeft(&scanner))
   {

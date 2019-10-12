@@ -86,7 +86,7 @@ void U_ParseMusInfo(const char *mapid)
     int lumpnum;
     int inMap = false;
 
-    u_scanner_t s = U_ScanOpen(data, datalength);
+    u_scanner_t s = U_ScanOpen(data, datalength, "MUSINFO");
     while (U_HasTokensLeft(&s))
     {
       if (inMap || U_CheckToken(&s, TK_Identifier))

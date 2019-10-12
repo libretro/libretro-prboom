@@ -451,7 +451,7 @@ void U_ErrorToken(u_scanner_t* s, int token)
   else if (token < TK_NumSpecialTokens && s->token >= TK_NumSpecialTokens)
     U_Error(s, "Expected %s but got '%c' instead.", U_TokenNames[token], s->token);
   else if (token >= TK_NumSpecialTokens && s->token < TK_NumSpecialTokens)
-    U_Error(s, "Expected '%c' but got '%s' instead.", token, U_TokenNames[(int)s->token]);
+    U_Error(s, "Expected '%c' but got %s '%s' instead.", token, U_TokenNames[(int)s->token], s->string);
   else
     U_Error(s, "Expected '%c' but got '%c' instead.", token, s->token);
 }

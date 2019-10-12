@@ -303,9 +303,10 @@ static int ParseMapEntry(u_scanner_t *s, mapentry_t *val)
 {
   val->mapname = NULL;
 
-  U_MustGetIdentifier(s, "map");
-  U_MustGetToken(s, TK_Identifier);
+  if(!U_MustGetIdentifier(s, "map"))
+    return 0;
 
+  U_MustGetToken(s, TK_Identifier);
   if (!G_ValidateMapName(s->string, NULL, NULL))
   {
     U_Error(s, "Invalid map name %s", s->string);
@@ -340,6 +341,7 @@ int U_ParseMapInfo(const char *buffer, size_t length)
     if (!ParseMapEntry(&scanner, &parsed))
     {
       U_Error(&scanner, "Skipping entry: %s", scanner.string);
+      continue;
     }
 
     // Does this property already exist? If yes, replace it.

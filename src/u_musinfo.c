@@ -78,50 +78,56 @@ void U_ParseMusInfo(const char *mapid)
 
   S_music[NUMMUSIC].lumpnum = -1;
 
-  int musinfolump = W_GetNumForName("MUSINFO");
+  int musinfolump = W_CheckNumForName("MUSINFO");
   if (musinfolump != -1)
   {
     const char *data = W_CacheLumpNum(musinfolump);
     int datalength = W_LumpLength(musinfolump);
-    int lumpnum;
-    int inMap = false;
+    int i, lumpnum, musitem;
+    boolean inMap = false;
+
+    // Clear any previous value
+    for(i=0; i<MAX_MUS_ENTRIES; i++)
+       musinfo.items[i] = -1;
 
     u_scanner_t s = U_ScanOpen(data, datalength, "MUSINFO");
     while (U_HasTokensLeft(&s))
     {
-      if (inMap || U_CheckToken(&s, TK_Identifier))
+      if (inMap || (U_CheckToken(&s, TK_Identifier) && !strcasecmp(s.string, mapid)))
       {
         if (!inMap)
-          inMap = true;
+        {
+          inMap = true; // begin first line parsing
+        }
 
-        // If there's a new map as identifier, stop search
-        if (U_CheckToken(&s, TK_Identifier) &&
-             (s.string[0] == 'E' || s.string[0] == 'e' ||
-               s.string[0] == 'M' || s.string[0] == 'm'))
+        // If we were already parsing and found a map as identifier, stop search
+        else if (s.string[0] == 'E' || s.string[0] == 'e' ||
+                 s.string[0] == 'M' || s.string[0] == 'm')
         {
           break;
         }
 
-        U_MustGetInteger(&s);
-
-        // Check number in range
-        if (s.number > 0 && s.number < MAX_MUS_ENTRIES)
+        if (U_MustGetInteger(&s))
         {
-          if (U_MustGetToken(&s, TK_Identifier))
+          musitem = s.number;
+          // Check number in range
+          if (musitem > 0 && musitem < MAX_MUS_ENTRIES)
           {
-            lumpnum = W_CheckNumForName(s.string);
-
-            if (lumpnum >= 0)
-              musinfo.items[s.number] = lumpnum;
-            else
-              U_Error(&s, "U_ParseMusInfo: Unknown MUS lump %s", s.string);
+            if (U_MustGetToken(&s, TK_Identifier))
+            {
+              lumpnum = W_CheckNumForName(s.string);
+              if (lumpnum >= 0)
+                musinfo.items[musitem] = lumpnum;
+              else
+                U_Error(&s, "U_ParseMusInfo: Unknown MUS lump '%s'", s.string);
+            }
           }
+          else
+            U_Error(&s, "U_ParseMusInfo: Number %d out of range (1- %d)", musitem, MAX_MUS_ENTRIES);
         }
-        else
-          U_Error(&s, "U_ParseMusInfo: Number not in range 1 to %d", MAX_MUS_ENTRIES);
       }
       else
-         U_GetNextToken(&s, TRUE);
+        U_GetNextLineToken(&s);
     }
 
     U_ScanClose(&s);
@@ -161,7 +167,11 @@ void P_MapMusicThinker(void)
       char* musicname = W_GetNameForNum(musinfo.items[musitem]);
       if (musicname)
         S_ChangeMusicByName(musicname, true);
+      else
+         I_Error("P_MapMusicThinker: MUSINFO item not found: %d", musitem);
     }
+    else
+       I_Error("P_MapMusicThinker: MUSINFO item out of range: %d", musitem);
     musinfo.tics = -1;
   }
 }

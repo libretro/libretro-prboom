@@ -443,6 +443,21 @@ boolean U_GetNextToken(u_scanner_t* scanner, boolean expandState)
   return FALSE;
 }
 
+/**
+ * Skips all Tokens in current line and parses the first token on
+ * the next line.
+ */
+boolean U_GetNextLineToken(u_scanner_t* scanner)
+{
+  unsigned int line = scanner->line;
+  boolean retval = FALSE;
+
+  do retval = U_GetNextToken(scanner, TRUE);
+  while (retval && scanner->line == line);
+
+  return retval;
+}
+
 
 void U_ErrorToken(u_scanner_t* s, int token)
 {

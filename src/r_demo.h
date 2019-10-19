@@ -32,6 +32,9 @@
  *---------------------------------------------------------------------
  */
 
+#ifndef __RDEMO_H__
+#define __RDEMO_H__
+
 #include "doomstat.h"
 
 #define SMOOTH_PLAYING_MAXFACTOR 16 
@@ -43,3 +46,5 @@ void R_SmoothPlaying_Reset(player_t *player);
 void R_SmoothPlaying_Add(int delta);
 angle_t R_SmoothPlaying_Get(angle_t defangle);
 void R_ResetAfterTeleport(player_t *player);
+
+#endif

@@ -1,6 +1,9 @@
 /* config.h.  Generated from config.h.in by configure.  */
 /* config.h.in.  Generated from configure.ac by autoheader.  */
 
+#ifndef __CONFIG_H__
+#define __CONFIG_H__
+
 /* Define to be the path where Doom WADs are stored */
 #define DOOMWADDIR "/usr/local/share/games/doom"
 
@@ -77,3 +80,5 @@ extern int SCREENHEIGHT;
 
 /* Define to strncasecmp, if we have it */
 #define strnicmp strncasecmp
+
+#endif

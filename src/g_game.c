@@ -544,10 +544,8 @@ static void G_DoLoadLevel (void)
 {
   int i;
 
-  lprintf(LO_ALWAYS,
-          "---------------------------------\n"
-          "G_DoLoadLevel: Episode %d - Map %.2d\n"
-          "---------------------------------\n",
+  lprintf(LO_INFO, "------------------------------\n"
+          "G_DoLoadLevel:  ===== Episode %d - Map %.2d =====\n",
           gameepisode, gamemap);
 
   /* Set the sky map for the episode.

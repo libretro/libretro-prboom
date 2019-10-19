@@ -688,10 +688,10 @@ static char *FindIWADFile(void)
   char  * iwad  = NULL;
 
   i = M_CheckParm("-iwad");
-  lprintf(LO_ALWAYS, "i: %d\n", i);
+  lprintf(LO_DEBUG, "i: %d\n", i);
 
   for(x = 0; x < 32; x++)
-     lprintf(LO_ALWAYS, "myargv[%d]: %s\n", x, myargv[x]);
+     lprintf(LO_DEBUG, "myargv[%d]: %s\n", x, myargv[x]);
 
   if (i && (++i < myargc)) {
     iwad = I_FindFile(myargv[i], NULL);
@@ -732,7 +732,7 @@ static bool IdentifyVersion (void)
   // set save path to -save parm or current dir
 
   strcpy(basesavegame,I_DoomExeDir());
-  lprintf(LO_ALWAYS, "IdentifyVersion: basesavegame: %s\n", basesavegame);
+  lprintf(LO_INFO, "IdentifyVersion: basesavegame: %s\n", basesavegame);
 #ifndef __CELLOS_LV2__
   if ((i=M_CheckParm("-save")) && i<myargc-1) //jff 3/24/98 if -save present
   {
@@ -749,7 +749,7 @@ static bool IdentifyVersion (void)
   // locate the IWAD and determine game mode from it
 
   iwad = FindIWADFile();
-  lprintf(LO_ALWAYS, "iwad: %s\n", iwad);
+  lprintf(LO_INFO, "iwad: %s\n", iwad);
 
   if (iwad && *iwad)
   {
@@ -1157,7 +1157,7 @@ bool D_DoomMainSetup(void)
     }
 
     /* cphipps - the main display. This shows the build date, copyright, and game type */
-    lprintf(LO_ALWAYS,"PrBoom, playing: %s\n"
+    lprintf(LO_INFO,"PrBoom, playing: %s\n"
       "PrBoom is released under the GNU General Public license v2.0.\n"
       "You are welcome to redistribute it under certain conditions.\n"
       "It comes with ABSOLUTELY NO WARRANTY. See the file COPYING for details.\n",

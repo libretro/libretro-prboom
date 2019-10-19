@@ -352,7 +352,7 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 			break;
 		default:
 			if (log_cb)
-				log_cb(RETRO_LOG_ERROR, "[libretro]: Invalid device, setting type to RETROPAD_CLASSIC ...\n");
+				log_cb(RETRO_LOG_ERROR, "Invalid libretro controller device, using default: RETROPAD_CLASSIC\n");
 			doom_devices[port] = RETROPAD_CLASSIC;
 			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_classic.desc);
 	}
@@ -1427,7 +1427,7 @@ void R_InitInterpolation(void)
     tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;
 
     if (log_cb)
-      log_cb(RETRO_LOG_INFO, "[libretro]: Framerate set to %.2f FPS\n", info.timing.fps);
+      log_cb(RETRO_LOG_INFO, "R_InitInterpolation: Framerate set to %.2f FPS\n", info.timing.fps);
   }
   tic_vars.frac = FRACUNIT;
 }

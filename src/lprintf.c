@@ -47,12 +47,12 @@
 /* cphipps - enlarged message buffer and made non-static
  * We still have to be careful here, this function can be called after exit
  */
-#define MAX_MESSAGE_SIZE 2048
 
+#ifndef __LIBRETRO__
 int lprintf(OutputLevels pri, const char *s, ...)
 {
   int r=0;
-  char msg[MAX_MESSAGE_SIZE];
+  char msg[MAX_LOG_MESSAGE_SIZE];
 
   va_list v;
   va_start(v,s);
@@ -67,6 +67,7 @@ int lprintf(OutputLevels pri, const char *s, ...)
 
   return r;
 }
+#endif
 
 /*
  * I_Error
@@ -79,7 +80,7 @@ int lprintf(OutputLevels pri, const char *s, ...)
 
 bool I_Error(const char *error, ...)
 {
-  char errmsg[MAX_MESSAGE_SIZE];
+  char errmsg[MAX_LOG_MESSAGE_SIZE];
   va_list argptr;
   va_start(argptr,error);
 #ifdef HAVE_VSNPRINTF

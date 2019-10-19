@@ -5,6 +5,7 @@
 #include <unistd.h>
 #endif
 #include <errno.h>
+#include <stdarg.h>
 
 #include <libretro.h>
 #include <file/file_path.h>
@@ -1430,3 +1431,38 @@ void R_InitInterpolation(void)
   }
   tic_vars.frac = FRACUNIT;
 }
+
+int lprintf(OutputLevels pri, const char *s, ...)
+{
+  int r=0;
+  char msg[MAX_LOG_MESSAGE_SIZE];
+
+  va_list v;
+  va_start(v,s);
+#ifdef HAVE_VSNPRINTF
+  r = vsnprintf(msg,sizeof(msg),s,v);         /* print message in buffer  */
+#else
+  r = vsprintf(msg,s,v);
+#endif
+  va_end(v);
+
+  if (log_cb) {
+    enum retro_log_level lvl;
+    switch(pri) {
+      case LO_DEBUG:    lvl = RETRO_LOG_DEBUG; break;
+      case LO_CONFIRM:
+      case LO_INFO:     lvl = RETRO_LOG_INFO;  break;
+      case LO_WARN:     lvl = RETRO_LOG_WARN;  break;
+      case LO_ERROR:
+      case LO_FATAL:
+      default:          lvl = RETRO_LOG_ERROR; break;
+    }
+    log_cb(lvl, "%s", msg);
+  }
+  else
+    r=fprintf(stderr,"%s",msg);           /* select output at console */
+
+  return r;
+}
+
+

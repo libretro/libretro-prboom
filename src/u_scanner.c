@@ -391,6 +391,9 @@ boolean U_GetNextToken(u_scanner_t* scanner, boolean expandState)
       else
         break;
     }
+    // If we reached end of input while reading, set it as the end of token
+    if(scanner->scanPos == scanner->length && start == end)
+      end = scanner->length;
   }
 
   if(end-start > 0 || stringFinished)

@@ -5,6 +5,7 @@
 #include <unistd.h>
 #endif
 #include <errno.h>
+#include <stdarg.h>
 
 #include <libretro.h>
 #include <file/file_path.h>
@@ -351,7 +352,7 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 			break;
 		default:
 			if (log_cb)
-				log_cb(RETRO_LOG_ERROR, "[libretro]: Invalid device, setting type to RETROPAD_CLASSIC ...\n");
+				log_cb(RETRO_LOG_ERROR, "Invalid libretro controller device, using default: RETROPAD_CLASSIC\n");
 			doom_devices[port] = RETROPAD_CLASSIC;
 			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_classic.desc);
 	}
@@ -1426,7 +1427,42 @@ void R_InitInterpolation(void)
     tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;
 
     if (log_cb)
-      log_cb(RETRO_LOG_INFO, "[libretro]: Framerate set to %.2f FPS\n", info.timing.fps);
+      log_cb(RETRO_LOG_INFO, "R_InitInterpolation: Framerate set to %.2f FPS\n", info.timing.fps);
   }
   tic_vars.frac = FRACUNIT;
 }
+
+int lprintf(OutputLevels pri, const char *s, ...)
+{
+  int r=0;
+  char msg[MAX_LOG_MESSAGE_SIZE];
+
+  va_list v;
+  va_start(v,s);
+#ifdef HAVE_VSNPRINTF
+  r = vsnprintf(msg,sizeof(msg),s,v);         /* print message in buffer  */
+#else
+  r = vsprintf(msg,s,v);
+#endif
+  va_end(v);
+
+  if (log_cb) {
+    enum retro_log_level lvl;
+    switch(pri) {
+      case LO_DEBUG:    lvl = RETRO_LOG_DEBUG; break;
+      case LO_CONFIRM:
+      case LO_INFO:     lvl = RETRO_LOG_INFO;  break;
+      case LO_WARN:     lvl = RETRO_LOG_WARN;  break;
+      case LO_ERROR:
+      case LO_FATAL:
+      default:          lvl = RETRO_LOG_ERROR; break;
+    }
+    log_cb(lvl, "%s", msg);
+  }
+  else
+    r=fprintf(stderr,"%s",msg);           /* select output at console */
+
+  return r;
+}
+
+

@@ -543,7 +543,12 @@ void S_ChangeMusicByName(char* lumpname, int looping)
     musicinfo_t *music = &S_music[NUMMUSIC];
     int lumpnum = W_CheckNumForName(lumpname);
 
-    if ((lumpnum < -1) || (mus_playing && mus_playing->lumpnum == lumpnum))
+    if (lumpnum <= -1)
+    {
+       I_Error("S_ChangeMusicByName: invalid lump name '%s'", lumpname);
+       return;
+    }
+    if(mus_playing && mus_playing->lumpnum == lumpnum)
       return;
 
     // shutdown old music

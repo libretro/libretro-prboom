@@ -1791,9 +1791,7 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
   }
 
   if (fpout) fprintf(fpout,"Thing %d (%s) -> line: '%s'\n", indexnum+1,
-                     ((indexnum >= 0 && indexnum < NUMMOBJTYPES)?
-                      mobjinfo[indexnum].actorname : "undefined"),
-                     inbuffer);
+                      mobjinfo[indexnum].actorname, inbuffer);
 
   // now process the stuff
   // Note that for Things we can look up the key and use its offset

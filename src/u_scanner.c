@@ -391,6 +391,9 @@ boolean U_GetNextToken(u_scanner_t* scanner, boolean expandState)
       else
         break;
     }
+    // If we reached end of input while reading, set it as the end of token
+    if(scanner->scanPos == scanner->length && start == end)
+      end = scanner->length;
   }
 
   if(end-start > 0 || stringFinished)
@@ -441,6 +444,21 @@ boolean U_GetNextToken(u_scanner_t* scanner, boolean expandState)
   if(expandState)
     U_ExpandState(scanner);
   return FALSE;
+}
+
+/**
+ * Skips all Tokens in current line and parses the first token on
+ * the next line.
+ */
+boolean U_GetNextLineToken(u_scanner_t* scanner)
+{
+  unsigned int line = scanner->line;
+  boolean retval = FALSE;
+
+  do retval = U_GetNextToken(scanner, TRUE);
+  while (retval && scanner->line == line);
+
+  return retval;
 }
 
 

@@ -52,8 +52,8 @@ const char * const * myargv; // CPhipps - not sure if ANSI C allows you to
 int M_CheckParm(const char *check)
 {
 #if 0
-  lprintf(LO_ALWAYS, "M_CheckParm: Checking %s...\n", check);
-  lprintf(LO_ALWAYS, "M_CheckParm: myargc: %d, myargc - 1: %d\n", myargc, myargc-1);
+  lprintf(LO_DEBUG, "M_CheckParm: Checking %s...\n", check);
+  lprintf(LO_DEBUG, "M_CheckParm: myargc: %d, myargc - 1: %d\n", myargc, myargc-1);
 #endif
   signed int i = myargc;
   while (--i>0)

@@ -36,6 +36,11 @@
 
 #include <boolean.h>
 
+/* cphipps - enlarged message buffer and made non-static
+ * We still have to be careful here, this function can be called after exit
+ */
+#define MAX_LOG_MESSAGE_SIZE 2048
+
 typedef enum                /* Logical output levels */
 {
   LO_INFO=1,                /* One of these is used in each physical output    */

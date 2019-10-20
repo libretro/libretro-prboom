@@ -801,7 +801,7 @@ void A_FireOldBFG(player_t *player, pspdef_t *psp)
     th->momz = finetangent[an2>>ANGLETOFINESHIFT] * 25;
     P_CheckMissileSpawn(th);
   }
-  while ((type != MT_PLASMA2) && (type = MT_PLASMA2)); //killough: obfuscated!
+  while ((type != MT_PLASMA2) && (type = MT_PLASMA2)); //killough: obfuscated! // lgtm[cpp/assign-where-compare-meant]
 }
 
 //

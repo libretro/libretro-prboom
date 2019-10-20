@@ -16,6 +16,9 @@
  *  Foundation, Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.
  */
 
+#ifndef __DBOPL_H__
+#define __DBOPL_H__
+
 #include <stdint.h>
 
 #ifdef _MSC_VER
@@ -212,5 +215,6 @@ void DBOPL_InitTables( void );
 void Chip__Chip(Chip *self);
 void Chip__WriteReg(Chip *self, Bit32u reg, Bit8u val );
 void Chip__GenerateBlock2(Chip *self, Bitu total, Bit32s* output );
+#endif
 
 #endif

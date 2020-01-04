@@ -176,7 +176,7 @@ int R_PointOnSegSide(fixed_t x, fixed_t y, const seg_t *line)
   return FixedMul(y, ldx>>FRACBITS) >= FixedMul(ldy>>FRACBITS, x);
 }
 
-angle_t tantoangle[2049];
+extern angle_t tantoangle[2049];
 
 int SlopeDiv(unsigned num, unsigned den)
 {

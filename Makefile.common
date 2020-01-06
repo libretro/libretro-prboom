@@ -169,4 +169,7 @@ endif
 
 # The custom memory allocation system should be used consistently across the core
 # See https://doom.fandom.com/wiki/Zone_memory
+ifneq (,$(findstring msvc,$(platform)))
+else
 INCFLAGS += -include z_zone.h
+endif

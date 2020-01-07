@@ -48,9 +48,7 @@
 
 #include <boolean.h>
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include "doomstat.h"
 #include "d_net.h"
@@ -1308,14 +1306,16 @@ void G_DoCompleted (void)
   wminfo.nextmapinfo = NULL;
   if (gamemapinfo)
   {
+    const char *next = "";
     if (gamemapinfo->endpic[0])
     {
       gameaction = ga_victory;
       return;
     }
-    const char *next = "";
-    if (secretexit) next = gamemapinfo->nextsecret;
-    if (next[0] == 0) next = gamemapinfo->nextmap;
+    if (secretexit)
+       next = gamemapinfo->nextsecret;
+    if (next[0] == 0)
+       next = gamemapinfo->nextmap;
     if (next[0])
     {
       G_ValidateMapName(next, &wminfo.nextep, &wminfo.next);

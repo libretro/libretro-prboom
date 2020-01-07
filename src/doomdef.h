@@ -35,10 +35,7 @@
 #ifndef __DOOMDEF__
 #define __DOOMDEF__
 
-/* use config.h if autoconf made one -- josh */
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 // killough 4/25/98: Make gcc extensions mean nothing on other compilers
 #ifndef __GNUC__

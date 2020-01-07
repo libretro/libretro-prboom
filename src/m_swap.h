@@ -41,9 +41,7 @@
  * To find our own endianness, use config.h
  */
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 /* Endianness handling. */
 

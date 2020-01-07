@@ -24,6 +24,8 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
 // THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+#include "config.h"
+
 #include <stdarg.h>
 #include <ctype.h>
 
@@ -215,6 +217,13 @@ void U_RestoreState(u_scanner_t* s, u_scanner_t savedstate)
 
 boolean U_GetNextToken(u_scanner_t* scanner, boolean expandState)
 {
+  unsigned int start;
+  unsigned int end;
+  char cur;
+  int integerBase            = 10;
+  boolean floatHasDecimal    = FALSE;
+  boolean floatHasExponent   = FALSE;
+  boolean stringFinished     = FALSE; // Strings are the only things that can have 0 length tokens.
   u_parserstate_t* nextState = &scanner->nextState;
 
   if(!scanner->needNext)
@@ -235,14 +244,9 @@ boolean U_GetNextToken(u_scanner_t* scanner, boolean expandState)
     return FALSE;
   }
 
-  unsigned int start = scanner->scanPos;
-  unsigned int end = scanner->scanPos;
-  int integerBase = 10;
-  boolean floatHasDecimal = FALSE;
-  boolean floatHasExponent = FALSE;
-  boolean stringFinished = FALSE; // Strings are the only things that can have 0 length tokens.
-
-  char cur = scanner->data[scanner->scanPos++];
+  start = scanner->scanPos;
+  end   = scanner->scanPos;
+  cur   = scanner->data[scanner->scanPos++];
 
   // Determine by first character
   if(cur == '_' || (cur >= 'A' && cur <= 'Z') || (cur >= 'a' && cur <= 'z'))
@@ -584,19 +588,23 @@ boolean U_ScanFloat(u_scanner_t* s)
 
 boolean U_CheckInteger(u_scanner_t* s)
 {
+  boolean res;
   u_scanner_t savedstate;
   U_SaveState(s, savedstate);
-  boolean res = U_ScanInteger(s);
-  if (!res) U_RestoreState(s, savedstate);
+  res = U_ScanInteger(s);
+  if (!res)
+     U_RestoreState(s, savedstate);
   return res;
 }
 
 boolean U_CheckFloat(u_scanner_t* s)
 {
+  boolean res;
   u_scanner_t savedstate;
   U_SaveState(s, savedstate);
-  boolean res = U_ScanFloat(s);
-  if (!res) U_RestoreState(s, savedstate);
+  res = U_ScanFloat(s);
+  if (!res)
+     U_RestoreState(s, savedstate);
   return res;
 }
 

@@ -33,9 +33,7 @@
  *
  *-----------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdarg.h>
@@ -43,31 +41,6 @@
 #include "lprintf.h"
 #include "i_main.h"
 #include "m_argv.h"
-
-/* cphipps - enlarged message buffer and made non-static
- * We still have to be careful here, this function can be called after exit
- */
-
-#ifndef __LIBRETRO__
-int lprintf(OutputLevels pri, const char *s, ...)
-{
-  int r=0;
-  char msg[MAX_LOG_MESSAGE_SIZE];
-
-  va_list v;
-  va_start(v,s);
-#ifdef HAVE_VSNPRINTF
-  vsnprintf(msg,sizeof(msg),s,v);         /* print message in buffer  */
-#else
-  vsprintf(msg,s,v);
-#endif
-  va_end(v);
-
-  r=fprintf(stderr,"%s",msg);           /* select output at console */
-
-  return r;
-}
-#endif
 
 /*
  * I_Error

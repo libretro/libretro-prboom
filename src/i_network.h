@@ -30,9 +30,7 @@
  *  Low level network interface.
  *-----------------------------------------------------------------------------*/
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #ifdef USE_SDL_NET
  #include "SDL_net.h"

@@ -31,6 +31,8 @@
  *
  *-----------------------------------------------------------------------------*/
 
+#include "config.h"
+
 #include <string.h>
 // CPhipps - include the correct header
 #include "doomtype.h"

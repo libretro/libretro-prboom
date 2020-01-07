@@ -33,9 +33,7 @@
 // killough 5/2/98: reindented, removed useless code, beautified
 // ferk 10/1/19: cleanup/refactor, reuse u_scanner, support id:0 default music like ZDoom
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include "doomstat.h"
 #include "doomtype.h"
@@ -74,13 +72,15 @@ musinfo_t musinfo;
 //
 void U_ParseMusInfo(const char *mapid)
 {
+  int musinfolump;
   memset(&musinfo, 0, sizeof(musinfo));
 
   S_music[NUMMUSIC].lumpnum = -1;
 
-  int musinfolump = W_CheckNumForName("MUSINFO");
+  musinfolump = W_CheckNumForName("MUSINFO");
   if (musinfolump != -1)
   {
+    u_scanner_t s;
     const char *data = W_CacheLumpNum(musinfolump);
     int datalength = W_LumpLength(musinfolump);
     int i, lumpnum, musitem;
@@ -90,7 +90,7 @@ void U_ParseMusInfo(const char *mapid)
     for(i=0; i<MAX_MUS_ENTRIES; i++)
        musinfo.items[i] = -1;
 
-    u_scanner_t s = U_ScanOpen(data, datalength, "MUSINFO");
+    s = U_ScanOpen(data, datalength, "MUSINFO");
     while (U_HasTokensLeft(&s))
     {
       if (inMap || (U_CheckToken(&s, TK_Identifier) && !strcasecmp(s.string, mapid)))

@@ -32,6 +32,7 @@
  *
  *-----------------------------------------------------------------------------*/
 
+#include "config.h"
 #include "doomstat.h"
 #include "m_bbox.h"
 #include "m_argv.h"

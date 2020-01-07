@@ -35,16 +35,14 @@
 #ifndef __DOOMTYPE__
 #define __DOOMTYPE__
 
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #ifndef __BYTEBOOL__
 #define __BYTEBOOL__
 #include "custombool.h"
 #endif
 
-#include <inttypes.h>
+#include <stdint.h>
 
 #ifndef PRIu64
 #define PRIu64 "I64u"

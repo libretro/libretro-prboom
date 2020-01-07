@@ -32,10 +32,7 @@
  *-----------------------------------------------------------------------------
  */
 
-// use config.h if autoconf made one -- josh
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 #ifdef _MSC_VER
 #include <stddef.h>
 #include <io.h>

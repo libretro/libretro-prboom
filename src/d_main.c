@@ -49,6 +49,7 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include "config.h"
 #include "doomdef.h"
 #include "doomtype.h"
 #include "doomstat.h"
@@ -1420,8 +1421,9 @@ bool D_DoomMainSetup(void)
   {
     for (p = -1; (p = W_ListNumFromName("UMAPINFO", p)) >= 0; )
     {
+      const char *data;
       lprintf(LO_INFO,"U_ParseMapInfo: Loading Custom Episode and Map Information.\n");
-      const char *data = (const char *)W_CacheLumpNum(p);
+      data = (const char *)W_CacheLumpNum(p);
       U_ParseMapInfo(data, W_LumpLength(p));
     }
   }

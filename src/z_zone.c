@@ -41,10 +41,7 @@
  */
 
 
-// use config.h if autoconf made one -- josh
-#ifdef HAVE_CONFIG_H
 #include "config.h"
-#endif
 
 #include <stdlib.h>
 #include <stdio.h>
@@ -300,7 +297,7 @@ void *Z_Realloc(void *ptr, size_t n, int tag, void **user)
       else
       {
         memcpy(p, ptr, block->size);
-        memset(p+block->size, 0, n - block->size);
+        memset((char*)p+block->size, 0, n - block->size);
       }
 
       (Z_Free)(ptr DA(file, line));

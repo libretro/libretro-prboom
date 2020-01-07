@@ -39,10 +39,6 @@
 #define TRACK_CHUNK_ID  "MTrk"
 #define MAX_BUFFER_SIZE 0x10000
 
-#ifdef HAVE_CONFIG_H
-#include "config.h"
-#endif
-
 #ifndef ntohl
 #ifdef MSB_FIRST
 #define ntohl

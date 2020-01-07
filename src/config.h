@@ -4,8 +4,9 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
-/* Define to be the path where Doom WADs are stored */
-#define DOOMWADDIR "/usr/local/share/games/doom"
+#if _MSC_VER
+#include <compat/msvc.h>
+#endif
 
 #define SURFACE_PIXEL_DEPTH 2
 extern int SCREENWIDTH;

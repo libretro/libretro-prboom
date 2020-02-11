@@ -49,6 +49,7 @@ typedef struct {
 } tic_vars_t;
 
 extern tic_vars_t tic_vars;
+extern boolean pause_interpolations;
 
 void R_InitInterpolation(void);
 void R_InterpolateView(player_t *player);

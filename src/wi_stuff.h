@@ -48,6 +48,25 @@ typedef enum
 
 } stateenum_t;
 
+struct wi_state {
+  uint32_t state;
+  uint32_t cnt;
+  uint32_t bcnt;
+  uint32_t cnt_time;
+  uint32_t cnt_total_time;
+  uint32_t cnt_par;
+  uint32_t cnt_pause;
+  uint32_t sp_state;
+  uint32_t cnt_kills;
+  uint32_t cnt_items;
+  uint32_t cnt_secret;
+  uint32_t cnt_frags;
+  uint32_t dofrags;
+  uint32_t ng_state;
+  wbstartstruct_t wbs;
+  wbplayerstruct_t plrs[MAXPLAYERS];
+};
+
 // Called by main loop, animate the intermission.
 void WI_Ticker (void);
 
@@ -60,5 +79,11 @@ void WI_Start(wbstartstruct_t*   wbstartstruct);
 
 // Release intermission screen memory
 void WI_End(void);
+
+void
+WI_Save(struct wi_state *save);
+
+void
+WI_Load(const struct wi_state *save);
 
 #endif

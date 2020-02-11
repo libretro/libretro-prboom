@@ -1468,7 +1468,7 @@ boolean set_compat_active = FALSE;
 //
 // current_setup_menu is a pointer to the current setup menu table.
 
-static int set_menu_itemon; // which setup item is selected?   // phares 3/98
+int set_menu_itemon; // which setup item is selected?   // phares 3/98
 setup_menu_t* current_setup_menu; // points to current setup menu table
 
 /////////////////////////////

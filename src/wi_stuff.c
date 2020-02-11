@@ -314,9 +314,11 @@ static int    me;
 static stateenum_t  state;
 
 // contains information passed into intermission
-static wbstartstruct_t* wbs;
+static wbstartstruct_t wbs_real;
+static wbstartstruct_t *const wbs = &wbs_real;
 
-static wbplayerstruct_t* plrs;  // wbs->plyr[]
+static wbplayerstruct_t plrs_real[MAXPLAYERS];
+static wbplayerstruct_t *const plrs = plrs_real;  // wbs->plyr[]
 
 // used for general timing
 static int    cnt;
@@ -2065,14 +2067,13 @@ void WI_Drawer (void)
 //
 void WI_initVariables(wbstartstruct_t* wbstartstruct)
 {
-
-  wbs = wbstartstruct;
+  wbs_real = *wbstartstruct;
 
   acceleratestage = 0;
   cnt = bcnt = 0;
   firstrefresh = 1;
   me = wbs->pnum;
-  plrs = wbs->plyr;
+  memcpy(plrs_real, wbs->plyr, sizeof(plrs_real));
 
   if (!wbs->maxkills)
     wbs->maxkills = 1;  // probably only useful in MAP30
@@ -2108,3 +2109,62 @@ void WI_Start(wbstartstruct_t* wbstartstruct)
   else
     WI_initStats();
 }
+
+#define NULL_SERIALIZE 0x77777777
+
+static int *
+intp_unpack(uint32_t val) {
+  if (val == NULL_SERIALIZE)
+    return NULL;
+  int *ret = malloc (sizeof(int) * MAXPLAYERS);
+  memset (ret, 0 , sizeof(int) * MAXPLAYERS);
+  ret[me] = val;
+  return ret;
+}
+
+static uint32_t
+intp_pack(int *val) {
+  return val ? val[me] : NULL_SERIALIZE;
+}
+
+void
+WI_Save(struct wi_state *save) {
+  save->state = state;
+  save->cnt = cnt;
+  save->bcnt = bcnt;
+  save->cnt_time = cnt_time;
+  save->cnt_total_time = cnt_total_time;
+  save->cnt_par = cnt_par;
+  save->cnt_pause = cnt_pause;
+  save->sp_state = sp_state;
+  save->cnt_kills = intp_pack(cnt_kills);
+  save->cnt_items = intp_pack(cnt_items);
+  save->cnt_secret = intp_pack(cnt_secret);
+  save->cnt_frags = intp_pack(cnt_frags);
+  memcpy (&save->wbs, &wbs_real, sizeof(save->wbs));
+  memcpy (&save->plrs, &plrs_real, sizeof(save->plrs));
+  save->dofrags = dofrags;
+  save->ng_state = ng_state;
+}
+
+void
+WI_Load(const struct wi_state *save) {
+  state = save->state;
+  cnt = save->cnt;
+  bcnt = save->bcnt;
+  cnt_time = save->cnt_time;
+  cnt_total_time = save->cnt_total_time;
+  cnt_par = save->cnt_par;
+  cnt_pause = save->cnt_pause;
+  sp_state = save->sp_state;
+  memcpy (&wbs_real, &save->wbs, sizeof(wbs_real));
+  memcpy (&plrs_real, &save->plrs, sizeof(plrs_real));
+  me = wbs->pnum;
+  cnt_kills = intp_unpack(save->cnt_kills);
+  cnt_items = intp_unpack(save->cnt_items);
+  cnt_secret = intp_unpack(save->cnt_secret);
+  cnt_frags = intp_unpack(save->cnt_frags);
+  dofrags = save->dofrags;
+  ng_state = save->ng_state;
+}
+

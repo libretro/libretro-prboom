@@ -659,8 +659,10 @@ failed:
       if (environ_cb)
          environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
    }
-   if (screen_buf)
+   if (screen_buf) {
       free(screen_buf);
+      screen_buf = NULL;
+   }
    I_SafeExit(-1);
    return false;
 }

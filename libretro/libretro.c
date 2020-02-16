@@ -548,6 +548,7 @@ bool I_PreInitGraphics(void)
 
 bool retro_load_game(const struct retro_game_info *info)
 {
+   unsigned i;
    int argc = 0;
    static char *argv[32] = {NULL};
 
@@ -655,7 +656,7 @@ bool retro_load_game(const struct retro_game_info *info)
       goto failed;
 
    // Run few cycles to finish init.
-   for (int i = 0; i < 3; i++)
+   for (i = 0; i < 3; i++)
      D_DoomLoop();
 
    return true;
@@ -789,6 +790,7 @@ size_t retro_serialize_size(void)
 
 bool retro_serialize(void *data_, size_t size)
 {
+  unsigned i;
   struct extra_serialize *extra = data_;
   int gameless = (thinkercap.next == NULL);
 
@@ -813,12 +815,12 @@ bool retro_serialize(void *data_, size_t size)
   extra->currentMenu = 0;
   extra->set_menu_itemon = set_menu_itemon;
   extra->menuactive = menuactive;
-  for (unsigned i = 0; i < sizeof (menus) / sizeof(menus[0]); i++)
+  for (i = 0; i < sizeof (menus) / sizeof(menus[0]); i++)
     if (menus[i] == currentMenu)
       extra->currentMenu = i;
-  for (int i = 0; i < NUMKEYS; i++)
+  for (i = 0; i < NUMKEYS; i++)
     extra->gamekeydown[i] = gamekeydown[i];
-  for (int i = 0; i < MAX_BUTTON_BINDS; i++)
+  for (i = 0; i < MAX_BUTTON_BINDS; i++)
 	extra->old_input[i] = old_input[i];
   WI_Save(&extra->wi_state);
   return true;
@@ -838,6 +840,7 @@ bool retro_unserialize(const void *data_, size_t size)
   }
   if (extra->extra_size == sizeof(*extra))
     {
+      unsigned i;
       gameaction = extra->gameaction;
       turnheld = extra->turnheld;
       autorun = extra->autorun;
@@ -850,9 +853,9 @@ bool retro_unserialize(const void *data_, size_t size)
       whichSkull = extra->whichSkull;
       currentMenu = menus[extra->currentMenu];
       set_menu_itemon = extra->set_menu_itemon;
-      for (int i = 0; i < NUMKEYS; i++)
+      for (i = 0; i < NUMKEYS; i++)
 	gamekeydown[i] = extra->gamekeydown[i];
-      for (int i = 0; i < MAX_BUTTON_BINDS; i++)
+      for (i = 0; i < MAX_BUTTON_BINDS; i++)
 	old_input[i] = extra->old_input[i];
       menuactive = extra->menuactive;
     }
@@ -1186,7 +1189,6 @@ process_input(void)
    static bool old_input_kb[117];
    bool new_input_kb[117];
    int16_t ret = 0;
-
 
    for (port = 0; port < MAX_PADS; port++)
    {

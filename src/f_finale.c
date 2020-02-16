@@ -44,8 +44,8 @@
 
 // Stage of animation:
 //  0 = text, 1 = art screen, 2 = character cast
-static int FinaleStage; // cph -
-static int FinaleCount; // made static
+int FinaleStage; // cph -
+int FinaleCount; // made static
 static const char*   finaletext; // cph -
 static const char*   finaleflat; // made static const
 

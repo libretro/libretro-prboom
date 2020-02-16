@@ -55,6 +55,8 @@ void G_DeferedPlayDemo(const char *demo); // CPhipps - const
 void G_LoadGame(int slot, boolean is_command); // killough 5/15/98
 void G_ForcedLoadGame(void);           // killough 5/15/98: forced loadgames
 void G_DoLoadGame(void);
+bool G_DoLoadGameFromBuffer(void *data, size_t length);
+bool G_DoSaveGameToBuffer(void *buf, size_t size);
 void G_SaveGame(int slot, char *description); // Called by M_Responder.
 void G_ExitLevel(void);
 void G_SecretExitLevel(void);
@@ -162,12 +164,15 @@ extern int  key_map_rotate; // cph - map rotation
 extern int  key_map_overlay;// cph - map overlay
 extern int  key_screenshot;    // killough 2/22/98 -- add key for screenshot
 extern int  autorun;           // always running?                   // phares
+extern int  turnheld;
 extern int  mousebfire;
 extern int  mousebstrafe;
 extern int  mousebforward;
 extern int  mousebbackward;
 extern int  mouse_double_click_use;
 extern int  mlooky;
+extern int FinaleStage; // cph -
+extern int FinaleCount; // made static
 
 extern int  defaultskill;      //jff 3/24/98 default skill
 extern boolean haswolflevels;  //jff 4/18/98 wolf levels present

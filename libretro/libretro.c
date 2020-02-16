@@ -38,6 +38,8 @@
 #include "../src/doomstat.h"
 #include "../src/m_cheat.h"
 #include "../src/g_game.h"
+#include "../src/wi_stuff.h"
+#include "../src/p_tick.h"
 
 //i_system
 int ms_to_next_tick;
@@ -70,6 +72,8 @@ retro_audio_sample_batch_t audio_batch_cb;
 static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
+
+static void process_input(void);
 
 #define MAX_PADS 1
 static unsigned doom_devices[1];
@@ -453,6 +457,8 @@ static void update_variables(bool startup)
 
 void I_SafeExit(int rc);
 
+static fixed_t unserial_time = 0;
+
 void retro_run(void)
 {
    bool updated = false;
@@ -463,6 +469,9 @@ void retro_run(void)
       environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
       I_SafeExit(1);
    }
+
+   if (pause_interpolations && tic_vars.frac / FRACUNIT > unserial_time / FRACUNIT)
+     pause_interpolations = false;
 
    D_DoomLoop();
    I_UpdateSound();
@@ -645,6 +654,10 @@ bool retro_load_game(const struct retro_game_info *info)
    if (!D_DoomMainSetup())
       goto failed;
 
+   // Run few cycles to finish init.
+   for (int i = 0; i < 3; i++)
+     D_DoomLoop();
+
    return true;
 
 failed:
@@ -688,19 +701,166 @@ bool retro_load_game_special(unsigned type, const struct retro_game_info *info, 
    return false;
 }
 
+extern short itemOn;
+extern short skullAnimCounter;
+extern short whichSkull;
+extern int set_menu_itemon;
+extern enum menuactive_e menuactive;
+typedef struct menu_s menu_t;
+
+extern menu_t* currentMenu;
+
+extern menu_t NewDef;
+extern menu_t MainDef;
+extern menu_t HelpDef;
+extern menu_t ExtHelpDef;
+extern menu_t SoundDef;
+extern menu_t ReadDef1;
+extern menu_t ReadDef2;
+extern menu_t EpiDef;
+extern menu_t LoadDef;
+extern menu_t SaveDef;
+extern menu_t OptionsDef;
+extern menu_t MouseDef;
+extern menu_t KeybndDef;
+extern menu_t WeaponDef;
+extern menu_t StatusHUDDef;
+extern menu_t AutoMapDef;
+extern menu_t EnemyDef;
+extern menu_t GeneralDef;
+extern menu_t CompatDef;
+extern menu_t MessageDef;
+extern menu_t ChatStrDef;
+extern menu_t SetupDef;
+
+static menu_t *menus[] = {
+		   &MainDef,
+		   &HelpDef,
+		   &SoundDef,
+		   &ExtHelpDef,
+		   &ReadDef1,
+		   &ReadDef2,
+		   &NewDef,
+		   &EpiDef,
+		   &LoadDef,
+		   &SaveDef,
+		   &OptionsDef,
+		   &MouseDef,
+		   &KeybndDef,
+		   &WeaponDef,
+		   &StatusHUDDef,
+		   &AutoMapDef,
+		   &EnemyDef,
+		   &GeneralDef,
+		   &CompatDef,
+		   &MessageDef,
+		   &ChatStrDef,
+		   &SetupDef
+};
+
+#define NUMKEYS 512
+extern boolean gamekeydown[NUMKEYS];
+static bool old_input[MAX_BUTTON_BINDS];
+
+struct extra_serialize {
+  uint32_t extra_size;
+  uint32_t gameaction;
+  uint32_t turnheld;
+  uint32_t gamestate;
+  uint32_t FinaleStage;
+  uint32_t FinaleCount;
+  uint32_t set_menu_itemon;
+  struct wi_state wi_state;
+  short itemOn;
+  short skullAnimCounter;
+  short whichSkull;
+  short currentMenu;
+  uint8_t  autorun;
+  uint8_t  gameless;
+  uint8_t  menuactive;
+  uint8_t  old_input[MAX_BUTTON_BINDS];
+  uint8_t  gamekeydown[NUMKEYS];
+};
+
 size_t retro_serialize_size(void)
 {
-   return 0;
+  return 0x20000 + sizeof(struct extra_serialize);
 }
 
 bool retro_serialize(void *data_, size_t size)
 {
-   return false;
+  struct extra_serialize *extra = data_;
+  int gameless = (thinkercap.next == NULL);
+
+  if(!gameless) {
+    int ret = G_DoSaveGameToBuffer((char *) data_ + sizeof(*extra),
+				   size - sizeof(*extra));
+    if (!ret) {
+      return false;
+    }
+  }
+  extra->gameaction = gameaction;
+  extra->turnheld = turnheld;
+  extra->extra_size = sizeof(*extra);
+  extra->autorun = autorun;
+  extra->gamestate = gamestate;
+  extra->FinaleStage = FinaleStage;
+  extra->FinaleCount = FinaleCount;
+  extra->gameless = gameless;
+  extra->itemOn = itemOn;
+  extra->skullAnimCounter = skullAnimCounter;
+  extra->whichSkull = whichSkull;
+  extra->currentMenu = 0;
+  extra->set_menu_itemon = set_menu_itemon;
+  extra->menuactive = menuactive;
+  for (unsigned i = 0; i < sizeof (menus) / sizeof(menus[0]); i++)
+    if (menus[i] == currentMenu)
+      extra->currentMenu = i;
+  for (int i = 0; i < NUMKEYS; i++)
+    extra->gamekeydown[i] = gamekeydown[i];
+  for (int i = 0; i < MAX_BUTTON_BINDS; i++)
+	extra->old_input[i] = old_input[i];
+  WI_Save(&extra->wi_state);
+  return true;
 }
 
 bool retro_unserialize(const void *data_, size_t size)
 {
-   return false;
+  const struct extra_serialize *extra = data_;
+  int gameless = 0;
+  if (extra->extra_size == sizeof(*extra))
+    gameless = extra->gameless;
+  if (!gameless) {
+    int ret = G_DoLoadGameFromBuffer((char *) data_ + extra->extra_size,
+				     size - extra->extra_size);
+    if (!ret)
+      return false;
+  }
+  if (extra->extra_size == sizeof(*extra))
+    {
+      gameaction = extra->gameaction;
+      turnheld = extra->turnheld;
+      autorun = extra->autorun;
+      gamestate = extra->gamestate;
+      FinaleStage = extra->FinaleStage;
+      FinaleCount = extra->FinaleCount;
+      WI_Load(&extra->wi_state);
+      itemOn = extra->itemOn;
+      skullAnimCounter = extra->skullAnimCounter;
+      whichSkull = extra->whichSkull;
+      currentMenu = menus[extra->currentMenu];
+      set_menu_itemon = extra->set_menu_itemon;
+      for (int i = 0; i < NUMKEYS; i++)
+	gamekeydown[i] = extra->gamekeydown[i];
+      for (int i = 0; i < MAX_BUTTON_BINDS; i++)
+	old_input[i] = extra->old_input[i];
+      menuactive = extra->menuactive;
+    }
+  R_StopAllInterpolations();
+  R_ResetViewInterpolation ();
+  pause_interpolations = true;
+  unserial_time = tic_vars.frac;
+  return true;
 }
 
 void *retro_get_memory_data(unsigned id)
@@ -880,7 +1040,6 @@ static bool synthetic_pwm(int amplitude, int* modulation_state)
 static void process_gamepad_buttons(int16_t ret, unsigned num_buttons, action_lut_t action_lut[])
 {
    unsigned i;
-   static bool old_input[MAX_BUTTON_BINDS];
    bool new_input[MAX_BUTTON_BINDS];
 
    for (i = 0; i < num_buttons; i++)
@@ -1016,7 +1175,8 @@ static void process_gamepad_right_analog(bool pressed_y, bool pressed_l2)
 		D_PostEvent(&event_mouse);
 }
 
-void I_StartTic (void)
+static void
+process_input(void)
 {
    int port;
    unsigned i;
@@ -1027,7 +1187,6 @@ void I_StartTic (void)
    bool new_input_kb[117];
    int16_t ret = 0;
 
-   input_poll_cb();
 
    for (port = 0; port < MAX_PADS; port++)
    {
@@ -1154,6 +1313,14 @@ void I_StartTic (void)
    }
 }
 
+void I_StartTic (void)
+{
+  if (!input_poll_cb)
+    return;
+  input_poll_cb();
+  process_input();
+}
+
 static void I_UpdateVideoMode(void)
 {
    if (log_cb)
@@ -1175,6 +1342,8 @@ static void I_UpdateVideoMode(void)
 
 void I_FinishUpdate (void)
 {
+   if (!video_cb)
+     return;
    video_cb(screen_buf, SCREENWIDTH, SCREENHEIGHT, SCREENPITCH);
 }
 

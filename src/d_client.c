@@ -551,7 +551,8 @@ void TryRunTics(void)
         D_DoAdvanceDemo ();
       G_Ticker ();
     }
-    M_Ticker ();
+    if (menuactive)
+      M_Ticker ();
     P_Checksum(gametic);
     gametic++;
   }

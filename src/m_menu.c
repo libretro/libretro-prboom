@@ -187,7 +187,6 @@ typedef struct menu_s
 } menu_t;
 
 short itemOn;           // menu item skull is on (for Big Font menus)
-short skullAnimCounter; // skull animation counter
 short whichSkull;       // which skull to draw (he blinks)
 
 // graphic name of skulls
@@ -5167,10 +5166,9 @@ void M_SetupNextMenu(menu_t *menudef)
 //
 void M_Ticker (void)
 {
-  if (--skullAnimCounter <= 0)
+  if (gametic % 8 == 0)
     {
       whichSkull ^= 1;
-      skullAnimCounter = 8;
     }
 }
 
@@ -5394,7 +5392,6 @@ void M_Init(void)
   menuactive = mnact_inactive;
   itemOn = currentMenu->lastOn;
   whichSkull = 0;
-  skullAnimCounter = 10;
   messageToPrint = 0;
   messageString = NULL;
   messageLastMenuActive = menuactive;

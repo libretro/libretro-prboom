@@ -764,6 +764,7 @@ extern boolean gamekeydown[NUMKEYS];
 static bool old_input[MAX_BUTTON_BINDS];
 
 struct extra_serialize {
+  uint32_t gametic;
   uint32_t extra_size;
   uint32_t gameaction;
   uint32_t turnheld;
@@ -773,7 +774,6 @@ struct extra_serialize {
   uint32_t set_menu_itemon;
   struct wi_state wi_state;
   short itemOn;
-  short skullAnimCounter;
   short whichSkull;
   short currentMenu;
   uint8_t  autorun;
@@ -801,6 +801,7 @@ bool retro_serialize(void *data_, size_t size)
       return false;
     }
   }
+  extra->gametic = gametic;
   extra->gameaction = gameaction;
   extra->turnheld = turnheld;
   extra->extra_size = sizeof(*extra);
@@ -810,7 +811,6 @@ bool retro_serialize(void *data_, size_t size)
   extra->FinaleCount = FinaleCount;
   extra->gameless = gameless;
   extra->itemOn = itemOn;
-  extra->skullAnimCounter = skullAnimCounter;
   extra->whichSkull = whichSkull;
   extra->currentMenu = 0;
   extra->set_menu_itemon = set_menu_itemon;
@@ -841,6 +841,7 @@ bool retro_unserialize(const void *data_, size_t size)
   if (extra->extra_size == sizeof(*extra))
     {
       unsigned i;
+      gametic = extra->gametic;
       gameaction = extra->gameaction;
       turnheld = extra->turnheld;
       autorun = extra->autorun;
@@ -849,7 +850,6 @@ bool retro_unserialize(const void *data_, size_t size)
       FinaleCount = extra->FinaleCount;
       WI_Load(&extra->wi_state);
       itemOn = extra->itemOn;
-      skullAnimCounter = extra->skullAnimCounter;
       whichSkull = extra->whichSkull;
       currentMenu = menus[extra->currentMenu];
       set_menu_itemon = extra->set_menu_itemon;

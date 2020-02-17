@@ -2114,9 +2114,10 @@ void WI_Start(wbstartstruct_t* wbstartstruct)
 
 static int *
 intp_unpack(uint32_t val) {
+  int *ret;
   if (val == NULL_SERIALIZE)
     return NULL;
-  int *ret = malloc (sizeof(int) * MAXPLAYERS);
+  ret     = malloc (sizeof(int) * MAXPLAYERS);
   memset (ret, 0 , sizeof(int) * MAXPLAYERS);
   ret[me] = val;
   return ret;

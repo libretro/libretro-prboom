@@ -1642,6 +1642,7 @@ static const size_t num_version_headers = sizeof(version_headers) / sizeof(versi
 //
 static int G_DoLoadGameFromSaveBuffer(int length)
 {
+  int isok;
   int  i;
   int savegame_compatibility = -1;
 
@@ -1740,7 +1741,7 @@ static int G_DoLoadGameFromSaveBuffer(int length)
   P_MapEnd();
   R_SmoothPlaying_Reset(NULL); // e6y
 
-  int isok = *save_p == 0xe6;
+  isok = *save_p == 0xe6;
   if (!isok)
     I_Error ("G_DoLoadGame: Bad savegame");
 
@@ -1752,6 +1753,7 @@ static int G_DoLoadGameFromSaveBuffer(int length)
 
 void G_DoLoadGame(void)
 {
+  int err;
   int  length;
   // CPhipps - do savegame filename stuff here
   char name[PATH_MAX+1];     // killough 3/22/98
@@ -1762,16 +1764,17 @@ void G_DoLoadGame(void)
   if (length<=0)
     I_Error("Couldn't read file %s: %s", name, "(Unknown Error)");
 
-  int err = G_DoLoadGameFromSaveBuffer(length);
+  err = G_DoLoadGameFromSaveBuffer(length);
   if (err == -2) {
     G_LoadGameErr("Unrecognised savegame version!\nAre you sure? (y/n) ");
   }
 
   if (err == -3) {
+    char *msg;
     uint64_t checksum = 0;
 
     checksum = G_Signature();
-    char *msg = malloc(strlen((const char*)save_p + sizeof checksum) + 128);
+    msg      = malloc(strlen((const char*)save_p + sizeof checksum) + 128);
     strcpy(msg,"Incompatible Savegame!!!\n");
     if (save_p[sizeof checksum])
       strcat(strcat(msg,"Wads expected:\n\n"), (const char*)save_p + sizeof checksum);
@@ -1786,9 +1789,10 @@ void G_DoLoadGame(void)
 
 bool G_DoLoadGameFromBuffer(void *data, size_t length)
 {
+  int err;
   savebuffer = data;
 
-  int err = G_DoLoadGameFromSaveBuffer(length);
+  err = G_DoLoadGameFromSaveBuffer(length);
 
   // done
   savebuffer = NULL;
@@ -1979,6 +1983,7 @@ static int G_DoSaveGameToSaveBuffer() {
 
 static void G_DoSaveGame (boolean menu)
 {
+  int length;
   char name[PATH_MAX+1];
 
   gameaction = ga_nothing; // cph - cancel savegame at top of this function,
@@ -1986,7 +1991,7 @@ static void G_DoSaveGame (boolean menu)
 
   G_SaveGameName(name,sizeof(name),savegameslot, demoplayback && !menu);
 
-  int length = G_DoSaveGameToSaveBuffer();
+  length = G_DoSaveGameToSaveBuffer();
 
   doom_printf( "%s", M_WriteFile(name, savebuffer, length)
          ? s_GGSAVED /* Ty - externalised */
@@ -1999,10 +2004,11 @@ static void G_DoSaveGame (boolean menu)
 }
 
 bool G_DoSaveGameToBuffer(void *buf, size_t size) {
+  int length, ok;
+  char description_saved[SAVEDESCLEN];
   // If no game is loaded we can't save
   if (thinkercap.next == NULL)
     return false;
-  char description_saved[SAVEDESCLEN];
 
   memcpy(description_saved, savedescription, SAVEDESCLEN);
   strcpy(savedescription, "BUFFER");
@@ -2012,13 +2018,13 @@ bool G_DoSaveGameToBuffer(void *buf, size_t size) {
   savegamesize = size;
   savestaticbuffer = TRUE;
 
-  int length = G_DoSaveGameToSaveBuffer();
+  length = G_DoSaveGameToSaveBuffer();
 
-  int ok = ((size_t) length <= size);
+  ok     = ((size_t) length <= size);
 
   if (ok && size != (size_t)length) {
     // initialize the rest with zeroes
-    memset(buf+length, 0, size - length);
+    memset((char*)buf+length, 0, size - length);
   } else if (savebuffer != NULL && !savestaticbuffer) {
     // a different savebuffer was allocated, free it
     free(savebuffer);

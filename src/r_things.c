@@ -475,7 +475,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    fixed_t tz;
    int width;
 
-   if (movement_smooth && !pause_interpolations)
+   if (movement_smooth)
    {
       fx = thing->PrevX + FixedMul (tic_vars.frac, thing->x - thing->PrevX);
       fy = thing->PrevY + FixedMul (tic_vars.frac, thing->y - thing->PrevY);

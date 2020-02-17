@@ -457,8 +457,6 @@ static void update_variables(bool startup)
 
 void I_SafeExit(int rc);
 
-static fixed_t unserial_time = 0;
-
 void retro_run(void)
 {
    bool updated = false;
@@ -469,10 +467,6 @@ void retro_run(void)
       environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
       I_SafeExit(1);
    }
-
-   if (pause_interpolations && tic_vars.frac / FRACUNIT > unserial_time / FRACUNIT)
-     pause_interpolations = false;
-
    D_DoomLoop();
    I_UpdateSound();
 }
@@ -764,8 +758,9 @@ extern boolean gamekeydown[NUMKEYS];
 static bool old_input[MAX_BUTTON_BINDS];
 
 struct extra_serialize {
-  uint32_t gametic;
   uint32_t extra_size;
+  uint32_t gametic;
+  fixed_t  gameticfrac;
   uint32_t gameaction;
   uint32_t turnheld;
   uint32_t gamestate;
@@ -779,6 +774,11 @@ struct extra_serialize {
   uint8_t  autorun;
   uint8_t  gameless;
   uint8_t  menuactive;
+  fixed_t  prevx;
+  fixed_t  prevy;
+  fixed_t  prevz;
+  angle_t  prevangle;
+  angle_t  prevpitch;
   uint8_t  old_input[MAX_BUTTON_BINDS];
   uint8_t  gamekeydown[NUMKEYS];
 };
@@ -800,8 +800,14 @@ bool retro_serialize(void *data_, size_t size)
     if (!ret) {
       return false;
     }
+    extra->prevx = viewplayer->mo->PrevX;
+    extra->prevy = viewplayer->mo->PrevY;
+    extra->prevz = viewplayer->prev_viewz;
+    extra->prevangle = viewplayer->prev_viewangle;
+    extra->prevpitch = viewplayer->prev_viewpitch;
   }
   extra->gametic = gametic;
+  extra->gameticfrac = tic_vars.frac;
   extra->gameaction = gameaction;
   extra->turnheld = turnheld;
   extra->extra_size = sizeof(*extra);
@@ -841,7 +847,7 @@ bool retro_unserialize(const void *data_, size_t size)
   if (extra->extra_size == sizeof(*extra))
     {
       unsigned i;
-      gametic = extra->gametic;
+      gametic = maketic = extra->gametic;
       gameaction = extra->gameaction;
       turnheld = extra->turnheld;
       autorun = extra->autorun;
@@ -858,11 +864,15 @@ bool retro_unserialize(const void *data_, size_t size)
       for (i = 0; i < MAX_BUTTON_BINDS; i++)
 	old_input[i] = extra->old_input[i];
       menuactive = extra->menuactive;
+      tic_vars.frac = extra->gameticfrac;
+      if (viewplayer && viewplayer->mo) {
+        viewplayer->mo->PrevX = extra->prevx;
+        viewplayer->mo->PrevY = extra->prevy;
+        viewplayer->prev_viewz = extra->prevz;
+        viewplayer->prev_viewangle = extra->prevangle;
+        viewplayer->prev_viewpitch = extra->prevpitch;
+      }
     }
-  R_StopAllInterpolations();
-  R_ResetViewInterpolation ();
-  pause_interpolations = true;
-  unserial_time = tic_vars.frac;
   return true;
 }
 

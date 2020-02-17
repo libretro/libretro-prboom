@@ -1994,14 +1994,10 @@ bool G_DoSaveGameToBuffer(void *buf, size_t size) {
   // If no game is loaded we can't save
   if (thinkercap.next == NULL)
     return false;
-  gameaction_t ga_saved = gameaction;
   char         description_saved[SAVEDESCLEN];
 
   memcpy(description_saved, savedescription, SAVEDESCLEN);
   strcpy(savedescription, "BUFFER");
-
-  gameaction = ga_nothing; // cph - cancel savegame at top of this function,
-    // in case later problems cause a premature exit
 
   // set savebuffer and its size to attempt to save directly into the destination buffer
   savebuffer = buf;
@@ -2022,7 +2018,6 @@ bool G_DoSaveGameToBuffer(void *buf, size_t size) {
 
   savebuffer = save_p = NULL;
   memcpy(savedescription, description_saved, SAVEDESCLEN);
-  gameaction = ga_saved;
 
   return ok;
 }

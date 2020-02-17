@@ -503,12 +503,11 @@ void P_UnArchiveThinkers (void)
 
       if (mobj->player)
         (mobj->player = &players[(uintptr_t) mobj->player - 1]) -> mo = mobj;
-      else {
-        // avoid glitchy interpolation on non-player objects
-        mobj->PrevX = mobj->x;
-        mobj->PrevY = mobj->y;
-        mobj->PrevZ = mobj->z;
-      }
+
+      // avoid glitchy interpolation
+      mobj->PrevX = mobj->x;
+      mobj->PrevY = mobj->y;
+      mobj->PrevZ = mobj->z;
 
       P_SetThingPosition (mobj);
       mobj->info = &mobjinfo[mobj->type];

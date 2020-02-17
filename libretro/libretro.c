@@ -799,11 +799,13 @@ bool retro_serialize(void *data_, size_t size)
     if (!ret) {
       return false;
     }
-    extra->prevx = viewplayer->mo->PrevX;
-    extra->prevy = viewplayer->mo->PrevY;
-    extra->prevz = viewplayer->prev_viewz;
-    extra->prevangle = viewplayer->prev_viewangle;
-    extra->prevpitch = viewplayer->prev_viewpitch;
+    if (viewplayer && viewplayer->mo) {
+      extra->prevx = viewplayer->mo->PrevX;
+      extra->prevy = viewplayer->mo->PrevY;
+      extra->prevz = viewplayer->prev_viewz;
+      extra->prevangle = viewplayer->prev_viewangle;
+      extra->prevpitch = viewplayer->prev_viewpitch;
+    }
   }
   extra->gametic = gametic;
   extra->gameticfrac = tic_vars.frac;

@@ -2007,7 +2007,7 @@ bool G_DoSaveGameToBuffer(void *buf, size_t size) {
 
   int ok = ((size_t) length <= size);
 
-  if (ok && size != length) {
+  if (ok && size != (size_t)length) {
     // initialize the rest with zeroes
     memset(buf+length, 0, size - length);
   } else if (savebuffer != NULL) {

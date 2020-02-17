@@ -785,7 +785,7 @@ struct extra_serialize {
 
 size_t retro_serialize_size(void)
 {
-  return 0x20000 + sizeof(struct extra_serialize);
+  return sizeof(struct extra_serialize) + 0x30000;
 }
 
 bool retro_serialize(void *data_, size_t size)

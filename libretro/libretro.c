@@ -792,9 +792,8 @@ bool retro_serialize(void *data_, size_t size)
 {
   unsigned i;
   struct extra_serialize *extra = data_;
-  int gameless = (thinkercap.next == NULL);
 
-  if(!gameless) {
+  if (gamestate == GS_LEVEL) {
     int ret = G_DoSaveGameToBuffer((char *) data_ + sizeof(*extra),
 				   size - sizeof(*extra));
     if (!ret) {
@@ -815,7 +814,6 @@ bool retro_serialize(void *data_, size_t size)
   extra->gamestate = gamestate;
   extra->FinaleStage = FinaleStage;
   extra->FinaleCount = FinaleCount;
-  extra->gameless = gameless;
   extra->itemOn = itemOn;
   extra->whichSkull = whichSkull;
   extra->currentMenu = 0;
@@ -837,12 +835,20 @@ bool retro_unserialize(const void *data_, size_t size)
   const struct extra_serialize *extra = data_;
   int gameless = 0;
   if (extra->extra_size == sizeof(*extra))
-    gameless = extra->gameless;
+    gameless = (extra->gamestate != GS_LEVEL);
   if (!gameless) {
     int ret = G_DoLoadGameFromBuffer((char *) data_ + extra->extra_size,
 				     size - extra->extra_size);
     if (!ret)
       return false;
+
+    if (viewplayer && viewplayer->mo) {
+      viewplayer->mo->PrevX = extra->prevx;
+      viewplayer->mo->PrevY = extra->prevy;
+      viewplayer->prev_viewz = extra->prevz;
+      viewplayer->prev_viewangle = extra->prevangle;
+      viewplayer->prev_viewpitch = extra->prevpitch;
+    }
   }
   if (extra->extra_size == sizeof(*extra))
     {
@@ -865,13 +871,6 @@ bool retro_unserialize(const void *data_, size_t size)
 	old_input[i] = extra->old_input[i];
       menuactive = extra->menuactive;
       tic_vars.frac = extra->gameticfrac;
-      if (viewplayer && viewplayer->mo) {
-        viewplayer->mo->PrevX = extra->prevx;
-        viewplayer->mo->PrevY = extra->prevy;
-        viewplayer->prev_viewz = extra->prevz;
-        viewplayer->prev_viewangle = extra->prevangle;
-        viewplayer->prev_viewpitch = extra->prevpitch;
-      }
     }
   return true;
 }

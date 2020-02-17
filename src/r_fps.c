@@ -60,7 +60,6 @@ typedef struct
 } interpolation_t;
 
 static int numinterpolations = 0;
-boolean pause_interpolations = false;
 
 tic_vars_t tic_vars;
 
@@ -99,11 +98,6 @@ void R_InterpolateView (player_t *player)
 
   if (movement_smooth)
   {
-    if (pause_interpolations)
-    {
-      frac = FRACUNIT;
-    }
-
     viewx = player->mo->PrevX + FixedMul (frac, player->mo->x - player->mo->PrevX);
     viewy = player->mo->PrevY + FixedMul (frac, player->mo->y - player->mo->PrevY);
     viewz = player->prev_viewz + FixedMul (frac, player->viewz - player->prev_viewz);
@@ -317,7 +311,7 @@ void R_DoInterpolations(fixed_t smoothratio)
   if (!movement_smooth)
     return;
 
-  if (smoothratio == FRACUNIT || pause_interpolations)
+  if (smoothratio == FRACUNIT)
   {
     didInterp = false;
     return;

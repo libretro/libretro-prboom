@@ -534,24 +534,25 @@ void D_BuildNewTiccmds(void)
 void TryRunTics(void)
 {
   fixed_t overflow = 0;
-  // Increment tic fraction if game is ongoing
-  if ((demoplayback || !menuactive) && !paused)
-  {
-     tic_vars.frac += tic_vars.frac_step;
-     if(tic_vars.frac > FRACUNIT) {
-        overflow = tic_vars.frac - FRACUNIT;
-        tic_vars.frac = FRACUNIT;
-     }
+
+  // Increment tic fraction
+  tic_vars.frac += tic_vars.frac_step;
+  if(tic_vars.frac > FRACUNIT) {
+    overflow = tic_vars.frac - FRACUNIT;
+    tic_vars.frac = FRACUNIT;
   }
 
   D_BuildNewTiccmds();
 
   if(tic_vars.frac == FRACUNIT) {
     tic_vars.frac = overflow;
-    if (advancedemo)
-      D_DoAdvanceDemo ();
-    M_Ticker ();
-    G_Ticker ();
+    if (!paused) {
+      if (advancedemo)
+        D_DoAdvanceDemo ();
+      G_Ticker ();
+    }
+    if (menuactive)
+      M_Ticker ();
     P_Checksum(gametic);
     gametic++;
   }

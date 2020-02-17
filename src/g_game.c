@@ -88,7 +88,7 @@
 #define SAVEGAMESIZE  0x20000
 #define SAVESTRINGSIZE  24
 
-static size_t   savegamesize = SAVEGAMESIZE; // killough
+static size_t   savegamesize = 0; // killough
 static boolean  netdemo;
 static const uint8_t *demobuffer;   /* cph - only used for playback */
 static int demolength; // check for overrun (missing DEMOMARKER)
@@ -126,6 +126,7 @@ int             demover;
 wbstartstruct_t wminfo;               // parms for world map / intermission
 boolean         haswolflevels = FALSE;// jff 4/18/98 wolf levels present
 static uint8_t     *savebuffer;          // CPhipps - static
+static boolean     savestaticbuffer = FALSE;
 int             autorun = FALSE;      // always running?          // phares
 int             totalleveltimes;      // CPhipps - total time for all completed levels
 int		longtics;
@@ -1636,7 +1637,10 @@ static const struct {
 
 static const size_t num_version_headers = sizeof(version_headers) / sizeof(version_headers[0]);
 
-static int G_DoLoadGameReal(int length)
+//
+// Load the game from the internal savebuffer
+//
+static int G_DoLoadGameFromSaveBuffer(int length)
 {
   int  i;
   int savegame_compatibility = -1;
@@ -1758,7 +1762,7 @@ void G_DoLoadGame(void)
   if (length<=0)
     I_Error("Couldn't read file %s: %s", name, "(Unknown Error)");
 
-  int err = G_DoLoadGameReal(length);
+  int err = G_DoLoadGameFromSaveBuffer(length);
   if (err == -2) {
     G_LoadGameErr("Unrecognised savegame version!\nAre you sure? (y/n) ");
   }
@@ -1784,7 +1788,7 @@ bool G_DoLoadGameFromBuffer(void *data, size_t length)
 {
   savebuffer = data;
 
-  int err = G_DoLoadGameReal(length);
+  int err = G_DoLoadGameFromSaveBuffer(length);
 
   // done
   savebuffer = NULL;
@@ -1822,9 +1826,16 @@ void (CheckSaveGame)(size_t size, const char* file, int line)
   size_t pos = save_p - savebuffer;
 
   size += 1024;  // breathing room
-  if (pos+size > savegamesize)
-    save_p = (savebuffer = realloc(savebuffer,
-           savegamesize += (size+1023) & ~1023)) + pos;
+  if (pos+size > savegamesize) {
+    savegamesize += (size+1023) & ~1023;
+    if (savestaticbuffer) {
+      savebuffer = malloc(savegamesize);
+      savestaticbuffer = FALSE;
+    }
+    else
+      savebuffer = realloc(savebuffer, savegamesize);
+    save_p = savebuffer + pos;
+  }
 }
 
 /* killough 3/22/98: form savegame name in one location
@@ -1843,14 +1854,23 @@ void G_SaveGameName(char *name, size_t size, int slot, boolean demoplayback)
   snprintf (name, size, "%s%c%s%d.dsg", basesavegame, slash, sgn, slot);
 }
 
-static int G_DoSaveGameReal() {
+
+//
+// Save the game state into the internal savebuffer
+// It'll only reallocate the savebuffer if necessary
+//
+static int G_DoSaveGameToSaveBuffer() {
   char name2[VERSIONSIZE];
   char *description;
   int  length, i;
 
   description = savedescription;
 
-  save_p = savebuffer = malloc(savegamesize);
+  if(!savebuffer || savegamesize < SAVEGAMESIZE) {
+    savegamesize = SAVEGAMESIZE;
+    savebuffer = malloc(savegamesize);
+  }
+  save_p = savebuffer;
 
   CheckSaveGame(SAVESTRINGSIZE+VERSIONSIZE+sizeof(uint64_t));
   memcpy (save_p, description, SAVESTRINGSIZE);
@@ -1966,7 +1986,7 @@ static void G_DoSaveGame (boolean menu)
 
   G_SaveGameName(name,sizeof(name),savegameslot, demoplayback && !menu);
 
-  int length = G_DoSaveGameReal();
+  int length = G_DoSaveGameToSaveBuffer();
 
   doom_printf( "%s", M_WriteFile(name, savebuffer, length)
          ? s_GGSAVED /* Ty - externalised */
@@ -1982,28 +2002,31 @@ bool G_DoSaveGameToBuffer(void *buf, size_t size) {
   // If no game is loaded we can't save
   if (thinkercap.next == NULL)
     return false;
-  gameaction_t ga_saved = gameaction;
-  char         description_saved[SAVEDESCLEN];
+  char description_saved[SAVEDESCLEN];
 
   memcpy(description_saved, savedescription, SAVEDESCLEN);
   strcpy(savedescription, "BUFFER");
 
-  gameaction = ga_nothing; // cph - cancel savegame at top of this function,
-    // in case later problems cause a premature exit
+  // set savebuffer and its size to attempt to save directly into the destination buffer
+  savebuffer = buf;
+  savegamesize = size;
+  savestaticbuffer = TRUE;
 
-  int length = G_DoSaveGameReal();
+  int length = G_DoSaveGameToSaveBuffer();
 
-  int ok = (length > 0 && (size_t) length <= size);
+  int ok = ((size_t) length <= size);
 
-  if (ok) {
-    memcpy(buf, savebuffer, length);
+  if (ok && size != (size_t)length) {
+    // initialize the rest with zeroes
     memset(buf+length, 0, size - length);
+  } else if (savebuffer != NULL && !savestaticbuffer) {
+    // a different savebuffer was allocated, free it
+    free(savebuffer);
+    I_Error("G_DoSaveGameToBuffer: too much data by %d bytes", (int) (length - size));
   }
-
-  free(savebuffer);  // killough
+  savestaticbuffer = FALSE;
   savebuffer = save_p = NULL;
   memcpy(savedescription, description_saved, SAVEDESCLEN);
-  gameaction = ga_saved;
 
   return ok;
 }

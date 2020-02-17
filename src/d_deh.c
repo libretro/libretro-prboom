@@ -1849,9 +1849,9 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
               if (strcasecmp(strval,deh_mobjflags[iy].name)) continue;
               if (fpout) {
                 fprintf(fpout,
-                  "ORed value 0x%08lX%08lX %s\n",
-                  (unsigned long)(deh_mobjflags[iy].value>>32) & 0xffffffff,
-                  (unsigned long)deh_mobjflags[iy].value & 0xffffffff, strval
+                  "ORed value 0x%08"PRIX64"%08"PRIX64" %s\n",
+                  (uint64_t)(deh_mobjflags[iy].value>>32) & 0xffffffff,
+                  (uint64_t)deh_mobjflags[iy].value & 0xffffffff, strval
                 );
               }
               value |= deh_mobjflags[iy].value;
@@ -1872,8 +1872,8 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
 
           if (fpout)
             fprintf(fpout,
-                    "Result  =  0x%016lX\n"
-                    "Current    0x%016lX\n",
+                    "Result  =  0x%016"PRIX64"\n"
+                    "Current    0x%016"PRIX64"\n",
                     value, mobjinfo[indexnum].flags);
 
           // Each "Bits" field can use any mnemonic, but it won't overwrite the values
@@ -1889,9 +1889,9 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
       setMobjInfoValue(indexnum, ix, value);
       if (fpout) {
         fprintf(fpout,
-          "Assigned 0x%08lx%08lx to %s(%d) at index %d\n",
-          (unsigned long)(value>>32) & 0xffffffff,
-          (unsigned long)value & 0xffffffff, key, indexnum, ix
+          "Assigned 0x%08"PRIx64"%08"PRIx64" to %s(%d) at index %d\n",
+          (uint64_t)(value>>32) & 0xffffffff,
+          (uint64_t)value & 0xffffffff, key, indexnum, ix
         );
       }
     }

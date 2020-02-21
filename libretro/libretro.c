@@ -104,7 +104,7 @@ typedef struct {
 } action_lut_t;
 
 typedef struct {
-	struct retro_input_descriptor desc[MAX_BUTTON_BINDS];
+	struct retro_input_descriptor desc[MAX_BUTTON_BINDS+4];
 	action_lut_t action_lut[MAX_BUTTON_BINDS];
 	unsigned num_buttons;
 } gamepad_layout_t;
@@ -168,6 +168,9 @@ static gamepad_layout_t gp_modern = { // Based on Original XBOX Doom 3 Collectio
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "180 Turn" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Show/Hide Map" },
 		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Show/Hide Menu" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Strafe" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Move" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Turn" },
 		{ 0 },
 	},
 	{	// gamekey,             menukey

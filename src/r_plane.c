@@ -131,51 +131,30 @@ void R_InitPlanes (void)
 
 static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
 {
-   angle_t angle;
-   fixed_t distance, length;
+   fixed_t distance;
+   int dx, dy;
    unsigned index;
 
-#ifndef ANDROID
-   if (!r_wiggle_fix)
-#endif
+   if ((dy = abs(centery - y)) == 0)
+      return; // skip early if there's no change
+
+   if (planeheight != cachedheight[y])
    {
-      if (planeheight != cachedheight[y])
-      {
-         cachedheight[y] = planeheight;
-         distance = cacheddistance[y] = FixedMul (planeheight, yslope[y]);
-         dsvars->xstep = cachedxstep[y] = FixedMul (distance,basexscale);
-         dsvars->ystep = cachedystep[y] = FixedMul (distance,baseyscale);
-      }
-      else
-      {
-         distance = cacheddistance[y];
-         dsvars->xstep = cachedxstep[y];
-         dsvars->ystep = cachedystep[y];
-      }
-
-      length = FixedMul (distance,distscale[x1]);
-      angle = (viewangle + xtoviewangle[x1])>>ANGLETOFINESHIFT;
-
-      // killough 2/28/98: Add offsets
-      dsvars->xfrac =  viewx + FixedMul(finecosine[angle], length) + xoffs;
-      dsvars->yfrac = -viewy - FixedMul(finesine[angle],   length) + yoffs;
+      cachedheight[y] = planeheight;
+      distance = cacheddistance[y] = FixedMul (planeheight, yslope[y]);
+      dsvars->xstep = cachedxstep[y] = FixedMul (viewsin, planeheight) / dy;
+      dsvars->ystep = cachedystep[y] = FixedMul (viewcos, planeheight) / dy;
    }
-#ifndef ANDROID
    else
    {
-      float slope, realy;
-
-      distance = FixedMul (planeheight, yslope[y]);
-      slope = (float)(planeheight / 65535.0f / D_abs(centery - y));
-      realy = (float)distance / 65536.0f;
-
-      dsvars->xstep = (unsigned int)(viewsin * slope * viewfocratio);
-      dsvars->ystep = (unsigned int)(viewcos * slope * viewfocratio);
-
-      dsvars->xfrac =  viewx + xoffs + (int)(viewcos * realy) + (x1 - centerx) * dsvars->xstep;
-      dsvars->yfrac = -viewy + yoffs - (int)(viewsin * realy) + (x1 - centerx) * dsvars->ystep;
+      distance = cacheddistance[y];
+      dsvars->xstep = cachedxstep[y];
+      dsvars->ystep = cachedystep[y];
    }
-#endif
+
+   dx = x1 - centerx;
+   dsvars->xfrac = xoffs + viewx + FixedMul(viewcos, distance) + dx * dsvars->xstep;
+   dsvars->yfrac = yoffs - viewy - FixedMul(viewsin, distance) + dx * dsvars->ystep;
 
    if (drawvars.filterfloor == RDRAW_FILTER_LINEAR) {
       dsvars->xfrac -= (FRACUNIT>>1);

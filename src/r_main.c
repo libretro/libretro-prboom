@@ -76,7 +76,6 @@ angle_t  viewangle;
 angle_t  viewpitch;
 fixed_t  viewcos, viewsin;
 player_t *viewplayer;
-float viewfocratio; /*e6y: for more precise flat drawing */
 fixed_t  focallength;
 int      fieldofview;
 fixed_t  freelookviewheight;
@@ -440,8 +439,6 @@ void R_ExecuteSetViewSize (void)
 // proff 11/06/98: Added for high-res
   projectiony = ((SCREENHEIGHT * centerx * 320) / 200) / SCREENWIDTH * FRACUNIT;
 
-  /*  e6y: this is a precalculated value for more precise flats drawing (see R_MapPlane) */
-  viewfocratio = 1.6f / ((float)SCREENWIDTH / (float)SCREENHEIGHT);
   R_InitBuffer (scaledviewwidth, viewheight);
 
   R_InitTextureMapping();

@@ -469,6 +469,7 @@ void retro_run(void)
    {
       environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
       I_SafeExit(1);
+      return;
    }
    D_DoomLoop();
    I_UpdateSound();

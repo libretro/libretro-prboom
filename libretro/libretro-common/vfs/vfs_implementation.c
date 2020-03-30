@@ -1,4 +1,4 @@
-/* Copyright  (C) 2010-2019 The RetroArch team
+/* Copyright  (C) 2010-2020 The RetroArch team
 *
 * ---------------------------------------------------------------------------------------
 * The following license statement only applies to this file (vfs_implementation.c).
@@ -41,11 +41,12 @@
 #    include <xtl.h>
 #    define INVALID_FILE_ATTRIBUTES -1
 #  else
-#    include <io.h>
+
 #    include <fcntl.h>
 #    include <direct.h>
 #    include <windows.h>
 #  endif
+#    include <io.h>
 #else
 #  if defined(PSP)
 #    include <pspiofilemgr.h>
@@ -67,7 +68,7 @@
 #  endif
 #endif
 
-#ifdef __CELLOS_LV2__
+#if defined (__CELLOS_LV2__)  && !defined(__PSL1GHT__)
 #include <cell/cell_fs.h>
 #define O_RDONLY CELL_FS_O_RDONLY
 #define O_WRONLY CELL_FS_O_WRONLY
@@ -150,7 +151,7 @@
 #include <fileXio.h>
 #endif
 
-#if defined(__CELLOS_LV2__)
+#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
 #include <cell/cell_fs.h>
 #endif
 
@@ -171,15 +172,9 @@
 
 #endif
 
-#if defined(_WIN32) && !defined(_XBOX)
+#if defined(_WIN32)
 #if !defined(_MSC_VER) || (defined(_MSC_VER) && _MSC_VER >= 1400)
 #define ATLEAST_VC2005
-#endif
-#endif
-
-#ifdef RARCH_INTERNAL
-#ifndef VFS_FRONTEND
-#define VFS_FRONTEND
 #endif
 #endif
 
@@ -190,26 +185,11 @@
 #include <compat/fopen_utf8.h>
 #include <file/file_path.h>
 
-#define RFILE_HINT_UNBUFFERED (1 << 8)
+#ifdef HAVE_CDROM
+#include <vfs/vfs_implementation_cdrom.h>
+#endif
 
-#ifdef VFS_FRONTEND
-struct retro_vfs_file_handle
-#else
-struct libretro_vfs_implementation_file
-#endif
-{
-   int fd;
-   unsigned hints;
-   int64_t size;
-   char *buf;
-   FILE *fp;
-   char* orig_path;
-#if defined(HAVE_MMAP)
-   uint64_t mappos;
-   uint64_t mapsize;
-   uint8_t *mapped;
-#endif
-};
+#define RFILE_HINT_UNBUFFERED (1 << 8)
 
 int64_t retro_vfs_file_seek_internal(libretro_vfs_implementation_file *stream, int64_t offset, int whence)
 {
@@ -218,22 +198,30 @@ int64_t retro_vfs_file_seek_internal(libretro_vfs_implementation_file *stream, i
 
    if ((stream->hints & RFILE_HINT_UNBUFFERED) == 0)
    {
+#ifdef HAVE_CDROM
+      if (stream->scheme == VFS_SCHEME_CDROM)
+         return retro_vfs_file_seek_cdrom(stream, offset, whence);
+#endif
 /* VC2005 and up have a special 64-bit fseek */
 #ifdef ATLEAST_VC2005
       return _fseeki64(stream->fp, offset, whence);
 #elif defined(__CELLOS_LV2__) || defined(_MSC_VER) && _MSC_VER <= 1310
       return fseek(stream->fp, (long)offset, whence);
 #elif defined(PS2)
-      int64_t ret = fileXioLseek(fileno(stream->fp), (off_t)offset, whence);
-      /* fileXioLseek could return positive numbers */
-      if (ret > 0)
-         return 0;
-      return ret;
+      {
+         int64_t ret = fileXioLseek(fileno(stream->fp), (off_t)offset, whence);
+         /* fileXioLseek could return positive numbers */
+         if (ret > 0)
+            return 0;
+         return ret;
+      }
 #elif defined(ORBIS)
-      int ret = orbisLseek(stream->fd, offset, whence);
-      if (ret < 0)
-         return -1;
-      return 0;
+      {
+         int ret = orbisLseek(stream->fd, offset, whence);
+         if (ret < 0)
+            return -1;
+         return 0;
+      }
 #else
       return fseeko(stream->fp, (off_t)offset, whence);
 #endif
@@ -298,17 +286,36 @@ libretro_vfs_implementation_file *retro_vfs_file_open_impl(
    const char                     *mode_str = NULL;
    libretro_vfs_implementation_file *stream = (libretro_vfs_implementation_file*)
       calloc(1, sizeof(*stream));
+#if defined(VFS_FRONTEND) || defined(HAVE_CDROM)
+   int                             path_len = (int)strlen(path);
+#endif
 
 #ifdef VFS_FRONTEND
    const char                 *dumb_prefix  = "vfsonly://";
    size_t                   dumb_prefix_siz = strlen(dumb_prefix);
    int                      dumb_prefix_len = (int)dumb_prefix_siz;
-   int                             path_len = (int)strlen(path);
 
    if (path_len >= dumb_prefix_len)
    {
       if (!memcmp(path, dumb_prefix, dumb_prefix_len))
          path += dumb_prefix_siz;
+   }
+#endif
+
+#ifdef HAVE_CDROM
+   {
+      const char *cdrom_prefix = "cdrom://";
+      size_t cdrom_prefix_siz = strlen(cdrom_prefix);
+      int cdrom_prefix_len = (int)cdrom_prefix_siz;
+
+      if (path_len > cdrom_prefix_len)
+      {
+         if (!memcmp(path, cdrom_prefix, cdrom_prefix_len))
+         {
+            path += cdrom_prefix_siz;
+            stream->scheme = VFS_SCHEME_CDROM;
+         }
+      }
    }
 #endif
 
@@ -398,11 +405,29 @@ libretro_vfs_implementation_file *retro_vfs_file_open_impl(
       }
       stream->fd = fd;
 #else
-      FILE   *fp = (FILE*)fopen_utf8(path, mode_str);
+      FILE *fp;
+#ifdef HAVE_CDROM
+      if (stream->scheme == VFS_SCHEME_CDROM)
+      {
+         retro_vfs_file_open_cdrom(stream, path, mode, hints);
+#if defined(_WIN32) && !defined(_XBOX)
+         if (!stream->fh)
+            goto error;
+#else
+         if (!stream->fp)
+            goto error;
+#endif
+      }
+      else
+#endif
+      {
+         fp = (FILE*)fopen_utf8(path, mode_str);
 
-      if (!fp)
-         goto error;
+         if (!fp)
+            goto error;
 
+         stream->fp  = fp;
+      }
       /* Regarding setvbuf:
        *
        * https://www.freebsd.org/cgi/man.cgi?query=setvbuf&apropos=0&sektion=0&manpath=FreeBSD+11.1-RELEASE&arch=default&format=html
@@ -413,10 +438,13 @@ libretro_vfs_implementation_file *retro_vfs_file_open_impl(
        * Since C89 does not support specifying a null buffer with a non-zero size, we create and track our own buffer for it.
        */
       /* TODO: this is only useful for a few platforms, find which and add ifdef */
-      stream->fp  = fp;
 #if !defined(PS2) && !defined(PSP)
-      stream->buf = (char*)calloc(1, 0x4000);
-      setvbuf(stream->fp, stream->buf, _IOFBF, 0x4000);
+      if (stream->scheme != VFS_SCHEME_CDROM)
+      {
+         stream->buf = (char*)calloc(1, 0x4000);
+         if (stream->fp)
+            setvbuf(stream->fp, stream->buf, _IOFBF, 0x4000);
+      }
 #endif
 #endif
    }
@@ -465,12 +493,26 @@ libretro_vfs_implementation_file *retro_vfs_file_open_impl(
    stream->size = orbisLseek(stream->fd, 0, SEEK_END);
    orbisLseek(stream->fd, 0, SEEK_SET);
 #else
-   retro_vfs_file_seek_internal(stream, 0, SEEK_SET);
-   retro_vfs_file_seek_internal(stream, 0, SEEK_END);
+#ifdef HAVE_CDROM
+   if (stream->scheme == VFS_SCHEME_CDROM)
+   {
+      retro_vfs_file_seek_cdrom(stream, 0, SEEK_SET);
+      retro_vfs_file_seek_cdrom(stream, 0, SEEK_END);
 
-   stream->size = retro_vfs_file_tell_impl(stream);
+      stream->size = retro_vfs_file_tell_impl(stream);
 
-   retro_vfs_file_seek_internal(stream, 0, SEEK_SET);
+      retro_vfs_file_seek_cdrom(stream, 0, SEEK_SET);
+   }
+   else
+#endif
+   {
+      retro_vfs_file_seek_internal(stream, 0, SEEK_SET);
+      retro_vfs_file_seek_internal(stream, 0, SEEK_END);
+
+      stream->size = retro_vfs_file_tell_impl(stream);
+
+      retro_vfs_file_seek_internal(stream, 0, SEEK_SET);
+   }
 #endif
    return stream;
 
@@ -484,10 +526,20 @@ int retro_vfs_file_close_impl(libretro_vfs_implementation_file *stream)
    if (!stream)
       return -1;
 
+#ifdef HAVE_CDROM
+   if (stream->scheme == VFS_SCHEME_CDROM)
+   {
+      retro_vfs_file_close_cdrom(stream);
+      goto end;
+   }
+#endif
+
    if ((stream->hints & RFILE_HINT_UNBUFFERED) == 0)
    {
       if (stream->fp)
+      {
          fclose(stream->fp);
+      }
    }
    else
    {
@@ -506,10 +558,17 @@ int retro_vfs_file_close_impl(libretro_vfs_implementation_file *stream)
       close(stream->fd);
 #endif
    }
+#ifdef HAVE_CDROM
+end:
+   if (stream->cdrom.cue_buf)
+      free(stream->cdrom.cue_buf);
+#endif
    if (stream->buf)
       free(stream->buf);
+
    if (stream->orig_path)
       free(stream->orig_path);
+
    free(stream);
 
    return 0;
@@ -517,6 +576,10 @@ int retro_vfs_file_close_impl(libretro_vfs_implementation_file *stream)
 
 int retro_vfs_file_error_impl(libretro_vfs_implementation_file *stream)
 {
+#ifdef HAVE_CDROM
+   if (stream->scheme == VFS_SCHEME_CDROM)
+      return retro_vfs_file_error_cdrom(stream);
+#endif
 #ifdef ORBIS
    /* TODO/FIXME - implement this? */
    return 0;
@@ -555,13 +618,19 @@ int64_t retro_vfs_file_tell_impl(libretro_vfs_implementation_file *stream)
 
    if ((stream->hints & RFILE_HINT_UNBUFFERED) == 0)
    {
+#ifdef HAVE_CDROM
+      if (stream->scheme == VFS_SCHEME_CDROM)
+         return retro_vfs_file_tell_cdrom(stream);
+#endif
 #ifdef ORBIS
-      int64_t ret = orbisLseek(stream->fd, 0, SEEK_CUR);
-      if (ret < 0)
-         return -1;
-      return ret;
+      {
+         int64_t ret = orbisLseek(stream->fd, 0, SEEK_CUR);
+         if (ret < 0)
+            return -1;
+         return ret;
+      }
 #else
-/* VC2005 and up have a special 64-bit ftell */
+      /* VC2005 and up have a special 64-bit ftell */
 #ifdef ATLEAST_VC2005
       return _ftelli64(stream->fp);
 #else
@@ -609,6 +678,10 @@ int64_t retro_vfs_file_read_impl(libretro_vfs_implementation_file *stream,
 
    if ((stream->hints & RFILE_HINT_UNBUFFERED) == 0)
    {
+#ifdef HAVE_CDROM
+      if (stream->scheme == VFS_SCHEME_CDROM)
+         return retro_vfs_file_read_cdrom(stream, s, len);
+#endif
 #ifdef ORBIS
       if (orbisRead(stream->fd, s, (size_t)len) < 0)
          return -1;
@@ -867,14 +940,16 @@ int retro_vfs_stat_impl(const char *path, int32_t *size)
       /* if fileXioGetStat fails */
       int dir_ret = fileXioDopen(path);
       is_dir      =  dir_ret > 0;
-      fileXioDclose(dir_ret);
+      if (is_dir) {
+         fileXioDclose(dir_ret);
+      }
    }
    else
       is_dir = FIO_S_ISDIR(buf.mode);
 
    return RETRO_VFS_STAT_IS_VALID | (is_dir ? RETRO_VFS_STAT_IS_DIRECTORY : 0) | (is_character_special ? RETRO_VFS_STAT_IS_CHARACTER_SPECIAL : 0);
 
-#elif defined(__CELLOS_LV2__)
+#elif defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
    /* CellOS Lv2 */
    bool is_dir;
    bool is_character_special = false;
@@ -1020,7 +1095,7 @@ struct libretro_vfs_implementation_dir
 #elif defined(PS2)
    int directory;
    iox_dirent_t entry;
-#elif defined(__CELLOS_LV2__)
+#elif defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
    CellFsErrno error;
    int directory;
    CellFsDirent entry;
@@ -1039,18 +1114,20 @@ static bool dirent_check_error(libretro_vfs_implementation_dir *rdir)
    return (rdir->directory == INVALID_HANDLE_VALUE);
 #elif defined(VITA) || defined(PSP) || defined(PS2) || defined(ORBIS)
    return (rdir->directory < 0);
-#elif defined(__CELLOS_LV2__)
+#elif defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
    return (rdir->error != CELL_FS_SUCCEEDED);
 #else
    return !(rdir->directory);
 #endif
 }
 
-libretro_vfs_implementation_dir *retro_vfs_opendir_impl(const char *name, bool include_hidden)
+libretro_vfs_implementation_dir *retro_vfs_opendir_impl(
+      const char *name, bool include_hidden)
 {
 #if defined(_WIN32)
    unsigned path_len;
    char path_buf[1024];
+   size_t copied      = 0;
 #if defined(LEGACY_WIN32)
    char *path_local   = NULL;
 #else
@@ -1074,21 +1151,24 @@ libretro_vfs_implementation_dir *retro_vfs_opendir_impl(const char *name, bool i
    path_buf[0]           = '\0';
    path_len              = strlen(name);
 
+   copied                = strlcpy(path_buf, name, sizeof(path_buf));
+
    /* Non-NT platforms don't like extra slashes in the path */
-   if (name[path_len - 1] == '\\')
-      snprintf(path_buf, sizeof(path_buf), "%s*", name);
-   else
-      snprintf(path_buf, sizeof(path_buf), "%s\\*", name);
+   if (name[path_len - 1] != '\\')
+      path_buf[copied++]   = '\\';
+
+   path_buf[copied]        = '*';
+   path_buf[copied+1]      = '\0';
 
 #if defined(LEGACY_WIN32)
-   path_local            = utf8_to_local_string_alloc(path_buf);
-   rdir->directory       = FindFirstFile(path_local, &rdir->entry);
+   path_local              = utf8_to_local_string_alloc(path_buf);
+   rdir->directory         = FindFirstFile(path_local, &rdir->entry);
 
    if (path_local)
       free(path_local);
 #else
-   path_wide             = utf8_to_utf16_string_alloc(path_buf);
-   rdir->directory       = FindFirstFileW(path_wide, &rdir->entry);
+   path_wide               = utf8_to_utf16_string_alloc(path_buf);
+   rdir->directory         = FindFirstFileW(path_wide, &rdir->entry);
 
    if (path_wide)
       free(path_wide);
@@ -1101,7 +1181,7 @@ libretro_vfs_implementation_dir *retro_vfs_opendir_impl(const char *name, bool i
 #elif defined(_3DS)
    rdir->directory       = !string_is_empty(name) ? opendir(name) : NULL;
    rdir->entry           = NULL;
-#elif defined(__CELLOS_LV2__)
+#elif defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
    rdir->error           = cellFsOpendir(name, &rdir->directory);
 #elif defined(ORBIS)
    rdir->directory       = orbisDopen(name);
@@ -1143,7 +1223,7 @@ bool retro_vfs_readdir_impl(libretro_vfs_implementation_dir *rdir)
    int ret = ps2fileXioDread(rdir->directory, &record);
    rdir->entry = record;
    return ( ret > 0);
-#elif defined(__CELLOS_LV2__)
+#elif defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
    uint64_t nread;
    rdir->error = cellFsReaddir(rdir->directory, &rdir->entry, &nread);
    return (nread != 0);
@@ -1158,27 +1238,32 @@ const char *retro_vfs_dirent_get_name_impl(libretro_vfs_implementation_dir *rdir
 {
 #if defined(_WIN32)
 #if defined(LEGACY_WIN32)
-   char *name_local = local_to_utf8_string_alloc(rdir->entry.cFileName);
-   memset(rdir->entry.cFileName, 0, sizeof(rdir->entry.cFileName));
-   strlcpy(rdir->entry.cFileName, name_local, sizeof(rdir->entry.cFileName));
+   {
+      char *name_local = local_to_utf8_string_alloc(rdir->entry.cFileName);
+      memset(rdir->entry.cFileName, 0, sizeof(rdir->entry.cFileName));
+      strlcpy(rdir->entry.cFileName, name_local, sizeof(rdir->entry.cFileName));
 
-   if (name_local)
-      free(name_local);
+      if (name_local)
+         free(name_local);
+   }
 #else
-   char *name       = utf16_to_utf8_string_alloc(rdir->entry.cFileName);
-   memset(rdir->entry.cFileName, 0, sizeof(rdir->entry.cFileName));
-   strlcpy((char*)rdir->entry.cFileName, name, sizeof(rdir->entry.cFileName));
+   {
+      char *name       = utf16_to_utf8_string_alloc(rdir->entry.cFileName);
+      memset(rdir->entry.cFileName, 0, sizeof(rdir->entry.cFileName));
+      strlcpy((char*)rdir->entry.cFileName, name, sizeof(rdir->entry.cFileName));
 
-   if (name)
-      free(name);
+      if (name)
+         free(name);
+   }
 #endif
    return (char*)rdir->entry.cFileName;
-#elif defined(VITA) || defined(PSP) || defined(__CELLOS_LV2__) || defined(ORBIS)
+#elif defined(VITA) || defined(PSP) || defined(__CELLOS_LV2__) && !defined(__PSL1GHT__) || defined(ORBIS)
    return rdir->entry.d_name;
 #elif defined(PS2)
    return rdir->entry.name;
 #else
-
+   if (!rdir || !rdir->entry)
+      return NULL;
    return rdir->entry->d_name;
 #endif
 }
@@ -1198,7 +1283,7 @@ bool retro_vfs_dirent_is_dir_impl(libretro_vfs_implementation_dir *rdir)
 #elif defined(PS2)
    const iox_dirent_t *entry = (const iox_dirent_t*)&rdir->entry;
    return FIO_S_ISDIR(entry->stat.mode);
-#elif defined(__CELLOS_LV2__)
+#elif defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
    CellFsDirent *entry = (CellFsDirent*)&rdir->entry;
    return (entry->d_type == CELL_FS_TYPE_DIRECTORY);
 #elif defined(ORBIS)
@@ -1239,7 +1324,7 @@ int retro_vfs_closedir_impl(libretro_vfs_implementation_dir *rdir)
    sceIoDclose(rdir->directory);
 #elif defined(PS2)
    ps2fileXioDclose(rdir->directory);
-#elif defined(__CELLOS_LV2__)
+#elif defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
    rdir->error = cellFsClosedir(rdir->directory);
 #elif defined(ORBIS)
    orbisDclose(rdir->directory);

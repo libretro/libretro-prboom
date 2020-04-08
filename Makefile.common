@@ -26,7 +26,8 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/compat/fopen_utf8.c \
 				 $(LIBRETRO_COMM_DIR)/string/stdstring.c \
 				 $(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.c \
-				 $(LIBRETRO_COMM_DIR)/file/file_path.c
+				 $(LIBRETRO_COMM_DIR)/file/file_path.c \
+ 				 $(LIBRETRO_COMM_DIR)/file/file_path_io.c
 
 SOURCES_C += $(DEPS_DIR)/libmad/bit.c \
 				 $(DEPS_DIR)/libmad/decoder.c \

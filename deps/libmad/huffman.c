@@ -22,6 +22,8 @@
 # include "global.h"
 # include "huffman.h"
 
+# include <retro_endianness.h>
+
 /*
  * These are the Huffman code words for Layer III.
  * The data for these tables are derived from Table B.7 of ISO/IEC 11172-3.

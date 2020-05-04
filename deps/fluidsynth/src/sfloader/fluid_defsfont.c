@@ -21,6 +21,7 @@
  * 02110-1301, USA
  */
 
+#include <retro_endianness.h>
 
 #include "fluid_defsfont.h"
 /* Todo: Get rid of that 'include' */

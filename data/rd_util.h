@@ -3,28 +3,16 @@
 
 // Useful utility functions
 
+#include <retro_endianness.h>
+
 #ifdef __GNUC__
 #define ATTR(x) __attribute__(x)
 #else
 #define ATTR(x)
 #endif
 
-#ifdef MSB_FIRST
-# ifdef __GNUC__
-#define LONG(x) __builtin_bswap32((x))
-#define SHORT(x) (__builtin_bswap32((x))>>16)
-# else
-#define LONG(x) ( (((x) & 0x000000FF) << 24) \
-                 +(((x) & 0x0000FF00) <<  8) \
-                 +(((x) & 0x00FF0000) >>  8) \
-                 +(((x) & 0xFF000000) >> 24) )
-#define SHORT(x) ( (((x) & 0x00FF) << 8) \
-                  +(((x) & 0xFF00) >> 8) )
-# endif
-#else
-#define LONG(x) (x)
-#define SHORT(x) (x)
-#endif
+#define LONG(x) (retro_le_to_cpu32(x))
+#define SHORT(x) (retro_le_to_cpu16(x))
 
 void ATTR((noreturn)) die(const char *error, ...);
 

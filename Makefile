@@ -85,9 +85,6 @@ else ifeq ($(platform), osx)
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
    fpic := -fPIC
    SHARED := -dynamiclib
-ifeq ($(arch),ppc)
-   CFLAGS += -DMSB_FIRST
-endif
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
    OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
    fpic += -mmacosx-version-min=10.1
@@ -200,21 +197,19 @@ else ifeq ($(platform), ps3)
    TARGET := $(TARGET_NAME)_libretro_ps3.$(EXT)
    CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
    AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
-   CFLAGS += -DMSB_FIRST
 	STATIC_LINKING = 1
 else ifeq ($(platform), sncps3)
 	EXT=a
    TARGET := $(TARGET_NAME)_libretro_ps3.$(EXT)
    CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
    AR = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
-   CFLAGS += -DMSB_FIRST
 	STATIC_LINKING = 1
 else ifeq ($(platform), psl1ght)
 	EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
-   CFLAGS += -DMSB_FIRST -DHAVE_STRLWR -D__CELLOS_LV2__ -D__PSL1GHT__
+   CFLAGS += -DHAVE_STRLWR -D__CELLOS_LV2__ -D__PSL1GHT__
 	STATIC_LINKING = 1
 
 # PSP1
@@ -258,14 +253,14 @@ else ifeq ($(platform), xenon)
    TARGET := $(TARGET_NAME)_libretro_xenon360.$(EXT)
    CC = xenon-gcc$(EXE_EXT)
    AR = xenon-ar$(EXE_EXT)
-   CFLAGS += -D__LIBXENON__ -m32 -D__ppc__ -DMSB_FIRST
+   CFLAGS += -D__LIBXENON__ -m32 -D__ppc__
    STATIC_LINKING = 1
 else ifeq ($(platform), ngc)
    EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMEMORY_LOW -DMSB_FIRST 
+   CFLAGS += -DGEKKO -DHW_DOL -mrvl -mcpu=750 -meabi -mhard-float -DMEMORY_LOW
    CFLAGS += -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int
    STATIC_LINKING = 1
 
@@ -274,7 +269,7 @@ else ifeq ($(platform), wii)
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float -DMSB_FIRST
+   CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float
    CFLAGS += -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int
    STATIC_LINKING = 1
 
@@ -283,7 +278,7 @@ else ifeq ($(platform), wiiu)
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -DHW_RVL -DWIIU -mcpu=750 -meabi -mhard-float -DMSB_FIRST
+   CFLAGS += -DGEKKO -DHW_RVL -DWIIU -mcpu=750 -meabi -mhard-float
    CFLAGS += -U__INT32_TYPE__ -U __UINT32_TYPE__ -D__INT32_TYPE__=int
    STATIC_LINKING = 1
 
@@ -357,7 +352,6 @@ LD   = "$(MSVCBINDIRPREFIX)/lib.exe"
 export INCLUDE := $(XEDK)/include/xbox
 export LIB := $(XEDK)/lib/xbox
 PSS_STYLE :=2
-CFLAGS += -DMSB_FIRST
 CFLAGS   += -D_XBOX -D_XBOX360
 CXXFLAGS += -D_XBOX -D_XBOX360
 STATIC_LINKING=1

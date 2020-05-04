@@ -4,6 +4,8 @@
 #ifndef __CONFIG_H__
 #define __CONFIG_H__
 
+#include <retro_endianness.h>
+
 #if _MSC_VER
 #include <compat/msvc.h>
 #endif

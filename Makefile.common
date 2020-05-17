@@ -173,7 +173,5 @@ endif
 ifneq (,$(findstring msvc,$(platform)))
 else
 INCFLAGS += -include z_zone.h
-# Make sure variable declaration is C89 compatible, for portability
-CFLAGS += -Werror=declaration-after-statement
 endif
 

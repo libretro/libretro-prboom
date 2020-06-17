@@ -216,7 +216,7 @@ void retro_init(void)
 
    rgb565 = RETRO_PIXEL_FORMAT_RGB565;
    if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
-      log_cb(RETRO_LOG_INFO, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+      log_cb(RETRO_LOG_DEBUG, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
       libretro_supports_bitmasks = true;
@@ -420,7 +420,7 @@ static void update_variables(bool startup)
             SCREENHEIGHT = strtoul(pch, NULL, 0);
 
          if (log_cb)
-            log_cb(RETRO_LOG_INFO, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
+            log_cb(RETRO_LOG_DEBUG, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
       }
       else
       {
@@ -1340,9 +1340,6 @@ void I_StartTic (void)
 
 static void I_UpdateVideoMode(void)
 {
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "I_UpdateVideoMode: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
-
    V_InitMode();
    V_DestroyUnusedTrueColorPalettes();
    V_FreeScreens();
@@ -1376,9 +1373,6 @@ void I_InitGraphics(void)
    {
       firsttime = 0;
 
-      if (log_cb)
-         log_cb(RETRO_LOG_INFO, "I_InitGraphics: %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
-
       /* Set the video mode */
       I_UpdateVideoMode();
 
@@ -1394,9 +1388,6 @@ void I_SetRes(void)
       screens[i].height = SCREENHEIGHT;
 
    screens[4].height = (ST_SCALED_HEIGHT+1);
-
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO, "I_SetRes: Using resolution %dx%d\n", SCREENWIDTH, SCREENHEIGHT);
 }
 
 /* i_system - i_main */
@@ -1467,34 +1458,32 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
    /* Precalculate a length we will need in the loop */
    size_t pl = strlen(wfname) + (ext ? strlen(ext) : 0) + 4;
 
-   if( dir == NULL ) {
-     if ((p = malloc(pl)) != NULL)
-       sprintf(p, "%s", wfname);
-     else
-       return NULL;
+   if(!dir)
+   {
+      if (!(p = malloc(pl)))
+         return NULL;
+      sprintf(p, "%s", wfname);
    }
-   else {
-     if ((p = malloc(strlen(dir) + pl)) != NULL)
-       sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
-     else
-       return NULL;
+   else
+   {
+     if (!(p = malloc(strlen(dir) + pl)))
+        return NULL;
+     sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
    }
 
    if (ext && ext[0] != '\0')
-   {
       strcat(p, ext);
-   }
    file = fopen(p, "rb");
 
    if (file)
    {
       if (log_cb)
-         log_cb(RETRO_LOG_INFO, "FindFileInDir: found %s\n", p);
+         log_cb(RETRO_LOG_DEBUG, "FindFileInDir: found %s\n", p);
       fclose(file);
       return p;
    }
    else if (log_cb)
-      log_cb(RETRO_LOG_DEBUG, "FindFileInDir: not found %s in %s\n", wfname, dir);
+      log_cb(RETRO_LOG_ERROR, "FindFileInDir: not found %s in %s\n", wfname, dir);
 
    free(p);
    return NULL;
@@ -1521,12 +1510,12 @@ char* I_FindFile(const char* wfname, const char* ext)
        sprintf(prboom_system_dir, "%s%c%s", system_dir, DIR_SLASH, "prboom");
        p = FindFileInDir(prboom_system_dir, wfname, ext);
        free(prboom_system_dir);
-       if(p == NULL)
+       if (!p)
          p = FindFileInDir(system_dir, wfname, ext);
      }
 
      // If not found, check on parent folders recursively (if configured to do so)
-     if (p == NULL && find_recursive_on)
+     if (!p && find_recursive_on)
      {
        if ((dir = malloc(strlen(g_wad_dir) + 1)) != NULL)
        {
@@ -1538,7 +1527,8 @@ char* I_FindFile(const char* wfname, const char* ext)
            {
              dir[i] = '\0'; // remove leading slash
              p = FindFileInDir(dir, wfname, ext);
-             if(p != NULL) break;
+             if(p != NULL)
+                break;
            }
          }
          free(dir);
@@ -1605,27 +1595,31 @@ void R_InitInterpolation(void)
 {
   struct retro_system_av_info info;
   retro_get_system_av_info(&info);
-  if(tic_vars.fps != info.timing.fps) {
-    // Only update av_info if changed and it's not the first run
-    if(tic_vars.fps)
+  if(tic_vars.fps != info.timing.fps)
+  {
+     // Only update av_info if changed and it's not the first run
+     if(tic_vars.fps)
         environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
 
-    tic_vars.fps = info.timing.fps;
-    tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
-    tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;
+     tic_vars.fps = info.timing.fps;
+     tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
+     tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;
 
-    if (log_cb)
-      log_cb(RETRO_LOG_INFO, "R_InitInterpolation: Framerate set to %.2f FPS\n", info.timing.fps);
+     if (log_cb)
+        log_cb(RETRO_LOG_DEBUG, "R_InitInterpolation: Framerate set to %.2f FPS\n", info.timing.fps);
   }
   tic_vars.frac = FRACUNIT;
 }
 
 int lprintf(OutputLevels pri, const char *s, ...)
 {
+  va_list v;
   int r=0;
   char msg[MAX_LOG_MESSAGE_SIZE];
 
-  va_list v;
+  if (!log_cb)
+     return 0;
+
   va_start(v,s);
 #ifdef HAVE_VSNPRINTF
   r = vsnprintf(msg,sizeof(msg),s,v);         /* print message in buffer  */
@@ -1634,23 +1628,30 @@ int lprintf(OutputLevels pri, const char *s, ...)
 #endif
   va_end(v);
 
-  if (log_cb) {
+  if (log_cb)
+  {
     enum retro_log_level lvl;
-    switch(pri) {
-      case LO_DEBUG:    lvl = RETRO_LOG_DEBUG; break;
-      case LO_CONFIRM:
-      case LO_INFO:     lvl = RETRO_LOG_INFO;  break;
-      case LO_WARN:     lvl = RETRO_LOG_WARN;  break;
-      case LO_ERROR:
-      case LO_FATAL:
-      default:          lvl = RETRO_LOG_ERROR; break;
+    switch(pri)
+    {
+       case LO_DEBUG:   
+          lvl = RETRO_LOG_DEBUG;
+          break;
+       case LO_CONFIRM:
+       case LO_INFO:
+          lvl = RETRO_LOG_INFO;
+          break;
+       case LO_WARN:
+          lvl = RETRO_LOG_WARN;
+          break;
+       case LO_ERROR:
+       case LO_FATAL:
+       default:
+          lvl = RETRO_LOG_ERROR;
+          break;
     }
+
     log_cb(lvl, "%s", msg);
   }
-  else
-    r=fprintf(stderr,"%s",msg);           /* select output at console */
 
-  return r;
+  return 0;
 }
-
-

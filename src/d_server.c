@@ -199,10 +199,7 @@ char** myargv;
 
 void NORETURN I_Error(const char *error, ...) // killough 3/20/98: add const
 {
-  va_list argptr;
-  va_start(argptr,error);
-  vfprintf(stderr,error,argptr);
-  va_end(argptr);
+  lprintf(LO_ERROR, error);
   exit(-1);
 }
 

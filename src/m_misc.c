@@ -938,7 +938,7 @@ void M_LoadDefaultsFile (char *file, boolean basedefault)
     while (!feof(f))
     {
       isstring = FALSE;
-      if (fscanf (f, "%79s %[^\n]\n", def, strparm) == 2)
+      if (fscanf (f, "%79s %99[^\n]\n", def, strparm) == 2)
       {
         //jff 3/3/98 skip lines not starting with an alphanum
 

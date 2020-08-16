@@ -82,7 +82,12 @@
 #include <pspkernel.h>
 #endif
 
-#if defined(__CELLOS_LV2__) && !defined(__PSL1GHT__)
+#if defined(PS2)
+#include <fileXio_rpc.h>
+#include <fileXio.h>
+#endif
+
+#if defined(__CELLOS_LV2__)
 #include <cell/cell_fs.h>
 #endif
 
@@ -109,7 +114,6 @@
 
 #endif
 
-/* TODO/FIXME - globals */
 static retro_vfs_stat_t path_stat_cb   = retro_vfs_stat_impl;
 static retro_vfs_mkdir_t path_mkdir_cb = retro_vfs_mkdir_impl;
 

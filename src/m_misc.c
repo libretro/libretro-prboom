@@ -692,7 +692,7 @@ default_t defaults[] =
    def_str,ss_none, NULL, NULL},
 	{"mus_e2m4", {0,&S_music_files[mus_e2m4]}, {0,"e2m4.mp3"},UL,UL,
    def_str,ss_none, NULL, NULL},
-	{"mus_e2m5", {0,&S_music_files[mus_e2m5]}, {0,"e1m5.mp3"},UL,UL,
+	{"mus_e2m5", {0,&S_music_files[mus_e2m5]}, {0,"e2m5.mp3"},UL,UL,
    def_str,ss_none, NULL, NULL},
 	{"mus_e2m6", {0,&S_music_files[mus_e2m6]}, {0,"e2m6.mp3"},UL,UL,
    def_str,ss_none, NULL, NULL},

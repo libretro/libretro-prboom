@@ -288,6 +288,8 @@ boolean P_GivePower(player_t *player, int power)
 // P_TouchSpecialThing
 //
 
+extern void retro_set_rumble_touch(unsigned intensity, float duration);
+
 void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
 {
   player_t *player;
@@ -314,12 +316,14 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!P_GiveArmor (player, green_armor_class))
         return;
       player->message = s_GOTARMOR; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(12, 160.0f);
       break;
 
     case SPR_ARM2:
       if (!P_GiveArmor (player, blue_armor_class))
         return;
       player->message = s_GOTMEGA; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(14, 160.0f);
       break;
 
         // bonus items
@@ -329,6 +333,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         player->health = (maxhealth * 2);
       player->mo->health = player->health;
       player->message = s_GOTHTHBONUS; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(5, 160.0f);
       break;
 
     case SPR_BON2:
@@ -338,6 +343,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!player->armortype)
         player->armortype = green_armor_class;
       player->message = s_GOTARMBONUS; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(5, 160.0f);
       break;
 
     case SPR_SOUL:
@@ -347,6 +353,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       player->mo->health = player->health;
       player->message = s_GOTSUPER; // Ty 03/22/98 - externalized
       sound = sfx_getpow;
+      retro_set_rumble_touch(14, 160.0f);
       break;
 
     case SPR_MEGA:
@@ -357,6 +364,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       P_GiveArmor (player,blue_armor_class);
       player->message = s_GOTMSPHERE; // Ty 03/22/98 - externalized
       sound = sfx_getpow;
+      retro_set_rumble_touch(16, 160.0f);
       break;
 
         // cards
@@ -365,6 +373,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!player->cards[it_bluecard])
         player->message = s_GOTBLUECARD; // Ty 03/22/98 - externalized
       P_GiveCard (player, it_bluecard);
+      retro_set_rumble_touch(7, 150.0f);
       if (!netgame)
         break;
       return;
@@ -373,6 +382,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!player->cards[it_yellowcard])
         player->message = s_GOTYELWCARD; // Ty 03/22/98 - externalized
       P_GiveCard (player, it_yellowcard);
+      retro_set_rumble_touch(7, 150.0f);
       if (!netgame)
         break;
       return;
@@ -381,6 +391,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!player->cards[it_redcard])
         player->message = s_GOTREDCARD; // Ty 03/22/98 - externalized
       P_GiveCard (player, it_redcard);
+      retro_set_rumble_touch(7, 150.0f);
       if (!netgame)
         break;
       return;
@@ -389,6 +400,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!player->cards[it_blueskull])
         player->message = s_GOTBLUESKUL; // Ty 03/22/98 - externalized
       P_GiveCard (player, it_blueskull);
+      retro_set_rumble_touch(8, 150.0f);
       if (!netgame)
         break;
       return;
@@ -397,6 +409,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!player->cards[it_yellowskull])
         player->message = s_GOTYELWSKUL; // Ty 03/22/98 - externalized
       P_GiveCard (player, it_yellowskull);
+      retro_set_rumble_touch(8, 150.0f);
       if (!netgame)
         break;
       return;
@@ -405,6 +418,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!player->cards[it_redskull])
         player->message = s_GOTREDSKULL; // Ty 03/22/98 - externalized
       P_GiveCard (player, it_redskull);
+      retro_set_rumble_touch(8, 150.0f);
       if (!netgame)
         break;
       return;
@@ -414,6 +428,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (!P_GiveBody (player, 10))
         return;
       player->message = s_GOTSTIM; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(6, 160.0f);
       break;
 
     case SPR_MEDI:
@@ -424,6 +439,8 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         player->message = s_GOTMEDINEED; // Ty 03/22/98 - externalized
       else
         player->message = s_GOTMEDIKIT; // Ty 03/22/98 - externalized
+
+      retro_set_rumble_touch(8, 160.0f);
       break;
 
 
@@ -433,6 +450,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTINVUL; // Ty 03/22/98 - externalized
       sound = sfx_getpow;
+      retro_set_rumble_touch(18, 160.0f);
       break;
 
     case SPR_PSTR:
@@ -442,6 +460,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       if (player->readyweapon != WP_FIST)
         player->pendingweapon = WP_FIST;
       sound = sfx_getpow;
+      retro_set_rumble_touch(20, 180.0f);
       break;
 
     case SPR_PINS:
@@ -449,6 +468,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTINVIS; // Ty 03/22/98 - externalized
       sound = sfx_getpow;
+      retro_set_rumble_touch(18, 160.0f);
       break;
 
     case SPR_SUIT:
@@ -456,6 +476,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTSUIT; // Ty 03/22/98 - externalized
       sound = sfx_getpow;
+      retro_set_rumble_touch(18, 160.0f);
       break;
 
     case SPR_PMAP:
@@ -463,6 +484,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTMAP; // Ty 03/22/98 - externalized
       sound = sfx_getpow;
+      retro_set_rumble_touch(18, 160.0f);
       break;
 
     case SPR_PVIS:
@@ -470,6 +492,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTVISOR; // Ty 03/22/98 - externalized
       sound = sfx_getpow;
+      retro_set_rumble_touch(18, 160.0f);
       break;
 
       // ammo
@@ -485,48 +508,57 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
             return;
         }
       player->message = s_GOTCLIP; // Ty 03/22/98 - externalized
+
+      retro_set_rumble_touch(6, 140.0f);
       break;
 
     case SPR_AMMO:
       if (!P_GiveAmmo (player, AM_CLIP,5))
         return;
       player->message = s_GOTCLIPBOX; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(8, 140.0f);
       break;
 
     case SPR_ROCK:
       if (!P_GiveAmmo (player, AM_MISL,1))
         return;
       player->message = s_GOTROCKET; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(6, 140.0f);
       break;
 
     case SPR_BROK:
       if (!P_GiveAmmo (player, AM_MISL,5))
         return;
       player->message = s_GOTROCKBOX; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(8, 140.0f);
       break;
 
     case SPR_CELL:
       if (!P_GiveAmmo (player, AM_CELL,1))
         return;
       player->message = s_GOTCELL; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(6, 140.0f);
       break;
 
     case SPR_CELP:
       if (!P_GiveAmmo (player, AM_CELL,5))
         return;
       player->message = s_GOTCELLBOX; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(8, 140.0f);
       break;
 
     case SPR_SHEL:
       if (!P_GiveAmmo (player, AM_SHELL,1))
         return;
       player->message = s_GOTSHELLS; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(6, 140.0f);
       break;
 
     case SPR_SBOX:
       if (!P_GiveAmmo (player, AM_SHELL,5))
         return;
       player->message = s_GOTSHELLBOX; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(8, 140.0f);
       break;
 
     case SPR_BPAK:
@@ -539,6 +571,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       for (i=0 ; i<NUMAMMO ; i++)
         P_GiveAmmo (player, i, 1);
       player->message = s_GOTBACKPACK; // Ty 03/22/98 - externalized
+      retro_set_rumble_touch(12, 160.0f);
       break;
 
         // weapons
@@ -547,6 +580,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTBFG9000; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
+      retro_set_rumble_touch(20, 180.0f);
       break;
 
     case SPR_MGUN:
@@ -554,6 +588,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTCHAINGUN; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
+      retro_set_rumble_touch(15, 180.0f);
       break;
 
     case SPR_CSAW:
@@ -561,6 +596,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTCHAINSAW; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
+      retro_set_rumble_touch(15, 180.0f);
       break;
 
     case SPR_LAUN:
@@ -568,6 +604,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTLAUNCHER; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
+      retro_set_rumble_touch(18, 180.0f);
       break;
 
     case SPR_PLAS:
@@ -575,6 +612,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTPLASMA; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
+      retro_set_rumble_touch(17, 180.0f);
       break;
 
     case SPR_SHOT:
@@ -582,6 +620,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTSHOTGUN; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
+      retro_set_rumble_touch(14, 180.0f);
       break;
 
     case SPR_SGN2:
@@ -589,6 +628,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = s_GOTSHOTGUN2; // Ty 03/22/98 - externalized
       sound = sfx_wpnup;
+      retro_set_rumble_touch(16, 180.0f);
       break;
 
     default:

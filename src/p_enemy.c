@@ -68,6 +68,8 @@ typedef enum
 static void P_NewChaseDir(mobj_t *actor);
 void P_ZBumpCheck(mobj_t *);                                        // phares
 
+extern void retro_set_rumble_damage(int damage, float duration);
+
 //
 // ENEMY THINKING
 // Enemies are allways spawned
@@ -2108,6 +2110,7 @@ void A_Fall(mobj_t *actor)
 void A_Explode(mobj_t *thingy)
 {
   P_RadiusAttack( thingy, thingy->target, 128 );
+  retro_set_rumble_damage(60, 500.f);
 }
 
 //
@@ -2546,6 +2549,7 @@ void A_Die(mobj_t *actor)
 void A_Detonate(mobj_t *mo)
 {
   P_RadiusAttack(mo, mo->target, mo->info->damage);
+  retro_set_rumble_damage(60, 500.f);
 }
 
 //

@@ -220,6 +220,9 @@ static void P_StartButton
 //
 // No return
 //
+
+extern void retro_set_rumble_touch(unsigned intensity, float duration);
+
 void P_ChangeSwitchTexture
 ( line_t*       line,
   int           useAgain )
@@ -280,6 +283,8 @@ void P_ChangeSwitchTexture
 
    if (useAgain)
       P_StartButton(line, position, switchlist[i], BUTTONTIME);
+
+   retro_set_rumble_touch(12, 200.0f);
 }
 
 

@@ -360,6 +360,9 @@ static int      st_fragscount;
 // used to use appopriately pained face
 static int      st_oldhealth = -1;
 
+// used to track armour reduction
+static int      st_oldarmour = -1;
+
 // used for evil grin
 static boolean  oldweaponsowned[NUMWEAPONS];
 
@@ -697,12 +700,28 @@ static void ST_updateWidgets(void)
 
 }
 
+extern void retro_set_rumble_damage(int damage, float duration);
+
 void ST_Ticker(void)
 {
   st_clock++;
   st_randomnumber = M_Random();
   ST_updateWidgets();
+
+  /* If player has taken damage, trigger a
+   * rumble effect */
+  if (st_oldhealth > plyr->health)
+  {
+    int damage = st_oldhealth - plyr->health;
+    /* Add any armour damage */
+    if (st_oldarmour > plyr->armorpoints)
+      damage += st_oldarmour - plyr->armorpoints;
+
+    retro_set_rumble_damage(damage, 333.3333f);
+  }
+
   st_oldhealth = plyr->health;
+  st_oldarmour = plyr->armorpoints;
 }
 
 int st_palette = 0;

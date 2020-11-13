@@ -32,10 +32,10 @@ struct retro_core_option_definition option_defs_us[] = {
       "Internal resolution (restart)",
       "Configure the resolution. Requires a restart.",
       {
-         { "320x200", NULL },
-         { "640x400", NULL },
-         { "960x600", NULL },
-         { "1280x800", NULL },
+         { "320x200",   NULL },
+         { "640x400",   NULL },
+         { "960x600",   NULL },
+         { "1280x800",  NULL },
          { "1600x1000", NULL },
          { "1920x1200", NULL },
          { "2240x1400", NULL },
@@ -49,8 +49,8 @@ struct retro_core_option_definition option_defs_us[] = {
       "Mouse active when using Gamepad",
       "Allows you to use mouse inputs even when User 1's device type isn't set to 'RetroKeyboard/Mouse'.",
       {
-         { "disabled",              "Disabled"},
-         { "enabled",               "Enabled"},
+         { "disabled", NULL },
+         { "enabled",  NULL },
          { NULL, NULL },
       },
       "disabled"
@@ -60,21 +60,32 @@ struct retro_core_option_definition option_defs_us[] = {
       "Look on parent folders for IWADs",
       "Scans parent folders for IWADs. NOTE: You need to disable this if you want to run SIGIL.",
       {
-         { "disabled",  "Disabled" },
-         { "enabled",   "Enabled" },
+         { "disabled", NULL },
+         { "enabled",  NULL },
          { NULL, NULL },
       },
       "enabled"
    },
    {
+      "prboom-rumble",
+      "Rumble Effects",
+      "Enables haptic feedback when using a rumble-equipped gamepad.",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       "prboom-analog_deadzone",
       "Analog Deadzone (percent)",
-      "Sets the deadzone of the Gamepad analog sticks when the input device type is set to 'Gamepad Modern'.",
+      "Sets the deadzone of the gamepad analog sticks when the input device type is set to 'Gamepad Modern'.",
       {
          { "0",  NULL },
          { "5",  NULL },
-         { "10",  NULL },
-         { "15",  NULL },
+         { "10", NULL },
+         { "15", NULL },
          { "20", NULL },
          { "25", NULL },
          { "30", NULL },

@@ -54,6 +54,8 @@
 
 extern void P_Thrust(player_t *, angle_t, fixed_t);
 
+extern void retro_set_rumble_damage(int damage, float duration);
+
 // The following array holds the recoil values         // phares
 
 static const int recoil_values[] = {    // phares
@@ -669,6 +671,8 @@ void A_Punch(player_t *player, pspdef_t *psp)
   player->mo->angle = R_PointToAngle2(player->mo->x, player->mo->y,
                                       linetarget->x, linetarget->y);
   R_SmoothPlaying_Reset(player); // e6y
+
+  retro_set_rumble_damage(30, 120.0f);
 }
 
 //
@@ -718,6 +722,8 @@ void A_Saw(player_t *player, pspdef_t *psp)
 
   player->mo->flags |= MF_JUSTATTACKED;
   R_SmoothPlaying_Reset(player); // e6y
+
+  retro_set_rumble_damage(40, 120.0f);
 }
 
 //
@@ -728,6 +734,7 @@ void A_FireMissile(player_t *player, pspdef_t *psp)
 {
   player->ammo[weaponinfo[player->readyweapon].ammo]--;
   P_SpawnPlayerMissile(player->mo, MT_ROCKET);
+  retro_set_rumble_damage(50, 120.0f);
 }
 
 //
@@ -738,6 +745,7 @@ void A_FireBFG(player_t *player, pspdef_t *psp)
 {
   player->ammo[weaponinfo[player->readyweapon].ammo] -= BFGCELLS;
   P_SpawnPlayerMissile(player->mo, MT_BFG);
+  retro_set_rumble_damage(50, 120.0f);
 }
 
 //
@@ -802,6 +810,7 @@ void A_FireOldBFG(player_t *player, pspdef_t *psp)
     P_CheckMissileSpawn(th);
   }
   while ((type != MT_PLASMA2) && (type = MT_PLASMA2)); //killough: obfuscated! // lgtm[cpp/assign-where-compare-meant]
+  retro_set_rumble_damage(50, 120.0f);
 }
 
 //
@@ -814,6 +823,7 @@ void A_FirePlasma(player_t *player, pspdef_t *psp)
 
   A_FireSomething(player,P_Random(pr_plasma)&1);              // phares
   P_SpawnPlayerMissile(player->mo, MT_PLASMA);
+  retro_set_rumble_damage(50, 120.0f);
 }
 
 //
@@ -874,6 +884,8 @@ void A_FirePistol(player_t *player, pspdef_t *psp)
   A_FireSomething(player,0);                                      // phares
   P_BulletSlope(player->mo);
   P_GunShot(player->mo, !player->refire);
+
+  retro_set_rumble_damage(30, 120.0f);
 }
 
 //
@@ -895,6 +907,8 @@ void A_FireShotgun(player_t *player, pspdef_t *psp)
 
   for (i=0; i<7; i++)
     P_GunShot(player->mo, false);
+
+  retro_set_rumble_damage(40, 120.0f);
 }
 
 //
@@ -924,6 +938,8 @@ void A_FireShotgun2(player_t *player, pspdef_t *psp)
       P_LineAttack(player->mo, angle, MISSILERANGE, bulletslope +
                    ((t - P_Random(pr_shotgun))<<5), damage);
     }
+
+  retro_set_rumble_damage(40, 120.0f);
 }
 
 //
@@ -946,6 +962,8 @@ void A_FireCGun(player_t *player, pspdef_t *psp)
   P_BulletSlope(player->mo);
 
   P_GunShot(player->mo, !player->refire);
+
+  retro_set_rumble_damage(10, 120.0f);
 }
 
 #ifdef HEXEN

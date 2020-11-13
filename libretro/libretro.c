@@ -194,6 +194,68 @@ static gamepad_layout_t gp_modern = { // Based on Original XBOX Doom 3 Collectio
 	16,
 };
 
+static struct retro_rumble_interface rumble = {0};
+static bool rumble_enabled                  = false;
+static uint16_t rumble_damage_strength      = 0;
+static int16_t rumble_damage_counter        = -1;
+static uint16_t rumble_touch_strength       = 0;
+static int16_t rumble_touch_counter         = -1;
+
+void retro_set_rumble_damage(int damage, float duration)
+{
+   /* Rumble scales linearly from 0xFFF to 0xFFFF
+    * as damage increases from 1 to 80 */
+   int capped_damage = (damage < 80) ? damage : 80;
+   uint16_t strength = 0;
+
+   if (!rumble.set_rumble_state ||
+       (!rumble_enabled && (capped_damage > 0)))
+      return;
+
+   if ((capped_damage > 0) && (duration > 0.0f))
+   {
+      strength = 0xFFF + (capped_damage * 0x300);
+      rumble_damage_counter = (int16_t)((duration * (float)tic_vars.fps / 1000.0f) + 1.0f);
+   }
+
+   /* Return early if:
+    * - strength and last set value are both zero
+    * - strength is greater than zero but less than
+    *   (or equal to) last set value */
+   if (((strength == 0) && (rumble_damage_strength == 0)) ||
+       ((strength > 0) && (strength <= rumble_damage_strength)))
+      return;
+
+   rumble.set_rumble_state(0, RETRO_RUMBLE_STRONG, strength);
+   rumble_damage_strength = strength;
+}
+
+void retro_set_rumble_touch(unsigned intensity, float duration)
+{
+   /* Rumble scales linearly from 0x1FE to 0xFFFF
+    * as intensity increases from 1 to 20 */
+   unsigned capped_intensity = (intensity < 20) ? intensity : 20;
+   uint16_t strength         = 0;
+
+   if (!rumble.set_rumble_state ||
+       (!rumble_enabled && (capped_intensity > 0)))
+      return;
+
+   if ((capped_intensity > 0) && (duration > 0.0f))
+   {
+      strength             = 0x1FE + (capped_intensity * 0xCB3);
+      rumble_touch_counter = (int16_t)((duration * (float)tic_vars.fps / 1000.0f) + 1.0f);
+   }
+
+   /* Return early if strength matches last
+    * set value */
+   if (strength == rumble_touch_strength)
+      return;
+
+   rumble.set_rumble_state(0, RETRO_RUMBLE_WEAK, strength);
+   rumble_touch_strength = strength;
+}
+
 char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
 
 static void check_system_specs(void)
@@ -227,7 +289,18 @@ void retro_init(void)
 void retro_deinit(void)
 {
    D_DoomDeinit();
+
    libretro_supports_bitmasks = false;
+
+   retro_set_rumble_damage(0, 0.0f);
+   retro_set_rumble_touch(0, 0.0f);
+
+   memset(&rumble, 0, sizeof(struct retro_rumble_interface));
+   rumble_enabled         = false;
+   rumble_damage_strength = 0;
+   rumble_damage_counter  = -1;
+   rumble_touch_strength  = 0;
+   rumble_touch_counter   = -1;
 }
 
 unsigned retro_api_version(void)
@@ -450,12 +523,23 @@ static void update_variables(bool startup)
          find_recursive_on = false;
    }
 
+   var.key = "prboom-rumble";
+   var.value = NULL;
+   rumble_enabled = false;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      if (!strcmp(var.value, "enabled"))
+         rumble_enabled = true;
+
+   if (!rumble_enabled)
+   {
+      retro_set_rumble_damage(0, 0.0f);
+      retro_set_rumble_touch(0, 0.0f);
+   }
+
    var.key = "prboom-analog_deadzone";
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
-   {
-		analog_deadzone = (int)(atoi(var.value) * 0.01f * ANALOG_RANGE);
-   }
+      analog_deadzone = (int)(atoi(var.value) * 0.01f * ANALOG_RANGE);
 }
 
 void I_SafeExit(int rc);
@@ -473,6 +557,22 @@ void retro_run(void)
    }
    D_DoomLoop();
    I_UpdateSound();
+
+   if (rumble_damage_counter > -1)
+   {
+      rumble_damage_counter--;
+
+      if (rumble_damage_counter == 0)
+         retro_set_rumble_damage(0, 0.0f);
+   }
+
+   if (rumble_touch_counter > -1)
+   {
+      rumble_touch_counter--;
+
+      if (rumble_touch_counter == 0)
+         retro_set_rumble_touch(0, 0.0f);
+   }
 }
 
 static void extract_basename(char *buf, const char *path, size_t size)
@@ -549,6 +649,14 @@ bool retro_load_game(const struct retro_game_info *info)
    unsigned i;
    int argc = 0;
    static char *argv[32] = {NULL};
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble))
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_INFO, "Rumble environment supported.\n");
+   }
+   else if (log_cb)
+      log_cb(RETRO_LOG_INFO, "Rumble environment not supported.\n");
 
    update_variables(true);
 

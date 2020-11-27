@@ -321,7 +321,7 @@ else ifeq ($(platform), gcw0)
    AR = /opt/gcw0-toolchain/usr/bin/mipsel-linux-ar
    fpic := -fPIC
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
-   CFLAGS += -ffast-math -march=mips32 -mtune=mips32r2 -mhard-float
+   CFLAGS += -ffast-math -march=mips32 -mtune=mips32r2 -mhard-float -fomit-frame-pointer
 
 # Windows MSVC 2003 Xbox 1
 else ifeq ($(platform), xbox1_msvc2003)

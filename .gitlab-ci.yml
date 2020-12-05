@@ -33,7 +33,7 @@ include:
   ################################## CONSOLES ################################
   # PlayStation Portable
   - project: 'libretro-infrastructure/ci-templates'
-    file: '/ps2-static.yml'
+    file: '/psp-static.yml'
 
   # PlayStation Vita
   - project: 'libretro-infrastructure/ci-templates'

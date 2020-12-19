@@ -192,24 +192,12 @@ else ifeq ($(platform), libnx)
 	 CFLAGS += -DHAVE_STRLWR
     CFLAGS += -std=gnu11
     STATIC_LINKING = 1
-else ifeq ($(platform), ps3)
-	EXT=a
-   TARGET := $(TARGET_NAME)_libretro_ps3.$(EXT)
-   CC = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-gcc.exe
-   AR = $(CELL_SDK)/host-win32/ppu/bin/ppu-lv2-ar.exe
-	STATIC_LINKING = 1
-else ifeq ($(platform), sncps3)
-	EXT=a
-   TARGET := $(TARGET_NAME)_libretro_ps3.$(EXT)
-   CC = $(CELL_SDK)/host-win32/sn/bin/ps3ppusnc.exe
-   AR = $(CELL_SDK)/host-win32/sn/bin/ps3snarl.exe
-	STATIC_LINKING = 1
 else ifeq ($(platform), psl1ght)
 	EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
    AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
-   CFLAGS += -DHAVE_STRLWR -D__CELLOS_LV2__ -D__PSL1GHT__
+   CFLAGS += -DHAVE_STRLWR -D__PSL1GHT__
 	STATIC_LINKING = 1
 
 # PSP1
@@ -610,10 +598,7 @@ OBJECTS = $(SOURCES_C:.c=.o)
 
 DEFINES    = $(COREDEFINES)
 
-ifeq ($(platform), sncps3)
-WARNINGS_DEFINES =
-CODE_DEFINES =
-else ifneq (,$(findstring msvc,$(platform)))
+ifneq (,$(findstring msvc,$(platform)))
 WARNINGS_DEFINES =
 CODE_DEFINES =
 else

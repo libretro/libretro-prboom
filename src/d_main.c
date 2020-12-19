@@ -734,18 +734,6 @@ static bool IdentifyVersion (void)
 
   strcpy(basesavegame,I_DoomExeDir());
   lprintf(LO_INFO, "IdentifyVersion: basesavegame: %s\n", basesavegame);
-#ifndef __CELLOS_LV2__
-  if ((i=M_CheckParm("-save")) && i<myargc-1) //jff 3/24/98 if -save present
-  {
-    if (!stat(myargv[i+1],&sbuf) && S_ISDIR(sbuf.st_mode)) // and is a dir
-    {
-      strcpy(basesavegame,myargv[i+1]);  //jff 3/24/98 use that for savegame
-      NormalizeSlashes(basesavegame);    //jff 9/22/98 fix c:\ not working
-    }
-    //jff 9/3/98 use logical output routine
-    else lprintf(LO_ERROR,"Error: -save path does not exist, using %s\n", basesavegame);
-  }
-#endif
 
   // locate the IWAD and determine game mode from it
 

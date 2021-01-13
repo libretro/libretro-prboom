@@ -567,12 +567,21 @@ void V_UpdateTrueColorPalette(void) {
            for (w=0; w<VID_NUMCOLORWEIGHTS; w++)
            {
               float t = (float)(w)/(float)(VID_NUMCOLORWEIGHTS-1);
+#if defined(ABGR1555)
+              int nr  = (int)((r>>3)*t+roundUpR);
+              int ng  = (int)((g>>3)*t+roundUpG);
+              int nb  = (int)((b>>3)*t+roundUpB);
+              Palettes16[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] = (
+                    (nb<<10) | (ng<<5) | nr
+                    );
+#else
               int nr  = (int)((r>>3)*t+roundUpR);
               int ng  = (int)((g>>2)*t+roundUpG);
               int nb  = (int)((b>>3)*t+roundUpB);
               Palettes16[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] = (
                     (nr<<11) | (ng<<5) | nb
                     );
+#endif
            }
         }
      }

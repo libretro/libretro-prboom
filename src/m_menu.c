@@ -66,9 +66,9 @@
 #include <libretro.h>
 
 extern patchnum_t hu_font[HU_FONTSIZE];
-extern boolean  message_dontfuckwithme;
+extern dbool  message_dontfuckwithme;
 
-extern boolean chat_on;          // in heads-up code
+extern dbool chat_on;          // in heads-up code
 extern int has_exited;
 
 extern angle_t viewpitch_max;
@@ -82,8 +82,8 @@ int mouseSensitivity_horiz; // has default   //  killough
 int mouseSensitivity_vert;  // has default
 
 // Freelook settings
-boolean movement_mouselook;
-boolean movement_mouseinvert;
+dbool movement_mouselook;
+dbool movement_mouseinvert;
 int     movement_maxviewpitch;
 
 int showMessages;    // Show messages has default, 0 = off, 1 = on
@@ -106,7 +106,7 @@ int     messx;
 int     messy;
 int     messageLastMenuActive;
 
-boolean messageNeedsInput; // timed message = no input from user
+dbool messageNeedsInput; // timed message = no input from user
 
 void (*messageRoutine)(int response);
 
@@ -133,7 +133,7 @@ int warning_about_changes, print_warning_about_changes;
 
 /* cphipps - M_DrawBackground renamed and moved to v_video.c */
 
-boolean menu_background = 1; // do Boom fullscreen menus have backgrounds?
+dbool menu_background = 1; // do Boom fullscreen menus have backgrounds?
 
 static void M_DrawBackground(const char *flat, int scrn)
 {
@@ -149,7 +149,7 @@ int saveCharIndex;   // which char we're editing
 // old save description before edit
 char saveOldString[SAVESTRINGSIZE];
 
-boolean inhelpscreens; // indicates we are in or just left a help screen
+dbool inhelpscreens; // indicates we are in or just left a help screen
 
 enum menuactive_e menuactive;    // The menus are up
 
@@ -267,7 +267,7 @@ int  M_StringWidth(const char *string);
 int  M_StringHeight(const char *string);
 void M_DrawTitle(int x, int y, const char *patch, int cm,
                  const char *alttext, int altcm);
-void M_StartMessage(const char *string,void *routine,boolean input);
+void M_StartMessage(const char *string,void *routine,dbool input);
 void M_StopMessage(void);
 void M_ClearMenus (void);
 
@@ -1054,7 +1054,7 @@ int quitsounds2[8] =
   sfx_sgtatk
 };
 
-boolean quit_pressed = false;
+dbool quit_pressed = false;
 
 static void M_QuitResponse(int ch)
 {
@@ -1440,25 +1440,25 @@ void M_SizeDisplay(int choice)
 
 /////////////////////////////
 //
-// booleans for setup screens
+// dbools for setup screens
 // these tell you what state the setup screens are in, and whether any of
 // the overlay screens (automap colors, reset button message) should be
 // displayed
 
-boolean setup_active      = FALSE; // in one of the setup screens
-boolean set_keybnd_active = FALSE; // in key binding setup screens
-boolean set_weapon_active = FALSE; // in weapons setup screen
-boolean set_status_active = FALSE; // in status bar/hud setup screen
-boolean set_auto_active   = FALSE; // in automap setup screen
-boolean set_enemy_active  = FALSE; // in enemies setup screen
-boolean set_mess_active   = FALSE; // in messages setup screen
-boolean set_chat_active   = FALSE; // in chat string setup screen
-boolean setup_select      = FALSE; // changing an item
-boolean setup_gather      = FALSE; // gathering keys for value
-boolean colorbox_active   = FALSE; // color palette being shown
-boolean default_verify    = FALSE; // verify reset defaults decision
-boolean set_general_active = FALSE;
-boolean set_compat_active = FALSE;
+dbool setup_active      = FALSE; // in one of the setup screens
+dbool set_keybnd_active = FALSE; // in key binding setup screens
+dbool set_weapon_active = FALSE; // in weapons setup screen
+dbool set_status_active = FALSE; // in status bar/hud setup screen
+dbool set_auto_active   = FALSE; // in automap setup screen
+dbool set_enemy_active  = FALSE; // in enemies setup screen
+dbool set_mess_active   = FALSE; // in messages setup screen
+dbool set_chat_active   = FALSE; // in chat string setup screen
+dbool setup_select      = FALSE; // changing an item
+dbool setup_gather      = FALSE; // gathering keys for value
+dbool colorbox_active   = FALSE; // color palette being shown
+dbool default_verify    = FALSE; // verify reset defaults decision
+dbool set_general_active = FALSE;
+dbool set_compat_active = FALSE;
 
 /////////////////////////////
 //
@@ -3474,7 +3474,7 @@ void M_DrawChatStrings(void)
 // General routines used by the Setup screens.
 //
 
-static boolean shiftdown = FALSE; // phares 4/10/98: SHIFT key down or not
+static dbool shiftdown = FALSE; // phares 4/10/98: SHIFT key down or not
 
 // phares 4/17/98:
 // M_SelectDone() gets called when you have finished entering your
@@ -4045,7 +4045,7 @@ static int M_IndexInChoices(const char *str, const char **choices) {
 // action based on the state of the system.
 //
 
-boolean M_Responder (event_t* ev) {
+dbool M_Responder (event_t* ev) {
   int    ch;
   int    i;
 
@@ -4486,7 +4486,7 @@ boolean M_Responder (event_t* ev) {
       if (ev->type == ev_mouse)
         {
     unsigned int i,oldbutton,group;
-    boolean search = TRUE;
+    dbool search = TRUE;
 
     if (!ptr1->m_mouse)
       return TRUE; // not a legal action here (yet)
@@ -4523,7 +4523,7 @@ boolean M_Responder (event_t* ev) {
       else  // keyboard key
         {
     unsigned int i,oldkey,group;
-    boolean search = TRUE;
+    dbool search = TRUE;
 
     // see if 'ch' is already bound elsewhere. if so, you have
     // to swap bindings so the action where it's currently
@@ -5177,7 +5177,7 @@ void M_Ticker (void)
 // Message Routines
 //
 
-void M_StartMessage (const char* string,void* routine,boolean input)
+void M_StartMessage (const char* string,void* routine,dbool input)
 {
   messageLastMenuActive = menuactive;
   messageToPrint = 1;

@@ -352,7 +352,7 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
 }
 
 
-boolean I_SoundIsPlaying (int handle)
+dbool   I_SoundIsPlaying (int handle)
 {
     int i;
 
@@ -531,10 +531,10 @@ void I_InitSound(void)
     log_cb(RETRO_LOG_INFO, "I_InitSound: \n");
 }
 
-boolean I_AnySoundStillPlaying(void)
+dbool   I_AnySoundStillPlaying(void)
 {
-  boolean result = false;
   int i;
+  dbool   result = false;
 
   for (i=0; i<MAX_CHANNELS; i++)
     result |= channelinfo[i].data != NULL;

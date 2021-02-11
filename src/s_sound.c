@@ -86,7 +86,7 @@ int snd_SfxVolume = 15;
 int snd_MusicVolume = 15;
 
 // whether songs are mus_paused
-static boolean mus_paused;
+static dbool   mus_paused;
 
 // music currently being played
 static musicinfo_t *mus_playing;

@@ -35,7 +35,7 @@
 #define __I_SYSTEM__
 
 extern int ms_to_next_tick;
-boolean I_StartDisplay(void);
+dbool   I_StartDisplay(void);
 void I_EndDisplay(void);
 int I_GetTime_RealTime(void);     /* killough */
 #ifndef PRBOOM_SERVER
@@ -56,7 +56,7 @@ const char* I_SigString(char* buf, size_t sz, int signum);
 
 const char *I_DoomExeDir(void); // killough 2/16/98: path to executable's dir
 
-boolean HasTrailingSlash(const char* dn);
+dbool   HasTrailingSlash(const char* dn);
 char* I_FindFile(const char* wfname, const char* ext);
 
 /* cph 2001/11/18 - Move W_Filelength to i_system.c */

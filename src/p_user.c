@@ -55,7 +55,7 @@
 
 #define MAXBOB  0x100000
 
-boolean onground; // whether player is on ground or in air
+dbool   onground; // whether player is on ground or in air
 
 // max/min values for pitch angle
 angle_t viewpitch_min;
@@ -645,7 +645,7 @@ void P_MorphPlayerThink(player_t *player)
 //
 //----------------------------------------------------------------------------
 
-boolean P_UndoPlayerMorph(player_t *player)
+dbool   P_UndoPlayerMorph(player_t *player)
 {
    mobj_t *fog;
    mobj_t *mo;

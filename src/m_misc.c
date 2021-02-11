@@ -73,7 +73,7 @@
    #define DIR_SLASH_STR "/"
 #endif
 
-extern boolean r_wigglefix;
+extern dbool   r_wigglefix;
 
 /*
  * M_WriteFile
@@ -81,7 +81,7 @@ extern boolean r_wigglefix;
  * killough 9/98: rewritten to use stdio and to flash disk icon
  */
 
-boolean M_WriteFile(char const *name, void *source, int length)
+dbool   M_WriteFile(char const *name, void *source, int length)
 {
   FILE *fp;
 
@@ -148,7 +148,7 @@ char* M_Strupr(char* str)
 //
 
 int usemouse;
-boolean    precache = TRUE; /* if TRUE, load all graphics at start */
+dbool      precache = TRUE; /* if TRUE, load all graphics at start */
 
 extern int viewwidth;
 extern int viewheight;
@@ -920,7 +920,7 @@ struct default_s *M_LookupDefault(const char *name)
  * Load configuration file
  */
 
-void M_LoadDefaultsFile (char *file, boolean basedefault)
+void M_LoadDefaultsFile (char *file, dbool   basedefault)
 {
   int   i;
   int   len;
@@ -929,7 +929,7 @@ void M_LoadDefaultsFile (char *file, boolean basedefault)
   char  strparm[100];
   char* newstring = NULL;   // killough
   int   parm;
-  boolean isstring;
+  dbool   isstring;
 
   // read the file in, overriding any set defaults
   f = fopen (file, "r");

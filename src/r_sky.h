@@ -47,8 +47,8 @@ extern int skytexturemid;
 
 // Sky stretching (see https://zdoom.org/wiki/Sky_stretching )
 #define SKYSTRETCH_HEIGHT 228
-extern boolean r_stretchsky; // user option
-extern boolean skystretch;
+extern dbool   r_stretchsky; // user option
+extern dbool   skystretch;
 
 
 

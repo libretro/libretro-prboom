@@ -91,30 +91,30 @@ static void D_PageDrawer(void);
 // CPhipps - removed wadfiles[] stuff
 
 // jff 1/24/98 add new versions of these variables to remember command line
-boolean clnomonsters;   // checkparm of -nomonsters
-boolean clrespawnparm;  // checkparm of -respawn
-boolean clfastparm;     // checkparm of -fast
+dbool clnomonsters;   // checkparm of -nomonsters
+dbool clrespawnparm;  // checkparm of -respawn
+dbool clfastparm;     // checkparm of -fast
 // jff 1/24/98 end definition of command line version of play mode switches
 
-boolean nomonsters;     // working -nomonsters
-boolean respawnparm;    // working -respawn
-boolean fastparm;       // working -fast
+dbool nomonsters;     // working -nomonsters
+dbool respawnparm;    // working -respawn
+dbool fastparm;       // working -fast
 
 //jff 1/22/98 parms for disabling music and sound
-boolean nosfxparm;
-boolean nomusicparm;
+dbool nosfxparm;
+dbool nomusicparm;
 
 //jff 4/18/98
-extern boolean inhelpscreens;
+extern dbool inhelpscreens;
 
 skill_t startskill;
 int     startepisode;
 int     startmap;
-boolean autostart;
+dbool autostart;
 int ffmap;
 
-boolean advancedemo;
-boolean singledemo;
+dbool advancedemo;
+dbool singledemo;
 
 char    wadfile[PATH_MAX+1];       // primary wad file
 char    mapdir[PATH_MAX+1];        // directory of development maps
@@ -169,7 +169,7 @@ void D_PostEvent(event_t *ev)
 // and screen updating
 
 // Make D_Wipe reentrant. We cannot stick around for an indefinite amount of time in this loop. (Themaister).
-static boolean in_d_wipe;
+static dbool in_d_wipe;
 
 static void D_Wipe(void)
 {
@@ -185,14 +185,14 @@ static void D_Wipe(void)
 
 // wipegamestate can be set to -1 to force a wipe on the next draw
 gamestate_t    wipegamestate = GS_DEMOSCREEN;
-extern boolean setsizeneeded;
+extern dbool setsizeneeded;
 extern int     showMessages;
 
 void D_Display (void)
 {
-  boolean wipe, viewactive, isborder = FALSE;
-  static boolean isborderstate        = FALSE;
-  static boolean borderwillneedredraw = FALSE;
+  dbool wipe, viewactive, isborder = FALSE;
+  static dbool isborderstate        = FALSE;
+  static dbool borderwillneedredraw = FALSE;
   static gamestate_t oldgamestate = -1;
 
   // Reentrancy.
@@ -232,7 +232,7 @@ void D_Display (void)
       break;
     }
   } else if (gametic != basetic) { // In a level
-    boolean redrawborderstuff;
+    dbool redrawborderstuff;
 
     HU_Erase();
 
@@ -325,7 +325,7 @@ void I_SafeExit(int rc)
 static int  demosequence;         // killough 5/2/98: made static
 static int  pagetic;
 static const char *pagename; // CPhipps - const
-boolean bfgedition = 0;
+dbool bfgedition = 0;
 
 //
 // D_PageTicker
@@ -553,7 +553,7 @@ static const char *D_dehout(void)
 // jff 4/19/98 Add routine to test IWAD for validity and determine
 // the gamemode from it. Also note if DOOM II, whether secret levels exist
 // CPhipps - const char* for iwadname, made static
-static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,boolean *hassec)
+static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
 {
   int read_iwad = 0;
   FILE* fp = fopen(iwadname, "rb");
@@ -938,7 +938,7 @@ static void DoLooseFiles(void)
   int i,j,p;
   const char **tmyargv;  // use these to recreate the argv array
   int tmyargc;
-  boolean skip[MAXARGVS]; // CPhipps - should these be skipped at the end
+  dbool skip[MAXARGVS]; // CPhipps - should these be skipped at the end
 
   for (i=0; i<MAXARGVS; i++)
     skip[i] = FALSE;
@@ -1054,7 +1054,7 @@ bool D_DoomMainSetup(void)
   // proff 04/05/2000: Added support for include response files
   /* proff 2001/7/1 - Moved up, so -config can be in response files */
   {
-    boolean rsp_found;
+    dbool rsp_found;
     int i;
 
     do {
@@ -1073,7 +1073,7 @@ bool D_DoomMainSetup(void)
   // figgi 09/18/00-- added switch to force classic bsp nodes
   if (M_CheckParm ("-forceoldbsp"))
   {
-    extern boolean forceOldBsp;
+    extern dbool forceOldBsp;
     forceOldBsp = TRUE;
   }
 
@@ -1540,10 +1540,10 @@ void D_DoomDeinit(void)
 void GetFirstMap(int *ep, int *map)
 {
   short int i,j; // used to generate map name
-  boolean done = FALSE;  // Ty 09/13/98 - to exit inner loops
+  dbool done = FALSE;  // Ty 09/13/98 - to exit inner loops
   char test[9];  // MAPxx or ExMx plus terminator for testing
   char name[9];  // MAPxx or ExMx plus terminator for display
-  boolean newlevel = FALSE;  // Ty 10/04/98 - to test for new level
+  dbool newlevel = FALSE;  // Ty 10/04/98 - to test for new level
   int ix;  // index for lookup
 
   strcpy(name,""); // initialize

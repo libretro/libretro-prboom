@@ -60,7 +60,7 @@
 void HU_Init(void);
 void HU_Start(void);
 
-boolean HU_Responder(event_t* ev);
+dbool   HU_Responder(event_t* ev);
 
 void HU_Ticker(void);
 void HU_Drawer(void);
@@ -88,8 +88,8 @@ extern int hudcolor_list;   /* color of list of past messages                  *
 extern int hud_list_bgon;   /* solid window background for list of messages    */
 extern int hud_msg_lines;   /* number of message lines in window up to 16      */
 /* jff 2/18/98 hud/status control */
-extern boolean hud_showstats;   /* show secrets/items/kills stats */
-extern boolean hud_showkeys;    /* show keys HUD line */
-extern boolean hud_showweapons; /* show weapons HUD line */
+extern dbool   hud_showstats;   /* show secrets/items/kills stats */
+extern dbool   hud_showkeys;    /* show keys HUD line */
+extern dbool   hud_showweapons; /* show weapons HUD line */
 
 #endif

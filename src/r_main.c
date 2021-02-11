@@ -397,7 +397,7 @@ static void R_InitLightTables (void)
 // The change will take effect next refresh.
 //
 
-boolean setsizeneeded;
+dbool   setsizeneeded;
 int     setblocks;
 
 void R_SetViewSize(int blocks)
@@ -623,7 +623,7 @@ int autodetect_hom = 0;       // killough 2/7/98: HOM autodetection flag
 // R_ShowStats
 //
 int rendered_visplanes, rendered_segs, rendered_vissprites;
-boolean rendering_stats;
+dbool   rendering_stats;
 
 //
 // R_RenderView

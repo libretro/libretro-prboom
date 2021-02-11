@@ -63,9 +63,9 @@
 //  crushed - plane encountered an obstacle, is holding until removed
 //
 result_e T_MovePlane(sector_t *sector, fixed_t speed,
-      fixed_t dest, boolean crush, int floorOrCeiling, int direction)
+      fixed_t dest, dbool   crush, int floorOrCeiling, int direction)
 {
-   boolean       flag;
+   dbool         flag;
    fixed_t       lastpos;
    fixed_t       destheight; //jff 02/04/98 used to keep floors/ceilings
    // from moving thru each other

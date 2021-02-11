@@ -103,7 +103,7 @@ void HUlib_initTextLine(hu_textline_t* t, int x, int y,
 // Passed the hu_textline_t and the char to add
 // Returns FALSE if already at length limit, TRUE if the character added
 //
-boolean HUlib_addCharToTextLine
+dbool   HUlib_addCharToTextLine
 ( hu_textline_t*  t,
   char      ch )
 {
@@ -132,7 +132,7 @@ boolean HUlib_addCharToTextLine
 // Passed the hu_textline_t
 // Returns FALSE if already empty, TRUE if the character deleted
 //
-static boolean HUlib_delCharFromTextLine(hu_textline_t* t)
+static dbool   HUlib_delCharFromTextLine(hu_textline_t* t)
 {
   if (!t->len) return FALSE;
   else
@@ -153,7 +153,7 @@ static boolean HUlib_delCharFromTextLine(hu_textline_t* t)
 //
 void HUlib_drawTextLine
 ( hu_textline_t* l,
-  boolean drawcursor )
+  dbool   drawcursor )
 {
 
   int     i;
@@ -244,7 +244,7 @@ void HUlib_initSText
   const patchnum_t* font,
   int   startchar,
   int cm,       //jff 2/16/98 add color range parameter
-  boolean*  on )
+  dbool  *  on )
 {
 
   int i;
@@ -379,7 +379,7 @@ void HUlib_eraseSText(hu_stext_t* s)
 //
 void HUlib_initMText(hu_mtext_t *m, int x, int y, int w, int h,
          const patchnum_t* font, int startchar, int cm,
-         const patchnum_t* bgfont, boolean *on)
+         const patchnum_t* bgfont, dbool   *on)
 {
   int i;
 
@@ -586,7 +586,7 @@ void HUlib_initIText
   const patchnum_t* font,
   int   startchar,
   int cm,   //jff 2/16/98 add color range parameter
-  boolean*  on )
+  dbool  *  on )
 {
   it->lm = 0; // default left margin is start of text
   it->on = on;
@@ -667,7 +667,7 @@ void HUlib_addPrefixToIText
 // Passed the hu_itext_t and the char input
 // Returns TRUE if it ate the key
 //
-boolean HUlib_keyInIText
+dbool   HUlib_keyInIText
 ( hu_itext_t* it,
   unsigned char ch )
 {

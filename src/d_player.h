@@ -115,8 +115,8 @@ typedef struct player_s
 
   // Power ups. invinc and invis are tic counters.
   int                 powers[NUMPOWERS];
-  boolean             cards[NUMCARDS];
-  boolean             backpack;
+  dbool             cards[NUMCARDS];
+  dbool             backpack;
 
   // Frags, kills of other players.
   int                 frags[MAXPLAYERS];
@@ -125,7 +125,7 @@ typedef struct player_s
   // Is wp_nochange if not changing.
   weapontype_t        pendingweapon;
 
-  boolean             weaponowned[NUMWEAPONS];
+  dbool             weaponowned[NUMWEAPONS];
   int                 ammo[NUMAMMO];
   int                 maxammo[NUMAMMO];
 
@@ -170,7 +170,7 @@ typedef struct player_s
   pspdef_t            psprites[NUMPSPRITES];
 
   // True if secret level has been done.
-  boolean             didsecret;
+  dbool             didsecret;
 
   /* killough 10/98: used for realistic bobbing (i.e. not simply overall speed)
    * mo->momx and mo->momy represent true momenta experienced by player.
@@ -196,7 +196,7 @@ typedef struct player_s
 //
 typedef struct
 {
-  boolean     in;     // whether the player is in game
+  dbool     in;     // whether the player is in game
 
   // Player stats, kills, collected items etc.
   int         skills;
@@ -213,7 +213,7 @@ typedef struct
   int         epsd;   // episode # (0-2)
 
   // if true, splash the secret level
-  boolean     didsecret;
+  dbool     didsecret;
 
   // previous and next levels, origin 0
   int         last;

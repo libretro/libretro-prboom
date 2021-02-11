@@ -46,7 +46,7 @@
 #include "hu_stuff.h" // for using the hud font
 
 // Ty 03/17/98: flag that new par times have been loaded in d_deh
-extern boolean deh_pars;
+extern dbool   deh_pars;
 
 //
 // Data needed to add patches to full screen intermission pics.
@@ -404,7 +404,7 @@ static void WI_endNetgameStats(void);
  * Args:    Buffer (must by 9 chars) to write to, and whether to give Next level
  * Returns: void
  */
-void WI_levelNameLump(char* buf, boolean isNextLevel)
+void WI_levelNameLump(char* buf, dbool   isNextLevel)
 {
    mapentry_t *mapinfo = ((isNextLevel)? wbs->nextmapinfo : wbs->lastmapinfo);
   // use the lump name from the levelpic mapinfo if available
@@ -460,7 +460,7 @@ static void WI_slamBackground(void)
 //
 // The ticker is used to detect keys
 //  because of timing issues in netgames.
-boolean WI_Responder(event_t* ev)
+dbool   WI_Responder(event_t* ev)
 {
   return FALSE;
 }
@@ -600,10 +600,8 @@ WI_drawOnLnode  // draw stuff at a location by episode/map#
 ( int   n,
   const char* const c[] )
 {
-  int   i;
-  boolean fits = FALSE;
-
-  i = 0;
+  dbool   fits = FALSE;
+  int i = 0;
   do
   {
     int            left;
@@ -652,7 +650,7 @@ WI_drawOnLnode  // draw stuff at a location by episode/map#
 // Args:    isEntering - TRUE if entering a new level, FALSE otherwise
 // Returns: void
 //
-void WI_initAnimatedBack(boolean isEntering)
+void WI_initAnimatedBack(dbool   isEntering)
 {
   unsigned i;
   anim_t*  a;
@@ -971,7 +969,7 @@ void WI_updateNoState(void)
     G_WorldDone();
 }
 
-static boolean    snl_pointeron = FALSE;
+static dbool      snl_pointeron = FALSE;
 
 
 // ====================================================================
@@ -1186,7 +1184,7 @@ void WI_updateDeathmatchStats(void)
   int   i;
   int   j;
 
-  boolean stillticking;
+  dbool   stillticking;
 
   WI_updateAnimatedBack();
 
@@ -1451,7 +1449,7 @@ void WI_updateNetgameStats(void)
   int   i;
   int   fsum;
 
-  boolean stillticking;
+  dbool   stillticking;
 
   WI_updateAnimatedBack();
 

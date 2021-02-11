@@ -49,9 +49,9 @@
 // Command line parameters.
 //
 
-extern  boolean nomonsters; // checkparm of -nomonsters
-extern  boolean respawnparm;  // checkparm of -respawn
-extern  boolean fastparm; // checkparm of -fast
+extern  dbool   nomonsters; // checkparm of -nomonsters
+extern  dbool   respawnparm;  // checkparm of -respawn
+extern  dbool   fastparm; // checkparm of -fast
 
 // -----------------------------------------------------
 // Game Mode - identify IWAD as shareware, retail etc.
@@ -61,7 +61,7 @@ extern GameMode_t gamemode;
 extern GameMission_t  gamemission;
 
 // Set if homebrew PWAD stuff has been added.
-extern  boolean modifiedgame;
+extern  dbool   modifiedgame;
 
 // CPhipps - new compatibility handling
 extern complevel_t compatibility_level, default_compatibility_level;
@@ -124,7 +124,7 @@ extern  skill_t   startskill;
 extern  int             startepisode;
 extern  int   startmap;
 
-extern  boolean   autostart;
+extern  dbool   autostart;
 
 // Selected by user.
 extern  skill_t         gameskill;
@@ -133,14 +133,14 @@ extern  int   gamemap;
 extern  mapentry_t*     gamemapinfo;
 
 // Nightmare mode flag, single player.
-extern  boolean         respawnmonsters;
+extern  dbool         respawnmonsters;
 
 // Netgame? Only true if >1 player.
-extern  boolean netgame;
+extern  dbool netgame;
 
 // Flag: true only if started as net deathmatch.
 // An enum might handle altdeath/cooperative better.
-extern  boolean deathmatch;
+extern  dbool deathmatch;
 
 // ------------------------------------------
 // Internal parameters for sound rendering.
@@ -179,7 +179,7 @@ enum menuactive_e {
 };
 extern enum menuactive_e menuactive; // Type of menu overlaid, if any
 
-extern  boolean paused;        // Game Pause?
+extern  dbool paused;        // Game Pause?
 
 // This one is related to the 3-screen display mode.
 // ANG90 = left side, ANG270 = right
@@ -205,8 +205,8 @@ extern  int leveltime;  // tics in game play for par
 // --------------------------------------
 // DEMO playback/recording related stuff.
 
-extern  boolean usergame;
-extern  boolean demoplayback;
+extern  dbool usergame;
+extern  dbool demoplayback;
 extern  int demover;
 
 extern  gamestate_t  gamestate;
@@ -224,8 +224,8 @@ extern  int   gametic;
 extern  player_t  players[MAXPLAYERS];
 
 // Alive? Disconnected?
-extern  boolean   playeringame[MAXPLAYERS];
-extern  boolean   realplayeringame[MAXPLAYERS];
+extern  dbool   playeringame[MAXPLAYERS];
+extern  dbool   realplayeringame[MAXPLAYERS];
 
 extern  mapthing_t *deathmatchstarts;     // killough
 extern  size_t     num_deathmatchstarts; // killough
@@ -244,7 +244,7 @@ extern wbstartstruct_t wminfo;
 //
 
 // if true, load all graphics at level load
-extern  boolean precache;
+extern  dbool precache;
 
 // wipegamestate can be set to -1
 //  to force a wipe on the next draw
@@ -253,8 +253,8 @@ extern  gamestate_t     wipegamestate;
 extern  int             mouseSensitivity_horiz; // killough
 extern  int             mouseSensitivity_vert;
 
-extern  boolean         movement_mouselook;
-extern  boolean         movement_mouseinvert;
+extern  dbool         movement_mouselook;
+extern  dbool         movement_mouseinvert;
 
 extern  int             bodyqueslot;
 

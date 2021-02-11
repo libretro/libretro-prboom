@@ -103,7 +103,7 @@ static fixed_t xoffs,yoffs;    // killough 2/28/98: flat offsets
 fixed_t yslope[MAX_SCREENHEIGHT], distscale[MAX_SCREENWIDTH];
 
 /* forward declarations */
-extern boolean r_wiggle_fix;
+extern dbool   r_wiggle_fix;
 
 //
 // R_InitPlanes

@@ -79,9 +79,9 @@ static void process_input(void);
 static unsigned doom_devices[1];
 
 /* Whether mouse active when using Gamepad */
-boolean mouse_on;
+dbool   mouse_on;
 /* Whether to search for IWADs on parent folders recursively */
-boolean find_recursive_on;
+dbool   find_recursive_on;
 
 // System analog stick range is -0x8000 to 0x8000
 #define ANALOG_RANGE 0x8000
@@ -468,7 +468,7 @@ void retro_reset(void)
    M_EndGame(0);
 }
 
-extern boolean quit_pressed;
+extern dbool   quit_pressed;
 
 static void update_variables(bool startup)
 {
@@ -866,7 +866,7 @@ static menu_t *menus[] = {
 };
 
 #define NUMKEYS 512
-extern boolean gamekeydown[NUMKEYS];
+extern dbool   gamekeydown[NUMKEYS];
 static bool old_input[MAX_BUTTON_BINDS];
 
 struct extra_serialize {
@@ -1500,9 +1500,9 @@ void I_SetRes(void)
 
 /* i_system - i_main */
 
-static boolean InDisplay = false;
+static dbool   InDisplay = false;
 
-boolean I_StartDisplay(void)
+dbool   I_StartDisplay(void)
 {
    if (InDisplay)
       return false;
@@ -1548,7 +1548,7 @@ const char *I_DoomExeDir(void)
 *
 * cphipps - simple test for trailing slash on dir names
 */
-boolean HasTrailingSlash(const char* dn)
+dbool   HasTrailingSlash(const char* dn)
 {
   return ( dn && ((dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\')));
 }

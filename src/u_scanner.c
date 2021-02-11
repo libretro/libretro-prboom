@@ -160,7 +160,7 @@ void U_CheckForWhitespace(u_scanner_t* scanner)
   }
 }
 
-boolean U_CheckToken(u_scanner_t* s, char token)
+dbool   U_CheckToken(u_scanner_t* s, char token)
 {
   if(s->needNext)
   {
@@ -215,15 +215,15 @@ void U_RestoreState(u_scanner_t* s, u_scanner_t savedstate)
   }
 }
 
-boolean U_GetNextToken(u_scanner_t* scanner, boolean expandState)
+dbool   U_GetNextToken(u_scanner_t* scanner, dbool   expandState)
 {
   unsigned int start;
   unsigned int end;
   char cur;
   int integerBase            = 10;
-  boolean floatHasDecimal    = FALSE;
-  boolean floatHasExponent   = FALSE;
-  boolean stringFinished     = FALSE; // Strings are the only things that can have 0 length tokens.
+  dbool   floatHasDecimal    = FALSE;
+  dbool   floatHasExponent   = FALSE;
+  dbool   stringFinished     = FALSE; // Strings are the only things that can have 0 length tokens.
   u_parserstate_t* nextState = &scanner->nextState;
 
   if(!scanner->needNext)
@@ -454,10 +454,10 @@ boolean U_GetNextToken(u_scanner_t* scanner, boolean expandState)
  * Skips all Tokens in current line and parses the first token on
  * the next line.
  */
-boolean U_GetNextLineToken(u_scanner_t* scanner)
+dbool   U_GetNextLineToken(u_scanner_t* scanner)
 {
   unsigned int line = scanner->line;
-  boolean retval = FALSE;
+  dbool   retval = FALSE;
 
   do retval = U_GetNextToken(scanner, TRUE);
   while (retval && scanner->line == line);
@@ -496,7 +496,7 @@ void U_Error(u_scanner_t* s, const char *msg, ...)
   I_Error("%s:%d:%d:%s.", s->name, s->tokenLine, s->tokenLinePosition, buffer);
 }
 
-boolean U_MustGetToken(u_scanner_t* s, char token)
+dbool   U_MustGetToken(u_scanner_t* s, char token)
 {
   if(!U_CheckToken(s, token))
   {
@@ -507,7 +507,7 @@ boolean U_MustGetToken(u_scanner_t* s, char token)
   return TRUE;
 }
 
-boolean U_MustGetIdentifier(u_scanner_t* s, const char *ident)
+dbool   U_MustGetIdentifier(u_scanner_t* s, const char *ident)
 {
   if (!U_CheckToken(s, TK_Identifier) || strcasecmp(s->string, ident))
   {
@@ -518,9 +518,9 @@ boolean U_MustGetIdentifier(u_scanner_t* s, const char *ident)
 }
 
 // Convenience helpers that parse an entire number including a leading minus or plus sign
-boolean U_ScanInteger(u_scanner_t* s)
+dbool   U_ScanInteger(u_scanner_t* s)
 {
-  boolean neg = FALSE;
+  dbool   neg = FALSE;
   if (!U_GetNextToken(s, TRUE))
   {
     return FALSE;
@@ -552,9 +552,9 @@ boolean U_ScanInteger(u_scanner_t* s)
   return TRUE;
 }
 
-boolean U_ScanFloat(u_scanner_t* s)
+dbool   U_ScanFloat(u_scanner_t* s)
 {
-  boolean neg = FALSE;
+  dbool   neg = FALSE;
   if (!U_GetNextToken(s, TRUE))
   {
     return FALSE;
@@ -586,9 +586,9 @@ boolean U_ScanFloat(u_scanner_t* s)
   return TRUE;
 }
 
-boolean U_CheckInteger(u_scanner_t* s)
+dbool   U_CheckInteger(u_scanner_t* s)
 {
-  boolean res;
+  dbool   res;
   u_scanner_t savedstate;
   U_SaveState(s, savedstate);
   res = U_ScanInteger(s);
@@ -597,9 +597,9 @@ boolean U_CheckInteger(u_scanner_t* s)
   return res;
 }
 
-boolean U_CheckFloat(u_scanner_t* s)
+dbool   U_CheckFloat(u_scanner_t* s)
 {
-  boolean res;
+  dbool   res;
   u_scanner_t savedstate;
   U_SaveState(s, savedstate);
   res = U_ScanFloat(s);
@@ -608,7 +608,7 @@ boolean U_CheckFloat(u_scanner_t* s)
   return res;
 }
 
-boolean U_MustGetInteger(u_scanner_t* s)
+dbool   U_MustGetInteger(u_scanner_t* s)
 {
   if (!U_ScanInteger(s))
   {
@@ -618,7 +618,7 @@ boolean U_MustGetInteger(u_scanner_t* s)
   return TRUE;
 }
 
-boolean U_MustGetFloat(u_scanner_t* s)
+dbool   U_MustGetFloat(u_scanner_t* s)
 {
   if (!U_ScanFloat(s))
   {
@@ -629,7 +629,7 @@ boolean U_MustGetFloat(u_scanner_t* s)
 }
 
 
-boolean U_HasTokensLeft(u_scanner_t* s)
+dbool   U_HasTokensLeft(u_scanner_t* s)
 {
   return (s->scanPos < s->length);
 }

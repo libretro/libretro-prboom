@@ -77,7 +77,7 @@ uint8_t solidcol[MAX_SCREENWIDTH];
 // Replaces the old R_Clip*WallSegment functions. It draws bits of walls in those
 // columns which aren't solid, and updates the solidcol[] array appropriately
 
-static void R_ClipWallSegment(int first, int last, boolean solid)
+static void R_ClipWallSegment(int first, int last, dbool   solid)
 {
    uint8_t *p;
    while (first < last)
@@ -201,7 +201,7 @@ static void R_RecalcLineFlags(void)
 
 sector_t *R_FakeFlat(sector_t *sec, sector_t *tempsec,
                      int *floorlightlevel, int *ceilinglightlevel,
-                     boolean back)
+                     dbool   back)
 {
   if (floorlightlevel)
     *floorlightlevel = sec->floorlightsec == -1 ?
@@ -401,7 +401,7 @@ static const int checkcoord[12][4] = // killough -- static const
 };
 
 // killough 1/28/98: static // CPhipps - const parameter, reformatted
-static boolean R_CheckBBox(const fixed_t *bspcoord)
+static dbool   R_CheckBBox(const fixed_t *bspcoord)
 {
   angle_t angle1, angle2;
 

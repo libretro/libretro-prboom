@@ -89,7 +89,7 @@
 #define SAVESTRINGSIZE  24
 
 static size_t   savegamesize = 0; // killough
-static boolean  netdemo;
+static dbool    netdemo;
 static const uint8_t *demobuffer;   /* cph - only used for playback */
 static int demolength; // check for overrun (missing DEMOMARKER)
 #if 0
@@ -102,31 +102,31 @@ static short    consistancy[MAXPLAYERS][BACKUPTICS];
 gameaction_t    gameaction;
 gamestate_t     gamestate;
 skill_t         gameskill;
-boolean         respawnmonsters;
+dbool           respawnmonsters;
 int             gameepisode;
 int             gamemap;
 mapentry_t*     gamemapinfo;
-boolean         paused;
+dbool           paused;
 // CPhipps - moved *_loadgame vars here
-static boolean forced_loadgame = FALSE;
-static boolean command_loadgame = FALSE;
+static dbool   forced_loadgame = FALSE;
+static dbool   command_loadgame = FALSE;
 
-boolean         usergame;      // ok to save / end game
-boolean         deathmatch;    // only if started as net death
-boolean         netgame;       // only TRUE if packets are broadcast
-boolean         playeringame[MAXPLAYERS];
+dbool           usergame;      // ok to save / end game
+dbool           deathmatch;    // only if started as net death
+dbool           netgame;       // only TRUE if packets are broadcast
+dbool           playeringame[MAXPLAYERS];
 player_t        players[MAXPLAYERS];
 int             consoleplayer; // player taking events and displaying
 int             displayplayer; // view being displayed
 int             gametic;
 int             basetic;       /* killough 9/29/98: for demo sync */
 int             totalkills, totallive, totalitems, totalsecret;    // for intermission
-boolean         demoplayback;
+dbool           demoplayback;
 int             demover;
 wbstartstruct_t wminfo;               // parms for world map / intermission
-boolean         haswolflevels = FALSE;// jff 4/18/98 wolf levels present
+dbool           haswolflevels = FALSE;// jff 4/18/98 wolf levels present
 static uint8_t     *savebuffer;          // CPhipps - static
-static boolean     savestaticbuffer = FALSE;
+static dbool       savestaticbuffer = FALSE;
 int             autorun = FALSE;      // always running?          // phares
 int             totalleveltimes;      // CPhipps - total time for all completed levels
 int		longtics;
@@ -220,11 +220,11 @@ fixed_t sidemove[2]    = {0x18, 0x28};
 fixed_t angleturn[3]   = {640, 1280, 320};  // + slow turn
 
 // CPhipps - made lots of key/button state vars static
-boolean gamekeydown[NUMKEYS];
+dbool   gamekeydown[NUMKEYS];
 int     turnheld;       // for accelerative turning
 
-static boolean mousearray[4];
-static boolean *mousebuttons = &mousearray[1];    // allow [-1]
+static dbool   mousearray[4];
+static dbool   *mousebuttons = &mousearray[1];    // allow [-1]
 
 // mouse values are used once
 static int   mousex;
@@ -242,8 +242,8 @@ int defaultskill;               //note 1-based
 int    bodyqueslot, bodyquesize;        // killough 2/8/98
 mobj_t **bodyque = 0;                   // phares 8/10/98
 
-static void G_DoSaveGame (boolean menu);
-static const uint8_t* G_ReadDemoHeader(const uint8_t* demo_p, size_t size, boolean failonerror);
+static void G_DoSaveGame (dbool   menu);
+static const uint8_t* G_ReadDemoHeader(const uint8_t* demo_p, size_t size, dbool   failonerror);
 static mapentry_t *G_LookupMapinfo(int episode, int map);
 
 //
@@ -271,13 +271,13 @@ static INLINE signed short fudgea(signed short b)
 
 void G_BuildTiccmd(ticcmd_t* cmd)
 {
-  boolean strafe;
+  dbool   strafe;
   int speed;
   int tspeed;
   int forward;
   int side;
   int newweapon   = WP_NOCHANGE;
-  boolean bstrafe = FALSE;
+  dbool   bstrafe = FALSE;
   /* cphipps - remove needless I_BaseTiccmd call, just set the ticcmd to zero */
   memset(cmd,0,sizeof*cmd);
   cmd->consistancy = consistancy[consoleplayer][maketic%BACKUPTICS];
@@ -639,7 +639,7 @@ static void G_DoLoadLevel (void)
 // Get info needed to make ticcmd_ts for the players.
 //
 
-boolean G_Responder (event_t* ev)
+dbool   G_Responder (event_t* ev)
 {
   // allow spy mode changes even during the demo
   // killough 2/22/98: even during DM demo
@@ -1057,7 +1057,7 @@ void G_PlayerReborn (int player)
 ====================
 */
 
-static boolean G_CheckSpot(int playernum, mapthing_t *mthing)
+static dbool   G_CheckSpot(int playernum, mapthing_t *mthing)
 {
   fixed_t     x,y;
   subsector_t *ss;
@@ -1258,7 +1258,7 @@ int cpars[32] = {
   120,30          // 31-32
 };
 
-boolean secretexit;
+dbool   secretexit;
 
 /*
 ====================
@@ -1511,7 +1511,7 @@ void G_DoWorldDone (void)
 
 #define MIN_MAXPLAYERS 32
 
-extern boolean setsizeneeded;
+extern dbool   setsizeneeded;
 
 //CPhipps - savename variable redundant
 
@@ -1540,7 +1540,7 @@ static uint64_t G_UpdateSignature(uint64_t s, const char *name)
 static uint64_t G_Signature(void)
 {
   static uint64_t s = 0;
-  static boolean computed = FALSE;
+  static dbool   computed = FALSE;
   char name[9];
   int episode, map;
 
@@ -1572,7 +1572,7 @@ void G_ForcedLoadGame(void)
 
 // killough 3/16/98: add slot info
 // killough 5/15/98: add command-line
-void G_LoadGame(int slot, boolean command)
+void G_LoadGame(int slot, dbool   command)
 {
   if (!demoplayback && !command) {
     // CPhipps - handle savegame filename in G_DoLoadGame
@@ -1847,7 +1847,7 @@ void (CheckSaveGame)(size_t size, const char* file, int line)
  * cph - Avoid possible buffer overflow problems by passing
  * size to this function and using snprintf */
 
-void G_SaveGameName(char *name, size_t size, int slot, boolean demoplayback)
+void G_SaveGameName(char *name, size_t size, int slot, dbool   demoplayback)
 {
   const char* sgn = demoplayback ? "demosav" : savegamename;
 #ifdef _WIN32
@@ -1981,7 +1981,7 @@ static int G_DoSaveGameToSaveBuffer() {
   return length;
 }
 
-static void G_DoSaveGame (boolean menu)
+static void G_DoSaveGame (dbool   menu)
 {
   int length;
   char name[PATH_MAX+1];
@@ -2639,7 +2639,7 @@ static int G_GetOriginalDoomCompatLevel(int ver)
 }
 
 //e6y: Check for overrun
-static boolean CheckForOverrun(const uint8_t *start_p, const uint8_t *current_p, size_t maxsize, size_t size, boolean failonerror)
+static dbool   CheckForOverrun(const uint8_t *start_p, const uint8_t *current_p, size_t maxsize, size_t size, dbool   failonerror)
 {
   size_t pos = current_p - start_p;
   if (pos + size > maxsize)
@@ -2652,7 +2652,7 @@ static boolean CheckForOverrun(const uint8_t *start_p, const uint8_t *current_p,
   return FALSE;
 }
 
-static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, boolean failonerror)
+static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, dbool   failonerror)
 {
    skill_t skill;
    int i, episode, map;
@@ -2911,7 +2911,7 @@ void G_DoPlayDemo(void)
  * Called after a death or level completion to allow demos to be cleaned up
  * Returns TRUE if a new demo loop action will take place
  */
-boolean G_CheckDemoStatus (void)
+dbool   G_CheckDemoStatus (void)
 {
   P_ChecksumFinal();
 

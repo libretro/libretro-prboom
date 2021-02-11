@@ -51,7 +51,7 @@ typedef enum
   INTERP_CeilingPanning
 } interpolation_type_e;
 
-boolean WasRenderedInTryRunTics;
+dbool   WasRenderedInTryRunTics;
 
 typedef struct
 {
@@ -66,8 +66,8 @@ tic_vars_t tic_vars;
 static void R_DoAnInterpolation (int i, fixed_t smoothratio);
 void R_ResetViewInterpolation ();
 
-static boolean NoInterpolateView;
-static boolean didInterp;
+static dbool   NoInterpolateView;
+static dbool   didInterp;
 
 static interpolation_t *curipos;
 typedef fixed_t fixed2_t[2];
@@ -81,7 +81,7 @@ void R_InterpolateView (player_t *player)
   static mobj_t *oviewer;
   fixed_t frac;
 
-  boolean NoInterpolate = paused || (menuactive && !demoplayback);
+  dbool   NoInterpolate = paused || (menuactive && !demoplayback);
 
   viewplayer = player;
 

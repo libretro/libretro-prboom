@@ -41,7 +41,7 @@
 
 int leveltime;
 
-static boolean newthinkerpresent;
+static dbool   newthinkerpresent;
 
 //
 // THINKERS

@@ -69,7 +69,7 @@ int ticdup = 1;
 int              wanted_player_number;
 
 #ifdef HAVE_NET
-static boolean   server;
+static dbool     server;
 
 static int       remotetic; // Tic expected from the remote
 static int       remotesend; // Tic expected by the remote
@@ -79,7 +79,7 @@ static packet_header_t** queuedpacket;
 
 static int xtratics = 0;
 
-static boolean isExtraDDisplay = FALSE;
+static dbool   isExtraDDisplay = FALSE;
 
 void D_CheckNetGame(void)
 {
@@ -99,12 +99,12 @@ void D_CheckNetGame(void)
   Z_Free(packet);
 }
 
-boolean D_NetGetWad(const char* name)
+dbool   D_NetGetWad(const char* name)
 {
 #if defined(HAVE_WAIT_H)
   size_t psize = sizeof(packet_header_t) + strlen(name) + 500;
   packet_header_t *packet;
-  boolean done = FALSE;
+  dbool   done = FALSE;
 
   if (!server || strchr(name, '/')) return FALSE; // If it contains path info, reject
 

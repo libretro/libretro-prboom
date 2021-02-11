@@ -13,7 +13,7 @@
 
 #ifndef _BOOLEAN_TYPE
 #define _BOOLEAN_TYPE
-typedef int boolean;
+typedef int dbool;
 #endif
 
 #endif

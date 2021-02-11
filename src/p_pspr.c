@@ -168,7 +168,7 @@ static void P_BringUpWeapon(player_t *player)
 //---------------------------------------------------------------------------
 
 #ifdef HEXEN
-boolean P_CheckMana(player_t *player)
+dbool P_CheckMana(player_t *player)
 {
    manatype_t mana;
    int count;
@@ -353,7 +353,7 @@ int P_GetAmmoLevel(player_t *player, weapontype_t weapon)
 // (only in demo_compatibility mode -- killough 3/22/98)
 //
 
-boolean P_CheckAmmo(player_t *player)
+dbool P_CheckAmmo(player_t *player)
 {
   if (P_GetAmmoLevel(player, player->readyweapon) > 0) // has enough ammo
     return true;
@@ -856,7 +856,7 @@ static void P_BulletSlope(mobj_t *mo)
 // P_GunShot
 //
 
-static void P_GunShot(mobj_t *mo, boolean accurate)
+static void P_GunShot(mobj_t *mo, dbool accurate)
 {
   int damage = 5*(P_Random(pr_gunshot)%3+1);
   angle_t angle = mo->angle;

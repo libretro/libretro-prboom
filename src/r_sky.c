@@ -46,8 +46,8 @@ int skyflatnum;
 int skytexture;
 int skytexturemid;
 
-boolean r_stretchsky; // user option, named after ZDoom's
-boolean skystretch;
+dbool   r_stretchsky; // user option, named after ZDoom's
+dbool   skystretch;
 
 //
 // R_InitSkyMap

@@ -46,7 +46,7 @@
 // this can resize the view and change game parameters.
 // Does all the real work of the menu interaction.
 
-boolean M_Responder (event_t *ev);
+dbool   M_Responder (event_t *ev);
 
 // Called by main loop,
 // only used for menu (skull cursor) animation.
@@ -82,8 +82,8 @@ void M_DrawCredits(void);    // killough 11/98
 
 extern int warning_about_changes, print_warning_about_changes;
 
-extern boolean menu_background;
-extern boolean r_wiggle_fix;
+extern dbool   menu_background;
+extern dbool   r_wiggle_fix;
 
 /****************************
  *

@@ -55,7 +55,7 @@ typedef struct
   char          *string;
   int            number;
   double        decimal;
-  boolean        boolean;
+  dbool         boolean;
   char          token;
   unsigned int  tokenLine;
   unsigned int  tokenLinePosition;
@@ -77,12 +77,12 @@ typedef struct
   unsigned int     tokenLinePosition;
   unsigned int     scanPos;
 
-  boolean          needNext; // If checkToken returns false this will be false.
+  dbool            needNext; // If checkToken returns false this will be false.
 
   char*   string;
   int     number;
   double  decimal;
-  boolean boolean;
+  dbool   boolean;
   char    token;
 
 } u_scanner_t;
@@ -90,16 +90,16 @@ typedef struct
 
 u_scanner_t  U_ScanOpen(const char* data, int length, const char *name);
 void         U_ScanClose(u_scanner_t* scanner);
-boolean      U_GetNextToken(u_scanner_t* scanner, boolean expandState);
-boolean      U_GetNextLineToken(u_scanner_t* scanner);
-boolean      U_HasTokensLeft(u_scanner_t* scanner);
-boolean      U_MustGetToken(u_scanner_t* scanner, char token);
-boolean      U_MustGetIdentifier(u_scanner_t* scanner, const char *ident);
-boolean      U_MustGetInteger(u_scanner_t* s);
-boolean      U_MustGetFloat(u_scanner_t* s);
-boolean      U_CheckToken(u_scanner_t* scanner, char token);
-boolean      U_CheckInteger(u_scanner_t* s);
-boolean      U_CheckFloat(u_scanner_t* s);
+dbool        U_GetNextToken(u_scanner_t* scanner, dbool   expandState);
+dbool        U_GetNextLineToken(u_scanner_t* scanner);
+dbool        U_HasTokensLeft(u_scanner_t* scanner);
+dbool        U_MustGetToken(u_scanner_t* scanner, char token);
+dbool        U_MustGetIdentifier(u_scanner_t* scanner, const char *ident);
+dbool        U_MustGetInteger(u_scanner_t* s);
+dbool        U_MustGetFloat(u_scanner_t* s);
+dbool        U_CheckToken(u_scanner_t* scanner, char token);
+dbool        U_CheckInteger(u_scanner_t* s);
+dbool        U_CheckFloat(u_scanner_t* s);
 
 void         U_Error(u_scanner_t* s, const char *msg, ...);
 void         U_ErrorToken(u_scanner_t* s, int token);

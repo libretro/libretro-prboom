@@ -64,12 +64,12 @@ static const char*   finaleflat; // made static const
 
 void    F_StartCast (void);
 void    F_CastTicker (void);
-boolean F_CastResponder (event_t *ev);
+dbool   F_CastResponder (event_t *ev);
 void    F_CastDrawer (void);
 
 void WI_checkForAccelerate(void);    // killough 3/28/98: used to
 extern int acceleratestage;          // accelerate intermission screens
-extern boolean secretexit;           // whether we've entered a secret map
+extern dbool   secretexit;           // whether we've entered a secret map
 static int midstage;                 // whether we're in "mid-stage"
 
 /*
@@ -202,7 +202,7 @@ void F_StartFinale (void)
   FinaleCount = 0;
 }
 
-boolean F_Responder (event_t *event)
+dbool   F_Responder (event_t *event)
 {
 #ifndef HEXEN
   if (FinaleStage == 2)
@@ -409,10 +409,10 @@ static const castinfo_t castorder[] = { // CPhipps - static const, initialised h
 int             castnum;
 int             casttics;
 state_t*        caststate;
-boolean         castdeath;
+dbool           castdeath;
 int             castframes;
 int             castonmelee;
-boolean         castattacking;
+dbool           castattacking;
 
 
 //
@@ -556,7 +556,7 @@ void F_CastTicker (void)
 // F_CastResponder
 //
 
-boolean F_CastResponder (event_t* ev)
+dbool   F_CastResponder (event_t* ev)
 {
   if (ev->type != ev_keydown)
     return FALSE;
@@ -638,7 +638,7 @@ void F_CastDrawer (void)
   spriteframe_t*      sprframe;
   int                 sprframenum;
   int                 lump;
-  boolean             flip;
+  dbool               flip;
 
   // erase the entire screen to a background
   // CPhipps - patch drawing updated
@@ -653,7 +653,7 @@ void F_CastDrawer (void)
   {
     sprframe = &sprdef->spriteframes[ caststate->frame & FF_FRAMEMASK];
     lump = sprframe->lump[0];
-    flip = (boolean)sprframe->flip[0];
+    flip = (dbool)sprframe->flip[0];
 
     // CPhipps - patch drawing updated
     V_DrawNumPatch(160, 170, 0, lump+firstspritelump, CR_DEFAULT,

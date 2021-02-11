@@ -49,9 +49,9 @@
 
 int hud_graph_keys=1; //jff 3/7/98 display HUD keys as graphics
 hud_mode_t hud_mode;
-boolean hud_showstats;   /* show secrets/items/kills stats */
-boolean hud_showkeys;    /* show keys HUD line */
-boolean hud_showweapons; /* show weapons HUD line */
+dbool   hud_showstats;   /* show secrets/items/kills stats */
+dbool   hud_showkeys;    /* show keys HUD line */
+dbool   hud_showweapons; /* show weapons HUD line */
 
 //
 // Locally used constants, shortcuts.
@@ -184,17 +184,17 @@ static hu_textline_t  w_gkeys;  //jff 3/7/98 graphic keys widget for hud
 static hu_textline_t  w_monsec; //jff 2/16/98 new kill/secret widget for hud
 static hu_mtext_t     w_rtext;  //jff 2/26/98 text message refresh widget
 
-static boolean    always_off = FALSE;
+static dbool    always_off = FALSE;
 static char       chat_dest[MAXPLAYERS];
-boolean           chat_on;
-static boolean    message_on;
-static boolean    message_list; //2/26/98 enable showing list of messages
-boolean           message_dontfuckwithme;
-static boolean    message_nottobefuckedwith;
+dbool           chat_on;
+static dbool    message_on;
+static dbool    message_list; //2/26/98 enable showing list of messages
+dbool           message_dontfuckwithme;
+static dbool    message_nottobefuckedwith;
 static int        message_counter;
 extern int        showMessages;
-extern boolean    automapactive;
-static boolean    headsupactive = FALSE;
+extern dbool    automapactive;
+static dbool    headsupactive = FALSE;
 
 //jff 2/16/98 hud supported automap colors added
 int hudcolor_titl;  // color range of automap level title
@@ -361,7 +361,7 @@ void HU_Start(void)
 
   int   i;
   const char* s; /* cph - const */
-  boolean is_distributed = (hud_mode == hud_distributed);
+  dbool is_distributed = (hud_mode == hud_distributed);
 
   if (headsupactive)                    // stop before starting
     HU_Stop();
@@ -680,8 +680,8 @@ void HU_Start(void)
 //
 void HU_MoveHud(void)
 {
-  static boolean was_distributed=-1;
-  boolean is_distributed = (hud_mode == hud_distributed);
+  static dbool was_distributed=-1;
+  dbool is_distributed = (hud_mode == hud_distributed);
 
   //jff 3/4/98 move displays around on F5 changing hud_distributed
   if (is_distributed != was_distributed)
@@ -1116,7 +1116,7 @@ void HU_Drawer(void)
       if (doit)
       {
         int k;
-        boolean haskeys = FALSE;
+        dbool haskeys = FALSE;
 
         hud_keysstr[4] = '\0';    //jff 3/7/98 make sure deleted keys go away
         //jff add case for graphic key display
@@ -1300,7 +1300,7 @@ void HU_Erase(void)
 //
 // Passed nothing, returns nothing
 //
-static boolean bsdown; // Is backspace down?
+static dbool bsdown; // Is backspace down?
 static int bscounter;
 
 void HU_Ticker(void)
@@ -1445,14 +1445,14 @@ char HU_dequeueChatChar(void)
 //
 // Passed the event to respond to, returns TRUE if the event was handled
 //
-boolean HU_Responder(event_t *ev)
+dbool HU_Responder(event_t *ev)
 {
 
   static char   lastmessage[HU_MAXLINELENGTH+1];
   const char*   macromessage; // CPhipps - const char*
-  boolean   eatkey = FALSE;
-  static boolean  shiftdown = FALSE;
-  static boolean  altdown = FALSE;
+  dbool   eatkey = FALSE;
+  static dbool  shiftdown = FALSE;
+  static dbool  altdown = FALSE;
   unsigned char   c;
   int     i;
   int     numplayers;

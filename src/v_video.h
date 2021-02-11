@@ -53,7 +53,7 @@
 
 typedef struct {
   uint8_t *data;       // pointer to the screen content
-  boolean not_on_heap; // if set, no malloc or free is preformed and
+  dbool   not_on_heap; // if set, no malloc or free is preformed and
                        // data never set to NULL. Used i.e. with SDL doublebuffer.
   int height;          // the height of the surface, used when mallocing
 } screeninfo_t;

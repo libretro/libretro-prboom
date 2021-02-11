@@ -299,7 +299,7 @@ void P_ChangeSwitchTexture
  * Passed the thing using the line, the line being used, and the side used
  * Returns TRUE if a thinker was created
 */
-boolean
+dbool  
 P_UseSpecialLine
 ( mobj_t*       thing,
   line_t*       line,

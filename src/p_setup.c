@@ -86,7 +86,7 @@ side_t   *sides;
 #define GL_VERT_OFFSET  4
 
 int     firstglvertex = 0;
-boolean forceOldBsp   = FALSE;
+dbool   forceOldBsp   = FALSE;
 
 int nodes_glbsp; // version of GLBSP nodes detected, or 0
 int nodes_zdbsp; // version of ZDBSP nodes detected, or 0
@@ -156,7 +156,7 @@ static void *ReadIdentifier(int lumpnum, void *buffer)
 }
 
 // check GL lumps are present (cf. P_CheckLevel)
-static boolean CheckForGLBSPLumps(int gl_lumpnum)
+static dbool   CheckForGLBSPLumps(int gl_lumpnum)
 {
   static const char *names[] = { "GL_VERT", "GL_SEGS", "GL_SSECT", "GL_NODES" };
   int i, e;

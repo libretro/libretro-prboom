@@ -61,7 +61,7 @@ extern fixed_t skyiscale;
 //
 
 extern int rendered_visplanes, rendered_segs, rendered_vissprites;
-extern boolean rendering_stats;
+extern dbool   rendering_stats;
 
 //
 // Lighting LUT.

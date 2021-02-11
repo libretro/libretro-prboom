@@ -54,7 +54,7 @@
 // Returns TRUE if the mobj is still present.
 //
 
-boolean P_SetMobjState(mobj_t* mobj,statenum_t state)
+dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
 {
   state_t*  st;
 
@@ -64,7 +64,7 @@ boolean P_SetMobjState(mobj_t* mobj,statenum_t state)
   statenum_t *seenstate = seenstate_tab;      // pointer to table
   static int recursion;                       // detects recursion
   statenum_t i = state;                       // initial state
-  boolean ret = TRUE;                         // return value
+  dbool ret = TRUE;                         // return value
   statenum_t tempstate[NUMSTATES];            // for use with recursion
 
   if (recursion++)                            // if recursion detected,
@@ -1125,7 +1125,7 @@ void P_SpawnPlayer (int n, const mapthing_t* mthing)
  * if the thing in question is expected to be available in the gamemode used.
  */
 
-boolean P_IsDoomnumAllowed(int doomnum)
+dbool P_IsDoomnumAllowed(int doomnum)
 {
   // Do not spawn cool, new monsters if !commercial
   if (gamemode != commercial)

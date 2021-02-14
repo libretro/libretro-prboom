@@ -589,7 +589,7 @@ dbool   U_ScanFloat(u_scanner_t* s)
 dbool   U_CheckInteger(u_scanner_t* s)
 {
   dbool   res;
-  u_scanner_t savedstate;
+  u_scanner_t savedstate = {0};
   U_SaveState(s, savedstate);
   res = U_ScanInteger(s);
   if (!res)
@@ -600,7 +600,7 @@ dbool   U_CheckInteger(u_scanner_t* s)
 dbool   U_CheckFloat(u_scanner_t* s)
 {
   dbool   res;
-  u_scanner_t savedstate;
+  u_scanner_t savedstate = {0};
   U_SaveState(s, savedstate);
   res = U_ScanFloat(s);
   if (!res)

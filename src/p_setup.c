@@ -119,6 +119,9 @@ enum
 
 static float fast_sqrt(float n)
 {
+#if defined(NO_FAST_SQRT)
+  return sqrtf(n);
+#else
 	float		prev = 0.0f;
 	float		cur  = 1.0f;
 
@@ -132,6 +135,7 @@ static float fast_sqrt(float n)
 	}
 
 	return cur;
+#endif
 }
 
 //

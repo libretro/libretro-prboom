@@ -106,7 +106,10 @@ int idmusnum;
 
 void S_StopChannel(int cnum);
 
-int S_AdjustSoundParams(mobj_t *listener, mobj_t *source,
+// Will start a sound at a given volume.
+static void S_StartSoundAtVolume(degenmobj_t *origin, int sound_id, int volume);
+
+int S_AdjustSoundParams(mobj_t *listener, degenmobj_t *source,
                         int *vol, int *sep, int *pitch);
 
 static int S_getChannel(void *origin, sfxinfo_t *sfxinfo, int is_pickup);
@@ -201,11 +204,10 @@ void S_Start(void)
   S_ChangeMusic(mnum, TRUE);
 }
 
-void S_StartSoundAtVolume(void *origin_p, int sfx_id, int volume)
+static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
 {
   int sep, pitch, priority, cnum, is_pickup;
   sfxinfo_t *sfx;
-  mobj_t *origin = (mobj_t *) origin_p;
 
   //jff 1/22/98 return if sound is not enabled
   if (nosfxparm)
@@ -242,7 +244,7 @@ void S_StartSoundAtVolume(void *origin_p, int sfx_id, int volume)
   // Check to see if it is audible, modify the params
   // killough 3/7/98, 4/25/98: code rearranged slightly
 
-  if (!origin || origin == players[displayplayer].mo) {
+  if (!origin || origin == (degenmobj_t*)players[displayplayer].mo) {
     sep = NORM_SEP;
     volume *= 8;
   } else
@@ -628,7 +630,7 @@ void S_StopChannel(int cnum)
 // Otherwise, modifies parameters and returns 1.
 //
 
-int S_AdjustSoundParams(mobj_t *listener, mobj_t *source,
+int S_AdjustSoundParams(mobj_t *listener, degenmobj_t *source,
                         int *vol, int *sep, int *pitch)
 {
   fixed_t adx, ady,approx_dist;

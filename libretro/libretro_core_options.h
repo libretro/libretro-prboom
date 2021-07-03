@@ -29,8 +29,8 @@ extern "C" {
 struct retro_core_option_definition option_defs_us[] = {
    {
       "prboom-resolution",
-      "Internal resolution (restart)",
-      "Configure the resolution. Requires a restart.",
+      "Internal resolution (restart required)",
+      "Configure the resolution.",
       {
          { "320x200",   NULL },
          { "640x400",   NULL },
@@ -102,6 +102,76 @@ struct retro_core_option_definition option_defs_us[] = {
 
 /* RETRO_LANGUAGE_SPANISH */
 
+struct retro_core_option_definition option_defs_es[] = {
+   {
+      "prboom-resolution",
+      "Resolución interna (es necesario reiniciar)",
+      "Cambia la resolución.",
+      {
+         { "320x200",   NULL },
+         { "640x400",   NULL },
+         { "960x600",   NULL },
+         { "1280x800",  NULL },
+         { "1600x1000", NULL },
+         { "1920x1200", NULL },
+         { "2240x1400", NULL },
+         { "2560x1600", NULL },
+         { NULL, NULL },
+      },
+      "320x200"
+   },
+   {
+      "prboom-mouse_on",
+      "Usar el ratón al utilizar un mando",
+      "Permite usar entradas de ratón incluso cuando el dispositivo del usuario 1 no sea un RetroKeyboard/Mouse.",
+      {
+         { "disabled", "No" },
+         { "enabled",  "Sí" },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-find_recursive_on",
+      "Buscar IWAD en las carpetas primarias",
+      "Busca IWAD en las carpetas primarias. NOTA: Debes desactivar esta opción para poder jugar a SIGIL.",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      "prboom-rumble",
+      "Vibración",
+      "Activa la respuesta háptica al utilizar un mando compatible con vibración.",
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-analog_deadzone",
+      "Zona muerta analógica (en porcentaje)",
+      "Asigna la zona muerta de los sticks analógicos cuando el dispositivo de entrada sea un mando moderno.",
+      {
+         { "0",  NULL },
+         { "5",  NULL },
+         { "10", NULL },
+         { "15", NULL },
+         { "20", NULL },
+         { "25", NULL },
+         { "30", NULL },
+         { NULL, NULL },
+      },
+      "15"
+   },
+   { NULL, NULL, NULL, {{0}}, NULL },
+};
+
 /* RETRO_LANGUAGE_GERMAN */
 
 /* RETRO_LANGUAGE_ITALIAN */
@@ -142,7 +212,7 @@ struct retro_core_option_definition *option_defs_intl[RETRO_LANGUAGE_LAST] = {
    option_defs_us, /* RETRO_LANGUAGE_ENGLISH */
    NULL,           /* RETRO_LANGUAGE_JAPANESE */
    NULL,           /* RETRO_LANGUAGE_FRENCH */
-   NULL,           /* RETRO_LANGUAGE_SPANISH */
+   option_defs_es, /* RETRO_LANGUAGE_SPANISH */
    NULL,           /* RETRO_LANGUAGE_GERMAN */
    NULL,           /* RETRO_LANGUAGE_ITALIAN */
    NULL,           /* RETRO_LANGUAGE_DUTCH */

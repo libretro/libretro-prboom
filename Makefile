@@ -353,6 +353,14 @@ else ifeq ($(platform), retrofw)
    fpic := -fPIC
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
    CFLAGS += -ffast-math -march=mips32 -mtune=mips32 -mhard-float -fomit-frame-pointer
+else ifeq ($(platform), miyoo)
+   TARGET := $(TARGET_NAME)_libretro.so
+   CC = /opt/miyoo/usr/bin/arm-linux-gcc
+   CXX = /opt/miyoo/usr/bin/arm-linux-g++
+   AR = /opt/miyoo/usr/bin/arm-linux-ar
+   fpic := -fPIC
+   SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
+   CFLAGS += -ffast-math -march=armv5te -mtune=arm926ej-s -fomit-frame-pointer
 
 # Windows MSVC 2003 Xbox 1
 else ifeq ($(platform), xbox1_msvc2003)

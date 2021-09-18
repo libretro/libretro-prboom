@@ -64,6 +64,12 @@
 #include "r_fps.h"
 
 #include <libretro.h>
+#include <streams/file_stream.h>
+
+/* Don't include file_stream_transforms.h but instead
+just forward declare the prototype */
+int64_t rfread(void* buffer,
+   size_t elem_size, size_t elem_count, RFILE* stream);
 
 extern patchnum_t hu_font[HU_FONTSIZE];
 extern dbool  message_dontfuckwithme;
@@ -860,20 +866,23 @@ void M_ReadSaveStrings(void)
 
   for (i = 0 ; i < load_end ; i++) {
     char name[PATH_MAX+1];    // killough 3/22/98
-    FILE *fp;  // killough 11/98: change to use stdio
+    RFILE *fp;
 
     /* killough 3/22/98
      * cph - add not-demoplayback parameter */
     G_SaveGameName(name,sizeof(name),i,FALSE);
-    fp = fopen(name,"rb");
+    fp = filestream_open(name,
+		    RETRO_VFS_FILE_ACCESS_READ,
+		    RETRO_VFS_FILE_ACCESS_HINT_NONE);
+
     if (!fp) {   // Ty 03/27/98 - externalized:
       strcpy(&savegamestrings[i][0],s_EMPTYSTRING);
       LoadMenue[i].status = 0;
       continue;
     }
-    if ( fread(&savegamestrings[i], SAVESTRINGSIZE, 1, fp) != 1)
+    if ( rfread(&savegamestrings[i], SAVESTRINGSIZE, 1, fp) != 1)
       I_Error("M_ReadSaveStrings: can't read savegame file '%s'", name);
-    fclose(fp);
+    filestream_close(fp);
     LoadMenue[i].status = 1;
   }
 }

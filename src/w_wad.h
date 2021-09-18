@@ -36,6 +36,7 @@
 #define __W_WAD__
 
 #include <stdio.h>
+#include <streams/file_stream.h>
 
 //
 // TYPES
@@ -90,7 +91,7 @@ typedef struct {
 #ifdef MEMORY_LOW
   int handle;
 #else
-  FILE* handle;
+  RFILE* handle;
   unsigned char *data;
   int position;
   int length;

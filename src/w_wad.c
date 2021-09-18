@@ -49,6 +49,13 @@
 
 #include <sys/stat.h>
 
+#include <streams/file_stream.h>
+
+/* Don't include file_stream_transforms.h but instead
+just forward declare the prototype */
+int64_t rfread(void* buffer,
+   size_t elem_size, size_t elem_count, RFILE* stream);
+
 //
 // GLOBALS
 //
@@ -141,9 +148,11 @@ static void W_AddFile(wadfile_info_t *wadfile)
    if (wadfile->handle == -1)
 #else
       //precache into memory instead of reading from disk
-      wadfile->handle = fopen(wadfile->name, "rb");
+      wadfile->handle = filestream_open(wadfile->name,
+		      RETRO_VFS_FILE_ACCESS_READ,
+		      RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
-   if (wadfile->handle == 0)
+   if (!wadfile->handle)
 #endif
    {
       if (  strlen(wadfile->name)<=4 ||      // add error check -- killough
@@ -158,7 +167,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
    stat(wadfile->name, &statbuf);
    wadfile->length = statbuf.st_size;
    wadfile->data = malloc(statbuf.st_size);
-   if ( fread(wadfile->data, statbuf.st_size, 1, wadfile->handle) != 1)
+   if ( rfread(wadfile->data, statbuf.st_size, 1, wadfile->handle) != 1)
      I_Error("W_AddFile: couldn't read wad data");
 #endif
 
@@ -494,7 +503,7 @@ void W_Exit(void)
 #ifdef MEMORY_LOW
          close(wadfiles[i].handle);
 #else
-         fclose(wadfiles[i].handle);
+         filestream_close(wadfiles[i].handle);
          free(wadfiles[i].data);
 #endif
       }
@@ -513,7 +522,7 @@ void W_ReleaseAllWads(void)
 #ifdef MEMORY_LOW
 			close(wadfiles[i].handle);
 #else
-         fclose(wadfiles[i].handle);
+         filestream_close(wadfiles[i].handle);
 			free(wadfiles[i].data);
 #endif
 			wadfiles[i].handle = 0;

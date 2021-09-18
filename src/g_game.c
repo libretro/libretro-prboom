@@ -61,7 +61,6 @@
 #include "p_saveg.h"
 #include "p_tick.h"
 #include "p_map.h"
-#include "p_checksum.h"
 #include "d_main.h"
 #include "wi_stuff.h"
 #include "hu_stuff.h"
@@ -542,9 +541,11 @@ static void G_DoLoadLevel (void)
 {
   int i;
 
+#if 0
   lprintf(LO_INFO, "------------------------------\n"
           "G_DoLoadLevel:  ===== Episode %d - Map %.2d =====\n",
           gameepisode, gamemap);
+#endif
 
   /* Set the sky map for the episode.
    * First thing, we have a dummy sky texture name,
@@ -2892,8 +2893,6 @@ void G_DoPlayDemo(void)
  */
 dbool   G_CheckDemoStatus (void)
 {
-  P_ChecksumFinal();
-
   if (demoplayback)
   {
     if (demolumpnum != -1) {

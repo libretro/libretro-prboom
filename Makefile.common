@@ -24,6 +24,8 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/compat/compat_strl.c \
 				 $(LIBRETRO_COMM_DIR)/compat/compat_posix_string.c \
 				 $(LIBRETRO_COMM_DIR)/compat/fopen_utf8.c \
+				 $(LIBRETRO_COMM_DIR)/streams/file_stream.c \
+				 $(LIBRETRO_COMM_DIR)/streams/file_stream_transforms.c \
 				 $(LIBRETRO_COMM_DIR)/string/stdstring.c \
 				 $(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.c \
 				 $(LIBRETRO_COMM_DIR)/file/file_path.c \
@@ -103,7 +105,6 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/z_bmalloc.c \
 				 $(CORE_DIR)/lprintf.c \
 				 $(CORE_DIR)/wi_stuff.c \
-				 $(CORE_DIR)/p_checksum.c \
 				 $(CORE_DIR)/md5.c \
 				 $(CORE_DIR)/d_client.c \
 				 $(CORE_DIR)/memio.c \

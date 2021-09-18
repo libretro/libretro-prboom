@@ -9,6 +9,7 @@
 
 #include <libretro.h>
 #include <file/file_path.h>
+#include <streams/file_stream.h>
 
 #if _MSC_VER
 #include <compat/msvc.h>
@@ -40,6 +41,11 @@
 #include "../src/g_game.h"
 #include "../src/wi_stuff.h"
 #include "../src/p_tick.h"
+
+/* Don't include file_stream_transforms.h but instead
+just forward declare the prototype */
+int64_t rfread(void* buffer,
+   size_t elem_size, size_t elem_count, RFILE* stream);
 
 //i_system
 int ms_to_next_tick;
@@ -391,6 +397,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
+   struct retro_vfs_interface_info vfs_iface_info;
    static const struct retro_controller_description port[] = {
 		{ "Gamepad Modern", RETROPAD_MODERN },
 		{ "Gamepad Classic", RETROPAD_CLASSIC },
@@ -407,6 +414,11 @@ void retro_set_environment(retro_environment_t cb)
 
    libretro_set_core_options(environ_cb);
 	cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
+
+   vfs_iface_info.required_interface_version = 1;
+   vfs_iface_info.iface                      = NULL;
+   if (cb(RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &vfs_iface_info))
+      filestream_vfs_init(&vfs_iface_info);
 }
 
 void retro_set_controller_port_device(unsigned port, unsigned device)
@@ -625,13 +637,15 @@ static char* remove_extension(char *buf, const char *path, size_t size)
 
 static wadinfo_t get_wadinfo(const char *path)
 {
-   FILE* fp = fopen(path, "rb");
    wadinfo_t header;
-   if (fp != NULL)
+   RFILE* fp = filestream_open(path,
+		   RETRO_VFS_FILE_ACCESS_READ,
+		   RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (fp)
    {
-      if(fread(&header, sizeof(header), 1, fp) != 1)
+      if(rfread(&header, sizeof(header), 1, fp) != 1)
          I_Error("get_wadinfo: error reading file header");
-      fclose(fp);
+      filestream_close(fp);
    }
    else
       memset(&header, 0, sizeof(header));
@@ -1561,7 +1575,6 @@ dbool   HasTrailingSlash(const char* dn)
  */
 char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
 {
-   FILE * file;
    char * p;
    /* Precalculate a length we will need in the loop */
    size_t pl = strlen(wfname) + (ext ? strlen(ext) : 0) + 4;
@@ -1581,13 +1594,11 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
 
    if (ext && ext[0] != '\0')
       strcat(p, ext);
-   file = fopen(p, "rb");
 
-   if (file)
+   if (path_is_valid(p))
    {
       if (log_cb)
          log_cb(RETRO_LOG_DEBUG, "FindFileInDir: found %s\n", p);
-      fclose(file);
       return p;
    }
    else if (log_cb)
@@ -1722,7 +1733,6 @@ void R_InitInterpolation(void)
 int lprintf(OutputLevels pri, const char *s, ...)
 {
   va_list v;
-  int r=0;
   char msg[MAX_LOG_MESSAGE_SIZE];
 
   if (!log_cb)
@@ -1730,9 +1740,9 @@ int lprintf(OutputLevels pri, const char *s, ...)
 
   va_start(v,s);
 #ifdef HAVE_VSNPRINTF
-  r = vsnprintf(msg,sizeof(msg),s,v);         /* print message in buffer  */
+  vsnprintf(msg,sizeof(msg),s,v);
 #else
-  r = vsprintf(msg,s,v);
+  vsprintf(msg,s,v);
 #endif
   va_end(v);
 

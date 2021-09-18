@@ -83,7 +83,10 @@ int64_t rfwrite(void const* buffer,
 int64_t rfread(void* buffer,
    size_t elem_size, size_t elem_count, RFILE* stream);
 int rfscanf(RFILE * stream, const char * format, ...);
+int rfprintf(RFILE *stream, const char *fmt, ...);
+int rfeof(RFILE* stream);
 
+extern retro_log_printf_t log_cb;
 extern dbool   r_wigglefix;
 
 /*
@@ -857,13 +860,15 @@ static char *defaultfile;
 void M_SaveDefaults (void)
 {
   int   i;
-  FILE *f = fopen (defaultfile, "w");
+  RFILE *f = filestream_open (defaultfile,
+        RETRO_VFS_FILE_ACCESS_WRITE,
+        RETRO_VFS_FILE_ACCESS_HINT_NONE);
   if (!f)
     return; // can't write the file, but don't complain
 
   // 3/3/98 explain format of file
 
-  fprintf(f,"# Doom config file\n"
+  rfprintf(f,"# Doom config file\n"
           "#\n"
           "# Format:\n"
           "#  variable   value\n"
@@ -874,7 +879,7 @@ void M_SaveDefaults (void)
   for (i = 0 ; i < numdefaults ; i++) {
     if (defaults[i].type == def_none) {
       // CPhipps - pure headers
-      fprintf(f, "\n## %s\n", defaults[i].name);
+      rfprintf(f, "\n## %s\n", defaults[i].name);
     } else {
       // CPhipps - modified for new default_t form
       if (!IS_STRING(defaults[i])) //jff 4/10/98 kill super-hack on pointer value
@@ -882,24 +887,24 @@ void M_SaveDefaults (void)
         // CPhipps - remove keycode hack
         // killough 3/6/98: use spaces instead of tabs for uniform justification
         if (defaults[i].type == def_hex)
-          fprintf (f,"%s%-25s 0x%x\n",
+          rfprintf (f,"%s%-25s 0x%x\n",
                    (defaults[i].defaultvalue.i == *(defaults[i].location.pi))?"#":"",
                    defaults[i].name,*(defaults[i].location.pi));
         else
-          fprintf (f,"%s%-25s %5i\n",
+          rfprintf (f,"%s%-25s %5i\n",
                    (defaults[i].defaultvalue.i == *(defaults[i].location.pi))?"#":"",
                    defaults[i].name,*(defaults[i].location.pi));
       }
       else
       {
-        fprintf (f,"%s%-25s \"%s\"\n",
+        rfprintf (f,"%s%-25s \"%s\"\n",
                  (strcmp(defaults[i].defaultvalue.psz,*(defaults[i].location.ppsz)) == 0)?"#":"",
                  defaults[i].name,*(defaults[i].location.ppsz));
       }
     }
   }
 
-  fclose (f);
+  filestream_close (f);
 }
 
 /*
@@ -969,10 +974,12 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
           if ((defaults[i].type != def_none) && !strcmp(def, defaults[i].name))
           {
             // CPhipps - safety check
-            if (isstring != IS_STRING(defaults[i])) {
-              lprintf(LO_WARN, "M_LoadDefaults: Type mismatch reading %s\n", defaults[i].name);
+            if (isstring != IS_STRING(defaults[i]))
+            {
+              log_cb(RETRO_LOG_WARN, "M_LoadDefaults: Type mismatch reading %s\n", defaults[i].name);
               continue;
             }
+
             if (!isstring)
             {
               //jff 3/4/98 range check numeric parameters
@@ -1049,7 +1056,7 @@ void M_LoadDefaults (void)
             "pr");
   }
 
-  lprintf (LO_CONFIRM, " default file: %s\n",defaultfile);
+  log_cb(RETRO_LOG_INFO, " Default file: %s\n",defaultfile);
 
   M_LoadDefaultsFile(defaultfile, FALSE);
 }

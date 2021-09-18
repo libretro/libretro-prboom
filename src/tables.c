@@ -1870,7 +1870,7 @@ void R_LoadTrigTables(void)
   {
     lump = (W_CheckNumForName)("SINETABL",ns_prboom);
     if (lump == -1)
-      lprintf(LO_INFO,"SINETABL:internal ");
+      lprintf(LO_INFO,"SINETABL:internal\n");
     else if (W_LumpLength(lump) != sizeof(finesine))
       I_Error("R_LoadTrigTables: Invalid SINETABL");
     else
@@ -1879,7 +1879,7 @@ void R_LoadTrigTables(void)
   {
     lump = (W_CheckNumForName)("TANGTABL",ns_prboom);
     if (lump == -1)
-      lprintf(LO_INFO,"TANGTABL:internal ");
+      lprintf(LO_INFO,"TANGTABL:internal\n");
     else if (W_LumpLength(lump) != sizeof(finetangent))
       I_Error("R_LoadTrigTables: Invalid TANGTABL");
     else
@@ -1888,7 +1888,7 @@ void R_LoadTrigTables(void)
   {
     lump = (W_CheckNumForName)("TANTOANG",ns_prboom);
     if (lump == -1)
-      lprintf(LO_INFO,"TANTOANG:internal ");
+      lprintf(LO_INFO,"TANTOANG:internal'\n");
     else if (W_LumpLength(lump) != sizeof(tantoangle))
       I_Error("R_LoadTrigTables: Invalid TANTOANG");
     else
@@ -1897,12 +1897,12 @@ void R_LoadTrigTables(void)
   // Endianness correction - might still be non-portable, but is fast where possible
   {
     size_t n;
-    lprintf(LO_INFO, "Endianness...");
+    lprintf(LO_INFO, "Endianness...\n");
 
     // This test doesn't assume the endianness of the tables, but deduces them from
     // en entry. I hope this is portable.
     if ((10 < finesine[1]) && (finesine[1] < 100)) {
-      lprintf(LO_INFO, "ok.");
+      lprintf(LO_INFO, "ok.\n");
       return; // Endianness is correct
     }
 
@@ -1913,6 +1913,6 @@ void R_LoadTrigTables(void)
     CORRECT_TABLE_ENDIAN(finesine);
     CORRECT_TABLE_ENDIAN(finetangent);
     CORRECT_TABLE_ENDIAN(tantoangle);
-    lprintf(LO_INFO, "corrected.");
+    lprintf(LO_INFO, "corrected.\n");
   }
 }

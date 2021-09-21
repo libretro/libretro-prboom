@@ -2007,7 +2007,7 @@ bool G_DoSaveGameToBuffer(void *buf, size_t size) {
 
   if (ok) {
     memcpy(buf, savebuffer, length);
-    memset(buf+length, 0, size - length);
+    memset(((char*)buf)+length, 0, size - length);
   }
 
   free(savebuffer);  // killough

@@ -935,22 +935,23 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
 {
   int   i;
   int   len;
-  char  def[80];
-  char  strparm[100];
+  char  def[80] = {0};
+  char  strparm[100] = {0};
   char* newstring = NULL;   // killough
   int   parm;
   dbool   isstring;
   // read the file in, overriding any set defaults
-  FILE *f = fopen (file, "r");
+  RFILE *f = filestream_open (file,
+      RETRO_VFS_FILE_ACCESS_READ,
+      RETRO_VFS_FILE_ACCESS_HINT_NONE);
   if (f)
   {
-    while (!feof(f))
+    while (!rfeof(f))
     {
       isstring = FALSE;
-      if (fscanf(f, "%79s %99[^\n]\n", def, strparm) == 2)
+      if (rfscanf(f, "%79s %99[^\n]\n", def, strparm) == 2)
       {
         //jff 3/3/98 skip lines not starting with an alphanum
-
         if (!isalnum(def[0]))
           continue;
 
@@ -1006,7 +1007,7 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
           }
       }
     }
-    fclose(f);
+    filestream_close(f);
   }
   //jff 3/4/98 redundant range checks for hud deleted here
 }

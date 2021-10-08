@@ -348,14 +348,6 @@ void _vp_psy_init(vorbis_look_psy *p,vorbis_info_psy *vi,
         p->vi->noiseoff[j][inthalfoc+1]*del;
 
   }
-#if 0
-  {
-    static int ls=0;
-    _analysis_output_always("noiseoff0",ls,p->noiseoffset[0],n,1,0,0);
-    _analysis_output_always("noiseoff1",ls,p->noiseoffset[1],n,1,0,0);
-    _analysis_output_always("noiseoff2",ls++,p->noiseoffset[2],n,1,0,0);
-  }
-#endif
 }
 
 void _vp_psy_clear(vorbis_look_psy *p){

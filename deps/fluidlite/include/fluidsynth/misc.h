@@ -32,24 +32,6 @@ extern "C" {
  *  Utility functions
  */
 
-/**
- * fluid_is_soundfont returns 1 if the specified filename is a
- * soundfont. It retuns 0 otherwise. The current implementation only
- * checks for the "RIFF" header in the file. It is useful only to
- * distinguish between SoundFonts and MIDI files.
- */
-FLUIDSYNTH_API int fluid_is_soundfont(char* filename);
-
-/**
- * fluid_is_midifile returns 1 if the specified filename is a MIDI
- * file. It retuns 0 otherwise. The current implementation only checks
- * for the "MThd" header in the file.  
- */
-FLUIDSYNTH_API int fluid_is_midifile(char* filename);
-
-
-
-
 #ifdef WIN32
 /** Set the handle to the instance of the application on the Windows
     platform. The handle is needed to open DirectSound. */

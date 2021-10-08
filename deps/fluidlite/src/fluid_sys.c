@@ -38,29 +38,6 @@ void fluid_sys_config()
 
 unsigned int fluid_debug_flags = 0;
 
-#if DEBUG
-/*
- * fluid_debug
- */
-int fluid_debug(int level, char * fmt, ...)
-{
-  if (fluid_debug_flags & level) {
-    fluid_log_function_t fun;
-    va_list args;
-
-    va_start (args, fmt);
-    vsnprintf(fluid_errbuf, sizeof (fluid_errbuf), fmt, args);
-    va_end (args);
-
-    fun = fluid_log_function[FLUID_DBG];
-    if (fun != NULL) {
-      (*fun)(level, fluid_errbuf, fluid_log_user_data[FLUID_DBG]);
-    }
-  }
-  return 0;
-}
-#endif
-
 /**
  * Installs a new log function for a specified log level.
  * @param level Log level to install handler for.
@@ -116,9 +93,6 @@ fluid_default_log_function(int level, char* message, void* data)
     FLUID_FPRINTF(out, "%s: %s\n", fluid_libname, message);
     break;
   case FLUID_DBG:
-#if DEBUG
-    FLUID_FPRINTF(out, "%s: debug: %s\n", fluid_libname, message);
-#endif
     break;
   default:
     FLUID_FPRINTF(out, "%s: %s\n", fluid_libname, message);
@@ -262,51 +236,6 @@ char*
 fluid_error()
 {
   return fluid_errbuf;
-}
-
-
-/*
- *
- *  fluid_is_midifile
- */
-int
-fluid_is_midifile(char* filename)
-{
-  FILE* fp = fopen(filename, "rb");
-  char id[4];
-
-  if (fp == NULL) {
-    return 0;
-  }
-  if (fread((void*) id, 1, 4, fp) != 4) {
-    fclose(fp);
-    return 0;
-  }
-  fclose(fp);
-
-  return strncmp(id, "MThd", 4) == 0;
-}
-
-/*
- *  fluid_is_soundfont
- *
- */
-int
-fluid_is_soundfont(char* filename)
-{
-  FILE* fp = fopen(filename, "rb");
-  char id[4];
-
-  if (fp == NULL) {
-    return 0;
-  }
-  if (fread((void*) id, 1, 4, fp) != 4) {
-    fclose(fp);
-    return 0;
-  }
-  fclose(fp);
-
-  return strncmp(id, "RIFF", 4) == 0;
 }
 
 /*=============================================================*/

@@ -145,26 +145,26 @@ SOURCES_C += $(FLUIDSYNTH_DIR)/src/fluid_chan.c \
 				 $(FLUIDSYNTH_DIR)/src/fluid_voice.c
 
 SOURCES_C += $(LIBVORBIS_DIR)/lib/analysis.c \
-				 $(LIBVORBIS_DIR)/lib/bitrate.c \
-				 $(LIBVORBIS_DIR)/lib/block.c \
-				 $(LIBVORBIS_DIR)/lib/codebook.c \
-				 $(LIBVORBIS_DIR)/lib/envelope.c \
-				 $(LIBVORBIS_DIR)/lib/floor0.c \
-				 $(LIBVORBIS_DIR)/lib/floor1.c \
-				 $(LIBVORBIS_DIR)/lib/info.c \
-				 $(LIBVORBIS_DIR)/lib/lookup.c \
-				 $(LIBVORBIS_DIR)/lib/lpc.c \
-				 $(LIBVORBIS_DIR)/lib/lsp.c \
-				 $(LIBVORBIS_DIR)/lib/mapping0.c \
-				 $(LIBVORBIS_DIR)/lib/mdct.c \
-				 $(LIBVORBIS_DIR)/lib/psy.c \
-				 $(LIBVORBIS_DIR)/lib/registry.c \
-				 $(LIBVORBIS_DIR)/lib/res0.c \
-				 $(LIBVORBIS_DIR)/lib/sharedbook.c \
-				 $(LIBVORBIS_DIR)/lib/smallft.c \
-				 $(LIBVORBIS_DIR)/lib/synthesis.c \
-				 $(LIBVORBIS_DIR)/lib/vorbisfile.c \
-				 $(LIBVORBIS_DIR)/lib/window.c
+	     $(LIBVORBIS_DIR)/lib/bitrate.c \
+	     $(LIBVORBIS_DIR)/lib/block.c \
+	     $(LIBVORBIS_DIR)/lib/codebook.c \
+	     $(LIBVORBIS_DIR)/lib/envelope.c \
+	     $(LIBVORBIS_DIR)/lib/floor0.c \
+	     $(LIBVORBIS_DIR)/lib/floor1.c \
+	     $(LIBVORBIS_DIR)/lib/info.c \
+	     $(LIBVORBIS_DIR)/lib/lookup.c \
+	     $(LIBVORBIS_DIR)/lib/lpc.c \
+	     $(LIBVORBIS_DIR)/lib/lsp.c \
+	     $(LIBVORBIS_DIR)/lib/mapping0.c \
+	     $(LIBVORBIS_DIR)/lib/mdct.c \
+	     $(LIBVORBIS_DIR)/lib/psy.c \
+	     $(LIBVORBIS_DIR)/lib/registry.c \
+	     $(LIBVORBIS_DIR)/lib/res0.c \
+	     $(LIBVORBIS_DIR)/lib/sharedbook.c \
+	     $(LIBVORBIS_DIR)/lib/smallft.c \
+	     $(LIBVORBIS_DIR)/lib/synthesis.c \
+	     $(LIBVORBIS_DIR)/lib/vorbisfile.c \
+	     $(LIBVORBIS_DIR)/lib/window.c
 
 SOURCES_C += $(LIBOGG_DIR)/src/bitwise.c \
 				 $(LIBOGG_DIR)/src/framing.c

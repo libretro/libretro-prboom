@@ -881,17 +881,6 @@ int floor1_encode(oggpack_buffer *opb,vorbis_block *vb,
         look->phrasebits+=
           vorbis_book_encode(books+info->class_book[class],cval,opb);
 
-#ifdef TRAIN_FLOOR1
-        {
-          FILE *of;
-          char buffer[80];
-          sprintf(buffer,"line_%dx%ld_class%d.vqd",
-                  vb->pcmend/2,posts-2,class);
-          of=fopen(buffer,"a");
-          fprintf(of,"%d\n",cval);
-          fclose(of);
-        }
-#endif
       }
 
       /* write post values */
@@ -902,20 +891,6 @@ int floor1_encode(oggpack_buffer *opb,vorbis_block *vb,
           if(out[j+k]<(books+book)->entries)
             look->postbits+=vorbis_book_encode(books+book,
                                                out[j+k],opb);
-          /*else
-            fprintf(stderr,"+!");*/
-
-#ifdef TRAIN_FLOOR1
-          {
-            FILE *of;
-            char buffer[80];
-            sprintf(buffer,"line_%dx%ld_%dsub%d.vqd",
-                    vb->pcmend/2,posts-2,class,bookas[k]);
-            of=fopen(buffer,"a");
-            fprintf(of,"%d\n",out[j+k]);
-            fclose(of);
-          }
-#endif
         }
       }
       j+=cdim;

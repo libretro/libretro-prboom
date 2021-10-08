@@ -67,10 +67,7 @@ size_t mem_fread(void *buf, size_t size, size_t nmemb, MEMFILE *stream)
   size_t items;
 
   if (stream->mode != MODE_READ)
-  {
-    printf("not a read stream\n");
     return -1;
-  }
 
   // Trying to read more bytes than we have left?
 
@@ -116,9 +113,7 @@ size_t mem_fwrite(const void *ptr, size_t size, size_t nmemb, MEMFILE *stream)
   size_t bytes;
 
   if (stream->mode != MODE_WRITE)
-  {
     return -1;
-  }
 
   // More bytes than can fit in the buffer?
   // If so, reallocate bigger.
@@ -156,9 +151,7 @@ void mem_get_buf(MEMFILE *stream, void **buf, size_t *buflen)
 void mem_fclose(MEMFILE *stream)
 {
   if (stream->mode == MODE_WRITE)
-  {
     Z_Free(stream->buf);
-  }
 
   Z_Free(stream);
 }
@@ -170,33 +163,30 @@ long mem_ftell(MEMFILE *stream)
 
 int mem_fseek(MEMFILE *stream, signed long position, mem_rel_t whence)
 {
-  unsigned int newpos;
+   unsigned int newpos;
 
-  switch (whence)
-  {
-    case MEM_SEEK_SET:
-      newpos = (int) position;
-      break;
+   switch (whence)
+   {
+      case MEM_SEEK_SET:
+         newpos = (int) position;
+         break;
 
-    case MEM_SEEK_CUR:
-      newpos = (int) (stream->position + position);
-      break;
+      case MEM_SEEK_CUR:
+         newpos = (int) (stream->position + position);
+         break;
 
-    case MEM_SEEK_END:
-      newpos = (int) (stream->buflen + position);
-      break;
-    default:
-      return -1;
-  }
+      case MEM_SEEK_END:
+         newpos = (int) (stream->buflen + position);
+         break;
+      default:
+         return -1;
+   }
 
-  if (newpos < stream->buflen)
-  {
-    stream->position = newpos;
-    return 0;
-  }
-  else
-  {
-    printf("Error seeking to %i\n", newpos);
-    return -1;
-  }
+   if (newpos < stream->buflen)
+   {
+      stream->position = newpos;
+      return 0;
+   }
+
+   return -1;
 }

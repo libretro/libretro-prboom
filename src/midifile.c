@@ -119,18 +119,7 @@ struct midi_file_s
 static dbool   CheckChunkHeader(chunk_header_t *chunk,
                                 const char *expected_id)
 {
-    dbool result = (memcmp((char *) chunk->chunk_id, expected_id, 4) == 0);
-
-    if (!result)
-    {
-        lprintf (LO_WARN, "CheckChunkHeader: Expected '%s' chunk header, "
-                        "got '%c%c%c%c'\n",
-                        expected_id,
-                        chunk->chunk_id[0], chunk->chunk_id[1],
-                        chunk->chunk_id[2], chunk->chunk_id[3]);
-    }
-
-    return result;
+    return (memcmp((char *) chunk->chunk_id, expected_id, 4) == 0);
 }
 
 // Read a single byte.  Returns false on error.
@@ -138,10 +127,7 @@ static dbool   CheckChunkHeader(chunk_header_t *chunk,
 static dbool   ReadByte(unsigned char *result, midimem_t *mf)
 {
     if (mf->pos >= mf->len)
-    {
-        lprintf (LO_WARN, "ReadByte: Unexpected end of file\n");
         return false;
-    }
 
     *result = mf->data[mf->pos++];
     return true;
@@ -154,10 +140,7 @@ static dbool   ReadMultipleBytes (void *dest, size_t len, midimem_t *mf)
   for (i = 0; i < len; i++)
   {
     if (!ReadByte (cdest + i, mf))
-    {
-      lprintf (LO_WARN, "ReadMultipleBytes: Unexpected end of file\n");
       return false;
-    }
   }
   return true;
 }
@@ -174,11 +157,7 @@ static dbool   ReadVariableLength(unsigned int *result, midimem_t *mf)
     for (i=0; i<4; ++i)
     {
         if (!ReadByte(&b, mf))
-        {
-            lprintf (LO_WARN, "ReadVariableLength: Error while reading "
-                            "variable-length value\n");
             return false;
-        }
 
         // Insert the bottom seven bits from this byte.
 
@@ -188,13 +167,9 @@ static dbool   ReadVariableLength(unsigned int *result, midimem_t *mf)
         // If the top bit is not set, this is the end.
 
         if ((b & 0x80) == 0)
-        {
             return true;
-        }
     }
 
-    lprintf (LO_WARN, "ReadVariableLength: Variable-length value too "
-                    "long: maximum of four bytes\n");
     return false;
 }
 
@@ -214,10 +189,7 @@ static void *ReadByteSequence(unsigned int num_bytes, midimem_t *mf)
     result = malloc(num_bytes);
 
     if (result == NULL)
-    {
-        lprintf (LO_WARN, "ReadByteSequence: Failed to allocate buffer %u bytes\n", num_bytes);
         return NULL;
-    }
 
     // Read the data:
 
@@ -736,79 +708,6 @@ void MIDI_RestartIterator(midi_track_iter_t *iter)
     iter->position = 0;
 }
 
-#if 0
-static void MIDI_PrintFlatListDBG (const midi_event_t **evs)
-{
-  const midi_event_t *event;
-
-  while (1)
-  {
-    event = *evs++;
-
-    if (event->delta_time > 0)
-      printf("Delay: %i ticks\n", event->delta_time);
-
-
-    switch (event->event_type)
-    {
-      case MIDI_EVENT_NOTE_OFF:
-        printf ("MIDI_EVENT_NOTE_OFF\n");break;
-      case MIDI_EVENT_NOTE_ON:
-        printf ("MIDI_EVENT_NOTE_ON\n");break;
-      case MIDI_EVENT_AFTERTOUCH:
-        printf ("MIDI_EVENT_AFTERTOUCH\n");break;
-      case MIDI_EVENT_CONTROLLER:
-        printf ("MIDI_EVENT_CONTROLLER\n");break;
-      case MIDI_EVENT_PROGRAM_CHANGE:
-        printf ("MIDI_EVENT_PROGRAM_CHANGE\n");break;
-      case MIDI_EVENT_CHAN_AFTERTOUCH:
-        printf ("MIDI_EVENT_CHAN_AFTERTOUCH\n");break;
-      case MIDI_EVENT_PITCH_BEND:
-        printf ("MIDI_EVENT_PITCH_BEND\n");break;
-      case MIDI_EVENT_SYSEX:
-        printf ("MIDI_EVENT_SYSEX\n");break;
-      case MIDI_EVENT_SYSEX_SPLIT:
-        printf ("MIDI_EVENT_SYSEX_SPLIT\n");break;
-      case MIDI_EVENT_META:
-        printf ("MIDI_EVENT_META\n");break;
-
-      default:
-        printf ("(unknown)\n");break;
-    }
-    switch(event->event_type)
-    {
-            case MIDI_EVENT_NOTE_OFF:
-            case MIDI_EVENT_NOTE_ON:
-            case MIDI_EVENT_AFTERTOUCH:
-            case MIDI_EVENT_CONTROLLER:
-            case MIDI_EVENT_PROGRAM_CHANGE:
-            case MIDI_EVENT_CHAN_AFTERTOUCH:
-            case MIDI_EVENT_PITCH_BEND:
-                printf("\tChannel: %i\n", event->data.channel.channel);
-                printf("\tParameter 1: %i\n", event->data.channel.param1);
-                printf("\tParameter 2: %i\n", event->data.channel.param2);
-                break;
-
-            case MIDI_EVENT_SYSEX:
-            case MIDI_EVENT_SYSEX_SPLIT:
-                printf("\tLength: %i\n", event->data.sysex.length);
-                break;
-
-            case MIDI_EVENT_META:
-                printf("\tMeta type: %i\n", event->data.meta.type);
-                printf("\tLength: %i\n", event->data.meta.length);
-                break;
-    }
-    if (event->event_type == MIDI_EVENT_META &&
-        event->data.meta.type == MIDI_META_END_OF_TRACK)
-    {
-      printf ("gotta go!\n");
-      return;
-    }
-  }
-}
-#endif
-    
 // NSM: an alternate iterator tool.
 
 midi_event_t **MIDI_GenerateFlatList (midi_file_t *file)

@@ -35,7 +35,6 @@
  *-----------------------------------------------------------------------------
  */
 
-#include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #ifdef _MSC_VER

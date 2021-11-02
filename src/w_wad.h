@@ -35,7 +35,6 @@
 #ifndef __W_WAD__
 #define __W_WAD__
 
-#include <stdio.h>
 #include <streams/file_stream.h>
 
 //

@@ -35,7 +35,6 @@
 
 #include "config.h"
 
-#include <stdio.h>
 #include <stdarg.h>
 #include <errno.h>
 #ifdef _MSC_VER
@@ -92,7 +91,7 @@ extern dbool   r_wigglefix;
 /*
  * M_WriteFile
  *
- * killough 9/98: rewritten to use stdio and to flash disk icon
+ * killough 9/98: rewritten to use filestream and to flash disk icon
  */
 
 dbool   M_WriteFile(char const *name, void *source, int length)
@@ -115,7 +114,7 @@ dbool   M_WriteFile(char const *name, void *source, int length)
 /*
  * M_ReadFile
  *
- * killough 9/98: rewritten to use stdio and to flash disk icon
+ * killough 9/98: rewritten to use filestream and to flash disk icon
  */
 
 int M_ReadFile(char const *name, uint8_t **buffer)

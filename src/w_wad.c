@@ -495,46 +495,49 @@ void W_Init(void)
 
 void W_Exit(void)
 {
-	unsigned i;
-	for (i = 0; i < numwadfiles; i++)
+   unsigned i;
+   for (i = 0; i < numwadfiles; i++)
    {
-		if (wadfiles[i].handle)
+      if (wadfiles[i].handle)
       {
 #ifdef MEMORY_LOW
          close(wadfiles[i].handle);
 #else
          filestream_close(wadfiles[i].handle);
          free(wadfiles[i].data);
+         wadfiles[i].data = NULL;
 #endif
+         wadfiles[i].handle = NULL;
       }
-	}
+   }
 }
 
 void W_ReleaseAllWads(void)
 {
-	unsigned i;
-	W_DoneCache();
+   unsigned i;
+   W_DoneCache();
 
-	for(i = 0; i < numwadfiles; i++)
-	{
-		if(wadfiles[i].handle)
-		{
+   for(i = 0; i < numwadfiles; i++)
+   {
+      if(wadfiles[i].handle)
+      {
 #ifdef MEMORY_LOW
-			close(wadfiles[i].handle);
+         close(wadfiles[i].handle);
 #else
          filestream_close(wadfiles[i].handle);
-			free(wadfiles[i].data);
+         free(wadfiles[i].data);
+         wadfiles[i].data = NULL;
 #endif
-			wadfiles[i].handle = 0;
-		}
-	}
+         wadfiles[i].handle = NULL;
+      }
+   }
 
-	numwadfiles = 0;
-	free(wadfiles);
-	wadfiles = NULL;
-	numlumps = 0;
-	free(lumpinfo);
-	lumpinfo = NULL;
+   numwadfiles = 0;
+   free(wadfiles);
+   wadfiles = NULL;
+   numlumps = 0;
+   free(lumpinfo);
+   lumpinfo = NULL;
 }
 
 //

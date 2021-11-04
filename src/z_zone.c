@@ -105,10 +105,9 @@ void Z_DumpHistory(char *buf)
 
 void Z_Close(void)
 {
-#if 0
-  (free)(zonebase);
-  zone = rover = zonebase = NULL;
-#endif
+   Z_FreeTags(PU_FREE, PU_MAX);
+   memory_size = 0;
+   free_memory = 0;
 }
 
 bool Z_Init(void)

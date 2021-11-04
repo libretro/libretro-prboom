@@ -58,26 +58,26 @@
 // Store VERTEXES, LINEDEFS, SIDEDEFS, etc.
 //
 
-int      numvertexes;
-vertex_t *vertexes;
+int      numvertexes = 0;
+vertex_t *vertexes = NULL;
 
-int      numsegs;
-seg_t    *segs;
+int      numsegs = 0;
+seg_t    *segs = NULL;
 
-int      numsectors;
-sector_t *sectors;
+int      numsectors = 0;
+sector_t *sectors = NULL;
 
-int      numsubsectors;
-subsector_t *subsectors;
+int      numsubsectors = 0;
+subsector_t *subsectors = NULL;
 
-int      numnodes;
-node_t   *nodes;
+int      numnodes = 0;
+node_t   *nodes = NULL;
 
-int      numlines;
-line_t   *lines;
+int      numlines = 0;
+line_t   *lines = NULL;
 
-int      numsides;
-side_t   *sides;
+int      numsides = 0;
+side_t   *sides = NULL;
 
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -1917,4 +1917,36 @@ void P_Init (void)
    P_InitSwitchList();
    P_InitPicAnims();
    R_InitSprites(sprnames);
+}
+/*
+ * 
+=================
+=
+= P_Deinit
+=
+=================
+*/
+
+void P_Deinit(void)
+{
+   Z_Free(vertexes);
+   numvertexes = 0;
+
+   Z_Free(segs);
+   numsegs = 0;
+
+   Z_Free(sectors);
+   numsectors = 0;
+
+   Z_Free(subsectors);
+   numsubsectors = 0;
+
+   Z_Free(nodes);
+   numnodes = 0;
+
+   Z_Free(lines);
+   numlines = 0;
+
+   Z_Free(sides);
+   numsides = 0;
 }

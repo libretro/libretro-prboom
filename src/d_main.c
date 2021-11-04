@@ -1481,16 +1481,20 @@ void D_DoomDeinit(void)
   lprintf(LO_INFO,"D_DoomDeinit:\n");
   //Deinit
   M_QuitDOOM(0);
-  Z_Close();
 #ifdef HAVE_NET
   D_QuitNetGame();
   I_ShutdownNetwork();
 #endif
   M_SaveDefaults ();
-  W_Exit();
+  W_ReleaseAllWads();
   U_FreeMapInfo();
   I_ShutdownSound();
   I_ShutdownMusic();
+  V_FreeScreens();
+  V_DestroyUnusedTrueColorPalettes();
+  R_FlushAllPatches();
+  P_Deinit();
+  Z_Close();
 }
 
 //

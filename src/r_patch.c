@@ -98,8 +98,12 @@ void R_FlushAllPatches(void) {
   if (patches)
   {
     for (i=0; i < numlumps; i++)
+    {
       if (patches[i].locks > 0)
         I_Error("R_FlushAllPatches: patch number %i still locked",i);
+      if (patches[i].data)
+        free(patches[i].data);
+    }
     free(patches);
     patches = NULL;
   }

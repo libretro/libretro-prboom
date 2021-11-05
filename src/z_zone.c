@@ -105,7 +105,12 @@ void Z_DumpHistory(char *buf)
 
 void Z_Close(void)
 {
+   /* The libretro core will crash on
+    * close content if we free memory
+    * here while running on Windows... */
+#if !defined(_WIN32)
    Z_FreeTags(PU_FREE, PU_MAX);
+#endif
    memory_size = 0;
    free_memory = 0;
 }

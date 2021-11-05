@@ -112,6 +112,10 @@ void Z_Close(void)
 
 bool Z_Init(void)
 {
+   unsigned i;
+   for (i = 0; i < PU_MAX; i++)
+      blockbytag[i] = NULL;
+
    return true;
 }
 

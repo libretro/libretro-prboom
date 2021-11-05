@@ -10,6 +10,7 @@
 #include <libretro.h>
 #include <file/file_path.h>
 #include <streams/file_stream.h>
+#include <array/rbuf.h>
 
 #if _MSC_VER
 #include <compat/msvc.h>
@@ -41,6 +42,7 @@
 #include "../src/g_game.h"
 #include "../src/wi_stuff.h"
 #include "../src/p_tick.h"
+#include "../src/z_zone.h"
 
 /* Don't include file_stream_transforms.h but instead
 just forward declare the prototype */
@@ -55,12 +57,17 @@ int SCREENWIDTH  = 320;
 int SCREENHEIGHT = 200;
 
 //i_video
-static unsigned char *screen_buf;
+static unsigned char *screen_buf = NULL;
 
 /* libretro */
 static char g_wad_dir[1024];
 static char g_basename[1024];
 static char g_save_dir[1024];
+
+/* Cheat handling */
+static bool cheats_enabled = false;
+static bool cheats_pending = false;
+static char **cheats_pending_list = NULL;
 
 //forward decls
 bool D_DoomMainSetup(void);
@@ -277,6 +284,8 @@ void retro_init(void)
    enum retro_pixel_format rgb565;
    struct retro_log_callback log;
 
+   Z_Init(); /* 1/18/98 killough: start up memory stuff first */
+
    if(environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
    else
@@ -296,6 +305,24 @@ void retro_deinit(void)
 {
    D_DoomDeinit();
 
+   if (screen_buf)
+      free(screen_buf);
+   screen_buf = NULL;
+
+   cheats_enabled = false;
+   cheats_pending = false;
+   if (cheats_pending_list)
+   {
+      unsigned i;
+      for (i = 0; i < RBUF_LEN(cheats_pending_list); i++)
+      {
+         if (cheats_pending_list[i])
+            free(cheats_pending_list[i]);
+         cheats_pending_list[i] = NULL;
+      }
+      RBUF_FREE(cheats_pending_list);
+   }
+
    libretro_supports_bitmasks = false;
 
    retro_set_rumble_damage(0, 0.0f);
@@ -307,6 +334,13 @@ void retro_deinit(void)
    rumble_damage_counter  = -1;
    rumble_touch_strength  = 0;
    rumble_touch_counter   = -1;
+
+   /* Z_Close() must be the very last
+    * function that is called, since
+    * z_zone.h overrides malloc()/free()/etc.
+    * (i.e. anything that calls free()
+    * after Z_Close() will likely segfault) */
+   Z_Close();
 }
 
 unsigned retro_api_version(void)
@@ -561,6 +595,27 @@ void retro_run(void)
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       update_variables(false);
+
+   /* Check for pending cheats */
+   if (cheats_pending && (gamestate == GS_LEVEL) && !demoplayback)
+   {
+      unsigned i, j;
+      for (i = 0; i < RBUF_LEN(cheats_pending_list); i++)
+      {
+         const char *cheat_code = cheats_pending_list[i];
+         if (cheat_code)
+         {
+            for (j = 0; cheat_code[j] != '\0'; j++)
+               M_FindCheats(cheat_code[j]);
+
+            free(cheats_pending_list[i]);
+            cheats_pending_list[i] = NULL;
+         }
+      }
+      RBUF_FREE(cheats_pending_list);
+      cheats_pending = false;
+   }
+
    if (quit_pressed)
    {
       environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
@@ -765,9 +820,6 @@ bool retro_load_game(const struct retro_game_info *info)
    myargc = argc;
    myargv = (const char **) argv;
 
-   if (!Z_Init()) /* 1/18/98 killough: start up memory stuff first */
-      goto failed;
-
    /* cphipps - call to video specific startup code */
    if (!I_PreInitGraphics())
       goto failed;
@@ -778,6 +830,10 @@ bool retro_load_game(const struct retro_game_info *info)
    // Run few cycles to finish init.
    for (i = 0; i < 3; i++)
      D_DoomLoop();
+
+   cheats_enabled      = true;
+   cheats_pending      = false;
+   cheats_pending_list = NULL;
 
    return true;
 
@@ -804,9 +860,6 @@ failed:
 
 void retro_unload_game(void)
 {
-   if (screen_buf)
-      free(screen_buf);
-   screen_buf = NULL;
 }
 
 unsigned retro_get_region(void)
@@ -1020,11 +1073,43 @@ void retro_cheat_reset(void)
 
 void retro_cheat_set(unsigned index, bool enabled, const char *code)
 {
-   int i;
+   unsigned i;
    (void)index;(void)enabled;
-   if(code)
-      for (i=0; code[i] != '\0'; i++)
+
+   if (!code || !cheats_enabled)
+      return;
+
+   /* Note: it is not currently possible to disable
+    * cheats once active... */
+
+   /* Check if cheat can be applied now */
+   if ((gamestate == GS_LEVEL) && !demoplayback)
+   {
+      for (i = 0; code[i] != '\0'; i++)
          M_FindCheats(code[i]);
+   }
+   /* Current game state does not support cheat
+    * activation - add code to pending list */
+   else
+   {
+      bool code_found = false;
+
+      for (i = 0; i < RBUF_LEN(cheats_pending_list); i++)
+      {
+         const char *existing_code = cheats_pending_list[i];
+         if (existing_code && !strcmp(existing_code, code))
+         {
+            code_found = true;
+            break;
+         }
+      }
+
+      if (!code_found)
+      {
+         RBUF_PUSH(cheats_pending_list, strdup(code));
+         cheats_pending = true;
+      }
+   }
 }
 
 static action_lut_t left_analog_lut[] = {

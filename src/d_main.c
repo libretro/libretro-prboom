@@ -1494,7 +1494,6 @@ void D_DoomDeinit(void)
   V_DestroyUnusedTrueColorPalettes();
   R_FlushAllPatches();
   P_Deinit();
-  Z_Close();
 }
 
 //

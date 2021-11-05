@@ -42,6 +42,7 @@
 #include "../src/g_game.h"
 #include "../src/wi_stuff.h"
 #include "../src/p_tick.h"
+#include "../src/z_zone.h"
 
 /* Don't include file_stream_transforms.h but instead
 just forward declare the prototype */
@@ -728,7 +729,7 @@ bool retro_load_game(const struct retro_game_info *info)
 
    update_variables(true);
 
-   argv[argc++] = strdup("prboom");
+   argv[argc++] = Z_Strdup("prboom", PU_STATIC, 0);
    if(info->path)
    {
       wadinfo_t header;
@@ -745,8 +746,8 @@ bool retro_load_game(const struct retro_game_info *info)
       if(strcasecmp(extension,"lmp") == 0)
       {
         // Play as a demo file lump
-        argv[argc++] = strdup("-playdemo");
-        argv[argc++] = strdup(info->path);
+        argv[argc++] = Z_Strdup("-playdemo", PU_STATIC, 0);
+        argv[argc++] = Z_Strdup(info->path,  PU_STATIC, 0);
       }
       else
       {
@@ -759,13 +760,13 @@ bool retro_load_game(const struct retro_game_info *info)
         }
         if(!strncmp(header.identification, "IWAD", 4))
         {
-          argv[argc++] = strdup("-iwad");
-          argv[argc++] = strdup(g_basename);
+          argv[argc++] = Z_Strdup("-iwad", PU_STATIC, 0);
+          argv[argc++] = Z_Strdup(g_basename, PU_STATIC, 0);
         }
         else if(!strncmp(header.identification, "PWAD", 4))
         {
-          argv[argc++] = strdup("-file");
-          argv[argc++] = strdup(info->path);
+          argv[argc++] = Z_Strdup("-file",    PU_STATIC, 0);
+          argv[argc++] = Z_Strdup(info->path, PU_STATIC, 0);
         }
         else {
           I_Error("retro_load_game: invalid WAD header '%.*s'", 4, header.identification);
@@ -1665,13 +1666,13 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
 
    if(!dir)
    {
-      if (!(p = malloc(pl)))
+      if (!(p = Z_Malloc(pl, PU_STATIC, 0)))
          return NULL;
       sprintf(p, "%s", wfname);
    }
    else
    {
-     if (!(p = malloc(strlen(dir) + pl)))
+     if (!(p = Z_Malloc(strlen(dir) + pl, PU_STATIC, 0)))
         return NULL;
      sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
    }
@@ -1688,7 +1689,7 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
    else if (log_cb)
       log_cb(RETRO_LOG_ERROR, "FindFileInDir: not found %s in %s\n", wfname, dir);
 
-   free(p);
+   Z_Free(p);
    return NULL;
 }
 
@@ -1708,7 +1709,7 @@ char* I_FindFile(const char* wfname, const char* ext)
    {
      // Then check on system dir (both under prboom subfolder and directly)
      environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
-     if (system_dir && (prboom_system_dir = malloc(strlen(system_dir) + 8)))
+     if (system_dir && (prboom_system_dir = Z_Malloc(strlen(system_dir) + 8, PU_STATIC, 0)))
      {
        sprintf(prboom_system_dir, "%s%c%s", system_dir, DIR_SLASH, "prboom");
        p = FindFileInDir(prboom_system_dir, wfname, ext);
@@ -1720,7 +1721,7 @@ char* I_FindFile(const char* wfname, const char* ext)
      // If not found, check on parent folders recursively (if configured to do so)
      if (!p && find_recursive_on)
      {
-       if ((dir = malloc(strlen(g_wad_dir) + 1)) != NULL)
+       if ((dir = Z_Malloc(strlen(g_wad_dir) + 1, PU_STATIC, 0)) != NULL)
        {
          strcpy(dir, g_wad_dir);
          for (i = strlen(dir)-1; i > 1; dir[i--] = '\0')
@@ -1734,7 +1735,7 @@ char* I_FindFile(const char* wfname, const char* ext)
                 break;
            }
          }
-         free(dir);
+         Z_Free(dir);
        }
      }
    }

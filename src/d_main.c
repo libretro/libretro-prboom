@@ -1486,14 +1486,15 @@ void D_DoomDeinit(void)
   I_ShutdownNetwork();
 #endif
   M_SaveDefaults ();
-  W_ReleaseAllWads();
+  W_Exit();
+  //W_ReleaseAllWads();
   U_FreeMapInfo();
   I_ShutdownSound();
   I_ShutdownMusic();
-  V_FreeScreens();
-  V_DestroyUnusedTrueColorPalettes();
-  R_FlushAllPatches();
-  P_Deinit();
+  //V_FreeScreens();
+  //V_DestroyUnusedTrueColorPalettes();
+  //R_FlushAllPatches();
+  //P_Deinit();
 }
 
 //

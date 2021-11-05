@@ -181,11 +181,11 @@ static void *ReadByteSequence(unsigned int num_bytes, midimem_t *mf)
 
     // events can be length 0.  malloc(0) is not portable (can return NULL)
     if (!num_bytes)
-      return malloc (4);
+      return Z_Malloc (4, PU_STATIC, 0);
 
     // Allocate a buffer:
 
-    result = malloc(num_bytes);
+    result = Z_Malloc(num_bytes, PU_STATIC, 0);
 
     if (result == NULL)
         return NULL;
@@ -197,7 +197,7 @@ static void *ReadByteSequence(unsigned int num_bytes, midimem_t *mf)
         if (!ReadByte(&result[i], mf))
         {
             lprintf (LO_WARN, "ReadByteSequence: Error while reading byte %u\n", i);
-            free(result);
+            Z_Free(result);
             return NULL;
         }
     }
@@ -400,11 +400,11 @@ static void FreeEvent(midi_event_t *event)
     {
         case MIDI_EVENT_SYSEX:
         case MIDI_EVENT_SYSEX_SPLIT:
-            free(event->data.sysex.data);
+            Z_Free(event->data.sysex.data);
             break;
 
         case MIDI_EVENT_META:
-            free(event->data.meta.data);
+            Z_Free(event->data.meta.data);
             break;
 
         default:
@@ -512,7 +512,7 @@ static void FreeTrack(midi_track_t *track)
         FreeEvent(&track->events[i]);
     }
 
-    free(track->events);
+    Z_Free(track->events);
 }
 
 static dbool ReadAllTracks(midi_file_t *file, midimem_t *mf)
@@ -521,7 +521,7 @@ static dbool ReadAllTracks(midi_file_t *file, midimem_t *mf)
 
     // Allocate list of tracks and read each track:
 
-    file->tracks = malloc(sizeof(midi_track_t) * file->num_tracks);
+    file->tracks = Z_Malloc(sizeof(midi_track_t) * file->num_tracks, PU_STATIC, 0);
 
     if (file->tracks == NULL)
     {
@@ -594,26 +594,22 @@ void MIDI_FreeFile(midi_file_t *file)
             FreeTrack(&file->tracks[i]);
         }
 
-        free(file->tracks);
+        Z_Free(file->tracks);
     }
 
-    free(file);
+    Z_Free(file);
 }
 
 midi_file_t *MIDI_LoadFile (midimem_t *mf)
 {
-    midi_file_t *file;
-
-    file = malloc(sizeof(midi_file_t));
+    midi_file_t *file = Z_Malloc(sizeof(midi_file_t), PU_STATIC, 0);
 
     if (file == NULL)
-    {
         return NULL;
-    }
 
-    file->tracks = NULL;
-    file->num_tracks = 0;
-    file->buffer = NULL;
+    file->tracks      = NULL;
+    file->num_tracks  = 0;
+    file->buffer      = NULL;
     file->buffer_size = 0;
 
     // Read MIDI file header
@@ -650,8 +646,8 @@ midi_track_iter_t *MIDI_IterateTrack(const midi_file_t *file, unsigned int track
 
     assert(track < file->num_tracks);
 
-    iter = malloc(sizeof(*iter));
-    iter->track = &file->tracks[track];
+    iter           = Z_Malloc(sizeof(*iter), PU_STATIC, 0);
+    iter->track    = &file->tracks[track];
     iter->position = 0;
 
     return iter;
@@ -659,7 +655,7 @@ midi_track_iter_t *MIDI_IterateTrack(const midi_file_t *file, unsigned int track
 
 void MIDI_FreeIterator(midi_track_iter_t *iter)
 {
-    free(iter);
+    Z_Free(iter);
 }
 
 // Get the time until the next MIDI event in a track.
@@ -717,8 +713,8 @@ midi_event_t **MIDI_GenerateFlatList (midi_file_t *file)
 
   int totaldelta = 0;
 
-  int *trackpos = Z_Calloc (file->num_tracks, sizeof (int));
-  int *tracktime = calloc (file->num_tracks, sizeof (int));
+  int *trackpos = Z_Calloc (file->num_tracks, sizeof (int), PU_STATIC, 0);
+  int *tracktime = Z_Calloc (file->num_tracks, sizeof (int), PU_STATIC, 0);
   int trackactive = file->num_tracks;
 
   midi_event_t **ret;
@@ -727,7 +723,7 @@ midi_event_t **MIDI_GenerateFlatList (midi_file_t *file)
   for (i = 0; i < file->num_tracks; i++)
     totalevents += file->tracks[i].num_events;
 
-  ret = malloc (totalevents * sizeof (midi_event_t **));
+  ret = Z_Malloc (totalevents * sizeof (midi_event_t **), PU_STATIC, 0);
 
   epos = ret;
 
@@ -772,9 +768,9 @@ midi_event_t **MIDI_GenerateFlatList (midi_file_t *file)
     else if ((unsigned) trackpos[nextrk] == file->tracks[nextrk].num_events)
     {
       lprintf (LO_WARN, "MIDI_GenerateFlatList: Unexpected end of track\n");
-      free (trackpos);
-      free (tracktime);
-      free (ret);
+      Z_Free (trackpos);
+      Z_Free (tracktime);
+      Z_Free (ret);
       return NULL;
     }
     epos++;
@@ -783,22 +779,22 @@ midi_event_t **MIDI_GenerateFlatList (midi_file_t *file)
   if (trackactive)
   { // unexpected EOF
     lprintf (LO_WARN, "MIDI_GenerateFlatList: Unexpected end of midi file\n");
-    free (trackpos);
-    free (tracktime);
-    free (ret);
+    Z_Free (trackpos);
+    Z_Free (tracktime);
+    Z_Free (ret);
     return NULL;
   }
   
   // last end of track event is preserved though
   epos[-1]->data.meta.type = MIDI_META_END_OF_TRACK;
 
-  free (trackpos);
-  free (tracktime);
+  Z_Free (trackpos);
+  Z_Free (tracktime);
   
   if (totaldelta < 100)
   {
     lprintf (LO_WARN, "MIDI_GeneratFlatList: very short file %i\n", totaldelta);
-    free (ret);
+    Z_Free (ret);
     return NULL;
   }
 
@@ -812,7 +808,7 @@ midi_event_t **MIDI_GenerateFlatList (midi_file_t *file)
 
 void MIDI_DestroyFlatList (midi_event_t **evs)
 {
-  free (evs);
+  Z_Free (evs);
 }
 
 
@@ -942,19 +938,19 @@ midi_file_t *MIDI_LoadFileSpecial (midimem_t *mf)
     return NULL;
   }
 
-  ret = malloc (sizeof (midi_file_t));
+  ret = Z_Malloc (sizeof (midi_file_t), PU_STATIC, 0);
 
-  ret->header.format_type = 0;
-  ret->header.num_tracks = 1;
+  ret->header.format_type   = 0;
+  ret->header.num_tracks    = 1;
   ret->header.time_division = 10000;
-  ret->num_tracks = 1;
-  ret->buffer_size = 0;
-  ret->buffer = NULL;
-  ret->tracks = malloc (sizeof (midi_track_t));
+  ret->num_tracks           = 1;
+  ret->buffer_size          = 0;
+  ret->buffer               = NULL;
+  ret->tracks               = Z_Malloc (sizeof (midi_track_t), PU_STATIC, 0);
 
-  ret->tracks->num_events = 0;
+  ret->tracks->num_events    = 0;
   ret->tracks->num_event_mem = 0;
-  ret->tracks->events = NULL;
+  ret->tracks->events        = NULL;
 
   opi = MIDI_spmc (base, NULL, 20000);
 
@@ -991,20 +987,20 @@ midi_file_t *MIDI_LoadFileSpecial (midimem_t *mf)
       { // adjust future tempo scaling
         opi = MIDI_spmc (base, oldev, 20000);
         // insert event as dummy
-        nextev->event_type = MIDI_EVENT_META;
-        nextev->data.meta.type = MIDI_META_TEXT;
+        nextev->event_type       = MIDI_EVENT_META;
+        nextev->data.meta.type   = MIDI_META_TEXT;
         nextev->data.meta.length = 0;
-        nextev->data.meta.data = malloc (4);
+        nextev->data.meta.data   = Z_Malloc (4, PU_STATIC, 0);
         epos++;
         ret->tracks->num_events++;
         continue;
       }
       if (oldev->data.meta.type == MIDI_META_END_OF_TRACK)
       { // reproduce event and break
-        nextev->event_type = MIDI_EVENT_META;
-        nextev->data.meta.type = MIDI_META_END_OF_TRACK;
+        nextev->event_type       = MIDI_EVENT_META;
+        nextev->data.meta.type   = MIDI_META_END_OF_TRACK;
         nextev->data.meta.length = 0;
-        nextev->data.meta.data = malloc (4);
+        nextev->data.meta.data   = Z_Malloc (4, PU_STATIC, 0);
         epos++;
         ret->tracks->num_events++;
         break;

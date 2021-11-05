@@ -47,17 +47,15 @@ struct opl_callback_queue_s
 
 opl_callback_queue_t *OPL_Queue_Create(void)
 {
-    opl_callback_queue_t *queue;
-
-    queue = malloc(sizeof(opl_callback_queue_t));
-    queue->num_entries = 0;
+    opl_callback_queue_t *queue = Z_Malloc(sizeof(opl_callback_queue_t), PU_STATIC, 0);
+    queue->num_entries          = 0;
 
     return queue;
 }
 
 void OPL_Queue_Destroy(opl_callback_queue_t *queue)
 {
-    free(queue);
+    Z_Free(queue);
 }
 
 int OPL_Queue_IsEmpty(opl_callback_queue_t *queue)

@@ -1131,12 +1131,12 @@ static void AddBlockLine
   if (done[blockno])
     return;
 
-  l = malloc(sizeof(linelist_t));
-  l->num = lineno;
-  l->next = lists[blockno];
+  l              = Z_Malloc(sizeof(linelist_t), PU_STATIC, 0);
+  l->num         = lineno;
+  l->next        = lists[blockno];
   lists[blockno] = l;
   count[blockno]++;
-  done[blockno] = 1;
+  done[blockno]  = 1;
 }
 
 //
@@ -1195,17 +1195,17 @@ static void P_CreateBlockMap(void)
   // finally make an array in which we can mark blocks done per line
 
   // CPhipps - calloc's
-  blocklists = calloc(NBlocks,sizeof(linelist_t *));
-  blockcount = calloc(NBlocks,sizeof(int));
-  blockdone = malloc(NBlocks*sizeof(int));
+  blocklists = Z_Calloc(NBlocks,sizeof(linelist_t *), PU_STATIC, 0);
+  blockcount = Z_Calloc(NBlocks,sizeof(int), PU_STATIC, 0);
+  blockdone  = Z_Malloc(NBlocks*sizeof(int), PU_STATIC, 0);
 
   // initialize each blocklist, and enter the trailing -1 in all blocklists
   // note the linked list of lines grows backwards
 
   for (i=0;i<NBlocks;i++)
   {
-    blocklists[i] = malloc(sizeof(linelist_t));
-    blocklists[i]->num = -1;
+    blocklists[i]       = Z_Malloc(sizeof(linelist_t), PU_STATIC, 0);
+    blocklists[i]->num  = -1;
     blocklists[i]->next = NULL;
     blockcount[i]++;
   }
@@ -1394,16 +1394,16 @@ static void P_CreateBlockMap(void)
     {
       linelist_t *tmp = bl->next;
       blockmaplump[offs++] = bl->num;
-      free(bl);
+      Z_Free(bl);
       bl = tmp;
     }
   }
 
   // free all temporary storage
 
-  free (blocklists);
-  free (blockcount);
-  free (blockdone);
+  Z_Free (blocklists);
+  Z_Free (blockcount);
+  Z_Free (blockdone);
 }
 
 // jff 10/6/98
@@ -1702,7 +1702,8 @@ static int P_GroupLines (void)
 
 static void P_RemoveSlimeTrails(void)         // killough 10/98
 {
-  uint8_t *hit = calloc(1, numvertexes);         // Hitlist for vertices
+  // Hitlist for vertices
+  uint8_t *hit = Z_Calloc(1, numvertexes, PU_STATIC, 0);
   int i;
   for (i=0; i<numsegs; i++)                   // Go through each seg
   {
@@ -1710,7 +1711,7 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
 
     if (segs[i].miniseg == TRUE)        //figgi -- skip minisegs
     {
-      free(hit);
+      Z_Free(hit);
       return;
     }
 
@@ -1736,7 +1737,7 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
     while ((v != segs[i].v2) && (v = segs[i].v2));
   }
     }
-  free(hit);
+  Z_Free(hit);
 }
 
 /*

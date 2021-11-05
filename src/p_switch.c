@@ -134,8 +134,8 @@ void P_InitSwitchList(void)
   for (i=0;;i++)
   {
     if (index+1 >= max_numswitches)
-      switchlist = realloc(switchlist, sizeof *switchlist *
-        (max_numswitches = max_numswitches ? max_numswitches*2 : 8));
+      switchlist = Z_Realloc(switchlist, sizeof *switchlist *
+        (max_numswitches = max_numswitches ? max_numswitches*2 : 8), PU_STATIC, 0);
 
     if (SHORT(alphSwitchList[i].episode) <= episode)
     {

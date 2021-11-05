@@ -79,13 +79,13 @@ static rpatch_t *texture_composites = 0;
 void R_InitPatches(void) {
   if (!patches)
   {
-    patches = (rpatch_t*)malloc(numlumps * sizeof(rpatch_t));
+    patches = (rpatch_t*)Z_Malloc(numlumps * sizeof(rpatch_t), PU_STATIC, 0);
     // clear out new patches to signal they're uninitialized
     memset(patches, 0, sizeof(rpatch_t)*numlumps);
   }
   if (!texture_composites)
   {
-    texture_composites = (rpatch_t*)malloc(numtextures * sizeof(rpatch_t));
+    texture_composites = (rpatch_t*)Z_Malloc(numtextures * sizeof(rpatch_t), PU_STATIC, 0);
     // clear out new patches to signal they're uninitialized
     memset(texture_composites, 0, sizeof(rpatch_t)*numtextures);
   }
@@ -102,17 +102,17 @@ void R_FlushAllPatches(void) {
       if (patches[i].locks > 0)
         I_Error("R_FlushAllPatches: patch number %i still locked",i);
       if (patches[i].data)
-        free(patches[i].data);
+        Z_Free(patches[i].data);
     }
-    free(patches);
+    Z_Free(patches);
     patches = NULL;
   }
   if (texture_composites)
   {
     for (i=0; i<numtextures; i++)
       if (texture_composites[i].data)
-        free(texture_composites[i].data);
-    free(texture_composites);
+        Z_Free(texture_composites[i].data);
+    Z_Free(texture_composites);
     texture_composites = NULL;
   }
 }
@@ -205,22 +205,22 @@ static void createPatch(int id) {
   int numPostsUsedSoFar;
   int edgeSlope;
 
-  patch = &patches[id];
+  patch                = &patches[id];
   // proff - 2003-02-16 What about endianess?
-  patch->width = SHORT(oldPatch->width);
-  patch->widthmask = 0;
-  patch->height = SHORT(oldPatch->height);
-  patch->leftoffset = SHORT(oldPatch->leftoffset);
-  patch->topoffset = SHORT(oldPatch->topoffset);
+  patch->width         = SHORT(oldPatch->width);
+  patch->widthmask     = 0;
+  patch->height        = SHORT(oldPatch->height);
+  patch->leftoffset    = SHORT(oldPatch->leftoffset);
+  patch->topoffset     = SHORT(oldPatch->topoffset);
   patch->isNotTileable = getPatchIsNotTileable(oldPatch);
 
   // work out how much memory we need to allocate for this patch's data
-  pixelDataSize = (patch->width * patch->height + 4) & ~3;
-  columnsDataSize = sizeof(rcolumn_t) * patch->width;
+  pixelDataSize    = (patch->width * patch->height + 4) & ~3;
+  columnsDataSize  = sizeof(rcolumn_t) * patch->width;
 
   // count the number of posts in each column
-  numPostsInColumn = (int*)malloc(sizeof(int) * patch->width);
-  numPostsTotal = 0;
+  numPostsInColumn = (int*)Z_Malloc(sizeof(int) * patch->width, PU_STATIC, 0);
+  numPostsTotal    = 0;
 
   for (x=0; x<patch->width; x++) {
     oldColumn = (const column_t *)((const uint8_t *)oldPatch + LONG(oldPatch->columnofs[x]));
@@ -359,7 +359,7 @@ static void createPatch(int id) {
   }
 
   W_UnlockLumpNum(patchNum);
-  free(numPostsInColumn);
+  Z_Free(numPostsInColumn);
 }
 
 typedef struct {
@@ -432,8 +432,8 @@ static void createTextureCompositePatch(int id) {
   columnsDataSize = sizeof(rcolumn_t) * composite_patch->width;
 
   // count the number of posts in each column
-  countsInColumn = (count_t *)calloc(sizeof(count_t), composite_patch->width);
-  numPostsTotal = 0;
+  countsInColumn = (count_t *)Z_Calloc(sizeof(count_t), composite_patch->width, PU_STATIC, 0);
+  numPostsTotal  = 0;
 
   for (i=0; i<texture->patchcount; i++) {
     texpatch = &texture->patches[i];
@@ -677,7 +677,7 @@ static void createTextureCompositePatch(int id) {
     // this determines tiling later on
   }
 
-  free(countsInColumn);
+  Z_Free(countsInColumn);
 }
 
 //---------------------------------------------------------------------------

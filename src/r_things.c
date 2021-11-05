@@ -169,7 +169,7 @@ static void R_InitSpriteDefs(const char * const * namelist)
    // Create hash table based on just the first four letters of each sprite
    // killough 1/31/98
 
-   hash = malloc(sizeof(*hash)*numentries); // allocate hash table
+   hash = Z_Malloc(sizeof(*hash)*numentries, PU_STATIC, 0); // allocate hash table
 
    for (i=0; (size_t)i<numentries; i++)             // initialize hash table as empty
       hash[i].index = -1;
@@ -255,7 +255,7 @@ static void R_InitSpriteDefs(const char * const * namelist)
          }
       }
    }
-   free(hash);             // free hash table
+   Z_Free(hash);             // free hash table
 }
 
 //
@@ -299,7 +299,7 @@ static vissprite_t *R_NewVisSprite(void)
       size_t num_vissprite_alloc_prev = num_vissprite_alloc;
 
       num_vissprite_alloc = num_vissprite_alloc ? num_vissprite_alloc*2 : 128;
-      vissprites = realloc(vissprites,num_vissprite_alloc*sizeof(*vissprites));
+      vissprites          = Z_Realloc(vissprites,num_vissprite_alloc*sizeof(*vissprites), PU_STATIC, 0);
 
       //e6y: set all fields to zero
       memset(vissprites + num_vissprite_alloc_prev, 0,
@@ -836,9 +836,9 @@ void R_SortVisSprites (void)
 
       if (num_vissprite_ptrs < num_vissprite*2)
       {
-         free(vissprite_ptrs);  // better than realloc -- no preserving needed
-         vissprite_ptrs = malloc((num_vissprite_ptrs = num_vissprite_alloc*2)
-               * sizeof *vissprite_ptrs);
+         Z_Free(vissprite_ptrs);  // better than realloc -- no preserving needed
+         vissprite_ptrs = Z_Malloc((num_vissprite_ptrs = num_vissprite_alloc*2)
+               * sizeof *vissprite_ptrs, PU_STATIC, 0);
       }
 
       while (--i>=0)

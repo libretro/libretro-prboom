@@ -1133,8 +1133,8 @@ void WI_initDeathmatchStats(void)
   int   i; // looping variables
 
   // CPhipps - allocate data structures needed
-  dm_frags  = calloc(MAXPLAYERS, sizeof(*dm_frags));
-  dm_totals = calloc(MAXPLAYERS, sizeof(*dm_totals));
+  dm_frags  = Z_Calloc(MAXPLAYERS, sizeof(*dm_frags), PU_STATIC, 0);
+  dm_totals = Z_Calloc(MAXPLAYERS, sizeof(*dm_totals), PU_STATIC, 0);
 
   state = StatCount;  // We're doing stats
   acceleratestage = 0;
@@ -1147,7 +1147,7 @@ void WI_initDeathmatchStats(void)
     if (playeringame[i])
     {
       // CPhipps - allocate frags line
-      dm_frags[i] = calloc(MAXPLAYERS, sizeof(**dm_frags)); // set all counts to zero
+      dm_frags[i] = Z_Calloc(MAXPLAYERS, sizeof(**dm_frags), PU_STATIC, 0); // set all counts to zero
 
       dm_totals[i] = 0;
     }
@@ -1166,9 +1166,10 @@ void WI_endDeathmatchStats(void)
 {
   int i;
   for (i=0; i<MAXPLAYERS; i++)
-    free(dm_frags[i]);
+    Z_Free(dm_frags[i]);
 
-  free(dm_frags); free(dm_totals);
+  Z_Free(dm_frags);
+  Z_Free(dm_totals);
 }
 
 // ====================================================================
@@ -1399,10 +1400,14 @@ static int    ng_state;
 //
 static void WI_endNetgameStats(void)
 {
-  free(cnt_frags); cnt_frags = NULL;
-  free(cnt_secret); cnt_secret = NULL;
-  free(cnt_items); cnt_items = NULL;
-  free(cnt_kills); cnt_kills = NULL;
+  Z_Free(cnt_frags);
+  cnt_frags = NULL;
+  Z_Free(cnt_secret);
+  cnt_secret = NULL;
+  Z_Free(cnt_items);
+  cnt_items = NULL;
+  Z_Free(cnt_kills);
+  cnt_kills = NULL;
 }
 
 // ====================================================================
@@ -1422,10 +1427,10 @@ void WI_initNetgameStats(void)
   cnt_pause = TICRATE;
 
   // CPhipps - allocate these dynamically, blank with calloc
-  cnt_kills = calloc(MAXPLAYERS, sizeof(*cnt_kills));
-  cnt_items = calloc(MAXPLAYERS, sizeof(*cnt_items));
-  cnt_secret= calloc(MAXPLAYERS, sizeof(*cnt_secret));
-  cnt_frags = calloc(MAXPLAYERS, sizeof(*cnt_frags));
+  cnt_kills = Z_Calloc(MAXPLAYERS, sizeof(*cnt_kills),  PU_STATIC, 0);
+  cnt_items = Z_Calloc(MAXPLAYERS, sizeof(*cnt_items),  PU_STATIC, 0);
+  cnt_secret= Z_Calloc(MAXPLAYERS, sizeof(*cnt_secret), PU_STATIC, 0);
+  cnt_frags = Z_Calloc(MAXPLAYERS, sizeof(*cnt_frags),  PU_STATIC, 0);
 
   for (i=0 ; i<MAXPLAYERS ; i++)
     if (playeringame[i])
@@ -1695,9 +1700,9 @@ void WI_initStats(void)
   sp_state = 1;
 
   // CPhipps - allocate (awful code, I know, but saves changing it all) and initialise
-  *(cnt_kills = malloc(sizeof(*cnt_kills))) =
-  *(cnt_items = malloc(sizeof(*cnt_items))) =
-  *(cnt_secret= malloc(sizeof(*cnt_secret))) = -1;
+  *(cnt_kills = Z_Malloc(sizeof(*cnt_kills),  PU_STATIC, 0)) =
+  *(cnt_items = Z_Malloc(sizeof(*cnt_items),  PU_STATIC, 0)) =
+  *(cnt_secret= Z_Malloc(sizeof(*cnt_secret), PU_STATIC, 0)) = -1;
   cnt_time = cnt_par = cnt_total_time = -1;
   cnt_pause = TICRATE;
 
@@ -2110,12 +2115,12 @@ void WI_Start(wbstartstruct_t* wbstartstruct)
 
 #define NULL_SERIALIZE 0x77777777
 
-static int *
-intp_unpack(uint32_t val) {
+static int *intp_unpack(uint32_t val)
+{
   int *ret;
   if (val == NULL_SERIALIZE)
     return NULL;
-  ret     = malloc (sizeof(int) * MAXPLAYERS);
+  ret     = Z_Malloc (sizeof(int) * MAXPLAYERS, PU_STATIC, 0);
   memset (ret, 0 , sizeof(int) * MAXPLAYERS);
   ret[me] = val;
   return ret;

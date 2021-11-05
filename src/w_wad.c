@@ -166,7 +166,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
 #ifndef MEMORY_LOW
    stat(wadfile->name, &statbuf);
    wadfile->length = statbuf.st_size;
-   wadfile->data = malloc(statbuf.st_size);
+   wadfile->data   = Z_Malloc(statbuf.st_size, PU_STATIC, 0);
    if ( rfread(wadfile->data, statbuf.st_size, 1, wadfile->handle) != 1)
      I_Error("W_AddFile: couldn't read wad data");
 #endif
@@ -207,7 +207,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
       header.numlumps = LONG(header.numlumps);
       header.infotableofs = LONG(header.infotableofs);
       length = header.numlumps*sizeof(filelump_t);
-      fileinfo2free = fileinfo = malloc(length);    // killough
+      fileinfo2free = fileinfo = Z_Malloc(length, PU_STATIC, 0);    // killough
 #ifdef MEMORY_LOW
       lseek(wadfile->handle, header.infotableofs, SEEK_SET);
       I_Read(wadfile->handle, fileinfo, length);
@@ -218,7 +218,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
    }
 
    // Fill in lumpinfo
-   lumpinfo = realloc(lumpinfo, numlumps*sizeof(lumpinfo_t));
+   lumpinfo = Z_Realloc(lumpinfo, numlumps*sizeof(lumpinfo_t), PU_STATIC, 0);
 
    lump_p = &lumpinfo[startlump];
 
@@ -232,7 +232,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
       lump_p->source = wadfile->src;                    // Ty 08/29/98
    }
 
-   free(fileinfo2free);      // killough
+   Z_Free(fileinfo2free);      // killough
 }
 
 // jff 1/23/98 Create routines to reorder the master directory
@@ -256,10 +256,10 @@ static void W_CoalesceMarkedResource(const char *start_marker,
                                      const char *end_marker,
                                      lumpinfo_namespace_t li_namespace)
 {
-  lumpinfo_t *marked = malloc(sizeof(*marked) * numlumps);
+  lumpinfo_t *marked   = Z_Malloc(sizeof(*marked) * numlumps, PU_STATIC, 0);
   size_t i, num_marked = 0, num_unmarked = 0;
-  int is_marked = 0, mark_end = 0;
-  lumpinfo_t *lump = lumpinfo;
+  int is_marked        = 0, mark_end = 0;
+  lumpinfo_t *lump     = lumpinfo;
 
   for (i=numlumps; i--; lump++)
     if (IsMarker(start_marker, lump->name))       // start marker found
@@ -292,7 +292,7 @@ static void W_CoalesceMarkedResource(const char *start_marker,
   // Append marked list to end of unmarked list
   memcpy(lumpinfo + num_unmarked, marked, num_marked * sizeof(*marked));
 
-  free(marked);                                   // free marked list
+  Z_Free(marked);                                   // free marked list
 
   numlumps = num_unmarked + num_marked;           // new total number of lumps
 
@@ -504,7 +504,7 @@ void W_Exit(void)
          close(wadfiles[i].handle);
 #else
          filestream_close(wadfiles[i].handle);
-         free(wadfiles[i].data);
+         Z_Free(wadfiles[i].data);
          wadfiles[i].data = NULL;
 #endif
          wadfiles[i].handle = NULL;
@@ -525,7 +525,7 @@ void W_ReleaseAllWads(void)
          close(wadfiles[i].handle);
 #else
          filestream_close(wadfiles[i].handle);
-         free(wadfiles[i].data);
+         Z_Free(wadfiles[i].data);
          wadfiles[i].data = NULL;
 #endif
          wadfiles[i].handle = NULL;
@@ -533,10 +533,10 @@ void W_ReleaseAllWads(void)
    }
 
    numwadfiles = 0;
-   free(wadfiles);
+   Z_Free(wadfiles);
    wadfiles = NULL;
    numlumps = 0;
-   free(lumpinfo);
+   Z_Free(lumpinfo);
    lumpinfo = NULL;
 }
 

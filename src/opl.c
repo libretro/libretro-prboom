@@ -106,7 +106,7 @@ int OPL_Init (unsigned int rate)
     current_time = 0;
 
 
-    mix_buffer = malloc(opl_sample_rate * sizeof(uint32_t));
+    mix_buffer = Z_Malloc(opl_sample_rate * sizeof(uint32_t), PU_STATIC, 0);
 
     // Create the emulator structure:
 
@@ -129,7 +129,7 @@ void OPL_Shutdown(void)
     if (callback_queue)
     {
       OPL_Queue_Destroy(callback_queue);
-      free(mix_buffer);
+      Z_Free(mix_buffer);
 
       callback_queue = NULL;
       mix_buffer = NULL;

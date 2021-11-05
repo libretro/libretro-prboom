@@ -75,22 +75,6 @@ void *(Z_Realloc)(void *p, size_t n, int tag, void **user DA(const char *, int))
 char *(Z_Strdup)(const char *s, int tag, void **user DA(const char *, int));
 void (Z_CheckHeap)(DAC(const char *,int));   // killough 3/22/98: add file/line info
 void Z_DumpHistory(char *);
-
-// Remove all definitions before including system definitions
-
-#undef malloc
-#undef free
-#undef realloc
-#undef calloc
-#undef strdup
-
-#define malloc(n)          Z_MallocD(n,PU_STATIC,0)
-#define free(p)            Z_FreeD(p)
-#define realloc(p,n)       Z_ReallocD(p,n,PU_STATIC,0)
-#define calloc(n1,n2)      Z_CallocD(n1,n2,PU_STATIC,0)
-#define strdup(s)          Z_StrdupD(s,PU_STATIC,0)
-
-
 void Z_ZoneHistory(char *);
 
 #endif

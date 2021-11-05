@@ -393,13 +393,13 @@ int EV_StopPlat(line_t* line)
 //
 void P_AddActivePlat(plat_t* plat)
 {
-   platlist_t *list = malloc(sizeof *list);
-   list->plat = plat;
-   plat->list = list;
+   platlist_t *list = Z_Malloc(sizeof *list, PU_STATIC, 0);
+   list->plat       = plat;
+   plat->list       = list;
    if ((list->next = activeplats))
       list->next->prev = &list->next;
-   list->prev = &activeplats;
-   activeplats = list;
+   list->prev          = &activeplats;
+   activeplats         = list;
 }
 
 //
@@ -417,7 +417,7 @@ void P_RemoveActivePlat(plat_t* plat)
    P_RemoveThinker(&plat->thinker);
    if ((*list->prev = list->next))
       list->next->prev = list->prev;
-   free(list);
+   Z_Free(list);
 }
 
 //
@@ -432,7 +432,7 @@ void P_RemoveAllActivePlats(void)
    while (activeplats)
    {
       platlist_t *next = activeplats->next;
-      free(activeplats);
+      Z_Free(activeplats);
       activeplats = next;
    }
 }

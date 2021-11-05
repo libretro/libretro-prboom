@@ -1097,7 +1097,7 @@ static dbool   G_CheckSpot(int playernum, mapthing_t *mthing)
       static int queuesize;
       if (queuesize < bodyquesize)
 	{
-	  bodyque = realloc(bodyque, bodyquesize*sizeof*bodyque);
+	  bodyque = Z_Realloc(bodyque, bodyquesize*sizeof*bodyque, PU_STATIC, 0);
 	  memset(bodyque+queuesize, 0,
 		 (bodyquesize-queuesize)*sizeof*bodyque);
 	  queuesize = bodyquesize;
@@ -1773,13 +1773,13 @@ void G_DoLoadGame(void)
     uint64_t checksum = 0;
 
     checksum = G_Signature();
-    msg      = malloc(strlen((const char*)save_p + sizeof checksum) + 128);
+    msg      = Z_Malloc(strlen((const char*)save_p + sizeof checksum) + 128, PU_STATIC, 0);
     strcpy(msg,"Incompatible Savegame!!!\n");
     if (save_p[sizeof checksum])
       strcat(strcat(msg,"Wads expected:\n\n"), (const char*)save_p + sizeof checksum);
     strcat(msg, "\nAre you sure?");
     G_LoadGameErr(msg);
-    free(msg);
+    Z_Free(msg);
   }
 
   // done
@@ -1830,8 +1830,8 @@ void (CheckSaveGame)(size_t size, const char* file, int line)
 
   size += 1024;  // breathing room
   if (pos+size > savegamesize)
-    save_p = (savebuffer = realloc(savebuffer,
-           savegamesize += (size+1023) & ~1023)) + pos;
+    save_p = (savebuffer = Z_Realloc(savebuffer,
+           savegamesize += (size+1023) & ~1023, PU_STATIC, 0)) + pos;
 }
 
 /* killough 3/22/98: form savegame name in one location
@@ -1860,7 +1860,7 @@ static int G_DoSaveGameToSaveBuffer() {
 
   description = savedescription;
 
-  save_p = savebuffer = malloc(savegamesize);
+  save_p = savebuffer = Z_Malloc(savegamesize, PU_STATIC, 0);
 
   CheckSaveGame(SAVESTRINGSIZE+VERSIONSIZE+sizeof(uint64_t));
   memcpy (save_p, description, SAVESTRINGSIZE);
@@ -1983,7 +1983,7 @@ static void G_DoSaveGame (dbool   menu)
          ? s_GGSAVED /* Ty - externalised */
          : "Game save failed!"); // CPhipps - not externalised
 
-  free(savebuffer);  // killough
+  Z_Free(savebuffer);  // killough
   savebuffer = save_p = NULL;
 
   savedescription[0] = 0;
@@ -2009,7 +2009,7 @@ bool G_DoSaveGameToBuffer(void *buf, size_t size) {
     memset(((char*)buf)+length, 0, size - length);
   }
 
-  free(savebuffer);  // killough
+  Z_Free(savebuffer);  // killough
   savebuffer = save_p = NULL;
   memcpy(savedescription, description_saved, SAVEDESCLEN);
 

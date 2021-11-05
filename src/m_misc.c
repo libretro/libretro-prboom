@@ -959,7 +959,7 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
 
           isstring = TRUE;
           len = strlen(strparm);
-          newstring = (char *) malloc(len);
+          newstring = (char *) Z_Malloc(len, PU_STATIC, 0);
           strparm[len-1] = 0; // clears trailing double-quote mark
           strcpy(newstring, strparm+1); // clears leading double-quote mark
         } else if ((strparm[0] == '0') && (strparm[1] == 'x')) {
@@ -996,11 +996,11 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
               union { const char **c; char **s; } u; // type punning via unions
 
               u.c = defaults[i].location.ppsz;
-              free(*(u.s));
+              Z_Free(*(u.s));
               *(u.s) = newstring;
 
               if(basedefault)
-                defaults[i].defaultvalue.psz = strdup(newstring);
+                defaults[i].defaultvalue.psz = Z_Strdup(newstring, PU_STATIC, 0);
             }
             break;
           }
@@ -1025,9 +1025,9 @@ void M_LoadDefaults (void)
   numdefaults = sizeof(defaults)/sizeof(defaults[0]);
   for (i = 0 ; i < numdefaults ; i++) {
     if (defaults[i].location.ppsz)
-      *defaults[i].location.ppsz = strdup(defaults[i].defaultvalue.psz);
+      *defaults[i].location.ppsz = Z_Strdup(defaults[i].defaultvalue.psz, PU_STATIC, 0);
     if (defaults[i].location.pi)
-      *defaults[i].location.pi = defaults[i].defaultvalue.i;
+      *defaults[i].location.pi   = defaults[i].defaultvalue.i;
   }
 
 
@@ -1036,7 +1036,7 @@ void M_LoadDefaults (void)
   i = M_CheckParm ("-baseconfig");
   if (i && i < myargc-1)
   {
-    basefile = strdup(myargv[i+1]);
+    basefile = Z_Strdup(myargv[i+1], PU_STATIC, 0);
     lprintf (LO_CONFIRM, " default file with base values: %s\n", basefile);
     M_LoadDefaultsFile(basefile, TRUE);
   }
@@ -1045,10 +1045,10 @@ void M_LoadDefaults (void)
 
   i = M_CheckParm ("-config");
   if (i && i < myargc-1)
-    defaultfile = strdup(myargv[i+1]);
+    defaultfile = Z_Strdup(myargv[i+1], PU_STATIC, 0);
   else {
     const char* exedir = I_DoomExeDir();
-    defaultfile = malloc(PATH_MAX+1);
+    defaultfile = Z_Malloc(PATH_MAX+1, PU_STATIC, 0);
     /* get config file from same directory as executable */
     snprintf(defaultfile, PATH_MAX,
             "%s%s%sboom.cfg", exedir,

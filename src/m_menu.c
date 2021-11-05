@@ -806,13 +806,13 @@ static void M_VerifyForcedLoadGame(int ch)
 {
   if (ch=='y')
     G_ForcedLoadGame();
-  free(forced_loadgame_message);    // free the message strdup()'ed below
+  Z_Free(forced_loadgame_message);    // free the message strdup()'ed below
   M_ClearMenus();
 }
 
 void M_ForcedLoadGame(const char *msg)
 {
-  forced_loadgame_message = strdup(msg); // free()'d above
+  forced_loadgame_message = Z_Strdup(msg, PU_STATIC, 0); // free()'d above
   M_StartMessage(forced_loadgame_message, M_VerifyForcedLoadGame, TRUE);
 }
 
@@ -1770,14 +1770,14 @@ static void M_DrawItem(const setup_menu_t* s)
      * This supports multiline items on horizontally-crowded menus.
      */
 
-    for (p = t = strdup(s->m_text); (p = strtok(p,"\n")); y += 8, p = NULL)
+    for (p = t = Z_Strdup(s->m_text, PU_STATIC, 0); (p = strtok(p,"\n")); y += 8, p = NULL)
       {      /* killough 10/98: support left-justification: */
   strcpy(menu_buffer,p);
   if (!(flags & S_LEFTJUST))
     w = M_GetPixelWidth(menu_buffer) + 4;
   M_DrawMenuString(x - w, y ,color);
       }
-    free(t);
+    Z_Free(t);
   }
 }
 
@@ -3556,8 +3556,8 @@ static void M_ResetDefaults(void)
       union { const char **c; char **s; } u; // type punning via unions
 
       u.c = dp->location.ppsz;
-      free(*(u.s));
-      *(u.c) = strdup(dp->defaultvalue.psz);
+      Z_Free(*(u.s));
+      *(u.c) = Z_Strdup(dp->defaultvalue.psz, PU_STATIC, 0);
     }
     else
       *dp->location.pi = dp->defaultvalue.i;
@@ -4783,7 +4783,7 @@ dbool M_Responder (event_t* ev) {
         //
         // killough 10/98: fix bugs, simplify
 
-        chat_string_buffer = malloc(CHAT_STRING_BFR_SIZE);
+        chat_string_buffer = Z_Malloc(CHAT_STRING_BFR_SIZE, PU_STATIC, 0);
         strncpy(chat_string_buffer,
           *ptr1->var.def->location.ppsz, CHAT_STRING_BFR_SIZE);
 
@@ -4796,7 +4796,7 @@ dbool M_Responder (event_t* ev) {
           union { const char **c; char **s; } u; // type punning via unions
 
           u.c = ptr1->var.def->location.ppsz;
-          free(*(u.s));
+          Z_Free(*(u.s));
           *(u.c) = chat_string_buffer;
         }
         chat_index = 0; // current cursor position in chat_string_buffer
@@ -5076,10 +5076,10 @@ void M_Drawer (void)
   if (messageToPrint)
     {
       /* cph - strdup string to writable memory */
-      char *ms = strdup(messageString);
-      char *p = ms;
+      char *ms = Z_Strdup(messageString, PU_STATIC, 0);
+      char *p  = ms;
 
-      int y = 100 - M_StringHeight(messageString)/2;
+      int y    = 100 - M_StringHeight(messageString)/2;
       while (*p)
       {
         char *string = p, c;
@@ -5091,7 +5091,7 @@ void M_Drawer (void)
         if ((*p = c))
           p++;
       }
-      free(ms);
+      Z_Free(ms);
     }
   else
     if (menuactive)

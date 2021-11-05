@@ -517,21 +517,21 @@ void D_AddFile (const char *file, wad_source_t source)
 {
   char *gwa_filename=NULL;
 
-  wadfiles = realloc(wadfiles, sizeof(*wadfiles)*(numwadfiles+1));
+  wadfiles = Z_Realloc(wadfiles, sizeof(*wadfiles)*(numwadfiles+1), PU_STATIC, 0);
   wadfiles[numwadfiles].name =
-    AddDefaultExtension(strcpy(malloc(strlen(file)+5), file), ".wad");
+    AddDefaultExtension(strcpy(Z_Malloc(strlen(file)+5, PU_STATIC, 0), file), ".wad");
   wadfiles[numwadfiles].src = source; // Ty 08/29/98
   numwadfiles++;
   // proff: automatically try to add the gwa files
   // proff - moved from w_wad.c
-  gwa_filename=AddDefaultExtension(strcpy(malloc(strlen(file)+5), file), ".wad");
+  gwa_filename=AddDefaultExtension(strcpy(Z_Malloc(strlen(file)+5, PU_STATIC, 0), file), ".wad");
   if (strlen(gwa_filename)>4)
     if (!strcasecmp(gwa_filename+(strlen(gwa_filename)-4),".wad"))
     {
       char *ext;
       ext = &gwa_filename[strlen(gwa_filename)-4];
       ext[1] = 'g'; ext[2] = 'w'; ext[3] = 'a';
-      wadfiles = realloc(wadfiles, sizeof(*wadfiles)*(numwadfiles+1));
+      wadfiles = Z_Realloc(wadfiles, sizeof(*wadfiles)*(numwadfiles+1), PU_STATIC, 0);
       wadfiles[numwadfiles].name = gwa_filename;
       wadfiles[numwadfiles].src = source; // Ty 08/29/98
       numwadfiles++;
@@ -582,42 +582,44 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
       filelump_t *fileinfo;
 
       // read IWAD directory
-      header.numlumps = LONG(header.numlumps);
+      header.numlumps     = LONG(header.numlumps);
       header.infotableofs = LONG(header.infotableofs);
-      length = header.numlumps;
-      fileinfo = malloc(length*sizeof(filelump_t));
+      length              = header.numlumps;
+      fileinfo            = Z_Malloc(length*sizeof(filelump_t), PU_STATIC, 0);
       if (filestream_seek (fp, header.infotableofs, SEEK_SET) ||
         rfread (fileinfo, sizeof(filelump_t), length, fp) != length)
       I_Error("CheckIWAD: failed to read directory %s",iwadname);
 
       // scan directory for levelname lumps
       while (length--)
-        if (fileinfo[length].name[0] == 'E' &&
-              fileinfo[length].name[2] == 'M' &&
-              fileinfo[length].name[4] == 0)
-        {
-          if (fileinfo[length].name[1] == '4')
-            ++ud;
-          else if (fileinfo[length].name[1] == '3')
-            ++rg;
-          else if (fileinfo[length].name[1] == '2')
-            ++rg;
-          else if (fileinfo[length].name[1] == '1')
-            ++sw;
-        }
-        else if (fileinfo[length].name[0] == 'M' &&
-                    fileinfo[length].name[1] == 'A' &&
-                    fileinfo[length].name[2] == 'P' &&
-                    fileinfo[length].name[5] == 0)
-        {
-          ++cm;
-          if (fileinfo[length].name[3] == '3')
-              if (fileinfo[length].name[4] == '1' ||
-                  fileinfo[length].name[4] == '2')
-                ++sc;
-        }
+      {
+	      if (fileinfo[length].name[0] == 'E' &&
+			      fileinfo[length].name[2] == 'M' &&
+			      fileinfo[length].name[4] == 0)
+	      {
+		      if (fileinfo[length].name[1] == '4')
+			      ++ud;
+		      else if (fileinfo[length].name[1] == '3')
+			      ++rg;
+		      else if (fileinfo[length].name[1] == '2')
+			      ++rg;
+		      else if (fileinfo[length].name[1] == '1')
+			      ++sw;
+	      }
+	      else if (fileinfo[length].name[0] == 'M' &&
+			      fileinfo[length].name[1] == 'A' &&
+			      fileinfo[length].name[2] == 'P' &&
+			      fileinfo[length].name[5] == 0)
+	      {
+		      ++cm;
+		      if (fileinfo[length].name[3] == '3')
+			      if (fileinfo[length].name[4] == '1' ||
+					      fileinfo[length].name[4] == '2')
+				      ++sc;
+	      }
+      }
 
-        free(fileinfo);
+        Z_Free(fileinfo);
       }
       else // missing IWAD tag in header
       {
@@ -757,7 +759,7 @@ static bool IdentifyVersion (void)
       //jff 9/3/98 use logical output routine
       lprintf(LO_WARN,"Unknown Game Version, may not work\n");
     D_AddFile(iwad,source_iwad);
-    free(iwad);
+    Z_Free(iwad);
   }
   else
     return I_Error("IdentifyVersion: IWAD not found\n");
@@ -785,7 +787,7 @@ static bool FindResponseFile (void)
          int  index;
          int indexinfile;
          uint8_t *file = NULL;
-         const char **moreargs = malloc(myargc * sizeof(const char*));
+         const char **moreargs = Z_Malloc(myargc * sizeof(const char*), PU_STATIC, 0);
          const char **newargv;
          // proff 04/05/2000: Added for searching responsefile
          char fname[PATH_MAX+1];
@@ -816,7 +818,7 @@ static bool FindResponseFile (void)
             int k;
             lprintf(LO_ERROR,"\nResponse file empty!\n");
 
-            newargv = calloc(sizeof(char *),MAXARGVS);
+            newargv    = Z_Calloc(sizeof(char *),MAXARGVS, PU_STATIC, 0);
             newargv[0] = myargv[0];
             for (k = 1,index = 1;k < myargc;k++)
             {
@@ -832,7 +834,7 @@ static bool FindResponseFile (void)
 
          {
             const char *firstargv = myargv[0];
-            newargv = calloc(sizeof(char *),MAXARGVS);
+            newargv               = Z_Calloc(sizeof(char *),MAXARGVS, PU_STATIC, 0);
             newargv[0] = firstargv;
          }
 
@@ -843,8 +845,8 @@ static bool FindResponseFile (void)
             do {
                while (size > 0 && isspace(*infile)) { infile++; size--; }
                if (size > 0) {
-                  char *s = malloc(size+1);
-                  char *p = s;
+                  char *s    = Z_Malloc(size+1, PU_STATIC, 0);
+                  char *p    = s;
                   int quoted = 0;
 
                   while (size > 0) {
@@ -862,14 +864,14 @@ static bool FindResponseFile (void)
 
                   // Terminate string, realloc and add to argv
                   *p = 0;
-                  newargv[indexinfile++] = realloc(s,strlen(s)+1);
+                  newargv[indexinfile++] = Z_Realloc(s,strlen(s)+1, PU_STATIC, 0);
                }
             } while(size > 0);
          }
-         free(file);
+         Z_Free(file);
 
          memcpy((void *)&newargv[indexinfile],moreargs,index*sizeof(moreargs[0]));
-         free((void *)moreargs);
+         Z_Free((void *)moreargs);
 
          myargc = indexinfile+index; myargv = newargv;
 
@@ -928,15 +930,15 @@ static void DoLooseFiles(void)
     // so now we must have a loose file.  Find out what kind and store it.
     j = strlen(myargv[i]);
     if (!strcasecmp(&myargv[i][j-4],".wad"))
-      wads[wadcount++] = strdup(myargv[i]);
+      wads[wadcount++] = Z_Strdup(myargv[i], PU_STATIC, 0);
     if (!strcasecmp(&myargv[i][j-4],".lmp"))
-      lmps[lmpcount++] = strdup(myargv[i]);
+      lmps[lmpcount++] = Z_Strdup(myargv[i], PU_STATIC, 0);
     if (!strcasecmp(&myargv[i][j-4],".deh"))
-      dehs[dehcount++] = strdup(myargv[i]);
+      dehs[dehcount++] = Z_Strdup(myargv[i], PU_STATIC, 0);
     if (!strcasecmp(&myargv[i][j-4],".bex"))
-      dehs[dehcount++] = strdup(myargv[i]);
+      dehs[dehcount++] = Z_Strdup(myargv[i], PU_STATIC, 0);
     if (myargv[i][j-4] != '.')  // assume wad if no extension
-      wads[wadcount++] = strdup(myargv[i]);
+      wads[wadcount++] = Z_Strdup(myargv[i], PU_STATIC, 0);
     skip[i] = TRUE; // nuke that entry so it won't repeat later
   }
 
@@ -948,7 +950,7 @@ static void DoLooseFiles(void)
     skip[p] = TRUE;    // nuke the entry
     while (++p != myargc && *myargv[p] != '-')
     {
-      wads[wadcount++] = strdup(myargv[p]);
+      wads[wadcount++] = Z_Strdup(myargv[p], PU_STATIC, 0);
       skip[p] = TRUE;  // null any we find and save
     }
   }
@@ -958,7 +960,7 @@ static void DoLooseFiles(void)
     skip[p] = TRUE;    // nuke the entry
     while (++p != myargc && *myargv[p] != '-')
     {
-      dehs[dehcount++] = strdup(myargv[p]);
+      dehs[dehcount++] = Z_Strdup(myargv[p], PU_STATIC, 0);
       skip[p] = TRUE;  // null any we find and save
     }
   }
@@ -968,21 +970,21 @@ static void DoLooseFiles(void)
     skip[p] = true;    // nuke the entry
     while (++p != myargc && *myargv[p] != '-')
     {
-      lmps[lmpcount++] = strdup(myargv[p]);
+      lmps[lmpcount++] = Z_Strdup(myargv[p], PU_STATIC, 0);
       skip[p] = true;  // null any we find and save
     }
   }
 
   // Now go back and redo the whole myargv array with our stuff in it.
   // First, create a new myargv array to copy into
-  tmyargv = calloc(sizeof(char *),MAXARGVS);
+  tmyargv    = Z_Calloc(sizeof(char *),MAXARGVS, PU_STATIC, 0);
   tmyargv[0] = myargv[0]; // invocation
-  tmyargc = 1;
+  tmyargc    = 1;
 
   // put our stuff into it
   if (wadcount > 0)
   {
-    tmyargv[tmyargc++] = strdup("-file"); // put the switch in
+    tmyargv[tmyargc++] = Z_Strdup("-file", PU_STATIC, 0); // put the switch in
     for (i=0;i<wadcount;)
       tmyargv[tmyargc++] = wads[i++]; // allocated by strdup above
   }
@@ -990,7 +992,7 @@ static void DoLooseFiles(void)
   // for -deh
   if (dehcount > 0)
   {
-    tmyargv[tmyargc++] = strdup("-deh");
+    tmyargv[tmyargc++] = Z_Strdup("-deh", PU_STATIC, 0);
     for (i=0;i<dehcount;)
       tmyargv[tmyargc++] = dehs[i++];
   }
@@ -998,7 +1000,7 @@ static void DoLooseFiles(void)
   // for -playdemo
   if (lmpcount > 0)
   {
-    tmyargv[tmyargc++] = strdup("-playdemo");
+    tmyargv[tmyargc++] = Z_Strdup("-playdemo", PU_STATIC, 0);
     for (i=0;i<lmpcount;)
       tmyargv[tmyargc++] = lmps[i++];
   }
@@ -1069,7 +1071,7 @@ bool D_DoomMainSetup(void)
       lprintf(LO_INFO, PACKAGE ".wad not found - internal default data will be used\n");
     else
       D_AddFile(data_wad_path, source_pre);
-    free(data_wad_path);
+    Z_Free(data_wad_path);
   }
 
   // e6y: DEH files preloaded in wrong order
@@ -1223,7 +1225,7 @@ bool D_DoomMainSetup(void)
       else {
         D_AddFile(fpath,source_auto_load);
         modifiedgame = TRUE;
-        free(fpath);
+        Z_Free(fpath);
       }
     }
   }
@@ -1306,7 +1308,7 @@ bool D_DoomMainSetup(void)
       else {
         ProcessDehFile(fpath, D_dehout(), 0);
         // this used to set modifiedgame here, but patches shouldn't
-        free(fpath);
+        Z_Free(fpath);
       }
     }
   }

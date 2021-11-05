@@ -42,7 +42,6 @@
 #include "../src/g_game.h"
 #include "../src/wi_stuff.h"
 #include "../src/p_tick.h"
-#include "../src/z_zone.h"
 
 /* Don't include file_stream_transforms.h but instead
 just forward declare the prototype */

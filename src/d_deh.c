@@ -1429,15 +1429,15 @@ void D_BuildBEXTables(void)
      deh_codeptr[i] = states[i].action;
 
    for(i = 0; i < NUMSPRITES; i++)
-      deh_spritenames[i] = strdup(sprnames[i]);
+      deh_spritenames[i] = Z_Strdup(sprnames[i], PU_STATIC, 0);
    deh_spritenames[NUMSPRITES] = NULL;
 
    for(i = 1; i < NUMMUSIC; i++)
-      deh_musicnames[i] = strdup(S_music[i].name);
+      deh_musicnames[i] = Z_Strdup(S_music[i].name, PU_STATIC, 0);
    deh_musicnames[0] = deh_musicnames[NUMMUSIC] = NULL;
 
    for(i = 1; i < NUMSFX; i++)
-      deh_soundnames[i] = strdup(S_sfx[i].name);
+      deh_soundnames[i] = Z_Strdup(S_sfx[i].name, PU_STATIC, 0);
    deh_soundnames[0] = deh_soundnames[NUMSFX] = NULL;
 }
 
@@ -2415,7 +2415,7 @@ static void deh_procCheat(DEHFILE *fpin, FILE* fpout, char *line) // done
           cheat[i].deh_modified = TRUE;
                 }
 #endif
-                cheat[iy].cheat = strdup(p);
+                cheat[iy].cheat = Z_Strdup(p, PU_STATIC, 0);
                 if (fpout) fprintf(fpout,
                                    "Assigned new cheat '%s' to cheat '%s'at index %d\n",
                                    p, cheat[ix].deh_cheat, iy); // killough 4/18/98
@@ -2593,7 +2593,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
         {
     // CPhipps - fix constness problem
     char *s;
-    sprnames[i] = s = strdup(sprnames[i]);
+    sprnames[i] = s = Z_Strdup(sprnames[i], PU_STATIC, 0);
 
     //e6y: flag the sprite as changed
     sprnames_state[i] = TRUE;
@@ -2625,7 +2625,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
                                    "Changing name of sfx from %s to %*s\n",
                                    S_sfx[i].name,usedlen,&inbuffer[fromlen]);
 
-                S_sfx[i].name = strdup(&inbuffer[fromlen]);
+                S_sfx[i].name = Z_Strdup(&inbuffer[fromlen], PU_STATIC, 0);
 
                 //e6y: flag the SFX as changed
                 S_sfx_state[i] = TRUE;
@@ -2647,7 +2647,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
                                        "Changing name of music from %s to %*s\n",
                                        S_music[i].name,usedlen,&inbuffer[fromlen]);
 
-                    S_music[i].name = strdup(&inbuffer[fromlen]);
+                    S_music[i].name = Z_Strdup(&inbuffer[fromlen], PU_STATIC, 0);
 
                     //e6y: flag the music as changed
                     S_music_state[i] = TRUE;
@@ -2664,13 +2664,13 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
       if (fpout) fprintf(fpout,"Checking text area through strings for '%.12s%s' from=%d to=%d\n",inbuffer, (strlen(inbuffer) > 12) ? "..." : "",fromlen,tolen);
       if ((size_t)fromlen <= strlen(inbuffer))
         {
-          line2 = strdup(&inbuffer[fromlen]);
+          line2             = Z_Strdup(&inbuffer[fromlen], PU_STATIC, 0);
           inbuffer[fromlen] = '\0';
         }
 
       deh_procStringSub(NULL, inbuffer, line2, fpout);
     }
-  free(line2); // may be NULL, ignored by free()
+  Z_Free(line2); // may be NULL, ignored by free()
   return;
 }
 
@@ -2705,7 +2705,7 @@ static void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
 
   if (fpout) fprintf(fpout,"Processing extended string substitution\n");
 
-  if (!holdstring) holdstring = malloc(maxstrlen*sizeof(*holdstring));
+  if (!holdstring) holdstring = Z_Malloc(maxstrlen*sizeof(*holdstring), PU_STATIC, 0);
 
   *holdstring = '\0';  // empty string to start with
   strncpy(inbuffer,line,DEH_BUFFERMAX);
@@ -2732,7 +2732,7 @@ static void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
           if (fpout) fprintf(fpout,
                              "* increased buffer from to %d for buffer size %d\n",
                              maxstrlen,(int)strlen(inbuffer));
-          holdstring = realloc(holdstring,maxstrlen*sizeof(*holdstring));
+          holdstring = Z_Realloc(holdstring,maxstrlen*sizeof(*holdstring), PU_STATIC, 0);
         }
       // concatenate the whole buffer if continuation or the value iffirst
       strcat(holdstring,ptr_lstrip(((*holdstring) ? inbuffer : strval)));
@@ -2789,7 +2789,7 @@ dbool   deh_procStringSub(char *key, char *lookfor, char *newstring, FILE *fpout
       if (found)
         {
     char *t;
-          *deh_strlookup[i].ppstr = t = strdup(newstring); // orphan originalstring
+          *deh_strlookup[i].ppstr = t = Z_Strdup(newstring, PU_STATIC, 0); // orphan originalstring
           found = TRUE;
           // Handle embedded \n's in the incoming string, convert to 0x0a's
           {
@@ -2925,7 +2925,7 @@ static void deh_procBexSprites(DEHFILE *fpin, FILE *fpout, char *line)
 	       fprintf(fpout, "Substituting '%s' for sprite '%s'\n",
 	               candidate, deh_spritenames[rover]);
 
-	    sprnames[rover] = strdup(candidate);
+	    sprnames[rover] = Z_Strdup(candidate, PU_STATIC, 0);
 	    break;
 	 }
 	 rover++;
@@ -2984,7 +2984,7 @@ static void deh_procBexSounds(DEHFILE *fpin, FILE *fpout, char *line)
 	       fprintf(fpout, "Substituting '%s' for sound '%s'\n",
 	               candidate, deh_soundnames[rover]);
 
-	    S_sfx[rover].name = strdup(candidate);
+	    S_sfx[rover].name = Z_Strdup(candidate, PU_STATIC, 0);
 	    break;
 	 }
 	 rover++;
@@ -3043,7 +3043,7 @@ static void deh_procBexMusic(DEHFILE *fpin, FILE *fpout, char *line)
 	       fprintf(fpout, "Substituting '%s' for music '%s'\n",
 	               candidate, deh_musicnames[rover]);
 
-	    S_music[rover].name = strdup(candidate);
+	    S_music[rover].name = Z_Strdup(candidate, PU_STATIC, 0);
 	    break;
 	 }
 	 rover++;

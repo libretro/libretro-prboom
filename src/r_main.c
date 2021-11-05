@@ -362,7 +362,7 @@ static void R_InitLightTables (void)
   int i;
 
   // killough 4/4/98: dynamic colormaps
-  c_zlight = malloc(sizeof(*c_zlight) * numcolormaps);
+  c_zlight = Z_Malloc(sizeof(*c_zlight) * numcolormaps, PU_STATIC, 0);
 
   // Calculate the light levels to use
   //  for each level / distance combination.

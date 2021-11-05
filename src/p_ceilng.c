@@ -428,13 +428,13 @@ int EV_CeilingCrushStop(line_t* line)
 //
 void P_AddActiveCeiling(ceiling_t* ceiling)
 {
-  ceilinglist_t *list = malloc(sizeof *list);
-  list->ceiling = ceiling;
-  ceiling->list = list;
+  ceilinglist_t *list = Z_Malloc(sizeof *list, PU_STATIC, 0);
+  list->ceiling       = ceiling;
+  ceiling->list       = list;
   if ((list->next = activeceilings))
-    list->next->prev = &list->next;
-  list->prev = &activeceilings;
-  activeceilings = list;
+    list->next->prev  = &list->next;
+  list->prev          = &activeceilings;
+  activeceilings      = list;
 }
 
 //
@@ -452,7 +452,7 @@ void P_RemoveActiveCeiling(ceiling_t* ceiling)
   P_RemoveThinker(&ceiling->thinker);
   if ((*list->prev = list->next))
     list->next->prev = list->prev;
-  free(list);
+  Z_Free(list);
 }
 
 //
@@ -467,7 +467,7 @@ void P_RemoveAllActiveCeilings(void)
   while (activeceilings)
   {
     ceilinglist_t *next = activeceilings->next;
-    free(activeceilings);
+    Z_Free(activeceilings);
     activeceilings = next;
   }
 }

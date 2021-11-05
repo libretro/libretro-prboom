@@ -572,11 +572,11 @@ void R_StoreWallRange(const int start, const int stop)
 
    if (ds_p == drawsegs+maxdrawsegs)   // killough 1/98 -- fix 2s line HOM
    {
-      unsigned pos = ds_p - drawsegs; // jff 8/9/98 fix from ZDOOM1.14a
+      unsigned pos    = ds_p - drawsegs; // jff 8/9/98 fix from ZDOOM1.14a
       unsigned newmax = maxdrawsegs ? maxdrawsegs*2 : 128; // killough
-      drawsegs = realloc(drawsegs,newmax*sizeof(*drawsegs));
-      ds_p = drawsegs + pos;          // jff 8/9/98 fix from ZDOOM1.14a
-      maxdrawsegs = newmax;
+      drawsegs        = Z_Realloc(drawsegs,newmax*sizeof(*drawsegs), PU_STATIC, 0);
+      ds_p            = drawsegs + pos; // jff 8/9/98 fix from ZDOOM1.14a
+      maxdrawsegs     = newmax;
    }
 
    if(curline->miniseg == FALSE) // figgi -- skip minisegs
@@ -619,8 +619,8 @@ void R_StoreWallRange(const int start, const int stop)
          do
             maxopenings = maxopenings ? maxopenings*2 : 16384;
          while (need > maxopenings);
-         openings = realloc(openings, maxopenings * sizeof(*openings));
-         lastopening = openings + pos;
+         openings       = Z_Realloc(openings, maxopenings * sizeof(*openings), PU_STATIC, 0);
+         lastopening    = openings + pos;
 
          // jff 8/9/98 borrowed fix for openings from ZDOOM1.14
          // [RH] We also need to adjust the openings pointers that

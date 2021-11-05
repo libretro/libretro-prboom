@@ -470,8 +470,8 @@ void P_UnArchiveThinkers (void)
       I_Error ("P_UnArchiveThinkers: Unknown tclass %i in savegame", *save_p);
 
     // first table entry special: 0 maps to NULL
-    *(mobj_p = malloc(size * sizeof *mobj_p)) = 0;   // table of pointers
-    save_p = sp;           // restore save pointer
+    *(mobj_p = Z_Malloc(size * sizeof *mobj_p, PU_STATIC, 0)) = 0;   // table of pointers
+    save_p   = sp;           // restore save pointer
   }
 
   // read in saved thinkers
@@ -566,7 +566,7 @@ void P_UnArchiveThinkers (void)
     }
   }
 
-  free(mobj_p);    // free translation table
+  Z_Free(mobj_p);    // free translation table
 
   // killough 3/26/98: Spawn icon landings:
   if (gamemode == commercial)
@@ -1040,8 +1040,8 @@ void P_UnArchiveMap(void)
   if (markpointnum)
     {
       while (markpointnum >= markpointnum_max)
-        markpoints = realloc(markpoints, sizeof *markpoints *
-         (markpointnum_max = markpointnum_max ? markpointnum_max*2 : 16));
+        markpoints = Z_Realloc(markpoints, sizeof *markpoints *
+         (markpointnum_max = markpointnum_max ? markpointnum_max*2 : 16), PU_STATIC, 0);
       memcpy(markpoints, save_p, markpointnum * sizeof *markpoints);
       save_p += markpointnum * sizeof *markpoints;
     }

@@ -139,7 +139,7 @@ void S_Init(int sfxVolume, int musicVolume)
     // simultaneously) within zone memory.
     // CPhipps - calloc
     channels =
-      (channel_t *) calloc(numChannels,sizeof(channel_t));
+      (channel_t *) Z_Calloc(numChannels,sizeof(channel_t), PU_STATIC, 0);
 
     // Note that sounds have not been cached (yet).
     for (i=1 ; i<NUMSFX ; i++)
@@ -500,7 +500,7 @@ void S_ChangeMusic(int musicnum, int looping)
       lprintf(LO_INFO, "S_ChangeMusic: playing %s from file '%s'\n",
                        music->name, music_filename);
       music_file_failed = I_RegisterMusicFile(music_filename, music);
-      free(music_filename);
+      Z_Free(music_filename);
     }
   }
 

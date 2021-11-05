@@ -54,7 +54,7 @@ static struct {
 void W_InitCache(void)
 {
   // set up caching
-  cachelump = calloc(sizeof *cachelump, numlumps);
+  cachelump = Z_Calloc(sizeof *cachelump, numlumps, PU_STATIC, 0);
   if (!cachelump)
     I_Error ("W_Init: Couldn't allocate lumpcache");
 }
@@ -62,7 +62,7 @@ void W_InitCache(void)
 void W_DoneCache(void)
 {
    if (cachelump)
-      free(cachelump);
+      Z_Free(cachelump);
 }
 
 /* W_CacheLumpNum

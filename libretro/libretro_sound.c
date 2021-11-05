@@ -22,7 +22,6 @@
 #include "../src/m_misc.h"
 #include "../src/m_swap.h"
 #include "../src/w_wad.h"
-#include "../src/z_zone.h"
 
 #include "../src/mus2mid.h"
 
@@ -176,7 +175,7 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
     times = 48000.0f / (float)orig_rate;
 
     padded_sfx_len = ((sfxlump_len*R_ceil(times) + (SAMPLECOUNT_35-1)) / SAMPLECOUNT_35) * SAMPLECOUNT_35;
-    padded_sfx_data = (uint8_t*)malloc(padded_sfx_len);
+    padded_sfx_data = (uint8_t*)Z_Malloc(padded_sfx_len, PU_STATIC, 0);
 
     for (i=0; i < padded_sfx_len; i++)
     {
@@ -507,7 +506,7 @@ void I_ShutdownSound(void)
    {
       if (!S_sfx[i].link)
       {
-         free(S_sfx[i].data);
+         Z_Free(S_sfx[i].data);
          S_sfx[i].data = NULL;
       }
    }
@@ -607,7 +606,7 @@ void I_UnRegisterSong(int handle)
   if (current_player)
     current_player->stop();
 
-   free(song_data);
+   Z_Free(song_data);
    music_handle = NULL;
    song_data    = NULL;
 #endif
@@ -726,7 +725,7 @@ int I_RegisterMusicFile( const char* filename, musicinfo_t *song )
 
   if (!I_RegisterSong(song_data, len))
   {
-     free(song_data);
+     Z_Free(song_data);
      song_data = NULL;
      if (log_cb)
         log_cb(RETRO_LOG_WARN, "Couldn't load music from %s\n", filename);

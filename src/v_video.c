@@ -541,7 +541,7 @@ void V_UpdateTrueColorPalette(void) {
   int numPals = W_LumpLength(pplump) / (3*256);
   
   if (usegammaOnLastPaletteGeneration != usegamma) {
-    if (Palettes16) free(Palettes16);
+    if (Palettes16) Z_Free(Palettes16);
     Palettes16 = NULL;
     usegammaOnLastPaletteGeneration = usegamma;      
   }
@@ -549,7 +549,7 @@ void V_UpdateTrueColorPalette(void) {
   if (!Palettes16)
   {
      // set short palette
-     Palettes16 = malloc(numPals*256*sizeof(uint16_t)*VID_NUMCOLORWEIGHTS);
+     Palettes16 = Z_Malloc(numPals*256*sizeof(uint16_t)*VID_NUMCOLORWEIGHTS, PU_STATIC, 0);
      for (p=0; p<numPals; p++)
      {
         for (i=0; i<256; i++)
@@ -599,7 +599,7 @@ void V_UpdateTrueColorPalette(void) {
 //---------------------------------------------------------------------------
 static void V_DestroyTrueColorPalette(void)
 {
-    if (Palettes16) free(Palettes16);
+    if (Palettes16) Z_Free(Palettes16);
     Palettes16 = NULL;
     V_Palette16 = NULL;
 }
@@ -671,7 +671,7 @@ int V_GetPixelDepth(void) {
 void V_AllocScreen(screeninfo_t *scrn) {
   if (!scrn->not_on_heap)
     if (( SURFACE_BYTE_PITCH * scrn->height) > 0)
-      scrn->data = malloc( SURFACE_BYTE_PITCH * scrn->height);
+      scrn->data = Z_Malloc( SURFACE_BYTE_PITCH * scrn->height, PU_STATIC, 0);
 }
 
 //
@@ -689,7 +689,7 @@ void V_AllocScreens(void) {
 //
 void V_FreeScreen(screeninfo_t *scrn) {
   if (!scrn->not_on_heap) {
-    free(scrn->data);
+    Z_Free(scrn->data);
     scrn->data = NULL;
   }
 }

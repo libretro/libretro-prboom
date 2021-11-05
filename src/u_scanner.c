@@ -70,7 +70,7 @@ u_scanner_t U_ScanOpen(const char* data, int length, const char* name)
   if(length == -1)
     length = strlen(data);
   scanner.length = length;
-  scanner.data = (char*) malloc(sizeof(char)*length);
+  scanner.data = (char*)Z_Malloc(sizeof(char)*length, PU_STATIC, 0);
   memcpy(scanner.data, data, length);
 
   U_CheckForWhitespace(&scanner);
@@ -81,9 +81,9 @@ u_scanner_t U_ScanOpen(const char* data, int length, const char* name)
 void U_ScanClose(u_scanner_t* scanner)
 {
   if (scanner->nextState.string != NULL)
-    free(scanner->nextState.string);
+    Z_Free(scanner->nextState.string);
   if(scanner->data != NULL)
-    free(scanner->data);
+    Z_Free(scanner->data);
 }
 
 void U_IncrementLine(u_scanner_t* scanner)
@@ -197,13 +197,13 @@ void U_ExpandState(u_scanner_t* s)
 void U_SaveState(u_scanner_t* s, u_scanner_t savedstate)
 {
   // This saves the entire parser state except for the data pointer.
-  if (savedstate.string != NULL) free(savedstate.string);
-  if (savedstate.nextState.string != NULL) free(savedstate.nextState.string);
+  if (savedstate.string != NULL) Z_Free(savedstate.string);
+  if (savedstate.nextState.string != NULL) Z_Free(savedstate.nextState.string);
 
   memcpy(&savedstate, s, sizeof(*s));
-  savedstate.string = strdup(s->string);
-  savedstate.nextState.string = strdup(s->nextState.string);
-  savedstate.data = NULL;
+  savedstate.string           = Z_Strdup(s->string, PU_STATIC, 0);
+  savedstate.nextState.string = Z_Strdup(s->nextState.string, PU_STATIC, 0);
+  savedstate.data             = NULL;
 }
 
 void U_RestoreState(u_scanner_t* s, u_scanner_t savedstate)
@@ -729,8 +729,8 @@ void U_SetString(char **ptr, const char *start, int length)
 {
   if (length == -1)
     length = strlen(start);
-  if (*ptr != NULL) free(*ptr);
-  *ptr = (char*)malloc(length + 1);
+  if (*ptr != NULL) Z_Free(*ptr);
+  *ptr = (char*)Z_Malloc(length + 1, PU_STATIC, 0);
   memcpy(*ptr, start, length);
   (*ptr)[length] = '\0';
 }

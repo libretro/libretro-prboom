@@ -324,9 +324,9 @@ static void AM_restoreScaleAndLoc(void)
 static void AM_addMark(void)
 {
    if (markpointnum >= markpointnum_max)
-      markpoints = realloc(markpoints,
+      markpoints = Z_Realloc(markpoints,
             (markpointnum_max = markpointnum_max ?
-             markpointnum_max*2 : 16) * sizeof(*markpoints));
+             markpointnum_max*2 : 16) * sizeof(*markpoints), PU_STATIC, 0);
 
    markpoints[markpointnum].x = m_x + m_w/2;
    markpoints[markpointnum].y = m_y + m_h/2;

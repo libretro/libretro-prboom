@@ -462,14 +462,14 @@ static dbool ReadTrack(midi_track_t *track, midimem_t *mf)
     {
         // Resize the track slightly larger to hold another event:
         /*
-        new_events = realloc(track->events,
-                             sizeof(midi_event_t) * (track->num_events + 1));
+        new_events = Z_Realloc(track->events,
+                             sizeof(midi_event_t) * (track->num_events + 1), PU_STATIC, 0);
         */
         if (track->num_events == track->num_event_mem)
-        { // depending on the state of the heap and the malloc implementation, realloc()
+        { // depending on the state of the heap and the malloc implementation, Z_Realloc()
           // one more event at a time can be VERY slow.  10sec+ in MSVC
           track->num_event_mem += 100; 
-          new_events = realloc (track->events, sizeof (midi_event_t) * track->num_event_mem);
+          new_events = Z_Realloc (track->events, sizeof (midi_event_t) * track->num_event_mem, PU_STATIC, 0);
         }
 
         if (new_events == NULL)
@@ -717,7 +717,7 @@ midi_event_t **MIDI_GenerateFlatList (midi_file_t *file)
 
   int totaldelta = 0;
 
-  int *trackpos = calloc (file->num_tracks, sizeof (int));
+  int *trackpos = Z_Calloc (file->num_tracks, sizeof (int));
   int *tracktime = calloc (file->num_tracks, sizeof (int));
   int trackactive = file->num_tracks;
 
@@ -967,7 +967,7 @@ midi_file_t *MIDI_LoadFileSpecial (midimem_t *mf)
     if (ret->tracks->num_events == ret->tracks->num_event_mem)
     { 
       ret->tracks->num_event_mem += 100; 
-      ret->tracks->events = realloc (ret->tracks->events, sizeof (midi_event_t) * ret->tracks->num_event_mem);
+      ret->tracks->events = Z_Realloc (ret->tracks->events, sizeof (midi_event_t) * ret->tracks->num_event_mem, PU_STATIC, 0);
     }
 
     oldev = flatlist[epos];

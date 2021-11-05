@@ -43,17 +43,17 @@ umapinfo_t U_mapinfo;
 
 static void FreeMap(mapentry_t *mape)
 {
-  if (mape->mapname) free(mape->mapname);
-  if (mape->levelname) free(mape->levelname);
-  if (mape->intertext) free(mape->intertext);
-  if (mape->intertextsecret) free(mape->intertextsecret);
+  if (mape->mapname) Z_Free(mape->mapname);
+  if (mape->levelname) Z_Free(mape->levelname);
+  if (mape->intertext) Z_Free(mape->intertext);
+  if (mape->intertextsecret) Z_Free(mape->intertextsecret);
   mape->mapname = NULL;
 }
 
 static void ReplaceString(char **pptr, const char *newstring)
 {
-  if (*pptr != NULL) free(*pptr);
-  *pptr = strdup(newstring);
+  if (*pptr != NULL) Z_Free(*pptr);
+  *pptr = Z_Strdup(newstring, PU_STATIC, 0);
 }
 
 
@@ -69,7 +69,7 @@ static char *ParseMultiString(u_scanner_t* s, int error)
   {
     if (!strcasecmp(s->string, "clear"))
     {
-      return strdup("-"); // this was explicitly deleted to override the default.
+      return Z_Strdup("-", PU_STATIC, 0); // this was explicitly deleted to override the default.
     }
     else
     {
@@ -80,13 +80,13 @@ static char *ParseMultiString(u_scanner_t* s, int error)
   do
   {
     U_MustGetToken(s, TK_StringConst);
-    if (build == NULL) build = strdup(s->string);
+    if (build == NULL) build = Z_Strdup(s->string, PU_STATIC, 0);
     else
     {
       size_t oldlen = strlen(build);
       size_t newlen = oldlen + strlen(s->string) + 2;
 
-      build = (char*)realloc(build, newlen);
+      build = (char*)Z_Realloc(build, newlen, PU_STATIC, 0);
       build[oldlen] = '\n';
       strcpy(build + oldlen + 1, s->string);
       build[newlen-1] = 0;
@@ -135,7 +135,7 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
   if (!U_MustGetToken(s, TK_Identifier))
     return 0;
 
-  pname = strdup(s->string);
+  pname = Z_Strdup(s->string, PU_STATIC, 0);
   U_MustGetToken(s, '=');
 
   if (!strcasecmp(pname, "levelname"))
@@ -223,14 +223,14 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
   {
     char *lname = ParseMultiString(s, 1);
     if (!lname) return 0;
-    if (mape->intertext != NULL) free(mape->intertext);
+    if (mape->intertext != NULL) Z_Free(mape->intertext);
     mape->intertext = lname;
   }
   else if (!strcasecmp(pname, "intertextsecret"))
   {
     char *lname = ParseMultiString(s, 1);
     if (!lname) return 0;
-    if (mape->intertextsecret != NULL) free(mape->intertextsecret);
+    if (mape->intertextsecret != NULL) Z_Free(mape->intertextsecret);
     mape->intertextsecret = lname;
   }
   else if (!strcasecmp(pname, "interbackdrop"))
@@ -248,7 +248,7 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
       if (!strcasecmp(s->string, "clear"))
       {
         // mark level free of boss actions
-        if (mape->bossactions) free(mape->bossactions);
+        if (mape->bossactions) Z_Free(mape->bossactions);
         mape->bossactions = NULL;
         mape->numbossactions = -1;
       }
@@ -270,8 +270,8 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
             {
               if (mape->numbossactions == -1) mape->numbossactions = 1;
               else mape->numbossactions++;
-              mape->bossactions = (bossaction_t *)realloc(mape->bossactions,
-                                                        sizeof(bossaction_t)*mape->numbossactions);
+              mape->bossactions = (bossaction_t *)Z_Realloc(mape->bossactions,
+                                                        sizeof(bossaction_t)*mape->numbossactions, PU_STATIC, 0);
               mape->bossactions[mape->numbossactions - 1].type = i;
               mape->bossactions[mape->numbossactions - 1].special = special;
               mape->bossactions[mape->numbossactions - 1].tag = tag;
@@ -290,7 +290,7 @@ static int ParseStandardProperty(u_scanner_t* s, mapentry_t *mape)
     U_GetNextToken(s, TRUE);
   } while (U_CheckToken(s, ','));
 
-  free(pname);
+  Z_Free(pname);
   return status;
 }
 
@@ -359,7 +359,7 @@ int U_ParseMapInfo(const char *buffer, size_t length)
     if (i == U_mapinfo.mapcount)
     {
       U_mapinfo.mapcount++;
-      U_mapinfo.maps = (mapentry_t*)realloc(U_mapinfo.maps, sizeof(mapentry_t)*U_mapinfo.mapcount);
+      U_mapinfo.maps = (mapentry_t*)Z_Realloc(U_mapinfo.maps, sizeof(mapentry_t)*U_mapinfo.mapcount, PU_STATIC, 0);
       U_mapinfo.maps[U_mapinfo.mapcount-1] = parsed;
     }
   }
@@ -377,7 +377,7 @@ void U_FreeMapInfo()
   {
     FreeMap(&U_mapinfo.maps[i]);
   }
-  free(U_mapinfo.maps);
+  Z_Free(U_mapinfo.maps);
   U_mapinfo.maps = NULL;
   U_mapinfo.mapcount = 0;
 }

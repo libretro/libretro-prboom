@@ -169,7 +169,7 @@ SOURCES_C += $(LIBVORBIS_DIR)/lib/analysis.c \
 	     $(LIBVORBIS_DIR)/lib/window.c
 
 SOURCES_C += $(LIBOGG_DIR)/src/bitwise.c \
-				 $(LIBOGG_DIR)/src/framing.c
+	     $(LIBOGG_DIR)/src/framing.c
 endif
 
 # The custom memory allocation system should be used consistently across the core

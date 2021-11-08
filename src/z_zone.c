@@ -93,8 +93,14 @@ static const size_t HEADER_SIZE = (sizeof(memblock_t)+CHUNK_SIZE-1) & ~(CHUNK_SI
 static memblock_t *blockbytag[PU_MAX];
 
 // 0 means unlimited, any other value is a hard limit
-//static int memory_size = 8192*1024;
+#ifdef MEMORY_LOW
+/* Set a limit of 12 MB (previous default was
+ * 8 MB, but this reduces runtime performance
+ * to an unacceptable level) */
+static int memory_size = 12*1024*1024;
+#else
 static int memory_size = 0;
+#endif
 static int free_memory = 0;
 
 

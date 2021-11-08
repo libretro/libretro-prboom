@@ -59,7 +59,4 @@ const char *I_DoomExeDir(void); // killough 2/16/98: path to executable's dir
 dbool   HasTrailingSlash(const char* dn);
 char* I_FindFile(const char* wfname, const char* ext);
 
-/* cph 2001/11/18 - Move W_Filelength to i_system.c */
-int I_Filelength(int handle);
-
 #endif

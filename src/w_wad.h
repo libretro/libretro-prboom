@@ -87,10 +87,8 @@ typedef enum {
 typedef struct {
   const char* name;
   wad_source_t src;
-#ifdef MEMORY_LOW
-  int handle;
-#else
   RFILE* handle;
+#ifndef MEMORY_LOW
   unsigned char *data;
   int position;
   int length;

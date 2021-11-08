@@ -1761,40 +1761,6 @@ void I_Init(void)
    R_InitInterpolation();
 }
 
-/*
-* I_Filelength
-*
-* Return length of an open file.
-*/
-
-int I_Filelength(int handle)
-{
-   struct stat   fileinfo;
-   if (fstat(handle,&fileinfo) == -1)
-   {
-      I_Error("I_Filelength: %s",strerror(errno));
-      return 0;
-   }
-   return fileinfo.st_size;
-}
-
-void I_Read(int fd, void* vbuf, size_t sz)
-{
-   unsigned char* buf = vbuf;
-
-   while (sz)
-   {
-      int rc = read(fd,buf,sz);
-      if (rc <= 0)
-      {
-         I_Error("I_Read: read failed: %s", rc ? strerror(errno) : "EOF");
-         break;
-      }
-      sz  -= rc;
-      buf += rc;
-   }
-}
-
 void R_InitInterpolation(void)
 {
   struct retro_system_av_info info;

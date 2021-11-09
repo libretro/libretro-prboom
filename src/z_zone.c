@@ -94,10 +94,12 @@ static memblock_t *blockbytag[PU_MAX];
 
 // 0 means unlimited, any other value is a hard limit
 #ifdef MEMORY_LOW
-/* Set a limit of 12 MB (previous default was
- * 8 MB, but this reduces runtime performance
- * to an unacceptable level) */
-static int memory_size = 12*1024*1024;
+/* Set a default limit of 16 MB; smaller values
+ * will cause performance issues when rendering
+ * large levels */
+static int memory_size = 16*1024*1024;
+/* Set a minimum 'limited' size of 8 MB */
+#define MIN_MEMORY_SIZE (8*1024*1024)
 #else
 static int memory_size = 0;
 #endif
@@ -334,4 +336,21 @@ char *Z_Strdup(const char *s, int tag, void **user)
 
 void Z_CheckHeap(void)
 {
+}
+
+void Z_SetPurgeLimit(int size)
+{
+   /* Only memory-starved platforms apply
+    * a purge limit */
+#ifdef MEMORY_LOW
+   if (size == memory_size)
+      return;
+
+   if (size < MIN_MEMORY_SIZE)
+   {
+      I_Error("Z_SetPurgeLimit: Attempted to set a purge limit of less than 8 MB");
+      size = MIN_MEMORY_SIZE;
+   }
+   memory_size = size;
+#endif
 }

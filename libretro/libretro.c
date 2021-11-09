@@ -586,6 +586,16 @@ static void update_variables(bool startup)
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       analog_deadzone = (int)(atoi(var.value) * 0.01f * ANALOG_RANGE);
+
+#if defined(MEMORY_LOW)
+   var.key = "prboom-purge_limit";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      int purge_limit = atoi(var.value) * 1024 * 1024;
+      Z_SetPurgeLimit(purge_limit);
+   }
+#endif
 }
 
 void I_SafeExit(int rc);

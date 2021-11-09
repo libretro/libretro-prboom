@@ -75,6 +75,7 @@ void *(Z_Realloc)(void *p, size_t n, int tag, void **user DA(const char *, int))
 char *(Z_Strdup)(const char *s, int tag, void **user DA(const char *, int));
 void (Z_CheckHeap)(DAC(const char *,int));   // killough 3/22/98: add file/line info
 void Z_DumpHistory(char *);
+void Z_SetPurgeLimit(int size);
 
 // Remove all definitions before including system definitions
 

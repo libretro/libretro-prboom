@@ -549,16 +549,19 @@ void W_ReadLump(int lump, void *dest)
 {
   lumpinfo_t *l = lumpinfo + lump;
 
-    {
-      if (l->wadfile)
-      {
+   if (l->wadfile)
+   {
 #ifdef MEMORY_LOW
+      if (l->size > 0)
+      {
          rfseek(l->wadfile->handle, l->position, SEEK_SET);
          if (rfread(dest, l->size, 1, l->wadfile->handle) <= 0)
             I_Error("W_ReadLump: read failed");
-#else
-         memcpy(dest, &l->wadfile->data[l->position], l->size);
-#endif
       }
-    }
+      else
+         I_Error("W_ReadLump: attempt to read lump of zero size");
+#else
+      memcpy(dest, &l->wadfile->data[l->position], l->size);
+#endif
+   }
 }

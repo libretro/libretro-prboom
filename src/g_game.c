@@ -35,7 +35,6 @@
  *-----------------------------------------------------------------------------
  */
 
-#include <stdio.h>
 #include <stdarg.h>
 #include <stdlib.h>
 #ifdef _MSC_VER
@@ -61,7 +60,6 @@
 #include "p_saveg.h"
 #include "p_tick.h"
 #include "p_map.h"
-#include "p_checksum.h"
 #include "d_main.h"
 #include "wi_stuff.h"
 #include "hu_stuff.h"
@@ -88,7 +86,7 @@
 #define SAVEGAMESIZE  0x20000
 #define SAVESTRINGSIZE  24
 
-static size_t   savegamesize = 0; // killough
+static size_t   savegamesize = SAVEGAMESIZE; // killough
 static dbool    netdemo;
 static const uint8_t *demobuffer;   /* cph - only used for playback */
 static int demolength; // check for overrun (missing DEMOMARKER)
@@ -126,7 +124,6 @@ int             demover;
 wbstartstruct_t wminfo;               // parms for world map / intermission
 dbool           haswolflevels = FALSE;// jff 4/18/98 wolf levels present
 static uint8_t     *savebuffer;          // CPhipps - static
-static dbool       savestaticbuffer = FALSE;
 int             autorun = FALSE;      // always running?          // phares
 int             totalleveltimes;      // CPhipps - total time for all completed levels
 int		longtics;
@@ -543,9 +540,11 @@ static void G_DoLoadLevel (void)
 {
   int i;
 
+#if 0
   lprintf(LO_INFO, "------------------------------\n"
           "G_DoLoadLevel:  ===== Episode %d - Map %.2d =====\n",
           gameepisode, gamemap);
+#endif
 
   /* Set the sky map for the episode.
    * First thing, we have a dummy sky texture name,
@@ -1830,16 +1829,9 @@ void (CheckSaveGame)(size_t size, const char* file, int line)
   size_t pos = save_p - savebuffer;
 
   size += 1024;  // breathing room
-  if (pos+size > savegamesize) {
-    savegamesize += (size+1023) & ~1023;
-    if (savestaticbuffer) {
-      savebuffer = malloc(savegamesize);
-      savestaticbuffer = FALSE;
-    }
-    else
-      savebuffer = realloc(savebuffer, savegamesize);
-    save_p = savebuffer + pos;
-  }
+  if (pos+size > savegamesize)
+    save_p = (savebuffer = realloc(savebuffer,
+           savegamesize += (size+1023) & ~1023)) + pos;
 }
 
 /* killough 3/22/98: form savegame name in one location
@@ -1858,10 +1850,8 @@ void G_SaveGameName(char *name, size_t size, int slot, dbool   demoplayback)
   snprintf (name, size, "%s%c%s%d.dsg", basesavegame, slash, sgn, slot);
 }
 
-
 //
 // Save the game state into the internal savebuffer
-// It'll only reallocate the savebuffer if necessary
 //
 static int G_DoSaveGameToSaveBuffer() {
   char name2[VERSIONSIZE];
@@ -1870,11 +1860,7 @@ static int G_DoSaveGameToSaveBuffer() {
 
   description = savedescription;
 
-  if(!savebuffer || savegamesize < SAVEGAMESIZE) {
-    savegamesize = SAVEGAMESIZE;
-    savebuffer = malloc(savegamesize);
-  }
-  save_p = savebuffer;
+  save_p = savebuffer = malloc(savegamesize);
 
   CheckSaveGame(SAVESTRINGSIZE+VERSIONSIZE+sizeof(uint64_t));
   memcpy (save_p, description, SAVESTRINGSIZE);
@@ -2010,27 +1996,20 @@ bool G_DoSaveGameToBuffer(void *buf, size_t size) {
   if (thinkercap.next == NULL)
     return false;
 
+
   memcpy(description_saved, savedescription, SAVEDESCLEN);
   strcpy(savedescription, "BUFFER");
 
-  // set savebuffer and its size to attempt to save directly into the destination buffer
-  savebuffer = buf;
-  savegamesize = size;
-  savestaticbuffer = TRUE;
-
   length = G_DoSaveGameToSaveBuffer();
 
-  ok     = ((size_t) length <= size);
+  ok = (length > 0 && (size_t) length <= size);
 
-  if (ok && size != (size_t)length) {
-    // initialize the rest with zeroes
-    memset((char*)buf+length, 0, size - length);
-  } else if (savebuffer != NULL && !savestaticbuffer) {
-    // a different savebuffer was allocated, free it
-    free(savebuffer);
-    I_Error("G_DoSaveGameToBuffer: too much data by %d bytes", (int) (length - size));
+  if (ok) {
+    memcpy(buf, savebuffer, length);
+    memset(((char*)buf)+length, 0, size - length);
   }
-  savestaticbuffer = FALSE;
+
+  free(savebuffer);  // killough
   savebuffer = save_p = NULL;
   memcpy(savedescription, description_saved, SAVEDESCLEN);
 
@@ -2913,8 +2892,6 @@ void G_DoPlayDemo(void)
  */
 dbool   G_CheckDemoStatus (void)
 {
-  P_ChecksumFinal();
-
   if (demoplayback)
   {
     if (demolumpnum != -1) {

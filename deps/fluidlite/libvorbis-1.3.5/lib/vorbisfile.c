@@ -975,9 +975,6 @@ int ov_clear(OggVorbis_File *vf){
       (vf->callbacks.close_func)(vf->datasource);
     memset(vf,0,sizeof(*vf));
   }
-#ifdef DEBUG_LEAKS
-  _VDBG_dump();
-#endif
   return(0);
 }
 
@@ -995,28 +992,6 @@ int ov_open_callbacks(void *f,OggVorbis_File *vf,
   if(ret)return ret;
   return _ov_open2(vf);
 }
-
-int ov_open(FILE *f,OggVorbis_File *vf,const char *initial,long ibytes){
-  ov_callbacks callbacks = {
-    (size_t (*)(void *, size_t, size_t, void *))  fread,
-    (int (*)(void *, ogg_int64_t, int))              _fseek64_wrap,
-    (int (*)(void *))                             fclose,
-    (long (*)(void *))                            ftell
-  };
-
-  return ov_open_callbacks((void *)f, vf, initial, ibytes, callbacks);
-}
-
-int ov_fopen(const char *path,OggVorbis_File *vf){
-  int ret;
-  FILE *f = fopen(path,"rb");
-  if(!f) return -1;
-
-  ret = ov_open(f,vf,NULL,0);
-  if(ret) fclose(f);
-  return ret;
-}
-
 
 /* cheap hack for game usage where downsampling is desirable; there's
    no need for SRC as we can just do it cheaply in libvorbis. */
@@ -2293,11 +2268,6 @@ int ov_crosslap(OggVorbis_File *vf1, OggVorbis_File *vf2){
      buffer of vf2 */
   /* consolidate and expose the buffer. */
   vorbis_synthesis_lapout(&vf2->vd,&pcm);
-
-#if 0
-  _analysis_output_always("pcmL",0,pcm[0],n1*2,0,0,0);
-  _analysis_output_always("pcmR",0,pcm[1],n1*2,0,0,0);
-#endif
 
   /* splice */
   _ov_splice(pcm,lappcm,n1,n2,vi1->channels,vi2->channels,w1,w2);

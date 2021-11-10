@@ -58,18 +58,6 @@ char *fluid_strtok (char **str, char *delim);
 
 extern unsigned int fluid_debug_flags;
 
-#if DEBUG
-
-enum fluid_debug_level {
-  FLUID_DBG_DRIVER = 1
-};
-
-int fluid_debug(int level, char * fmt, ...);
-
-#else
-#define fluid_debug
-#endif
-
 //timer disabled
 
 /**

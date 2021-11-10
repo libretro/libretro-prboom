@@ -24,7 +24,6 @@
 //
 //-----------------------------------------------------------------------------
 
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -41,10 +40,6 @@
 #include "midifile.h"
 
 #include "musicplayer.h"
-
-#include "lprintf.h"
-
-// #define OPL_MIDI_DEBUG
 
 #define MAXMIDLENGTH (96 * 1024)
 #define GENMIDI_NUM_INSTRS  128
@@ -614,19 +609,9 @@ static void VoiceKeyOff(opl_voice_t *voice)
 
 static void KeyOffEvent(opl_track_data_t *track, midi_event_t *event)
 {
-    opl_channel_data_t *channel;
-    unsigned int key;
     unsigned int i;
-
-    /*
-    printf("note off: channel %i, %i, %i\n",
-           event->data.channel.channel,
-           event->data.channel.param1,
-           event->data.channel.param2);
-    */
-
-    channel = &track->channels[event->data.channel.channel];
-    key = event->data.channel.param1;
+    opl_channel_data_t *channel = &track->channels[event->data.channel.channel];
+    unsigned int key = event->data.channel.param1;
 
     // Turn off voices being used to play this key.
     // If it is a double voice instrument there will be two.
@@ -882,13 +867,6 @@ static void KeyOnEvent(opl_track_data_t *track, midi_event_t *event)
     unsigned int key;
     unsigned int volume;
 
-    /*
-    printf("note on: channel %i, %i, %i\n",
-           event->data.channel.channel,
-           event->data.channel.param1,
-           event->data.channel.param2);
-    */
-
     if (event->data.channel.param2 == 0)
     {   // NSM
         // i have no idea why this is the case, but it is
@@ -964,20 +942,9 @@ static void SetChannelVolume(opl_channel_data_t *channel, unsigned int volume)
 
 static void ControllerEvent(opl_track_data_t *track, midi_event_t *event)
 {
-    unsigned int controller;
-    unsigned int param;
-    opl_channel_data_t *channel;
-
-    /*
-    printf("change controller: channel %i, %i, %i\n",
-           event->data.channel.channel,
-           event->data.channel.param1,
-           event->data.channel.param2);
-    */
-
-    channel = &track->channels[event->data.channel.channel];
-    controller = event->data.channel.param1;
-    param = event->data.channel.param2;
+    opl_channel_data_t *channel = &track->channels[event->data.channel.channel];
+    unsigned int controller = event->data.channel.param1;
+    unsigned int param = event->data.channel.param2;
 
     switch (controller)
     {
@@ -986,9 +953,6 @@ static void ControllerEvent(opl_track_data_t *track, midi_event_t *event)
             break;
 
         default:
-#ifdef OPL_MIDI_DEBUG
-            lprintf (LO_WARN, "Unknown MIDI controller type: %i\n", controller);
-#endif
             break;
     }
 }
@@ -1043,10 +1007,6 @@ static void MetaEvent(opl_track_data_t *track, midi_event_t *event)
             break;
 
         default:
-#ifdef OPL_MIDI_DEBUG
-            lprintf (LO_WARN, "Unknown MIDI meta event type: %i\n",
-                            event->data.meta.type);
-#endif
             break;
     }
 }
@@ -1088,9 +1048,6 @@ static void ProcessEvent(opl_track_data_t *track, midi_event_t *event)
             break;
 
         default:
-#ifdef OPL_MIDI_DEBUG
-            lprintf (LO_WARN, "Unknown MIDI event type %i\n", event->event_type);
-#endif
             break;
     }
 }
@@ -1345,13 +1302,11 @@ static dbool IsMid(unsigned char *mem, int len)
 // now only takes files in MIDI format
 static const void *I_OPL_RegisterSong(const void *data, unsigned len)
 {
-    midi_file_t *result;
     midimem_t mf;
 
     if (!music_initialized)
-    {
         return NULL;
-    }
+
     mf.len = len;
     mf.pos = 0;
     mf.data = data;
@@ -1363,19 +1318,9 @@ static const void *I_OPL_RegisterSong(const void *data, unsigned len)
     // this check of course isn't very accurate, but to actually get the
     // time numbers we have to traverse the tracks and everything
     if (mf.len < 100)
-    {
-       lprintf (LO_WARN, "I_OPL_RegisterSong: Very short MIDI (%lu bytes)\n", (long) mf.len);
         return NULL;
-    }
 
-    result = MIDI_LoadFileSpecial (&mf);
-
-    if (result == NULL)
-    {
-        lprintf (LO_WARN, "I_OPL_RegisterSong: Failed to load MID.\n");
-    }
-
-    return result;
+    return MIDI_LoadFileSpecial (&mf);
 }
 
 
@@ -1403,10 +1348,7 @@ int I_OPL_InitMusic(int samplerate)
 {
 
     if (!OPL_Init(samplerate))
-    {
-        //printf("Dude.  The Adlib isn't responding.\n");
         return 0;
-    }
 
     // Load instruments from GENMIDI lump:
 

@@ -111,15 +111,10 @@ static int _ve_amp(envelope_lookup *ve,
   if(penalty<0.f)penalty=0.f;
   if(penalty>gi->stretch_penalty)penalty=gi->stretch_penalty;
 
-  /*_analysis_output_always("lpcm",seq2,data,n,0,0,
-    totalshift+pos*ve->searchstep);*/
-
  /* window and transform */
   for(i=0;i<n;i++)
     vec[i]=data[i]*ve->mdct_win[i];
   mdct_forward(&ve->mdct,vec,vec);
-
-  /*_analysis_output_always("mdct",seq2,vec,n/2,0,1,0); */
 
   /* near-DC spreading function; this has nothing to do with
      psychoacoustics, just sidelobe leakage and window size */
@@ -156,8 +151,6 @@ static int _ve_amp(envelope_lookup *ve,
     vec[i>>1]=val;
     decay-=8.;
   }
-
-  /*_analysis_output_always("spread",seq2++,vec,n/4,0,0,0);*/
 
   /* perform preecho/postecho triggering by band */
   for(j=0;j<VE_BANDS;j++){
@@ -276,44 +269,6 @@ long _ve_envelope_search(vorbis_dsp_state *v){
 
       if(ve->mark[j/ve->searchstep]){
         if(j>centerW){
-
-#if 0
-          if(j>ve->curmark){
-            float *marker=alloca(v->pcm_current*sizeof(*marker));
-            int l,m;
-            memset(marker,0,sizeof(*marker)*v->pcm_current);
-            fprintf(stderr,"mark! seq=%d, cursor:%fs time:%fs\n",
-                    seq,
-                    (totalshift+ve->cursor)/44100.,
-                    (totalshift+j)/44100.);
-            _analysis_output_always("pcmL",seq,v->pcm[0],v->pcm_current,0,0,totalshift);
-            _analysis_output_always("pcmR",seq,v->pcm[1],v->pcm_current,0,0,totalshift);
-
-            _analysis_output_always("markL",seq,v->pcm[0],j,0,0,totalshift);
-            _analysis_output_always("markR",seq,v->pcm[1],j,0,0,totalshift);
-
-            for(m=0;m<VE_BANDS;m++){
-              char buf[80];
-              sprintf(buf,"delL%d",m);
-              for(l=0;l<last;l++)marker[l*ve->searchstep]=ve->filter[m].markers[l]*.1;
-              _analysis_output_always(buf,seq,marker,v->pcm_current,0,0,totalshift);
-            }
-
-            for(m=0;m<VE_BANDS;m++){
-              char buf[80];
-              sprintf(buf,"delR%d",m);
-              for(l=0;l<last;l++)marker[l*ve->searchstep]=ve->filter[m+VE_BANDS].markers[l]*.1;
-              _analysis_output_always(buf,seq,marker,v->pcm_current,0,0,totalshift);
-            }
-
-            for(l=0;l<last;l++)marker[l*ve->searchstep]=ve->mark[l]*.4;
-            _analysis_output_always("mark",seq,marker,v->pcm_current,0,0,totalshift);
-
-
-            seq++;
-
-          }
-#endif
 
           ve->curmark=j;
           if(j>=testW)return(1);

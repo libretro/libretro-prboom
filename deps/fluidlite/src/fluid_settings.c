@@ -567,59 +567,6 @@ fluid_settings_getstr_default(fluid_settings_t* settings, const char* name)
   }
 }
 
-int fluid_settings_add_option(fluid_settings_t* settings, const char* name, char* s)
-{
-  int type;
-  void* value;
-  char* tokens[MAX_SETTINGS_TOKENS];
-  char buf[MAX_SETTINGS_LABEL+1];
-  int ntokens;
-
-  ntokens = fluid_settings_tokenize(name, buf, tokens);
-
-  if (fluid_settings_get(settings, tokens, ntokens, &value, &type)
-      && (type == FLUID_STR_TYPE)) {
-    fluid_str_setting_t* setting = (fluid_str_setting_t*) value;
-    char* copy = FLUID_STRDUP(s);
-    setting->options = fluid_list_append(setting->options, copy);
-    return 1;
-  } else {
-    return 0;
-  }
-}
-
-int fluid_settings_remove_option(fluid_settings_t* settings, const char* name, char* s)
-{
-  int type;
-  void* value;
-  char* tokens[MAX_SETTINGS_TOKENS];
-  char buf[MAX_SETTINGS_LABEL+1];
-  int ntokens;
-
-  ntokens = fluid_settings_tokenize(name, buf, tokens);
-
-  if (fluid_settings_get(settings, tokens, ntokens, &value, &type)
-      && (type == FLUID_STR_TYPE)) {
-
-    fluid_str_setting_t* setting = (fluid_str_setting_t*) value;
-    fluid_list_t* list = setting->options;
-
-    while (list) {
-      char* option = (char*) fluid_list_get(list);
-      if (FLUID_STRCMP(s, option) == 0) {
-	FLUID_FREE (option);
-	setting->options = fluid_list_remove_link(setting->options, list);
-	return 1;
-      }
-      list = fluid_list_next(list);
-    }
-
-    return 0;
-  } else {
-    return 0;
-  }
-}
-
 int fluid_settings_setnum(fluid_settings_t* settings, const char* name, double val)
 {
   int type;

@@ -46,7 +46,7 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       "prboom-mouse_on",
-      "Mouse active when using Gamepad",
+      "Mouse Active When Using Gamepad",
       "Allows you to use mouse inputs even when User 1's device type isn't set to 'RetroKeyboard/Mouse'.",
       {
          { "disabled", NULL },
@@ -57,7 +57,7 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       "prboom-find_recursive_on",
-      "Look on parent folders for IWADs",
+      "Look on Parent Folders for IWADs",
       "Scans parent folders for IWADs. NOTE: You need to disable this if you want to run SIGIL.",
       {
          { "disabled", NULL },
@@ -79,7 +79,7 @@ struct retro_core_option_definition option_defs_us[] = {
    },
    {
       "prboom-analog_deadzone",
-      "Analog Deadzone (percent)",
+      "Analog Deadzone (Percent)",
       "Sets the deadzone of the gamepad analog sticks when the input device type is set to 'Gamepad Modern'.",
       {
          { "0",  NULL },
@@ -93,6 +93,26 @@ struct retro_core_option_definition option_defs_us[] = {
       },
       "15"
    },
+#if defined(MEMORY_LOW)
+   {
+      "prboom-purge_limit",
+      "Cache Size",
+      "Sets a limit on the size of the memory pool used to cache game assets. Small values may cause stuttering when navigating large maps.",
+      {
+         { "8",   "8 MB" },
+         { "12",  "12 MB" },
+         { "16",  "16 MB" },
+         { "24",  "24 MB" },
+         { "32",  "32 MB" },
+         { "48",  "48 MB" },
+         { "64",  "64 MB" },
+         { "128", "128 MB" },
+         { "256", "256 MB" },
+         { NULL, NULL },
+      },
+      "16"
+   },
+#endif
    { NULL, NULL, NULL, {{0}}, NULL },
 };
 
@@ -250,7 +270,7 @@ static INLINE void libretro_set_core_options(retro_environment_t environ_cb)
    if (!environ_cb)
       return;
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION, &version) && (version == 1))
+   if (environ_cb(RETRO_ENVIRONMENT_GET_CORE_OPTIONS_VERSION, &version) && (version >= 1))
    {
       struct retro_core_options_intl core_options_intl;
       unsigned language = 0;

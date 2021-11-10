@@ -147,8 +147,6 @@ typedef struct OggVorbis_File {
 
 
 extern int ov_clear(OggVorbis_File *vf);
-extern int ov_fopen(const char *path,OggVorbis_File *vf);
-extern int ov_open(FILE *f,OggVorbis_File *vf,const char *initial,long ibytes);
 extern int ov_open_callbacks(void *datasource, OggVorbis_File *vf,
                 const char *initial, long ibytes, ov_callbacks callbacks);
 

@@ -4,7 +4,6 @@
 // Convert portable pixmap to Doom patch format
 
 #include <stdlib.h>
-#include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 

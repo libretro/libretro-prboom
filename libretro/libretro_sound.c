@@ -501,6 +501,16 @@ void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
 
 void I_ShutdownSound(void)
 {
+   int i;
+
+   for(i = 0; i < NUMSFX; i++)
+   {
+      if (!S_sfx[i].link)
+      {
+         free(S_sfx[i].data);
+         S_sfx[i].data = NULL;
+      }
+   }
 }
 
 

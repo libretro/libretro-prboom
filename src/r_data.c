@@ -236,7 +236,7 @@ static void R_InitTextures (void)
           if (patch->patch == -1)
             {
               //jff 8/3/98 use logical output routine
-              lprintf(LO_ERROR,"\nR_InitTextures: Missing patch %d in texture %.8s",
+              lprintf(LO_ERROR,"\nR_InitTextures: Missing patch %d in texture %.8s\n",
                      SHORT(mpatch->patch), texture->name); // killough 4/17/98
               ++errors;
             }
@@ -407,13 +407,13 @@ const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
 
 void R_InitData(void)
 {
-  lprintf(LO_INFO, "Textures ");
+  lprintf(LO_INFO, "Textures\n");
   R_InitTextures();
-  lprintf(LO_INFO, "Flats ");
+  lprintf(LO_INFO, "Flats\n");
   R_InitFlats();
-  lprintf(LO_INFO, "Sprites ");
+  lprintf(LO_INFO, "Sprites\n");
   R_InitSpriteLumps();
-  lprintf(LO_INFO, "Colormaps ");
+  lprintf(LO_INFO, "Colormaps\n");
   R_InitColormaps();                    // killough 3/20/98
 }
 

@@ -22,15 +22,6 @@
 #ifndef _FLUID_SETTINGS_H
 #define _FLUID_SETTINGS_H
 
-
-
-/** returns 1 if the option was added, 0 otherwise */
-int fluid_settings_add_option(fluid_settings_t* settings, const char* name, char* s);
-
-/** returns 1 if the option was added, 0 otherwise */
-int fluid_settings_remove_option(fluid_settings_t* settings, const char* name, char* s);
-
-
 typedef int (*fluid_num_update_t)(void* data, const char* name, double value);
 typedef int (*fluid_str_update_t)(void* data, const char* name, char* value);
 typedef int (*fluid_int_update_t)(void* data, const char* name, int value);

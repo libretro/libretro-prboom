@@ -51,7 +51,6 @@
 #include "d_main.h"
 #include "g_game.h"
 #include "m_menu.h"
-#include "p_checksum.h"
 
 #include "protocol.h"
 #include "i_network.h"
@@ -465,7 +464,6 @@ void TryRunTics (void)
     M_Ticker ();
     I_GetTime_SaveMS();
     G_Ticker ();
-    P_Checksum(gametic);
     gametic++;
     NetUpdate(); // Keep sending our tics to avoid stalling remote nodes
   }
@@ -481,7 +479,6 @@ void TryRunTics(void) // Avoid sleeping/timer crap, just run it. (Themaister)
          D_DoAdvanceDemo ();
       M_Ticker ();
       G_Ticker ();
-      P_Checksum(gametic);
       gametic++;
    }
 }
@@ -553,7 +550,6 @@ void TryRunTics(void)
     }
     if (menuactive)
       M_Ticker ();
-    P_Checksum(gametic);
     gametic++;
   }
 }

@@ -35,7 +35,7 @@
 
 #include "config.h"
 
-#include <stdio.h>
+#include <stdarg.h>
 #include <errno.h>
 #ifdef _MSC_VER
 #include <io.h>
@@ -43,6 +43,8 @@
 #endif
 #include <fcntl.h>
 #include <sys/stat.h>
+
+#include <streams/file_stream.h>
 
 #include "doomstat.h"
 #include "m_argv.h"
@@ -73,28 +75,38 @@
    #define DIR_SLASH_STR "/"
 #endif
 
+/* Don't include file_stream_transforms.h but instead
+just forward declare the prototype */
+int64_t rfwrite(void const* buffer,
+   size_t elem_size, size_t elem_count, RFILE* stream);
+int64_t rfread(void* buffer,
+   size_t elem_size, size_t elem_count, RFILE* stream);
+int rfscanf(RFILE * stream, const char * format, ...);
+int rfprintf(RFILE *stream, const char *fmt, ...);
+int rfeof(RFILE* stream);
+
+extern retro_log_printf_t log_cb;
 extern dbool   r_wigglefix;
 
 /*
  * M_WriteFile
  *
- * killough 9/98: rewritten to use stdio and to flash disk icon
+ * killough 9/98: rewritten to use filestream and to flash disk icon
  */
 
 dbool   M_WriteFile(char const *name, void *source, int length)
 {
-  FILE *fp;
+  RFILE *fp;
 
   errno = 0;
 
-  if (!(fp = fopen(name, "wb")))       // Try opening file
+  if (!(fp = filestream_open(name,
+				  RETRO_VFS_FILE_ACCESS_WRITE,
+				  RETRO_VFS_FILE_ACCESS_HINT_NONE)))
     return 0;                          // Could not open file for writing
 
-  length = fwrite(source, 1, length, fp) == (size_t)length;   // Write data
-  fclose(fp);
-
-  if (!length)                         // Remove partially written file
-    remove(name);
+  rfwrite(source, 1, length, fp);
+  filestream_close(fp);
 
   return length;
 }
@@ -102,27 +114,25 @@ dbool   M_WriteFile(char const *name, void *source, int length)
 /*
  * M_ReadFile
  *
- * killough 9/98: rewritten to use stdio and to flash disk icon
+ * killough 9/98: rewritten to use filestream and to flash disk icon
  */
 
 int M_ReadFile(char const *name, uint8_t **buffer)
 {
-   FILE *fp;
+   RFILE *fp;
 
-   if ((fp = fopen(name, "rb")))
+   if ((fp = filestream_open(name,
+				   RETRO_VFS_FILE_ACCESS_READ,
+				   RETRO_VFS_FILE_ACCESS_HINT_NONE)))
    {
-      size_t length;
-
-      fseek(fp, 0, SEEK_END);
-      length = ftell(fp);
-      fseek(fp, 0, SEEK_SET);
+      int64_t length = filestream_get_size(fp);
       *buffer = Z_Malloc(length, PU_STATIC, 0);
-      if (fread(*buffer, 1, length, fp) == length)
+      if (filestream_read(fp, *buffer, length) >= 0)
       {
-         fclose(fp);
+         filestream_close(fp);
          return length;
       }
-      fclose(fp);
+      filestream_close(fp);
    }
 
    /* cph 2002/08/10 - this used to return 0 on error, but that's ambiguous,
@@ -849,15 +859,15 @@ static char *defaultfile;
 void M_SaveDefaults (void)
 {
   int   i;
-  FILE* f;
-
-  f = fopen (defaultfile, "w");
+  RFILE *f = filestream_open (defaultfile,
+        RETRO_VFS_FILE_ACCESS_WRITE,
+        RETRO_VFS_FILE_ACCESS_HINT_NONE);
   if (!f)
     return; // can't write the file, but don't complain
 
   // 3/3/98 explain format of file
 
-  fprintf(f,"# Doom config file\n"
+  rfprintf(f,"# Doom config file\n"
           "#\n"
           "# Format:\n"
           "#  variable   value\n"
@@ -868,7 +878,7 @@ void M_SaveDefaults (void)
   for (i = 0 ; i < numdefaults ; i++) {
     if (defaults[i].type == def_none) {
       // CPhipps - pure headers
-      fprintf(f, "\n## %s\n", defaults[i].name);
+      rfprintf(f, "\n## %s\n", defaults[i].name);
     } else {
       // CPhipps - modified for new default_t form
       if (!IS_STRING(defaults[i])) //jff 4/10/98 kill super-hack on pointer value
@@ -876,24 +886,24 @@ void M_SaveDefaults (void)
         // CPhipps - remove keycode hack
         // killough 3/6/98: use spaces instead of tabs for uniform justification
         if (defaults[i].type == def_hex)
-          fprintf (f,"%s%-25s 0x%x\n",
+          rfprintf (f,"%s%-25s 0x%x\n",
                    (defaults[i].defaultvalue.i == *(defaults[i].location.pi))?"#":"",
                    defaults[i].name,*(defaults[i].location.pi));
         else
-          fprintf (f,"%s%-25s %5i\n",
+          rfprintf (f,"%s%-25s %5i\n",
                    (defaults[i].defaultvalue.i == *(defaults[i].location.pi))?"#":"",
                    defaults[i].name,*(defaults[i].location.pi));
       }
       else
       {
-        fprintf (f,"%s%-25s \"%s\"\n",
+        rfprintf (f,"%s%-25s \"%s\"\n",
                  (strcmp(defaults[i].defaultvalue.psz,*(defaults[i].location.ppsz)) == 0)?"#":"",
                  defaults[i].name,*(defaults[i].location.ppsz));
       }
     }
   }
 
-  fclose (f);
+  filestream_close (f);
 }
 
 /*
@@ -924,24 +934,23 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
 {
   int   i;
   int   len;
-  FILE* f;
-  char  def[80];
-  char  strparm[100];
+  char  def[80] = {0};
+  char  strparm[100] = {0};
   char* newstring = NULL;   // killough
   int   parm;
   dbool   isstring;
-
   // read the file in, overriding any set defaults
-  f = fopen (file, "r");
+  RFILE *f = filestream_open (file,
+      RETRO_VFS_FILE_ACCESS_READ,
+      RETRO_VFS_FILE_ACCESS_HINT_NONE);
   if (f)
   {
-    while (!feof(f))
+    while (!rfeof(f))
     {
       isstring = FALSE;
-      if (fscanf (f, "%79s %99[^\n]\n", def, strparm) == 2)
+      if (rfscanf(f, "%79s %99[^\n]\n", def, strparm) == 2)
       {
         //jff 3/3/98 skip lines not starting with an alphanum
-
         if (!isalnum(def[0]))
           continue;
 
@@ -965,10 +974,12 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
           if ((defaults[i].type != def_none) && !strcmp(def, defaults[i].name))
           {
             // CPhipps - safety check
-            if (isstring != IS_STRING(defaults[i])) {
-              lprintf(LO_WARN, "M_LoadDefaults: Type mismatch reading %s\n", defaults[i].name);
+            if (isstring != IS_STRING(defaults[i]))
+            {
+              log_cb(RETRO_LOG_WARN, "M_LoadDefaults: Type mismatch reading %s\n", defaults[i].name);
               continue;
             }
+
             if (!isstring)
             {
               //jff 3/4/98 range check numeric parameters
@@ -995,7 +1006,7 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
           }
       }
     }
-    fclose (f);
+    filestream_close(f);
   }
   //jff 3/4/98 redundant range checks for hud deleted here
 }
@@ -1045,7 +1056,7 @@ void M_LoadDefaults (void)
             "pr");
   }
 
-  lprintf (LO_CONFIRM, " default file: %s\n",defaultfile);
+  log_cb(RETRO_LOG_INFO, " Default file: %s\n",defaultfile);
 
   M_LoadDefaultsFile(defaultfile, FALSE);
 }

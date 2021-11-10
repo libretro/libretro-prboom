@@ -49,6 +49,14 @@
 
 #include <sys/stat.h>
 
+#include <streams/file_stream.h>
+
+/* Don't include file_stream_transforms.h but instead
+just forward declare the prototype */
+int64_t rfread(void* buffer,
+   size_t elem_size, size_t elem_count, RFILE* stream);
+int64_t rfseek(RFILE* stream, int64_t offset, int origin);
+
 //
 // GLOBALS
 //
@@ -129,22 +137,13 @@ static void W_AddFile(wadfile_info_t *wadfile)
    filelump_t  *fileinfo = NULL;
    filelump_t *fileinfo2free=NULL; //killough
    filelump_t singleinfo;
-#ifndef MEMORY_LOW
-   struct stat statbuf;
-#endif
 
    // open the file and add to directory
+   wadfile->handle = filestream_open(wadfile->name,
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
-#ifdef MEMORY_LOW
-   wadfile->handle = open(wadfile->name, O_RDONLY | O_BINARY);
-
-   if (wadfile->handle == -1)
-#else
-      //precache into memory instead of reading from disk
-      wadfile->handle = fopen(wadfile->name, "rb");
-
-   if (wadfile->handle == 0)
-#endif
+   if (!wadfile->handle)
    {
       if (  strlen(wadfile->name)<=4 ||      // add error check -- killough
             (strcasecmp(wadfile->name+strlen(wadfile->name)-4 , ".lmp" ) &&
@@ -155,11 +154,11 @@ static void W_AddFile(wadfile_info_t *wadfile)
    }
 
 #ifndef MEMORY_LOW
-   stat(wadfile->name, &statbuf);
-   wadfile->length = statbuf.st_size;
-   wadfile->data = malloc(statbuf.st_size);
-   if ( fread(wadfile->data, statbuf.st_size, 1, wadfile->handle) != 1)
-     I_Error("W_AddFile: couldn't read wad data");
+   // precache into memory instead of reading from disk
+   wadfile->length = filestream_get_size(wadfile->handle);
+   wadfile->data = malloc(wadfile->length);
+   if ( rfread(wadfile->data, wadfile->length, 1, wadfile->handle) != 1)
+      I_Error("W_AddFile: couldn't read wad data");
 #endif
 
    //jff 8/3/98 use logical output routine
@@ -177,7 +176,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
       fileinfo = &singleinfo;
       singleinfo.filepos = 0;
 #ifdef MEMORY_LOW
-      singleinfo.size = LONG(I_Filelength(wadfile->handle));
+      singleinfo.size = LONG(filestream_get_size(wadfile->handle));
 #else
       singleinfo.size = wadfile->length;
 #endif
@@ -188,7 +187,8 @@ static void W_AddFile(wadfile_info_t *wadfile)
    {
       // WAD file
 #ifdef MEMORY_LOW
-      I_Read(wadfile->handle, &header, sizeof(header));
+      if (rfread(&header, sizeof(header), 1, wadfile->handle) <= 0)
+         I_Error("W_AddFile: read failed");
 #else
       memcpy(&header, wadfile->data, sizeof(header));
 #endif
@@ -200,8 +200,9 @@ static void W_AddFile(wadfile_info_t *wadfile)
       length = header.numlumps*sizeof(filelump_t);
       fileinfo2free = fileinfo = malloc(length);    // killough
 #ifdef MEMORY_LOW
-      lseek(wadfile->handle, header.infotableofs, SEEK_SET);
-      I_Read(wadfile->handle, fileinfo, length);
+      rfseek(wadfile->handle, header.infotableofs, SEEK_SET);
+      if (rfread(fileinfo, length, 1, wadfile->handle) <= 0)
+         I_Error("W_AddFile: read failed");
 #else
       memcpy(fileinfo, &wadfile->data[header.infotableofs], length);
 #endif
@@ -486,46 +487,45 @@ void W_Init(void)
 
 void W_Exit(void)
 {
-	unsigned i;
-	for (i = 0; i < numwadfiles; i++)
+   unsigned i;
+   for (i = 0; i < numwadfiles; i++)
    {
-		if (wadfiles[i].handle)
+      if (wadfiles[i].handle)
       {
-#ifdef MEMORY_LOW
-         close(wadfiles[i].handle);
-#else
-         fclose(wadfiles[i].handle);
+         filestream_close(wadfiles[i].handle);
+#ifndef MEMORY_LOW
          free(wadfiles[i].data);
+         wadfiles[i].data = NULL;
 #endif
+         wadfiles[i].handle = NULL;
       }
-	}
+   }
 }
 
 void W_ReleaseAllWads(void)
 {
-	unsigned i;
-	W_DoneCache();
+   unsigned i;
+   W_DoneCache();
 
-	for(i = 0; i < numwadfiles; i++)
-	{
-		if(wadfiles[i].handle)
-		{
-#ifdef MEMORY_LOW
-			close(wadfiles[i].handle);
-#else
-         fclose(wadfiles[i].handle);
-			free(wadfiles[i].data);
+   for(i = 0; i < numwadfiles; i++)
+   {
+      if(wadfiles[i].handle)
+      {
+         filestream_close(wadfiles[i].handle);
+#ifndef MEMORY_LOW
+         free(wadfiles[i].data);
+         wadfiles[i].data = NULL;
 #endif
-			wadfiles[i].handle = 0;
-		}
-	}
+         wadfiles[i].handle = NULL;
+      }
+   }
 
-	numwadfiles = 0;
-	free(wadfiles);
-	wadfiles = NULL;
-	numlumps = 0;
-	free(lumpinfo);
-	lumpinfo = NULL;
+   numwadfiles = 0;
+   free(wadfiles);
+   wadfiles = NULL;
+   numlumps = 0;
+   free(lumpinfo);
+   lumpinfo = NULL;
 }
 
 //
@@ -549,15 +549,19 @@ void W_ReadLump(int lump, void *dest)
 {
   lumpinfo_t *l = lumpinfo + lump;
 
-    {
-      if (l->wadfile)
-      {
+   if (l->wadfile)
+   {
 #ifdef MEMORY_LOW
-         lseek(l->wadfile->handle, l->position, SEEK_SET);
-         I_Read(l->wadfile->handle, dest, l->size);
-#else
-         memcpy(dest, &l->wadfile->data[l->position], l->size);
-#endif
+      if (l->size > 0)
+      {
+         rfseek(l->wadfile->handle, l->position, SEEK_SET);
+         if (rfread(dest, l->size, 1, l->wadfile->handle) <= 0)
+            I_Error("W_ReadLump: read failed");
       }
-    }
+      else
+         I_Error("W_ReadLump: attempt to read lump of zero size");
+#else
+      memcpy(dest, &l->wadfile->data[l->position], l->size);
+#endif
+   }
 }

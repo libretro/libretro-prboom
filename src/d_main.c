@@ -49,6 +49,9 @@
 #include <sys/stat.h>
 #include <fcntl.h>
 
+#include <file/file_path.h>
+#include <streams/file_stream.h>
+
 #include "config.h"
 #include "doomdef.h"
 #include "doomtype.h"
@@ -65,7 +68,6 @@
 #include "m_argv.h"
 #include "m_misc.h"
 #include "m_menu.h"
-#include "p_checksum.h"
 #include "i_main.h"
 #include "i_system.h"
 #include "i_sound.h"
@@ -87,6 +89,12 @@
 
 void GetFirstMap(int *ep, int *map); // Ty 08/29/98 - add "-warp x" functionality
 static void D_PageDrawer(void);
+
+/* Don't include file_stream_transforms.h but instead
+just forward declare the prototypes */
+int64_t rfread(void* buffer,
+   size_t elem_size, size_t elem_count, RFILE* stream);
+int rfscanf(RFILE * stream, const char * format, ...);
 
 // CPhipps - removed wadfiles[] stuff
 
@@ -555,77 +563,69 @@ static const char *D_dehout(void)
 // CPhipps - const char* for iwadname, made static
 static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
 {
-  int read_iwad = 0;
-  FILE* fp = fopen(iwadname, "rb");
+  RFILE *fp     = NULL;
 
-  if (fp != NULL)
-     read_iwad = 1;
-
-  fclose(fp);
-
-  if ( read_iwad )
+  if ((fp = filestream_open(iwadname, 
+		  RETRO_VFS_FILE_ACCESS_READ,
+		  RETRO_VFS_FILE_ACCESS_HINT_NONE
+		  )))
   {
     int ud=0,rg=0,sw=0,cm=0,sc=0;
 
     // Identify IWAD correctly
-    if ((fp = fopen(iwadname, "rb")))
+    wadinfo_t header;
+
+    // read IWAD header
+    if (rfread(&header, sizeof(header), 1, fp) == 1 && !strncmp(header.identification, "IWAD", 4))
     {
-      wadinfo_t header;
+      int64_t length;
+      filelump_t *fileinfo;
 
-      // read IWAD header
-      if (fread(&header, sizeof(header), 1, fp) == 1 && !strncmp(header.identification, "IWAD", 4))
-      {
-        size_t length;
-        filelump_t *fileinfo;
+      // read IWAD directory
+      header.numlumps = LONG(header.numlumps);
+      header.infotableofs = LONG(header.infotableofs);
+      length = header.numlumps;
+      fileinfo = malloc(length*sizeof(filelump_t));
+      if (filestream_seek (fp, header.infotableofs, SEEK_SET) ||
+        rfread (fileinfo, sizeof(filelump_t), length, fp) != length)
+      I_Error("CheckIWAD: failed to read directory %s",iwadname);
 
-        // read IWAD directory
-        header.numlumps = LONG(header.numlumps);
-        header.infotableofs = LONG(header.infotableofs);
-        length = header.numlumps;
-        fileinfo = malloc(length*sizeof(filelump_t));
-        if (fseek (fp, header.infotableofs, SEEK_SET) ||
-            fread (fileinfo, sizeof(filelump_t), length, fp) != length)
-          I_Error("CheckIWAD: failed to read directory %s",iwadname);
-
-        // scan directory for levelname lumps
-        while (length--)
-          if (fileinfo[length].name[0] == 'E' &&
+      // scan directory for levelname lumps
+      while (length--)
+        if (fileinfo[length].name[0] == 'E' &&
               fileinfo[length].name[2] == 'M' &&
               fileinfo[length].name[4] == 0)
-          {
-            if (fileinfo[length].name[1] == '4')
-              ++ud;
-            else if (fileinfo[length].name[1] == '3')
-              ++rg;
-            else if (fileinfo[length].name[1] == '2')
-              ++rg;
-            else if (fileinfo[length].name[1] == '1')
-              ++sw;
-          }
-          else if (fileinfo[length].name[0] == 'M' &&
+        {
+          if (fileinfo[length].name[1] == '4')
+            ++ud;
+          else if (fileinfo[length].name[1] == '3')
+            ++rg;
+          else if (fileinfo[length].name[1] == '2')
+            ++rg;
+          else if (fileinfo[length].name[1] == '1')
+            ++sw;
+        }
+        else if (fileinfo[length].name[0] == 'M' &&
                     fileinfo[length].name[1] == 'A' &&
                     fileinfo[length].name[2] == 'P' &&
                     fileinfo[length].name[5] == 0)
-          {
-            ++cm;
-            if (fileinfo[length].name[3] == '3')
+        {
+          ++cm;
+          if (fileinfo[length].name[3] == '3')
               if (fileinfo[length].name[4] == '1' ||
                   fileinfo[length].name[4] == '2')
                 ++sc;
-          }
+        }
 
         free(fileinfo);
       }
       else // missing IWAD tag in header
       {
-        fclose(fp);
+        filestream_close(fp);
         return I_Error("CheckIWAD: IWAD tag %s not present", iwadname);
       }
 
-      fclose(fp);
-    }
-    else // error from open call
-      return I_Error("CheckIWAD: Can't open IWAD %s", iwadname);
+      filestream_close(fp);
 
     // Determine game mode from levels present
     // Must be a full set for whichever mode is present
@@ -646,35 +646,14 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
       *gmode = shareware;
   }
   else // error from access call
+  {
+    filestream_close(fp);
     return I_Error("CheckIWAD: IWAD %s not readable", iwadname);
+  }
 
   return true;
 }
 
-
-
-// NormalizeSlashes
-//
-// Remove trailing slashes, translate backslashes to slashes
-// The string to normalize is passed and returned in str
-//
-// jff 4/19/98 Make killoughs slash fixer a subroutine
-//
-static void NormalizeSlashes(char *str)
-{
-  int l;
-
-  // killough 1/18/98: Neater / \ handling.
-  // Remove trailing / or \ to prevent // /\ \/ \\, and change \ to /
-
-  if (!str || !(l = strlen(str)))
-    return;
-  if (str[--l]=='/' || str[l]=='\\')     // killough 1/18/98
-    str[l]=0;
-  while (l--)
-    if (str[l]=='\\')
-      str[l]='/';
-}
 
 /*
  * FindIWADFIle
@@ -727,8 +706,7 @@ static char *FindIWADFile(void)
 static bool IdentifyVersion (void)
 {
   int         i;    //jff 3/24/98 index of args on commandline
-  struct stat sbuf; //jff 3/24/98 used to test save path for existence
-  char *iwad       = NULL;
+  char *iwad = NULL;
 
   // set save path to -save parm or current dir
 
@@ -1359,27 +1337,13 @@ bool D_DoomMainSetup(void)
 
     while (++p != myargc && *myargv[p] != '-')
     {
-      int stillnotfound = 1;
-      FILE *fp;
       AddDefaultExtension(strcpy(file, myargv[p]), ".bex");
-      fp = fopen(file, "rb");
-
-      if (fp == NULL)
-         stillnotfound = 1;
-      else
-         stillnotfound = 0;
-
-      fclose(fp);
-
-      if (stillnotfound)  // nope
+      if (!path_is_valid(file))
       {
         AddDefaultExtension(strcpy(file, myargv[p]), ".deh");
-	fp = fopen(file, "rb");
-
-        if (fp == NULL)  // still nope
+	if (!path_is_valid(file))
           I_Error("D_DoomMainSetup: Cannot find .deh or .bex file named %s",
                   myargv[p]);
-        fclose(fp);
       }
       // during the beta we have debug output to dehout.txt
       ProcessDehFile(file,D_dehout(),0);
@@ -1484,7 +1448,6 @@ failed:
 //
 // D_DoomMain
 //
-extern void p_checksum_cleanup(void);
 #ifdef HAVE_NET
 extern void D_QuitNetGame (void);
 #endif
@@ -1518,17 +1481,20 @@ void D_DoomDeinit(void)
   lprintf(LO_INFO,"D_DoomDeinit:\n");
   //Deinit
   M_QuitDOOM(0);
-  Z_Close();
 #ifdef HAVE_NET
   D_QuitNetGame();
   I_ShutdownNetwork();
 #endif
   M_SaveDefaults ();
   W_Exit();
+  //W_ReleaseAllWads();
   U_FreeMapInfo();
   I_ShutdownSound();
   I_ShutdownMusic();
-  p_checksum_cleanup();
+  //V_FreeScreens();
+  //V_DestroyUnusedTrueColorPalettes();
+  //R_FlushAllPatches();
+  //P_Deinit();
 }
 
 //

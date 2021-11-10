@@ -35,7 +35,7 @@
 #ifndef __W_WAD__
 #define __W_WAD__
 
-#include <stdio.h>
+#include <streams/file_stream.h>
 
 //
 // TYPES
@@ -87,10 +87,8 @@ typedef enum {
 typedef struct {
   const char* name;
   wad_source_t src;
-#ifdef MEMORY_LOW
-  int handle;
-#else
-  FILE* handle;
+  RFILE* handle;
+#ifndef MEMORY_LOW
   unsigned char *data;
   int position;
   int length;

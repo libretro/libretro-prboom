@@ -1,6 +1,7 @@
 DEBUG ?= 0
 STATIC_LINKING ?= 0
 WANT_FLUIDSYNTH ?= 0
+HAVE_LOW_MEMORY ?= 0
 
 ifeq ($(platform),)
 platform = unix
@@ -233,8 +234,9 @@ else ifeq ($(platform), ps2)
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = mips64r5900el-ps2-elf-gcc$(EXE_EXT)
    AR = mips64r5900el-ps2-elf-ar$(EXE_EXT)
-   CFLAGS += -DHAVE_STRLWR -DPS2 -G0 -ffast-math -DABGR1555 -DNO_FAST_SQRT -DMEMORY_LOW
-	STATIC_LINKING = 1
+   CFLAGS += -DHAVE_STRLWR -DPS2 -G0 -ffast-math -DABGR1555 -DNO_FAST_SQRT
+   STATIC_LINKING = 1
+   HAVE_LOW_MEMORY = 1
 # PSP1
 else ifeq ($(platform), psp1)
 	EXT=a
@@ -283,8 +285,9 @@ else ifeq ($(platform), ngc)
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
-   CFLAGS += -DGEKKO -DHW_DOL -mogc -mcpu=750 -meabi -mhard-float -DMEMORY_LOW
+   CFLAGS += -DGEKKO -DHW_DOL -mogc -mcpu=750 -meabi -mhard-float
    STATIC_LINKING = 1
+   HAVE_LOW_MEMORY = 1
 
 else ifeq ($(platform), wii)
    EXT=a
@@ -345,6 +348,23 @@ else ifeq ($(platform), gcw0)
    fpic := -fPIC
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
    CFLAGS += -ffast-math -march=mips32 -mtune=mips32r2 -mhard-float -fomit-frame-pointer
+else ifeq ($(platform), retrofw)
+   TARGET := $(TARGET_NAME)_libretro.so
+   CC = /opt/retrofw-toolchain/usr/bin/mipsel-linux-gcc
+   CXX = /opt/retrofw-toolchain/usr/bin/mipsel-linux-g++
+   AR = /opt/retrofw-toolchain/usr/bin/mipsel-linux-ar
+   fpic := -fPIC
+   SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
+   CFLAGS += -ffast-math -march=mips32 -mtune=mips32 -mhard-float -fomit-frame-pointer
+else ifeq ($(platform), miyoo)
+   TARGET := $(TARGET_NAME)_libretro.so
+   CC = /opt/miyoo/usr/bin/arm-linux-gcc
+   CXX = /opt/miyoo/usr/bin/arm-linux-g++
+   AR = /opt/miyoo/usr/bin/arm-linux-ar
+   fpic := -fPIC
+   SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,-no-undefined
+   CFLAGS += -ffast-math -march=armv5te -mtune=arm926ej-s -fomit-frame-pointer
+   HAVE_LOW_MEMORY = 1
 
 # Windows MSVC 2003 Xbox 1
 else ifeq ($(platform), xbox1_msvc2003)
@@ -444,7 +464,8 @@ INCLUDE := $(shell IFS=$$'\n'; cygpath "$(VS80COMNTOOLS)../../VC/include")
 LIB := $(shell IFS=$$'\n'; cygpath -w "$(VS80COMNTOOLS)../../VC/lib")
 BIN := $(shell IFS=$$'\n'; cygpath "$(VS80COMNTOOLS)../../VC/bin")
 
-WindowsSdkDir := $(shell reg query "HKLM\SOFTWARE\Microsoft\MicrosoftSDK\InstalledSDKs\8F9E5EF3-A9A5-491B-A889-C58EFFECE8B3" -v "Install Dir" | grep -o '[A-Z]:\\.*')
+WindowsSdkDir := $(shell reg query "HKLM\SOFTWARE\Microsoft\Microsoft SDKs\Windows\v7.1A" -v "InstallationFolder" | grep -o '[A-Z]:\\.*')
+WindowsSdkDir ?= $(shell reg query "HKLM\SOFTWARE\Microsoft\Microsoft SDKs\Windows\v7.0A" -v "InstallationFolder" | grep -o '[A-Z]:\\.*')
 
 WindowsSDKIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include")
 WindowsSDKAtlIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\atl")
@@ -453,6 +474,7 @@ WindowsSDKGlIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\gl")
 WindowsSDKMfcIncludeDir := $(shell cygpath -w "$(WindowsSdkDir)\Include\mfc")
 WindowsSDKLibDir := $(shell cygpath -w "$(WindowsSdkDir)\Lib")
 
+INCFLAGS_PLATFORM = -I"$(WindowsSDKIncludeDir)"
 export INCLUDE := $(INCLUDE);$(WindowsSDKIncludeDir);$(WindowsSDKAtlIncludeDir);$(WindowsSDKCrtIncludeDir);$(WindowsSDKGlIncludeDir);$(WindowsSDKMfcIncludeDir);libretro/libretro-common/include/compat/msvc
 export LIB := $(LIB);$(WindowsSDKLibDir)
 TARGET := $(TARGET_NAME)_libretro.dll
@@ -599,6 +621,10 @@ CFLAGS += -DHAVE_LIBMAD -DMUSIC_SUPPORT
 
 ifeq ($(WANT_FLUIDSYNTH), 1)
 CFLAGS += -DHAVE_LIBFLUIDSYNTH
+endif
+
+ifeq ($(HAVE_LOW_MEMORY), 1)
+CFLAGS += -DMEMORY_LOW
 endif
 
 ifeq ($(DEBUG), 1)

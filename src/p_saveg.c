@@ -383,13 +383,19 @@ void P_ArchiveThinkers (void)
     for (i = 0; i < numsectors; i++)
     {
       mobj_t *target = sectors[i].soundtarget;
+
       // Fix crash on reload when a soundtarget points to a removed corpse
       // (prboom bug #1590350)
       if (target && target->thinker.function == P_MobjThinker)
         target = (mobj_t *) target->thinker.prev;
       else
         target = NULL;
-      memcpy(save_p, &target, sizeof target);
+
+      if (target)
+        memcpy(save_p, &target, sizeof target);
+      else
+        memset(save_p, 0, sizeof target);
+
       save_p += sizeof target;
     }
   }
@@ -419,9 +425,9 @@ static void P_SetNewTarget(mobj_t **mop, mobj_t *targ)
 // safely casts them back to int.
 static int P_GetMobj(mobj_t* mi, size_t s)
 {
-  size_t i = (size_t)mi;
+  uintptr_t i = (uintptr_t)mi;
   if (i >= s) I_Error("Corrupt savegame");
-  return i;
+  return (int)i;
 }
 
 void P_UnArchiveThinkers (void)
@@ -549,8 +555,14 @@ void P_UnArchiveThinkers (void)
       mobj_t *target;
       memcpy(&target, save_p, sizeof target);
       save_p += sizeof target;
+
       // Must verify soundtarget. See P_ArchiveThinkers.
-      P_SetNewTarget(&sectors[i].soundtarget, mobj_p[P_GetMobj(target,size)]);
+      // Check if 'saved' soundtarget pointer was NULL
+      // or otherwise invalid
+      if (!target || P_GetMobj(target,size) >= size)
+        sectors[i].soundtarget = 0;
+      else
+        P_SetNewTarget(&sectors[i].soundtarget, mobj_p[P_GetMobj(target,size)]);
     }
   }
 

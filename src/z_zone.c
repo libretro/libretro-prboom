@@ -44,7 +44,6 @@
 #include "config.h"
 
 #include <stdlib.h>
-#include <stdio.h>
 
 #include "z_zone.h"
 #include "doomstat.h"
@@ -94,8 +93,16 @@ static const size_t HEADER_SIZE = (sizeof(memblock_t)+CHUNK_SIZE-1) & ~(CHUNK_SI
 static memblock_t *blockbytag[PU_MAX];
 
 // 0 means unlimited, any other value is a hard limit
-//static int memory_size = 8192*1024;
+#ifdef MEMORY_LOW
+/* Set a default limit of 16 MB; smaller values
+ * will cause performance issues when rendering
+ * large levels */
+static int memory_size = 16*1024*1024;
+/* Set a minimum 'limited' size of 8 MB */
+#define MIN_MEMORY_SIZE (8*1024*1024)
+#else
 static int memory_size = 0;
+#endif
 static int free_memory = 0;
 
 
@@ -106,14 +113,22 @@ void Z_DumpHistory(char *buf)
 
 void Z_Close(void)
 {
-#if 0
-  (free)(zonebase);
-  zone = rover = zonebase = NULL;
+   /* The libretro core will crash on
+    * close content if we free memory
+    * here while running on Windows... */
+#if !defined(_WIN32)
+   Z_FreeTags(PU_FREE, PU_MAX);
 #endif
+   memory_size = 0;
+   free_memory = 0;
 }
 
 bool Z_Init(void)
 {
+   unsigned i;
+   for (i = 0; i < PU_MAX; i++)
+      blockbytag[i] = NULL;
+
    return true;
 }
 
@@ -321,4 +336,21 @@ char *Z_Strdup(const char *s, int tag, void **user)
 
 void Z_CheckHeap(void)
 {
+}
+
+void Z_SetPurgeLimit(int size)
+{
+   /* Only memory-starved platforms apply
+    * a purge limit */
+#ifdef MEMORY_LOW
+   if (size == memory_size)
+      return;
+
+   if (size < MIN_MEMORY_SIZE)
+   {
+      I_Error("Z_SetPurgeLimit: Attempted to set a purge limit of less than 8 MB");
+      size = MIN_MEMORY_SIZE;
+   }
+   memory_size = size;
+#endif
 }

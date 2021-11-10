@@ -9,6 +9,8 @@
 
 #include <libretro.h>
 #include <file/file_path.h>
+#include <streams/file_stream.h>
+#include <array/rbuf.h>
 
 #if _MSC_VER
 #include <compat/msvc.h>
@@ -40,6 +42,12 @@
 #include "../src/g_game.h"
 #include "../src/wi_stuff.h"
 #include "../src/p_tick.h"
+#include "../src/z_zone.h"
+
+/* Don't include file_stream_transforms.h but instead
+just forward declare the prototype */
+int64_t rfread(void* buffer,
+   size_t elem_size, size_t elem_count, RFILE* stream);
 
 //i_system
 int ms_to_next_tick;
@@ -49,12 +57,17 @@ int SCREENWIDTH  = 320;
 int SCREENHEIGHT = 200;
 
 //i_video
-static unsigned char *screen_buf;
+static unsigned char *screen_buf = NULL;
 
 /* libretro */
 static char g_wad_dir[1024];
 static char g_basename[1024];
 static char g_save_dir[1024];
+
+/* Cheat handling */
+static bool cheats_enabled = false;
+static bool cheats_pending = false;
+static char **cheats_pending_list = NULL;
 
 //forward decls
 bool D_DoomMainSetup(void);
@@ -271,6 +284,8 @@ void retro_init(void)
    enum retro_pixel_format rgb565;
    struct retro_log_callback log;
 
+   Z_Init(); /* 1/18/98 killough: start up memory stuff first */
+
    if(environ_cb(RETRO_ENVIRONMENT_GET_LOG_INTERFACE, &log))
       log_cb = log.log;
    else
@@ -290,6 +305,24 @@ void retro_deinit(void)
 {
    D_DoomDeinit();
 
+   if (screen_buf)
+      free(screen_buf);
+   screen_buf = NULL;
+
+   cheats_enabled = false;
+   cheats_pending = false;
+   if (cheats_pending_list)
+   {
+      unsigned i;
+      for (i = 0; i < RBUF_LEN(cheats_pending_list); i++)
+      {
+         if (cheats_pending_list[i])
+            free(cheats_pending_list[i]);
+         cheats_pending_list[i] = NULL;
+      }
+      RBUF_FREE(cheats_pending_list);
+   }
+
    libretro_supports_bitmasks = false;
 
    retro_set_rumble_damage(0, 0.0f);
@@ -301,6 +334,13 @@ void retro_deinit(void)
    rumble_damage_counter  = -1;
    rumble_touch_strength  = 0;
    rumble_touch_counter   = -1;
+
+   /* Z_Close() must be the very last
+    * function that is called, since
+    * z_zone.h overrides malloc()/free()/etc.
+    * (i.e. anything that calls free()
+    * after Z_Close() will likely segfault) */
+   Z_Close();
 }
 
 unsigned retro_api_version(void)
@@ -391,6 +431,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
+   struct retro_vfs_interface_info vfs_iface_info;
    static const struct retro_controller_description port[] = {
 		{ "Gamepad Modern", RETROPAD_MODERN },
 		{ "Gamepad Classic", RETROPAD_CLASSIC },
@@ -407,6 +448,11 @@ void retro_set_environment(retro_environment_t cb)
 
    libretro_set_core_options(environ_cb);
 	cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
+
+   vfs_iface_info.required_interface_version = 1;
+   vfs_iface_info.iface                      = NULL;
+   if (cb(RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &vfs_iface_info))
+      filestream_vfs_init(&vfs_iface_info);
 }
 
 void retro_set_controller_port_device(unsigned port, unsigned device)
@@ -540,6 +586,16 @@ static void update_variables(bool startup)
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       analog_deadzone = (int)(atoi(var.value) * 0.01f * ANALOG_RANGE);
+
+#if defined(MEMORY_LOW)
+   var.key = "prboom-purge_limit";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      int purge_limit = atoi(var.value) * 1024 * 1024;
+      Z_SetPurgeLimit(purge_limit);
+   }
+#endif
 }
 
 void I_SafeExit(int rc);
@@ -549,6 +605,27 @@ void retro_run(void)
    bool updated = false;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       update_variables(false);
+
+   /* Check for pending cheats */
+   if (cheats_pending && (gamestate == GS_LEVEL) && !demoplayback)
+   {
+      unsigned i, j;
+      for (i = 0; i < RBUF_LEN(cheats_pending_list); i++)
+      {
+         const char *cheat_code = cheats_pending_list[i];
+         if (cheat_code)
+         {
+            for (j = 0; cheat_code[j] != '\0'; j++)
+               M_FindCheats(cheat_code[j]);
+
+            free(cheats_pending_list[i]);
+            cheats_pending_list[i] = NULL;
+         }
+      }
+      RBUF_FREE(cheats_pending_list);
+      cheats_pending = false;
+   }
+
    if (quit_pressed)
    {
       environ_cb(RETRO_ENVIRONMENT_SHUTDOWN, NULL);
@@ -625,13 +702,15 @@ static char* remove_extension(char *buf, const char *path, size_t size)
 
 static wadinfo_t get_wadinfo(const char *path)
 {
-   FILE* fp = fopen(path, "rb");
    wadinfo_t header;
-   if (fp != NULL)
+   RFILE* fp = filestream_open(path,
+		   RETRO_VFS_FILE_ACCESS_READ,
+		   RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (fp)
    {
-      if(fread(&header, sizeof(header), 1, fp) != 1)
+      if(rfread(&header, sizeof(header), 1, fp) != 1)
          I_Error("get_wadinfo: error reading file header");
-      fclose(fp);
+      filestream_close(fp);
    }
    else
       memset(&header, 0, sizeof(header));
@@ -751,9 +830,6 @@ bool retro_load_game(const struct retro_game_info *info)
    myargc = argc;
    myargv = (const char **) argv;
 
-   if (!Z_Init()) /* 1/18/98 killough: start up memory stuff first */
-      goto failed;
-
    /* cphipps - call to video specific startup code */
    if (!I_PreInitGraphics())
       goto failed;
@@ -764,6 +840,10 @@ bool retro_load_game(const struct retro_game_info *info)
    // Run few cycles to finish init.
    for (i = 0; i < 3; i++)
      D_DoomLoop();
+
+   cheats_enabled      = true;
+   cheats_pending      = false;
+   cheats_pending_list = NULL;
 
    return true;
 
@@ -790,9 +870,6 @@ failed:
 
 void retro_unload_game(void)
 {
-   if (screen_buf)
-      free(screen_buf);
-   screen_buf = NULL;
 }
 
 unsigned retro_get_region(void)
@@ -1006,11 +1083,43 @@ void retro_cheat_reset(void)
 
 void retro_cheat_set(unsigned index, bool enabled, const char *code)
 {
-   int i;
+   unsigned i;
    (void)index;(void)enabled;
-   if(code)
-      for (i=0; code[i] != '\0'; i++)
+
+   if (!code || !cheats_enabled)
+      return;
+
+   /* Note: it is not currently possible to disable
+    * cheats once active... */
+
+   /* Check if cheat can be applied now */
+   if ((gamestate == GS_LEVEL) && !demoplayback)
+   {
+      for (i = 0; code[i] != '\0'; i++)
          M_FindCheats(code[i]);
+   }
+   /* Current game state does not support cheat
+    * activation - add code to pending list */
+   else
+   {
+      bool code_found = false;
+
+      for (i = 0; i < RBUF_LEN(cheats_pending_list); i++)
+      {
+         const char *existing_code = cheats_pending_list[i];
+         if (existing_code && !strcmp(existing_code, code))
+         {
+            code_found = true;
+            break;
+         }
+      }
+
+      if (!code_found)
+      {
+         RBUF_PUSH(cheats_pending_list, strdup(code));
+         cheats_pending = true;
+      }
+   }
 }
 
 static action_lut_t left_analog_lut[] = {
@@ -1561,7 +1670,6 @@ dbool   HasTrailingSlash(const char* dn)
  */
 char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
 {
-   FILE * file;
    char * p;
    /* Precalculate a length we will need in the loop */
    size_t pl = strlen(wfname) + (ext ? strlen(ext) : 0) + 4;
@@ -1581,13 +1689,11 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
 
    if (ext && ext[0] != '\0')
       strcat(p, ext);
-   file = fopen(p, "rb");
 
-   if (file)
+   if (path_is_valid(p))
    {
       if (log_cb)
          log_cb(RETRO_LOG_DEBUG, "FindFileInDir: found %s\n", p);
-      fclose(file);
       return p;
    }
    else if (log_cb)
@@ -1665,40 +1771,6 @@ void I_Init(void)
    R_InitInterpolation();
 }
 
-/*
-* I_Filelength
-*
-* Return length of an open file.
-*/
-
-int I_Filelength(int handle)
-{
-   struct stat   fileinfo;
-   if (fstat(handle,&fileinfo) == -1)
-   {
-      I_Error("I_Filelength: %s",strerror(errno));
-      return 0;
-   }
-   return fileinfo.st_size;
-}
-
-void I_Read(int fd, void* vbuf, size_t sz)
-{
-   unsigned char* buf = vbuf;
-
-   while (sz)
-   {
-      int rc = read(fd,buf,sz);
-      if (rc <= 0)
-      {
-         I_Error("I_Read: read failed: %s", rc ? strerror(errno) : "EOF");
-         break;
-      }
-      sz  -= rc;
-      buf += rc;
-   }
-}
-
 void R_InitInterpolation(void)
 {
   struct retro_system_av_info info;
@@ -1722,7 +1794,6 @@ void R_InitInterpolation(void)
 int lprintf(OutputLevels pri, const char *s, ...)
 {
   va_list v;
-  int r=0;
   char msg[MAX_LOG_MESSAGE_SIZE];
 
   if (!log_cb)
@@ -1730,9 +1801,9 @@ int lprintf(OutputLevels pri, const char *s, ...)
 
   va_start(v,s);
 #ifdef HAVE_VSNPRINTF
-  r = vsnprintf(msg,sizeof(msg),s,v);         /* print message in buffer  */
+  vsnprintf(msg,sizeof(msg),s,v);
 #else
-  r = vsprintf(msg,s,v);
+  vsprintf(msg,s,v);
 #endif
   va_end(v);
 

@@ -160,6 +160,8 @@ int wipe_StartScreen(void)
   wipe_scr_start.height = SCREENHEIGHT;
   wipe_scr_start.not_on_heap = FALSE;
   V_AllocScreen(&wipe_scr_start);
+  if (&screens[SRC_SCR] != &wipe_scr_start)
+    V_FreeScreen(&screens[SRC_SCR]);
   screens[SRC_SCR] = wipe_scr_start;
   V_CopyRect(0, 0, 0,       SCREENWIDTH, SCREENHEIGHT, 0, 0, SRC_SCR, VPT_NONE ); // Copy start screen to buffer
   return 0;
@@ -170,6 +172,8 @@ int wipe_EndScreen(void)
   wipe_scr_end.height = SCREENHEIGHT;
   wipe_scr_end.not_on_heap = FALSE;
   V_AllocScreen(&wipe_scr_end);
+  if (&screens[DEST_SCR] != &wipe_scr_end)
+    V_FreeScreen(&screens[DEST_SCR]);
   screens[DEST_SCR] = wipe_scr_end;
   V_CopyRect(0, 0, 0,       SCREENWIDTH, SCREENHEIGHT, 0, 0, DEST_SCR, VPT_NONE); // Copy end screen to buffer
   V_CopyRect(0, 0, SRC_SCR, SCREENWIDTH, SCREENHEIGHT, 0, 0, 0       , VPT_NONE); // restore start screen

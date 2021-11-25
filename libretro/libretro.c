@@ -432,6 +432,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 void retro_set_environment(retro_environment_t cb)
 {
    struct retro_vfs_interface_info vfs_iface_info;
+   static bool libretro_supports_option_categories = false;
    static const struct retro_controller_description port[] = {
 		{ "Gamepad Modern", RETROPAD_MODERN },
 		{ "Gamepad Classic", RETROPAD_CLASSIC },
@@ -446,7 +447,9 @@ void retro_set_environment(retro_environment_t cb)
 
 	environ_cb = cb;
 
-   libretro_set_core_options(environ_cb);
+   libretro_set_core_options(environ_cb,
+         &libretro_supports_option_categories);
+
 	cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 
    vfs_iface_info.required_interface_version = 1;

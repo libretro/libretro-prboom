@@ -1196,21 +1196,21 @@ struct retro_core_options_v2 options_da = {
 
 /* RETRO_LANGUAGE_DE */
 
-#define PRBOOM_RESOLUTION_LABEL_DE NULL
+#define PRBOOM_RESOLUTION_LABEL_DE "Interne Auflösung (Neustart erforderlich)"
 #define PRBOOM_RESOLUTION_INFO_0_DE NULL
-#define OPTION_VAL_320X200_DE NULL
-#define OPTION_VAL_640X400_DE NULL
-#define OPTION_VAL_960X600_DE NULL
-#define OPTION_VAL_1280X800_DE NULL
-#define OPTION_VAL_1600X1000_DE NULL
-#define OPTION_VAL_1920X1200_DE NULL
-#define OPTION_VAL_2240X1400_DE NULL
-#define OPTION_VAL_2560X1600_DE NULL
+#define OPTION_VAL_320X200_DE "320 x 200"
+#define OPTION_VAL_640X400_DE "640 x 400"
+#define OPTION_VAL_960X600_DE "960 x 600"
+#define OPTION_VAL_1280X800_DE "1280 x 800"
+#define OPTION_VAL_1600X1000_DE "1600 x 1000"
+#define OPTION_VAL_1920X1200_DE "1920 x 1200"
+#define OPTION_VAL_2240X1400_DE "2240 x 1400"
+#define OPTION_VAL_2560X1600_DE "2560 x 1600"
 #define PRBOOM_MOUSE_ON_LABEL_DE NULL
 #define PRBOOM_MOUSE_ON_INFO_0_DE NULL
 #define PRBOOM_FIND_RECURSIVE_ON_LABEL_DE NULL
 #define PRBOOM_FIND_RECURSIVE_ON_INFO_0_DE NULL
-#define PRBOOM_RUMBLE_LABEL_DE NULL
+#define PRBOOM_RUMBLE_LABEL_DE "Rumpel-Effekte"
 #define PRBOOM_RUMBLE_INFO_0_DE NULL
 #define PRBOOM_ANALOG_DEADZONE_LABEL_DE NULL
 #define PRBOOM_ANALOG_DEADZONE_INFO_0_DE NULL
@@ -1647,14 +1647,14 @@ struct retro_core_options_v2 options_eo = {
 #define OPTION_VAL_1920X1200_ES "1920 × 1200"
 #define OPTION_VAL_2240X1400_ES "2240 × 1400"
 #define OPTION_VAL_2560X1600_ES "2560 × 1600"
-#define PRBOOM_MOUSE_ON_LABEL_ES "Usar el ratón al utilizar un mando"
-#define PRBOOM_MOUSE_ON_INFO_0_ES "Permite usar entradas de ratón incluso cuando el dispositivo del usuario 1 no sea un RetroKeyboard/Mouse."
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_ES "Buscar IWAD en las carpetas primarias"
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_ES "Busca IWAD en las carpetas primarias. NOTA: Debes desactivar esta opción para poder jugar a SIGIL."
+#define PRBOOM_MOUSE_ON_LABEL_ES "Mantener el ratón activo al usar un mando"
+#define PRBOOM_MOUSE_ON_INFO_0_ES "Permite usar los controles del ratón aunque el dispositivo de entrada del usuario 1 no esté configurado como «RetroKeyboard/Ratón»."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_ES "Buscar archivos IWAD en las carpetas principales"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_ES "Busca archivos IWAD dentro de las carpetas principales. NOTA: Es necesario desactivar esta opción para poder ejecutar SIGIL."
 #define PRBOOM_RUMBLE_LABEL_ES "Vibración"
 #define PRBOOM_RUMBLE_INFO_0_ES "Activa la respuesta háptica al utilizar un mando compatible con vibración."
-#define PRBOOM_ANALOG_DEADZONE_LABEL_ES "Zona muerta analógica (en porcentaje)"
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_ES "Asigna la zona muerta de los sticks analógicos cuando el dispositivo de entrada sea un mando moderno."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_ES "Zona muerta de los analógicos (%)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_ES "Establece la zona muerta de los sticks analógicos del mando en caso de seleccionar como dispositivo de entrada la opción «Mando moderno»."
 #define PRBOOM_PURGE_LIMIT_LABEL_ES "Tamaño de la caché"
 #define PRBOOM_PURGE_LIMIT_INFO_0_ES "Establece un límite al tamaño de la memoria asignada para almacenar los recursos del juego. Un valor muy bajo puede provocar tirones al jugar en mapas de grandes dimensiones."
 #define OPTION_VAL_8_ES NULL
@@ -1931,7 +1931,7 @@ struct retro_core_options_v2 options_fa = {
 
 /* RETRO_LANGUAGE_FI */
 
-#define PRBOOM_RESOLUTION_LABEL_FI NULL
+#define PRBOOM_RESOLUTION_LABEL_FI "Sisäinen resoluutio (Uudelleenkäynnistys vaaditaan)"
 #define PRBOOM_RESOLUTION_INFO_0_FI "Määritä resoluutio."
 #define OPTION_VAL_320X200_FI NULL
 #define OPTION_VAL_640X400_FI NULL
@@ -1941,16 +1941,16 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_1920X1200_FI NULL
 #define OPTION_VAL_2240X1400_FI NULL
 #define OPTION_VAL_2560X1600_FI NULL
-#define PRBOOM_MOUSE_ON_LABEL_FI NULL
-#define PRBOOM_MOUSE_ON_INFO_0_FI NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_FI NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_FI NULL
-#define PRBOOM_RUMBLE_LABEL_FI NULL
-#define PRBOOM_RUMBLE_INFO_0_FI NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_FI NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_FI NULL
+#define PRBOOM_MOUSE_ON_LABEL_FI "Hiiri aktiivisena kun käytetään ohjainta"
+#define PRBOOM_MOUSE_ON_INFO_0_FI "Sallii hiiren syötteet silloinkin, kun käyttäjän 1 laitetyyppi ei ole asetettu \"RetroKeyboard/Mouse\"."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_FI "Etsi IWAD-tiedostoja ylemmistä tason kansioista"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_FI "Skannaa IWAD-tiedostoja ylemmän tason kansioista. HUOM: Tämä täytyy poistaa käytöstä, jos haluat ajaa SIGIL."
+#define PRBOOM_RUMBLE_LABEL_FI "Tärinä tehosteet"
+#define PRBOOM_RUMBLE_INFO_0_FI "Mahdollistaa haptisen palautteen, kun käytetään tärinällä varustettua peliohjainta."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_FI "Analoginen katvealue (Prosentteina)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_FI "Asettaa peliohjaimen analogisen katvealueen kun syöttölaitteen tyyppi on asetettu \"Gamepad Modern\"."
 #define PRBOOM_PURGE_LIMIT_LABEL_FI "Välimuistin koko"
-#define PRBOOM_PURGE_LIMIT_INFO_0_FI NULL
+#define PRBOOM_PURGE_LIMIT_INFO_0_FI "Asettaa rajan pelin komponenttien varastoinnille välimuistiin. Pienet arvot voivat aiheuttaa nykimistä, kun navigoidaan suuria kenttiä."
 #define OPTION_VAL_8_FI "8 Mt"
 #define OPTION_VAL_12_FI "12 Mt"
 #define OPTION_VAL_16_FI "16 Mt"
@@ -2813,8 +2813,8 @@ struct retro_core_options_v2 options_id = {
 
 /* RETRO_LANGUAGE_IT */
 
-#define PRBOOM_RESOLUTION_LABEL_IT NULL
-#define PRBOOM_RESOLUTION_INFO_0_IT NULL
+#define PRBOOM_RESOLUTION_LABEL_IT "Risoluzione interna (Riavvio richiesto)"
+#define PRBOOM_RESOLUTION_INFO_0_IT "Configura la risoluzione."
 #define OPTION_VAL_320X200_IT NULL
 #define OPTION_VAL_640X400_IT NULL
 #define OPTION_VAL_960X600_IT NULL
@@ -2823,16 +2823,16 @@ struct retro_core_options_v2 options_id = {
 #define OPTION_VAL_1920X1200_IT NULL
 #define OPTION_VAL_2240X1400_IT NULL
 #define OPTION_VAL_2560X1600_IT NULL
-#define PRBOOM_MOUSE_ON_LABEL_IT NULL
-#define PRBOOM_MOUSE_ON_INFO_0_IT NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_IT NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_IT NULL
-#define PRBOOM_RUMBLE_LABEL_IT NULL
-#define PRBOOM_RUMBLE_INFO_0_IT NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_IT NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_IT NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_IT NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_IT NULL
+#define PRBOOM_MOUSE_ON_LABEL_IT "Mouse Attivo Quando Si Usano Gamepad"
+#define PRBOOM_MOUSE_ON_INFO_0_IT "Consente di utilizzare gli input del mouse anche quando il tipo di dispositivo dell'utente 1 non è impostato su 'RetroKeyboard/Mouse'."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_IT "Cerca nelle cartelle genitori per gli IWAD"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_IT "Scansiona le cartelle genitore per IWADs. NOTA: È necessario disattivare questa opzione se si desidera eseguire SIGIL."
+#define PRBOOM_RUMBLE_LABEL_IT "Effetti Di Vibrazione"
+#define PRBOOM_RUMBLE_INFO_0_IT "Abilita il feedback tattile quando si utilizza un gamepad dotato di vibrazione."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_IT "Deadzone Analogica (Percentuale)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_IT "Imposta la zona morta dei bastoncini analogici del gamepad quando il tipo di dispositivo di input è impostato su 'Gamepad Modern'."
+#define PRBOOM_PURGE_LIMIT_LABEL_IT "Dimensione Cache"
+#define PRBOOM_PURGE_LIMIT_INFO_0_IT "Imposta un limite alla dimensione del pool di memoria utilizzato per la cache degli asset di gioco. Valori piccoli possono causare balbuzie durante la navigazione di mappe di grandi dimensioni."
 #define OPTION_VAL_8_IT NULL
 #define OPTION_VAL_12_IT NULL
 #define OPTION_VAL_16_IT NULL
@@ -3107,8 +3107,8 @@ struct retro_core_options_v2 options_ja = {
 
 /* RETRO_LANGUAGE_KO */
 
-#define PRBOOM_RESOLUTION_LABEL_KO NULL
-#define PRBOOM_RESOLUTION_INFO_0_KO NULL
+#define PRBOOM_RESOLUTION_LABEL_KO "내부 해상도 (재시작 필요)"
+#define PRBOOM_RESOLUTION_INFO_0_KO "해상도를 설정합니다."
 #define OPTION_VAL_320X200_KO NULL
 #define OPTION_VAL_640X400_KO NULL
 #define OPTION_VAL_960X600_KO NULL
@@ -3117,16 +3117,16 @@ struct retro_core_options_v2 options_ja = {
 #define OPTION_VAL_1920X1200_KO NULL
 #define OPTION_VAL_2240X1400_KO NULL
 #define OPTION_VAL_2560X1600_KO NULL
-#define PRBOOM_MOUSE_ON_LABEL_KO NULL
-#define PRBOOM_MOUSE_ON_INFO_0_KO NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_KO NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_KO NULL
-#define PRBOOM_RUMBLE_LABEL_KO NULL
-#define PRBOOM_RUMBLE_INFO_0_KO NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_KO NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_KO NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_KO NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_KO NULL
+#define PRBOOM_MOUSE_ON_LABEL_KO "게임패드 사용 중 마우스 활성"
+#define PRBOOM_MOUSE_ON_INFO_0_KO "사용자 1의 장치 종류가 'Retro키보드/마우스'가 아닐 경우에도 마우스 입력을 사용할 수 있게 합니다."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_KO "상위 폴더에서 IWAD 찾기"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_KO "IWAD를 찾을 때 상위 폴더까지 검색합니다. 주의: SIGIL을 실행하려면 이 옵션을 비활성화해야합니다."
+#define PRBOOM_RUMBLE_LABEL_KO "진동 효과"
+#define PRBOOM_RUMBLE_INFO_0_KO "진동 효과를 지원하는 게임패드를 사용할 때 햅틱 피드백을 사용합니다."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_KO "아날로그 데드존 (퍼센트)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_KO "입력 장치가 'Gamepad Modern'일 때 사용할 아날로그 스틱의 데드존을 설정합니다."
+#define PRBOOM_PURGE_LIMIT_LABEL_KO "캐시 크기"
+#define PRBOOM_PURGE_LIMIT_INFO_0_KO "게임 애셋을 캐싱해둘 메모리 풀의 한계 크기를 지정합니다. 작은 값으로 설정할 경우 큰 맵을 탐색할 때 끊김이 발생할 수 있습니다."
 #define OPTION_VAL_8_KO NULL
 #define OPTION_VAL_12_KO NULL
 #define OPTION_VAL_16_KO NULL
@@ -3696,7 +3696,7 @@ struct retro_core_options_v2 options_oc = {
 /* RETRO_LANGUAGE_PL */
 
 #define PRBOOM_RESOLUTION_LABEL_PL NULL
-#define PRBOOM_RESOLUTION_INFO_0_PL NULL
+#define PRBOOM_RESOLUTION_INFO_0_PL "Skonfiguruj rozdzielczość."
 #define OPTION_VAL_320X200_PL NULL
 #define OPTION_VAL_640X400_PL NULL
 #define OPTION_VAL_960X600_PL NULL
@@ -3705,15 +3705,15 @@ struct retro_core_options_v2 options_oc = {
 #define OPTION_VAL_1920X1200_PL NULL
 #define OPTION_VAL_2240X1400_PL NULL
 #define OPTION_VAL_2560X1600_PL NULL
-#define PRBOOM_MOUSE_ON_LABEL_PL NULL
+#define PRBOOM_MOUSE_ON_LABEL_PL "Mysz aktywna podczas korzystania z Gamepad"
 #define PRBOOM_MOUSE_ON_INFO_0_PL NULL
 #define PRBOOM_FIND_RECURSIVE_ON_LABEL_PL NULL
 #define PRBOOM_FIND_RECURSIVE_ON_INFO_0_PL NULL
-#define PRBOOM_RUMBLE_LABEL_PL NULL
+#define PRBOOM_RUMBLE_LABEL_PL "Efekty rozrastania"
 #define PRBOOM_RUMBLE_INFO_0_PL NULL
 #define PRBOOM_ANALOG_DEADZONE_LABEL_PL NULL
 #define PRBOOM_ANALOG_DEADZONE_INFO_0_PL NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_PL NULL
+#define PRBOOM_PURGE_LIMIT_LABEL_PL "Wielkość pamięci podręcznej"
 #define PRBOOM_PURGE_LIMIT_INFO_0_PL NULL
 #define OPTION_VAL_8_PL NULL
 #define OPTION_VAL_12_PL NULL
@@ -3842,8 +3842,8 @@ struct retro_core_options_v2 options_pl = {
 
 /* RETRO_LANGUAGE_PT_BR */
 
-#define PRBOOM_RESOLUTION_LABEL_PT_BR NULL
-#define PRBOOM_RESOLUTION_INFO_0_PT_BR NULL
+#define PRBOOM_RESOLUTION_LABEL_PT_BR "Resolução interna (requer reinício)"
+#define PRBOOM_RESOLUTION_INFO_0_PT_BR "Configure a resolução."
 #define OPTION_VAL_320X200_PT_BR NULL
 #define OPTION_VAL_640X400_PT_BR NULL
 #define OPTION_VAL_960X600_PT_BR NULL
@@ -3852,16 +3852,16 @@ struct retro_core_options_v2 options_pl = {
 #define OPTION_VAL_1920X1200_PT_BR NULL
 #define OPTION_VAL_2240X1400_PT_BR NULL
 #define OPTION_VAL_2560X1600_PT_BR NULL
-#define PRBOOM_MOUSE_ON_LABEL_PT_BR NULL
-#define PRBOOM_MOUSE_ON_INFO_0_PT_BR NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_PT_BR NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_PT_BR NULL
-#define PRBOOM_RUMBLE_LABEL_PT_BR NULL
-#define PRBOOM_RUMBLE_INFO_0_PT_BR NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_PT_BR NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_PT_BR NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_PT_BR NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_PT_BR NULL
+#define PRBOOM_MOUSE_ON_LABEL_PT_BR "Ative o mouse ao utilizar o controle"
+#define PRBOOM_MOUSE_ON_INFO_0_PT_BR "Permite que você use as entradas do mouse mesmo quando o tipo do dispositivo do usuário 1 não estiver definido como 'RetroKeyboard/Mouse'."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_PT_BR "Consulte as pastas principais para IWADs"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_PT_BR "Varre as pastas principais por IWADs. OBSERVAÇÃO: É preciso desativar esta opção caso queira executar o SIGIL."
+#define PRBOOM_RUMBLE_LABEL_PT_BR "Efeitos de vibração"
+#define PRBOOM_RUMBLE_INFO_0_PT_BR "Permite um feedback háptico ao utilizar um controle equipado com vibração."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_PT_BR "Zona morta analógica (Porcentagem)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_PT_BR "Define a zona morta dos controles analógicos quando o tipo do dispositivo de entrada for definido como \"Gamepad moderno\"."
+#define PRBOOM_PURGE_LIMIT_LABEL_PT_BR "Tamanho do cache"
+#define PRBOOM_PURGE_LIMIT_INFO_0_PT_BR "Estabelece um limite para o tamanho do espaço da memória utilizado para armazenar os ativos do jogo. Pequenos valores podem causar disfunções durante a navegação nos mapas grandes."
 #define OPTION_VAL_8_PT_BR NULL
 #define OPTION_VAL_12_PT_BR NULL
 #define OPTION_VAL_16_PT_BR NULL
@@ -4284,7 +4284,7 @@ struct retro_core_options_v2 options_ro = {
 /* RETRO_LANGUAGE_RU */
 
 #define PRBOOM_RESOLUTION_LABEL_RU "Внутреннее разрешение (требуется перезапуск)"
-#define PRBOOM_RESOLUTION_INFO_0_RU NULL
+#define PRBOOM_RESOLUTION_INFO_0_RU "Настройка разрешения."
 #define OPTION_VAL_320X200_RU NULL
 #define OPTION_VAL_640X400_RU NULL
 #define OPTION_VAL_960X600_RU NULL
@@ -4293,16 +4293,16 @@ struct retro_core_options_v2 options_ro = {
 #define OPTION_VAL_1920X1200_RU NULL
 #define OPTION_VAL_2240X1400_RU NULL
 #define OPTION_VAL_2560X1600_RU NULL
-#define PRBOOM_MOUSE_ON_LABEL_RU NULL
-#define PRBOOM_MOUSE_ON_INFO_0_RU NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_RU NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_RU NULL
-#define PRBOOM_RUMBLE_LABEL_RU NULL
-#define PRBOOM_RUMBLE_INFO_0_RU NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_RU NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_RU NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_RU NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_RU NULL
+#define PRBOOM_MOUSE_ON_LABEL_RU "Использовать мышку совместно с геймпадом"
+#define PRBOOM_MOUSE_ON_INFO_0_RU "Позволяет использовать мышку даже когда тип устройства Игрока 1 отличается от 'RetroKeyboard/Mouse'."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_RU "Искать IWAD в родительских папках"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_RU "Искать файлы IWAD в родительских каталогах. Примечание: отключите для запуска SIGIL."
+#define PRBOOM_RUMBLE_LABEL_RU "Эффекты вибрации"
+#define PRBOOM_RUMBLE_INFO_0_RU "Включает тактильную отдачу для совместимых геймпадов."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_RU "Мёртвая зона стиков (в процентах)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_RU "Настройка мёртвой зоны аналоговых стиков геймпада, если выбран тип устройства ввода 'Gamepad Modern'."
+#define PRBOOM_PURGE_LIMIT_LABEL_RU "Размер кэша"
+#define PRBOOM_PURGE_LIMIT_INFO_0_RU "Устанавливает предельный размер памяти для кэширования ресурсов игры. Меньшие значения могут вызывать подтормаживания на больших картах."
 #define OPTION_VAL_8_RU NULL
 #define OPTION_VAL_12_RU NULL
 #define OPTION_VAL_16_RU NULL

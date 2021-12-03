@@ -20,7 +20,7 @@ extern "C" {
 */
 /* RETRO_LANGUAGE_AR */
 
-#define PRBOOM_RESOLUTION_LABEL_AR NULL
+#define PRBOOM_RESOLUTION_LABEL_AR "الدقة الداخلية (إعادة التشغيل مطلوبة)"
 #define PRBOOM_RESOLUTION_INFO_0_AR NULL
 #define OPTION_VAL_320X200_AR NULL
 #define OPTION_VAL_640X400_AR NULL
@@ -461,8 +461,8 @@ struct retro_core_options_v2 options_ca = {
 
 /* RETRO_LANGUAGE_CHS */
 
-#define PRBOOM_RESOLUTION_LABEL_CHS NULL
-#define PRBOOM_RESOLUTION_INFO_0_CHS NULL
+#define PRBOOM_RESOLUTION_LABEL_CHS "内部分辨率(需要重启)"
+#define PRBOOM_RESOLUTION_INFO_0_CHS "配置分辨率。"
 #define OPTION_VAL_320X200_CHS NULL
 #define OPTION_VAL_640X400_CHS NULL
 #define OPTION_VAL_960X600_CHS NULL
@@ -471,16 +471,16 @@ struct retro_core_options_v2 options_ca = {
 #define OPTION_VAL_1920X1200_CHS NULL
 #define OPTION_VAL_2240X1400_CHS NULL
 #define OPTION_VAL_2560X1600_CHS NULL
-#define PRBOOM_MOUSE_ON_LABEL_CHS NULL
-#define PRBOOM_MOUSE_ON_INFO_0_CHS NULL
+#define PRBOOM_MOUSE_ON_LABEL_CHS "当使用游戏手柄时鼠标激活"
+#define PRBOOM_MOUSE_ON_INFO_0_CHS "允许您使用鼠标输入，即使用户 1 的设备类型未设置为 'RetroKeyboard/Mouse'。"
 #define PRBOOM_FIND_RECURSIVE_ON_LABEL_CHS NULL
 #define PRBOOM_FIND_RECURSIVE_ON_INFO_0_CHS NULL
 #define PRBOOM_RUMBLE_LABEL_CHS NULL
 #define PRBOOM_RUMBLE_INFO_0_CHS NULL
 #define PRBOOM_ANALOG_DEADZONE_LABEL_CHS NULL
 #define PRBOOM_ANALOG_DEADZONE_INFO_0_CHS NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_CHS NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_CHS NULL
+#define PRBOOM_PURGE_LIMIT_LABEL_CHS "缓存大小"
+#define PRBOOM_PURGE_LIMIT_INFO_0_CHS "设置用于缓存游戏数据的存储空间大小限制。设置过小的值可能会在浏览大地图时导致卡顿。"
 #define OPTION_VAL_8_CHS NULL
 #define OPTION_VAL_12_CHS NULL
 #define OPTION_VAL_16_CHS NULL
@@ -1942,13 +1942,13 @@ struct retro_core_options_v2 options_fa = {
 #define OPTION_VAL_2240X1400_FI NULL
 #define OPTION_VAL_2560X1600_FI NULL
 #define PRBOOM_MOUSE_ON_LABEL_FI "Hiiri aktiivisena kun käytetään ohjainta"
-#define PRBOOM_MOUSE_ON_INFO_0_FI "Sallii hiiren syötteet silloinkin, kun käyttäjän 1 laitetyyppi ei ole asetettu \"RetroKeyboard/Mouse\"."
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_FI "Etsi IWAD-tiedostoja ylemmistä tason kansioista"
+#define PRBOOM_MOUSE_ON_INFO_0_FI "Sallii hiiren syötteet silloinkin, kun käyttäjän 1 laitetyyppi ei ole asetettuna \"RetroKeyboard/Mouse\"."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_FI "Etsi IWAD-tiedostoja ylemmän tason kansioista"
 #define PRBOOM_FIND_RECURSIVE_ON_INFO_0_FI "Skannaa IWAD-tiedostoja ylemmän tason kansioista. HUOM: Tämä täytyy poistaa käytöstä, jos haluat ajaa SIGIL."
 #define PRBOOM_RUMBLE_LABEL_FI "Tärinä tehosteet"
 #define PRBOOM_RUMBLE_INFO_0_FI "Mahdollistaa haptisen palautteen, kun käytetään tärinällä varustettua peliohjainta."
 #define PRBOOM_ANALOG_DEADZONE_LABEL_FI "Analoginen katvealue (Prosentteina)"
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_FI "Asettaa peliohjaimen analogisen katvealueen kun syöttölaitteen tyyppi on asetettu \"Gamepad Modern\"."
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_FI "Asettaa peliohjaimen analogisen katvealueen kun syöttölaitteen tyypiksi on asetettu \"Gamepad Modern\"."
 #define PRBOOM_PURGE_LIMIT_LABEL_FI "Välimuistin koko"
 #define PRBOOM_PURGE_LIMIT_INFO_0_FI "Asettaa rajan pelin komponenttien varastoinnille välimuistiin. Pienet arvot voivat aiheuttaa nykimistä, kun navigoidaan suuria kenttiä."
 #define OPTION_VAL_8_FI "8 Mt"
@@ -2078,8 +2078,8 @@ struct retro_core_options_v2 options_fi = {
 
 /* RETRO_LANGUAGE_FR */
 
-#define PRBOOM_RESOLUTION_LABEL_FR NULL
-#define PRBOOM_RESOLUTION_INFO_0_FR NULL
+#define PRBOOM_RESOLUTION_LABEL_FR "Résolution interne (Redémarrage requis)"
+#define PRBOOM_RESOLUTION_INFO_0_FR "Configurer la résolution."
 #define OPTION_VAL_320X200_FR NULL
 #define OPTION_VAL_640X400_FR NULL
 #define OPTION_VAL_960X600_FR NULL
@@ -2088,25 +2088,25 @@ struct retro_core_options_v2 options_fi = {
 #define OPTION_VAL_1920X1200_FR NULL
 #define OPTION_VAL_2240X1400_FR NULL
 #define OPTION_VAL_2560X1600_FR NULL
-#define PRBOOM_MOUSE_ON_LABEL_FR NULL
-#define PRBOOM_MOUSE_ON_INFO_0_FR NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_FR NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_FR NULL
-#define PRBOOM_RUMBLE_LABEL_FR NULL
-#define PRBOOM_RUMBLE_INFO_0_FR NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_FR NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_FR NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_FR NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_FR NULL
-#define OPTION_VAL_8_FR NULL
-#define OPTION_VAL_12_FR NULL
-#define OPTION_VAL_16_FR NULL
-#define OPTION_VAL_24_FR NULL
-#define OPTION_VAL_32_FR NULL
-#define OPTION_VAL_48_FR NULL
-#define OPTION_VAL_64_FR NULL
-#define OPTION_VAL_128_FR NULL
-#define OPTION_VAL_256_FR NULL
+#define PRBOOM_MOUSE_ON_LABEL_FR "Souris active lors de l'utilisation d'une manette"
+#define PRBOOM_MOUSE_ON_INFO_0_FR "Permet d'utiliser des entrées de souris même lorsque le type de périphérique de l'Utilisateur 1 n'est pas réglé sur 'RetroClavier/Souris'."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_FR "Rechercher dans les dossiers parents pour les IWADs"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_FR "Analyse les dossiers parents pour les IWADs. NOTE : Vous devez désactiver cette option si vous voulez lancer SIGIL."
+#define PRBOOM_RUMBLE_LABEL_FR "Effets de vibration"
+#define PRBOOM_RUMBLE_INFO_0_FR "Active le retour haptique lorsque vous utilisez une manette de jeu équipée pour la vibration."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_FR "Deadzone analogique (%)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_FR "Définit la zone morte des sticks analogiques de la manette lorsque le type de périphérique d’entrée est réglé sur 'Gamepad Modern'."
+#define PRBOOM_PURGE_LIMIT_LABEL_FR "Taille du cache"
+#define PRBOOM_PURGE_LIMIT_INFO_0_FR "Définit une limite sur la taille du pool de mémoire utilisé pour mettre en cache les ressources de jeu. De petites valeurs peuvent causer des saccades lors de la navigation dans de grandes cartes."
+#define OPTION_VAL_8_FR "8 Mo"
+#define OPTION_VAL_12_FR "12 Mo"
+#define OPTION_VAL_16_FR "16 Mo"
+#define OPTION_VAL_24_FR "24 Mo"
+#define OPTION_VAL_32_FR "32 Mo"
+#define OPTION_VAL_48_FR "48 Mo"
+#define OPTION_VAL_64_FR "64 Mo"
+#define OPTION_VAL_128_FR "128 Mo"
+#define OPTION_VAL_256_FR "256 Mo"
 
 struct retro_core_option_v2_category option_cats_fr[] = {
    { NULL, NULL, NULL },

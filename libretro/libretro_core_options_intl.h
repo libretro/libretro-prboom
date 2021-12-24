@@ -4300,9 +4300,9 @@ struct retro_core_options_v2 options_ro = {
 #define PRBOOM_RUMBLE_LABEL_RU "Эффекты вибрации"
 #define PRBOOM_RUMBLE_INFO_0_RU "Включает тактильную отдачу для совместимых геймпадов."
 #define PRBOOM_ANALOG_DEADZONE_LABEL_RU "Мёртвая зона стиков (в процентах)"
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_RU "Настройка мёртвой зоны аналоговых стиков геймпада, если выбран тип устройства ввода 'Gamepad Modern'."
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_RU "Установка мёртвой зоны аналоговых стиков геймпада для устройства ввода типа 'Gamepad Modern'."
 #define PRBOOM_PURGE_LIMIT_LABEL_RU "Размер кэша"
-#define PRBOOM_PURGE_LIMIT_INFO_0_RU "Устанавливает предельный размер памяти для кэширования ресурсов игры. Меньшие значения могут вызывать подтормаживания на больших картах."
+#define PRBOOM_PURGE_LIMIT_INFO_0_RU "Установка ограничения памяти, доступной для кэширования ресурсов игры. Меньшие значения могут вызывать подтормаживания на больших картах."
 #define OPTION_VAL_8_RU NULL
 #define OPTION_VAL_12_RU NULL
 #define OPTION_VAL_16_RU NULL
@@ -5019,7 +5019,7 @@ struct retro_core_options_v2 options_sv = {
 /* RETRO_LANGUAGE_TR */
 
 #define PRBOOM_RESOLUTION_LABEL_TR "Dahili çözünürlük (Yeniden Başlatılmalı)"
-#define PRBOOM_RESOLUTION_INFO_0_TR NULL
+#define PRBOOM_RESOLUTION_INFO_0_TR "Çözünürlüğü yapılandırın."
 #define OPTION_VAL_320X200_TR NULL
 #define OPTION_VAL_640X400_TR NULL
 #define OPTION_VAL_960X600_TR NULL
@@ -5028,16 +5028,16 @@ struct retro_core_options_v2 options_sv = {
 #define OPTION_VAL_1920X1200_TR NULL
 #define OPTION_VAL_2240X1400_TR NULL
 #define OPTION_VAL_2560X1600_TR NULL
-#define PRBOOM_MOUSE_ON_LABEL_TR NULL
-#define PRBOOM_MOUSE_ON_INFO_0_TR NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_TR NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_TR NULL
-#define PRBOOM_RUMBLE_LABEL_TR NULL
-#define PRBOOM_RUMBLE_INFO_0_TR NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_TR NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_TR NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_TR NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_TR NULL
+#define PRBOOM_MOUSE_ON_LABEL_TR "Oyun Kolu Kullanılırken Fare Etkin"
+#define PRBOOM_MOUSE_ON_INFO_0_TR "1. Kullanıcı cihaz türü 'RetroKeyboard/Fare' olarak ayarlanmadığında bile fare girişlerini kullanmanıza izin verir."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_TR "IWAD'ler için Ana Klasörlere Bakın"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_TR "IWAD'ler için ana klasörleri tarar. NOT: SIGIL'i çalıştırmak istiyorsanız bunu devre dışı bırakmanız gerekir."
+#define PRBOOM_RUMBLE_LABEL_TR "Titreşim Efektleri"
+#define PRBOOM_RUMBLE_INFO_0_TR "Titreşim donanımlı bir oyun kolu kullanırken dokunsal geri bildirim sağlar."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_TR "Analog Ölü Bölge (Yüzde)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_TR "Giriş cihazı türü 'Modern Oyun Kolu' olarak ayarlandığında oyun kumandası analog çubuklarının ölü bölgesini ayarlar."
+#define PRBOOM_PURGE_LIMIT_LABEL_TR "Önbellek Boyutu"
+#define PRBOOM_PURGE_LIMIT_INFO_0_TR "Oyun içeriklerini önbelleğe almak için kullanılan bellek havuzunun boyutuna bir sınır ayarlar. Küçük değerler, büyük haritalarda gezinirken takılmalara neden olabilir."
 #define OPTION_VAL_8_TR NULL
 #define OPTION_VAL_12_TR NULL
 #define OPTION_VAL_16_TR NULL

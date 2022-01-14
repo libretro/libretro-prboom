@@ -3546,6 +3546,153 @@ struct retro_core_options_v2 options_nl = {
    option_defs_nl
 };
 
+/* RETRO_LANGUAGE_NO */
+
+#define PRBOOM_RESOLUTION_LABEL_NO NULL
+#define PRBOOM_RESOLUTION_INFO_0_NO NULL
+#define OPTION_VAL_320X200_NO NULL
+#define OPTION_VAL_640X400_NO NULL
+#define OPTION_VAL_960X600_NO NULL
+#define OPTION_VAL_1280X800_NO NULL
+#define OPTION_VAL_1600X1000_NO NULL
+#define OPTION_VAL_1920X1200_NO NULL
+#define OPTION_VAL_2240X1400_NO NULL
+#define OPTION_VAL_2560X1600_NO NULL
+#define PRBOOM_MOUSE_ON_LABEL_NO NULL
+#define PRBOOM_MOUSE_ON_INFO_0_NO NULL
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_NO NULL
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_NO NULL
+#define PRBOOM_RUMBLE_LABEL_NO NULL
+#define PRBOOM_RUMBLE_INFO_0_NO NULL
+#define PRBOOM_ANALOG_DEADZONE_LABEL_NO NULL
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_NO NULL
+#define PRBOOM_PURGE_LIMIT_LABEL_NO NULL
+#define PRBOOM_PURGE_LIMIT_INFO_0_NO NULL
+#define OPTION_VAL_8_NO NULL
+#define OPTION_VAL_12_NO NULL
+#define OPTION_VAL_16_NO NULL
+#define OPTION_VAL_24_NO NULL
+#define OPTION_VAL_32_NO NULL
+#define OPTION_VAL_48_NO NULL
+#define OPTION_VAL_64_NO NULL
+#define OPTION_VAL_128_NO NULL
+#define OPTION_VAL_256_NO NULL
+
+struct retro_core_option_v2_category option_cats_no[] = {
+   { NULL, NULL, NULL },
+};
+struct retro_core_option_v2_definition option_defs_no[] = {
+   {
+      "prboom-resolution",
+      PRBOOM_RESOLUTION_LABEL_NO,
+      NULL,
+      PRBOOM_RESOLUTION_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "320x200",   OPTION_VAL_320X200_NO },
+         { "640x400",   OPTION_VAL_640X400_NO },
+         { "960x600",   OPTION_VAL_960X600_NO },
+         { "1280x800",  OPTION_VAL_1280X800_NO },
+         { "1600x1000", OPTION_VAL_1600X1000_NO },
+         { "1920x1200", OPTION_VAL_1920X1200_NO },
+         { "2240x1400", OPTION_VAL_2240X1400_NO },
+         { "2560x1600", OPTION_VAL_2560X1600_NO },
+         { NULL, NULL },
+      },
+      "320x200"
+   },
+   {
+      "prboom-mouse_on",
+      PRBOOM_MOUSE_ON_LABEL_NO,
+      NULL,
+      PRBOOM_MOUSE_ON_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-find_recursive_on",
+      PRBOOM_FIND_RECURSIVE_ON_LABEL_NO,
+      NULL,
+      PRBOOM_FIND_RECURSIVE_ON_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      "prboom-rumble",
+      PRBOOM_RUMBLE_LABEL_NO,
+      NULL,
+      PRBOOM_RUMBLE_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-analog_deadzone",
+      PRBOOM_ANALOG_DEADZONE_LABEL_NO,
+      NULL,
+      PRBOOM_ANALOG_DEADZONE_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "0",  NULL },
+         { "5",  NULL },
+         { "10", NULL },
+         { "15", NULL },
+         { "20", NULL },
+         { "25", NULL },
+         { "30", NULL },
+         { NULL, NULL },
+      },
+      "15"
+   },
+#if defined(MEMORY_LOW)
+   {
+      "prboom-purge_limit",
+      PRBOOM_PURGE_LIMIT_LABEL_NO,
+      NULL,
+      PRBOOM_PURGE_LIMIT_INFO_0_NO,
+      NULL,
+      NULL,
+      {
+         { "8",   OPTION_VAL_8_NO },
+         { "12",  OPTION_VAL_12_NO },
+         { "16",  OPTION_VAL_16_NO },
+         { "24",  OPTION_VAL_24_NO },
+         { "32",  OPTION_VAL_32_NO },
+         { "48",  OPTION_VAL_48_NO },
+         { "64",  OPTION_VAL_64_NO },
+         { "128", OPTION_VAL_128_NO },
+         { "256", OPTION_VAL_256_NO },
+         { NULL, NULL },
+      },
+      "16"
+   },
+#endif
+   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
+};
+struct retro_core_options_v2 options_no = {
+   option_cats_no,
+   option_defs_no
+};
+
 /* RETRO_LANGUAGE_OC */
 
 #define PRBOOM_RESOLUTION_LABEL_OC NULL

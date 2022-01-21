@@ -1343,7 +1343,7 @@ struct retro_core_options_v2 options_de = {
 
 /* RETRO_LANGUAGE_EL */
 
-#define PRBOOM_RESOLUTION_LABEL_EL NULL
+#define PRBOOM_RESOLUTION_LABEL_EL "Εσωτερική ανάλυση (Απαιτείται Επανεκκίνηση)"
 #define PRBOOM_RESOLUTION_INFO_0_EL NULL
 #define OPTION_VAL_320X200_EL NULL
 #define OPTION_VAL_640X400_EL NULL

@@ -5457,6 +5457,153 @@ struct retro_core_options_v2 options_uk = {
    option_defs_uk
 };
 
+/* RETRO_LANGUAGE_VAL */
+
+#define PRBOOM_RESOLUTION_LABEL_VAL NULL
+#define PRBOOM_RESOLUTION_INFO_0_VAL NULL
+#define OPTION_VAL_320X200_VAL NULL
+#define OPTION_VAL_640X400_VAL NULL
+#define OPTION_VAL_960X600_VAL NULL
+#define OPTION_VAL_1280X800_VAL NULL
+#define OPTION_VAL_1600X1000_VAL NULL
+#define OPTION_VAL_1920X1200_VAL NULL
+#define OPTION_VAL_2240X1400_VAL NULL
+#define OPTION_VAL_2560X1600_VAL NULL
+#define PRBOOM_MOUSE_ON_LABEL_VAL NULL
+#define PRBOOM_MOUSE_ON_INFO_0_VAL NULL
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_VAL NULL
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_VAL NULL
+#define PRBOOM_RUMBLE_LABEL_VAL NULL
+#define PRBOOM_RUMBLE_INFO_0_VAL NULL
+#define PRBOOM_ANALOG_DEADZONE_LABEL_VAL NULL
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_VAL NULL
+#define PRBOOM_PURGE_LIMIT_LABEL_VAL NULL
+#define PRBOOM_PURGE_LIMIT_INFO_0_VAL NULL
+#define OPTION_VAL_8_VAL NULL
+#define OPTION_VAL_12_VAL NULL
+#define OPTION_VAL_16_VAL NULL
+#define OPTION_VAL_24_VAL NULL
+#define OPTION_VAL_32_VAL NULL
+#define OPTION_VAL_48_VAL NULL
+#define OPTION_VAL_64_VAL NULL
+#define OPTION_VAL_128_VAL NULL
+#define OPTION_VAL_256_VAL NULL
+
+struct retro_core_option_v2_category option_cats_val[] = {
+   { NULL, NULL, NULL },
+};
+struct retro_core_option_v2_definition option_defs_val[] = {
+   {
+      "prboom-resolution",
+      PRBOOM_RESOLUTION_LABEL_VAL,
+      NULL,
+      PRBOOM_RESOLUTION_INFO_0_VAL,
+      NULL,
+      NULL,
+      {
+         { "320x200",   OPTION_VAL_320X200_VAL },
+         { "640x400",   OPTION_VAL_640X400_VAL },
+         { "960x600",   OPTION_VAL_960X600_VAL },
+         { "1280x800",  OPTION_VAL_1280X800_VAL },
+         { "1600x1000", OPTION_VAL_1600X1000_VAL },
+         { "1920x1200", OPTION_VAL_1920X1200_VAL },
+         { "2240x1400", OPTION_VAL_2240X1400_VAL },
+         { "2560x1600", OPTION_VAL_2560X1600_VAL },
+         { NULL, NULL },
+      },
+      "320x200"
+   },
+   {
+      "prboom-mouse_on",
+      PRBOOM_MOUSE_ON_LABEL_VAL,
+      NULL,
+      PRBOOM_MOUSE_ON_INFO_0_VAL,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-find_recursive_on",
+      PRBOOM_FIND_RECURSIVE_ON_LABEL_VAL,
+      NULL,
+      PRBOOM_FIND_RECURSIVE_ON_INFO_0_VAL,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      "prboom-rumble",
+      PRBOOM_RUMBLE_LABEL_VAL,
+      NULL,
+      PRBOOM_RUMBLE_INFO_0_VAL,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-analog_deadzone",
+      PRBOOM_ANALOG_DEADZONE_LABEL_VAL,
+      NULL,
+      PRBOOM_ANALOG_DEADZONE_INFO_0_VAL,
+      NULL,
+      NULL,
+      {
+         { "0",  NULL },
+         { "5",  NULL },
+         { "10", NULL },
+         { "15", NULL },
+         { "20", NULL },
+         { "25", NULL },
+         { "30", NULL },
+         { NULL, NULL },
+      },
+      "15"
+   },
+#if defined(MEMORY_LOW)
+   {
+      "prboom-purge_limit",
+      PRBOOM_PURGE_LIMIT_LABEL_VAL,
+      NULL,
+      PRBOOM_PURGE_LIMIT_INFO_0_VAL,
+      NULL,
+      NULL,
+      {
+         { "8",   OPTION_VAL_8_VAL },
+         { "12",  OPTION_VAL_12_VAL },
+         { "16",  OPTION_VAL_16_VAL },
+         { "24",  OPTION_VAL_24_VAL },
+         { "32",  OPTION_VAL_32_VAL },
+         { "48",  OPTION_VAL_48_VAL },
+         { "64",  OPTION_VAL_64_VAL },
+         { "128", OPTION_VAL_128_VAL },
+         { "256", OPTION_VAL_256_VAL },
+         { NULL, NULL },
+      },
+      "16"
+   },
+#endif
+   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
+};
+struct retro_core_options_v2 options_val = {
+   option_cats_val,
+   option_defs_val
+};
+
 /* RETRO_LANGUAGE_VN */
 
 #define PRBOOM_RESOLUTION_LABEL_VN NULL

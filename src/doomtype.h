@@ -61,7 +61,7 @@
 /* cph - Wrapper for the long long type, as Win32 used a different name.
  * Except I don't know what to test as it's compiler specific
  * Proff - I fixed it */
-#ifndef _MSC_VER
+#if !defined(_MSC_VER) && !defined(__PS3__)
 // define compiled-specific long-long contstant notation here
 #define LONGLONG(num)   (uint64_t)num ## ll
 // for strcasecmp in POSIX/BSD systems

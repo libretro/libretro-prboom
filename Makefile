@@ -220,13 +220,18 @@ else ifeq ($(platform), libnx)
 	 CFLAGS += -DHAVE_STRLWR
     CFLAGS += -std=gnu11
     STATIC_LINKING = 1
-else ifeq ($(platform), psl1ght)
+
+# Lightweight PS3 Homebrew SDK
+else ifneq (,$(filter $(platform), ps3 psl1ght))
 	EXT=a
-   TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
-   CC = $(PS3DEV)/ppu/bin/ppu-gcc$(EXE_EXT)
-   AR = $(PS3DEV)/ppu/bin/ppu-ar$(EXE_EXT)
-   CFLAGS += -DHAVE_STRLWR -D__PSL1GHT__
+	TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
+	CC = $(PS3DEV)/ppu/bin/ppu-$(COMMONLV)gcc$(EXE_EXT)
+	AR = $(PS3DEV)/ppu/bin/ppu-$(COMMONLV)ar$(EXE_EXT)
+	CFLAGS += -D__PS3__
 	STATIC_LINKING = 1
+	ifeq ($(platform), psl1ght)
+		PLATFORM_DEFINES += -D__PSL1GHT__
+	endif
 
 # PS2
 else ifeq ($(platform), ps2)

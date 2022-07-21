@@ -1844,7 +1844,7 @@ static void M_DrawSetting(const setup_menu_t* s)
          key == &key_fire || key == &key_strafe || key == &key_use)
   {
     if (s->m_mouse && *s->m_mouse != -1)
-      sprintf(menu_buffer+strlen(menu_buffer), "/MB%d",
+      sprintf(menu_buffer + strlen(menu_buffer), "/MB%d",
         *s->m_mouse+1);
   }
       M_DrawMenuString(x,y,color);
@@ -5278,7 +5278,8 @@ void M_DrawSelCell (menu_t* menu,int item)
 int M_StringWidth(const char* string)
 {
   int i, c, w = 0;
-  for (i = 0;(size_t)i < strlen(string);i++)
+  size_t string_len = strlen(string);
+  for (i = 0;(size_t)i < string_len; i++)
     w += (c = toupper(string[i]) - HU_FONTSTART) < 0 || c >= HU_FONTSIZE ?
       4 : hu_font[c].width;
   return w;

@@ -67,16 +67,14 @@ int        numlumps;         // killough
 
 void ExtractFileBase (const char *path, char *dest)
 {
-  const char *src = path + strlen(path) - 1;
   int length;
+  const char *src = path + strlen(path) - 1;
 
   // back up until a \ or the start
   while (src != path && src[-1] != ':' // killough 3/22/98: allow c:filename
          && *(src-1) != '\\'
          && *(src-1) != '/')
-  {
     src--;
-  }
 
   // copy up to eight characters
   memset(dest,0,8);
@@ -129,6 +127,7 @@ char *AddDefaultExtension(char *path, const char *ext)
 static void W_AddFile(wadfile_info_t *wadfile)
 // killough 1/31/98: static, const
 {
+   size_t wadfile_name_len;
    wadinfo_t   header;
    lumpinfo_t* lump_p;
    unsigned    i;
@@ -143,11 +142,13 @@ static void W_AddFile(wadfile_info_t *wadfile)
          RETRO_VFS_FILE_ACCESS_READ,
          RETRO_VFS_FILE_ACCESS_HINT_NONE);
 
+   wadfile_name_len = strlen(wadfile->name);
+
    if (!wadfile->handle)
    {
-      if (  strlen(wadfile->name)<=4 ||      // add error check -- killough
-            (strcasecmp(wadfile->name+strlen(wadfile->name)-4 , ".lmp" ) &&
-             strcasecmp(wadfile->name+strlen(wadfile->name)-4 , ".gwa" ) )
+      if (  wadfile_name_len <= 4 ||      // add error check -- killough
+            (strcasecmp(wadfile->name + wadfile_name_len - 4, ".lmp" ) &&
+             strcasecmp(wadfile->name + wadfile_name_len - 4, ".gwa" ) )
          )
          I_Error("W_AddFile: couldn't open %s",wadfile->name);
       return;
@@ -165,10 +166,10 @@ static void W_AddFile(wadfile_info_t *wadfile)
    lprintf (LO_INFO," adding %s\n",wadfile->name);
    startlump = numlumps;
 
-   if (  strlen(wadfile->name)<=4 ||
+   if (  wadfile_name_len <=4 ||
          (
-          strcasecmp(wadfile->name+strlen(wadfile->name)-4,".wad") &&
-          strcasecmp(wadfile->name+strlen(wadfile->name)-4,".gwa")
+          strcasecmp(wadfile->name + wadfile_name_len - 4,".wad") &&
+          strcasecmp(wadfile->name + wadfile_name_len - 4,".gwa")
          )
       )
    {

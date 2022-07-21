@@ -2661,8 +2661,9 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
 
   if (!found) // Nothing we want to handle here--see if strings can deal with it.
     {
-      if (fpout) fprintf(fpout,"Checking text area through strings for '%.12s%s' from=%d to=%d\n",inbuffer, (strlen(inbuffer) > 12) ? "..." : "",fromlen,tolen);
-      if ((size_t)fromlen <= strlen(inbuffer))
+      size_t inbuffer_len = strlen(inbuffer);
+      if (fpout) fprintf(fpout,"Checking text area through strings for '%.12s%s' from=%d to=%d\n",inbuffer, (inbuffer_len > 12) ? "..." : "",fromlen,tolen);
+      if ((size_t)fromlen <= inbuffer_len)
         {
           line2 = strdup(&inbuffer[fromlen]);
           inbuffer[fromlen] = '\0';

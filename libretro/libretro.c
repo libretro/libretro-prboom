@@ -1662,7 +1662,8 @@ const char *I_DoomExeDir(void)
 */
 dbool   HasTrailingSlash(const char* dn)
 {
-  return ( dn && ((dn[strlen(dn)-1] == '/') || (dn[strlen(dn)-1] == '\\')));
+  size_t dn_len = strlen(dn);
+  return ( dn && ((dn[dn_len - 1] == '/') || (dn[dn_len - 1] == '\\')));
 }
 
 /**

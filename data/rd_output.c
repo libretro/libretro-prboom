@@ -8,6 +8,8 @@
 #include <string.h>
 #include <ctype.h>
 
+#include <compat/strl.h>
+
 #include "rd_util.h"
 #include "rd_output.h"
 
@@ -91,10 +93,7 @@ static void write_u32(FILE *f, unsigned int n)
 static void write_ch8(FILE *f, const char *s)
 {
   char buffer[9];
-
-  memset(buffer, 0, sizeof(buffer));
-  snprintf(buffer, sizeof(buffer), "%s", s);
-
+  strlcpy(buffer, s, sizeof(buffer));
   fwrite(buffer, 8, 1, f);
 }
 

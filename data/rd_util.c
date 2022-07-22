@@ -8,6 +8,9 @@
 #include <string.h>
 #include <stdarg.h>
 
+#include <compat/strl.h>
+#include <file/file_path.h>
+
 #include "rd_util.h"
 
 void ATTR((noreturn)) die(const char *error, ...)
@@ -65,19 +68,18 @@ size_t read_or_die(void **ptr, const char *file)
   void *buffer = NULL, *pos = buffer;
   FILE *f;
 
-  f = fopen(file, "rb");
-  if (!f)
+  if (!(f = fopen(file, "rb")))
   {
     int i;
-    size_t s;
-    char *path;
+    char *path      = NULL;
+    size_t file_len = strlen(file);
 
     for (i = 0; i < num_search_paths; i++)
     {
-      s = strlen(search_paths[i]) + 1 + strlen(file) + 1;
-      path = xmalloc(s);
-      snprintf(path, s, "%s/%s", search_paths[i], file);
-      f = fopen(path, "rb");
+      size_t s = strlen(search_paths[i]) + 1 + file_len + 1;
+      path     = xmalloc(s);
+      fill_pathname_join(path, search_paths[i], file, s);
+      f        = fopen(path, "rb");
       free(path);
     }
   }

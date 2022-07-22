@@ -11,6 +11,7 @@
 #include <file/file_path.h>
 #include <streams/file_stream.h>
 #include <array/rbuf.h>
+#include <compat/strl.h>
 
 #if _MSC_VER
 #include <compat/msvc.h>
@@ -532,7 +533,7 @@ static void update_variables(bool startup)
       {
          char *pch;
          char str[100];
-         snprintf(str, sizeof(str), "%s", var.value);
+         strlcpy(str, var.value, sizeof(str));
 
          pch = strtok(str, "x");
          if (pch)
@@ -821,7 +822,7 @@ bool retro_load_game(const struct retro_game_info *info)
       if (!use_external_savedir)
 		{
 			// > Use WAD directory fallback...
-			snprintf(g_save_dir, sizeof(g_save_dir), "%s", g_wad_dir);
+			strlcpy(g_save_dir, g_wad_dir, sizeof(g_save_dir));
 		}
    }
 
@@ -855,8 +856,7 @@ failed:
       struct retro_message msg;
       char msg_local[256];
 
-      snprintf(msg_local, sizeof(msg_local),
-      "ROM loading failed...");
+      strlcpy(msg_local, "ROM loading failed...", sizeof(msg_local));
       msg.msg    = msg_local;
       msg.frames = 360;
       if (environ_cb)

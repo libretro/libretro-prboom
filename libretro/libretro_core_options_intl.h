@@ -316,14 +316,14 @@ struct retro_core_options_v2 options_ast = {
 
 #define PRBOOM_RESOLUTION_LABEL_CA NULL
 #define PRBOOM_RESOLUTION_INFO_0_CA NULL
-#define OPTION_VAL_320X200_CA NULL
-#define OPTION_VAL_640X400_CA NULL
-#define OPTION_VAL_960X600_CA NULL
-#define OPTION_VAL_1280X800_CA NULL
-#define OPTION_VAL_1600X1000_CA NULL
-#define OPTION_VAL_1920X1200_CA NULL
-#define OPTION_VAL_2240X1400_CA NULL
-#define OPTION_VAL_2560X1600_CA NULL
+#define OPTION_VAL_320X200_CA "320×200"
+#define OPTION_VAL_640X400_CA "640×400"
+#define OPTION_VAL_960X600_CA "960×600"
+#define OPTION_VAL_1280X800_CA "1280×800"
+#define OPTION_VAL_1600X1000_CA "1600×1000"
+#define OPTION_VAL_1920X1200_CA "1920×1200"
+#define OPTION_VAL_2240X1400_CA "2240×1400"
+#define OPTION_VAL_2560X1600_CA "2560×1600"
 #define PRBOOM_MOUSE_ON_LABEL_CA NULL
 #define PRBOOM_MOUSE_ON_INFO_0_CA NULL
 #define PRBOOM_FIND_RECURSIVE_ON_LABEL_CA NULL
@@ -608,7 +608,7 @@ struct retro_core_options_v2 options_chs = {
 
 /* RETRO_LANGUAGE_CHT */
 
-#define PRBOOM_RESOLUTION_LABEL_CHT NULL
+#define PRBOOM_RESOLUTION_LABEL_CHT "內部解析度 (需要重新啟動)"
 #define PRBOOM_RESOLUTION_INFO_0_CHT NULL
 #define OPTION_VAL_320X200_CHT NULL
 #define OPTION_VAL_640X400_CHT NULL
@@ -755,8 +755,8 @@ struct retro_core_options_v2 options_cht = {
 
 /* RETRO_LANGUAGE_CS */
 
-#define PRBOOM_RESOLUTION_LABEL_CS NULL
-#define PRBOOM_RESOLUTION_INFO_0_CS NULL
+#define PRBOOM_RESOLUTION_LABEL_CS "Internal resolution (Vyžaduje restart)"
+#define PRBOOM_RESOLUTION_INFO_0_CS "Konfigurace rozlišení."
 #define OPTION_VAL_320X200_CS NULL
 #define OPTION_VAL_640X400_CS NULL
 #define OPTION_VAL_960X600_CS NULL
@@ -765,16 +765,16 @@ struct retro_core_options_v2 options_cht = {
 #define OPTION_VAL_1920X1200_CS NULL
 #define OPTION_VAL_2240X1400_CS NULL
 #define OPTION_VAL_2560X1600_CS NULL
-#define PRBOOM_MOUSE_ON_LABEL_CS NULL
-#define PRBOOM_MOUSE_ON_INFO_0_CS NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_CS NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_CS NULL
-#define PRBOOM_RUMBLE_LABEL_CS NULL
-#define PRBOOM_RUMBLE_INFO_0_CS NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_CS NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_CS NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_CS NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_CS NULL
+#define PRBOOM_MOUSE_ON_LABEL_CS "Aktivní Myš při Použití Gamepadu"
+#define PRBOOM_MOUSE_ON_INFO_0_CS "Umožňuje používat vstupy myši, i když typ zařízení uživatele 1 není nastaven na 'RetroKlávesnice/Myš'."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_CS "Prohlédnout si nadřazené složky IWADs"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_CS "Prohledá nadřazené složky a vyhledá v nich soubory IWAD. POZNÁMKA: Pokud chcete spustit SIGIL, musíte tuto funkci zakázat."
+#define PRBOOM_RUMBLE_LABEL_CS "Rázové Efekty"
+#define PRBOOM_RUMBLE_INFO_0_CS "Povoluje haptickou zpětnou vazbu při použití gamepadu vybaveného funkcí vibrace."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_CS "Analogová Mrtvá Zóna (Procenta)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_CS "Nastaví zónu odpojení analogových páček gamepadu, když je typ vstupního zařízení nastaven na 'Gamepad Modern'."
+#define PRBOOM_PURGE_LIMIT_LABEL_CS "Velikost Cache"
+#define PRBOOM_PURGE_LIMIT_INFO_0_CS "Nastavuje limit velikosti paměťového fondu používaného k ukládání herních prostředků do mezipaměti. Malé hodnoty mohou způsobit zadrhávání při procházení velkých map."
 #define OPTION_VAL_8_CS NULL
 #define OPTION_VAL_12_CS NULL
 #define OPTION_VAL_16_CS NULL
@@ -1197,7 +1197,7 @@ struct retro_core_options_v2 options_da = {
 /* RETRO_LANGUAGE_DE */
 
 #define PRBOOM_RESOLUTION_LABEL_DE "Interne Auflösung (Neustart erforderlich)"
-#define PRBOOM_RESOLUTION_INFO_0_DE NULL
+#define PRBOOM_RESOLUTION_INFO_0_DE "Die Auflösung konfigurieren."
 #define OPTION_VAL_320X200_DE "320 x 200"
 #define OPTION_VAL_640X400_DE "640 x 400"
 #define OPTION_VAL_960X600_DE "960 x 600"
@@ -1206,16 +1206,16 @@ struct retro_core_options_v2 options_da = {
 #define OPTION_VAL_1920X1200_DE "1920 x 1200"
 #define OPTION_VAL_2240X1400_DE "2240 x 1400"
 #define OPTION_VAL_2560X1600_DE "2560 x 1600"
-#define PRBOOM_MOUSE_ON_LABEL_DE NULL
-#define PRBOOM_MOUSE_ON_INFO_0_DE NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_DE NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_DE NULL
+#define PRBOOM_MOUSE_ON_LABEL_DE "Maus aktiv bei Verwendung von Gamepad"
+#define PRBOOM_MOUSE_ON_INFO_0_DE "Erlaubt die Verwendung von Mauseingaben, auch wenn der Gerätetyp des Benutzers 1 nicht auf „RetroKeyboard/Maus“ gesetzt ist."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_DE "In übergeordnete Ordnern nach IWADs suchen"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_DE "Scannt übergeordnete Ordner nach IWADs. HINWEIS: Dies muss deaktiviert werden, wenn SIGIL ausführen wird."
 #define PRBOOM_RUMBLE_LABEL_DE "Rumpel-Effekte"
-#define PRBOOM_RUMBLE_INFO_0_DE NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_DE NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_DE NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_DE NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_DE NULL
+#define PRBOOM_RUMBLE_INFO_0_DE "Aktiviert haptisches Feedback bei Verwendung eines mit Vibration ausgestatteten Gamepads."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_DE "Analoge Deadzone (Prozent)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_DE "Legt die Deadzone der Analogsticks vom Gamepad fest, wenn der Eingabegerätetyp auf „Gamepad Modern“ gesetzt ist."
+#define PRBOOM_PURGE_LIMIT_LABEL_DE "Cachegröße"
+#define PRBOOM_PURGE_LIMIT_INFO_0_DE "Legt eine Grenze für die Größe des Speicherpools fest, der zum Zwischenspeichern von Spielelementen verwendet wird. Kleine Werte können beim Navigieren auf großen Karten zum Stottern führen."
 #define OPTION_VAL_8_DE NULL
 #define OPTION_VAL_12_DE NULL
 #define OPTION_VAL_16_DE NULL
@@ -1486,6 +1486,153 @@ struct retro_core_option_v2_definition option_defs_el[] = {
 struct retro_core_options_v2 options_el = {
    option_cats_el,
    option_defs_el
+};
+
+/* RETRO_LANGUAGE_EN */
+
+#define PRBOOM_RESOLUTION_LABEL_EN NULL
+#define PRBOOM_RESOLUTION_INFO_0_EN NULL
+#define OPTION_VAL_320X200_EN NULL
+#define OPTION_VAL_640X400_EN NULL
+#define OPTION_VAL_960X600_EN NULL
+#define OPTION_VAL_1280X800_EN NULL
+#define OPTION_VAL_1600X1000_EN NULL
+#define OPTION_VAL_1920X1200_EN NULL
+#define OPTION_VAL_2240X1400_EN NULL
+#define OPTION_VAL_2560X1600_EN NULL
+#define PRBOOM_MOUSE_ON_LABEL_EN NULL
+#define PRBOOM_MOUSE_ON_INFO_0_EN NULL
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_EN NULL
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_EN NULL
+#define PRBOOM_RUMBLE_LABEL_EN NULL
+#define PRBOOM_RUMBLE_INFO_0_EN NULL
+#define PRBOOM_ANALOG_DEADZONE_LABEL_EN "Analogue Dead-zone (Percent)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_EN "Sets the dead-zone of the gamepad analogue sticks when the input device type is set to 'Gamepad Modern'."
+#define PRBOOM_PURGE_LIMIT_LABEL_EN NULL
+#define PRBOOM_PURGE_LIMIT_INFO_0_EN NULL
+#define OPTION_VAL_8_EN NULL
+#define OPTION_VAL_12_EN NULL
+#define OPTION_VAL_16_EN NULL
+#define OPTION_VAL_24_EN NULL
+#define OPTION_VAL_32_EN NULL
+#define OPTION_VAL_48_EN NULL
+#define OPTION_VAL_64_EN NULL
+#define OPTION_VAL_128_EN NULL
+#define OPTION_VAL_256_EN NULL
+
+struct retro_core_option_v2_category option_cats_en[] = {
+   { NULL, NULL, NULL },
+};
+struct retro_core_option_v2_definition option_defs_en[] = {
+   {
+      "prboom-resolution",
+      PRBOOM_RESOLUTION_LABEL_EN,
+      NULL,
+      PRBOOM_RESOLUTION_INFO_0_EN,
+      NULL,
+      NULL,
+      {
+         { "320x200",   OPTION_VAL_320X200_EN },
+         { "640x400",   OPTION_VAL_640X400_EN },
+         { "960x600",   OPTION_VAL_960X600_EN },
+         { "1280x800",  OPTION_VAL_1280X800_EN },
+         { "1600x1000", OPTION_VAL_1600X1000_EN },
+         { "1920x1200", OPTION_VAL_1920X1200_EN },
+         { "2240x1400", OPTION_VAL_2240X1400_EN },
+         { "2560x1600", OPTION_VAL_2560X1600_EN },
+         { NULL, NULL },
+      },
+      "320x200"
+   },
+   {
+      "prboom-mouse_on",
+      PRBOOM_MOUSE_ON_LABEL_EN,
+      NULL,
+      PRBOOM_MOUSE_ON_INFO_0_EN,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-find_recursive_on",
+      PRBOOM_FIND_RECURSIVE_ON_LABEL_EN,
+      NULL,
+      PRBOOM_FIND_RECURSIVE_ON_INFO_0_EN,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      "prboom-rumble",
+      PRBOOM_RUMBLE_LABEL_EN,
+      NULL,
+      PRBOOM_RUMBLE_INFO_0_EN,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-analog_deadzone",
+      PRBOOM_ANALOG_DEADZONE_LABEL_EN,
+      NULL,
+      PRBOOM_ANALOG_DEADZONE_INFO_0_EN,
+      NULL,
+      NULL,
+      {
+         { "0",  NULL },
+         { "5",  NULL },
+         { "10", NULL },
+         { "15", NULL },
+         { "20", NULL },
+         { "25", NULL },
+         { "30", NULL },
+         { NULL, NULL },
+      },
+      "15"
+   },
+#if defined(MEMORY_LOW)
+   {
+      "prboom-purge_limit",
+      PRBOOM_PURGE_LIMIT_LABEL_EN,
+      NULL,
+      PRBOOM_PURGE_LIMIT_INFO_0_EN,
+      NULL,
+      NULL,
+      {
+         { "8",   OPTION_VAL_8_EN },
+         { "12",  OPTION_VAL_12_EN },
+         { "16",  OPTION_VAL_16_EN },
+         { "24",  OPTION_VAL_24_EN },
+         { "32",  OPTION_VAL_32_EN },
+         { "48",  OPTION_VAL_48_EN },
+         { "64",  OPTION_VAL_64_EN },
+         { "128", OPTION_VAL_128_EN },
+         { "256", OPTION_VAL_256_EN },
+         { NULL, NULL },
+      },
+      "16"
+   },
+#endif
+   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
+};
+struct retro_core_options_v2 options_en = {
+   option_cats_en,
+   option_defs_en
 };
 
 /* RETRO_LANGUAGE_EO */
@@ -2517,10 +2664,157 @@ struct retro_core_options_v2 options_he = {
    option_defs_he
 };
 
+/* RETRO_LANGUAGE_HR */
+
+#define PRBOOM_RESOLUTION_LABEL_HR NULL
+#define PRBOOM_RESOLUTION_INFO_0_HR NULL
+#define OPTION_VAL_320X200_HR NULL
+#define OPTION_VAL_640X400_HR NULL
+#define OPTION_VAL_960X600_HR NULL
+#define OPTION_VAL_1280X800_HR NULL
+#define OPTION_VAL_1600X1000_HR NULL
+#define OPTION_VAL_1920X1200_HR NULL
+#define OPTION_VAL_2240X1400_HR NULL
+#define OPTION_VAL_2560X1600_HR NULL
+#define PRBOOM_MOUSE_ON_LABEL_HR NULL
+#define PRBOOM_MOUSE_ON_INFO_0_HR NULL
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_HR NULL
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_HR NULL
+#define PRBOOM_RUMBLE_LABEL_HR NULL
+#define PRBOOM_RUMBLE_INFO_0_HR NULL
+#define PRBOOM_ANALOG_DEADZONE_LABEL_HR NULL
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_HR NULL
+#define PRBOOM_PURGE_LIMIT_LABEL_HR NULL
+#define PRBOOM_PURGE_LIMIT_INFO_0_HR NULL
+#define OPTION_VAL_8_HR NULL
+#define OPTION_VAL_12_HR NULL
+#define OPTION_VAL_16_HR NULL
+#define OPTION_VAL_24_HR NULL
+#define OPTION_VAL_32_HR NULL
+#define OPTION_VAL_48_HR NULL
+#define OPTION_VAL_64_HR NULL
+#define OPTION_VAL_128_HR NULL
+#define OPTION_VAL_256_HR NULL
+
+struct retro_core_option_v2_category option_cats_hr[] = {
+   { NULL, NULL, NULL },
+};
+struct retro_core_option_v2_definition option_defs_hr[] = {
+   {
+      "prboom-resolution",
+      PRBOOM_RESOLUTION_LABEL_HR,
+      NULL,
+      PRBOOM_RESOLUTION_INFO_0_HR,
+      NULL,
+      NULL,
+      {
+         { "320x200",   OPTION_VAL_320X200_HR },
+         { "640x400",   OPTION_VAL_640X400_HR },
+         { "960x600",   OPTION_VAL_960X600_HR },
+         { "1280x800",  OPTION_VAL_1280X800_HR },
+         { "1600x1000", OPTION_VAL_1600X1000_HR },
+         { "1920x1200", OPTION_VAL_1920X1200_HR },
+         { "2240x1400", OPTION_VAL_2240X1400_HR },
+         { "2560x1600", OPTION_VAL_2560X1600_HR },
+         { NULL, NULL },
+      },
+      "320x200"
+   },
+   {
+      "prboom-mouse_on",
+      PRBOOM_MOUSE_ON_LABEL_HR,
+      NULL,
+      PRBOOM_MOUSE_ON_INFO_0_HR,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-find_recursive_on",
+      PRBOOM_FIND_RECURSIVE_ON_LABEL_HR,
+      NULL,
+      PRBOOM_FIND_RECURSIVE_ON_INFO_0_HR,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "enabled"
+   },
+   {
+      "prboom-rumble",
+      PRBOOM_RUMBLE_LABEL_HR,
+      NULL,
+      PRBOOM_RUMBLE_INFO_0_HR,
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
+      "prboom-analog_deadzone",
+      PRBOOM_ANALOG_DEADZONE_LABEL_HR,
+      NULL,
+      PRBOOM_ANALOG_DEADZONE_INFO_0_HR,
+      NULL,
+      NULL,
+      {
+         { "0",  NULL },
+         { "5",  NULL },
+         { "10", NULL },
+         { "15", NULL },
+         { "20", NULL },
+         { "25", NULL },
+         { "30", NULL },
+         { NULL, NULL },
+      },
+      "15"
+   },
+#if defined(MEMORY_LOW)
+   {
+      "prboom-purge_limit",
+      PRBOOM_PURGE_LIMIT_LABEL_HR,
+      NULL,
+      PRBOOM_PURGE_LIMIT_INFO_0_HR,
+      NULL,
+      NULL,
+      {
+         { "8",   OPTION_VAL_8_HR },
+         { "12",  OPTION_VAL_12_HR },
+         { "16",  OPTION_VAL_16_HR },
+         { "24",  OPTION_VAL_24_HR },
+         { "32",  OPTION_VAL_32_HR },
+         { "48",  OPTION_VAL_48_HR },
+         { "64",  OPTION_VAL_64_HR },
+         { "128", OPTION_VAL_128_HR },
+         { "256", OPTION_VAL_256_HR },
+         { NULL, NULL },
+      },
+      "16"
+   },
+#endif
+   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
+};
+struct retro_core_options_v2 options_hr = {
+   option_cats_hr,
+   option_defs_hr
+};
+
 /* RETRO_LANGUAGE_HU */
 
-#define PRBOOM_RESOLUTION_LABEL_HU NULL
-#define PRBOOM_RESOLUTION_INFO_0_HU NULL
+#define PRBOOM_RESOLUTION_LABEL_HU "Belső felbontás (újraindítás szükséges)"
+#define PRBOOM_RESOLUTION_INFO_0_HU "A felbontás beállítása."
 #define OPTION_VAL_320X200_HU NULL
 #define OPTION_VAL_640X400_HU NULL
 #define OPTION_VAL_960X600_HU NULL
@@ -2529,16 +2823,16 @@ struct retro_core_options_v2 options_he = {
 #define OPTION_VAL_1920X1200_HU NULL
 #define OPTION_VAL_2240X1400_HU NULL
 #define OPTION_VAL_2560X1600_HU NULL
-#define PRBOOM_MOUSE_ON_LABEL_HU NULL
-#define PRBOOM_MOUSE_ON_INFO_0_HU NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_HU NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_HU NULL
-#define PRBOOM_RUMBLE_LABEL_HU NULL
-#define PRBOOM_RUMBLE_INFO_0_HU NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_HU NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_HU NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_HU NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_HU NULL
+#define PRBOOM_MOUSE_ON_LABEL_HU "Kontroller használatakor is aktív egér"
+#define PRBOOM_MOUSE_ON_INFO_0_HU "Ha az 1. felhasználó eszköztípusa nem \"Billentyűzet/Egér\", akkor is engedélyezi az egérbemenetet."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_HU "IWAD-ok keresése a könyvtárstruktúrában feljebb"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_HU "A könyvtárstruktúrában felfele keresi az IWAD-okat. Figyelem: ezt SIGIL futtatása esetén ki kell kapcsolni."
+#define PRBOOM_RUMBLE_LABEL_HU "Rezgő effektek"
+#define PRBOOM_RUMBLE_INFO_0_HU "Engedélyezi a tapintható visszajelzést rezgőmotorral ellátott kontrollereknél."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_HU "Analóg holtsáv (százalék)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_HU "A kontroller analóg karjainak holtsávját állítja, ha a bemeneti eszköz típusa \"Gamepad Modern\"."
+#define PRBOOM_PURGE_LIMIT_LABEL_HU "Gyorsítótár mérete"
+#define PRBOOM_PURGE_LIMIT_INFO_0_HU "A játék tartalmaihoz használt memória-gyorsítótár felső korlátja. Kis értékek döcögősséget okozhatnak nagy térképeken közlekedés esetén."
 #define OPTION_VAL_8_HU NULL
 #define OPTION_VAL_12_HU NULL
 #define OPTION_VAL_16_HU NULL
@@ -3414,7 +3708,7 @@ struct retro_core_options_v2 options_mt = {
 #define PRBOOM_MOUSE_ON_LABEL_NL NULL
 #define PRBOOM_MOUSE_ON_INFO_0_NL NULL
 #define PRBOOM_FIND_RECURSIVE_ON_LABEL_NL NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_NL NULL
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_NL "Scant bovenliggende folders voor IWADs. LET OP: U moet dit uitschakelen als u SIGIL wilt uitvoeren."
 #define PRBOOM_RUMBLE_LABEL_NL NULL
 #define PRBOOM_RUMBLE_INFO_0_NL NULL
 #define PRBOOM_ANALOG_DEADZONE_LABEL_NL NULL
@@ -4279,153 +4573,6 @@ struct retro_core_option_v2_definition option_defs_pt_pt[] = {
 struct retro_core_options_v2 options_pt_pt = {
    option_cats_pt_pt,
    option_defs_pt_pt
-};
-
-/* RETRO_LANGUAGE_RO */
-
-#define PRBOOM_RESOLUTION_LABEL_RO NULL
-#define PRBOOM_RESOLUTION_INFO_0_RO NULL
-#define OPTION_VAL_320X200_RO NULL
-#define OPTION_VAL_640X400_RO NULL
-#define OPTION_VAL_960X600_RO NULL
-#define OPTION_VAL_1280X800_RO NULL
-#define OPTION_VAL_1600X1000_RO NULL
-#define OPTION_VAL_1920X1200_RO NULL
-#define OPTION_VAL_2240X1400_RO NULL
-#define OPTION_VAL_2560X1600_RO NULL
-#define PRBOOM_MOUSE_ON_LABEL_RO NULL
-#define PRBOOM_MOUSE_ON_INFO_0_RO NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_RO NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_RO NULL
-#define PRBOOM_RUMBLE_LABEL_RO NULL
-#define PRBOOM_RUMBLE_INFO_0_RO NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_RO NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_RO NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_RO NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_RO NULL
-#define OPTION_VAL_8_RO NULL
-#define OPTION_VAL_12_RO NULL
-#define OPTION_VAL_16_RO NULL
-#define OPTION_VAL_24_RO NULL
-#define OPTION_VAL_32_RO NULL
-#define OPTION_VAL_48_RO NULL
-#define OPTION_VAL_64_RO NULL
-#define OPTION_VAL_128_RO NULL
-#define OPTION_VAL_256_RO NULL
-
-struct retro_core_option_v2_category option_cats_ro[] = {
-   { NULL, NULL, NULL },
-};
-struct retro_core_option_v2_definition option_defs_ro[] = {
-   {
-      "prboom-resolution",
-      PRBOOM_RESOLUTION_LABEL_RO,
-      NULL,
-      PRBOOM_RESOLUTION_INFO_0_RO,
-      NULL,
-      NULL,
-      {
-         { "320x200",   OPTION_VAL_320X200_RO },
-         { "640x400",   OPTION_VAL_640X400_RO },
-         { "960x600",   OPTION_VAL_960X600_RO },
-         { "1280x800",  OPTION_VAL_1280X800_RO },
-         { "1600x1000", OPTION_VAL_1600X1000_RO },
-         { "1920x1200", OPTION_VAL_1920X1200_RO },
-         { "2240x1400", OPTION_VAL_2240X1400_RO },
-         { "2560x1600", OPTION_VAL_2560X1600_RO },
-         { NULL, NULL },
-      },
-      "320x200"
-   },
-   {
-      "prboom-mouse_on",
-      PRBOOM_MOUSE_ON_LABEL_RO,
-      NULL,
-      PRBOOM_MOUSE_ON_INFO_0_RO,
-      NULL,
-      NULL,
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-   {
-      "prboom-find_recursive_on",
-      PRBOOM_FIND_RECURSIVE_ON_LABEL_RO,
-      NULL,
-      PRBOOM_FIND_RECURSIVE_ON_INFO_0_RO,
-      NULL,
-      NULL,
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "enabled"
-   },
-   {
-      "prboom-rumble",
-      PRBOOM_RUMBLE_LABEL_RO,
-      NULL,
-      PRBOOM_RUMBLE_INFO_0_RO,
-      NULL,
-      NULL,
-      {
-         { "disabled", NULL },
-         { "enabled",  NULL },
-         { NULL, NULL },
-      },
-      "disabled"
-   },
-   {
-      "prboom-analog_deadzone",
-      PRBOOM_ANALOG_DEADZONE_LABEL_RO,
-      NULL,
-      PRBOOM_ANALOG_DEADZONE_INFO_0_RO,
-      NULL,
-      NULL,
-      {
-         { "0",  NULL },
-         { "5",  NULL },
-         { "10", NULL },
-         { "15", NULL },
-         { "20", NULL },
-         { "25", NULL },
-         { "30", NULL },
-         { NULL, NULL },
-      },
-      "15"
-   },
-#if defined(MEMORY_LOW)
-   {
-      "prboom-purge_limit",
-      PRBOOM_PURGE_LIMIT_LABEL_RO,
-      NULL,
-      PRBOOM_PURGE_LIMIT_INFO_0_RO,
-      NULL,
-      NULL,
-      {
-         { "8",   OPTION_VAL_8_RO },
-         { "12",  OPTION_VAL_12_RO },
-         { "16",  OPTION_VAL_16_RO },
-         { "24",  OPTION_VAL_24_RO },
-         { "32",  OPTION_VAL_32_RO },
-         { "48",  OPTION_VAL_48_RO },
-         { "64",  OPTION_VAL_64_RO },
-         { "128", OPTION_VAL_128_RO },
-         { "256", OPTION_VAL_256_RO },
-         { NULL, NULL },
-      },
-      "16"
-   },
-#endif
-   { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
-};
-struct retro_core_options_v2 options_ro = {
-   option_cats_ro,
-   option_defs_ro
 };
 
 /* RETRO_LANGUAGE_RU */
@@ -5312,9 +5459,9 @@ struct retro_core_options_v2 options_tr = {
 
 /* RETRO_LANGUAGE_UK */
 
-#define PRBOOM_RESOLUTION_LABEL_UK NULL
-#define PRBOOM_RESOLUTION_INFO_0_UK NULL
-#define OPTION_VAL_320X200_UK NULL
+#define PRBOOM_RESOLUTION_LABEL_UK "Роздільна здатність (потрібний перезапуск)"
+#define PRBOOM_RESOLUTION_INFO_0_UK "Налаштування роздільної здатності."
+#define OPTION_VAL_320X200_UK "320х200"
 #define OPTION_VAL_640X400_UK NULL
 #define OPTION_VAL_960X600_UK NULL
 #define OPTION_VAL_1280X800_UK NULL
@@ -5322,25 +5469,25 @@ struct retro_core_options_v2 options_tr = {
 #define OPTION_VAL_1920X1200_UK NULL
 #define OPTION_VAL_2240X1400_UK NULL
 #define OPTION_VAL_2560X1600_UK NULL
-#define PRBOOM_MOUSE_ON_LABEL_UK NULL
-#define PRBOOM_MOUSE_ON_INFO_0_UK NULL
-#define PRBOOM_FIND_RECURSIVE_ON_LABEL_UK NULL
-#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_UK NULL
-#define PRBOOM_RUMBLE_LABEL_UK NULL
-#define PRBOOM_RUMBLE_INFO_0_UK NULL
-#define PRBOOM_ANALOG_DEADZONE_LABEL_UK NULL
-#define PRBOOM_ANALOG_DEADZONE_INFO_0_UK NULL
-#define PRBOOM_PURGE_LIMIT_LABEL_UK NULL
-#define PRBOOM_PURGE_LIMIT_INFO_0_UK NULL
-#define OPTION_VAL_8_UK NULL
-#define OPTION_VAL_12_UK NULL
-#define OPTION_VAL_16_UK NULL
-#define OPTION_VAL_24_UK NULL
-#define OPTION_VAL_32_UK NULL
-#define OPTION_VAL_48_UK NULL
-#define OPTION_VAL_64_UK NULL
-#define OPTION_VAL_128_UK NULL
-#define OPTION_VAL_256_UK NULL
+#define PRBOOM_MOUSE_ON_LABEL_UK "Миша активна під час використання геймпаду"
+#define PRBOOM_MOUSE_ON_INFO_0_UK "Дозволяє використовувати введення мишею, навіть коли для Користувача 1 тип пристрою не налаштований як 'Ретро клавіатура/Миша'."
+#define PRBOOM_FIND_RECURSIVE_ON_LABEL_UK "Пошук в батьківських теках для IWAD"
+#define PRBOOM_FIND_RECURSIVE_ON_INFO_0_UK "Сканує батьківські папки для IWADs. ПРИМІТКА: Вам необхідно вимкнути це, якщо ви хочете запустити SIGIL."
+#define PRBOOM_RUMBLE_LABEL_UK "Бойові ефекти"
+#define PRBOOM_RUMBLE_INFO_0_UK "Включає вібрацію при використанні сумісного геймпаду."
+#define PRBOOM_ANALOG_DEADZONE_LABEL_UK "Мертва зона аналогу (Відсоток)"
+#define PRBOOM_ANALOG_DEADZONE_INFO_0_UK "Встановлює мертву зону аналогу, якщо тип пристрою для вводу встановлено на 'Сучасний геймпад'."
+#define PRBOOM_PURGE_LIMIT_LABEL_UK "Розмір кешу"
+#define PRBOOM_PURGE_LIMIT_INFO_0_UK "Встановлює обмеження на розмір пам'яті, який використовується для кешування ігрових активів. Малі значення можуть спричинити заїкання під час навігації великими картами."
+#define OPTION_VAL_8_UK "8 МБ"
+#define OPTION_VAL_12_UK "12 МБ"
+#define OPTION_VAL_16_UK "16 МБ"
+#define OPTION_VAL_24_UK "24 МБ"
+#define OPTION_VAL_32_UK "32 МБ"
+#define OPTION_VAL_48_UK "48 МБ"
+#define OPTION_VAL_64_UK "64 МБ"
+#define OPTION_VAL_128_UK "128 МБ"
+#define OPTION_VAL_256_UK "256 МБ"
 
 struct retro_core_option_v2_category option_cats_uk[] = {
    { NULL, NULL, NULL },
@@ -5461,14 +5608,14 @@ struct retro_core_options_v2 options_uk = {
 
 #define PRBOOM_RESOLUTION_LABEL_VAL NULL
 #define PRBOOM_RESOLUTION_INFO_0_VAL NULL
-#define OPTION_VAL_320X200_VAL NULL
-#define OPTION_VAL_640X400_VAL NULL
-#define OPTION_VAL_960X600_VAL NULL
-#define OPTION_VAL_1280X800_VAL NULL
-#define OPTION_VAL_1600X1000_VAL NULL
-#define OPTION_VAL_1920X1200_VAL NULL
-#define OPTION_VAL_2240X1400_VAL NULL
-#define OPTION_VAL_2560X1600_VAL NULL
+#define OPTION_VAL_320X200_VAL "320×200"
+#define OPTION_VAL_640X400_VAL "640×400"
+#define OPTION_VAL_960X600_VAL "960×600"
+#define OPTION_VAL_1280X800_VAL "1280×800"
+#define OPTION_VAL_1600X1000_VAL "1600×1000"
+#define OPTION_VAL_1920X1200_VAL "1920×1200"
+#define OPTION_VAL_2240X1400_VAL "2240×1400"
+#define OPTION_VAL_2560X1600_VAL "2560×1600"
 #define PRBOOM_MOUSE_ON_LABEL_VAL NULL
 #define PRBOOM_MOUSE_ON_INFO_0_VAL NULL
 #define PRBOOM_FIND_RECURSIVE_ON_LABEL_VAL NULL

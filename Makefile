@@ -230,7 +230,7 @@ else ifneq (,$(filter $(platform), ps3 psl1ght))
 	CFLAGS += -D__PS3__
 	STATIC_LINKING = 1
 	ifeq ($(platform), psl1ght)
-		PLATFORM_DEFINES += -D__PSL1GHT__
+		PLATFORM_DEFINES += -D__PSL1GHT__ -I$(PS3DEV)/ppu/include
 	endif
 
 # PS2

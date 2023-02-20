@@ -1,7 +1,7 @@
 /* Copyright  (C) 2010-2020 The RetroArch team
  *
  * ---------------------------------------------------------------------------------------
- * The following license statement only applies to this file (fopen_utf8.c).
+ * The following license statement only applies to this file (features_cpu.h).
  * ---------------------------------------------------------------------------------------
  *
  * Permission is hereby granted, free of charge,
@@ -20,45 +20,56 @@
  * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <compat/fopen_utf8.h>
-#include <encodings/utf.h>
-#include <stdio.h>
-#include <stdlib.h>
+#ifndef _LIBRETRO_SDK_CPU_INFO_H
+#define _LIBRETRO_SDK_CPU_INFO_H
 
-#if defined(_WIN32_WINNT) && _WIN32_WINNT < 0x0500 || defined(_XBOX)
-#ifndef LEGACY_WIN32
-#define LEGACY_WIN32
-#endif
-#endif
+#include <retro_common_api.h>
 
-#ifdef _WIN32
-#undef fopen
+#include <stdint.h>
 
-void *fopen_utf8(const char * filename, const char * mode)
-{
-#if defined(LEGACY_WIN32)
-   char * filename_local = utf8_to_local_string_alloc(filename);
-   if (filename_local)
-   {
-      FILE *ret          = fopen(filename_local, mode);
-      free(filename_local);
-      return ret;
-   }
-#else
-   wchar_t * filename_w  = utf8_to_utf16_string_alloc(filename);
-   if (filename_w)
-   {
-      FILE    *ret       = NULL;
-      wchar_t *mode_w    = utf8_to_utf16_string_alloc(mode);
-      if (mode_w)
-      {
-         ret             = _wfopen(filename_w, mode_w);
-         free(mode_w);
-      }
-      free(filename_w);
-      return ret;
-   }
-#endif
-   return NULL;
-}
+#include <libretro.h>
+
+RETRO_BEGIN_DECLS
+
+/**
+ * cpu_features_get_perf_counter:
+ *
+ * Gets performance counter.
+ *
+ * @return Performance counter.
+ **/
+retro_perf_tick_t cpu_features_get_perf_counter(void);
+
+/**
+ * cpu_features_get_time_usec:
+ *
+ * Gets time in microseconds, from an undefined epoch.
+ * The epoch may change between computers or across reboots.
+ *
+ * @return Time in microseconds
+ **/
+retro_time_t cpu_features_get_time_usec(void);
+
+/**
+ * cpu_features_get:
+ *
+ * Gets CPU features.
+ *
+ * @return Bitmask of all CPU features available.
+ **/
+uint64_t cpu_features_get(void);
+
+/**
+ * cpu_features_get_core_amount:
+ *
+ * Gets the amount of available CPU cores.
+ *
+ * @return Amount of CPU cores available.
+ **/
+unsigned cpu_features_get_core_amount(void);
+
+void cpu_features_get_model_name(char *name, int len);
+
+RETRO_END_DECLS
+
 #endif

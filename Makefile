@@ -75,6 +75,7 @@ ifeq ($(platform), unix)
    fpic := -fPIC
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,--no-undefined -Wl,--as-needed
    CFLAGS += -std=c99
+   CFLAGS += -D_POSIX_C_SOURCE=199309L
 else ifeq ($(platform), linux-portable)
 	EXT    ?= so
    TARGET := $(TARGET_NAME)_libretro.$(EXT)

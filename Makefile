@@ -613,7 +613,11 @@ else
 	EXT?=dll
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
    CC ?= gcc
-   SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=libretro/link.T
+   SHARED := -shared -static-libgcc -static-libstdc++
+   ifneq ($(DEBUG), 1)
+   SHARED += -s
+   endif  
+   SHARED += -Wl,--version-script=libretro/link.T
    CFLAGS += -D__WIN32__ -Wno-missing-field-initializers -DHAVE_STRLWR
 LIBS =
 endif

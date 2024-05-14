@@ -421,7 +421,8 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
       info->timing.fps = TICRATE;
       break;
   }
-  info->timing.sample_rate = 44100.0;
+  float rate_factor = info->timing.fps / 60.0;
+  info->timing.sample_rate = 44100.0 * rate_factor;
   info->geometry.base_width = SCREENWIDTH;
   info->geometry.base_height = SCREENHEIGHT;
   info->geometry.max_width = SCREENWIDTH;

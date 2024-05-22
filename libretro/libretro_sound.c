@@ -101,20 +101,20 @@ music_player_t* current_player = NULL;
 
 static channel_t channels[NUM_CHANNELS];
 
-int		vol_lookup[128*256];
+int vol_lookup[128*256];
 
-static double R_ceil (double x)
+static double R_ceil(double x)
 {
    if (x > LONG_MAX)
       return x; /* big floats are all ints */
    return ((long)(x+(0.99999999999999997)));
 }
 
-static const double twoTo52 = 4.50359962737049600e15;              /* 0x1p52 */
 
 static double R_floor(double x)
 {
    double y;
+   static const double twoTo52 = 4.50359962737049600e15;              /* 0x1p52 */
    union {double f; uint64_t i;} u = {x};
    int e = u.i >> 52 & 0x7ff;
 
@@ -134,14 +134,10 @@ static double R_floor(double x)
 }
 
 /* i_sound */
-static void I_SndMixResetChannel (int channum)
-{
-   memset (&channels[channum], 0, sizeof(channel_t));
-}
 
 /* This function loads the sound data from the WAD lump
  * for a single sound effect. */
-static void* I_SndLoadSample (const char* sfxname, int* len)
+static void* I_SndLoadSample(const char* sfxname, int* len)
 {
     int i, x, padded_sfx_len, sfxlump_num, sfxlump_len;
     char sfxlump_name[20];
@@ -164,21 +160,21 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
     if (sfxlump_len < 9)
         return 0;
 
-    // load it
-    sfxlump_data = W_CacheLumpNum (sfxlump_num);
-    sfxlump_sound = sfxlump_data + 8;
-    sfxlump_len -= 8;
+    /* load it */
+    sfxlump_data    = W_CacheLumpNum (sfxlump_num);
+    sfxlump_sound   = sfxlump_data + 8;
+    sfxlump_len    -= 8;
 
-    // get original sample rate from DMX header
-    memcpy (&orig_rate, sfxlump_data+2, 2);
-    orig_rate = SHORT (orig_rate);
+    /* get original sample rate from DMX header */
+    memcpy(&orig_rate, sfxlump_data+2, 2);
+    orig_rate       = SHORT (orig_rate);
 
-    times = 48000.0f / (float)orig_rate;
+    times           = 48000.0f / (float)orig_rate;
 
-    padded_sfx_len = ((sfxlump_len*R_ceil(times) + (SAMPLECOUNT_35-1)) / SAMPLECOUNT_35) * SAMPLECOUNT_35;
+    padded_sfx_len  = ((sfxlump_len * R_ceil(times) + (SAMPLECOUNT_35-1)) / SAMPLECOUNT_35) * SAMPLECOUNT_35;
     padded_sfx_data = (uint8_t*)malloc(padded_sfx_len);
 
-    for (i=0; i < padded_sfx_len; i++)
+    for (i = 0; i < padded_sfx_len; i++)
     {
         x = R_floor ((float)i/times);
 
@@ -193,7 +189,6 @@ static void* I_SndLoadSample (const char* sfxname, int* len)
     *len = padded_sfx_len;
     return (void *)(padded_sfx_data);
 }
-
 
 //
 // SFX API
@@ -215,14 +210,14 @@ void I_SetChannels(void)
    int i, j;
 
    /* Okay, reset internal mixing channels to zero. */
-   for (i=0; i<NUM_CHANNELS; i++)
-      I_SndMixResetChannel(i);
+   for (i = 0; i < NUM_CHANNELS; i++)
+      memset(&channels[i], 0, sizeof(channel_t));
 
    /* Generates volume lookup tables which also turn the unsigned
     * samples into signed samples. */
-   for (i=0 ; i<128 ; i++)
+   for (i = 0; i < 128; i++)
    {
-      for (j=0 ; j<256 ; j++)
+      for (j = 0; j < 256; j++)
          vol_lookup[i*256+j] = (i*(j-128)*256)/127;
    }
 }
@@ -230,16 +225,16 @@ void I_SetChannels(void)
 
 void I_SetSfxVolume(int volume)
 {
-  snd_SfxVolume = volume;
+   snd_SfxVolume = volume;
 }
 
 void I_SetMusicVolume(int volume)
 {
-  snd_MusicVolume = volume;
+   snd_MusicVolume = volume;
 
 #ifdef MUSIC_SUPPORT
-  if (current_player)
-    current_player->setvolume(volume);
+   if (current_player)
+      current_player->setvolume(volume);
 #endif
 }
 
@@ -248,7 +243,6 @@ void I_SetMusicVolume(int volume)
 int I_GetSfxLumpNum(sfxinfo_t* sfx)
 {
     char namebuf[9];
-
     sprintf(namebuf, "ds%s", sfx->name);
     return W_GetNumForName(namebuf);
 }
@@ -257,11 +251,11 @@ void I_StopSound (int handle)
 {
     int i;
 
-    for (i=0; i<NUM_CHANNELS; i++)
+    for (i = 0; i < NUM_CHANNELS; i++)
     {
-        if (channels[i].handle==handle)
+        if (channels[i].handle == handle)
         {
-            I_SndMixResetChannel(i);
+            memset(&channels[i], 0, sizeof(channel_t));
             return;
         }
     }
@@ -291,11 +285,11 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
         return -1;
 
     // Loop all channels to find a free slot.
-    slot = -1;
+    slot       = -1;
     oldesttics = gametic;
     oldestslot = 0;
 
-    for (i=0; i<NUM_CHANNELS; i++)
+    for (i = 0; i < NUM_CHANNELS; i++)
     {
         if (!channels[i].snd_start_ptr)  // not playing
         {
@@ -318,26 +312,26 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
 
     // Set pointers to raw sound data start & end.
     channels[slot].snd_start_ptr = (uint8_t*)S_sfx[id].data;
-    channels[slot].snd_end_ptr = channels[slot].snd_start_ptr + lengths[id];
+    channels[slot].snd_end_ptr   = channels[slot].snd_start_ptr + lengths[id];
 
     // Save starting gametic.
-    channels[slot].starttic = gametic;
+    channels[slot].starttic      = gametic;
 
     sep += 1;
 
     // Per left/right channel.
     //  x^2 seperation,
     //  adjust volume properly.
-    leftvol = vol - ((vol*sep*sep) >> 16); ///(256*256);
-    sep -= 257;
+    leftvol  = vol - ((vol*sep*sep) >> 16); ///(256*256);
+    sep     -= 257;
     rightvol = vol - ((vol*sep*sep) >> 16);
 
     // Sanity check, clamp volume.
     if (rightvol < 0 || rightvol > 127)
-	I_Error("addsfx: rightvol out of bounds");
+       I_Error("addsfx: rightvol out of bounds");
 
     if (leftvol < 0 || leftvol > 127)
-	I_Error("addsfx: leftvol out of bounds");
+       I_Error("addsfx: leftvol out of bounds");
 
     // Get the proper lookup table piece
     //  for this volume level???
@@ -351,12 +345,11 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     return currenthandle;
 }
 
-
 dbool   I_SoundIsPlaying (int handle)
 {
     int i;
 
-    for (i=0; i<NUM_CHANNELS; i++)
+    for (i = 0; i < NUM_CHANNELS; i++)
     {
         if (channels[i].handle==handle)
             return 1;
@@ -379,7 +372,6 @@ dbool   I_SoundIsPlaying (int handle)
 // This function currently supports only 16bit.
 //
 
-
 void I_UpdateSound(void)
 {
    // Mix current sound data. Data, from raw sound, for right and left.
@@ -388,21 +380,19 @@ void I_UpdateSound(void)
    int16_t mad_audio_buf[SAMPLECOUNT_35 * 2] = { 0 }; // initialize all zero
 
    // Pointers in global mixbuffer, left, right, end.
-   int16_t *leftout, *rightout, *leftend;
+   int16_t *leftend;
 
    // Left and right channel are in global mixbuffer, alternating.
-   leftout = mixbuffer;
-   rightout = mixbuffer+1;
-   step = 2;
-   frames = 0;
+   int16_t *leftout  = mixbuffer;
+   int16_t *rightout = mixbuffer+1;
+   step       = 2;
+   frames     = 0;
 
    out_frames = (tic_vars.sample_step)? tic_vars.sample_step : SAMPLECOUNT_35;
 
 #ifdef MUSIC_SUPPORT
    if (music_handle && current_player)
-   {
      current_player->render(mad_audio_buf, out_frames);
-   }
    else
 #endif
       memset(mad_audio_buf, 0, out_frames * 4);
@@ -418,7 +408,6 @@ void I_UpdateSound(void)
       // Reset left/right value.
       dl = mad_audio_buf[frames * 2 + 0];
       dr = mad_audio_buf[frames * 2 + 1];
-
 
       for (chan=0; chan<NUM_CHANNELS; chan++)
       {
@@ -436,7 +425,7 @@ void I_UpdateSound(void)
             channels[chan].snd_start_ptr++;
 
             if (!(channels[chan].snd_start_ptr < channels[chan].snd_end_ptr))
-               I_SndMixResetChannel (chan);
+               memset(&channels[chan], 0, sizeof(channel_t));
          }
       }
 
@@ -475,14 +464,14 @@ void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
 {
    int rightvol, leftvol, i;
 
-   for (i=0; i<NUM_CHANNELS; i++)
+   for (i = 0; i < NUM_CHANNELS; i++)
    {
       if (channels[i].handle==handle)
       {
-         sep += 1;
+         sep     += 1;
 
-         leftvol = vol - ((vol*sep*sep) >> 16); ///(256*256);
-         sep -= 257;
+         leftvol  = vol - ((vol*sep*sep) >> 16); ///(256*256);
+         sep     -= 257;
          rightvol = vol - ((vol*sep*sep) >> 16);
 
          if (rightvol < 0 || rightvol > 127)
@@ -513,26 +502,22 @@ void I_ShutdownSound(void)
    }
 }
 
-
 void I_InitSound(void)
 {
   int i;
 
-  memset (&lengths, 0, sizeof(int)*NUMSFX);
-  for (i=1 ; i<NUMSFX ; i++)
+  memset(&lengths, 0, sizeof(int)*NUMSFX);
+
+  for (i = 1; i < NUMSFX; i++)
   {
-    // Alias? Example is the chaingun sound linked to pistol.
-    if (!S_sfx[i].link)
-    {
-      // Load data from WAD file.
-      S_sfx[i].data = I_SndLoadSample( S_sfx[i].name, &lengths[i] );
-    }
-    else
-    {
-      // Previously loaded already?
-      S_sfx[i].data = S_sfx[i].link->data;
-      lengths[i] = lengths[(S_sfx[i].link - S_sfx)/sizeof(sfxinfo_t)];
-    }
+     // Alias? Example is the chaingun sound linked to pistol.
+     if (!S_sfx[i].link) // Load data from WAD file.
+        S_sfx[i].data = I_SndLoadSample( S_sfx[i].name, &lengths[i] );
+     else // Previously loaded already?
+     {
+        S_sfx[i].data = S_sfx[i].link->data;
+        lengths[i]    = lengths[(S_sfx[i].link - S_sfx)/sizeof(sfxinfo_t)];
+     }
   }
 
   I_SetChannels();
@@ -541,20 +526,18 @@ void I_InitSound(void)
     log_cb(RETRO_LOG_INFO, "I_InitSound: \n");
 }
 
-dbool   I_AnySoundStillPlaying(void)
+dbool I_AnySoundStillPlaying(void)
 {
-  int i;
-  dbool   result = false;
+   int i;
+   dbool   result = false;
 
-  for (i=0; i<MAX_CHANNELS; i++)
-    result |= channelinfo[i].data != NULL;
+   for (i = 0; i < MAX_CHANNELS; i++)
+      result |= channelinfo[i].data != NULL;
 
-  return result;
+   return result;
 }
 
-//
-// MUSIC API.
-//
+/* MUSIC API */
 
 static int	looping=0;
 static int	musicdies=-1;
@@ -562,21 +545,22 @@ static int	musicdies=-1;
 void I_PlaySong(int handle, int looping)
 {
   (void)handle;
-  musicdies = gametic + TICRATE*30; // ?
+  musicdies = gametic + TICRATE * 30;
 
 #ifdef MUSIC_SUPPORT
-  if (current_player) {
-    current_player->play(music_handle, looping);
-    current_player->setvolume(snd_MusicVolume);
+  if (current_player)
+  {
+     current_player->play(music_handle, looping);
+     current_player->setvolume(snd_MusicVolume);
   }
 #endif
 }
 
 void I_PauseSong (int handle)
 {
-  (void)handle;
-  if (current_player)
-    current_player->pause();
+   (void)handle;
+   if (current_player)
+      current_player->pause();
 }
 
 void I_ResumeSong (int handle)
@@ -584,7 +568,7 @@ void I_ResumeSong (int handle)
    (void)handle;
 #ifdef MUSIC_SUPPORT
    if (current_player)
-     current_player->resume();
+      current_player->resume();
 #endif
 }
 
@@ -595,8 +579,8 @@ void I_StopSong(int handle)
    looping   = 0;
    musicdies = 0;
 
-  if (current_player)
-    current_player->stop();
+   if (current_player)
+      current_player->stop();
 }
 
 void I_UnRegisterSong(int handle)
@@ -618,85 +602,81 @@ int I_RegisterSong(const void* data, size_t len)
   music_handle = NULL;
 
 #if defined(MUSIC_SUPPORT)
-
   // Now you can hear title music in deca.wad
   // http://www.doomworld.com/idgames/index.php?id=8808
   // Ability to use mp3 and ogg as inwad lump
 
   if (len > 4 && memcmp(data, "MUS", 3) != 0)
   {
-    // The header has no MUS signature
-    // Let's try to load this song with the music players
-    int i;
-    for (i = 0; i < NUM_MUS_PLAYERS; i++)
-    {
-      music_handle = music_players[i]->registersong(data, len);
-      if (music_handle) {
-        current_player = (music_player_t*)music_players[i];
-        break;
-      }
-    }
+     // The header has no MUS signature
+     // Let's try to load this song with the music players
+     int i;
+     for (i = 0; i < NUM_MUS_PLAYERS; i++)
+     {
+        music_handle = music_players[i]->registersong(data, len);
+        if (music_handle)
+        {
+           current_player = (music_player_t*)music_players[i];
+           break;
+        }
+     }
   }
 
   // e6y: from Chocolate-Doom
   // Assume a MUS file and try to convert
   if (!music_handle)
   {
-    MEMFILE *instream;
-    MEMFILE *outstream;
-    int result;
+     int result;
+     MEMFILE *instream  = mem_fopen_read(data, len);
+     MEMFILE *outstream = mem_fopen_write();
 
-    instream = mem_fopen_read(data, len);
-    outstream = mem_fopen_write();
+     // e6y: from chocolate-doom
+     // New mus -> mid conversion code thanks to Ben Ryves <benryves@benryves.com>
+     // This plays back a lot of music closer to Vanilla Doom - eg. tnt.wad map02
+     result = mus2mid(instream, outstream);
 
-    // e6y: from chocolate-doom
-    // New mus -> mid conversion code thanks to Ben Ryves <benryves@benryves.com>
-    // This plays back a lot of music closer to Vanilla Doom - eg. tnt.wad map02
-    result = mus2mid(instream, outstream);
+     if (result != 0)
+     {
+        size_t muslen = len;
+        const unsigned char *musptr = data;
 
-    if (result != 0)
-    {
-      size_t muslen = len;
-      const unsigned char *musptr = data;
-
-      // haleyjd 04/04/10: scan forward for a MUS header. Evidently DMX was
-      // capable of doing this, and would skip over any intervening data. That,
-      // or DMX doesn't use the MUS header at all somehow.
-      while (musptr < (const unsigned char*)data + len - sizeof(musheader))
-      {
-        // if we found a likely header start, reset the mus pointer to that location,
-        // otherwise just leave it alone and pray.
-        if (!strncmp((const char*)musptr, "MUS\x1a", 4))
+        // haleyjd 04/04/10: scan forward for a MUS header. Evidently DMX was
+        // capable of doing this, and would skip over any intervening data. That,
+        // or DMX doesn't use the MUS header at all somehow.
+        while (musptr < (const unsigned char*)data + len - sizeof(musheader))
         {
-          mem_fclose(instream);
-          instream = mem_fopen_read(musptr, muslen);
-          result = mus2mid(instream, outstream);
-          break;
+           // if we found a likely header start, reset the mus pointer to that location,
+           // otherwise just leave it alone and pray.
+           if (!strncmp((const char*)musptr, "MUS\x1a", 4))
+           {
+              mem_fclose(instream);
+              instream = mem_fopen_read(musptr, muslen);
+              result   = mus2mid(instream, outstream);
+              break;
+           }
+
+           musptr++;
+           muslen--;
         }
+     }
 
-        musptr++;
-        muslen--;
-      }
-    }
+     if (result == 0)
+     {
+        void *outbuf;
+        size_t outbuf_len;
+        mem_get_buf(outstream, &outbuf, &outbuf_len);
+        music_handle = opl_synth_player.registersong(outbuf, outbuf_len);
+        if(music_handle)
+           current_player = (music_player_t*)&opl_synth_player;
+     }
 
-    if (result == 0)
-    {
-      void *outbuf;
-      size_t outbuf_len;
-      mem_get_buf(outstream, &outbuf, &outbuf_len);
-      music_handle = opl_synth_player.registersong(outbuf, outbuf_len);
-      if(music_handle)
-        current_player = (music_player_t*)&opl_synth_player;
-    }
-
-    mem_fclose(instream);
-    mem_fclose(outstream);
+     mem_fclose(instream);
+     mem_fclose(outstream);
   }
 
-  // Failed to load
+  /* Failed to load */
   if (!music_handle)
-    lprintf(LO_ERROR, "I_RegisterSong: couldn't load music song.\n");
-
+     lprintf(LO_ERROR, "I_RegisterSong: couldn't load music song.\n");
 #endif
 
   return !!music_handle;
@@ -714,9 +694,7 @@ int I_QrySongPlaying(int handle)
 int I_RegisterMusicFile( const char* filename, musicinfo_t *song )
 {
 #ifdef MUSIC_SUPPORT
-  int len;
-
-  len = M_ReadFile(filename, (uint8_t**) &song_data);
+  int len = M_ReadFile(filename, (uint8_t**) &song_data);
   if (len == -1)
   {
      if (log_cb)
@@ -733,8 +711,8 @@ int I_RegisterMusicFile( const char* filename, musicinfo_t *song )
      return 1;
   }
 
-  song->data = 0;
-  song->handle = 0;
+  song->data    = 0;
+  song->handle  = 0;
   song->lumpnum = 0;
 #endif
   return 0;
@@ -745,51 +723,49 @@ int I_RegisterMusicFile( const char* filename, musicinfo_t *song )
 void I_ResampleStream (void *dest, unsigned nsamp, void (*proc)(void *dest, unsigned nsamp),
       unsigned sratein, unsigned srateout)
 {
-  unsigned i;
-  int                   j   = 0;
-  int16_t           *sout   = dest;
-  static int16_t     *sin   = NULL;
-  static unsigned sinsamp   = 0;
-  static unsigned remainder = 0;
-  unsigned step             = (sratein << 16) / (unsigned) srateout;
-  unsigned nreq             = (step * nsamp + remainder) >> 16;
+   unsigned i;
+   int                   j   = 0;
+   int16_t           *sout   = dest;
+   static int16_t     *sin   = NULL;
+   static unsigned sinsamp   = 0;
+   static unsigned remainder = 0;
+   unsigned step             = (sratein << 16) / (unsigned) srateout;
+   unsigned nreq             = (step * nsamp + remainder) >> 16;
 
-  if (nreq > sinsamp)
-  {
-    sin = realloc (sin, (nreq + 1) * 4);
-    if (!sinsamp) // avoid pop when first starting stream
-      sin[0] = sin[1] = 0;
-    sinsamp = nreq;
-  }
+   if (nreq > sinsamp)
+   {
+      sin = realloc(sin, (nreq + 1) * 4);
+      if (!sinsamp) // avoid pop when first starting stream
+         sin[0] = sin[1] = 0;
+      sinsamp = nreq;
+   }
 
-  proc (sin + 2, nreq);
+   proc (sin + 2, nreq);
 
-  for (i = 0; i < nsamp; i++)
-  {
-    *sout++ = ((unsigned) sin[j + 0] * (0x10000 - remainder) +
-               (unsigned) sin[j + 2] * remainder) >> 16;
-    *sout++ = ((unsigned) sin[j + 1] * (0x10000 - remainder) +
-               (unsigned) sin[j + 3] * remainder) >> 16;
-    remainder += step;
-    j += remainder >> 16 << 1;
-    remainder &= 0xffff;
-  }
-  sin[0] = sin[nreq * 2];
-  sin[1] = sin[nreq * 2 + 1];
+   for (i = 0; i < nsamp; i++)
+   {
+      *sout++ = ((unsigned) sin[j + 0] * (0x10000 - remainder) +
+            (unsigned) sin[j + 2] * remainder) >> 16;
+      *sout++ = ((unsigned) sin[j + 1] * (0x10000 - remainder) +
+            (unsigned) sin[j + 3] * remainder) >> 16;
+      remainder += step;
+      j += remainder >> 16 << 1;
+      remainder &= 0xffff;
+   }
+   sin[0] = sin[nreq * 2];
+   sin[1] = sin[nreq * 2 + 1];
 }
 
 void I_InitMusic(void)
 {
-  int i;
-  log_cb(RETRO_LOG_INFO, "I_InitMusic\n");
-
-  for (i = 0; music_players[i]; i++)
-    music_players[i]->init (SAMPLERATE);
+   int i;
+   for (i = 0; music_players[i]; i++)
+      music_players[i]->init (SAMPLERATE);
 }
 
 void I_ShutdownMusic(void)
 {
-  int i;
-  for (i = 0; music_players[i]; i++)
-    music_players[i]->shutdown ();
+   int i;
+   for (i = 0; music_players[i]; i++)
+      music_players[i]->shutdown ();
 }

@@ -272,16 +272,11 @@ void retro_set_rumble_touch(unsigned intensity, float duration)
 
 char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
 
-static void check_system_specs(void)
-{
-   unsigned level = 4;
-   environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
-}
-
 static bool libretro_supports_bitmasks = false;
 
 void retro_init(void)
 {
+   unsigned level = 4;
    enum retro_pixel_format rgb565;
    struct retro_log_callback log;
 
@@ -299,31 +294,11 @@ void retro_init(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
       libretro_supports_bitmasks = true;
 
-   check_system_specs();
+   environ_cb(RETRO_ENVIRONMENT_SET_PERFORMANCE_LEVEL, &level);
 }
 
 void retro_deinit(void)
 {
-   D_DoomDeinit();
-
-   if (screen_buf)
-      free(screen_buf);
-   screen_buf = NULL;
-
-   cheats_enabled = false;
-   cheats_pending = false;
-   if (cheats_pending_list)
-   {
-      unsigned i;
-      for (i = 0; i < RBUF_LEN(cheats_pending_list); i++)
-      {
-         if (cheats_pending_list[i])
-            free(cheats_pending_list[i]);
-         cheats_pending_list[i] = NULL;
-      }
-      RBUF_FREE(cheats_pending_list);
-   }
-
    libretro_supports_bitmasks = false;
 
    retro_set_rumble_damage(0, 0.0f);
@@ -359,7 +334,7 @@ void retro_get_system_info(struct retro_system_info *info)
    info->library_version  = "v2.5.0" GIT_VERSION;
    info->need_fullpath    = true;
    info->valid_extensions = "wad|iwad|pwad|lmp";
-   info->block_extract = false;
+   info->block_extract    = false;
 }
 
 void retro_get_system_av_info(struct retro_system_av_info *info)
@@ -421,11 +396,11 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
       info->timing.fps = TICRATE;
       break;
   }
-  info->timing.sample_rate = 44100.0;
-  info->geometry.base_width = SCREENWIDTH;
-  info->geometry.base_height = SCREENHEIGHT;
-  info->geometry.max_width = SCREENWIDTH;
-  info->geometry.max_height = SCREENHEIGHT;
+  info->timing.sample_rate    = 44100.0;
+  info->geometry.base_width   = SCREENWIDTH;
+  info->geometry.base_height  = SCREENHEIGHT;
+  info->geometry.max_width    = SCREENWIDTH;
+  info->geometry.max_height   = SCREENHEIGHT;
   info->geometry.aspect_ratio = 4.0 / 3.0;
 }
 
@@ -535,11 +510,9 @@ static void update_variables(bool startup)
          char str[100];
          strlcpy(str, var.value, sizeof(str));
 
-         pch = strtok(str, "x");
-         if (pch)
+         if ((pch = strtok(str, "x")))
             SCREENWIDTH = strtoul(pch, NULL, 0);
-         pch = strtok(NULL, "x");
-         if (pch)
+         if ((pch = strtok(NULL, "x")))
             SCREENHEIGHT = strtoul(pch, NULL, 0);
 
          if (log_cb)
@@ -721,17 +694,14 @@ static wadinfo_t get_wadinfo(const char *path)
    return header;
 }
 
-bool I_PreInitGraphics(void)
-{
-   screen_buf = malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
-   return (screen_buf != NULL);
-}
-
 bool retro_load_game(const struct retro_game_info *info)
 {
    unsigned i;
    int argc = 0;
    static char *argv[32] = {NULL};
+
+   for (i = 0; i < 32; i++)
+      argv[0] = NULL;
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble))
    {
@@ -744,6 +714,7 @@ bool retro_load_game(const struct retro_game_info *info)
    update_variables(true);
 
    argv[argc++] = strdup("prboom");
+
    if(info->path)
    {
       wadinfo_t header;
@@ -765,65 +736,63 @@ bool retro_load_game(const struct retro_game_info *info)
       }
       else
       {
-        header = get_wadinfo(info->path);
-        // header.identification is static array, always non-NULL, but it might be empty if it couldn't be read
-        if(header.identification[0] == 0)
-        {
-          I_Error("retro_load_game: couldn't read WAD header from '%s'", info->path);
-          goto failed;
-        }
-        if(!strncmp(header.identification, "IWAD", 4))
-        {
-          argv[argc++] = strdup("-iwad");
-          argv[argc++] = strdup(g_basename);
-        }
-        else if(!strncmp(header.identification, "PWAD", 4))
-        {
-          argv[argc++] = strdup("-file");
-          argv[argc++] = strdup(info->path);
-        }
-        else {
-          I_Error("retro_load_game: invalid WAD header '%.*s'", 4, header.identification);
-          goto failed;
-        }
+         header = get_wadinfo(info->path);
+         // header.identification is static array, always non-NULL, but it might be empty if it couldn't be read
+         if(header.identification[0] == 0)
+         {
+            I_Error("retro_load_game: couldn't read WAD header from '%s'", info->path);
+            goto failed;
+         }
+         if(!strncmp(header.identification, "IWAD", 4))
+         {
+            argv[argc++] = strdup("-iwad");
+            argv[argc++] = strdup(g_basename);
+         }
+         else if(!strncmp(header.identification, "PWAD", 4))
+         {
+            argv[argc++] = strdup("-file");
+            argv[argc++] = strdup(info->path);
+         }
+         else
+         {
+            I_Error("retro_load_game: invalid WAD header '%.*s'", 4, header.identification);
+            goto failed;
+         }
 
-        /* Check for DEH or BEX files */
-        if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))
-           || (deh = FindFileInDir(g_wad_dir, name_without_ext, ".bex")))
-        {
-          argv[argc++] = "-deh";
-          argv[argc++] = deh;
-        };
+         /* Check for DEH or BEX files */
+         if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))
+               || (deh = FindFileInDir(g_wad_dir, name_without_ext, ".bex")))
+         {
+            argv[argc++] = "-deh";
+            argv[argc++] = deh;
+         }
 
-        if((baseconfig = FindFileInDir(g_wad_dir, name_without_ext, ".prboom.cfg"))
-         || (baseconfig = I_FindFile("prboom.cfg", NULL)))
-        {
-          argv[argc++] = "-baseconfig";
-          argv[argc++] = baseconfig;
-        }
+         if((baseconfig = FindFileInDir(g_wad_dir, name_without_ext, ".prboom.cfg"))
+               || (baseconfig = I_FindFile("prboom.cfg", NULL)))
+         {
+            argv[argc++] = "-baseconfig";
+            argv[argc++] = baseconfig;
+         }
       }
 
       // Get save directory
       if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)
-		{
-			if (base_save_dir && strlen(base_save_dir) > 0)
-			{
-				// > Build save path
-				snprintf(g_save_dir, sizeof(g_save_dir), "%s%c%s", base_save_dir, DIR_SLASH, name_without_ext);
-				use_external_savedir = true;
+      {
+         if (base_save_dir && strlen(base_save_dir) > 0)
+         {
+            // > Build save path
+            snprintf(g_save_dir, sizeof(g_save_dir), "%s%c%s", base_save_dir, DIR_SLASH, name_without_ext);
+            use_external_savedir = true;
 
-				// > Create save directory, if required
-				if (!path_is_directory(g_save_dir))
-				{
-					use_external_savedir = path_mkdir(g_save_dir);
-				}
-			}
-		}
-      if (!use_external_savedir)
-		{
-			// > Use WAD directory fallback...
-			strlcpy(g_save_dir, g_wad_dir, sizeof(g_save_dir));
-		}
+            // > Create save directory, if required
+            if (!path_is_directory(g_save_dir))
+               use_external_savedir = path_mkdir(g_save_dir);
+         }
+      }
+
+       // > Use WAD directory fallback...
+       if (!use_external_savedir)
+          strlcpy(g_save_dir, g_wad_dir, sizeof(g_save_dir));
    }
 
 #if DEBUG
@@ -835,7 +804,8 @@ bool retro_load_game(const struct retro_game_info *info)
    myargv = (const char **) argv;
 
    /* cphipps - call to video specific startup code */
-   if (!I_PreInitGraphics())
+   screen_buf = (unsigned char*)malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
+   if (!screen_buf)
       goto failed;
 
    if (!D_DoomMainSetup())
@@ -862,7 +832,8 @@ failed:
       if (environ_cb)
          environ_cb(RETRO_ENVIRONMENT_SET_MESSAGE, (void*)&msg);
    }
-   if (screen_buf) {
+   if (screen_buf)
+   {
       free(screen_buf);
       screen_buf = NULL;
    }
@@ -870,9 +841,30 @@ failed:
    return false;
 }
 
-
 void retro_unload_game(void)
 {
+   D_DoomDeinit();
+
+   cheats_enabled = false;
+   cheats_pending = false;
+   if (cheats_pending_list)
+   {
+      unsigned i;
+      for (i = 0; i < RBUF_LEN(cheats_pending_list); i++)
+      {
+         if (cheats_pending_list[i])
+            free(cheats_pending_list[i]);
+         cheats_pending_list[i] = NULL;
+      }
+      RBUF_FREE(cheats_pending_list);
+   }
+
+   if (screen_buf)
+      free(screen_buf);
+   screen_buf = NULL;
+
+   myargc     = 0;
+   myargv     = NULL;
 }
 
 unsigned retro_get_region(void)
@@ -985,31 +977,34 @@ bool retro_serialize(void *data_, size_t size)
   unsigned i;
   struct extra_serialize *extra = data_;
 
-  if (gamestate == GS_LEVEL) {
-    int ret = G_DoSaveGameToBuffer((char *) data_ + sizeof(*extra),
-				   size - sizeof(*extra));
-    if (!ret) {
-      return false;
-    }
-    if (viewplayer && viewplayer->mo) {
-      extra->prevx = viewplayer->mo->PrevX;
-      extra->prevy = viewplayer->mo->PrevY;
-      extra->prevz = viewplayer->prev_viewz;
-      extra->prevangle = viewplayer->prev_viewangle;
-      extra->prevpitch = viewplayer->prev_viewpitch;
-    }
+  if (gamestate == GS_LEVEL)
+  {
+     int ret = G_DoSaveGameToBuffer((char *) data_ + sizeof(*extra),
+           size - sizeof(*extra));
+     if (!ret)
+        return false;
+
+     if (viewplayer && viewplayer->mo)
+     {
+        extra->prevx = viewplayer->mo->PrevX;
+        extra->prevy = viewplayer->mo->PrevY;
+        extra->prevz = viewplayer->prev_viewz;
+        extra->prevangle = viewplayer->prev_viewangle;
+        extra->prevpitch = viewplayer->prev_viewpitch;
+     }
   }
-  extra->gametic = gametic;
+
+  extra->gametic     = gametic;
   extra->gameticfrac = tic_vars.frac;
-  extra->gameaction = gameaction;
-  extra->turnheld = turnheld;
-  extra->extra_size = sizeof(*extra);
-  extra->autorun = autorun;
-  extra->gamestate = gamestate;
+  extra->gameaction  = gameaction;
+  extra->turnheld    = turnheld;
+  extra->extra_size  = sizeof(*extra);
+  extra->autorun     = autorun;
+  extra->gamestate   = gamestate;
   extra->FinaleStage = FinaleStage;
   extra->FinaleCount = FinaleCount;
-  extra->itemOn = itemOn;
-  extra->whichSkull = whichSkull;
+  extra->itemOn      = itemOn;
+  extra->whichSkull  = whichSkull;
   extra->currentMenu = 0;
   extra->set_menu_itemon = set_menu_itemon;
   extra->menuactive = menuactive;
@@ -1030,59 +1025,52 @@ bool retro_unserialize(const void *data_, size_t size)
   int gameless = 0;
   if (extra->extra_size == sizeof(*extra))
     gameless = (extra->gamestate != GS_LEVEL);
-  if (!gameless) {
-    int ret = G_DoLoadGameFromBuffer((char *) data_ + extra->extra_size,
-				     size - extra->extra_size);
-    if (!ret)
-      return false;
+  if (!gameless)
+  {
+     int ret = G_DoLoadGameFromBuffer((char *) data_ + extra->extra_size,
+           size - extra->extra_size);
+     if (!ret)
+        return false;
 
-    if (viewplayer && viewplayer->mo) {
-      viewplayer->mo->PrevX = extra->prevx;
-      viewplayer->mo->PrevY = extra->prevy;
-      viewplayer->prev_viewz = extra->prevz;
-      viewplayer->prev_viewangle = extra->prevangle;
-      viewplayer->prev_viewpitch = extra->prevpitch;
-    }
+     if (viewplayer && viewplayer->mo)
+     {
+        viewplayer->mo->PrevX = extra->prevx;
+        viewplayer->mo->PrevY = extra->prevy;
+        viewplayer->prev_viewz = extra->prevz;
+        viewplayer->prev_viewangle = extra->prevangle;
+        viewplayer->prev_viewpitch = extra->prevpitch;
+     }
   }
+
   if (extra->extra_size == sizeof(*extra))
-    {
-      unsigned i;
-      gametic = maketic = extra->gametic;
-      gameaction = extra->gameaction;
-      turnheld = extra->turnheld;
-      autorun = extra->autorun;
-      gamestate = extra->gamestate;
-      FinaleStage = extra->FinaleStage;
-      FinaleCount = extra->FinaleCount;
-      WI_Load(&extra->wi_state);
-      itemOn = extra->itemOn;
-      whichSkull = extra->whichSkull;
-      currentMenu = menus[extra->currentMenu];
-      set_menu_itemon = extra->set_menu_itemon;
-      for (i = 0; i < NUMKEYS; i++)
-	gamekeydown[i] = extra->gamekeydown[i];
-      for (i = 0; i < MAX_BUTTON_BINDS; i++)
-	old_input[i] = extra->old_input[i];
-      menuactive = extra->menuactive;
-      tic_vars.frac = extra->gameticfrac;
-    }
+  {
+     unsigned i;
+     gametic = maketic = extra->gametic;
+     gameaction = extra->gameaction;
+     turnheld = extra->turnheld;
+     autorun = extra->autorun;
+     gamestate = extra->gamestate;
+     FinaleStage = extra->FinaleStage;
+     FinaleCount = extra->FinaleCount;
+     WI_Load(&extra->wi_state);
+     itemOn = extra->itemOn;
+     whichSkull = extra->whichSkull;
+     currentMenu = menus[extra->currentMenu];
+     set_menu_itemon = extra->set_menu_itemon;
+     for (i = 0; i < NUMKEYS; i++)
+        gamekeydown[i] = extra->gamekeydown[i];
+     for (i = 0; i < MAX_BUTTON_BINDS; i++)
+        old_input[i] = extra->old_input[i];
+     menuactive = extra->menuactive;
+     tic_vars.frac = extra->gameticfrac;
+  }
+
   return true;
 }
 
-void *retro_get_memory_data(unsigned id)
-{
-   (void)id;
-   return NULL;
-}
-
-size_t retro_get_memory_size(unsigned id)
-{
-   (void)id;
-   return 0;
-}
-
-void retro_cheat_reset(void)
-{}
+void *retro_get_memory_data(unsigned id) { return NULL; }
+size_t retro_get_memory_size(unsigned id) { return 0; }
+void retro_cheat_reset(void) { }
 
 void retro_cheat_set(unsigned index, bool enabled, const char *code)
 {
@@ -1266,13 +1254,14 @@ static int keyboard_lut[117][2] = {
 // > Now that we process input once per game tic, the period here must
 //   match the internal tic rate (corresponding to default 35fps)
 static const int pwm_period = TICRATE;
+
 static bool synthetic_pwm(int amplitude, int* modulation_state)
 {
-	*modulation_state += amplitude;
-	if (*modulation_state < pwm_period)
-		return false;
-	*modulation_state -= pwm_period;
-	return true;
+   *modulation_state += amplitude;
+   if (*modulation_state < pwm_period)
+      return false;
+   *modulation_state -= pwm_period;
+   return true;
 }
 
 static void process_gamepad_buttons(int16_t ret, unsigned num_buttons, action_lut_t action_lut[])
@@ -1306,64 +1295,66 @@ static void process_gamepad_buttons(int16_t ret, unsigned num_buttons, action_lu
 
 static void process_gamepad_left_analog(void)
 {
-	unsigned i;
-	static bool old_input_analog_l[4];
-	bool new_input_analog_l[4];
-	int analog_l_amplitude[4];
-	static int analog_l_modulation_state[4];
-	int lsx, lsy, analog_range;
+   unsigned i;
+   static bool old_input_analog_l[4];
+   bool new_input_analog_l[4];
+   int analog_l_amplitude[4];
+   static int analog_l_modulation_state[4];
+   int lsx, lsy, analog_range;
 
-	// Only run once per game tic
-	if(tic_vars.frac < FRACUNIT) return;
-	// Increase range on menu
-	analog_range = (menuactive)? ANALOG_RANGE*8 : ANALOG_RANGE;
+   // Only run once per game tic
+   if (tic_vars.frac < FRACUNIT)
+      return;
+   // Increase range on menu
+   analog_range = (menuactive)? ANALOG_RANGE*8 : ANALOG_RANGE;
 
-	lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
-	lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
+   lsx = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X);
+   lsy = input_state_cb(0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y);
 
-	// Get movement 'amplitude' on each axis
-	// > x-axis
-	analog_l_amplitude[0] = 0;
-	analog_l_amplitude[1] = 0;
-	if (lsx > analog_deadzone)
-	{
-		// Add '1' to deal with float->int rounding accuracy loss...
-		// (Similarly, subtract '1' when lsx is negative...)
-		analog_l_amplitude[0] = 1 + pwm_period * (lsx - analog_deadzone) / (analog_range - analog_deadzone);
-	}
-	if (lsx < -analog_deadzone)
-		analog_l_amplitude[1] = -1 * (-1 + pwm_period * (lsx + analog_deadzone) / (analog_range - analog_deadzone));
-	// > y-axis
-	analog_l_amplitude[2] = 0;
-	analog_l_amplitude[3] = 0;
-	if (lsy > analog_deadzone)
-		analog_l_amplitude[2] = 1 + pwm_period * (lsy - analog_deadzone) / (analog_range - analog_deadzone);
-	if (lsy < -analog_deadzone)
-		analog_l_amplitude[3] = -1 * (-1 + pwm_period * (lsy + analog_deadzone) / (analog_range - analog_deadzone));
+   // Get movement 'amplitude' on each axis
+   // > x-axis
+   analog_l_amplitude[0] = 0;
+   analog_l_amplitude[1] = 0;
 
-	for (i = 0; i < 4; i++)
-	{
-		event_t event = {0};
+   // Add '1' to deal with float->int rounding accuracy loss...
+   // (Similarly, subtract '1' when lsx is negative...)
+   if (lsx > analog_deadzone)
+      analog_l_amplitude[0] = 1 + pwm_period * (lsx - analog_deadzone) / (analog_range - analog_deadzone);
 
-		new_input_analog_l[i] = synthetic_pwm(analog_l_amplitude[i], &analog_l_modulation_state[i]);
+   if (lsx < -analog_deadzone)
+      analog_l_amplitude[1] = -1 * (-1 + pwm_period * (lsx + analog_deadzone) / (analog_range - analog_deadzone));
+   // > y-axis
+   analog_l_amplitude[2] = 0;
+   analog_l_amplitude[3] = 0;
+   if (lsy > analog_deadzone)
+      analog_l_amplitude[2] = 1 + pwm_period * (lsy - analog_deadzone) / (analog_range - analog_deadzone);
+   if (lsy < -analog_deadzone)
+      analog_l_amplitude[3] = -1 * (-1 + pwm_period * (lsy + analog_deadzone) / (analog_range - analog_deadzone));
 
-		if(new_input_analog_l[i] && !old_input_analog_l[i])
-		{
-			event.type = ev_keydown;
-			event.data1 = *((menuactive)? left_analog_lut[i].menukey : left_analog_lut[i].gamekey);
-		}
+   for (i = 0; i < 4; i++)
+   {
+      event_t event = {0};
 
-		if(!new_input_analog_l[i] && old_input_analog_l[i])
-		{
-			event.type = ev_keyup;
-			event.data1 = *((menuactive)? left_analog_lut[i].menukey : left_analog_lut[i].gamekey);;
-		}
+      new_input_analog_l[i] = synthetic_pwm(analog_l_amplitude[i], &analog_l_modulation_state[i]);
 
-		if(event.type == ev_keydown || event.type == ev_keyup)
-			D_PostEvent(&event);
+      if(new_input_analog_l[i] && !old_input_analog_l[i])
+      {
+         event.type  = ev_keydown;
+         event.data1 = *((menuactive)? left_analog_lut[i].menukey : left_analog_lut[i].gamekey);
+      }
 
-		old_input_analog_l[i] = new_input_analog_l[i];
-	}
+      if(!new_input_analog_l[i] && old_input_analog_l[i])
+      {
+         event.type  = ev_keyup;
+         event.data1 = *((menuactive)? left_analog_lut[i].menukey : left_analog_lut[i].gamekey);;
+      }
+
+      if(      event.type == ev_keydown 
+            || event.type == ev_keyup)
+         D_PostEvent(&event);
+
+      old_input_analog_l[i] = new_input_analog_l[i];
+   }
 }
 
 static void process_gamepad_right_analog(bool pressed_y, bool pressed_l2)
@@ -1550,12 +1541,12 @@ process_input(void)
    }
 }
 
-void I_StartTic (void)
+void I_StartTic(void)
 {
-  if (!input_poll_cb)
-    return;
-  input_poll_cb();
-  process_input();
+   if (!input_poll_cb)
+      return;
+   input_poll_cb();
+   process_input();
 }
 
 static void I_UpdateVideoMode(void)
@@ -1581,13 +1572,11 @@ void I_FinishUpdate (void)
    video_cb(screen_buf, SCREENWIDTH, SCREENHEIGHT, SCREENPITCH);
 }
 
-void I_SetPalette (int pal)
-{
-}
+void I_SetPalette(int pal) { }
 
 void I_InitGraphics(void)
 {
-   static int    firsttime=1;
+   static int firsttime=1;
 
    if (firsttime)
    {
@@ -1595,7 +1584,6 @@ void I_InitGraphics(void)
 
       /* Set the video mode */
       I_UpdateVideoMode();
-
    }
 }
 
@@ -1660,7 +1648,7 @@ const char *I_DoomExeDir(void)
 *
 * cphipps - simple test for trailing slash on dir names
 */
-dbool   HasTrailingSlash(const char* dn)
+dbool HasTrailingSlash(const char* dn)
 {
   size_t dn_len = strlen(dn);
   return ( dn && ((dn[dn_len - 1] == '/') || (dn[dn_len - 1] == '\\')));
@@ -1682,7 +1670,7 @@ char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
    {
       if (!(p = malloc(pl)))
          return NULL;
-      sprintf(p, "%s", wfname);
+      strcpy(p, wfname);
    }
    else
    {
@@ -1725,32 +1713,33 @@ char* I_FindFile(const char* wfname, const char* ext)
      environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
      if (system_dir && (prboom_system_dir = malloc(strlen(system_dir) + 8)))
      {
-       sprintf(prboom_system_dir, "%s%c%s", system_dir, DIR_SLASH, "prboom");
-       p = FindFileInDir(prboom_system_dir, wfname, ext);
-       free(prboom_system_dir);
-       if (!p)
-         p = FindFileInDir(system_dir, wfname, ext);
+        sprintf(prboom_system_dir, "%s%c%s", system_dir, DIR_SLASH, "prboom");
+        p = FindFileInDir(prboom_system_dir, wfname, ext);
+        free(prboom_system_dir);
+        prboom_system_dir = NULL;
+        if (!p)
+           p = FindFileInDir(system_dir, wfname, ext);
      }
 
      // If not found, check on parent folders recursively (if configured to do so)
      if (!p && find_recursive_on)
      {
-       if ((dir = malloc(strlen(g_wad_dir) + 1)) != NULL)
-       {
-         strcpy(dir, g_wad_dir);
-         for (i = strlen(dir)-1; i > 1; dir[i--] = '\0')
-         {
-           if((dir[i] == '/' || dir[i] == '\\')
-              && dir[i-1] != dir[i])
+        if ((dir = malloc(strlen(g_wad_dir) + 1)) != NULL)
+        {
+           strcpy(dir, g_wad_dir);
+           for (i = strlen(dir)-1; i > 1; dir[i--] = '\0')
            {
-             dir[i] = '\0'; // remove leading slash
-             p = FindFileInDir(dir, wfname, ext);
-             if(p != NULL)
-                break;
+              if((dir[i] == '/' || dir[i] == '\\')
+                    && dir[i-1] != dir[i])
+              {
+                 dir[i] = '\0'; // remove leading slash
+                 p = FindFileInDir(dir, wfname, ext);
+                 if(p != NULL)
+                    break;
+              }
            }
-         }
-         free(dir);
-       }
+           free(dir);
+        }
      }
    }
    return p;
@@ -1813,27 +1802,27 @@ int lprintf(OutputLevels pri, const char *s, ...)
 
   if (log_cb)
   {
-    enum retro_log_level lvl;
-    switch(pri)
-    {
-       case LO_DEBUG:   
-          lvl = RETRO_LOG_DEBUG;
-          break;
-       case LO_CONFIRM:
-       case LO_INFO:
-          lvl = RETRO_LOG_INFO;
-          break;
-       case LO_WARN:
-          lvl = RETRO_LOG_WARN;
-          break;
-       case LO_ERROR:
-       case LO_FATAL:
-       default:
-          lvl = RETRO_LOG_ERROR;
-          break;
-    }
+     enum retro_log_level lvl;
+     switch(pri)
+     {
+        case LO_DEBUG:   
+           lvl = RETRO_LOG_DEBUG;
+           break;
+        case LO_CONFIRM:
+        case LO_INFO:
+           lvl = RETRO_LOG_INFO;
+           break;
+        case LO_WARN:
+           lvl = RETRO_LOG_WARN;
+           break;
+        case LO_ERROR:
+        case LO_FATAL:
+        default:
+           lvl = RETRO_LOG_ERROR;
+           break;
+     }
 
-    log_cb(lvl, "%s", msg);
+     log_cb(lvl, "%s", msg);
   }
 
   return 0;

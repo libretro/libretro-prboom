@@ -270,7 +270,47 @@ void retro_set_rumble_touch(unsigned intensity, float duration)
    rumble_touch_strength = strength;
 }
 
-char* FindFileInDir(const char* dir, const char* wfname, const char* ext);
+/**
+ * FindFileInDir
+ **
+ * Checks if directory contains a file with given name and extension.
+ * returns the path to the file if it exists and is readable or NULL otherwise
+ */
+static char *FindFileInDir(const char* dir, const char* wfname, const char* ext)
+{
+   char * p;
+   /* Precalculate a length we will need in the loop */
+   size_t pl = strlen(wfname) + (ext ? strlen(ext) : 0) + 4;
+
+   if(!dir)
+   {
+      if (!(p = malloc(pl)))
+         return NULL;
+      strcpy(p, wfname);
+   }
+   else
+   {
+     if (!(p = malloc(strlen(dir) + pl)))
+        return NULL;
+     sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
+   }
+
+   if (ext && ext[0] != '\0')
+      strcat(p, ext);
+
+   if (path_is_valid(p))
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_DEBUG, "FindFileInDir: found %s\n", p);
+      return p;
+   }
+   else if (log_cb)
+      log_cb(RETRO_LOG_ERROR, "FindFileInDir: not found %s in %s\n", wfname, dir);
+
+   free(p);
+   return NULL;
+}
+
 
 static bool libretro_supports_bitmasks = false;
 
@@ -1652,47 +1692,6 @@ dbool HasTrailingSlash(const char* dn)
 {
   size_t dn_len = strlen(dn);
   return ( dn && ((dn[dn_len - 1] == '/') || (dn[dn_len - 1] == '\\')));
-}
-
-/**
- * FindFileInDir
- **
- * Checks if directory contains a file with given name and extension.
- * returns the path to the file if it exists and is readable or NULL otherwise
- */
-char* FindFileInDir(const char* dir, const char* wfname, const char* ext)
-{
-   char * p;
-   /* Precalculate a length we will need in the loop */
-   size_t pl = strlen(wfname) + (ext ? strlen(ext) : 0) + 4;
-
-   if(!dir)
-   {
-      if (!(p = malloc(pl)))
-         return NULL;
-      strcpy(p, wfname);
-   }
-   else
-   {
-     if (!(p = malloc(strlen(dir) + pl)))
-        return NULL;
-     sprintf(p, "%s%c%s", dir, DIR_SLASH, wfname);
-   }
-
-   if (ext && ext[0] != '\0')
-      strcat(p, ext);
-
-   if (path_is_valid(p))
-   {
-      if (log_cb)
-         log_cb(RETRO_LOG_DEBUG, "FindFileInDir: found %s\n", p);
-      return p;
-   }
-   else if (log_cb)
-      log_cb(RETRO_LOG_ERROR, "FindFileInDir: not found %s in %s\n", wfname, dir);
-
-   free(p);
-   return NULL;
 }
 
 /*

@@ -512,14 +512,11 @@ static void cheat_mypos()
 }
 
 // cph - cheat to toggle frame rate/rendering stats display
-static void cheat_rate()
-{
-  rendering_stats ^= 1;
-}
+static void cheat_rate(void) { }
 
 // compatibility cheat
 
-static void cheat_comp()
+static void cheat_comp(void)
 {
   // CPhipps - modified for new compatibility system
   compatibility_level++; compatibility_level %= MAX_COMPATIBILITY_LEVEL;

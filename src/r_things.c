@@ -992,7 +992,6 @@ void R_DrawMasked(void)
 
    // draw all vissprites back to front
 
-   rendered_vissprites = num_vissprite;
    for (i = num_vissprite ;--i>=0; )
       R_DrawSprite(vissprite_ptrs[i]);         // killough
 

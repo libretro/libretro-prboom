@@ -620,12 +620,6 @@ static void R_SetupFrame (player_t *player)
 int autodetect_hom = 0;       // killough 2/7/98: HOM autodetection flag
 
 //
-// R_ShowStats
-//
-int rendered_visplanes, rendered_segs, rendered_vissprites;
-dbool   rendering_stats;
-
-//
 // R_RenderView
 //
 void R_RenderPlayerView (player_t* player)
@@ -638,7 +632,6 @@ void R_RenderPlayerView (player_t* player)
   R_ClearPlanes ();
   R_ClearSprites ();
 
-  rendered_segs = rendered_visplanes = 0;
     if (autodetect_hom)
     { // killough 2/10/98: add flashing red HOM indicators
       unsigned char color=(gametic % 20) < 9 ? 0xb0 : 0;

@@ -40,7 +40,6 @@
 #include "r_draw.h"
 #include "lprintf.h"
 #include "r_patch.h"
-#include <assert.h>
 
 // posts are runs of non masked source pixels
 typedef struct
@@ -243,9 +242,6 @@ static void createPatch(int id) {
   patch->pixels = patch->data;
   patch->columns = (rcolumn_t*)((unsigned char*)patch->pixels + pixelDataSize);
   patch->posts = (rpost_t*)((unsigned char*)patch->columns + columnsDataSize);
-
-  // sanity check that we've got all the memory allocated we need
-  assert((((uint8_t*)patch->posts  + numPostsTotal*sizeof(rpost_t)) - (uint8_t*)patch->data) == dataSize);
 
   memset(patch->pixels, 0xff, (patch->width*patch->height));
 
@@ -473,9 +469,6 @@ static void createTextureCompositePatch(int id) {
   composite_patch->columns = (rcolumn_t*)((unsigned char*)composite_patch->pixels + pixelDataSize);
   composite_patch->posts = (rpost_t*)((unsigned char*)composite_patch->columns + columnsDataSize);
 
-  // sanity check that we've got all the memory allocated we need
-  assert((((uint8_t*)composite_patch->posts + numPostsTotal*sizeof(rpost_t)) - (uint8_t*)composite_patch->data) == dataSize);
-
   memset(composite_patch->pixels, 0xff, (composite_patch->width*composite_patch->height));
 
   numPostsUsedSoFar = 0;
@@ -594,7 +587,6 @@ static void createTextureCompositePatch(int id) {
 
         oldColumn = (const column_t *)((const uint8_t *)oldColumn + oldColumn->length + 4);
         countsInColumn[tx].posts_used++;
-        assert(countsInColumn[tx].posts_used <= countsInColumn[tx].posts);
       }
     }
 

@@ -292,7 +292,7 @@ void Z_ChangeTag(void *ptr, int tag)
 
 void *Z_Realloc(void *ptr, size_t n, int tag, void **user)
 {
-   void *p = (Z_Malloc)(n, tag, user DA(file, line));
+   void *p = (Z_Malloc)(n, tag, user);
    if (ptr)
    {
       memblock_t *block = (memblock_t *)((uint8_t*) ptr - HEADER_SIZE);
@@ -305,7 +305,7 @@ void *Z_Realloc(void *ptr, size_t n, int tag, void **user)
         memset((char*)p+block->size, 0, n - block->size);
       }
 
-      (Z_Free)(ptr DA(file, line));
+      (Z_Free)(ptr);
       if (user) // in case Z_Free nullified same user
          *user=p;
    }
@@ -315,13 +315,13 @@ void *Z_Realloc(void *ptr, size_t n, int tag, void **user)
 void *Z_Calloc(size_t n1, size_t n2, int tag, void **user)
 {
    if (n1 *= n2)
-      return memset((Z_Malloc)(n1, tag, user DA(file, line)), 0, n1);
+      return memset((Z_Malloc)(n1, tag, user), 0, n1);
    return NULL;
 }
 
 char *Z_Strdup(const char *s, int tag, void **user)
 {
-   return strcpy((Z_Malloc)(strlen(s)+1, tag, user DA(file, line)), s);
+   return strcpy((Z_Malloc)(strlen(s)+1, tag, user), s);
 }
 
 void Z_SetPurgeLimit(int size)

@@ -618,8 +618,6 @@ static void G_DoLoadLevel (void)
     displayplayer = consoleplayer;    /* view the guy you are playing */
   gameaction = ga_nothing;
 
-  Z_CheckHeap ();
-
   /* clear cmd building stuff */
   memset (gamekeydown, 0, sizeof(gamekeydown));
   mousex = mousey = 0;
@@ -1932,10 +1930,7 @@ static int G_DoSaveGameToSaveBuffer() {
   // killough 11/98: save revenant tracer state
   *save_p++ = (gametic-basetic) & 255;
 
-  // killough 3/22/98: add Z_CheckHeap after each call to ensure consistency
-  Z_CheckHeap();
   P_ArchivePlayers();
-  Z_CheckHeap();
 
   // phares 9/13/98: Move mobj_t->index out of P_ArchiveThinkers so the
   // indices can be used by P_ArchiveWorld when the sectors are saved.
@@ -1944,7 +1939,6 @@ static int G_DoSaveGameToSaveBuffer() {
   P_ThinkerToIndex();
 
   P_ArchiveWorld();
-  Z_CheckHeap();
   P_ArchiveThinkers();
 
   // phares 9/13/98: Move index->mobj_t out of P_ArchiveThinkers, simply
@@ -1952,17 +1946,13 @@ static int G_DoSaveGameToSaveBuffer() {
 
   P_IndexToThinker();
 
-  Z_CheckHeap();
   P_ArchiveSpecials();
   P_ArchiveRNG();    // killough 1/18/98: save RNG information
-  Z_CheckHeap();
   P_ArchiveMap();    // killough 1/22/98: save automap information
 
   *save_p++ = 0xe6;   // consistancy marker
 
   length = save_p - savebuffer;
-
-  Z_CheckHeap();
 
   return length;
 }

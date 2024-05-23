@@ -80,7 +80,6 @@
 typedef struct memblock {
   struct memblock *next,*prev;
   size_t size;
-  void **user;
   unsigned char tag;
 
 } memblock_t;
@@ -104,11 +103,6 @@ static int memory_size = 16*1024*1024;
 static int memory_size = 0;
 #endif
 static int free_memory = 0;
-
-
-void Z_DumpHistory(char *buf)
-{
-}
 
 
 void Z_Close(void)
@@ -198,7 +192,6 @@ void *Z_Malloc(size_t size, int tag, void **user)
    free_memory -= block->size;
 
    block->tag = tag;           // tag
-   block->user = user;         // user
    block = (memblock_t *)((uint8_t*) block + HEADER_SIZE);
    if (user)                   // if there is a user
       *user = block;            // set user to point to new block
@@ -210,11 +203,8 @@ void Z_Free(void *p)
 {
    memblock_t *block = (memblock_t *)((uint8_t*) p - HEADER_SIZE);
 
-   if (!p)
+   if (!p || !block)
       return;
-
-   if (block->user)            // Nullify user if one exists
-      *block->user = NULL;
 
    if (block == block->next)
       blockbytag[block->tag] = NULL;
@@ -332,10 +322,6 @@ void *Z_Calloc(size_t n1, size_t n2, int tag, void **user)
 char *Z_Strdup(const char *s, int tag, void **user)
 {
    return strcpy((Z_Malloc)(strlen(s)+1, tag, user DA(file, line)), s);
-}
-
-void Z_CheckHeap(void)
-{
 }
 
 void Z_SetPurgeLimit(int size)

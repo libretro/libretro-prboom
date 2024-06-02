@@ -39,7 +39,6 @@
 #include "doomtype.h"
 #include "v_video.h"
 
-bool I_PreInitGraphics(void); /* CPhipps - do stuff immediately on start */
 void I_SetRes(void); /* set resolution */
 void I_InitGraphics (void);
 void I_ShutdownGraphics(void);

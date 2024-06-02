@@ -25,7 +25,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <assert.h>
 
 #include "config.h"
 
@@ -648,10 +647,8 @@ midi_track_iter_t *MIDI_IterateTrack(const midi_file_t *file, unsigned int track
 {
     midi_track_iter_t *iter;
 
-    assert(track < file->num_tracks);
-
-    iter = malloc(sizeof(*iter));
-    iter->track = &file->tracks[track];
+    iter           = malloc(sizeof(*iter));
+    iter->track    = &file->tracks[track];
     iter->position = 0;
 
     return iter;

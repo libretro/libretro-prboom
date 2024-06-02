@@ -75,6 +75,7 @@ ifeq ($(platform), unix)
    fpic := -fPIC
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,--no-undefined -Wl,--as-needed
    CFLAGS += -std=c99
+   CFLAGS += -D_POSIX_C_SOURCE=199309L
 else ifeq ($(platform), linux-portable)
 	EXT    ?= so
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
@@ -134,6 +135,8 @@ else ifeq ($(platform), tvos-arm64)
 ifeq ($(IOSSDK),)
    IOSSDK := $(shell xcodebuild -version -sdk appletvos Path)
 endif
+   CC = clang -arch arm64 -isysroot $(IOSSDK)
+   CXX = clang++ -arch arm64 -isysroot $(IOSSDK)
 
 else ifeq ($(platform), theos_ios)
 	# Theos iOS
@@ -611,7 +614,11 @@ else
 	EXT?=dll
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
    CC ?= gcc
-   SHARED := -shared -static-libgcc -static-libstdc++ -s -Wl,--version-script=libretro/link.T
+   SHARED := -shared -static-libgcc -static-libstdc++
+   ifneq ($(DEBUG), 1)
+   SHARED += -s
+   endif  
+   SHARED += -Wl,--version-script=libretro/link.T
    CFLAGS += -D__WIN32__ -Wno-missing-field-initializers -DHAVE_STRLWR
 LIBS =
 endif

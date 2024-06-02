@@ -587,7 +587,6 @@ void P_DeathThink (player_t* player)
 			newtorch = 0;
 			newtorchdelta = 0;
 		}
-      //printf("deaththink: %d\n", player-players);
 #endif
 
       player->playerstate = PST_REBORN;
@@ -760,10 +759,7 @@ void P_PlayerThink (player_t* player)
       player->prev_viewpitch = player->mo->pitch + viewpitchoffset;
    }
    if (player->mo == 0)
-   {
-      //printf("player->mo == 0\n");
       return;
-   }
 
    // killough 2/8/98, 3/21/98:
    if (player->cheats & CF_NOCLIP)

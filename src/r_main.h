@@ -57,13 +57,6 @@ extern int      validcount;
 extern fixed_t skyiscale;
 
 //
-// Rendering stats
-//
-
-extern int rendered_visplanes, rendered_segs, rendered_vissprites;
-extern dbool   rendering_stats;
-
-//
 // Lighting LUT.
 // Used for z-depth cuing per column/row,
 //  and other lighting effects (sector ambient, flash).

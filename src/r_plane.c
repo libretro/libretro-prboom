@@ -489,7 +489,7 @@ void R_DrawPlanes (void)
 
   for (i=0;i<MAXVISPLANES;i++)
   {
-     for (pl=visplanes[i]; pl; pl=pl->next, rendered_visplanes++)
+     for (pl=visplanes[i]; pl; pl=pl->next)
         R_DoDrawPlane(pl);
   }
 }

@@ -396,7 +396,7 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
    R_SetDefaultDrawColumnVars(&dcvars);
 
    drawvars.short_topleft = (uint16_t*)screens[scrn].data;
-   drawvars.int_topleft   = (uint32_t*)screens[scrn].data;
+   drawvars.int_topleft   = (uint32_t*)(uint16_t*)screens[scrn].data;
 
    if (!(flags & VPT_STRETCH))
    {

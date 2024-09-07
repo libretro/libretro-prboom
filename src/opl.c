@@ -248,7 +248,7 @@ static void FillBuffer(int16_t *buffer, unsigned int nsamples)
     unsigned int i;
     int sampval;
     
-    Chip__GenerateBlock2(&opl_chip, nsamples, mix_buffer);
+    Chip__GenerateBlock2(&opl_chip, nsamples, (int32_t *)mix_buffer);
 
     // Mix into the destination buffer, doubling up into stereo.
 

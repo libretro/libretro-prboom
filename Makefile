@@ -120,8 +120,10 @@ endif
 
 ifeq ($(platform),$(filter $(platform),ios9 ios-arm64))
 	CFLAGS +=  -miphoneos-version-min=8.0
+	LDFLAGS +=  -miphoneos-version-min=8.0
 else
   CFLAGS +=  -miphoneos-version-min=5.0
+  LDFLAGS +=  -miphoneos-version-min=5.0
 endif
 
 # tvOS
@@ -137,6 +139,8 @@ ifeq ($(IOSSDK),)
 endif
    CC = clang -arch arm64 -isysroot $(IOSSDK)
    CXX = clang++ -arch arm64 -isysroot $(IOSSDK)
+   CFLAGS +=  -mappletvos-version-min=11.0
+   LDFLAGS +=  -mappletvos-version-min=11.0
 
 else ifeq ($(platform), theos_ios)
 	# Theos iOS

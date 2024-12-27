@@ -2845,7 +2845,7 @@ enum {
 #define G_YA3 (G_YA2 + 16)
 #define GF_X 76
 
-static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "90fps", "100fps", "119fps", "120fps", "140fps", "144fps", "240fps", "244fps", "300fps", "360fps", NULL};
+static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "90fps", "100fps", "119fps", "120fps", "140fps", "144fps", "155fps", "160fps", "165fps", "180fps", "200fps", "240fps", "244fps", "300fps", "320fps", "360fps", "480fps", "540fps", NULL};
 static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4", NULL};
 static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD", NULL};
 

@@ -264,7 +264,7 @@ else ifeq ($(platform), vita)
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
 	CC = arm-vita-eabi-gcc$(EXE_EXT)
 #	CC = /usr/local/vitasdk/bin/clang$(EXE_EXT)
-	AR = /usr/local/vitasdk/bin/arm-vita-eabi-ar$(EXE_EXT)
+	AR = arm-vita-eabi-ar$(EXE_EXT)
 	CFLAGS += -march=armv7-a -mfpu=neon -mfloat-abi=hard -DHAVE_STRLWR -DVITA -fno-short-enums
 #	CFLAGS += -march=armv7-a -mfpu=neon -mfloat-abi=hard -DVITA -DHAVE_STRLWR -DVITA -D__vita__ -fno-short-enums -isystem /usr/local/vitasdk/arm-vita-eabi/include
 	STATIC_LINKING = 1

@@ -263,8 +263,10 @@ else ifeq ($(platform), vita)
 	EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
 	CC = arm-vita-eabi-gcc$(EXE_EXT)
-	AR = arm-vita-eabi-ar$(EXE_EXT)
-   CFLAGS += -DHAVE_STRLWR -DVITA -fno-short-enums
+#	CC = /usr/local/vitasdk/bin/clang$(EXE_EXT)
+	AR = /usr/local/vitasdk/bin/arm-vita-eabi-ar$(EXE_EXT)
+	CFLAGS += -march=armv7-a -mfpu=neon -mfloat-abi=hard -DHAVE_STRLWR -DVITA -fno-short-enums
+#	CFLAGS += -march=armv7-a -mfpu=neon -mfloat-abi=hard -DVITA -DHAVE_STRLWR -DVITA -D__vita__ -fno-short-enums -isystem /usr/local/vitasdk/arm-vita-eabi/include
 	STATIC_LINKING = 1
 
 # CTR (3DS)
@@ -296,8 +298,10 @@ else ifeq ($(platform), ngc)
    EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
+#   CC = $(DEVKITPPC)/bin/clang$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
    CFLAGS += -DGEKKO -DHW_DOL -mogc -mcpu=750 -meabi -mhard-float
+#  CFLAGS += -DGEKKO -DHW_DOL -mcpu=750 -mhard-float -isystem /opt/devkitpro/devkitPPC/powerpc-eabi/include -I /opt/devkitpro/libogc2/include
    STATIC_LINKING = 1
    HAVE_LOW_MEMORY = 1
 
@@ -305,17 +309,21 @@ else ifeq ($(platform), wii)
    EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
+#  CC = $(DEVKITPPC)/bin/clang$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
    CFLAGS += -DGEKKO -DHW_RVL -mrvl -mcpu=750 -meabi -mhard-float
+#  CFLAGS += -DGEKKO -DHW_RVL -mcpu=750 -mhard-float -isystem /opt/devkitpro/devkitPPC/powerpc-eabi/include -I /opt/devkitpro/libogc2/include
    STATIC_LINKING = 1
 
 else ifeq ($(platform), wiiu)
    EXT=a
    TARGET := $(TARGET_NAME)_libretro_$(platform).$(EXT)
    CC = $(DEVKITPPC)/bin/powerpc-eabi-gcc$(EXE_EXT)
+#  CC = $(DEVKITPPC)/bin/clang$(EXE_EXT)
    AR = $(DEVKITPPC)/bin/powerpc-eabi-ar$(EXE_EXT)
    CFLAGS += -DGEKKO -DHW_RVL -DWIIU -mcpu=750 -meabi -mhard-float
-   CFLAGS += -ffunction-sections -fdata-sections -D__wiiu__ -D__wut__
+#  CFLAGS += -DGEKKO -DHW_RVL -DWIIU -mcpu=750 -mhard-float
+   CFLAGS += -ffunction-sections -fdata-sections -D__wiiu__ -D__wut__ # -isystem /opt/devkitpro/devkitPPC/powerpc-eabi/include -I /opt/devkitpro/wut/include
    STATIC_LINKING = 1
 
 # Nintendo Switch (libtransistor)

@@ -44,6 +44,10 @@
 
 #include <stdint.h>
 
+#ifdef PSX
+#include <stddef.h>
+#endif
+
 #ifndef PRIu64
 #define PRIu64 "I64u"
 #define PRIX64 "I64X"

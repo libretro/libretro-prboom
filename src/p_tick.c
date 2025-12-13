@@ -86,8 +86,8 @@ void P_UpdateThinker(thinker_t *thinker)
   // find the class the thinker belongs to
 
   int class =
-    thinker->function == P_RemoveThinkerDelayed ? th_delete :
-    thinker->function == P_MobjThinker &&
+    thinker->function.arg1 == (void (*)(void *))P_RemoveThinkerDelayed ? th_delete :
+    thinker->function.arg1 == (void (*)(void *))P_MobjThinker &&
     ((mobj_t *) thinker)->health > 0 &&
     (((mobj_t *) thinker)->flags & MF_ISMONSTER) ?
     ((mobj_t *) thinker)->flags & MF_FRIEND ?
@@ -189,7 +189,7 @@ void P_RemoveThinkerDelayed(thinker_t *thinker)
 void P_RemoveThinker(thinker_t *thinker)
 {
   R_StopInterpolationIfNeeded(thinker);
-  thinker->function = P_RemoveThinkerDelayed;
+  thinker->function.arg1 = (void (*)(void *))P_RemoveThinkerDelayed;
 
   P_UpdateThinker(thinker);
 }
@@ -258,8 +258,8 @@ static void P_RunThinkers (void)
   {
     if (newthinkerpresent)
       R_ActivateThinkerInterpolations(currentthinker);
-    if (currentthinker->function)
-      currentthinker->function(currentthinker);
+    if (currentthinker->function.arg1)
+      currentthinker->function.arg1(currentthinker);
   }
   newthinkerpresent = FALSE;
 

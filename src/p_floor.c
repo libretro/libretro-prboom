@@ -40,6 +40,10 @@
 #include "s_sound.h"
 #include "sounds.h"
 
+#ifdef PSX
+#include <stddef.h>
+#endif
+
 ///////////////////////////////////////////////////////////////////////
 //
 // Plane (floor or ceiling), Floor motion and Elevator action routines
@@ -441,7 +445,7 @@ int EV_DoFloor
       memset(floor, 0, sizeof(*floor));
       P_AddThinker (&floor->thinker);
       sec->floordata = floor; //jff 2/22/98
-      floor->thinker.function = T_MoveFloor;
+      floor->thinker.function.arg1 = (void (*)(void *))T_MoveFloor;
       floor->type = floortype;
       floor->crush = FALSE;
 
@@ -746,7 +750,7 @@ int EV_BuildStairs
     memset(floor, 0, sizeof(*floor));
     P_AddThinker (&floor->thinker);
     sec->floordata = floor;
-    floor->thinker.function = T_MoveFloor;
+    floor->thinker.function.arg1 = (void (*)(void *))T_MoveFloor;
     floor->direction = 1;
     floor->sector = sec;
     floor->type = FLEV_BUILDSTAIR;   //jff 3/31/98 do not leave uninited
@@ -828,7 +832,7 @@ int EV_BuildStairs
         P_AddThinker (&floor->thinker);
 
         sec->floordata = floor; //jff 2/22/98
-        floor->thinker.function = T_MoveFloor;
+        floor->thinker.function.arg1 = (void (*)(void *))T_MoveFloor;
         floor->direction = 1;
         floor->sector = sec;
         floor->speed = speed;
@@ -928,7 +932,7 @@ int EV_DoDonut(line_t*  line)
       memset(floor, 0, sizeof(*floor));
       P_AddThinker (&floor->thinker);
       s2->floordata = floor; //jff 2/22/98
-      floor->thinker.function = T_MoveFloor;
+      floor->thinker.function.arg1 = (void (*)(void *))T_MoveFloor;
       floor->type = FLEV_DONUTRAISE;
       floor->crush = FALSE;
       floor->direction = 1;
@@ -943,7 +947,7 @@ int EV_DoDonut(line_t*  line)
       memset(floor, 0, sizeof(*floor));
       P_AddThinker (&floor->thinker);
       s1->floordata = floor; //jff 2/22/98
-      floor->thinker.function = T_MoveFloor;
+      floor->thinker.function.arg1 = (void (*)(void *))T_MoveFloor;
       floor->type = FLEV_LOWERFLOOR;
       floor->crush = FALSE;
       floor->direction = -1;
@@ -992,7 +996,7 @@ int EV_DoElevator
     P_AddThinker (&elevator->thinker);
     sec->floordata = elevator; //jff 2/22/98
     sec->ceilingdata = elevator; //jff 2/22/98
-    elevator->thinker.function = T_MoveElevator;
+    elevator->thinker.function.arg1 = (void (*)(void *))T_MoveElevator;
     elevator->type = elevtype;
 
     // set up the fields according to the type of elevator action

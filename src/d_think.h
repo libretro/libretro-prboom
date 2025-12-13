@@ -36,7 +36,19 @@
 #ifndef __D_THINK__
 #define __D_THINK__
 
-typedef  void (*actionf_t)();
+typedef void (*arg0_t)();
+typedef void (*arg1_t)(void *);
+typedef void (*arg2_t)(void *, void *);
+typedef void (*argi_t)(int);
+
+typedef union {
+    arg0_t arg0;
+    arg1_t arg1;
+    arg2_t arg2;
+    argi_t argi;
+} actionf_t;
+
+//typedef  void (*actionf_t)();
 
 /* Historically, "think_t" is yet another
  *  function pointer to a routine to handle

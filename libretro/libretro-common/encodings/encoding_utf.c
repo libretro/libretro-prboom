@@ -410,6 +410,45 @@ char *local_to_utf8_string_alloc(const char *str)
 	return NULL;
 }
 
+#ifdef PSX
+size_t
+mbstowcs (wchar_t *__restrict pwcs,
+        const char *__restrict s,
+        size_t n)
+{
+  int count = 0;
+  
+  if (n != 0) {
+    do {
+      if ((*pwcs++ = (wchar_t) *s++) == 0)
+    break;
+      count++;
+    } while (--n != 0);
+  }
+  
+  return count;
+}
+
+size_t
+wcstombs (char          *__restrict s,
+        const wchar_t *__restrict pwcs,
+        size_t         n)
+{
+  int count = 0;
+  
+  if (n != 0) {
+    do {
+      if ((*s++ = (char) *pwcs++) == 0)
+    break;
+      count++;
+    } while (--n != 0);
+  }
+  
+  return count;
+}
+
+#endif
+
 /**
  * utf8_to_utf16_string_alloc:
  * 

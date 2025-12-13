@@ -58,6 +58,7 @@ void rtime_deinit(void)
 /* Thread-safe wrapper for localtime() */
 struct tm *rtime_localtime(const time_t *timep, struct tm *result)
 {
+#ifndef PSX
    struct tm *time_info = NULL;
 
    /* Lock mutex */
@@ -72,6 +73,7 @@ struct tm *rtime_localtime(const time_t *timep, struct tm *result)
    /* Unlock mutex */
 #ifdef HAVE_THREADS
    slock_unlock(rtime_localtime_lock);
+#endif
 #endif
 
    return result;

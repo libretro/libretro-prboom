@@ -52,7 +52,7 @@ static mobj_t* P_TeleportDestination(line_t* line)
       while ((th = P_NextThinker(th,th_misc)) != NULL)
       {
          mobj_t *m = NULL;
-         if (th->function != P_MobjThinker)
+         if (th->function.arg1 != (void (*)(void *))P_MobjThinker)
             continue;
 
          m = (mobj_t*)th;

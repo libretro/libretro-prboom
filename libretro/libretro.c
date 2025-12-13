@@ -1,4 +1,9 @@
+#ifndef PSX
 #include <sys/stat.h>
+#else
+#include <psx.h>
+#endif
+
 #ifdef _WIN32
 #include <direct.h>
 #else
@@ -574,10 +579,17 @@ static void update_variables(bool startup)
          char str[100];
          strlcpy(str, var.value, sizeof(str));
 
+#ifdef PSX
+          if ((pch = strtok(str, "x")))
+             SCREENWIDTH = (unsigned long)strtol(pch, NULL, 0);
+          if ((pch = strtok(NULL, "x")))
+             SCREENHEIGHT = (unsigned long)strtol(pch, NULL, 0);
+#else
          if ((pch = strtok(str, "x")))
             SCREENWIDTH = strtoul(pch, NULL, 0);
          if ((pch = strtok(NULL, "x")))
             SCREENHEIGHT = strtoul(pch, NULL, 0);
+#endif
 
          if (log_cb)
             log_cb(RETRO_LOG_DEBUG, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
@@ -792,7 +804,11 @@ bool retro_load_game(const struct retro_game_info *info)
       extract_basename(g_basename, info->path, sizeof(g_basename));
       extension = remove_extension(name_without_ext, g_basename, sizeof(name_without_ext));
 
+#ifdef PSX
+       if(strcmp(extension,"lmp") == 0)
+#else
       if(strcasecmp(extension,"lmp") == 0)
+#endif
       {
         // Play as a demo file lump
         argv[argc++] = strdup("-playdemo");

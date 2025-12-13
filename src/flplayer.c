@@ -32,6 +32,10 @@
 
 #include "musicplayer.h"
 
+#ifdef PSX
+#include <stddef.h>
+#endif
+
 #ifndef HAVE_LIBFLUIDSYNTH
 #include <string.h>
 

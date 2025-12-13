@@ -206,7 +206,7 @@ typedef struct
 #else
 #  if (SIZE_MAX == 0xFFFF)
 #    define PRI_SIZET "hu"
-#  elif (SIZE_MAX == 0xFFFFFFFF)
+#  elif (SIZE_MAX == 0xFFFFFFFF) || defined(PSX)
 #    define PRI_SIZET "u"
 #  elif (SIZE_MAX == 0xFFFFFFFFFFFFFFFF)
 #    define PRI_SIZET "lu"

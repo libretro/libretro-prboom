@@ -23,7 +23,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef PSX
+typedef unsigned int time_t;
+#else
 #include <time.h>
+#endif
 
 #include <sys/stat.h>
 
@@ -514,6 +519,9 @@ void fill_pathname_parent_dir(char *out_dir,
 size_t fill_dated_filename(char *out_filename,
       const char *ext, size_t size)
 {
+#ifdef PSX
+   return strlcat(out_filename, "RetroArch", size);
+#else
    time_t cur_time = time(NULL);
    struct tm tm_;
 
@@ -522,6 +530,7 @@ size_t fill_dated_filename(char *out_filename,
    strftime(out_filename, size,
          "RetroArch-%m%d-%H%M%S", &tm_);
    return strlcat(out_filename, ext, size);
+#endif
 }
 
 /**
@@ -542,6 +551,10 @@ size_t fill_dated_filename(char *out_filename,
 size_t fill_str_dated_filename(char *out_filename,
       const char *in_str, const char *ext, size_t size)
 {
+#ifdef PSX
+   strlcpy(out_filename, in_str, size);
+   return strlen(out_filename);
+#else
    char format[NAME_MAX_LENGTH];
    struct tm tm_;
    time_t cur_time = time(NULL);
@@ -557,6 +570,7 @@ size_t fill_str_dated_filename(char *out_filename,
    strftime(format, sizeof(format), "-%y%m%d-%H%M%S.", &tm_);
    strlcat(out_filename, format, size);
    return strlcat(out_filename, ext, size);
+#endif
 }
 
 /**

@@ -35,6 +35,10 @@
 #include "lprintf.h"
 #include "u_scanner.h"
 
+#ifdef PSX
+#define atof(s) strtod((s), NULL)
+#endif
+
 const char* U_TokenNames[TK_NumSpecialTokens] =
 {
   "Identifier", // case insensitive identifier, beginning with a letter and may contain [a-z0-9_]

@@ -49,6 +49,10 @@
 #include "m_bbox.h"
 #include "lprintf.h"
 
+#ifdef PSX
+#include <stddef.h>
+#endif
+
 static mobj_t *current_actor;
 
 typedef enum
@@ -253,7 +257,7 @@ static dbool   P_IsOnLift(const mobj_t *actor)
   memset(&line, 0, sizeof(line));
 
   // Short-circuit: it's on a lift which is active.
-  if (sec->floordata && ((thinker_t *) sec->floordata)->function==T_PlatRaise)
+  if (sec->floordata && ((thinker_t *) sec->floordata)->function.arg1==(void (*)(void *))T_PlatRaise)
     return TRUE;
 
   // Check to see if it's in a sector which can be activated as a lift.
@@ -290,7 +294,7 @@ static int P_IsUnderDamage(mobj_t *actor)
   int dir = 0;
   for (seclist=actor->touching_sectorlist; seclist; seclist=seclist->m_tnext)
     if ((cl = seclist->m_sector->ceilingdata) &&
-  cl->thinker.function == T_MoveCeiling)
+  cl->thinker.function.arg1 == (void (*)(void *))T_MoveCeiling)
       dir |= cl->direction;
   return dir;
 }
@@ -997,7 +1001,7 @@ void A_KeenDie(mobj_t* mo)
   // scan the remaining thinkers to see if all Keens are dead
 
   for (th = thinkercap.next ; th != &thinkercap ; th=th->next)
-    if (th->function == P_MobjThinker)
+    if (th->function.arg1 == (void (*)(void *))P_MobjThinker)
       {
         mobj_t *mo2 = (mobj_t *) th;
         if (mo2 != mo && mo2->type == mo->type && mo2->health > 0)
@@ -1918,8 +1922,9 @@ void A_SkullAttack(mobj_t *actor)
 // The flying skull had different behavior on Beta Doom
 //
 
-void A_BetaSkullAttack(mobj_t *actor)
+void A_BetaSkullAttack(void *a)
 {
+  mobj_t *actor = (mobj_t *)a;
   int damage;
 
   if (compatibility_level < mbf_compatibility)
@@ -1939,8 +1944,9 @@ void A_BetaSkullAttack(mobj_t *actor)
 // The flying skull had different behavior on Beta Doom
 //
 
-void A_Stop(mobj_t *actor)
+void A_Stop(void *a)
 {
+  mobj_t *actor = (mobj_t *)a;
   if (compatibility_level < mbf_compatibility)
     return;
 
@@ -1969,7 +1975,7 @@ static void A_PainShootSkull(mobj_t *actor, angle_t angle)
       int count = 0;
       thinker_t *currentthinker = NULL;
       while ((currentthinker = P_NextThinker(currentthinker,th_all)) != NULL)
-        if ((currentthinker->function == P_MobjThinker)
+        if ((currentthinker->function.arg1 == (void (*)(void *))P_MobjThinker)
             && ((mobj_t *)currentthinker)->type == MT_SKULL)
           count++;
       if (count > 20)                                               // phares
@@ -2238,7 +2244,7 @@ void A_BossDeath(mobj_t *mo)
     // scan the remaining thinkers to see
     // if all bosses are dead
   for (th = thinkercap.next ; th != &thinkercap ; th=th->next)
-    if (th->function == P_MobjThinker)
+    if (th->function.arg1 == (void (*)(void *))P_MobjThinker)
       {
         mobj_t *mo2 = (mobj_t *) th;
         if (mo2 != mo && mo2->type == mo->type && mo2->health > 0)
@@ -2366,7 +2372,7 @@ void P_SpawnBrainTargets(void)  // killough 3/26/98: renamed old function
   for (thinker = thinkercap.next ;
        thinker != &thinkercap ;
        thinker = thinker->next)
-    if (thinker->function == P_MobjThinker)
+    if (thinker->function.arg1 == (void (*)(void *))P_MobjThinker)
       {
         mobj_t *m = (mobj_t *) thinker;
 

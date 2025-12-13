@@ -40,6 +40,10 @@
 #include "r_main.h"
 #include "r_draw.h"
 
+#ifdef PSX
+#include <stddef.h>
+#endif
+
 extern int  key_backspace;                                          // phares
 extern int  key_enter;                                              // phares
 

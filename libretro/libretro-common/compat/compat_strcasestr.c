@@ -22,6 +22,12 @@
 
 #include <ctype.h>
 
+#ifdef PSX
+#ifndef NULL
+#define NULL (void *)0
+#endif
+#endif
+
 #include <compat/strcasestr.h>
 
 /* Pretty much strncasecmp. */

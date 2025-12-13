@@ -23,7 +23,12 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
+#ifdef PSX
+typedef unsigned int time_t;
+#else
 #include <time.h>
+#endif
 
 #include <sys/stat.h>
 

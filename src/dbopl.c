@@ -51,6 +51,12 @@
 //#include "dosbox.h"
 #include "dbopl.h"
 
+#ifdef PSX
+#include <stddef.h>
+
+#define labs (long)abs
+#endif
+
 #ifdef _MSC_VER
 #define inline __inline
 #endif

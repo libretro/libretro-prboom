@@ -85,6 +85,12 @@ typedef int ssize_t;
 #define PRIuPTR "Iu"
 #endif
 #endif
+#elif defined(PSX)
+#ifndef PRId64
+#define PRId64 "lld"
+#define PRIu64 "llu"
+#define PRIuPTR "lu"
+#endif
 #else
 /* C++11 says this one isn't needed, but apparently (some versions of) mingw require it anyways */
 /* https://stackoverflow.com/questions/8132399/how-to-printf-uint64-t-fails-with-spurious-trailing-in-format */

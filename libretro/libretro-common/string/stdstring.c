@@ -571,7 +571,11 @@ unsigned string_to_unsigned(const char *str)
          return 0;
    }
 
+#ifdef PSX
+   return (unsigned)strtol(str, NULL, 10);
+#else
    return (unsigned)strtoul(str, NULL, 10);
+#endif
 }
 
 /**
@@ -610,7 +614,11 @@ unsigned string_hex_to_unsigned(const char *str)
          return 0;
    }
 
+#ifdef PSX
+   return (unsigned)strtol(hex_str, NULL, 16);
+#else
    return (unsigned)strtoul(hex_str, NULL, 16);
+#endif
 }
 
 /**

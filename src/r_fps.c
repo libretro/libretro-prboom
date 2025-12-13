@@ -366,31 +366,31 @@ static void R_InterpolationGetData(thinker_t *th,
   *posptr1 = NULL;
   *posptr2 = NULL;
 
-  if (th->function == T_MoveFloor)
+  if (th->function.arg1 == (void (*)(void *))T_MoveFloor)
   {
     *type1 = INTERP_SectorFloor;
     *posptr1 = ((floormove_t *)th)->sector;
   }
   else
-  if (th->function == T_PlatRaise)
+  if (th->function.arg1 == (void (*)(void *))T_PlatRaise)
   {
     *type1 = INTERP_SectorFloor;
     *posptr1 = ((plat_t *)th)->sector;
   }
   else
-  if (th->function == T_MoveCeiling)
+  if (th->function.arg1 == (void (*)(void *))T_MoveCeiling)
   {
     *type1 = INTERP_SectorCeiling;
     *posptr1 = ((ceiling_t *)th)->sector;
   }
   else
-  if (th->function == T_VerticalDoor)
+  if (th->function.arg1 == (void (*)(void *))T_VerticalDoor)
   {
     *type1 = INTERP_SectorCeiling;
     *posptr1 = ((vldoor_t *)th)->sector;
   }
   else
-  if (th->function == T_MoveElevator)
+  if (th->function.arg1 == (void (*)(void *))T_MoveElevator)
   {
     *type1 = INTERP_SectorFloor;
     *posptr1 = ((elevator_t *)th)->sector;
@@ -398,7 +398,7 @@ static void R_InterpolationGetData(thinker_t *th,
     *posptr2 = ((elevator_t *)th)->sector;
   }
   else
-  if (th->function == T_Scroll)
+  if (th->function.arg1 == (void (*)(void *))T_Scroll)
   {
     switch (((scroll_t *)th)->type)
     {

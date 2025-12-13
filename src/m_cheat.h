@@ -48,7 +48,7 @@ extern struct cheat_s {
     not_deh = 16,
     not_net = not_dm | not_coop
   } const when;
-  void (*const func)();
+  actionf_t func;
   const int arg;
   uint64_t code, mask;
 } cheat[];

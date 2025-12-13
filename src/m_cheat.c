@@ -55,16 +55,16 @@
 //
 //-----------------------------------------------------------------------------
 
-static void cheat_mus();
+static void cheat_mus(char buf[3]);
 static void cheat_choppers();
 static void cheat_god();
 static void cheat_fa();
 static void cheat_k();
 static void cheat_kfa();
 static void cheat_noclip();
-static void cheat_pw();
+static void cheat_pw(int);
 static void cheat_behold();
-static void cheat_clev();
+static void cheat_clev(char buf[3]);
 static void cheat_mypos();
 static void cheat_rate();
 static void cheat_comp();
@@ -76,18 +76,18 @@ static void cheat_hom();
 static void cheat_fast();
 static void cheat_tntkey();
 static void cheat_tntkeyx();
-static void cheat_tntkeyxx();
+static void cheat_tntkeyxx(int);
 static void cheat_tntweap();
-static void cheat_tntweapx();
+static void cheat_tntweapx(char buf[3]);
 static void cheat_tntammo();
-static void cheat_tntammox();
+static void cheat_tntammox(char buf[1]);
 static void cheat_smart();
 static void cheat_pitch();
 static void cheat_megaarmour();
 static void cheat_health();
 static void cheat_exitl();
 static void cheat_exits();
-static void cheat_summon();
+static void cheat_summon(char buf[4]);
 
 
 //-----------------------------------------------------------------------------
@@ -113,161 +113,160 @@ static void cheat_summon();
 
 struct cheat_s cheat[] = {
   {"idmus",      "Change music",      always,
-   cheat_mus,      -2, 0, 0},
+      {(arg0_t)cheat_mus},      -2, 0, 0},
 
   {"idchoppers", "Chainsaw",          not_net | not_demo,
-   cheat_choppers, 0, 0, 0 },
+      {cheat_choppers}, 0, 0, 0 },
 
   {"iddqd",      "God mode",          not_net | not_demo,
-   cheat_god, 0, 0, 0      },
+      {cheat_god}, 0, 0, 0      },
 
   {"idk",        NULL,                not_net | not_demo | not_deh,
-   cheat_k, 0, 0, 0 },  // The most controversial cheat code in Doom history!!!
+      {cheat_k}, 0, 0, 0 },  // The most controversial cheat code in Doom history!!!
 
   {"idkfa",      "Ammo & Keys",       not_net | not_demo,
-   cheat_kfa, 0, 0, 0 },
+      {cheat_kfa}, 0, 0, 0 },
 
   {"idfa",       "Ammo",              not_net | not_demo,
-   cheat_fa, 0, 0, 0  },
+      {cheat_fa}, 0, 0, 0  },
 
   {"idspispopd", "No Clipping 1",     not_net | not_demo,
-   cheat_noclip, 0, 0, 0 },
+      {cheat_noclip}, 0, 0, 0 },
 
   {"idclip",     "No Clipping 2",     not_net | not_demo,
-   cheat_noclip, 0, 0, 0 },
+      {cheat_noclip}, 0, 0, 0 },
 
   {"idbeholdh",  "Invincibility",     not_net | not_demo,
-   cheat_health, 0, 0, 0 },
+      {cheat_health}, 0, 0, 0 },
 
   {"idbeholdm",  "Invincibility",     not_net | not_demo,
-   cheat_megaarmour, 0, 0, 0 },
+      {cheat_megaarmour}, 0, 0, 0 },
 
   {"idbeholdv",  "Invincibility",     not_net | not_demo,
-   cheat_pw,  pw_invulnerability, 0, 0 },
+      {(arg0_t)cheat_pw},  pw_invulnerability, 0, 0 },
 
   {"idbeholds",  "Berserk",           not_net | not_demo,
-   cheat_pw,  pw_strength, 0, 0        },
+      {(arg0_t)cheat_pw},  pw_strength, 0, 0        },
 
   {"idbeholdi",  "Invisibility",      not_net | not_demo,
-   cheat_pw,  pw_invisibility, 0, 0    },
+      {(arg0_t)cheat_pw},  pw_invisibility, 0, 0    },
 
   {"idbeholdr",  "Radiation Suit",    not_net | not_demo,
-   cheat_pw,  pw_ironfeet, 0, 0        },
+      {(arg0_t)cheat_pw},  pw_ironfeet, 0, 0        },
 
   {"idbeholda",  "Auto-map",          not_dm,
-   cheat_pw,  pw_allmap, 0, 0          },
+      {(arg0_t)cheat_pw},  pw_allmap, 0, 0          },
 
   {"idbeholdl",  "Lite-Amp Goggles",  not_dm,
-   cheat_pw,  pw_infrared, 0, 0        },
+      {(arg0_t)cheat_pw},  pw_infrared, 0, 0        },
 
   {"idbehold",   "BEHOLD menu",       not_dm,
-   cheat_behold, 0, 0, 0   },
+      {cheat_behold}, 0, 0, 0   },
 
   {"idclev",     "Level Warp",        not_net | not_demo | not_menu,
-   cheat_clev,    -2, 0, 0},
+      {(arg0_t)cheat_clev},    -2, 0, 0},
 
   {"idmypos",    "Player Position",   not_dm,
-   cheat_mypos, 0, 0, 0    },
+      {cheat_mypos}, 0, 0, 0    },
 
   {"idrate",     "Frame rate",        0,
-   cheat_rate, 0, 0, 0     },
+      {cheat_rate}, 0, 0, 0     },
 
   {"idxitl",     "Exit level",        not_net | not_demo | not_menu,
-   cheat_exitl, 0, 0, 0     },
+      {cheat_exitl}, 0, 0, 0     },
 
   {"idxits",     "Exit to secret",    not_net | not_demo | not_menu,
-   cheat_exits, 0, 0, 0     },
+      {cheat_exits}, 0, 0, 0     },
 
   {"idsumm",     "Spawn an actor",    not_net | not_demo | not_menu,
-   cheat_summon, -3, 0, 0     },
+      {(arg0_t)cheat_summon}, -3, 0, 0     },
 
   {"tntcomp",    NULL,                not_net | not_demo,
-   cheat_comp, 0, 0, 0     },     // phares
+      {cheat_comp}, 0, 0, 0     },     // phares
 
   {"tntem",      NULL,                not_net | not_demo,
-   cheat_massacre, 0, 0, 0 },     // jff 2/01/98 kill all monsters
+      {cheat_massacre}, 0, 0, 0 },     // jff 2/01/98 kill all monsters
 
   {"iddt",       "Map cheat",         not_dm,
-   cheat_ddt, 0, 0, 0      },     // killough 2/07/98: moved from am_map.c
+      {cheat_ddt}, 0, 0, 0      },     // killough 2/07/98: moved from am_map.c
 
   {"tnthom",     NULL,                always,
-   cheat_hom, 0, 0, 0      },     // killough 2/07/98: HOM autodetector
+      {cheat_hom}, 0, 0, 0      },     // killough 2/07/98: HOM autodetector
 
   {"tntkey",     NULL,                not_net | not_demo,
-   cheat_tntkey, 0, 0, 0   },     // killough 2/16/98: generalized key cheats
+      {cheat_tntkey}, 0, 0, 0   },     // killough 2/16/98: generalized key cheats
 
   {"tntkeyr",    NULL,                not_net | not_demo,
-   cheat_tntkeyx, 0, 0, 0  },
+      {cheat_tntkeyx}, 0, 0, 0  },
 
   {"tntkeyy",    NULL,                not_net | not_demo,
-   cheat_tntkeyx, 0, 0, 0  },
+      {cheat_tntkeyx}, 0, 0, 0  },
 
   {"tntkeyb",    NULL,                not_net | not_demo,
-   cheat_tntkeyx, 0, 0, 0  },
+      {cheat_tntkeyx}, 0, 0, 0  },
 
   {"tntkeyrc",   NULL,                not_net | not_demo,
-   cheat_tntkeyxx, it_redcard, 0, 0    },
+      {(arg0_t)cheat_tntkeyxx}, it_redcard, 0, 0    },
 
   {"tntkeyyc",   NULL,                not_net | not_demo,
-   cheat_tntkeyxx, it_yellowcard, 0, 0 },
+      {(arg0_t)cheat_tntkeyxx}, it_yellowcard, 0, 0 },
 
   {"tntkeybc",   NULL,                not_net | not_demo,
-   cheat_tntkeyxx, it_bluecard, 0, 0   },
+      {(arg0_t)cheat_tntkeyxx}, it_bluecard, 0, 0   },
 
   {"tntkeyrs",   NULL,                not_net | not_demo,
-   cheat_tntkeyxx, it_redskull, 0, 0   },
+      {(arg0_t)cheat_tntkeyxx}, it_redskull, 0, 0   },
 
   {"tntkeyys",   NULL,                not_net | not_demo,
-   cheat_tntkeyxx, it_yellowskull, 0, 0},
+      {(arg0_t)cheat_tntkeyxx}, it_yellowskull, 0, 0},
 
   {"tntkeybs",   NULL,                not_net | not_demo,
-   cheat_tntkeyxx, it_blueskull, 0, 0 },  // killough 2/16/98: end generalized keys
+      {(arg0_t)cheat_tntkeyxx}, it_blueskull, 0, 0 },  // killough 2/16/98: end generalized keys
 
   {"tntka",      NULL,                not_net | not_demo,
-   cheat_k, 0, 0, 0    },         // Ty 04/11/98 - Added TNTKA
+      {cheat_k}, 0, 0, 0    },         // Ty 04/11/98 - Added TNTKA
 
   {"tntweap",    NULL,                not_net | not_demo,
-   cheat_tntweap, 0, 0, 0  },     // killough 2/16/98: generalized weapon cheats
+      {cheat_tntweap}, 0, 0, 0  },     // killough 2/16/98: generalized weapon cheats
 
   {"tntweap",    NULL,                not_net | not_demo,
-   cheat_tntweapx, -1, 0, 0},
+      {(arg0_t)cheat_tntweapx}, -1, 0, 0},
 
   {"tntammo",    NULL,                not_net | not_demo,
-   cheat_tntammo, 0, 0, 0  },
+      {cheat_tntammo}, 0, 0, 0  },
 
   {"tntammo",    NULL,                not_net | not_demo,
-   cheat_tntammox, -1, 0, 0},  // killough 2/16/98: end generalized weapons
+      {(arg0_t)cheat_tntammox}, -1, 0, 0},  // killough 2/16/98: end generalized weapons
 
   {"tntsmart",   NULL,                not_net | not_demo,
-   cheat_smart, 0, 0, 0},         // killough 2/21/98: smart monster toggle
+      {cheat_smart}, 0, 0, 0},         // killough 2/21/98: smart monster toggle
 
   {"tntpitch",   NULL,                always,
-   cheat_pitch, 0, 0, 0},         // killough 2/21/98: pitched sound toggle
+      {cheat_pitch}, 0, 0, 0},         // killough 2/21/98: pitched sound toggle
 
   // killough 2/21/98: reduce RSI injury by adding simpler alias sequences:
 
   {"tntamo",     NULL,                not_net | not_demo,
-   cheat_tntammo, 0, 0, 0    },   // killough 2/21/98: same as tntammo
+      {cheat_tntammo}, 0, 0, 0    },   // killough 2/21/98: same as tntammo
 
   {"tntamo",     NULL,                not_net | not_demo,
-   cheat_tntammox, -1, 0, 0},  // killough 2/21/98: same as tntammo
+      {(arg0_t)cheat_tntammox}, -1, 0, 0},  // killough 2/21/98: same as tntammo
 
   {"tntfast",    NULL,                not_net | not_demo,
-   cheat_fast, 0, 0, 0       },   // killough 3/6/98: -fast toggle
+      {cheat_fast}, 0, 0, 0       },   // killough 3/6/98: -fast toggle
 
   {"tntice",     NULL,                not_net | not_demo,
-   cheat_friction, 0, 0, 0   },   // phares 3/10/98: toggle variable friction effects
+      {cheat_friction}, 0, 0, 0   },   // phares 3/10/98: toggle variable friction effects
 
   {"tntpush",    NULL,                not_net | not_demo,
-   cheat_pushers, 0, 0, 0    },   // phares 3/10/98: toggle pushers
+      {cheat_pushers}, 0, 0, 0    },   // phares 3/10/98: toggle pushers
 
   {NULL}                 // end-of-list marker
 };
 
 //-----------------------------------------------------------------------------
 
-static void cheat_mus(buf)
-char buf[3];
+static void cheat_mus(char buf[3])
 {
   int musnum;
 
@@ -561,7 +560,7 @@ static void cheat_massacre()    // jff 2/01/98 kill all monsters
   P_MapStart();
   do
     while ((currentthinker = P_NextThinker(currentthinker,th_all)) != NULL)
-    if (currentthinker->function == P_MobjThinker &&
+    if (currentthinker->function.arg0 == (arg0_t)P_MobjThinker &&
   !(((mobj_t *) currentthinker)->flags & mask) && // killough 7/20/98
         (((mobj_t *) currentthinker)->flags & MF_ISMONSTER))
       { // killough 3/6/98: kill even if PE is dead
@@ -633,8 +632,7 @@ static void cheat_tntweap()
     "Weapon number 1-9" : "Weapon number 1-8";
 }
 
-static void cheat_tntweapx(buf)
-char buf[3];
+static void cheat_tntweapx(char buf[3])
 {
   int w = *buf - '1';
 
@@ -663,8 +661,7 @@ static void cheat_tntammo()
   plyr->message = "Ammo 1-4, Backpack";  // Ty 03/27/98 - *not* externalized
 }
 
-static void cheat_tntammox(buf)
-char buf[1];
+static void cheat_tntammox(char buf[1])
 {
   int a = *buf - '1';
   if (*buf == 'b')  // Ty 03/27/98 - strings *not* externalized
@@ -719,7 +716,7 @@ dbool   M_FindCheats(int key)
     {
       *arg++ = tolower(key);             // store key in arg buffer
       if (!--argsleft)                   // if last key in arg list,
-        cheat[cht].func(argbuf);         // process the arg buffer
+        cheat[cht].func.arg1(argbuf);         // process the arg buffer
       return 1;                          // affirmative response
     }
 
@@ -771,7 +768,7 @@ dbool   M_FindCheats(int key)
         if (!matchedbefore)               // allow only one cheat at a time
           {
             matchedbefore = ret = 1;      // responder has eaten key
-            cheat[i].func(cheat[i].arg);  // call cheat handler
+            cheat[i].func.argi(cheat[i].arg);  // call cheat handler
           }
     }
   return ret;

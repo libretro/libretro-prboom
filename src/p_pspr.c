@@ -109,9 +109,9 @@ static void P_SetPsprite(player_t *player, int position, statenum_t stnum)
 
       // Call action routine.
       // Modified handling.
-      if (state->action)
+      if (state->action.arg2)
       {
-         state->action(player, psp);
+         state->action.arg2(player, psp);
          if (!psp->state)
             break;
       }
@@ -2617,8 +2617,9 @@ void A_Light2 (player_t *player, pspdef_t *psp)
 // Spawn a BFG explosion on every monster in view
 //
 
-void A_BFGSpray(mobj_t *mo)
+void A_BFGSpray(void *m)
 {
+  mobj_t *mo = (mobj_t *)m;
   int i;
 
   for (i=0 ; i<40 ; i++)  // offset angles from its attack angle

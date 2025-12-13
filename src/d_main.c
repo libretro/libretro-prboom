@@ -1030,7 +1030,9 @@ bool D_DoomMainSetup(void)
 {
   int p;
 
+#ifndef PSX
   setbuf(stdout,NULL);
+#endif
 
   // proff 04/05/2000: Added support for include response files
   /* proff 2001/7/1 - Moved up, so -config can be in response files */

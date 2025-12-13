@@ -55,6 +55,13 @@
 #define TRUE 1
 #define FALSE 0
 
+#ifdef PSX
+#include <inttypes.h>
+#include <stdio.h>
+
+#define fprintf(F,...) printf(__VA_ARGS__)
+#endif
+
 #if defined(__HAIKU__)
 #include <string.h>
 #else
@@ -87,8 +94,14 @@ typedef struct {
 
 static char *dehfgets(char *buf, size_t n, DEHFILE *fp)
 {
-  if (!fp->lump)                                     // If this is a real file,
+  if (!fp->lump) {                                   // If this is a real file,
+#ifdef PSX
+    fread(buf, n, 1, fp->f);
+    return buf;
+#else
     return (fgets)(buf, n, fp->f);                   // return regular fgets
+#endif
+  }
   if (!n || fp->size<=0 || !*fp->inp)                // If no more characters
     return NULL;
   if (n==1)
@@ -1318,97 +1331,97 @@ typedef struct {
 
 static const deh_bexptr deh_bexptrs[] = // CPhipps - static const
 {
-  {A_Light0,          "A_Light0"},
-  {A_WeaponReady,     "A_WeaponReady"},
-  {A_Lower,           "A_Lower"},
-  {A_Raise,           "A_Raise"},
-  {A_Punch,           "A_Punch"},
-  {A_ReFire,          "A_ReFire"},
-  {A_FirePistol,      "A_FirePistol"},
-  {A_Light1,          "A_Light1"},
-  {A_FireShotgun,     "A_FireShotgun"},
-  {A_Light2,          "A_Light2"},
-  {A_FireShotgun2,    "A_FireShotgun2"},
-  {A_CheckReload,     "A_CheckReload"},
-  {A_OpenShotgun2,    "A_OpenShotgun2"},
-  {A_LoadShotgun2,    "A_LoadShotgun2"},
-  {A_CloseShotgun2,   "A_CloseShotgun2"},
-  {A_FireCGun,        "A_FireCGun"},
-  {A_GunFlash,        "A_GunFlash"},
-  {A_FireMissile,     "A_FireMissile"},
-  {A_Saw,             "A_Saw"},
-  {A_FirePlasma,      "A_FirePlasma"},
-  {A_BFGsound,        "A_BFGsound"},
-  {A_FireBFG,         "A_FireBFG"},
-  {A_BFGSpray,        "A_BFGSpray"},
-  {A_Explode,         "A_Explode"},
-  {A_Pain,            "A_Pain"},
-  {A_PlayerScream,    "A_PlayerScream"},
-  {A_Fall,            "A_Fall"},
-  {A_XScream,         "A_XScream"},
-  {A_Look,            "A_Look"},
-  {A_Chase,           "A_Chase"},
-  {A_FaceTarget,      "A_FaceTarget"},
-  {A_PosAttack,       "A_PosAttack"},
-  {A_Scream,          "A_Scream"},
-  {A_SPosAttack,      "A_SPosAttack"},
-  {A_VileChase,       "A_VileChase"},
-  {A_VileStart,       "A_VileStart"},
-  {A_VileTarget,      "A_VileTarget"},
-  {A_VileAttack,      "A_VileAttack"},
-  {A_StartFire,       "A_StartFire"},
-  {A_Fire,            "A_Fire"},
-  {A_FireCrackle,     "A_FireCrackle"},
-  {A_Tracer,          "A_Tracer"},
-  {A_SkelWhoosh,      "A_SkelWhoosh"},
-  {A_SkelFist,        "A_SkelFist"},
-  {A_SkelMissile,     "A_SkelMissile"},
-  {A_FatRaise,        "A_FatRaise"},
-  {A_FatAttack1,      "A_FatAttack1"},
-  {A_FatAttack2,      "A_FatAttack2"},
-  {A_FatAttack3,      "A_FatAttack3"},
-  {A_BossDeath,       "A_BossDeath"},
-  {A_CPosAttack,      "A_CPosAttack"},
-  {A_CPosRefire,      "A_CPosRefire"},
-  {A_TroopAttack,     "A_TroopAttack"},
-  {A_SargAttack,      "A_SargAttack"},
-  {A_HeadAttack,      "A_HeadAttack"},
-  {A_BruisAttack,     "A_BruisAttack"},
-  {A_SkullAttack,     "A_SkullAttack"},
-  {A_Metal,           "A_Metal"},
-  {A_SpidRefire,      "A_SpidRefire"},
-  {A_BabyMetal,       "A_BabyMetal"},
-  {A_BspiAttack,      "A_BspiAttack"},
-  {A_Hoof,            "A_Hoof"},
-  {A_CyberAttack,     "A_CyberAttack"},
-  {A_PainAttack,      "A_PainAttack"},
-  {A_PainDie,         "A_PainDie"},
-  {A_KeenDie,         "A_KeenDie"},
-  {A_BrainPain,       "A_BrainPain"},
-  {A_BrainScream,     "A_BrainScream"},
-  {A_BrainDie,        "A_BrainDie"},
-  {A_BrainAwake,      "A_BrainAwake"},
-  {A_BrainSpit,       "A_BrainSpit"},
-  {A_SpawnSound,      "A_SpawnSound"},
-  {A_SpawnFly,        "A_SpawnFly"},
-  {A_BrainExplode,    "A_BrainExplode"},
-  {A_Detonate,        "A_Detonate"},       // killough 8/9/98
-  {A_Mushroom,        "A_Mushroom"},       // killough 10/98
-  {A_Die,             "A_Die"},            // killough 11/98
-  {A_Spawn,           "A_Spawn"},          // killough 11/98
-  {A_Turn,            "A_Turn"},           // killough 11/98
-  {A_Face,            "A_Face"},           // killough 11/98
-  {A_Scratch,         "A_Scratch"},        // killough 11/98
-  {A_PlaySound,       "A_PlaySound"},      // killough 11/98
-  {A_RandomJump,      "A_RandomJump"},     // killough 11/98
-  {A_LineEffect,      "A_LineEffect"},     // killough 11/98
+    {{(arg0_t)A_Light0},          "A_Light0"},
+    {{(arg0_t)A_WeaponReady},     "A_WeaponReady"},
+    {{(arg0_t)A_Lower},           "A_Lower"},
+    {{(arg0_t)A_Raise},           "A_Raise"},
+    {{(arg0_t)A_Punch},           "A_Punch"},
+    {{(arg0_t)A_ReFire},          "A_ReFire"},
+    {{(arg0_t)A_FirePistol},      "A_FirePistol"},
+    {{(arg0_t)A_Light1},          "A_Light1"},
+    {{(arg0_t)A_FireShotgun},     "A_FireShotgun"},
+    {{(arg0_t)A_Light2},          "A_Light2"},
+    {{(arg0_t)A_FireShotgun2},    "A_FireShotgun2"},
+    {{(arg0_t)A_CheckReload},     "A_CheckReload"},
+    {{(arg0_t)A_OpenShotgun2},    "A_OpenShotgun2"},
+    {{(arg0_t)A_LoadShotgun2},    "A_LoadShotgun2"},
+    {{(arg0_t)A_CloseShotgun2},   "A_CloseShotgun2"},
+    {{(arg0_t)A_FireCGun},        "A_FireCGun"},
+    {{(arg0_t)A_GunFlash},        "A_GunFlash"},
+    {{(arg0_t)A_FireMissile},     "A_FireMissile"},
+    {{(arg0_t)A_Saw},             "A_Saw"},
+    {{(arg0_t)A_FirePlasma},      "A_FirePlasma"},
+    {{(arg0_t)A_BFGsound},        "A_BFGsound"},
+    {{(arg0_t)A_FireBFG},         "A_FireBFG"},
+    {{(arg0_t)A_BFGSpray},        "A_BFGSpray"},
+    {{(arg0_t)A_Explode},         "A_Explode"},
+    {{(arg0_t)A_Pain},            "A_Pain"},
+    {{(arg0_t)A_PlayerScream},    "A_PlayerScream"},
+    {{(arg0_t)A_Fall},            "A_Fall"},
+    {{(arg0_t)A_XScream},         "A_XScream"},
+    {{(arg0_t)A_Look},            "A_Look"},
+    {{(arg0_t)A_Chase},           "A_Chase"},
+    {{(arg0_t)A_FaceTarget},      "A_FaceTarget"},
+    {{(arg0_t)A_PosAttack},       "A_PosAttack"},
+    {{(arg0_t)A_Scream},          "A_Scream"},
+    {{(arg0_t)A_SPosAttack},      "A_SPosAttack"},
+    {{(arg0_t)A_VileChase},       "A_VileChase"},
+    {{(arg0_t)A_VileStart},       "A_VileStart"},
+    {{(arg0_t)A_VileTarget},      "A_VileTarget"},
+    {{(arg0_t)A_VileAttack},      "A_VileAttack"},
+    {{(arg0_t)A_StartFire},       "A_StartFire"},
+    {{(arg0_t)A_Fire},            "A_Fire"},
+    {{(arg0_t)A_FireCrackle},     "A_FireCrackle"},
+    {{(arg0_t)A_Tracer},          "A_Tracer"},
+    {{(arg0_t)A_SkelWhoosh},      "A_SkelWhoosh"},
+    {{(arg0_t)A_SkelFist},        "A_SkelFist"},
+    {{(arg0_t)A_SkelMissile},     "A_SkelMissile"},
+    {{(arg0_t)A_FatRaise},        "A_FatRaise"},
+    {{(arg0_t)A_FatAttack1},      "A_FatAttack1"},
+    {{(arg0_t)A_FatAttack2},      "A_FatAttack2"},
+    {{(arg0_t)A_FatAttack3},      "A_FatAttack3"},
+    {{(arg0_t)A_BossDeath},       "A_BossDeath"},
+    {{(arg0_t)A_CPosAttack},      "A_CPosAttack"},
+    {{(arg0_t)A_CPosRefire},      "A_CPosRefire"},
+    {{(arg0_t)A_TroopAttack},     "A_TroopAttack"},
+    {{(arg0_t)A_SargAttack},      "A_SargAttack"},
+    {{(arg0_t)A_HeadAttack},      "A_HeadAttack"},
+    {{(arg0_t)A_BruisAttack},     "A_BruisAttack"},
+    {{(arg0_t)A_SkullAttack},     "A_SkullAttack"},
+    {{(arg0_t)A_Metal},           "A_Metal"},
+    {{(arg0_t)A_SpidRefire},      "A_SpidRefire"},
+    {{(arg0_t)A_BabyMetal},       "A_BabyMetal"},
+    {{(arg0_t)A_BspiAttack},      "A_BspiAttack"},
+    {{(arg0_t)A_Hoof},            "A_Hoof"},
+    {{(arg0_t)A_CyberAttack},     "A_CyberAttack"},
+    {{(arg0_t)A_PainAttack},      "A_PainAttack"},
+    {{(arg0_t)A_PainDie},         "A_PainDie"},
+    {{(arg0_t)A_KeenDie},         "A_KeenDie"},
+    {{(arg0_t)A_BrainPain},       "A_BrainPain"},
+    {{(arg0_t)A_BrainScream},     "A_BrainScream"},
+    {{(arg0_t)A_BrainDie},        "A_BrainDie"},
+    {{(arg0_t)A_BrainAwake},      "A_BrainAwake"},
+    {{(arg0_t)A_BrainSpit},       "A_BrainSpit"},
+    {{(arg0_t)A_SpawnSound},      "A_SpawnSound"},
+    {{(arg0_t)A_SpawnFly},        "A_SpawnFly"},
+    {{(arg0_t)A_BrainExplode},    "A_BrainExplode"},
+    {{(arg0_t)A_Detonate},        "A_Detonate"},       // killough 8/9/98
+    {{(arg0_t)A_Mushroom},        "A_Mushroom"},       // killough 10/98
+    {{(arg0_t)A_Die},             "A_Die"},            // killough 11/98
+    {{(arg0_t)A_Spawn},           "A_Spawn"},          // killough 11/98
+    {{(arg0_t)A_Turn},            "A_Turn"},           // killough 11/98
+    {{(arg0_t)A_Face},            "A_Face"},           // killough 11/98
+    {{(arg0_t)A_Scratch},         "A_Scratch"},        // killough 11/98
+    {{(arg0_t)A_PlaySound},       "A_PlaySound"},      // killough 11/98
+    {{(arg0_t)A_RandomJump},      "A_RandomJump"},     // killough 11/98
+    {{(arg0_t)A_LineEffect},      "A_LineEffect"},     // killough 11/98
 
-  {A_FireOldBFG,      "A_FireOldBFG"},      // killough 7/19/98: classic BFG firing function
-  {A_BetaSkullAttack, "A_BetaSkullAttack"}, // killough 10/98: beta lost souls attacked different
-  {A_Stop,            "A_Stop"},
+    {{(arg0_t)A_FireOldBFG},      "A_FireOldBFG"},      // killough 7/19/98: classic BFG firing function
+    {{(arg0_t)A_BetaSkullAttack}, "A_BetaSkullAttack"}, // killough 10/98: beta lost souls attacked different
+    {{(arg0_t)A_Stop},            "A_Stop"},
 
-  // This NULL entry must be the last in the list
-  {NULL,              "A_NULL"},  // Ty 05/16/98
+    // This NULL entry must be the last in the list
+    {{NULL},              "A_NULL"},  // Ty 05/16/98
 };
 
 // to hold startup code pointers from INFO.C
@@ -1462,14 +1475,20 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
   if (outfilename && *outfilename && !fileout)
     {
       static dbool   firstfile = TRUE; // to allow append to output log
+#ifndef PSX
       if (!strcmp(outfilename, "-"))
         fileout = stdout;
       else
+#endif
         if (!(fileout=fopen(outfilename, firstfile ? "wt" : "at")))
           {
             lprintf(LO_WARN, "Could not open -dehout file %s\n... using stdout.\n",
                    outfilename);
+#ifdef PSX
+            fileout = NULL;
+#else
             fileout = stdout;
+#endif
           }
       firstfile = FALSE;
     }
@@ -1575,7 +1594,11 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
 
   if (outfilename)   // killough 10/98: only at top recursion level
     {
+#ifdef PSX
+      if (fileout != NULL)
+#else
       if (fileout != stdout)
+#endif
         fclose(fileout);
       fileout = NULL;
     }
@@ -1642,7 +1665,7 @@ static void deh_procBexCodePointers(DEHFILE *fpin, FILE* fpout, char *line)
                                  deh_bexptrs[i].lookup,i,indexnum);
               found = TRUE;
             }
-        } while (!found && (deh_bexptrs[i].cptr != NULL));
+        } while (!found && (deh_bexptrs[i].cptr.arg0 != NULL));
 
       if (!found)
         if (fpout) fprintf(fpout,
@@ -1849,7 +1872,11 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
               if (strcasecmp(strval,deh_mobjflags[iy].name)) continue;
               if (fpout) {
                 fprintf(fpout,
+#ifdef PSX
+                  "ORed value 0x%08llx%08llx %s\n",
+#else
                   "ORed value 0x%08"PRIX64"%08"PRIX64" %s\n",
+#endif
                   (uint64_t)(deh_mobjflags[iy].value>>32) & 0xffffffff,
                   (uint64_t)deh_mobjflags[iy].value & 0xffffffff, strval
                 );
@@ -1872,8 +1899,13 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
 
           if (fpout)
             fprintf(fpout,
+#ifdef PSX
+                    "Result  =  0x%016llx\n"
+                    "Current    0x%016llx\n",
+#else
                     "Result  =  0x%016"PRIX64"\n"
                     "Current    0x%016"PRIX64"\n",
+#endif
                     value, mobjinfo[indexnum].flags);
 
           // Each "Bits" field can use any mnemonic, but it won't overwrite the values
@@ -1889,7 +1921,11 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
       setMobjInfoValue(indexnum, ix, value);
       if (fpout) {
         fprintf(fpout,
+#ifdef PSX
+          "Assigned 0x%08llx%08llx to %s(%d) at index %d\n",
+#else
           "Assigned 0x%08"PRIx64"%08"PRIx64" to %s(%d) at index %d\n",
+#endif
           (uint64_t)(value>>32) & 0xffffffff,
           (uint64_t)value & 0xffffffff, key, indexnum, ix
         );
@@ -1934,25 +1970,41 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
         }
       if (!strcasecmp(key,deh_state[0]))  // Sprite number
         {
+#ifdef PSX
+          if (fpout) fprintf(fpout," - sprite = %llu\n",(uint64_t)value);
+#else
           if (fpout) fprintf(fpout," - sprite = %"PRIu64"\n",(uint64_t)value);
+#endif
           states[indexnum].sprite = (spritenum_t)value;
         }
       else
         if (!strcasecmp(key,deh_state[1]))  // Sprite subnumber
           {
+#ifdef PSX
+            if (fpout) fprintf(fpout," - frame = %llu\n",(uint64_t)value);
+#else
             if (fpout) fprintf(fpout," - frame = %"PRIu64"\n",(uint64_t)value);
+#endif
             states[indexnum].frame = (long)value; // long
           }
         else
           if (!strcasecmp(key,deh_state[2]))  // Duration
             {
+#ifdef PSX
+              if (fpout) fprintf(fpout," - tics = %llu\n",(uint64_t)value);
+#else
               if (fpout) fprintf(fpout," - tics = %"PRIu64"\n",(uint64_t)value);
+#endif
               states[indexnum].tics = (long)value; // long
             }
           else
             if (!strcasecmp(key,deh_state[3]))  // Next frame
               {
+#ifdef PSX
+                if (fpout) fprintf(fpout," - nextstate = %llu\n",(uint64_t)value);
+#else
                 if (fpout) fprintf(fpout," - nextstate = %"PRIu64"\n",(uint64_t)value);
+#endif
                 states[indexnum].nextstate = (statenum_t)value;
               }
             else
@@ -1964,13 +2016,21 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
               else
                 if (!strcasecmp(key,deh_state[5]))  // Unknown 1
                   {
+#ifdef PSX
+                    if (fpout) fprintf(fpout," - misc1 = %llu\n",(uint64_t)value);
+#else
                     if (fpout) fprintf(fpout," - misc1 = %"PRIu64"\n",(uint64_t)value);
+#endif
                     states[indexnum].misc1 = (long)value; // long
                   }
                 else
                   if (!strcasecmp(key,deh_state[6]))  // Unknown 2
                     {
+#ifdef PSX
+                      if (fpout) fprintf(fpout," - misc2 = %llu\n",(uint64_t)value);
+#else
                       if (fpout) fprintf(fpout," - misc2 = %"PRIu64"\n",(uint64_t)value);
+#endif
                       states[indexnum].misc2 = (long)value; // long
                     }
                   else
@@ -2027,7 +2087,11 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
       if (value >= NUMSTATES)
         {
           if (fpout)
+#ifdef PSX
+            fprintf(fpout,"Bad pointer number %llu of %d\n",
+#else
             fprintf(fpout,"Bad pointer number %"PRIu64" of %d\n",
+#endif
                   (uint64_t)value, NUMSTATES);
           return;
         }
@@ -2035,7 +2099,11 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
       if (!strcasecmp(key,deh_state[4]))  // Codep frame (not set in Frame deh block)
         {
           states[indexnum].action = deh_codeptr[value];
-          if (fpout) fprintf(fpout," - applied from codeptr[%"PRIu64"] to states[%d]\n",
+#ifdef PSX
+            if (fpout) fprintf(fpout," - applied from codeptr[%llu] to states[%d]\n",
+#else
+            if (fpout) fprintf(fpout," - applied from codeptr[%"PRIu64"] to states[%d]\n",
+#endif
            (uint64_t)value,indexnum);
           // Write BEX-oriented line to match:
           // for (i=0;i<NUMSTATES;i++) could go past the end of the array
@@ -2047,12 +2115,16 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
                                      indexnum, &deh_bexptrs[i].lookup[2]);
                   break;
                 }
-              if (deh_bexptrs[i].cptr == NULL) // stop at null entry
+              if (deh_bexptrs[i].cptr.arg0 == NULL) // stop at null entry
                 break;
             }
         }
       else
+#ifdef PSX
+        if (fpout) fprintf(fpout,"Invalid frame pointer index for '%s' at %llu\n",
+#else
         if (fpout) fprintf(fpout,"Invalid frame pointer index for '%s' at %"PRIu64"\n",
+#endif
                            key, (uint64_t)value);
     }
 }

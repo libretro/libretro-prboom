@@ -89,8 +89,8 @@ dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
     // Modified handling.
     // Call action functions when the state is set
 
-    if (st->action)
-      st->action(mobj);
+    if (st->action.arg1)
+      st->action.arg1(mobj);
 
     seenstate[state] = 1 + st->nextstate;   // killough 4/9/98
 
@@ -744,14 +744,14 @@ void P_MobjThinker (mobj_t* mobj)
   if (mobj->momx | mobj->momy || mobj->flags & MF_SKULLFLY)
   {
     P_XYMovement(mobj);
-    if (mobj->thinker.function != P_MobjThinker) // cph - Must've been removed
+    if (mobj->thinker.function.arg1 != (void (*)(void *))P_MobjThinker) // cph - Must've been removed
       return;       // killough - mobj was removed
   }
 
   if (mobj->z != mobj->floorz || mobj->momz)
   {
     P_ZMovement(mobj);
-    if (mobj->thinker.function != P_MobjThinker) // cph - Must've been removed
+    if (mobj->thinker.function.arg1 != (void (*)(void *))P_MobjThinker) // cph - Must've been removed
       return;       // killough - mobj was removed
   }
   else if (!(mobj->momx | mobj->momy) && !sentient(mobj))
@@ -870,7 +870,7 @@ mobj_t* P_SpawnMobj(fixed_t x,fixed_t y,fixed_t z,mobjtype_t type)
   mobj->PrevY = mobj->y;
   mobj->PrevZ = mobj->z;
 
-  mobj->thinker.function = P_MobjThinker;
+  mobj->thinker.function.arg1 = (void (*)(void *))P_MobjThinker;
 
   //e6y
   mobj->friction    = ORIG_FRICTION;                        // phares 3/17/98

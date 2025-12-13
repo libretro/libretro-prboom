@@ -41,6 +41,12 @@
 
 #define VFS_ERROR_RETURN_VALUE -1
 
+#ifdef PSX
+#ifndef isspace
+#define isspace(X) ((X) == 0x20)
+#endif
+#endif
+
 struct RFILE
 {
    struct retro_vfs_file_handle *hfile;

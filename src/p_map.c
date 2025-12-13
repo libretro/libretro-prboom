@@ -46,6 +46,10 @@
 #include "m_bbox.h"
 #include "lprintf.h"
 
+#ifdef PSX
+#include <stddef.h>
+#endif
+
 static mobj_t    *tmthing;
 static fixed_t   tmx;
 static fixed_t   tmy;

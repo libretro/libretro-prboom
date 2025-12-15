@@ -635,6 +635,11 @@ else
 LIBS =
 endif
 
+# webOS
+ifneq (,$(or $(findstring webos,$(CROSS_COMPILE)),$(findstring starfish,$(CROSS_COMPILE))))
+   CFLAGS += -D_GNU_SOURCE
+endif
+
 ifeq ($(STATIC_LINKING),1)
 SHARED=
 fpic=

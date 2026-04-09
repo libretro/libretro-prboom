@@ -64,6 +64,8 @@ int SCREENHEIGHT = 200;
 
 //i_video
 static unsigned char *screen_buf = NULL;
+static bool have_sw_fb           = false;
+static bool sw_fb_checked        = false;
 
 /* libretro */
 static char g_wad_dir[1024];
@@ -345,6 +347,8 @@ void retro_init(void)
 void retro_deinit(void)
 {
    libretro_supports_bitmasks = false;
+   have_sw_fb                 = false;
+   sw_fb_checked              = false;
 
    retro_set_rumble_damage(0, 0.0f);
    retro_set_rumble_touch(0, 0.0f);
@@ -1649,6 +1653,42 @@ void I_FinishUpdate (void)
 {
    if (!video_cb)
      return;
+
+   if (!sw_fb_checked)
+   {
+      struct retro_framebuffer fb = {0};
+      fb.width                    = SCREENWIDTH;
+      fb.height                   = SCREENHEIGHT;
+      fb.access_flags             = RETRO_MEMORY_ACCESS_WRITE;
+
+      if (environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
+            && fb.data)
+      {
+         have_sw_fb = true;
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO,
+                  "Software framebuffer acquired (pitch: %u).\n",
+                  (unsigned)fb.pitch);
+      }
+      sw_fb_checked = true;
+   }
+
+   if (have_sw_fb)
+   {
+      struct retro_framebuffer fb = {0};
+      fb.width                    = SCREENWIDTH;
+      fb.height                   = SCREENHEIGHT;
+      fb.access_flags             = RETRO_MEMORY_ACCESS_WRITE;
+
+      if (environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
+            && fb.data)
+      {
+         memcpy(fb.data, screen_buf, fb.pitch * SCREENHEIGHT);
+         video_cb(fb.data, SCREENWIDTH, SCREENHEIGHT, fb.pitch);
+         return;
+      }
+   }
+
    video_cb(screen_buf, SCREENWIDTH, SCREENHEIGHT, SCREENPITCH);
 }
 

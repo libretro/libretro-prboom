@@ -59,6 +59,7 @@ int64_t rfread(void* buffer,
 int ms_to_next_tick;
 int mus_opl_gain = 250; // fine tune OPL output level
 
+int SCREENPITCH;
 int SCREENWIDTH  = 320;
 int SCREENHEIGHT = 200;
 
@@ -324,6 +325,7 @@ static bool libretro_supports_bitmasks = false;
 void retro_init(void)
 {
    unsigned level = 4;
+   SCREENPITCH  = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
    enum retro_pixel_format rgb565;
    struct retro_log_callback log;
 
@@ -585,12 +587,18 @@ static void update_variables(bool startup)
 
 #ifdef PSX
           if ((pch = strtok(str, "x")))
+          {
              SCREENWIDTH = (unsigned long)strtol(pch, NULL, 0);
+	     SCREENPITCH = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
+          }
           if ((pch = strtok(NULL, "x")))
              SCREENHEIGHT = (unsigned long)strtol(pch, NULL, 0);
 #else
          if ((pch = strtok(str, "x")))
+         {
             SCREENWIDTH = strtoul(pch, NULL, 0);
+	    SCREENPITCH = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
+         }
          if ((pch = strtok(NULL, "x")))
             SCREENHEIGHT = strtoul(pch, NULL, 0);
 #endif
@@ -600,8 +608,9 @@ static void update_variables(bool startup)
       }
       else
       {
-         SCREENWIDTH = 320;
+         SCREENWIDTH  = 320;
          SCREENHEIGHT = 200;
+	 SCREENPITCH  = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
       }
    }
 

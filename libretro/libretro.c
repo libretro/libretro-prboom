@@ -55,15 +55,15 @@ just forward declare the prototype */
 int64_t rfread(void* buffer,
    size_t elem_size, size_t elem_count, RFILE* stream);
 
-//i_system
+/* i_system */
 int ms_to_next_tick;
-int mus_opl_gain = 250; // fine tune OPL output level
+int mus_opl_gain = 250; /* fine tune OPL output level */
 
 int SCREENPITCH;
 int SCREENWIDTH  = 320;
 int SCREENHEIGHT = 200;
 
-//i_video
+/* i_video */
 static unsigned char *screen_buf = NULL;
 static bool have_sw_fb           = false;
 static bool sw_fb_checked        = false;
@@ -78,7 +78,7 @@ static bool cheats_enabled = false;
 static bool cheats_pending = false;
 static char **cheats_pending_list = NULL;
 
-//forward decls
+/* forward decls */
 bool D_DoomMainSetup(void);
 void D_DoomLoop(void);
 void M_QuitDOOM(int choice);
@@ -111,7 +111,7 @@ dbool   find_recursive_on;
 // that has acceptable performance at the default sensitivity value
 // (i.e. user can easily change mouse speed, so absolute value here is not critical)
 #define ANALOG_MOUSE_SPEED 128
-// Default deadzone: 15%
+/* Default deadzone: 15% */
 static int analog_deadzone = (int)(0.15f * ANALOG_RANGE);
 
 #define RETROPAD_CLASSIC RETRO_DEVICE_JOYPAD
@@ -324,10 +324,10 @@ static bool libretro_supports_bitmasks = false;
 
 void retro_init(void)
 {
-   unsigned level = 4;
-   SCREENPITCH  = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
    enum retro_pixel_format rgb565;
    struct retro_log_callback log;
+   unsigned level = 4;
+   SCREENPITCH    = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
 
    Z_Init(); /* 1/18/98 killough: start up memory stuff first */
 
@@ -868,7 +868,7 @@ bool retro_load_game(const struct retro_game_info *info)
          }
       }
 
-      // Get save directory
+      /* Get save directory */
       if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)
       {
          if (base_save_dir && strlen(base_save_dir) > 0)

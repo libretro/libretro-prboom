@@ -2929,3 +2929,28 @@ void doom_printf(const char *s, ...)
   va_end(v);
   players[consoleplayer].message = msg;  // set new message
 }
+
+/* G_Deinit
+ *
+ * Reset session-spanning g_game state.  Called from D_DoomDeinit.
+ *
+ * demolumpnum: cached lump index from G_DoPlayDemo's W_GetNumForName.
+ * If a session ends mid-demo (without G_CheckDemoStatus running),
+ * this index keeps pointing into the previous wad's lump table.  On
+ * next session it would either index wrong content or feed
+ * W_UnlockLumpNum a stale index that decrements an unrelated lump's
+ * lock count.  Reset to -1 here; the underlying lump table is about
+ * to be torn down by W_Exit anyway, so an explicit unlock isn't
+ * needed (and would be unsafe with a possibly-stale index).
+ *
+ * forced_loadgame / command_loadgame: the load-game error paths
+ * leave these in whichever state the last load attempt landed
+ * them.  Clean them so a fresh session doesn't inherit a "forced"
+ * or "from-command-line" flag that no longer applies.
+ */
+void G_Deinit(void)
+{
+   demolumpnum     = -1;
+   forced_loadgame = FALSE;
+   command_loadgame = FALSE;
+}

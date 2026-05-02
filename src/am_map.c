@@ -248,6 +248,18 @@ int markpointnum_max = 0;       // killough 2/22/98
 
 static dbool   stopped = TRUE;
 
+/* Track the last (level, episode) AM_LevelInit ran for, so toggling
+ * automap mid-level reuses the existing geometry-derived scale and
+ * boundaries instead of recomputing.  These were function-local
+ * statics in AM_Start originally, but on libretro they had to
+ * survive across content loads -- and the previous session's
+ * (gamemap, gameepisode) collided with the new session's on
+ * matching slots, skipping AM_LevelInit and leaving the new map's
+ * automap with the previous map's scale_mtof / min_scale_mtof /
+ * boundaries.  Promoted to file scope so AM_Deinit can reset them. */
+static int am_lastlevel = -1;
+static int am_lastepisode = -1;
+
 //
 // AM_activateNewScale()
 //
@@ -539,21 +551,36 @@ void AM_Stop (void)
 */
 void AM_Start(void)
 {
-  static int lastlevel = -1, lastepisode = -1;
-
   if (!stopped)
     AM_Stop();
   stopped = false;
 
-  if (lastlevel != gamemap || lastepisode != gameepisode)
+  if (am_lastlevel != gamemap || am_lastepisode != gameepisode)
   {
     AM_LevelInit();
-    lastlevel   = gamemap;
-    lastepisode = gameepisode;
+    am_lastlevel   = gamemap;
+    am_lastepisode = gameepisode;
   }
 
   AM_initVariables();
   AM_loadPics();
+}
+
+/*
+ * AM_Deinit()
+ *
+ * Called from D_DoomDeinit.  Resets the AM_Start (level, episode)
+ * cache so a subsequent retro_load_game's AM_Start always
+ * re-runs AM_LevelInit -- otherwise the new session's matching
+ * (gamemap, gameepisode) reuses the previous WAD's geometry-
+ * derived scale/boundaries.  Also forces stopped back to its
+ * initial-state value.
+ */
+void AM_Deinit(void)
+{
+  am_lastlevel   = -1;
+  am_lastepisode = -1;
+  stopped        = TRUE;
 }
 
 /*

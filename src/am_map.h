@@ -58,6 +58,9 @@ void AM_Drawer (void);
 // if the level is completed while it is up.
 void AM_Stop (void);
 
+/* Reset session-spanning automap statics.  Called from D_DoomDeinit. */
+void AM_Deinit(void);
+
 // killough 2/22/98: for saving automap information in savegame:
 
 extern void AM_Start(void);

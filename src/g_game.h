@@ -78,6 +78,9 @@ const uint8_t *G_ReadOptions(const uint8_t *demo_p);   /* killough 3/1/98 - cph:
 uint8_t *G_WriteOptions(uint8_t *demo_p);        // killough 3/1/98
 void G_PlayerReborn(int player);
 void G_RestartLevel(void); // CPhipps - menu involked level restart
+
+/* Reset session-spanning g_game statics.  Called from D_DoomDeinit. */
+void G_Deinit(void);
 void G_DoVictory(void);
 void G_BuildTiccmd (ticcmd_t* cmd); // CPhipps - move decl to header
 void G_ChangedPlayerColour(int pn, int cl); // CPhipps - On-the-fly player colour changing

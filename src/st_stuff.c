@@ -248,9 +248,6 @@ static player_t *plyr;
 // ST_Start() has just been called
 static dbool st_firsttime;
 
-// used to execute ST_Init() only once
-static int veryfirsttime = 1;
-
 // CPhipps - no longer do direct PLAYPAL handling here
 
 // used for timing
@@ -1188,6 +1185,5 @@ static void ST_Stop(void)
 */
 void ST_Init(void)
 {
-  veryfirsttime = 0;
   ST_loadData();
 }

@@ -97,6 +97,23 @@ static retro_input_state_t input_state_cb;
 
 static void process_input(void);
 
+/* Backing storage for the const char **myargv that prboom's argv
+ * machinery reads.  We populate this in retro_load_game and free
+ * each heap-allocated slot in retro_unload_game (see
+ * free_load_argv below).  Every populated slot is heap-allocated
+ * so the cleanup is uniform. */
+static char *load_argv[32];
+
+static void free_load_argv(void)
+{
+   unsigned i;
+   for (i = 0; i < sizeof(load_argv)/sizeof(load_argv[0]); i++)
+   {
+      free(load_argv[i]);
+      load_argv[i] = NULL;
+   }
+}
+
 #define MAX_PADS 1
 static unsigned doom_devices[1];
 
@@ -787,10 +804,13 @@ bool retro_load_game(const struct retro_game_info *info)
 {
    unsigned i;
    int argc = 0;
-   static char *argv[32] = {NULL};
+   char **argv = load_argv;
 
-   for (i = 0; i < 32; i++)
-      argv[0] = NULL;
+   /* Free any leftover heap pointers from a previous session.
+    * Belt-and-braces: retro_unload_game also frees, but if a
+    * frontend re-calls retro_load_game without an intervening
+    * unload (unusual but legal), we'd otherwise leak. */
+   free_load_argv();
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_RUMBLE_INTERFACE, &rumble))
    {
@@ -856,15 +876,17 @@ bool retro_load_game(const struct retro_game_info *info)
          if((deh = FindFileInDir(g_wad_dir, name_without_ext, ".deh"))
                || (deh = FindFileInDir(g_wad_dir, name_without_ext, ".bex")))
          {
-            argv[argc++] = "-deh";
-            argv[argc++] = deh;
+            /* strdup so every argv[] slot is uniformly heap-owned;
+             * see retro_unload_game cleanup. */
+            argv[argc++] = strdup("-deh");
+            argv[argc++] = deh;  /* already heap from FindFileInDir */
          }
 
          if((baseconfig = FindFileInDir(g_wad_dir, name_without_ext, ".prboom.cfg"))
                || (baseconfig = I_FindFile("prboom.cfg", NULL)))
          {
-            argv[argc++] = "-baseconfig";
-            argv[argc++] = baseconfig;
+            argv[argc++] = strdup("-baseconfig");
+            argv[argc++] = baseconfig;  /* already heap */
          }
       }
 
@@ -889,8 +911,8 @@ bool retro_load_game(const struct retro_game_info *info)
    }
 
 #if DEBUG
-   argv[argc++] = "-dehout";
-   argv[argc++] = "-";
+   argv[argc++] = strdup("-dehout");
+   argv[argc++] = strdup("-");
 #endif
 
    myargc = argc;
@@ -955,6 +977,12 @@ void retro_unload_game(void)
    if (screen_buf)
       free(screen_buf);
    screen_buf = NULL;
+
+   /* Release the strdup'd argv slots from retro_load_game.
+    * Without this, every content load leaks ~8-12 strdups
+    * (prboom, -iwad/-file, the path, optionally -deh/-baseconfig
+    * with their paths). */
+   free_load_argv();
 
    myargc     = 0;
    myargv     = NULL;

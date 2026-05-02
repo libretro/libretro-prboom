@@ -1509,6 +1509,7 @@ void D_DoomDeinit(void)
   R_FlushAllPatches();
   V_FreeScreens();
   V_DestroyUnusedTrueColorPalettes();
+  S_Shutdown();
   I_ShutdownSound();
   I_ShutdownMusic();
   U_FreeMapInfo();

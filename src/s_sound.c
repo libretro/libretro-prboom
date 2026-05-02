@@ -155,6 +155,48 @@ void S_Init(int sfxVolume, int musicVolume)
   }
 }
 
+/* S_Shutdown
+ *
+ * Tears down the per-session sound state established by S_Init.
+ * Called from D_DoomDeinit.
+ *
+ *  - S_StopMusic: stops the current track, unlocks the music lump,
+ *    and clears mus_playing (issue #53 from the audit -- mus_playing
+ *    used to carry across sessions).
+ *  - S_Stop: stops every active sound channel.
+ *  - free(channels) + numChannels=0: releases the calloc'd channel
+ *    buffer.  S_Init calloc'd this every call without freeing the
+ *    previous allocation; the leak was numChannels * sizeof(channel_t)
+ *    per content load.
+ *  - Zero S_music[i].lumpnum: S_ChangeMusic caches lump numbers in
+ *    S_music[i].lumpnum on first lookup ("if (!music->lumpnum)").
+ *    Without invalidating the cache, a WAD swap to content with
+ *    different music lumps would replay the previous WAD's lumpnums,
+ *    yielding wrong music or out-of-range lookups.
+ *
+ * Safe to call when S_Init wasn't called (channels==NULL): the
+ * NULL-guarded S_Stop loop short-circuits and free(NULL) is a no-op.
+ */
+void S_Shutdown(void)
+{
+   int i;
+
+   if (!nomusicparm)
+      S_StopMusic();
+
+   if (!nosfxparm && channels)
+      S_Stop();
+
+   free(channels);
+   channels = NULL;
+   numChannels = 0;
+
+   /* Invalidate cached music lump numbers so the next session
+    * re-resolves them against whatever WAD is now loaded. */
+   for (i = 0; i < NUMMUSIC; i++)
+      S_music[i].lumpnum = 0;
+}
+
 void S_Stop(void)
 {
   int cnum;

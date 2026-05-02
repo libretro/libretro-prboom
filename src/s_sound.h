@@ -41,6 +41,11 @@
 //
 void S_Init(int sfxVolume, int musicVolume);
 
+// Releases per-session sound state: stops playing sounds and music,
+// frees the channels buffer, and clears cached music lump numbers
+// so the next session re-resolves them against the new WAD.
+void S_Shutdown(void);
+
 // Kills all sounds
 void S_Stop(void);
 

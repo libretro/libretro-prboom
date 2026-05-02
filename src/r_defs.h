@@ -352,6 +352,12 @@ typedef struct vissprite_s
   int patch;
   uint64_t mobjflags;
 
+  /* When non-NULL, R_DrawVisSprite renders this prerasterized voxel
+   * patch instead of looking up patch+firstspritelump in the WAD
+   * patch cache.  Set by R_ProjectSprite via R_KVX_LookupSprite when
+   * a (sprite, frame) is bound to a voxel.  See r_voxel.c. */
+  const struct rpatch_s *voxel_patch;
+
   // for color translation and shadow draw, maxbright frames as well
   const lighttable_t *colormap;
 

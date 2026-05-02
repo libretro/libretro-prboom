@@ -505,8 +505,10 @@ void R_Init (void)
   R_InitTranslationTables();
   lprintf(LO_INFO, "R_InitPatches\n");
   R_InitPatches();
-  lprintf(LO_INFO, "R_KVX_Init\n");
-  R_KVX_Init();
+  /* R_KVX_Init is NOT called here -- numsprites is still 0 at this
+   * point because R_InitSpriteDefs runs later via P_Init ->
+   * R_InitSprites.  R_KVX_Init is called from R_InitSprites instead,
+   * after the sprite table has been populated. */
 }
 
 /* R_Deinit
@@ -536,8 +538,10 @@ void R_Deinit(void)
 {
    int i;
 
-   /* Voxel test stub: free the synthetic model and its prerasterized
-    * sprite patch.  Idempotent -- safe to call when uninitialized. */
+   /* Voxel system: free the per-(sprite, frame) mapping table and
+    * every model + rpatch it holds.  Idempotent -- safe to call
+    * when uninitialized (table may be NULL if R_KVX_Init never
+    * ran or returned early). */
    R_KVX_Shutdown();
 
    /* sprites: spritedef_t array holding per-sprite spriteframes.

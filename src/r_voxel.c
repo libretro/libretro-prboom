@@ -390,21 +390,20 @@ static uint8_t kvx_voxel_at(const kvx_model_t *m, int x, int y, int z)
  * Doom's patch format reserves 0xff as the "no voxel" indicator. */
 #define KVX_TRANSPARENT 0xff
 
-rpatch_t *R_KVX_RasterizeFront(const kvx_model_t *m,
-                               const uint8_t *palette_remap)
+/* Rasterize a voxel front-view at exact target dimensions.  Each
+ * output pixel samples the model voxel at
+ *   model_x = out_x * model_x_size / target_w
+ *   model_z = out_z * model_z_size / target_h
+ * which handles both upscale (model smaller than target) and
+ * downscale (model larger than target) uniformly.  This lets a
+ * voxel be rendered to match an existing sprite's size, even when
+ * the voxel resolution doesn't match.
+ *
+ * Returns NULL on alloc failure or invalid dimensions. */
+rpatch_t *R_KVX_RasterizeFrontSized(const kvx_model_t *m,
+                                    const uint8_t *palette_remap,
+                                    int target_w, int target_h)
 {
-   /* Output dimensions: front view = looking down -Y.  Each output
-    * column corresponds to a model X plane; each output row to a
-    * model Z plane.  Depth axis is Y (model "into the page").
-    *
-    * The output sprite is upscaled by a constant factor: each voxel
-    * becomes UPSCALE x UPSCALE pixels.  This is purely a sprite-size
-    * concern -- a real Doom medikit sprite is ~16-25 pixels tall, but
-    * an 8-tall voxel rasterized 1:1 produces a tiny sprite that's
-    * barely visible at typical view distances on modern displays.
-    * Upscaling here is a placeholder; Turn 3's per-actor scale
-    * factor (from VOXELDEF) makes this configurable. */
-#define KVX_UPSCALE 4
    int      width;
    int      height;
    int      x, z, y;
@@ -420,28 +419,31 @@ rpatch_t *R_KVX_RasterizeFront(const kvx_model_t *m,
    if (!m)
       return NULL;
 
-   width  = m->x_size * KVX_UPSCALE;
-   height = m->z_size * KVX_UPSCALE;
+   width  = target_w;
+   height = target_h;
 
    if (width <= 0 || height <= 0)
       return NULL;
 
-   /* First pass: rasterize directly into a column-major scratch
-    * buffer.  pixels[col * height + row] = color, or
-    * KVX_TRANSPARENT if no opaque voxel at this position.  Each
-    * model voxel becomes a KVX_UPSCALE x KVX_UPSCALE block of
-    * identical pixels in the output. */
+   /* First pass: rasterize into a column-major scratch buffer.
+    * pixels[col * height + row] = color, or KVX_TRANSPARENT if no
+    * opaque voxel at this position.  Source coordinates are
+    * computed by proportional mapping so the voxel fills the
+    * target rectangle independent of its native resolution. */
    pixels = (uint8_t *)malloc((size_t)width * (size_t)height);
    if (!pixels)
       return NULL;
 
    for (x = 0; x < width; x++)
    {
-      int mx = x / KVX_UPSCALE;
+      int mx = (x * m->x_size) / width;
+      if (mx >= m->x_size) mx = m->x_size - 1;
       for (z = 0; z < height; z++)
       {
-         int mz = z / KVX_UPSCALE;
+         int mz = (z * m->z_size) / height;
          uint8_t color = KVX_TRANSPARENT;
+
+         if (mz >= m->z_size) mz = m->z_size - 1;
 
          /* Walk Y from front to back, take the first opaque voxel. */
          for (y = 0; y < m->y_size; y++)
@@ -520,7 +522,7 @@ rpatch_t *R_KVX_RasterizeFront(const kvx_model_t *m,
    /* Sprite origin: center horizontally, bottom at row 0.  This is
     * a reasonable default for a voxel meant to replace a pickup
     * sprite (which sits on the ground).  Real KVX models specify
-    * pivot points -- Turn 3 will respect them. */
+    * pivot points -- a later commit will respect them. */
    patch->leftoffset   = width / 2;
    patch->topoffset    = height;
    patch->locks        = 0;
@@ -575,6 +577,24 @@ rpatch_t *R_KVX_RasterizeFront(const kvx_model_t *m,
    }
 
    return patch;
+}
+
+/* Rasterize at a default scale.  Used by the fallback test cube and
+ * any caller that doesn't have a specific target sprite size in
+ * mind.  The default upscale factor exists because the synthetic
+ * test cube is 8x8x8 -- rasterized 1:1 it produces an 8x8 pixel
+ * sprite which is barely visible.  Real KVX content sized to match
+ * its target sprite should call R_KVX_RasterizeFrontSized directly
+ * with the sprite's dimensions. */
+#define KVX_DEFAULT_UPSCALE 4
+rpatch_t *R_KVX_RasterizeFront(const kvx_model_t *m,
+                               const uint8_t *palette_remap)
+{
+   if (!m)
+      return NULL;
+   return R_KVX_RasterizeFrontSized(m, palette_remap,
+                                    m->x_size * KVX_DEFAULT_UPSCALE,
+                                    m->z_size * KVX_DEFAULT_UPSCALE);
 }
 
 void R_KVX_FreeSprite(rpatch_t *p)
@@ -785,9 +805,10 @@ kvx_model_t *R_KVX_BuiltinTestVoxel(void)
 
 #ifndef KVX_NO_ENGINE_GLUE
 
-#include "info.h"           /* for sprnames[] */
-#include "w_wad.h"          /* W_CheckNumForName */
-#include "r_state.h"        /* firstspritelump */
+#include "info.h"           /* sprnames[], NUMSPRITES */
+#include "w_wad.h"          /* W_CheckNumForName, W_CacheLumpNum, ... */
+#include "r_state.h"        /* firstspritelump, numsprites */
+#include "z_zone.h"         /* PU_STATIC, Z_Free */
 #include "lprintf.h"
 
 /* User-controlled toggle.  Bound to the "voxel_sprites" cvar (see
@@ -795,26 +816,64 @@ kvx_model_t *R_KVX_BuiltinTestVoxel(void)
  * entry (see m_menu.c).  Default is 0 (off) -- voxel rendering is an
  * opt-in feature.
  *
- * When this is 0, R_KVX_Init() leaves the slot empty so
- * R_KVX_LookupSprite() returns NULL for every lump and the engine
- * renders normal sprites.  R_KVX_LookupSprite() additionally checks
- * this flag at lookup time as a defense in depth, so flipping the
- * flag without re-running Init still does the right thing.
- *
- * This is a developer-facing placeholder for Turn 3's VOXELDEF lump
- * system, where users will see voxels only when they explicitly load
- * a voxel mod -- but the menu plumbing established here will carry
- * forward as the on/off toggle for that system. */
+ * When this is 0, R_KVX_Init() leaves the mapping table empty and
+ * R_KVX_LookupSprite() returns NULL for every (sprite, frame) so
+ * the engine renders normal sprites.  R_KVX_LookupSprite() also
+ * checks this flag at lookup time as defense in depth. */
 int voxel_sprites = 0;
 
-static int           kvx_slot_lump  = -1;     /* absolute sprite lump number */
-static rpatch_t     *kvx_slot_patch = NULL;
-static kvx_model_t  *kvx_slot_model = NULL;
+/* Per-sprite, per-frame mapping table.  Indexed as
+ * kvx_table[sprite_index * KVX_MAX_FRAMES + frame].
+ *
+ * KVX_MAX_FRAMES covers letters 'A' through one past the practical
+ * limit; vanilla Doom uses 'A'..'Y' or so for any single sprite, but
+ * DEHACKED-extended frames can go further.  32 is comfortable. */
+#define KVX_MAX_FRAMES  32
+
+typedef struct kvx_voxel_entry_s
+{
+   kvx_model_t *model;
+   rpatch_t    *patch;
+} kvx_voxel_entry_t;
+
+static kvx_voxel_entry_t *kvx_table          = NULL;
+static int                kvx_table_sprites  = 0;
+static int                kvx_table_count    = 0;  /* populated entries */
+
+/* Parse statistics, accumulated across all voxeldef blocks.
+ * Reported in a final summary line so users can see how many
+ * mappings landed and why the rest didn't.  Useful when a voxel
+ * mod targets sprite names from a different IWAD (e.g. Chex Quest
+ * voxels loaded against doom2.wad) and most entries are silently
+ * rejected.  Defined here (before the forward decls) so other
+ * functions can reference it. */
+typedef struct kvx_parse_stats_s
+{
+   int registered;       /* mappings that landed successfully */
+   int unknown_sprite;   /* SPRITE name not in sprnames[] */
+   int bad_lump;         /* lump missing, unparseable, or rasterize failed */
+   int syntax_error;     /* malformed VOXELDEF block */
+} kvx_parse_stats_t;
+
+/* Forward decls for helpers defined further down. */
+static void kvx_register_test_voxel(void);
+static int  kvx_load_kvx_lump(const char *lumpname,
+                              int sprite_idx, int frame,
+                              kvx_model_t **out_model,
+                              rpatch_t    **out_patch);
+static void kvx_register_mapping(int sprite_idx, int frame,
+                                 kvx_model_t *model,
+                                 rpatch_t    *patch);
+static int  kvx_parse_voxeldef(const char *src, int len,
+                               kvx_parse_stats_t *stats);
 
 void R_KVX_Init(void)
 {
-   /* Tear down any previous slot (libretro reload safety, and
-    * also the OFF->ON->OFF->ON path from M_ChangeVoxelSprites). */
+   int                voxeldef_lump;
+   kvx_parse_stats_t  stats;
+
+   /* Tear down any previous mapping (libretro reload safety,
+    * OFF->ON->OFF->ON menu toggle path). */
    R_KVX_Shutdown();
 
    if (!voxel_sprites)
@@ -824,73 +883,796 @@ void R_KVX_Init(void)
       return;
    }
 
-   /* Build the synthetic test model. */
-   kvx_slot_model = R_KVX_BuiltinTestVoxel();
-   if (!kvx_slot_model)
-      return;
-
-   /* Rasterize the front view.  Identity palette mapping: the test
-    * voxel's color values are already PLAYPAL indices. */
-   kvx_slot_patch = R_KVX_RasterizeFront(kvx_slot_model, NULL);
-   if (!kvx_slot_patch)
+   /* Allocate the mapping table.  numsprites is set during
+    * R_InitSpriteDefs which has already run by the time R_Init
+    * gets to us. */
+   kvx_table_sprites = numsprites;
+   if (kvx_table_sprites <= 0)
    {
-      R_KVX_Free(kvx_slot_model);
-      kvx_slot_model = NULL;
+      lprintf(LO_INFO, "R_KVX_Init: numsprites = %d, skipping\n",
+              kvx_table_sprites);
       return;
    }
 
-   /* Bind to the medikit pickup sprite (MEDI), frame A.  The frame-
-    * A lump is named "MEDIA0" in the WAD.  Sprite lumps live in the
-    * ns_sprites namespace (between S_START / S_END markers); the
-    * default ns_global namespace doesn't see them, so we must call
-    * the namespace-aware form explicitly.  Returns -1 if not
-    * present (e.g. running on a non-Doom IWAD that lacks this
-    * sprite). */
+   kvx_table = (kvx_voxel_entry_t *)calloc(
+                  (size_t)kvx_table_sprites * KVX_MAX_FRAMES,
+                  sizeof(kvx_voxel_entry_t));
+   if (!kvx_table)
    {
-      int lump = (W_CheckNumForName)("MEDIA0", ns_sprites);
-      if (lump < 0)
-      {
-         lprintf(LO_INFO, "R_KVX_Init: MEDIA0 lump not found, voxel "
-                          "test stub disabled\n");
-         R_KVX_FreeSprite(kvx_slot_patch);
-         R_KVX_Free(kvx_slot_model);
-         kvx_slot_patch = NULL;
-         kvx_slot_model = NULL;
-         return;
-      }
-      kvx_slot_lump = lump;
+      lprintf(LO_WARN, "R_KVX_Init: out of memory allocating mapping table\n");
+      return;
+   }
+   kvx_table_count = 0;
+
+   /* Look for a VOXELDEF lump.  If one or more is loaded, parse
+    * each in WAD load order so later lumps can override earlier
+    * mappings. */
+   memset(&stats, 0, sizeof(stats));
+   voxeldef_lump = (W_CheckNumForName)("VOXELDEF", ns_global);
+   if (voxeldef_lump >= 0)
+   {
+      const char *src;
+      int          len;
+
+      len = W_LumpLength(voxeldef_lump);
+      src = (const char *)W_CacheLumpNum(voxeldef_lump);
+      if (src && len > 0)
+         kvx_parse_voxeldef(src, len, &stats);
+      W_UnlockLumpNum(voxeldef_lump);
    }
 
-   lprintf(LO_INFO, "R_KVX_Init: voxel test stub bound to "
-                    "MEDIA0 (lump %d)\n", kvx_slot_lump);
+   if (stats.registered > 0)
+   {
+      /* Report the breakdown so a user with a partial-success
+       * voxel mod (e.g. Chex Quest voxels on doom2.wad, where many
+       * Chex sprite names don't exist) can see what was skipped
+       * and why. */
+      int rejected = stats.unknown_sprite + stats.bad_lump +
+                     stats.syntax_error;
+      if (rejected > 0)
+         lprintf(LO_INFO, "R_KVX_Init: VOXELDEF parsed, %d registered, "
+                          "%d skipped (%d unknown sprite, %d bad lump, "
+                          "%d syntax error)\n",
+                          stats.registered, rejected,
+                          stats.unknown_sprite, stats.bad_lump,
+                          stats.syntax_error);
+      else
+         lprintf(LO_INFO, "R_KVX_Init: VOXELDEF parsed, %d voxel "
+                          "mappings registered\n", stats.registered);
+   }
+   else if (voxeldef_lump >= 0)
+   {
+      /* VOXELDEF was loaded but produced zero mappings.  Likely a
+       * complete sprite-name mismatch (wrong IWAD).  Skip the test
+       * cube fallback -- the user explicitly tried to load a voxel
+       * mod, replacing it with a placeholder cube would be more
+       * confusing than helpful. */
+      lprintf(LO_WARN, "R_KVX_Init: VOXELDEF parsed, 0 mappings landed "
+                       "(%d skipped: %d unknown sprite, %d bad lump, "
+                       "%d syntax error).  Wrong IWAD?\n",
+                       stats.unknown_sprite + stats.bad_lump +
+                          stats.syntax_error,
+                       stats.unknown_sprite, stats.bad_lump,
+                       stats.syntax_error);
+   }
+   else
+   {
+      /* No VOXELDEF in any loaded WAD.  Fall back to the synthetic
+       * test cube bound to MEDIA0, so the menu toggle still has a
+       * visible effect when no voxel mod is loaded.  This keeps
+       * the integration testable on stock IWADs while real voxel
+       * mods are being authored. */
+      lprintf(LO_INFO, "R_KVX_Init: no VOXELDEF lump, registering "
+                       "test cube on MEDI/A as fallback\n");
+      kvx_register_test_voxel();
+   }
 }
 
 void R_KVX_Shutdown(void)
 {
-   if (kvx_slot_patch)
+   int i, n;
+
+   if (!kvx_table)
    {
-      R_KVX_FreeSprite(kvx_slot_patch);
-      kvx_slot_patch = NULL;
+      kvx_table_sprites = 0;
+      kvx_table_count   = 0;
+      return;
    }
-   if (kvx_slot_model)
+
+   n = kvx_table_sprites * KVX_MAX_FRAMES;
+   for (i = 0; i < n; i++)
    {
-      R_KVX_Free(kvx_slot_model);
-      kvx_slot_model = NULL;
+      if (kvx_table[i].patch)
+      {
+         R_KVX_FreeSprite(kvx_table[i].patch);
+         kvx_table[i].patch = NULL;
+      }
+      if (kvx_table[i].model)
+      {
+         R_KVX_Free(kvx_table[i].model);
+         kvx_table[i].model = NULL;
+      }
    }
-   kvx_slot_lump = -1;
+   free(kvx_table);
+   kvx_table         = NULL;
+   kvx_table_sprites = 0;
+   kvx_table_count   = 0;
 }
 
-const rpatch_t *R_KVX_LookupSprite(int lump)
+const rpatch_t *R_KVX_LookupSprite(int sprite, int frame)
 {
    /* Defense in depth: if the user disabled voxel sprites without
     * triggering a re-init (shouldn't happen via the menu callback,
-    * but cheap to guard), short-circuit here so we never serve a
-    * stale slot. */
-   if (!voxel_sprites)
+    * but cheap to guard). */
+   if (!voxel_sprites || !kvx_table)
       return NULL;
-   if (kvx_slot_lump >= 0 && lump == kvx_slot_lump)
-      return kvx_slot_patch;
-   return NULL;
+   if (sprite < 0 || sprite >= kvx_table_sprites)
+      return NULL;
+   if (frame < 0 || frame >= KVX_MAX_FRAMES)
+      return NULL;
+   return kvx_table[sprite * KVX_MAX_FRAMES + frame].patch;
+}
+
+/* Look up a sprite name (4 chars, e.g. "MEDI") in the sprnames[]
+ * array and return its index, or -1 if not found.  Sprite names
+ * in DOOM are 4 chars; sprnames[i] is a NUL-terminated 4-char string. */
+static int kvx_lookup_sprite_name(const char *name)
+{
+   int i;
+   for (i = 0; i < numsprites; i++)
+   {
+      if (sprnames[i] &&
+          name[0] == sprnames[i][0] &&
+          name[1] == sprnames[i][1] &&
+          name[2] == sprnames[i][2] &&
+          name[3] == sprnames[i][3])
+         return i;
+   }
+   return -1;
+}
+
+/* Load a KVX from a WAD lump and prerasterize at the target
+ * sprite's dimensions.  On success, returns 1 and writes the
+ * kvx_model_t and rpatch_t pointers to *out_model and *out_patch.
+ * Caller takes ownership.  On failure returns 0 and leaves outputs
+ * unchanged.
+ *
+ * The (sprite_idx, frame) tuple identifies the sprite the voxel
+ * will replace; we look up that sprite's first-rotation lump and
+ * use its dimensions as the rasterization target.  This makes the
+ * voxel a drop-in size match for the original sprite -- a tiny
+ * floor splat stays tiny, a tall pickup stays tall -- regardless
+ * of whether the KVX is 8x8x8 or 128x128x128 internally.
+ *
+ * If sprite_idx is invalid or the sprite has no rotation 0 lump
+ * loaded (DEHACKED-extended sprite missing graphics, etc.), we
+ * fall back to the default upscale rasterizer so we still produce
+ * something. */
+static int kvx_load_kvx_lump(const char *lumpname,
+                             int sprite_idx, int frame,
+                             kvx_model_t **out_model,
+                             rpatch_t    **out_patch)
+{
+   int          lumpnum;
+   int          len;
+   const void  *data;
+   kvx_model_t *m;
+   rpatch_t    *p;
+   int          target_w = 0;
+   int          target_h = 0;
+   int          target_leftoffset = 0;
+   int          target_topoffset = 0;
+   int          have_offsets = 0;
+
+   lumpnum = (W_CheckNumForName)(lumpname, ns_global);
+   if (lumpnum < 0)
+   {
+      lprintf(LO_WARN, "R_KVX: VOXELDEF references missing lump '%s'\n",
+              lumpname);
+      return 0;
+   }
+
+   len  = W_LumpLength(lumpnum);
+   data = W_CacheLumpNum(lumpnum);
+   if (!data || len <= 0)
+   {
+      lprintf(LO_WARN, "R_KVX: lump '%s' is empty\n", lumpname);
+      W_UnlockLumpNum(lumpnum);
+      return 0;
+   }
+
+   m = R_KVX_Load(data, (size_t)len);
+   W_UnlockLumpNum(lumpnum);
+
+   if (!m)
+   {
+      lprintf(LO_WARN, "R_KVX: lump '%s' failed to parse as KVX\n",
+              lumpname);
+      return 0;
+   }
+
+   /* Look up the original sprite's dimensions and offsets so we
+    * can rasterize the voxel at matching size and pivot.  We use
+    * rotation 0 as the canonical view; voxels render the same in
+    * all rotations until the multi-rotation cache lands.  Bounds-
+    * check the sprite/frame indices defensively -- a VOXELDEF that
+    * references a valid sprite name pointing at a frame the sprite
+    * doesn't actually have shouldn't crash us. */
+   if (sprite_idx >= 0 && sprite_idx < numsprites &&
+       sprites && sprites[sprite_idx].spriteframes &&
+       frame >= 0 && frame < sprites[sprite_idx].numframes)
+   {
+      const spriteframe_t *sf = &sprites[sprite_idx].spriteframes[frame];
+      int sprite_lump = sf->lump[0];
+      if (sprite_lump >= 0)
+      {
+         const rpatch_t *orig = R_CachePatchNum(sprite_lump + firstspritelump);
+         if (orig)
+         {
+            target_w = orig->width;
+            target_h = orig->height;
+            target_leftoffset = orig->leftoffset;
+            target_topoffset  = orig->topoffset;
+            have_offsets = 1;
+         }
+         R_UnlockPatchNum(sprite_lump + firstspritelump);
+      }
+   }
+
+   if (target_w > 0 && target_h > 0)
+      p = R_KVX_RasterizeFrontSized(m, NULL, target_w, target_h);
+   else
+      p = R_KVX_RasterizeFront(m, NULL);
+
+   if (!p)
+   {
+      R_KVX_Free(m);
+      lprintf(LO_WARN, "R_KVX: rasterization of '%s' failed\n", lumpname);
+      return 0;
+   }
+
+   /* Override the rasterizer's default offsets with the original
+    * sprite's so the voxel positions identically.  Without this,
+    * a small floor splat that should sit on the ground would
+    * render with bottom-edge at thing origin (i.e. floating in
+    * the air at the thing's z position). */
+   if (have_offsets)
+   {
+      p->leftoffset = target_leftoffset;
+      p->topoffset  = target_topoffset;
+   }
+
+   *out_model = m;
+   *out_patch = p;
+   return 1;
+}
+
+/* Bind a (sprite, frame) cell to a (model, patch) pair.  Frees any
+ * previous occupant of the cell, transferring ownership of the new
+ * pair into the table.  Out-of-range arguments cause the new pair
+ * to be freed and discarded (defensive; callers should validate
+ * first). */
+static void kvx_register_mapping(int sprite_idx, int frame,
+                                 kvx_model_t *model,
+                                 rpatch_t    *patch)
+{
+   int idx;
+
+   if (sprite_idx < 0 || sprite_idx >= kvx_table_sprites ||
+       frame < 0 || frame >= KVX_MAX_FRAMES)
+   {
+      R_KVX_FreeSprite(patch);
+      R_KVX_Free(model);
+      return;
+   }
+
+   idx = sprite_idx * KVX_MAX_FRAMES + frame;
+   if (kvx_table[idx].patch)
+   {
+      R_KVX_FreeSprite(kvx_table[idx].patch);
+      R_KVX_Free(kvx_table[idx].model);
+   }
+   else
+   {
+      kvx_table_count++;
+   }
+   kvx_table[idx].model = model;
+   kvx_table[idx].patch = patch;
+}
+
+/* Build the synthetic 8x8x8 test cube and bind it to MEDI/A as a
+ * fallback when no VOXELDEF lump is present in any loaded WAD.
+ * This keeps the menu toggle visibly functional on a vanilla IWAD
+ * during development. */
+static void kvx_register_test_voxel(void)
+{
+   kvx_model_t *m;
+   rpatch_t    *p;
+   int          sprite_idx;
+
+   sprite_idx = kvx_lookup_sprite_name("MEDI");
+   if (sprite_idx < 0)
+      return;  /* not a Doom IWAD; nothing to bind */
+
+   m = R_KVX_BuiltinTestVoxel();
+   if (!m)
+      return;
+
+   p = R_KVX_RasterizeFront(m, NULL);
+   if (!p)
+   {
+      R_KVX_Free(m);
+      return;
+   }
+
+   /* Frame 'A' = index 0. */
+   kvx_register_mapping(sprite_idx, 0, m, p);
+   lprintf(LO_INFO, "R_KVX: test cube bound to MEDI/A "
+                    "(fallback, no VOXELDEF loaded)\n");
+}
+
+/* --- VOXELDEF parser --------------------------------------------
+ *
+ * Compatible with the DelphiDoom voxel-definition format used by
+ * existing voxel WADs (e.g. CHEX_QUEST_VOXELS_001):
+ *
+ *   voxeldef "lumpname.kvx"
+ *   {
+ *     [property [= value]]*
+ *     replaces sprite SPRITEFRAME
+ *     [property [= value]]*
+ *   }
+ *
+ * SPRITEFRAME is a 5-character token combining a 4-char sprite name
+ * and a 1-char frame letter, e.g. "MEDIA" = sprite MEDI, frame A.
+ * It may be quoted ("MEDIA") or bare (medi); case is normalized.
+ *
+ * The lump name in the quoted string may include a ".kvx" extension;
+ * we strip it for WAD lump lookup (WAD lump names have no extension).
+ *
+ * Properties other than 'replaces' (Scale, droppedspin, placedspin,
+ * AngleOffset, etc.) are recognized syntactically but silently
+ * ignored.  This lets existing voxel WADs load without errors even
+ * though we don't yet implement the corresponding behaviors; those
+ * features will be wired up in later commits.
+ *
+ * Whitespace and case are insensitive on keywords.  Comments via
+ * '#', ';', or '//' run to end of line.  Parse errors are reported
+ * via lprintf(LO_WARN) with approximate line numbers and recovery
+ * skips ahead to the next 'voxeldef' keyword; one bad block doesn't
+ * fail the whole load.  Returns the number of mappings successfully
+ * registered. */
+
+/* Lightweight scanner state.  Stateful position into the source
+ * with a 1-based line counter for error messages. */
+typedef struct kvx_scan_s
+{
+   const char *p;
+   const char *end;
+   int         line;
+} kvx_scan_t;
+
+static int kvx_is_space(int c)
+{
+   return (c == ' ' || c == '\t' || c == '\r');
+}
+
+static int kvx_is_word(int c)
+{
+   /* alphanumeric, underscore, dot, hyphen, plus -- covers sprite
+    * names, lump names (with optional .kvx), and numeric values
+    * like "0.9" or "-16". */
+   return  (c >= 'A' && c <= 'Z')
+        || (c >= 'a' && c <= 'z')
+        || (c >= '0' && c <= '9')
+        || c == '_' || c == '.' || c == '-' || c == '+';
+}
+
+static int kvx_to_upper(int c)
+{
+   if (c >= 'a' && c <= 'z')
+      return c - 'a' + 'A';
+   return c;
+}
+
+/* Skip spaces, tabs, newlines, carriage returns, and comments.
+ * Newlines bump the line counter.  This is the only whitespace
+ * primitive the parser needs -- everything else (commas between
+ * key=value pairs, etc.) is also treated as whitespace.  The
+ * original line-statement model from the simpler grammar is
+ * gone; tokens float in a free-form sea of whitespace and the
+ * structure comes from braces and the 'voxeldef' keyword. */
+static void kvx_skip_ws(kvx_scan_t *s)
+{
+   while (s->p < s->end)
+   {
+      if (*s->p == '\n')
+      {
+         s->line++;
+         s->p++;
+      }
+      else if (kvx_is_space((unsigned char)*s->p) || *s->p == ',')
+      {
+         s->p++;
+      }
+      else if (*s->p == '#' || *s->p == ';')
+      {
+         while (s->p < s->end && *s->p != '\n')
+            s->p++;
+      }
+      else if (s->p + 1 < s->end && s->p[0] == '/' && s->p[1] == '/')
+      {
+         while (s->p < s->end && *s->p != '\n')
+            s->p++;
+      }
+      else
+      {
+         break;
+      }
+   }
+}
+
+/* Read a quoted string into buf (size buflen including the NUL).
+ * Returns 1 on success, 0 on error.  Buf is left NUL-terminated. */
+static int kvx_read_quoted(kvx_scan_t *s, char *buf, int buflen)
+{
+   int n = 0;
+   if (s->p >= s->end || *s->p != '"')
+      return 0;
+   s->p++;
+   while (s->p < s->end && *s->p != '"' && *s->p != '\n')
+   {
+      if (n + 1 >= buflen)
+         return 0;
+      buf[n++] = *s->p++;
+   }
+   if (s->p >= s->end || *s->p != '"')
+      return 0;
+   s->p++;
+   buf[n] = '\0';
+   return 1;
+}
+
+/* Read a bare word (alphanumeric, _, ., -, +) into buf.  Returns 1
+ * on success, 0 on error.  Buf is uppercased. */
+static int kvx_read_word(kvx_scan_t *s, char *buf, int buflen)
+{
+   int n = 0;
+   if (s->p >= s->end || !kvx_is_word((unsigned char)*s->p))
+      return 0;
+   while (s->p < s->end && kvx_is_word((unsigned char)*s->p))
+   {
+      if (n + 1 >= buflen)
+         return 0;
+      buf[n++] = (char)kvx_to_upper((unsigned char)*s->p);
+      s->p++;
+   }
+   buf[n] = '\0';
+   return 1;
+}
+
+/* Read either a quoted string or a bare word.  Used for sprite
+ * names and lump names which may be either form in the wild. */
+static int kvx_read_quoted_or_word(kvx_scan_t *s, char *buf, int buflen)
+{
+   if (s->p >= s->end)
+      return 0;
+   if (*s->p == '"')
+   {
+      if (!kvx_read_quoted(s, buf, buflen))
+         return 0;
+      /* Uppercase quoted content too, so case handling matches the
+       * bare-word path. */
+      {
+         int i;
+         for (i = 0; buf[i]; i++)
+            buf[i] = (char)kvx_to_upper((unsigned char)buf[i]);
+      }
+      return 1;
+   }
+   return kvx_read_word(s, buf, buflen);
+}
+
+/* Try to match a keyword (case-insensitive) at the current scan
+ * position.  On match, scanner advances past the keyword and returns
+ * 1.  On no match, scanner is rewound and returns 0. */
+static int kvx_match_keyword(kvx_scan_t *s, const char *kw)
+{
+   char buf[32];
+   const char *save = s->p;
+   int          save_line = s->line;
+   if (!kvx_read_word(s, buf, sizeof(buf)))
+   {
+      s->p    = save;
+      s->line = save_line;
+      return 0;
+   }
+   {
+      int i;
+      for (i = 0; kw[i] && buf[i]; i++)
+      {
+         if (kvx_to_upper((unsigned char)kw[i]) != buf[i])
+         {
+            s->p    = save;
+            s->line = save_line;
+            return 0;
+         }
+      }
+      if (kw[i] || buf[i])
+      {
+         s->p    = save;
+         s->line = save_line;
+         return 0;
+      }
+   }
+   return 1;
+}
+
+/* Strip a trailing ".KVX" extension from a lump name, in place.
+ * WAD lump names have no extensions, but VOXELDEF strings tend to
+ * include ".kvx" for readability.  Idempotent if no extension. */
+static void kvx_strip_kvx_ext(char *name)
+{
+   int n = (int)strlen(name);
+   if (n >= 4 &&
+       name[n-4] == '.' &&
+       name[n-3] == 'K' &&
+       name[n-2] == 'V' &&
+       name[n-1] == 'X')
+   {
+      name[n-4] = '\0';
+   }
+}
+
+/* Skip past the next '}' or end of input.  Used to recover from a
+ * parse error inside a voxeldef block without re-misreading the
+ * tokens that already confused us. */
+static void kvx_skip_to_close_brace(kvx_scan_t *s)
+{
+   while (s->p < s->end && *s->p != '}')
+   {
+      if (*s->p == '\n')
+         s->line++;
+      s->p++;
+   }
+   if (s->p < s->end)
+      s->p++;  /* consume the } */
+}
+
+/* Skip a property value: a quoted string, a single bare word, or
+ * an '= word' pair.  Properties we don't recognize get their value
+ * silently consumed. */
+static void kvx_skip_value(kvx_scan_t *s)
+{
+   char dummy[32];
+   kvx_skip_ws(s);
+   if (s->p < s->end && *s->p == '=')
+   {
+      s->p++;
+      kvx_skip_ws(s);
+   }
+   if (s->p >= s->end)
+      return;
+   if (*s->p == '"')
+      kvx_read_quoted(s, dummy, sizeof(dummy));
+   else if (kvx_is_word((unsigned char)*s->p))
+      kvx_read_word(s, dummy, sizeof(dummy));
+}
+
+/* Parse a single voxeldef block.  Scanner is positioned just after
+ * the 'voxeldef' keyword; we read the lump name, the '{', the
+ * properties, and the '}'.  Updates *stats based on outcome.
+ * Returns 1 if a mapping was registered, 0 otherwise.  On parse
+ * error, recovers to the next '}'. */
+static int kvx_parse_voxeldef_block(kvx_scan_t *s,
+                                    kvx_parse_stats_t *stats)
+{
+   char         lump[64];
+   char         spriteframe[16];
+   char         keyword[32];
+   int          sprite_idx = -1;
+   int          frame = -1;
+   int          have_replaces = 0;
+   kvx_model_t *m = NULL;
+   rpatch_t    *p = NULL;
+   int          start_line;
+
+   start_line = s->line;
+
+   kvx_skip_ws(s);
+   if (!kvx_read_quoted(s, lump, sizeof(lump)))
+   {
+      lprintf(LO_WARN, "VOXELDEF line %d: expected quoted lump name "
+              "after 'voxeldef'\n", start_line);
+      stats->syntax_error++;
+      return 0;
+   }
+
+   /* Uppercase the lump name and strip a trailing .KVX extension
+    * for WAD lookup. */
+   {
+      int i;
+      for (i = 0; lump[i]; i++)
+         lump[i] = (char)kvx_to_upper((unsigned char)lump[i]);
+   }
+   kvx_strip_kvx_ext(lump);
+
+   kvx_skip_ws(s);
+   if (s->p >= s->end || *s->p != '{')
+   {
+      lprintf(LO_WARN, "VOXELDEF line %d: expected '{' after lump "
+              "name '%s'\n", start_line, lump);
+      stats->syntax_error++;
+      return 0;
+   }
+   s->p++;
+
+   /* Property loop: read keyword/value pairs until '}'. */
+   for (;;)
+   {
+      kvx_skip_ws(s);
+      if (s->p >= s->end)
+      {
+         lprintf(LO_WARN, "VOXELDEF line %d: unexpected end of input "
+                 "in voxeldef block\n", start_line);
+         stats->syntax_error++;
+         return 0;
+      }
+      if (*s->p == '}')
+      {
+         s->p++;
+         break;
+      }
+
+      if (!kvx_read_word(s, keyword, sizeof(keyword)))
+      {
+         lprintf(LO_WARN, "VOXELDEF line %d: malformed property in "
+                 "voxeldef '%s'\n", s->line, lump);
+         kvx_skip_to_close_brace(s);
+         stats->syntax_error++;
+         return 0;
+      }
+
+      /* The interesting case: 'replaces' takes 'sprite SPRITEFRAME'. */
+      if (keyword[0] == 'R' && strcmp(keyword, "REPLACES") == 0)
+      {
+         kvx_skip_ws(s);
+         /* Optional 'sprite' qualifier (DelphiDoom always emits it,
+          * but lenient parsers also accept 'replaces SPRITEFRAME'). */
+         if (kvx_match_keyword(s, "sprite"))
+            kvx_skip_ws(s);
+
+         if (!kvx_read_quoted_or_word(s, spriteframe, sizeof(spriteframe)))
+         {
+            lprintf(LO_WARN, "VOXELDEF line %d: 'replaces' needs a "
+                    "5-char SPRITE+FRAME token\n", s->line);
+            kvx_skip_to_close_brace(s);
+            stats->syntax_error++;
+            return 0;
+         }
+
+         if (strlen(spriteframe) != 5)
+         {
+            lprintf(LO_WARN, "VOXELDEF line %d: 'replaces sprite %s' "
+                    "must be exactly 5 characters (sprite name + frame "
+                    "letter)\n", s->line, spriteframe);
+            kvx_skip_to_close_brace(s);
+            stats->syntax_error++;
+            return 0;
+         }
+         if (spriteframe[4] < 'A' ||
+             spriteframe[4] >= 'A' + KVX_MAX_FRAMES)
+         {
+            lprintf(LO_WARN, "VOXELDEF line %d: '%s' frame letter must "
+                    "be A..%c\n", s->line, spriteframe,
+                    'A' + KVX_MAX_FRAMES - 1);
+            kvx_skip_to_close_brace(s);
+            stats->syntax_error++;
+            return 0;
+         }
+
+         {
+            char sprite[5];
+            sprite[0] = spriteframe[0];
+            sprite[1] = spriteframe[1];
+            sprite[2] = spriteframe[2];
+            sprite[3] = spriteframe[3];
+            sprite[4] = '\0';
+            sprite_idx = kvx_lookup_sprite_name(sprite);
+            if (sprite_idx < 0)
+            {
+               /* Demoted from LO_WARN to LO_INFO: this is the most
+                * common rejection reason (e.g. Chex Quest voxels
+                * loaded against doom2.wad name Chex sprites that
+                * don't exist).  Not really a warning -- it's
+                * normal cross-IWAD content mismatch.  The summary
+                * line at end of init shows the total count. */
+               lprintf(LO_INFO, "VOXELDEF line %d: unknown sprite '%s' "
+                       "for voxel '%s'\n", s->line, sprite, lump);
+               kvx_skip_to_close_brace(s);
+               stats->unknown_sprite++;
+               return 0;
+            }
+         }
+         frame = spriteframe[4] - 'A';
+         have_replaces = 1;
+         continue;
+      }
+
+      /* Any other property: 'Scale', 'droppedspin', 'AngleOffset', ...
+       * Recognized syntactically, ignored semantically.  Consume the
+       * '=value' or ' value' that follows. */
+      kvx_skip_value(s);
+   }
+
+   if (!have_replaces)
+   {
+      lprintf(LO_WARN, "VOXELDEF line %d: voxeldef '%s' has no "
+              "'replaces sprite SPRITEFRAME'\n", start_line, lump);
+      stats->syntax_error++;
+      return 0;
+   }
+
+   /* Load the KVX lump and bind. */
+   if (!kvx_load_kvx_lump(lump, sprite_idx, frame, &m, &p))
+   {
+      /* kvx_load_kvx_lump already logged the failure */
+      stats->bad_lump++;
+      return 0;
+   }
+
+   kvx_register_mapping(sprite_idx, frame, m, p);
+   /* Per-mapping success line.  Useful when debugging "voxel X
+    * doesn't show up" -- if the line is here, the mapping landed
+    * and the issue is downstream (rendering, lookup, etc.). */
+   lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d)\n",
+           sprnames[sprite_idx], 'A' + frame, lump,
+           p->width, p->height);
+   stats->registered++;
+   return 1;
+}
+
+static int kvx_parse_voxeldef(const char *src, int len,
+                              kvx_parse_stats_t *stats)
+{
+   kvx_scan_t   s;
+
+   s.p    = src;
+   s.end  = src + len;
+   s.line = 1;
+
+   while (s.p < s.end)
+   {
+      kvx_skip_ws(&s);
+      if (s.p >= s.end)
+         break;
+
+      if (kvx_match_keyword(&s, "voxeldef"))
+      {
+         kvx_parse_voxeldef_block(&s, stats);
+         /* On failure, kvx_parse_voxeldef_block has already
+          * recovered to past the matching '}' and bumped the
+          * appropriate stats counter, so we just continue. */
+      }
+      else
+      {
+         /* Stray garbage at top level.  Report once and skip the
+          * offending token to make progress. */
+         char garbage[32];
+         int  err_line = s.line;
+         if (kvx_read_word(&s, garbage, sizeof(garbage)))
+         {
+            lprintf(LO_WARN, "VOXELDEF line %d: unexpected token "
+                    "'%s' at top level (expected 'voxeldef')\n",
+                    err_line, garbage);
+            stats->syntax_error++;
+         }
+         else
+            s.p++;  /* couldn't even read a token; skip 1 char */
+      }
+   }
+
+   return stats->registered;
 }
 
 #endif /* !KVX_NO_ENGINE_GLUE */

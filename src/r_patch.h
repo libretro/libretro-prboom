@@ -54,7 +54,7 @@ typedef struct {
   unsigned char *pixels;
 } rcolumn_t;
 
-typedef struct {
+typedef struct rpatch_s {
   int width;
   int height;
   unsigned  widthmask;

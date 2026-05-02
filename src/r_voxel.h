@@ -194,6 +194,17 @@ void R_KVX_Free(kvx_model_t *m);
 rpatch_t *R_KVX_RasterizeFront(const kvx_model_t *m,
                                const uint8_t *palette_remap);
 
+/* Same as R_KVX_RasterizeFront but produces output at exact
+ * dimensions instead of upscaling by a default factor.  Each output
+ * pixel proportionally samples the model -- works for both upscale
+ * (model smaller than target) and downscale (model larger than
+ * target).  Used to render a voxel at the size of the original
+ * sprite it replaces, avoiding the giant-corpse-balloon problem
+ * when the KVX is much higher resolution than its target sprite. */
+rpatch_t *R_KVX_RasterizeFrontSized(const kvx_model_t *m,
+                                    const uint8_t *palette_remap,
+                                    int target_w, int target_h);
+
 /* Free an rpatch_t produced by R_KVX_RasterizeFront. */
 void R_KVX_FreeSprite(rpatch_t *p);
 
@@ -204,17 +215,34 @@ void R_KVX_FreeSprite(rpatch_t *p);
 kvx_model_t *R_KVX_BuiltinTestVoxel(void);
 
 /* ------------------------------------------------------------------
- * Engine integration (Turn 2: stub)
+ * Engine integration
  *
- * For Turn 2, a global table maps a single sprite lump number to
- * a prerasterized voxel rpatch_t.  R_KVX_Init() populates it at
- * startup; R_KVX_LookupSprite() is consulted by R_DrawVisSprite
- * before falling through to the WAD lump.
+ * A global table maps each (sprite, frame) pair to a prerasterized
+ * voxel rpatch_t.  R_KVX_Init() populates it at startup by parsing
+ * any VOXELDEF lump found in the loaded WADs and loading the
+ * referenced KVX data lumps.  R_KVX_LookupSprite() is consulted
+ * by R_ProjectSprite before falling through to the WAD lump.
  *
- * This is a placeholder for the real per-sprite, per-frame, per-
- * rotation mapping that arrives in Turn 3 with the VOXELDEF
- * parser.  For now we replace exactly ONE sprite (the medikit) for
- * end-to-end demonstration.
+ * VOXELDEF format (DelphiDoom-compatible):
+ *   voxeldef "lumpname.kvx"
+ *   {
+ *     [property [= value]]*
+ *     replaces sprite SPRITEFRAME
+ *     [property [= value]]*
+ *   }
+ *
+ * SPRITEFRAME is a 5-character token: a 4-char sprite name from
+ * sprnames[] (TROO, MEDI, ...) plus a 1-char frame letter A..].
+ * Other properties (Scale, droppedspin, AngleOffset, etc.) are
+ * recognized syntactically and silently ignored for now -- they
+ * will be wired up in subsequent commits.  Comments via '#', ';',
+ * or '//' to end of line.  See r_voxel.c for the full grammar.
+ *
+ * If no VOXELDEF lump is loaded (and voxel_sprites is on), the
+ * synthetic test cube is bound to MEDI/A as a fallback so the menu
+ * toggle remains visibly functional during development on stock
+ * IWADs.  This fallback will be removed once real voxel content
+ * is widely available.
  *
  * Excluded from KVX_NO_ENGINE_GLUE builds (e.g. the standalone
  * prerasterizer test fixture) which don't link the engine. */
@@ -228,10 +256,12 @@ extern int voxel_sprites;
 void R_KVX_Init(void);
 void R_KVX_Shutdown(void);
 
-/* Look up a voxel-prerasterized rpatch_t for an absolute sprite
- * lump number (i.e. lump + firstspritelump).  Returns NULL if no
- * voxel is registered for this lump, or if voxel_sprites is 0. */
-const rpatch_t *R_KVX_LookupSprite(int lump);
+/* Look up a voxel-prerasterized rpatch_t for a (sprite, frame)
+ * pair, where sprite is an index into sprnames[] (i.e. thing->
+ * sprite) and frame is the 0-based frame letter offset (i.e.
+ * thing->frame & FF_FRAMEMASK).  Returns NULL if no voxel is
+ * registered for this pair, or if voxel_sprites is 0. */
+const rpatch_t *R_KVX_LookupSprite(int sprite, int frame);
 #endif
 
 #endif /* !KVX_PARSER_ONLY */

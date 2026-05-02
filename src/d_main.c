@@ -529,16 +529,24 @@ void D_AddFile (const char *file, wad_source_t source)
   gwa_filename     = AddDefaultExtension(strcpy(malloc(file_len + 5), file), ".wad");
   gwa_filename_len = strlen(gwa_filename);
 
-  if (gwa_filename_len > 4)
-    if (!strcasecmp(gwa_filename+(gwa_filename_len - 4),".wad"))
-    {
-      char *ext = &gwa_filename[gwa_filename_len - 4];
-      ext[1]    = 'g'; ext[2] = 'w'; ext[3] = 'a';
-      wadfiles  = realloc(wadfiles, sizeof(*wadfiles)*(numwadfiles+1));
-      wadfiles[numwadfiles].name = gwa_filename;
-      wadfiles[numwadfiles].src = source; // Ty 08/29/98
-      numwadfiles++;
-    }
+  if (gwa_filename_len > 4
+      && !strcasecmp(gwa_filename+(gwa_filename_len - 4),".wad"))
+  {
+    char *ext = &gwa_filename[gwa_filename_len - 4];
+    ext[1]    = 'g'; ext[2] = 'w'; ext[3] = 'a';
+    wadfiles  = realloc(wadfiles, sizeof(*wadfiles)*(numwadfiles+1));
+    wadfiles[numwadfiles].name = gwa_filename;
+    wadfiles[numwadfiles].src = source; // Ty 08/29/98
+    numwadfiles++;
+  }
+  else
+  {
+    /* Not a .wad path -- the gwa_filename buffer we allocated above
+     * is unused.  Without this free, every D_AddFile of a non-.wad
+     * file (e.g. .deh, .bex, .lmp) leaked one ~PATH_MAX-byte malloc
+     * per call. */
+    free(gwa_filename);
+  }
 }
 
 // killough 10/98: support -dehout filename

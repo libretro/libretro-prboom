@@ -91,6 +91,11 @@ static dbool   mus_paused;
 // music currently being played
 static musicinfo_t *mus_playing;
 
+/* looping flag for mus_playing -- captured from the most recent
+ * S_ChangeMusic / S_ChangeMusicByName / S_StartMusic call so that
+ * S_RestartMusic can re-issue I_PlaySong with the correct value. */
+static int mus_playing_looping;
+
 // following is set
 //  by the defaults code in M_misc:
 // number of channels available
@@ -559,6 +564,7 @@ void S_ChangeMusic(int musicnum, int looping)
   I_PlaySong(music->handle, looping);
 
   mus_playing = music;
+  mus_playing_looping = looping;
 }
 
 void S_ChangeMusicByName(char* lumpname, int looping)
@@ -612,6 +618,7 @@ void S_ChangeMusicByName(char* lumpname, int looping)
     I_PlaySong(music->handle, looping);
 
     mus_playing = music;
+    mus_playing_looping = looping;
   }
 }
 
@@ -633,7 +640,56 @@ void S_StopMusic(void)
 
       mus_playing->data = 0;
       mus_playing = 0;
+      mus_playing_looping = 0;
     }
+}
+
+/* Re-registers and re-plays the currently playing track without
+ * advancing it.  Used by the "MIDI Hardware" menu callback so a
+ * change between Off / Adlib / Fluidsynth takes effect immediately
+ * instead of waiting for the next S_ChangeMusic.
+ *
+ * Skipped when:
+ *   - nothing is playing (mus_playing == NULL),
+ *   - the current track is an MP3 stream (mp_player) -- the
+ *     midi_player setting does not apply to non-MIDI playback,
+ *   - the current track was loaded from an external music file
+ *     via I_RegisterMusicFile (lumpnum was zeroed by that path,
+ *     and the original filename is no longer recoverable here);
+ *     such tracks are mp_player-backed in practice and would be
+ *     filtered out by the MP3 check above, but the lumpnum guard
+ *     is kept as a defensive belt-and-braces. */
+void S_RestartMusic(void)
+{
+  musicinfo_t *m;
+  int looping;
+  int lumpnum;
+
+  if (nomusicparm)
+    return;
+  if (!mus_playing)
+    return;
+  if (I_MusicIsMP3())
+    return;
+
+  m       = mus_playing;
+  looping = mus_playing_looping;
+  lumpnum = m->lumpnum;
+
+  if (lumpnum <= 0)
+    return; /* external file or never-cached, nothing safe to re-register */
+
+  /* S_StopMusic clears mus_playing, mus_playing->data, and the
+   * lump's cache lock.  We then re-cache and re-register on the
+   * same musicinfo_t slot. */
+  S_StopMusic();
+
+  m->data   = W_CacheLumpNum(lumpnum);
+  m->handle = I_RegisterSong(m->data, W_LumpLength(lumpnum));
+  I_PlaySong(m->handle, looping);
+
+  mus_playing         = m;
+  mus_playing_looping = looping;
 }
 
 

@@ -307,6 +307,7 @@ void M_ChangeDemoSmoothTurns(void);
 void M_ChangeFramerate(void);
 void M_ChangeMouseLook(void);
 void M_ChangeMaxViewPitch(void);
+void M_ChangeMidiPlayer(void);
 void M_General(int);      // killough 10/98
 void M_DrawCompat(void);  // killough 10/98
 void M_DrawGeneral(void); // killough 10/98
@@ -2881,7 +2882,7 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
    G_YA2 + general_mus_external*8, {"mus_load_external"}, 0, 0, NULL, mus_external_opts},
 
   {"MIDI Hardware", S_CHOICE, m_null, G_X,
-   G_YA2 + general_midi_player*8, {"midi_player"}, 0, 0, NULL, midi_player_opts},
+   G_YA2 + general_midi_player*8, {"midi_player"}, 0, 0, M_ChangeMidiPlayer, midi_player_opts},
 
 
   SETUP_MENU_TITLE("Freelook", G_X, G_YA3 + general_title_freelook*8 - 2),
@@ -3037,6 +3038,17 @@ void M_ChangeFramerate(void)
 {
   R_InitInterpolation();
   G_ScaleMovementToFramerate();
+}
+
+/* Re-issue I_RegisterSong / I_PlaySong on the currently playing
+ * track so the new "MIDI Hardware" choice applies immediately
+ * rather than waiting for the next S_ChangeMusic call.  No-op
+ * for MP3 streams (mp_player isn't a MIDI player) and when no
+ * music is playing.  See S_RestartMusic for the full skip
+ * conditions. */
+void M_ChangeMidiPlayer(void)
+{
+  S_RestartMusic();
 }
 
 void M_ChangeMouseLook(void)

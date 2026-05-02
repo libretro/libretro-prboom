@@ -737,6 +737,20 @@ int I_QrySongPlaying(int handle)
   return looping || musicdies > gametic;
 }
 
+/* Is the currently registered music being decoded by mp_player
+ * (an MP3 stream)?  Used by S_RestartMusic to decide whether a
+ * MIDI-hardware change should trigger a restart -- mp_player is
+ * not a MIDI player and is unaffected by the midi_player setting,
+ * so its tracks must not be torn down. */
+int I_MusicIsMP3(void)
+{
+#if defined(MUSIC_SUPPORT) && defined(HAVE_LIBMAD)
+   return current_player == (music_player_t *)&mp_player;
+#else
+   return 0;
+#endif
+}
+
 // try register external music file (not in WAD)
 int I_RegisterMusicFile( const char* filename, musicinfo_t *song )
 {

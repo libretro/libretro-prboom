@@ -78,6 +78,12 @@ void S_ChangeMusicByName(char* lumpname, int looping);
 // Stops the music fer sure.
 void S_StopMusic(void);
 
+/* Re-registers and re-plays the currently playing track using
+ * the current I_RegisterSong dispatch (i.e. the latest
+ * midi_player setting).  No-op if nothing is playing or if the
+ * current track is an MP3 stream. */
+void S_RestartMusic(void);
+
 // Stop and resume music, during game PAUSE.
 void S_PauseSound(void);
 void S_ResumeSound(void);

@@ -120,6 +120,12 @@ void I_StopSong(int handle);
 // See above (register), then think backwards
 void I_UnRegisterSong(int handle);
 
+/* Returns 1 if the currently registered track is being decoded by
+ * the MP3 player (mp_player), 0 otherwise (MIDI player, or nothing
+ * registered).  Used by S_RestartMusic to skip MIDI-hardware-driven
+ * restarts on MP3 streams. */
+int I_MusicIsMP3(void);
+
 // CPhipps - put these in config file
 extern int snd_samplerate;
 

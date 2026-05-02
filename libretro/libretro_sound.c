@@ -606,6 +606,9 @@ void I_UnRegisterSong(int handle)
 
 int I_RegisterSong(const void* data, size_t len)
 {
+#if defined(MUSIC_SUPPORT)
+  music_player_t *chosen_midi = NULL;
+#endif
   music_handle = NULL;
 
 #if defined(MUSIC_SUPPORT)
@@ -614,7 +617,6 @@ int I_RegisterSong(const void* data, size_t len)
    * m_menu.c).  Non-MIDI inputs (e.g. MP3 lumps via mp_player)
    * are unaffected -- they go through the autodetect loop below
    * regardless of the MIDI choice. */
-  music_player_t *chosen_midi = NULL;
   switch (midi_player)
   {
      case 0: /* Off: no MIDI playback */
@@ -633,14 +635,14 @@ int I_RegisterSong(const void* data, size_t len)
         break;
   }
 
-  // Now you can hear title music in deca.wad
-  // http://www.doomworld.com/idgames/index.php?id=8808
-  // Ability to use mp3 and ogg as inwad lump
+  /* Now you can hear title music in deca.wad
+   * http://www.doomworld.com/idgames/index.php?id=8808
+   * Ability to use mp3 and ogg as inwad lump */
 
   if (len > 4 && memcmp(data, "MUS", 3) != 0)
   {
-     // The header has no MUS signature
-     // Let's try to load this song with the music players
+     /* The header has no MUS signature
+      * Let's try to load this song with the music players */
      int i;
      for (i = 0; i < NUM_MUS_PLAYERS; i++)
      {
@@ -666,20 +668,20 @@ int I_RegisterSong(const void* data, size_t len)
      }
   }
 
-  // e6y: from Chocolate-Doom
-  // Assume a MUS file and try to convert -- but only if the user
-  // has a MIDI player selected.  Under "Off", we skip the whole
-  // mus2mid path; the song fails to load and I_PlaySong's
-  // current_player guard turns playback into a no-op.
+  /* e6y: from Chocolate-Doom
+   * Assume a MUS file and try to convert -- but only if the user
+   * has a MIDI player selected.  Under "Off", we skip the whole
+   * mus2mid path; the song fails to load and I_PlaySong's
+   * current_player guard turns playback into a no-op. */
   if (!music_handle && chosen_midi)
   {
      int result;
      MEMFILE *instream  = mem_fopen_read(data, len);
      MEMFILE *outstream = mem_fopen_write();
 
-     // e6y: from chocolate-doom
-     // New mus -> mid conversion code thanks to Ben Ryves <benryves@benryves.com>
-     // This plays back a lot of music closer to Vanilla Doom - eg. tnt.wad map02
+     /* e6y: from chocolate-doom
+      * New mus -> mid conversion code thanks to Ben Ryves <benryves@benryves.com>
+      * This plays back a lot of music closer to Vanilla Doom - eg. tnt.wad map02 */
      result = mus2mid(instream, outstream);
 
      if (result != 0)

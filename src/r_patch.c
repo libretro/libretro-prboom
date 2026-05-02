@@ -235,13 +235,26 @@ static void createPatch(int id) {
 
   // allocate our data chunk
   dataSize = pixelDataSize + columnsDataSize + postsDataSize;
-  /* No user back-pointer: &patch->data lives inside the `patches`
-   * array (allocated separately, same / lower tag).  If `patches` is
-   * freed before this block, Z_Free here would write *(&patch->data)
-   * = NULL into freed memory and corrupt the heap.  The outer
-   * `patches` lifetime owns these blocks; Z_FreeTags / Z_Close
-   * reclaims them via the linked list, no back-pointer needed. */
-  patch->data = (unsigned char*)Z_Malloc(dataSize, PU_CACHE, NULL);
+  /* Pass &patch->data as the user back-pointer so that when this
+   * PU_CACHE block is auto-purged (Z_Malloc's cache-purge under
+   * memory pressure, or an explicit Z_FreeTags(PU_CACHE)), the
+   * patch->data slot in `patches[]` is NULLed.  Otherwise the next
+   * R_CachePatchNum sees a non-NULL but freed patch->data, skips
+   * the re-create branch, and returns a patchnum whose pixels /
+   * columns / posts pointers point into freed memory.  Use-after-
+   * free, fires routinely under MEMORY_LOW (16MB cap, frequent
+   * cache purges).
+   *
+   * The deinit-time concern (Z_Close walks PU_STATIC before
+   * PU_CACHE; if patches[] were freed first, this Z_Free would
+   * write into freed memory) is handled by R_FlushAllPatches in
+   * D_DoomDeinit: it explicitly Z_Free's every patches[i].data
+   * BEFORE freeing patches[].  The Z_Free's back-pointer write to
+   * &patches[i].data is safe because patches[] is still alive
+   * throughout R_FlushAllPatches's loop.  By the time Z_Close
+   * runs, no patches.data blocks remain. */
+  patch->data = (unsigned char*)Z_Malloc(dataSize, PU_CACHE,
+                                         (void **)&patch->data);
   memset(patch->data, 0, dataSize);
 
   // set out pixel, column, and post pointers into our data array

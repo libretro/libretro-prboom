@@ -61,8 +61,30 @@ void W_InitCache(void)
 
 void W_DoneCache(void)
 {
+   /* Explicitly free every cached lump block before releasing the
+    * cachelump array itself.  Two reasons:
+    *
+    *  - The Z_Malloc below uses a back-pointer to &cachelump[lump]
+    *    .cache (so PU_CACHE auto-purges NULL the slot correctly --
+    *    see comment on W_CacheLumpNum).  At Z_Close time, PU_STATIC
+    *    blocks are freed before PU_CACHE.  cachelump itself is
+    *    PU_STATIC; if we let Z_Close handle it, cachelump would be
+    *    freed first, then each PU_CACHE cache block's Z_Free would
+    *    write *(&cachelump[lump].cache) = NULL through a now-
+    *    dangling back-pointer.  Heap corruption.  By explicitly
+    *    freeing cache blocks here while cachelump is still live,
+    *    Z_Close has no cachelump-pointing blocks left to encounter.
+    *
+    *  - Locked cache blocks are PU_STATIC and never auto-purge.
+    *    Without this loop, they'd survive until Z_Close at
+    *    retro_deinit and only get reclaimed at process end.  This
+    *    is the same per-session-leak shape we fixed elsewhere. */
    if (cachelump)
    {
+      int i;
+      for (i = 0; i < numlumps; i++)
+         if (cachelump[i].cache)
+            free(cachelump[i].cache);
       free(cachelump);
       cachelump = NULL;
    }
@@ -78,21 +100,26 @@ const void *W_CacheLumpNum(int lump)
 {
   const int locks = 1;
 
-  /* The Z_Malloc here intentionally passes NULL for the user back-
-   * pointer.  &cachelump[lump].cache lives inside the `cachelump`
-   * array (itself a Z_Malloc'd block, allocated earlier in
-   * W_InitCache).  At Z_Close time, `cachelump` is freed before this
-   * block; if Z_Free of this block tried to write *(&cachelump[lump]
-   * .cache) = NULL via the back-pointer, it would corrupt the freed
-   * `cachelump` allocation's heap header.  We assign the cache slot
-   * explicitly below instead.  The cache pointer's lifetime is
-   * managed explicitly via locks + W_DoneCache; no back-pointer
-   * needed. */
+  /* Pass &cachelump[lump].cache as the user back-pointer so that
+   * when this PU_CACHE block is auto-purged (Z_Malloc's cache-
+   * purge under MEMORY_LOW pressure, or an explicit Z_FreeTags
+   * (PU_CACHE)), the cachelump[lump].cache slot is NULLed.
+   * Otherwise the next W_CacheLumpNum sees a non-NULL but freed
+   * pointer, skips the re-read branch, and returns it -- caller
+   * dereferences freed memory.  Same bug shape as r_patch.c
+   * patch->data; fires routinely under MEMORY_LOW.
+   *
+   * The deinit-time concern (cachelump is PU_STATIC, freed before
+   * PU_CACHE blocks at Z_Close, so a back-pointer would dangle)
+   * is handled by W_DoneCache: it explicitly frees every
+   * cachelump[i].cache BEFORE freeing cachelump itself.  By the
+   * time Z_Close runs, no blocks back-pointing into cachelump
+   * remain. */
   if (!cachelump[lump].cache)      // read the lump in
   {
-    void *p = Z_Malloc(W_LumpLength(lump), PU_CACHE, NULL);
-    cachelump[lump].cache = p;
-    W_ReadLump(lump, p);
+    cachelump[lump].cache = Z_Malloc(W_LumpLength(lump), PU_CACHE,
+                                     &cachelump[lump].cache);
+    W_ReadLump(lump, cachelump[lump].cache);
   }
 
   /* cph - if wasn't locked but now is, tell z_zone to hold it */

@@ -205,6 +205,26 @@ rpatch_t *R_KVX_RasterizeFrontSized(const kvx_model_t *m,
                                     const uint8_t *palette_remap,
                                     int target_w, int target_h);
 
+/* Rasterize a voxel from one of 8 view rotations:
+ *   0 = front   (camera looks at -Y, voxel facing camera)
+ *   1 = front-left  (45 deg)
+ *   2 = right side  (90 deg, camera at +X)
+ *   3 = back-right  (135 deg)
+ *   4 = back        (180 deg)
+ *   5 = back-left   (225 deg)
+ *   6 = left side   (270 deg, camera at -X)
+ *   7 = front-right (315 deg)
+ *
+ * Output dimensions are independent of rotation -- all 8 views
+ * produce target_w x target_h sprites, so the rendering pipeline
+ * can swap rotations by index without resizing.  Rotation 0 is
+ * equivalent to R_KVX_RasterizeFrontSized for the same target
+ * dimensions. */
+rpatch_t *R_KVX_RasterizeRotated(const kvx_model_t *m,
+                                 const uint8_t *palette_remap,
+                                 int target_w, int target_h,
+                                 int rotation);
+
 /* Free an rpatch_t produced by R_KVX_RasterizeFront. */
 void R_KVX_FreeSprite(rpatch_t *p);
 
@@ -260,8 +280,21 @@ void R_KVX_Shutdown(void);
  * pair, where sprite is an index into sprnames[] (i.e. thing->
  * sprite) and frame is the 0-based frame letter offset (i.e.
  * thing->frame & FF_FRAMEMASK).  Returns NULL if no voxel is
- * registered for this pair, or if voxel_sprites is 0. */
+ * registered for this pair, or if voxel_sprites is 0.
+ *
+ * This wrapper returns the rotation 0 (front) view; for view-
+ * dependent rotation use R_KVX_LookupSpriteRotated. */
 const rpatch_t *R_KVX_LookupSprite(int sprite, int frame);
+
+/* Look up a voxel rpatch_t for a (sprite, frame, rotation) triple.
+ * rotation is 0..7, matching Doom's sprite rotation convention:
+ *   0 = thing facing camera
+ *   1 = thing rotated 45 deg CW (we see its front-right)
+ *   2 = thing rotated 90 deg CW (we see its right side)
+ *   ...and so on.
+ * Returns NULL if no voxel is registered for this (sprite, frame). */
+const rpatch_t *R_KVX_LookupSpriteRotated(int sprite, int frame,
+                                          int rotation);
 #endif
 
 #endif /* !KVX_PARSER_ONLY */

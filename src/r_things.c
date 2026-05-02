@@ -600,11 +600,21 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
        * no voxel is registered for this (sprite, frame), patch comes
        * from the WAD cache as usual.  voxel_patch is preserved into
        * the vissprite below so R_DrawVisSprite knows which one to
-       * draw without re-running the lookup. */
+       * draw without re-running the lookup.
+       *
+       * Rotation: compute the view rotation index even if the
+       * underlying sprite doesn't rotate (sprframe->rotate is 0 for
+       * static sprites like medikits, but the voxel cube replacing
+       * them should still rotate as the player walks around).  Same
+       * formula Doom uses for sprite rotations. */
       const rpatch_t* patch;
+      angle_t  vox_ang = R_PointToAngle(fx, fy);
+      unsigned vox_rot =
+         (vox_ang - thing->angle + (unsigned)(ANG45/2)*9) >> 29;
 
-      voxel_patch = R_KVX_LookupSprite(thing->sprite,
-                                       thing->frame & FF_FRAMEMASK);
+      voxel_patch = R_KVX_LookupSpriteRotated(thing->sprite,
+                                              thing->frame & FF_FRAMEMASK,
+                                              (int)vox_rot);
       if (voxel_patch)
          patch = voxel_patch;
       else

@@ -390,6 +390,121 @@ static uint8_t kvx_voxel_at(const kvx_model_t *m, int x, int y, int z)
  * Doom's patch format reserves 0xff as the "no voxel" indicator. */
 #define KVX_TRANSPARENT 0xff
 
+/* Build an rpatch_t from a column-major pixels buffer.  This is the
+ * back half of any rasterizer: counts posts, allocates the rpatch
+ * along with its data block, fills column and post tables.  Takes
+ * ownership of the pixels buffer (frees it before returning).  On
+ * alloc failure, frees pixels and returns NULL. */
+static rpatch_t *kvx_pixels_to_rpatch(uint8_t *pixels,
+                                      int width, int height)
+{
+   int       x, z;
+   int       num_posts_total;
+   size_t    pixels_size;
+   size_t    columns_size;
+   size_t    posts_size;
+   size_t    data_size;
+   int       post_index;
+   rpatch_t *patch;
+
+   /* Count posts (vertical runs of opaque pixels) per column. */
+   num_posts_total = 0;
+   for (x = 0; x < width; x++)
+   {
+      int in_run = 0;
+      for (z = 0; z < height; z++)
+      {
+         int opaque = (pixels[x * height + z] != KVX_TRANSPARENT);
+         if (opaque && !in_run)
+         {
+            num_posts_total++;
+            in_run = 1;
+         }
+         else if (!opaque)
+         {
+            in_run = 0;
+         }
+      }
+   }
+
+   pixels_size  = (size_t)width * (size_t)height;
+   columns_size = (size_t)width * sizeof(rcolumn_t);
+   posts_size   = (size_t)num_posts_total * sizeof(rpost_t);
+   data_size    = pixels_size + columns_size + posts_size;
+
+   patch = (rpatch_t *)malloc(sizeof(*patch));
+   if (!patch)
+   {
+      free(pixels);
+      return NULL;
+   }
+
+   patch->data = (unsigned char *)malloc(data_size);
+   if (!patch->data)
+   {
+      free(patch);
+      free(pixels);
+      return NULL;
+   }
+
+   patch->width         = width;
+   patch->height        = height;
+   patch->widthmask     = 0;
+   patch->isNotTileable = 1;
+   patch->leftoffset    = width / 2;
+   patch->topoffset     = height;
+   patch->locks         = 0;
+
+   patch->pixels  = patch->data;
+   patch->columns = (rcolumn_t *)(patch->data + pixels_size);
+   patch->posts   = (rpost_t *)(patch->data + pixels_size + columns_size);
+
+   memcpy(patch->pixels, pixels, pixels_size);
+   free(pixels);
+
+   /* Fill column and post tables. */
+   post_index = 0;
+   for (x = 0; x < width; x++)
+   {
+      rcolumn_t *col = &patch->columns[x];
+      int        post_start = -1;
+
+      col->numPosts = 0;
+      col->pixels   = patch->pixels + x * height;
+      col->posts    = &patch->posts[post_index];
+
+      for (z = 0; z < height; z++)
+      {
+         int opaque = (patch->pixels[x * height + z] != KVX_TRANSPARENT);
+
+         if (opaque && post_start < 0)
+         {
+            post_start = z;
+         }
+         else if (!opaque && post_start >= 0)
+         {
+            patch->posts[post_index].topdelta = post_start;
+            patch->posts[post_index].length   = z - post_start;
+            patch->posts[post_index].slope    = 0;
+            post_index++;
+            col->numPosts++;
+            post_start = -1;
+         }
+      }
+
+      if (post_start >= 0)
+      {
+         patch->posts[post_index].topdelta = post_start;
+         patch->posts[post_index].length   = height - post_start;
+         patch->posts[post_index].slope    = 0;
+         post_index++;
+         col->numPosts++;
+      }
+   }
+
+   return patch;
+}
+
 /* Rasterize a voxel front-view at exact target dimensions.  Each
  * output pixel samples the model voxel at
  *   model_x = out_x * model_x_size / target_w
@@ -408,13 +523,6 @@ rpatch_t *R_KVX_RasterizeFrontSized(const kvx_model_t *m,
    int      height;
    int      x, z, y;
    uint8_t *pixels;
-   rpatch_t *patch;
-   size_t   pixels_size;
-   int      num_posts_total;
-   size_t   columns_size;
-   size_t   posts_size;
-   size_t   data_size;
-   int      post_index;
 
    if (!m)
       return NULL;
@@ -425,11 +533,6 @@ rpatch_t *R_KVX_RasterizeFrontSized(const kvx_model_t *m,
    if (width <= 0 || height <= 0)
       return NULL;
 
-   /* First pass: rasterize into a column-major scratch buffer.
-    * pixels[col * height + row] = color, or KVX_TRANSPARENT if no
-    * opaque voxel at this position.  Source coordinates are
-    * computed by proportional mapping so the voxel fills the
-    * target rectangle independent of its native resolution. */
    pixels = (uint8_t *)malloc((size_t)width * (size_t)height);
    if (!pixels)
       return NULL;
@@ -468,115 +571,149 @@ rpatch_t *R_KVX_RasterizeFrontSized(const kvx_model_t *m,
       }
    }
 
-   /* Second pass: count posts (vertical runs of opaque pixels) per
-    * column.  This gives us the size of the posts allocation. */
-   num_posts_total = 0;
-   for (x = 0; x < width; x++)
-   {
-      int in_run = 0;
-      for (z = 0; z < height; z++)
-      {
-         int opaque = (pixels[x * height + z] != KVX_TRANSPARENT);
-         if (opaque && !in_run)
-         {
-            num_posts_total++;
-            in_run = 1;
-         }
-         else if (!opaque)
-         {
-            in_run = 0;
-         }
-      }
-   }
+   return kvx_pixels_to_rpatch(pixels, width, height);
+}
 
-   /* Layout the rpatch_t.  We mirror r_patch.c's "single allocation
-    * holding pixels + columns + posts" pattern, except we use plain
-    * malloc instead of Z_Malloc.  Since voxel-rasterized patches
-    * have a different lifetime than WAD patches (we own them and
-    * free them with R_KVX_FreeSprite), they live outside the patch
-    * cache entirely. */
-   pixels_size  = (size_t)width * (size_t)height;
-   columns_size = (size_t)width * sizeof(rcolumn_t);
-   posts_size   = (size_t)num_posts_total * sizeof(rpost_t);
-   data_size    = pixels_size + columns_size + posts_size;
-
-   patch = (rpatch_t *)malloc(sizeof(*patch));
-   if (!patch)
+/* Rasterize a voxel from one of 8 view rotations (0=front, 2=right
+ * side, 4=back, 6=left, with 1/3/5/7 the 45-degree diagonals).
+ * Output target dimensions are independent of rotation -- all 8
+ * views are produced at the same target_w x target_h, so the
+ * rendering pipeline can swap views by index without resizing.
+ *
+ * Sampling: for each output column out_x, walk a depth ray through
+ * the voxel along the view direction.  The ray's origin in the
+ * voxel's local XY plane is determined by out_x's offset from the
+ * sprite's centre line, rotated by view angle theta = rotation *
+ * 45 degrees.  The first opaque voxel along the ray determines the
+ * output pixel's colour.  Output rows map proportionally to the
+ * voxel's Z axis, the same as the front-view rasterizer.
+ *
+ * Sampling resolution: when the voxel is larger than the target
+ * sprite (typical for high-res KVX vs Doom sprite sizes), sampling
+ * undersamples and we get a "first hit" bias rather than averaging.
+ * That's the same bias as the front-view rasterizer; it's not
+ * better, but it's also not worse, and it preserves the chunky
+ * voxel aesthetic. */
+rpatch_t *R_KVX_RasterizeRotated(const kvx_model_t *m,
+                                 const uint8_t *palette_remap,
+                                 int target_w, int target_h,
+                                 int rotation)
+{
+   /* Trig table for the 8 cardinal+diagonal view angles, scaled by
+    * 256 to keep the sampler in fixed-point integer math.
+    * theta = rotation * 45deg; entries are (cos(theta)*256,
+    * sin(theta)*256).  cos(45deg) = sin(45deg) ~= 181/256. */
+   static const int cs8[8][2] =
    {
-      free(pixels);
+      { 256,    0 },   /* rot 0:   0 deg */
+      { 181,  181 },   /* rot 1:  45 deg */
+      {   0,  256 },   /* rot 2:  90 deg */
+      {-181,  181 },   /* rot 3: 135 deg */
+      {-256,    0 },   /* rot 4: 180 deg */
+      {-181, -181 },   /* rot 5: 225 deg */
+      {   0, -256 },   /* rot 6: 270 deg */
+      { 181, -181 }    /* rot 7: 315 deg */
+   };
+
+   int      width;
+   int      height;
+   int      out_x, out_z;
+   int      cx256, cy256;
+   int      cos_t, sin_t;
+   int      depth_max;
+   uint8_t *pixels;
+
+   if (!m)
       return NULL;
-   }
-
-   patch->data = (unsigned char *)malloc(data_size);
-   if (!patch->data)
-   {
-      free(patch);
-      free(pixels);
+   if (rotation < 0 || rotation >= 8)
       return NULL;
-   }
 
-   patch->width        = width;
-   patch->height       = height;
-   patch->widthmask    = 0;     /* sprites are not tileable */
-   patch->isNotTileable= 1;
-   /* Sprite origin: center horizontally, bottom at row 0.  This is
-    * a reasonable default for a voxel meant to replace a pickup
-    * sprite (which sits on the ground).  Real KVX models specify
-    * pivot points -- a later commit will respect them. */
-   patch->leftoffset   = width / 2;
-   patch->topoffset    = height;
-   patch->locks        = 0;
+   width  = target_w;
+   height = target_h;
+   if (width <= 0 || height <= 0)
+      return NULL;
 
-   patch->pixels  = patch->data;
-   patch->columns = (rcolumn_t *)(patch->data + pixels_size);
-   patch->posts   = (rpost_t *)(patch->data + pixels_size + columns_size);
+   /* Voxel centre in fixed-point (.8) for the rotation math. */
+   cx256 = (m->x_size * 256) / 2;
+   cy256 = (m->y_size * 256) / 2;
+   cos_t = cs8[rotation][0];
+   sin_t = cs8[rotation][1];
 
-   /* Copy the rasterized pixels in. */
-   memcpy(patch->pixels, pixels, pixels_size);
-   free(pixels);
-
-   /* Third pass: fill in column and post tables. */
-   post_index = 0;
-   for (x = 0; x < width; x++)
+   /* Worst-case depth: half the voxel's diagonal in the XY plane.
+    * Add 1 to avoid edge-case under-sampling on diagonal rotations
+    * where the ray enters and exits the voxel at off-axis points. */
    {
-      rcolumn_t *col = &patch->columns[x];
-      int        post_start = -1;
+      int half_x = m->x_size / 2 + 1;
+      int half_y = m->y_size / 2 + 1;
+      /* sqrt(half_x^2 + half_y^2), conservatively rounded up.  For
+       * cubic voxels this is ~1.42 * half_size; we use a coarse
+       * approximation that's never less than the true value: take
+       * the larger half-size and add the smaller. */
+      depth_max = (half_x > half_y ? half_x : half_y) +
+                  (half_x > half_y ? half_y : half_x);
+   }
 
-      col->numPosts = 0;
-      col->pixels   = patch->pixels + x * height;
-      col->posts    = &patch->posts[post_index];
+   pixels = (uint8_t *)malloc((size_t)width * (size_t)height);
+   if (!pixels)
+      return NULL;
 
-      for (z = 0; z < height; z++)
+   for (out_x = 0; out_x < width; out_x++)
+   {
+      /* Output column's offset from sprite centre line, scaled to
+       * model voxel coords.  For rot 0/4 this maps to model X; for
+       * rot 2/6 it maps to model Y; for diagonals it's a mix. */
+      int local_off256 = ((out_x - width / 2) * m->x_size * 256) /
+                         (width > 0 ? width : 1);
+
+      for (out_z = 0; out_z < height; out_z++)
       {
-         int opaque = (patch->pixels[x * height + z] != KVX_TRANSPARENT);
+         /* Output row to model Z, proportional. */
+         int     mz       = (out_z * m->z_size) / height;
+         int     d;
+         uint8_t color    = KVX_TRANSPARENT;
 
-         if (opaque && post_start < 0)
-         {
-            post_start = z;
-         }
-         else if (!opaque && post_start >= 0)
-         {
-            patch->posts[post_index].topdelta = post_start;
-            patch->posts[post_index].length   = z - post_start;
-            patch->posts[post_index].slope    = 0;
-            post_index++;
-            col->numPosts++;
-            post_start = -1;
-         }
-      }
+         if (mz >= m->z_size) mz = m->z_size - 1;
+         if (mz < 0)          mz = 0;
 
-      /* Close any post still open at column end. */
-      if (post_start >= 0)
-      {
-         patch->posts[post_index].topdelta = post_start;
-         patch->posts[post_index].length   = height - post_start;
-         patch->posts[post_index].slope    = 0;
-         post_index++;
-         col->numPosts++;
+         /* Walk depth from -depth_max to +depth_max, looking for
+          * the first opaque voxel.  Negative d puts the sample
+          * "behind" the camera (closer to viewer), positive d
+          * "in front" (further into the model).  We want first-
+          * hit-from-camera, so we walk from -depth_max upwards. */
+         for (d = -depth_max; d <= depth_max; d++)
+         {
+            /* model_x256 = cx + local_off * cos - d * sin
+             * model_y256 = cy + local_off * sin + d * cos
+             * (all in .8 fixed-point) */
+            int model_x256 = cx256
+                           + (local_off256 * cos_t) / 256
+                           - (d * 256 * sin_t)      / 256;
+            int model_y256 = cy256
+                           + (local_off256 * sin_t) / 256
+                           + (d * 256 * cos_t)      / 256;
+            int mx = model_x256 / 256;
+            int my = model_y256 / 256;
+            uint8_t c;
+
+            if (mx < 0 || mx >= m->x_size) continue;
+            if (my < 0 || my >= m->y_size) continue;
+
+            c = kvx_voxel_at(m, mx, my, mz);
+            if (c != 0xff)
+            {
+               color = c;
+               break;
+            }
+         }
+
+         if (color != KVX_TRANSPARENT && palette_remap)
+            color = palette_remap[color];
+
+         pixels[out_x * height + out_z] = color;
       }
    }
 
-   return patch;
+   return kvx_pixels_to_rpatch(pixels, width, height);
 }
 
 /* Rasterize at a default scale.  Used by the fallback test cube and
@@ -830,10 +967,21 @@ int voxel_sprites = 0;
  * DEHACKED-extended frames can go further.  32 is comfortable. */
 #define KVX_MAX_FRAMES  32
 
+/* Number of cached view rotations per (sprite, frame).  Matches
+ * Doom's 8 sprite rotations (0=front, 1=front-right at 45deg, ...,
+ * 7=front-left at 315deg).  Each rotation is an independently
+ * rasterized rpatch_t; lookup picks the right one based on the
+ * angle from viewer to thing. */
+#define KVX_NUM_ROTATIONS 8
+
 typedef struct kvx_voxel_entry_s
 {
    kvx_model_t *model;
-   rpatch_t    *patch;
+   /* One rasterized rpatch_t per view rotation.  All 8 share the
+    * same model (which is the raw KVX data) and the same target
+    * dimensions (matched to the original sprite); they differ only
+    * in the angle from which the voxel is sampled. */
+   rpatch_t    *patches[KVX_NUM_ROTATIONS];
 } kvx_voxel_entry_t;
 
 static kvx_voxel_entry_t *kvx_table          = NULL;
@@ -860,10 +1008,16 @@ static void kvx_register_test_voxel(void);
 static int  kvx_load_kvx_lump(const char *lumpname,
                               int sprite_idx, int frame,
                               kvx_model_t **out_model,
-                              rpatch_t    **out_patch);
+                              rpatch_t    *out_patches[KVX_NUM_ROTATIONS]);
 static void kvx_register_mapping(int sprite_idx, int frame,
                                  kvx_model_t *model,
-                                 rpatch_t    *patch);
+                                 rpatch_t    *patches[KVX_NUM_ROTATIONS]);
+static int  kvx_rasterize_all_rotations(const kvx_model_t *m,
+                                        int target_w, int target_h,
+                                        int target_leftoffset,
+                                        int target_topoffset,
+                                        int have_offsets,
+                                        rpatch_t *out_patches[KVX_NUM_ROTATIONS]);
 static int  kvx_parse_voxeldef(const char *src, int len,
                                kvx_parse_stats_t *stats);
 
@@ -982,10 +1136,14 @@ void R_KVX_Shutdown(void)
    n = kvx_table_sprites * KVX_MAX_FRAMES;
    for (i = 0; i < n; i++)
    {
-      if (kvx_table[i].patch)
+      int r;
+      for (r = 0; r < KVX_NUM_ROTATIONS; r++)
       {
-         R_KVX_FreeSprite(kvx_table[i].patch);
-         kvx_table[i].patch = NULL;
+         if (kvx_table[i].patches[r])
+         {
+            R_KVX_FreeSprite(kvx_table[i].patches[r]);
+            kvx_table[i].patches[r] = NULL;
+         }
       }
       if (kvx_table[i].model)
       {
@@ -999,7 +1157,8 @@ void R_KVX_Shutdown(void)
    kvx_table_count   = 0;
 }
 
-const rpatch_t *R_KVX_LookupSprite(int sprite, int frame)
+const rpatch_t *R_KVX_LookupSpriteRotated(int sprite, int frame,
+                                          int rotation)
 {
    /* Defense in depth: if the user disabled voxel sprites without
     * triggering a re-init (shouldn't happen via the menu callback,
@@ -1010,7 +1169,17 @@ const rpatch_t *R_KVX_LookupSprite(int sprite, int frame)
       return NULL;
    if (frame < 0 || frame >= KVX_MAX_FRAMES)
       return NULL;
-   return kvx_table[sprite * KVX_MAX_FRAMES + frame].patch;
+   if (rotation < 0 || rotation >= KVX_NUM_ROTATIONS)
+      return NULL;
+   return kvx_table[sprite * KVX_MAX_FRAMES + frame].patches[rotation];
+}
+
+const rpatch_t *R_KVX_LookupSprite(int sprite, int frame)
+{
+   /* Backwards-compat wrapper: returns the front view (rotation 0).
+    * Callers that want view-dependent rotation should use
+    * R_KVX_LookupSpriteRotated. */
+   return R_KVX_LookupSpriteRotated(sprite, frame, 0);
 }
 
 /* Look up a sprite name (4 chars, e.g. "MEDI") in the sprnames[]
@@ -1051,13 +1220,12 @@ static int kvx_lookup_sprite_name(const char *name)
 static int kvx_load_kvx_lump(const char *lumpname,
                              int sprite_idx, int frame,
                              kvx_model_t **out_model,
-                             rpatch_t    **out_patch)
+                             rpatch_t    *out_patches[KVX_NUM_ROTATIONS])
 {
    int          lumpnum;
    int          len;
    const void  *data;
    kvx_model_t *m;
-   rpatch_t    *p;
    int          target_w = 0;
    int          target_h = 0;
    int          target_leftoffset = 0;
@@ -1092,12 +1260,11 @@ static int kvx_load_kvx_lump(const char *lumpname,
    }
 
    /* Look up the original sprite's dimensions and offsets so we
-    * can rasterize the voxel at matching size and pivot.  We use
-    * rotation 0 as the canonical view; voxels render the same in
-    * all rotations until the multi-rotation cache lands.  Bounds-
-    * check the sprite/frame indices defensively -- a VOXELDEF that
-    * references a valid sprite name pointing at a frame the sprite
-    * doesn't actually have shouldn't crash us. */
+    * can rasterize the voxel at matching size and pivot.  All 8
+    * rotations are rendered at the same target dimensions (so the
+    * rendering pipeline can swap rotations by index without
+    * rescaling) -- only the sampling angle differs.  Bounds-check
+    * the sprite/frame indices defensively. */
    if (sprite_idx >= 0 && sprite_idx < numsprites &&
        sprites && sprites[sprite_idx].spriteframes &&
        frame >= 0 && frame < sprites[sprite_idx].numframes)
@@ -1119,57 +1286,112 @@ static int kvx_load_kvx_lump(const char *lumpname,
       }
    }
 
-   if (target_w > 0 && target_h > 0)
-      p = R_KVX_RasterizeFrontSized(m, NULL, target_w, target_h);
-   else
-      p = R_KVX_RasterizeFront(m, NULL);
-
-   if (!p)
+   if (!kvx_rasterize_all_rotations(m, target_w, target_h,
+                                    target_leftoffset, target_topoffset,
+                                    have_offsets, out_patches))
    {
       R_KVX_Free(m);
       lprintf(LO_WARN, "R_KVX: rasterization of '%s' failed\n", lumpname);
       return 0;
    }
 
-   /* Override the rasterizer's default offsets with the original
-    * sprite's so the voxel positions identically.  Without this,
-    * a small floor splat that should sit on the ground would
-    * render with bottom-edge at thing origin (i.e. floating in
-    * the air at the thing's z position). */
-   if (have_offsets)
-   {
-      p->leftoffset = target_leftoffset;
-      p->topoffset  = target_topoffset;
-   }
-
    *out_model = m;
-   *out_patch = p;
    return 1;
 }
 
-/* Bind a (sprite, frame) cell to a (model, patch) pair.  Frees any
- * previous occupant of the cell, transferring ownership of the new
- * pair into the table.  Out-of-range arguments cause the new pair
- * to be freed and discarded (defensive; callers should validate
- * first). */
+/* Helper: rasterize all 8 view rotations of a voxel at the given
+ * target dimensions and offsets, into the supplied output array.
+ * On any failure, frees any patches already produced and zeros the
+ * array, returning 0.  Returns 1 on full success.  Caller owns the
+ * patches on success; the model is not consumed. */
+static int kvx_rasterize_all_rotations(const kvx_model_t *m,
+                                       int target_w, int target_h,
+                                       int target_leftoffset,
+                                       int target_topoffset,
+                                       int have_offsets,
+                                       rpatch_t *out_patches[KVX_NUM_ROTATIONS])
+{
+   int r;
+
+   for (r = 0; r < KVX_NUM_ROTATIONS; r++)
+      out_patches[r] = NULL;
+
+   for (r = 0; r < KVX_NUM_ROTATIONS; r++)
+   {
+      rpatch_t *p;
+
+      if (target_w > 0 && target_h > 0)
+         p = R_KVX_RasterizeRotated(m, NULL, target_w, target_h, r);
+      else
+         /* No target sizing info -- fall back to default upscale on
+          * the front view only.  The other rotations get a copy of
+          * the rotated render at the model's native scale. */
+         p = R_KVX_RasterizeRotated(m, NULL,
+                                    m->x_size * 4, m->z_size * 4, r);
+
+      if (!p)
+      {
+         /* Roll back: free any earlier rotations and bail. */
+         int j;
+         for (j = 0; j < r; j++)
+         {
+            if (out_patches[j])
+            {
+               R_KVX_FreeSprite(out_patches[j]);
+               out_patches[j] = NULL;
+            }
+         }
+         return 0;
+      }
+
+      if (have_offsets)
+      {
+         p->leftoffset = target_leftoffset;
+         p->topoffset  = target_topoffset;
+      }
+
+      out_patches[r] = p;
+   }
+
+   return 1;
+}
+
+/* Bind a (sprite, frame) cell to a model and its 8 prerasterized
+ * rotation views.  Frees any previous occupant of the cell,
+ * transferring ownership of the new model and patches into the
+ * table.  Out-of-range arguments cause the new resources to be
+ * freed and discarded (defensive; callers should validate first). */
 static void kvx_register_mapping(int sprite_idx, int frame,
                                  kvx_model_t *model,
-                                 rpatch_t    *patch)
+                                 rpatch_t    *patches[KVX_NUM_ROTATIONS])
 {
    int idx;
+   int r;
 
    if (sprite_idx < 0 || sprite_idx >= kvx_table_sprites ||
        frame < 0 || frame >= KVX_MAX_FRAMES)
    {
-      R_KVX_FreeSprite(patch);
+      for (r = 0; r < KVX_NUM_ROTATIONS; r++)
+         if (patches[r])
+            R_KVX_FreeSprite(patches[r]);
       R_KVX_Free(model);
       return;
    }
 
    idx = sprite_idx * KVX_MAX_FRAMES + frame;
-   if (kvx_table[idx].patch)
+   /* Slot is occupied if any rotation is bound (treat the model
+    * pointer as the canonical "occupied" flag).  Free everything
+    * before overwriting. */
+   if (kvx_table[idx].model)
    {
-      R_KVX_FreeSprite(kvx_table[idx].patch);
+      for (r = 0; r < KVX_NUM_ROTATIONS; r++)
+      {
+         if (kvx_table[idx].patches[r])
+         {
+            R_KVX_FreeSprite(kvx_table[idx].patches[r]);
+            kvx_table[idx].patches[r] = NULL;
+         }
+      }
       R_KVX_Free(kvx_table[idx].model);
    }
    else
@@ -1177,7 +1399,8 @@ static void kvx_register_mapping(int sprite_idx, int frame,
       kvx_table_count++;
    }
    kvx_table[idx].model = model;
-   kvx_table[idx].patch = patch;
+   for (r = 0; r < KVX_NUM_ROTATIONS; r++)
+      kvx_table[idx].patches[r] = patches[r];
 }
 
 /* Build the synthetic 8x8x8 test cube and bind it to MEDI/A as a
@@ -1187,7 +1410,7 @@ static void kvx_register_mapping(int sprite_idx, int frame,
 static void kvx_register_test_voxel(void)
 {
    kvx_model_t *m;
-   rpatch_t    *p;
+   rpatch_t    *patches[KVX_NUM_ROTATIONS];
    int          sprite_idx;
 
    sprite_idx = kvx_lookup_sprite_name("MEDI");
@@ -1198,15 +1421,21 @@ static void kvx_register_test_voxel(void)
    if (!m)
       return;
 
-   p = R_KVX_RasterizeFront(m, NULL);
-   if (!p)
+   /* Rasterize all 8 view rotations of the test cube at the
+    * default upscale.  The cube has differently-coloured faces, so
+    * each rotation will look distinct -- a useful sanity test that
+    * the rotation lookup is wired through correctly. */
+   if (!kvx_rasterize_all_rotations(m,
+                                    m->x_size * 4, m->z_size * 4,
+                                    0, 0, 0, /* no offsets */
+                                    patches))
    {
       R_KVX_Free(m);
       return;
    }
 
    /* Frame 'A' = index 0. */
-   kvx_register_mapping(sprite_idx, 0, m, p);
+   kvx_register_mapping(sprite_idx, 0, m, patches);
    lprintf(LO_INFO, "R_KVX: test cube bound to MEDI/A "
                     "(fallback, no VOXELDEF loaded)\n");
 }
@@ -1474,8 +1703,12 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
    int          frame = -1;
    int          have_replaces = 0;
    kvx_model_t *m = NULL;
-   rpatch_t    *p = NULL;
+   rpatch_t    *patches[KVX_NUM_ROTATIONS];
    int          start_line;
+   int          r;
+
+   for (r = 0; r < KVX_NUM_ROTATIONS; r++)
+      patches[r] = NULL;
 
    start_line = s->line;
 
@@ -1614,20 +1847,22 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
    }
 
    /* Load the KVX lump and bind. */
-   if (!kvx_load_kvx_lump(lump, sprite_idx, frame, &m, &p))
+   if (!kvx_load_kvx_lump(lump, sprite_idx, frame, &m, patches))
    {
       /* kvx_load_kvx_lump already logged the failure */
       stats->bad_lump++;
       return 0;
    }
 
-   kvx_register_mapping(sprite_idx, frame, m, p);
    /* Per-mapping success line.  Useful when debugging "voxel X
     * doesn't show up" -- if the line is here, the mapping landed
-    * and the issue is downstream (rendering, lookup, etc.). */
-   lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d)\n",
+    * and the issue is downstream (rendering, lookup, etc.).
+    * Logged before kvx_register_mapping takes ownership of the
+    * patches so we can read width/height from patches[0]. */
+   lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, 8 rotations)\n",
            sprnames[sprite_idx], 'A' + frame, lump,
-           p->width, p->height);
+           patches[0]->width, patches[0]->height);
+   kvx_register_mapping(sprite_idx, frame, m, patches);
    stats->registered++;
    return 1;
 }

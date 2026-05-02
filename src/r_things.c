@@ -39,6 +39,7 @@
 #include "r_draw.h"
 #include "r_things.h"
 #include "r_fps.h"
+#include "r_voxel.h"
 #include "v_video.h"
 #include "lprintf.h"
 
@@ -388,7 +389,17 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 {
   int      texturecolumn;
   fixed_t  frac;
-  const rpatch_t *patch = R_CachePatchNum(vis->patch+firstspritelump);
+  /* Voxel sprite-cache hook (see r_voxel.c).  If a voxel is
+   * registered against this exact lump number, use the
+   * prerasterized rpatch_t instead of the WAD sprite.  We track
+   * is_voxel so the cleanup path below knows not to call
+   * R_UnlockPatchNum (the voxel patch isn't in the patches[] cache
+   * and unlocking it would either decrement a stale lock count or
+   * crash). */
+  const rpatch_t *patch = R_KVX_LookupSprite(vis->patch + firstspritelump);
+  const dbool is_voxel = (patch != NULL);
+  if (!is_voxel)
+    patch = R_CachePatchNum(vis->patch + firstspritelump);
   R_DrawColumn_f colfunc;
   draw_column_vars_t dcvars;
   enum draw_filter_type_e filter;
@@ -453,7 +464,13 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
       R_GetPatchColumnClamped(patch, texturecolumn+1)
     );
   }
-  R_UnlockPatchNum(vis->patch+firstspritelump); // cph - release lump
+  /* When is_voxel is true, we never called R_CachePatchNum for this
+   * lump, so we must not call R_UnlockPatchNum either --
+   * R_UnlockPatchNum decrements the lock count on the WAD-cached
+   * patch unconditionally, which would corrupt the lock state of
+   * a sprite that nobody asked us to lock. */
+  if (!is_voxel)
+    R_UnlockPatchNum(vis->patch+firstspritelump); // cph - release lump
 }
 
 //

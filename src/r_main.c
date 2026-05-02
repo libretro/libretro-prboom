@@ -55,6 +55,7 @@
 #include "g_game.h"
 #include "r_demo.h"
 #include "r_fps.h"
+#include "r_voxel.h"
 
 // Fineangles in the SCREENWIDTH wide window.
 #define FIELDOFVIEW 2048
@@ -504,6 +505,8 @@ void R_Init (void)
   R_InitTranslationTables();
   lprintf(LO_INFO, "R_InitPatches\n");
   R_InitPatches();
+  lprintf(LO_INFO, "R_KVX_Init\n");
+  R_KVX_Init();
 }
 
 /* R_Deinit
@@ -532,6 +535,10 @@ void R_Init (void)
 void R_Deinit(void)
 {
    int i;
+
+   /* Voxel test stub: free the synthetic model and its prerasterized
+    * sprite patch.  Idempotent -- safe to call when uninitialized. */
+   R_KVX_Shutdown();
 
    /* sprites: spritedef_t array holding per-sprite spriteframes.
     * R_InitSpriteDefs Z_Mallocs both, but only assigns spriteframes

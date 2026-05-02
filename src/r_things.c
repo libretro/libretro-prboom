@@ -384,11 +384,21 @@ void R_DrawMaskedColumn(
 // R_DrawVisSprite
 //  mfloorclip and mceilingclip should also be set.
 //
-// CPhipps - new wad lump handling, *'s to const*'s
+/* CPhipps - new wad lump handling, *'s to const*'s */
 static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 {
+  /* C89 requires all declarations to come before any statements
+   * in a block, so the voxel lookup and is_voxel determination
+   * happen as assignments after this declaration block. */
   int      texturecolumn;
   fixed_t  frac;
+  const rpatch_t *patch;
+  dbool    is_voxel;
+  R_DrawColumn_f colfunc;
+  draw_column_vars_t dcvars;
+  enum draw_filter_type_e filter;
+  enum draw_filter_type_e filterz;
+
   /* Voxel sprite-cache hook (see r_voxel.c).  If a voxel is
    * registered against this exact lump number, use the
    * prerasterized rpatch_t instead of the WAD sprite.  We track
@@ -396,14 +406,10 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
    * R_UnlockPatchNum (the voxel patch isn't in the patches[] cache
    * and unlocking it would either decrement a stale lock count or
    * crash). */
-  const rpatch_t *patch = R_KVX_LookupSprite(vis->patch + firstspritelump);
-  const dbool is_voxel = (patch != NULL);
+  patch    = R_KVX_LookupSprite(vis->patch + firstspritelump);
+  is_voxel = (patch != NULL);
   if (!is_voxel)
-    patch = R_CachePatchNum(vis->patch + firstspritelump);
-  R_DrawColumn_f colfunc;
-  draw_column_vars_t dcvars;
-  enum draw_filter_type_e filter;
-  enum draw_filter_type_e filterz;
+    patch  = R_CachePatchNum(vis->patch + firstspritelump);
 
   R_SetDefaultDrawColumnVars(&dcvars);
   if (vis->mobjflags & MF_PLAYERSPRITE) {
@@ -470,7 +476,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
    * patch unconditionally, which would corrupt the lock state of
    * a sprite that nobody asked us to lock. */
   if (!is_voxel)
-    R_UnlockPatchNum(vis->patch+firstspritelump); // cph - release lump
+    R_UnlockPatchNum(vis->patch+firstspritelump); /* cph - release lump */
 }
 
 //

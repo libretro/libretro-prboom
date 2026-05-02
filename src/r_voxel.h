@@ -121,8 +121,8 @@ typedef struct kvx_model_s
     *     uint8_t face  = *p++;
     *     uint8_t *col  = p;
     *     p += zlen;
-    *     // voxels at (x, y, ztop+0..ztop+zlen-1)
-    *     // colors col[0..zlen-1] are KVX palette indices
+    *     -- voxels at (x, y, ztop+0..ztop+zlen-1)
+    *     -- colors col[0..zlen-1] are KVX palette indices
     *   }
     */
    int     * offsets;       /* x_size * (y_size + 1) ints */

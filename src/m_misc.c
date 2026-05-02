@@ -172,6 +172,7 @@ extern int movement_maxviewpitch;
 
 int         mus_pause_opt; // 0 = kill music, 1 = pause, 2 = continue
 int         mus_load_external; // 0 = never load external music files, 1 = always load it, 2 = only from iwads
+int         midi_player; // 0 = off, 1 = adlib (OPL), 2 = fluidsynth
 
 extern const char* chat_macros[];
 
@@ -295,6 +296,13 @@ default_t defaults[] =
    def_int, ss_none, NULL, NULL}, // 0 = kill music when paused, 1 = pause music, 2 = let music continue
   {"mus_load_external", {&mus_load_external, NULL},  {2, NULL},0,2,
     def_int,ss_gen, NULL, NULL}, // 0 = never load external music files, 1 = always load it, 2 = only from iwads
+  {"midi_player", {&midi_player, NULL}, {1, NULL}, 0,
+#ifdef HAVE_LIBFLUIDSYNTH
+   2,
+#else
+   1,
+#endif
+   def_int, ss_gen, NULL, NULL}, // 0 = off, 1 = Adlib (OPL), 2 = Fluidsynth
   {"snd_channels",{&default_numChannels, NULL},{8, NULL},1,32,
    def_int,ss_gen, NULL, NULL}, // number of audio events simultaneously // killough
 

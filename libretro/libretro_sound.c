@@ -609,6 +609,30 @@ int I_RegisterSong(const void* data, size_t len)
   music_handle = NULL;
 
 #if defined(MUSIC_SUPPORT)
+  /* Pick the MIDI player according to the user's "MIDI Hardware"
+   * menu setting (defaults table in m_misc.c, midi_player_opts in
+   * m_menu.c).  Non-MIDI inputs (e.g. MP3 lumps via mp_player)
+   * are unaffected -- they go through the autodetect loop below
+   * regardless of the MIDI choice. */
+  music_player_t *chosen_midi = NULL;
+  switch (midi_player)
+  {
+     case 0: /* Off: no MIDI playback */
+        chosen_midi = NULL;
+        break;
+     case 1: /* Adlib (OPL) */
+        chosen_midi = (music_player_t *)&opl_synth_player;
+        break;
+#ifdef HAVE_LIBFLUIDSYNTH
+     case 2: /* Fluidsynth */
+        chosen_midi = (music_player_t *)&fl_player;
+        break;
+#endif
+     default:
+        chosen_midi = (music_player_t *)&opl_synth_player;
+        break;
+  }
+
   // Now you can hear title music in deca.wad
   // http://www.doomworld.com/idgames/index.php?id=8808
   // Ability to use mp3 and ogg as inwad lump
@@ -620,18 +644,34 @@ int I_RegisterSong(const void* data, size_t len)
      int i;
      for (i = 0; i < NUM_MUS_PLAYERS; i++)
      {
-        music_handle = music_players[i]->registersong(data, len);
+        const music_player_t *p = music_players[i];
+
+        /* Skip MIDI players the user did not select.  Non-MIDI
+         * players (e.g. mp_player) are not in this skip set, so
+         * MP3-as-music streams keep working under any midi_player
+         * value -- including "Off". */
+        if (p == &opl_synth_player && chosen_midi != (music_player_t *)&opl_synth_player)
+           continue;
+#ifdef HAVE_LIBFLUIDSYNTH
+        if (p == &fl_player && chosen_midi != (music_player_t *)&fl_player)
+           continue;
+#endif
+
+        music_handle = p->registersong(data, len);
         if (music_handle)
         {
-           current_player = (music_player_t*)music_players[i];
+           current_player = (music_player_t *)p;
            break;
         }
      }
   }
 
   // e6y: from Chocolate-Doom
-  // Assume a MUS file and try to convert
-  if (!music_handle)
+  // Assume a MUS file and try to convert -- but only if the user
+  // has a MIDI player selected.  Under "Off", we skip the whole
+  // mus2mid path; the song fails to load and I_PlaySong's
+  // current_player guard turns playback into a no-op.
+  if (!music_handle && chosen_midi)
   {
      int result;
      MEMFILE *instream  = mem_fopen_read(data, len);
@@ -672,9 +712,9 @@ int I_RegisterSong(const void* data, size_t len)
         void *outbuf;
         size_t outbuf_len;
         mem_get_buf(outstream, &outbuf, &outbuf_len);
-        music_handle = opl_synth_player.registersong(outbuf, outbuf_len);
+        music_handle = chosen_midi->registersong(outbuf, outbuf_len);
         if(music_handle)
-           current_player = (music_player_t*)&opl_synth_player;
+           current_player = chosen_midi;
      }
 
      mem_fclose(instream);

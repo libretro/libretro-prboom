@@ -46,6 +46,13 @@
 
 extern int mus_opl_gain; // NSM  fine tune OPL output level
 
+/* User-selected MIDI playback hardware:
+ *   0 = Off (no MIDI playback at all)
+ *   1 = Adlib (OPL2/OPL3 emulation, opl_synth_player)
+ *   2 = Fluidsynth (only valid if HAVE_LIBFLUIDSYNTH; falls back
+ *       to silence if the build doesn't include fluidsynth) */
+extern int midi_player;
+
 // Init at program start...
 void I_InitSound(void);
 

@@ -2832,6 +2832,7 @@ enum {
   general_sndchan,
   general_pitch,
   general_mus_external,
+  general_midi_player,
 
   general_title_freelook,
   general_mouselook,
@@ -2848,6 +2849,14 @@ enum {
 static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "90fps", "100fps", "119fps", "120fps", "140fps", "144fps", "155fps", "160fps", "165fps", "180fps", "200fps", "240fps", "244fps", "300fps", "320fps", "360fps", "480fps", "540fps", NULL};
 static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4", NULL};
 static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD", NULL};
+static const char *midi_player_opts[] = {
+  "Off",
+  "Adlib",
+#ifdef HAVE_LIBFLUIDSYNTH
+  "Fluidsynth",
+#endif
+  NULL
+};
 
 setup_menu_t gen_settings1[] = { // General Settings screen1
 
@@ -2870,6 +2879,9 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
 
   {"Play external MP3 files", S_CHOICE, m_null, G_X,
    G_YA2 + general_mus_external*8, {"mus_load_external"}, 0, 0, NULL, mus_external_opts},
+
+  {"MIDI Hardware", S_CHOICE, m_null, G_X,
+   G_YA2 + general_midi_player*8, {"midi_player"}, 0, 0, NULL, midi_player_opts},
 
 
   SETUP_MENU_TITLE("Freelook", G_X, G_YA3 + general_title_freelook*8 - 2),

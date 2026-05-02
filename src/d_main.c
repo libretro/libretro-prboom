@@ -1484,22 +1484,35 @@ void M_QuitDOOM(int choice);
 void D_DoomDeinit(void)
 {
   lprintf(LO_INFO,"D_DoomDeinit:\n");
-  //Deinit
+  /* Deinit, in dependency order:
+   *   - level data (PU_LEVEL/PU_LEVSPEC) before anything else, since
+   *     mobj thinkers etc. don't reference subsystem state being torn
+   *     down later;
+   *   - render-derived data (patches, screens, palettes) before sound,
+   *     music, and wad cleanup, so we don't accidentally re-cache a
+   *     lump after W_Exit closes the wad files;
+   *   - W_Exit last so file handles stay open through the rest of
+   *     deinit, even though nothing currently re-reads.
+   *
+   * W_ReleaseAllWads is intentionally left out: it calls W_DoneCache,
+   * which frees cachelump and would invalidate any subsequent
+   * W_CacheLumpNum.  Z_Close's PU_STATIC sweep reclaims cachelump,
+   * wadfiles, and lumpinfo just fine.
+   */
   M_QuitDOOM(0);
 #ifdef HAVE_NET
   D_QuitNetGame();
   I_ShutdownNetwork();
 #endif
-  M_SaveDefaults ();
-  W_Exit();
-  //W_ReleaseAllWads();
-  U_FreeMapInfo();
+  M_SaveDefaults();
+  P_Deinit();
+  R_FlushAllPatches();
+  V_FreeScreens();
+  V_DestroyUnusedTrueColorPalettes();
   I_ShutdownSound();
   I_ShutdownMusic();
-  //V_FreeScreens();
-  //V_DestroyUnusedTrueColorPalettes();
-  //R_FlushAllPatches();
-  //P_Deinit();
+  U_FreeMapInfo();
+  W_Exit();
 }
 
 //

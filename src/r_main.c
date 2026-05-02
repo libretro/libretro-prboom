@@ -39,6 +39,8 @@
 #include "d_net.h"
 #include "w_wad.h"
 #include "r_main.h"
+#include "r_data.h"
+#include "r_state.h"
 #include "r_things.h"
 #include "r_plane.h"
 #include "r_bsp.h"
@@ -502,6 +504,103 @@ void R_Init (void)
   R_InitTranslationTables();
   lprintf(LO_INFO, "R_InitPatches\n");
   R_InitPatches();
+}
+
+/* R_Deinit
+ *
+ * Releases the per-session allocations made by R_Init / R_InitData /
+ * R_InitLightTables / R_InitSpriteDefs.  Z_Close at retro_deinit
+ * would eventually reclaim these, but on libretro Z_Close only fires
+ * at libretro deinit, not between content loads -- without an
+ * explicit deinit, every retro_load_game leaks textures / texture
+ * patches / textureheight / texturetranslation / flattranslation /
+ * colormaps array / c_zlight / sprites / sprite frames.
+ *
+ * Total reclaim is wad-dependent, but for stock DOOM2 this runs
+ * into low MB territory once you account for per-texture allocations.
+ *
+ * R_FlushAllPatches must run BEFORE this -- it iterates `numtextures`
+ * to free its texture_composites parallel array.
+ *
+ * We intentionally do NOT W_UnlockLumpNum the COLORMAP / C_START..C_END
+ * lumps cached into colormaps[i].  The lock-count creep is +1 per
+ * session per colormap (so usually +1 for stock COLORMAP), tiny next
+ * to the rest of the leak; reclaiming them properly would require
+ * tracking the lump numbers across the R_InitColormaps "no markers"
+ * fallback and isn't worth the complexity.
+ */
+void R_Deinit(void)
+{
+   int i;
+
+   /* sprites: spritedef_t array holding per-sprite spriteframes.
+    * R_InitSpriteDefs Z_Mallocs both, but only assigns spriteframes
+    * for sprites that actually have lumps in the WAD (the
+    * `if (j >= 0)` and `if (++maxframe)` guards in R_InitSpriteDefs).
+    * The Z_Malloc is now memset to zero up front, so unallocated
+    * entries have spriteframes==NULL and free(NULL) is a no-op --
+    * but check numframes too as belt-and-braces against future
+    * regressions in the init path. */
+   if (sprites)
+   {
+      for (i = 0; i < numsprites; i++)
+         if (sprites[i].numframes > 0 && sprites[i].spriteframes)
+            Z_Free(sprites[i].spriteframes);
+      Z_Free(sprites);
+      sprites = NULL;
+   }
+   numsprites = 0;
+
+   /* c_zlight: malloc'd (= Z_Malloc) by R_InitLightTables; entries
+    * are pointers INTO colormaps[t], so freeing colormaps below
+    * doesn't leave c_zlight itself in a worse state. */
+   if (c_zlight)
+   {
+      free(c_zlight);
+      c_zlight = NULL;
+   }
+
+   /* colormaps: array of pointers Z_Malloc'd by R_InitColormaps.
+    * The pointed-at lumps are still cached/locked; they get reclaimed
+    * by Z_Close at retro_deinit (see comment above). */
+   if (colormaps)
+   {
+      Z_Free((void *)colormaps);
+      colormaps = NULL;
+   }
+   numcolormaps = 0;
+
+   /* flattranslation: small Z_Malloc'd array. */
+   if (flattranslation)
+   {
+      Z_Free(flattranslation);
+      flattranslation = NULL;
+   }
+
+   /* texturetranslation: small Z_Malloc'd array. */
+   if (texturetranslation)
+   {
+      Z_Free(texturetranslation);
+      texturetranslation = NULL;
+   }
+
+   /* textureheight: per-texture Z_Malloc'd array. */
+   if (textureheight)
+   {
+      Z_Free(textureheight);
+      textureheight = NULL;
+   }
+
+   /* textures: per-texture Z_Malloc'd structs PLUS the array itself.
+    * Free elements first, then the container. */
+   if (textures)
+   {
+      for (i = 0; i < numtextures; i++)
+         Z_Free(textures[i]);
+      Z_Free(textures);
+      textures = NULL;
+   }
+   numtextures = 0;
 }
 
 /*

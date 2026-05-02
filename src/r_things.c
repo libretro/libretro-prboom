@@ -165,6 +165,14 @@ static void R_InitSpriteDefs(const char * const * namelist)
    numsprites = i;
 
    sprites = Z_Malloc(numsprites *sizeof(*sprites), PU_STATIC, NULL);
+   /* Zero-init: the for(i) loop below only writes sprites[i].numframes
+    * and sprites[i].spriteframes inside `if (j >= 0)` -- so any sprite
+    * whose name has no matching lumps in this WAD is left with
+    * uninitialized numframes/spriteframes.  Garbage numframes was
+    * latent (downstream readers in r_data.c / f_finale.c trust it),
+    * and garbage spriteframes crashes R_Deinit's free loop on Win32
+    * GFlags-painted heap memory. */
+   memset(sprites, 0, numsprites * sizeof(*sprites));
 
    // Create hash table based on just the first four letters of each sprite
    // killough 1/31/98

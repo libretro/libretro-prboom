@@ -1507,6 +1507,7 @@ void D_DoomDeinit(void)
   M_SaveDefaults();
   P_Deinit();
   R_FlushAllPatches();
+  R_Deinit();
   V_FreeScreens();
   V_DestroyUnusedTrueColorPalettes();
   S_Shutdown();

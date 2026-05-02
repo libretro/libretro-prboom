@@ -52,6 +52,8 @@ void M_LoadDefaults (void);
 
 void M_SaveDefaults (void);
 
+void M_FreeDefaults (void);
+
 struct default_s *M_LookupDefault(const char *name);     /* killough 11/98 */
 
 char* M_Strupr(char* str);

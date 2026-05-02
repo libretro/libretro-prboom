@@ -1150,5 +1150,6 @@ extern const char* startup5;
 extern const char* savegamename;
 
 void D_BuildBEXTables(void);
+void D_FreeBEXTables(void);
 
 #endif

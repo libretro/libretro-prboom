@@ -1060,3 +1060,47 @@ void M_LoadDefaults (void)
 
   M_LoadDefaultsFile(defaultfile, FALSE);
 }
+
+/* M_FreeDefaults
+ *
+ * Releases the heap allocations M_LoadDefaults makes per call:
+ *
+ *  - For every def_str entry, *defaults[i].location.ppsz is the
+ *    strdup'd default value (or, if the user customized it, a
+ *    later strdup from M_LoadDefaultsFile).  Free and NULL it so
+ *    the next M_LoadDefaults strdups into a clean slot instead
+ *    of leaking the previous session's allocation.
+ *  - defaultfile is the strdup'd / malloc'd config file path.
+ *    Free and NULL it.
+ *
+ * Called from D_DoomDeinit.  Per-session leak before this fix
+ * was ~105 strdups (every def_str entry in the defaults table)
+ * plus defaultfile every retro_load_game.
+ *
+ * Note: defaults[i].defaultvalue.psz can also be mutated by
+ * M_LoadDefaultsFile when basedefault=TRUE (the -baseconfig path)
+ * to point at a heap-allocated string.  Tracking that requires
+ * knowing whether the slot was already heap-allocated, which the
+ * defaults table doesn't record.  Left as-is for now; the leak is
+ * one strdup per -baseconfig entry per session, only triggered
+ * when a .prboom.cfg sits next to the WAD.
+ */
+void M_FreeDefaults(void)
+{
+   int i;
+   int n = sizeof(defaults)/sizeof(defaults[0]);
+
+   for (i = 0; i < n; i++)
+   {
+      if (IS_STRING(defaults[i]) && defaults[i].location.ppsz)
+      {
+         union { const char **c; char **s; } u;
+         u.c = defaults[i].location.ppsz;
+         free(*u.s);
+         *u.s = NULL;
+      }
+   }
+
+   free(defaultfile);
+   defaultfile = NULL;
+}

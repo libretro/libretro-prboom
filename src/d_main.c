@@ -1512,6 +1512,8 @@ void D_DoomDeinit(void)
   I_ShutdownSound();
   I_ShutdownMusic();
   U_FreeMapInfo();
+  D_FreeBEXTables();
+  M_FreeDefaults();
   W_Exit();
 }
 

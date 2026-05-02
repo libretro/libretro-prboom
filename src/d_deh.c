@@ -1454,6 +1454,43 @@ void D_BuildBEXTables(void)
    deh_soundnames[0] = deh_soundnames[NUMSFX] = NULL;
 }
 
+/* D_FreeBEXTables
+ *
+ * Frees the per-session strdup'd BEX cross-reference tables and
+ * resets the slots to NULL so a subsequent D_BuildBEXTables doesn't
+ * leak the previous session's allocations.
+ *
+ * Called from D_DoomDeinit.  Safe to call multiple times: NULL slots
+ * are skipped (free(NULL) is a no-op anyway).
+ *
+ * Per-session leak before this fix was ~325 strdups (NUMSPRITES +
+ * NUMMUSIC + NUMSFX), which on libretro frontends accumulated
+ * forever because Z_Close only runs at retro_deinit, not between
+ * content loads.
+ */
+void D_FreeBEXTables(void)
+{
+   int i;
+
+   for (i = 0; i < NUMSPRITES; i++)
+   {
+      free(deh_spritenames[i]);
+      deh_spritenames[i] = NULL;
+   }
+
+   for (i = 1; i < NUMMUSIC; i++)
+   {
+      free(deh_musicnames[i]);
+      deh_musicnames[i] = NULL;
+   }
+
+   for (i = 1; i < NUMSFX; i++)
+   {
+      free(deh_soundnames[i]);
+      deh_soundnames[i] = NULL;
+   }
+}
+
 // ====================================================================
 // ProcessDehFile
 // Purpose: Read and process a DEH or BEX file

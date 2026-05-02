@@ -328,14 +328,29 @@ static void R_InitColormaps(void)
   firstcolormaplump = W_CheckNumForName("C_START");
   lastcolormaplump  = W_CheckNumForName("C_END");
   numcolormaps = lastcolormaplump - firstcolormaplump;
-  colormaps = Z_Malloc(sizeof(*colormaps) * MAX(1,numcolormaps), PU_STATIC, 0);
+
+  /* Always allocate at least 2 slots.  Code elsewhere (boom
+   * sector colormap selectors) probes colormaps[1] as a fallback,
+   * and most plain DOOM WADs lack C_START/C_END markers -- so
+   * numcolormaps comes out as 0 (or even negative if only one
+   * marker exists).  The original MAX(1, numcolormaps) only
+   * sized the array for index 0 and the "if (numcolormaps == 0)"
+   * branch below scribbled past the end, corrupting the heap. */
+  colormaps = Z_Malloc(sizeof(*colormaps) * MAX(2, numcolormaps), PU_STATIC, 0);
   colormaps[0] = (const lighttable_t *)W_CacheLumpName("COLORMAP");
   for (i=1; i<numcolormaps; i++)
     colormaps[i] = (const lighttable_t *)W_CacheLumpNum(i+firstcolormaplump);
 
-  if(numcolormaps == 0) {
-    const lighttable_t defaultmap[1] = {1};
-    colormaps[1] = defaultmap;
+  if(numcolormaps < 2) {
+    /* No (or degenerate) C_START..C_END range.  Point the dummy
+     * fallback slot at the default COLORMAP -- any code that
+     * probes colormaps[1] thus sees a fully-formed 32x256 lighting
+     * table and renders with standard lighting.  The previous code
+     * here pointed colormaps[1] at a stack-local 1-byte array
+     * `defaultmap` that went out of scope on function return,
+     * leaving a dangling pointer that the array was also too
+     * small to safely hold. */
+    colormaps[1] = colormaps[0];
     numcolormaps = 2;
   }
 }

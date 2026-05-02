@@ -432,9 +432,25 @@ void F_StartCast (void)
   castattacking = FALSE;
   S_ChangeMusic(mus_evil, TRUE);
 
-  // Fallback to CREDIT if Cast background is missing (eg. Doom1)
-  if (W_CheckNumForName(bgcastcall) == -1)
-     bgcastcall = "CREDIT";
+  /* Re-evaluate the BOSSBACK fallback each call.  Without snapshotting,
+   * once a wad without BOSSBACK triggers the "bgcastcall = CREDIT"
+   * line below, the global pointer permanently reads "CREDIT" -- so a
+   * later session whose wad does have BOSSBACK would still render
+   * CREDIT.  Snapshot the original pointer (which may itself have
+   * been DEH-replaced; capturing whatever was there at first call is
+   * fine) and restore it before re-checking.
+   */
+  {
+    static const char *bgcastcall_saved = NULL;
+    if (!bgcastcall_saved)
+      bgcastcall_saved = bgcastcall;
+    else
+      bgcastcall = bgcastcall_saved;
+
+    // Fallback to CREDIT if Cast background is missing (eg. Doom1)
+    if (W_CheckNumForName(bgcastcall) == -1)
+       bgcastcall = "CREDIT";
+  }
 }
 
 

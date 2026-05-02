@@ -5378,6 +5378,26 @@ void M_InitHelpScreen(void)
 {
   setup_menu_t* src;
 
+  /* Snapshot original m_flags so subsequent calls (other gamemodes
+   * across libretro retro_load_game cycles) can re-evaluate the
+   * "hide PLASMA/BFG in shareware, hide SSG outside commercial"
+   * rules from the original baseline.  Without this, m_flags=S_SKIP
+   * is permanent: once shareware hides PLASMA/BFG, a later commercial
+   * session would still hide them. */
+  static int helpstrings_flags_saved[
+    sizeof(helpstrings) / sizeof(helpstrings[0])];
+  static int helpstrings_flags_savedflag = 0;
+  size_t i;
+
+  if (!helpstrings_flags_savedflag) {
+    for (i = 0; i < sizeof(helpstrings)/sizeof(helpstrings[0]); i++)
+      helpstrings_flags_saved[i] = helpstrings[i].m_flags;
+    helpstrings_flags_savedflag = 1;
+  } else {
+    for (i = 0; i < sizeof(helpstrings)/sizeof(helpstrings[0]); i++)
+      helpstrings[i].m_flags = helpstrings_flags_saved[i];
+  }
+
   src = helpstrings;
   while (!(src->m_flags & S_END)) {
 
@@ -5396,6 +5416,40 @@ void M_InitHelpScreen(void)
 //
 void M_Init(void)
 {
+  /* Snapshot fields that the gamemode-dependent block below mutates
+   * destructively, so subsequent M_Init calls (e.g. on libretro
+   * retro_load_game without a process restart) see a clean baseline.
+   * Without this:
+   *   - MainDef.numitems decrements toward zero each commercial-mode
+   *     session (line "MainDef.numitems--" below);
+   *   - MainDef.y drifts down 8 px each commercial-mode session
+   *     ("MainDef.y += 8" below);
+   *   - ResetButtonName remains "WARNB0"/"WARNA0" forever once a
+   *     wad without M_BUTT1/M_BUTT2 triggers the strcpy fallback at
+   *     the end of M_Init, even if a later wad has the originals.
+   */
+  static int  maindef_numitems_saved = -1;
+  static int  maindef_y_saved        = -1;
+  static char resetbutton_saved[2][8];
+  static int  resetbutton_savedflag  = 0;
+
+  if (maindef_numitems_saved < 0) {
+    maindef_numitems_saved = MainDef.numitems;
+    maindef_y_saved        = MainDef.y;
+  } else {
+    MainDef.numitems = maindef_numitems_saved;
+    MainDef.y        = maindef_y_saved;
+  }
+
+  if (!resetbutton_savedflag) {
+    memcpy(resetbutton_saved[0], ResetButtonName[0], 8);
+    memcpy(resetbutton_saved[1], ResetButtonName[1], 8);
+    resetbutton_savedflag = 1;
+  } else {
+    memcpy(ResetButtonName[0], resetbutton_saved[0], 8);
+    memcpy(ResetButtonName[1], resetbutton_saved[1], 8);
+  }
+
   M_InitDefaults();                // killough 11/98
   currentMenu = &MainDef;
   menuactive = mnact_inactive;

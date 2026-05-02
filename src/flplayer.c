@@ -177,6 +177,7 @@ static int fl_init (int samplerate)
   {
     log_cb (RETRO_LOG_WARN, "fl_init: error creating fluidsynth object\n");
     delete_fluid_settings (f_set);
+    f_set = NULL;
     return 0;
   }
 
@@ -187,7 +188,10 @@ static int fl_init (int samplerate)
   {
     log_cb (RETRO_LOG_WARN, "fl_init: error loading soundfont %s\n", snd_soundfont);
     delete_fluid_synth (f_syn);
+    f_syn = NULL;
     delete_fluid_settings (f_set);
+    f_set = NULL;
+    f_font = 0;
     return 0;
   }
 

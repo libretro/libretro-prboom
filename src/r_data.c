@@ -259,9 +259,6 @@ static void R_InitTextures (void)
   if (errors)
     I_Error("R_InitTextures: %d errors", errors);
 
-  if (errors)
-    I_Error("R_InitTextures: %d errors", errors);
-
   // Create translation table for global animation.
 
   texturetranslation =

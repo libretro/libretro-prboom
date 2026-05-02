@@ -64,6 +64,10 @@ void *(Z_Malloc)(size_t size, int tag, void **ptr);
 void (Z_Free)(void *ptr);
 void (Z_FreeTags)(int lowtag, int hightag);
 void (Z_ChangeTag)(void *ptr, int tag);
+/* Z_ChangeUser updates the back-pointer of an already-allocated block.
+ * Use it to clear the back-pointer before the variable that owns it
+ * goes out of scope, or to transfer ownership between structures. */
+void (Z_ChangeUser)(void *ptr, void **user);
 bool (Z_Init)(void);
 void Z_Close(void);
 void *(Z_Calloc)(size_t n, size_t n2, int tag, void **user);

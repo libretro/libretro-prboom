@@ -75,8 +75,22 @@ const void *W_CacheLumpNum(int lump)
 {
   const int locks = 1;
 
+  /* The Z_Malloc here intentionally passes NULL for the user back-
+   * pointer.  &cachelump[lump].cache lives inside the `cachelump`
+   * array (itself a Z_Malloc'd block, allocated earlier in
+   * W_InitCache).  At Z_Close time, `cachelump` is freed before this
+   * block; if Z_Free of this block tried to write *(&cachelump[lump]
+   * .cache) = NULL via the back-pointer, it would corrupt the freed
+   * `cachelump` allocation's heap header.  We assign the cache slot
+   * explicitly below instead.  The cache pointer's lifetime is
+   * managed explicitly via locks + W_DoneCache; no back-pointer
+   * needed. */
   if (!cachelump[lump].cache)      // read the lump in
-    W_ReadLump(lump, Z_Malloc(W_LumpLength(lump), PU_CACHE, &cachelump[lump].cache));
+  {
+    void *p = Z_Malloc(W_LumpLength(lump), PU_CACHE, NULL);
+    cachelump[lump].cache = p;
+    W_ReadLump(lump, p);
+  }
 
   /* cph - if wasn't locked but now is, tell z_zone to hold it */
   if (!cachelump[lump].locks && locks) {

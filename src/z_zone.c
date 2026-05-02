@@ -79,8 +79,14 @@
 
 typedef struct memblock {
   struct memblock *next,*prev;
-  size_t size;
-  unsigned char tag;
+  void           **user;   /* if non-NULL, *user is set to NULL on free
+                            * and updated on Z_Realloc.  This is the
+                            * mechanism that prevents callers' globals
+                            * from going dangling when the zone frees
+                            * blocks (Z_Free, Z_FreeTags, the PU_CACHE
+                            * auto-purge in Z_Malloc, and Z_Close). */
+  size_t           size;
+  unsigned char    tag;
 
 } memblock_t;
 
@@ -107,12 +113,14 @@ static int free_memory = 0;
 
 void Z_Close(void)
 {
-   /* The libretro core will crash on
-    * close content if we free memory
-    * here while running on Windows... */
-#if !defined(_WIN32)
+   /* With the user back-pointer mechanism in place (see memblock_t::user
+    * and Z_Free), it is now safe to free the entire zone on shutdown:
+    * any global that holds a pointer into a freed block will be NULLed
+    * by Z_Free as the block is released.  The previous _WIN32 carve-out
+    * existed because, without the back-pointer, freeing the zone left
+    * dangling pointers in subsystem globals (textures, sprites,
+    * cachelump[].cache, vertexes, ...) that crashed during teardown. */
    Z_FreeTags(PU_FREE, PU_MAX);
-#endif
    memory_size = 0;
    free_memory = 0;
 }
@@ -192,6 +200,7 @@ void *Z_Malloc(size_t size, int tag, void **user)
    free_memory -= block->size;
 
    block->tag = tag;           // tag
+   block->user = user;         // remember the back-pointer for Z_Free
    block = (memblock_t *)((uint8_t*) block + HEADER_SIZE);
    if (user)                   // if there is a user
       *user = block;            // set user to point to new block
@@ -201,10 +210,28 @@ void *Z_Malloc(size_t size, int tag, void **user)
 
 void Z_Free(void *p)
 {
-   memblock_t *block = (memblock_t *)((uint8_t*) p - HEADER_SIZE);
+   memblock_t *block;
 
-   if (!p || !block)
+   if (!p)
       return;
+
+   block = (memblock_t *)((uint8_t*) p - HEADER_SIZE);
+
+   /* Null the caller's back-pointer, if any, so subsequent reads of
+    * the global it owns see NULL rather than the freed block.
+    * This is the load-bearing change that makes deinit safe and
+    * makes the PU_CACHE auto-purge correct.
+    *
+    * Note: we tolerate user being a stale pointer (caller freed its
+    * own memory containing the back-pointer slot) only because in
+    * practice every back-pointer here is into a static / BSS global
+    * whose lifetime is the process.  If that assumption ever breaks
+    * (e.g. Z_Malloc with user pointing into a heap-allocated struct
+    * that is freed before the block), the caller MUST clear
+    * block->user via Z_ChangeUser before freeing the containing
+    * memory.  See Z_ChangeUser below. */
+   if (block->user)
+      *block->user = NULL;
 
    if (block == block->next)
       blockbytag[block->tag] = NULL;
@@ -290,6 +317,21 @@ void Z_ChangeTag(void *ptr, int tag)
    block->tag = tag;
 }
 
+/* Z_ChangeUser
+ *
+ * Update the back-pointer of an existing block.  Use this if the caller
+ * needs to change which variable owns the block (e.g. transferring
+ * ownership across structures), or to clear the back-pointer before
+ * freeing the memory the back-pointer slot lives in. */
+void Z_ChangeUser(void *ptr, void **user)
+{
+   memblock_t *block;
+   if (!ptr)
+      return;
+   block = (memblock_t *)((uint8_t*) ptr - HEADER_SIZE);
+   block->user = user;
+}
+
 void *Z_Realloc(void *ptr, size_t n, int tag, void **user)
 {
    void *p = (Z_Malloc)(n, tag, user);
@@ -305,8 +347,13 @@ void *Z_Realloc(void *ptr, size_t n, int tag, void **user)
         memset((char*)p+block->size, 0, n - block->size);
       }
 
+      /* Z_Free below will null *user (because the old block records
+       * the same user back-pointer as the new one), so we restore
+       * *user to point at the new block afterwards.  This is the
+       * intended dance: at no point during a single-threaded Z_Realloc
+       * does the caller's slot dangle. */
       (Z_Free)(ptr);
-      if (user) // in case Z_Free nullified same user
+      if (user)
          *user=p;
    }
    return p;
@@ -321,7 +368,13 @@ void *Z_Calloc(size_t n1, size_t n2, int tag, void **user)
 
 char *Z_Strdup(const char *s, int tag, void **user)
 {
-   return strcpy((Z_Malloc)(strlen(s)+1, tag, user), s);
+   void *p = (Z_Malloc)(strlen(s)+1, tag, user);
+   /* Z_Malloc only returns NULL on size==0, which strlen(s)+1 cannot
+    * produce for any valid s, so p is always non-NULL here.  Guard
+    * anyway for robustness against future Z_Malloc behavior changes. */
+   if (!p)
+      return NULL;
+   return strcpy(p, s);
 }
 
 void Z_SetPurgeLimit(int size)

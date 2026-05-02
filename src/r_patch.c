@@ -235,7 +235,13 @@ static void createPatch(int id) {
 
   // allocate our data chunk
   dataSize = pixelDataSize + columnsDataSize + postsDataSize;
-  patch->data = (unsigned char*)Z_Malloc(dataSize, PU_CACHE, (void **)&patch->data);
+  /* No user back-pointer: &patch->data lives inside the `patches`
+   * array (allocated separately, same / lower tag).  If `patches` is
+   * freed before this block, Z_Free here would write *(&patch->data)
+   * = NULL into freed memory and corrupt the heap.  The outer
+   * `patches` lifetime owns these blocks; Z_FreeTags / Z_Close
+   * reclaims them via the linked list, no back-pointer needed. */
+  patch->data = (unsigned char*)Z_Malloc(dataSize, PU_CACHE, NULL);
   memset(patch->data, 0, dataSize);
 
   // set out pixel, column, and post pointers into our data array
@@ -461,7 +467,9 @@ static void createTextureCompositePatch(int id) {
 
   // allocate our data chunk
   dataSize = pixelDataSize + columnsDataSize + postsDataSize;
-  composite_patch->data = (unsigned char*)Z_Malloc(dataSize, PU_STATIC, (void **)&composite_patch->data);
+  /* See r_patch.c:238 — back-pointer would point into texture_composites[],
+   * unsafe at teardown.  No user back-pointer here. */
+  composite_patch->data = (unsigned char*)Z_Malloc(dataSize, PU_STATIC, NULL);
   memset(composite_patch->data, 0, dataSize);
 
   // set out pixel, column, and post pointers into our data array

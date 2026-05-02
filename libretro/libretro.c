@@ -952,6 +952,15 @@ failed:
       free(screen_buf);
       screen_buf = NULL;
    }
+   /* Release the strdup'd argv slots populated above before we
+    * return false.  RetroArch does not call retro_unload_game
+    * after retro_load_game returns false (nothing succeeded to
+    * unload), so without this each failed load leaks ~6-12
+    * strdups -- "prboom" plus -iwad/-file/-playdemo plus their
+    * paths plus optional -deh/-baseconfig and their paths. */
+   free_load_argv();
+   myargc = 0;
+   myargv = NULL;
    I_SafeExit(-1);
    return false;
 }

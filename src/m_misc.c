@@ -852,6 +852,16 @@ default_t defaults[] =
 int numdefaults;
 static char *defaultfile;
 
+/* Per-entry flag tracking whether defaults[i].defaultvalue.psz has
+ * been replaced by a heap-allocated strdup via the -baseconfig path
+ * in M_LoadDefaultsFile.  M_LoadDefaultsFile uses this to free the
+ * previous strdup before overwriting on subsequent calls (otherwise
+ * each retro_load_game with -baseconfig leaks one strdup per
+ * overridden entry).  Sized to match defaults[] at file scope so
+ * we don't have to thread an allocator through M_LoadDefaults. */
+static dbool defaultvalue_is_heap[
+   sizeof(defaults)/sizeof(defaults[0])];
+
 //
 // M_SaveDefaults
 //
@@ -999,8 +1009,17 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
               free(*(u.s));
               *(u.s) = newstring;
 
-              if(basedefault)
+              if(basedefault) {
+                /* Free the previous strdup if we already replaced
+                 * this entry with a heap value on an earlier call.
+                 * Without this, every retro_load_game with the
+                 * same -baseconfig leaks one strdup per overridden
+                 * entry. */
+                if (defaultvalue_is_heap[i])
+                   free((char *)defaults[i].defaultvalue.psz);
                 defaults[i].defaultvalue.psz = strdup(newstring);
+                defaultvalue_is_heap[i] = TRUE;
+              }
             }
             break;
           }
@@ -1077,13 +1096,16 @@ void M_LoadDefaults (void)
  * was ~105 strdups (every def_str entry in the defaults table)
  * plus defaultfile every retro_load_game.
  *
- * Note: defaults[i].defaultvalue.psz can also be mutated by
- * M_LoadDefaultsFile when basedefault=TRUE (the -baseconfig path)
- * to point at a heap-allocated string.  Tracking that requires
- * knowing whether the slot was already heap-allocated, which the
- * defaults table doesn't record.  Left as-is for now; the leak is
- * one strdup per -baseconfig entry per session, only triggered
- * when a .prboom.cfg sits next to the WAD.
+ * Note: defaults[i].defaultvalue.psz can also become a heap
+ * allocation via the -baseconfig path in M_LoadDefaultsFile.
+ * That heap allocation is intentionally NOT freed here -- the
+ * next M_LoadDefaults reads it at line 1028 (strdup into
+ * *location.ppsz), so it has to survive across sessions.
+ * Cross-session leak of the previous strdup is prevented at the
+ * mutation site (M_LoadDefaultsFile's `if (basedefault)` block)
+ * via the defaultvalue_is_heap[] flag, which frees the previous
+ * heap value before overwriting.  At process end, Z_Close
+ * reclaims any still-live entries.
  */
 void M_FreeDefaults(void)
 {

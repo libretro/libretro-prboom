@@ -279,6 +279,17 @@ static void fl_resume (void)
 }
 static void fl_play (const void *handle, int looping)
 {
+  /* Guard against fl_init having failed (no soundfont, fluidsynth
+   * object creation failure, or samplerate too low).  In those
+   * paths f_syn is NULL but the music_player_t vtable still points
+   * at this function, so I_PlaySong -> fl_play would dereference
+   * NULL inside fluidsynth.  Setting f_playing = 0 also makes the
+   * subsequent fl_render guard short-circuit cleanly. */
+  if (!f_syn)
+  {
+    f_playing = 0;
+    return;
+  }
   eventpos = 0;
   f_looping = looping;
   f_playing = 1;
@@ -292,6 +303,12 @@ static void fl_stop (void)
 {
   int i;
   f_playing = 0;
+
+  /* Same NULL-syn guard as fl_play.  fl_stop is also called from
+   * fl_render's MIDI_META_END_OF_TRACK branch, but if fl_render
+   * itself is NULL-syn-guarded it never reaches that branch. */
+  if (!f_syn)
+    return;
 
   for (i = 0; i < 16; i++)
   {
@@ -370,6 +387,21 @@ static void fl_render (void *vdest, unsigned length)
   midi_event_t *currevent;
 
   log_cb(RETRO_LOG_INFO, "Test 1\n");
+
+  /* No active synth (fl_init failed -- soundfont missing, etc.):
+   * write silence to the output buffer and return.  Without this
+   * guard, the event-loop below would dereference NULL inside
+   * fluid_synth_noteon / _noteoff / _cc / fluid_synth_write_float
+   * and crash.  fl_play already sets f_playing = 0 in this state,
+   * so most calls hit the existing !f_playing branch above; this
+   * is defense in depth for any path that reaches fl_render with
+   * f_playing = 1 but f_syn = NULL (e.g. an unusual ordering of
+   * S_RestartMusic transitions). */
+  if (!f_syn)
+  {
+    memset (vdest, 0, length * 4);
+    return;
+  }
 
   if (!f_playing || f_paused)
   { 

@@ -1490,14 +1490,29 @@ void D_DoomDeinit(void)
    *     down later;
    *   - render-derived data (patches, screens, palettes) before sound,
    *     music, and wad cleanup, so we don't accidentally re-cache a
-   *     lump after W_Exit closes the wad files;
-   *   - W_Exit last so file handles stay open through the rest of
-   *     deinit, even though nothing currently re-reads.
+   *     lump after the wads close;
+   *   - W_ReleaseAllWads last so file handles stay open through the
+   *     rest of deinit, even though nothing currently re-reads.
    *
-   * W_ReleaseAllWads is intentionally left out: it calls W_DoneCache,
-   * which frees cachelump and would invalidate any subsequent
-   * W_CacheLumpNum.  Z_Close's PU_STATIC sweep reclaims cachelump,
-   * wadfiles, and lumpinfo just fine.
+   * W_ReleaseAllWads (rather than W_Exit) does the FULL teardown:
+   * close handles, free wadfile data + name strings, free wadfiles
+   * array, free lumpinfo, and W_DoneCache to free cachelump.
+   * Without this, every retro_load_game leaked:
+   *   - cachelump (~32KB for shareware DOOM)
+   *   - lumpinfo (~100KB for DOOM2)
+   *   - wadfiles array
+   *   - wadfile name strings
+   * and -- worse -- the next session's W_Init iterated the previous
+   * session's stale wadfiles[] entries and re-opened the previous
+   * IWAD on top of the new one, accumulating both lump tables
+   * (with session 1's lumps shadowing session 2's where names
+   * collided).  Z_Close at retro_deinit eventually reclaims the
+   * memory but only at process end -- between sessions everything
+   * stayed orphaned and broken.
+   *
+   * Nothing between D_DoomDeinit returning and the next
+   * D_DoomMainSetup's W_Init touches cachelump / wadfiles /
+   * lumpinfo, so the full teardown is safe.
    */
   M_QuitDOOM(0);
 #ifdef HAVE_NET
@@ -1518,7 +1533,7 @@ void D_DoomDeinit(void)
   U_FreeMapInfo();
   D_FreeBEXTables();
   M_FreeDefaults();
-  W_Exit();
+  W_ReleaseAllWads();
 }
 
 //

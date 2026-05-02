@@ -510,6 +510,18 @@ void W_ReleaseAllWads(void)
 
    for(i = 0; i < numwadfiles; i++)
    {
+      /* Free the name string strdup'd in D_AddFile (system malloc,
+       * which maps to Z_Malloc PU_STATIC).  This was previously
+       * leaked per session because W_ReleaseAllWads wasn't called
+       * from D_DoomDeinit at all -- but with that hookup added, the
+       * names need releasing too or each retro_load_game leaks
+       * numwadfiles strings of ~PATH_MAX bytes. */
+      if(wadfiles[i].name)
+      {
+         free((void *)wadfiles[i].name);
+         wadfiles[i].name = NULL;
+      }
+
       if(wadfiles[i].handle)
       {
          filestream_close(wadfiles[i].handle);

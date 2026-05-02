@@ -296,6 +296,20 @@ void HU_Init(void)
 
   shiftxform = english_shiftxform;
 
+  /* Zero the patchnum arrays before re-populating them from the
+   * wad.  HU_Init runs every retro_load_game; the conditional
+   * R_SetPatchNum calls below ("if STCFNx exists" / "if BOXxx
+   * exists") skip on miss, so without this a session 2 wad that
+   * lacks one of these glyphs would inherit the previous wad's
+   * lumpnum -- pointing into a different lump table or at a
+   * stale lump after W_Exit/re-Init.  hu_font2 and hu_fontk
+   * already overwrite unconditionally (hu_font2 has an `else`
+   * fallback assignment, hu_fontk has no `if` guard), so they
+   * don't need zeroing, but doing it for hu_font and hu_msgbg
+   * is enough to fix the cross-session staleness. */
+  memset(hu_font,  0, sizeof(hu_font));
+  memset(hu_msgbg, 0, sizeof(hu_msgbg));
+
   // load the heads-up font
   j = HU_FONTSTART;
   for (i=0;i<HU_FONTSIZE;i++,j++)

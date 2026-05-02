@@ -184,7 +184,14 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
             padded_sfx_data[i] = 128; // fill the rest with silence
     }
 
-    Z_Free ((void*) sfxlump_data); //  free original lump
+    /* Release the cached lump back to the zone via the cache's
+     * lock-count mechanism.  The previous Z_Free here freed the
+     * lump's memory directly, leaving cachelump[sfxlump_num].cache
+     * pointing at freed memory and the lock count non-zero -- so
+     * the next W_CacheLumpNum on the same lump (e.g. on the next
+     * S_Init / content load) returned the dangling pointer
+     * instead of re-reading.  Use the proper unlock path. */
+    W_UnlockLumpNum (sfxlump_num);
 
     *len = padded_sfx_len;
     return (void *)(padded_sfx_data);

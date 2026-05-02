@@ -869,7 +869,17 @@ static dbool defaultvalue_is_heap[
 void M_SaveDefaults (void)
 {
   int   i;
-  RFILE *f = filestream_open (defaultfile,
+  RFILE *f;
+
+  /* M_LoadDefaults sets defaultfile from -config, falling back to
+   * a malloc'd PATH_MAX buffer.  If D_DoomMainSetup failed before
+   * M_LoadDefaults ran, defaultfile is still BSS-NULL.  Don't
+   * filestream_open(NULL) -- behavior depends on the libretro VFS
+   * impl and at minimum is wasted work. */
+  if (!defaultfile)
+    return;
+
+  f = filestream_open (defaultfile,
         RETRO_VFS_FILE_ACCESS_WRITE,
         RETRO_VFS_FILE_ACCESS_HINT_NONE);
   if (!f)

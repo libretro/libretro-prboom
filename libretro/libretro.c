@@ -952,6 +952,22 @@ failed:
       free(screen_buf);
       screen_buf = NULL;
    }
+   /* Roll back any partial init D_DoomMainSetup did before
+    * failing.  Critically: if IdentifyVersion ran (D_AddFile
+    * appended an entry to wadfiles[]) but a later step failed,
+    * the next retro_load_game would otherwise see the stale
+    * wadfile entry, re-open it on top of the new IWAD, and
+    * load both lump tables concatenated -- the same bug
+    * W_ReleaseAllWads in D_DoomDeinit was added to prevent for
+    * the success path.
+    *
+    * D_DoomDeinit's chain is null-safe in every step: P_Deinit's
+    * Z_Free(NULL) is a no-op, the R_, V_, and S_ shutdowns guard
+    * their pointers, M_SaveDefaults guards a NULL defaultfile,
+    * and W_ReleaseAllWads handles wadfiles==NULL /
+    * numwadfiles==0 gracefully.  Safe to call even if
+    * D_DoomMainSetup failed before reaching M_LoadDefaults. */
+   D_DoomDeinit();
    /* Release the strdup'd argv slots populated above before we
     * return false.  RetroArch does not call retro_unload_game
     * after retro_load_game returns false (nothing succeeded to

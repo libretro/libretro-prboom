@@ -982,6 +982,14 @@ typedef struct kvx_voxel_entry_s
     * dimensions (matched to the original sprite); they differ only
     * in the angle from which the voxel is sampled. */
    rpatch_t    *patches[KVX_NUM_ROTATIONS];
+
+   /* Pre-rotation in eighth-turn buckets (0..7), applied at lookup
+    * time.  Set from the VOXELDEF AngleOffset property: an offset of
+    * 90deg (= 2 buckets) means the voxel was authored with its
+    * "natural front" 90deg rotated from where Doom expects, so we
+    * shift the requested rotation by 2 to compensate.  Most content
+    * leaves this at 0. */
+   int          angle_offset_bucket;
 } kvx_voxel_entry_t;
 
 static kvx_voxel_entry_t *kvx_table          = NULL;
@@ -1007,11 +1015,13 @@ typedef struct kvx_parse_stats_s
 static void kvx_register_test_voxel(void);
 static int  kvx_load_kvx_lump(const char *lumpname,
                               int sprite_idx, int frame,
+                              double scale_factor,
                               kvx_model_t **out_model,
                               rpatch_t    *out_patches[KVX_NUM_ROTATIONS]);
 static void kvx_register_mapping(int sprite_idx, int frame,
                                  kvx_model_t *model,
-                                 rpatch_t    *patches[KVX_NUM_ROTATIONS]);
+                                 rpatch_t    *patches[KVX_NUM_ROTATIONS],
+                                 int angle_offset_bucket);
 static int  kvx_rasterize_all_rotations(const kvx_model_t *m,
                                         int target_w, int target_h,
                                         int target_leftoffset,
@@ -1160,6 +1170,9 @@ void R_KVX_Shutdown(void)
 const rpatch_t *R_KVX_LookupSpriteRotated(int sprite, int frame,
                                           int rotation)
 {
+   const kvx_voxel_entry_t *e;
+   int                      shifted;
+
    /* Defense in depth: if the user disabled voxel sprites without
     * triggering a re-init (shouldn't happen via the menu callback,
     * but cheap to guard). */
@@ -1171,7 +1184,14 @@ const rpatch_t *R_KVX_LookupSpriteRotated(int sprite, int frame,
       return NULL;
    if (rotation < 0 || rotation >= KVX_NUM_ROTATIONS)
       return NULL;
-   return kvx_table[sprite * KVX_MAX_FRAMES + frame].patches[rotation];
+
+   /* Apply the per-voxel angle offset.  The engine asks for the view
+    * rotation it would normally use for a Doom sprite (rot 0 = front
+    * facing camera); if the voxel was authored with a different
+    * "natural front", angle_offset_bucket compensates. */
+   e = &kvx_table[sprite * KVX_MAX_FRAMES + frame];
+   shifted = (rotation + e->angle_offset_bucket) & (KVX_NUM_ROTATIONS - 1);
+   return e->patches[shifted];
 }
 
 const rpatch_t *R_KVX_LookupSprite(int sprite, int frame)
@@ -1219,6 +1239,7 @@ static int kvx_lookup_sprite_name(const char *name)
  * something. */
 static int kvx_load_kvx_lump(const char *lumpname,
                              int sprite_idx, int frame,
+                             double scale_factor,
                              kvx_model_t **out_model,
                              rpatch_t    *out_patches[KVX_NUM_ROTATIONS])
 {
@@ -1284,6 +1305,23 @@ static int kvx_load_kvx_lump(const char *lumpname,
          }
          R_UnlockPatchNum(sprite_lump + firstspritelump);
       }
+   }
+
+   /* Apply VOXELDEF Scale to target dimensions and offsets.  All
+    * four scale together so the voxel positions correctly relative
+    * to its (now scaled) bounds.  scale_factor of 1.0 is a no-op;
+    * the parser clamps it to a sensible range so we don't have to
+    * worry about pathological values here. */
+   if (scale_factor != 1.0 && target_w > 0 && target_h > 0)
+   {
+      int sw = (int)((double)target_w * scale_factor + 0.5);
+      int sh = (int)((double)target_h * scale_factor + 0.5);
+      if (sw < 1) sw = 1;
+      if (sh < 1) sh = 1;
+      target_leftoffset = (int)((double)target_leftoffset * scale_factor + 0.5);
+      target_topoffset  = (int)((double)target_topoffset  * scale_factor + 0.5);
+      target_w = sw;
+      target_h = sh;
    }
 
    if (!kvx_rasterize_all_rotations(m, target_w, target_h,
@@ -1363,7 +1401,8 @@ static int kvx_rasterize_all_rotations(const kvx_model_t *m,
  * freed and discarded (defensive; callers should validate first). */
 static void kvx_register_mapping(int sprite_idx, int frame,
                                  kvx_model_t *model,
-                                 rpatch_t    *patches[KVX_NUM_ROTATIONS])
+                                 rpatch_t    *patches[KVX_NUM_ROTATIONS],
+                                 int angle_offset_bucket)
 {
    int idx;
    int r;
@@ -1401,6 +1440,7 @@ static void kvx_register_mapping(int sprite_idx, int frame,
    kvx_table[idx].model = model;
    for (r = 0; r < KVX_NUM_ROTATIONS; r++)
       kvx_table[idx].patches[r] = patches[r];
+   kvx_table[idx].angle_offset_bucket = angle_offset_bucket;
 }
 
 /* Build the synthetic 8x8x8 test cube and bind it to MEDI/A as a
@@ -1435,7 +1475,8 @@ static void kvx_register_test_voxel(void)
    }
 
    /* Frame 'A' = index 0. */
-   kvx_register_mapping(sprite_idx, 0, m, patches);
+   kvx_register_mapping(sprite_idx, 0, m, patches,
+                        0 /* no angle offset for test cube */);
    lprintf(LO_INFO, "R_KVX: test cube bound to MEDI/A "
                     "(fallback, no VOXELDEF loaded)\n");
 }
@@ -1688,6 +1729,83 @@ static void kvx_skip_value(kvx_scan_t *s)
       kvx_read_word(s, dummy, sizeof(dummy));
 }
 
+/* Read a numeric property value (with optional leading '=', optional
+ * sign, integer or simple decimal).  Stores into *out_value as a
+ * double.  Returns 1 on success, 0 if no number could be read.
+ *
+ * Accepts the forms: "= 1.5", "= -90", "0.875", "180", " = +0.5".
+ * Doesn't handle exponent notation (1e3) -- VOXELDEF in the wild
+ * doesn't use it, and avoiding it lets us roll our own parser
+ * without atof's locale dependence on the decimal separator (atof
+ * treats "0,9" as a valid number in some locales, which would
+ * silently mis-parse). */
+static int kvx_read_number(kvx_scan_t *s, double *out_value)
+{
+   const char *start;
+   const char *p;
+   int         sign = 1;
+   double      whole = 0.0;
+   double      frac = 0.0;
+   double      frac_div = 1.0;
+   int         have_digit = 0;
+   int         in_frac = 0;
+
+   kvx_skip_ws(s);
+   if (s->p < s->end && *s->p == '=')
+   {
+      s->p++;
+      kvx_skip_ws(s);
+   }
+
+   start = s->p;
+   p     = s->p;
+
+   if (p < s->end && (*p == '+' || *p == '-'))
+   {
+      if (*p == '-') sign = -1;
+      p++;
+   }
+
+   while (p < s->end)
+   {
+      char c = *p;
+      if (c >= '0' && c <= '9')
+      {
+         if (!in_frac)
+         {
+            whole = whole * 10.0 + (double)(c - '0');
+         }
+         else
+         {
+            frac = frac * 10.0 + (double)(c - '0');
+            frac_div *= 10.0;
+         }
+         have_digit = 1;
+         p++;
+      }
+      else if (c == '.' && !in_frac)
+      {
+         in_frac = 1;
+         p++;
+      }
+      else
+      {
+         break;
+      }
+   }
+
+   if (!have_digit)
+   {
+      /* No digits consumed -- restore the scanner and bail. */
+      s->p = start;
+      return 0;
+   }
+
+   *out_value = (double)sign * (whole + frac / frac_div);
+   s->p = p;
+   return 1;
+}
+
 /* Parse a single voxeldef block.  Scanner is positioned just after
  * the 'voxeldef' keyword; we read the lump name, the '{', the
  * properties, and the '}'.  Updates *stats based on outcome.
@@ -1706,6 +1824,13 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
    rpatch_t    *patches[KVX_NUM_ROTATIONS];
    int          start_line;
    int          r;
+
+   /* Optional VOXELDEF properties.  Defaults: scale=1.0 means "use
+    * the original sprite's dimensions verbatim"; angle_offset_deg=0
+    * means "voxel was authored with the same front-facing convention
+    * Doom expects". */
+   double       scale_factor = 1.0;
+   double       angle_offset_deg = 0.0;
 
    for (r = 0; r < KVX_NUM_ROTATIONS; r++)
       patches[r] = NULL;
@@ -1832,9 +1957,54 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
          continue;
       }
 
-      /* Any other property: 'Scale', 'droppedspin', 'AngleOffset', ...
-       * Recognized syntactically, ignored semantically.  Consume the
-       * '=value' or ' value' that follows. */
+      /* Scale: voxel size multiplier.  1.0 = match original sprite
+       * dimensions exactly; 0.9 = render 10% smaller; 1.1 = 10%
+       * larger.  Useful for fine-tuning voxels that look slightly
+       * off-scale relative to the sprite they replace. */
+      if (keyword[0] == 'S' && strcmp(keyword, "SCALE") == 0)
+      {
+         double v;
+         if (!kvx_read_number(s, &v))
+         {
+            lprintf(LO_WARN, "VOXELDEF line %d: 'Scale' needs a "
+                    "numeric value\n", s->line);
+            kvx_skip_to_close_brace(s);
+            stats->syntax_error++;
+            return 0;
+         }
+         /* Clamp to a sensible range.  Anything outside [0.1, 10]
+          * is almost certainly a typo; silently clamp instead of
+          * trusting it and producing a degenerate 1-pixel sprite
+          * or a 10000x10000 monstrosity. */
+         if (v < 0.1)  v = 0.1;
+         if (v > 10.0) v = 10.0;
+         scale_factor = v;
+         continue;
+      }
+
+      /* AngleOffset: per-voxel rotation correction in degrees.
+       * Positive values rotate the voxel CW relative to thing
+       * angle.  Used when a voxel was authored with a different
+       * "natural front" convention than Doom expects (e.g. KVX
+       * authored from Build engine which has Y flipped vs Doom). */
+      if (keyword[0] == 'A' && strcmp(keyword, "ANGLEOFFSET") == 0)
+      {
+         double v;
+         if (!kvx_read_number(s, &v))
+         {
+            lprintf(LO_WARN, "VOXELDEF line %d: 'AngleOffset' needs "
+                    "a numeric value (degrees)\n", s->line);
+            kvx_skip_to_close_brace(s);
+            stats->syntax_error++;
+            return 0;
+         }
+         angle_offset_deg = v;
+         continue;
+      }
+
+      /* Any other property: 'droppedspin', 'placedspin', ...
+       * Recognized syntactically, ignored semantically.  Consume
+       * the '=value' or ' value' that follows. */
       kvx_skip_value(s);
    }
 
@@ -1846,23 +2016,46 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
       return 0;
    }
 
-   /* Load the KVX lump and bind. */
-   if (!kvx_load_kvx_lump(lump, sprite_idx, frame, &m, patches))
+   /* Load the KVX lump and bind, applying the scale factor to
+    * target dimensions. */
+   if (!kvx_load_kvx_lump(lump, sprite_idx, frame, scale_factor,
+                          &m, patches))
    {
       /* kvx_load_kvx_lump already logged the failure */
       stats->bad_lump++;
       return 0;
    }
 
-   /* Per-mapping success line.  Useful when debugging "voxel X
-    * doesn't show up" -- if the line is here, the mapping landed
-    * and the issue is downstream (rendering, lookup, etc.).
-    * Logged before kvx_register_mapping takes ownership of the
-    * patches so we can read width/height from patches[0]. */
-   lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, 8 rotations)\n",
-           sprnames[sprite_idx], 'A' + frame, lump,
-           patches[0]->width, patches[0]->height);
-   kvx_register_mapping(sprite_idx, frame, m, patches);
+   /* Convert degrees to eighth-turn buckets.  Round to nearest
+    * bucket, normalise into [0, 7].  Negative angles wrap correctly
+    * (-90 deg -> -2 -> 6 = three-quarters turn, equivalent to +270). */
+   {
+      int bucket;
+      double normalised = angle_offset_deg / 45.0;
+      /* Round half away from zero. */
+      if (normalised >= 0.0)
+         bucket = (int)(normalised + 0.5);
+      else
+         bucket = -(int)(-normalised + 0.5);
+      bucket &= (KVX_NUM_ROTATIONS - 1);  /* &7 wraps negatives */
+
+      /* Per-mapping success line.  Useful when debugging "voxel X
+       * doesn't show up" -- if the line is here, the mapping landed
+       * and the issue is downstream (rendering, lookup, etc.).
+       * Logged before kvx_register_mapping takes ownership of the
+       * patches so we can read width/height from patches[0]. */
+      if (scale_factor != 1.0 || bucket != 0)
+         lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, 8 rotations, "
+                          "scale=%.2f, angle_offset=%d/8)\n",
+                 sprnames[sprite_idx], 'A' + frame, lump,
+                 patches[0]->width, patches[0]->height,
+                 scale_factor, bucket);
+      else
+         lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, 8 rotations)\n",
+                 sprnames[sprite_idx], 'A' + frame, lump,
+                 patches[0]->width, patches[0]->height);
+      kvx_register_mapping(sprite_idx, frame, m, patches, bucket);
+   }
    stats->registered++;
    return 1;
 }

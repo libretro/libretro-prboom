@@ -390,6 +390,118 @@ static uint8_t kvx_voxel_at(const kvx_model_t *m, int x, int y, int z)
  * Doom's patch format reserves 0xff as the "no voxel" indicator. */
 #define KVX_TRANSPARENT 0xff
 
+/* Compute leftoffset/topoffset for an rpatch_t derived from a voxel
+ * model, using the model's KVX-header pivot data and the requested
+ * view rotation.  Pivot semantics:
+ *
+ *   xpivot, ypivot = horizontal pivot in voxel-local XY plane
+ *                    (the point that should anchor at the thing's
+ *                    world x/y, which projects to leftoffset).
+ *   zpivot         = vertical pivot in voxel Z (anchors at thing's
+ *                    z, which projects to topoffset).
+ *
+ * Most KVX content sets xpivot=xsize/2, ypivot=ysize/2 (centred
+ * horizontally), and zpivot=zsize-1 (foot-anchored, suitable for
+ * pickups/monsters resting on the floor).  Some content uses
+ * non-centred pivots for pole-mounted props, off-axis projectiles,
+ * etc.  This function honours whatever's in the header.
+ *
+ * Rotation handling: zpivot is rotation-invariant (rotation is
+ * around Z).  The horizontal pivot rotates with the view: from the
+ * rasterizer's sampling math, the patch's horizontal axis in voxel
+ * coords is (cos(theta), sin(theta)).  Project (xpivot, ypivot)
+ * minus voxel centre onto that axis to get the pivot's horizontal
+ * offset from the patch centre.
+ *
+ * Falls back to safe defaults (centre-horizontal, foot-anchored) if
+ * the model has degenerate pivots or the rotation index is out of
+ * range. */
+static void kvx_compute_pivot_offsets(const kvx_model_t *m,
+                                      int rotation,
+                                      int width, int height,
+                                      int *out_leftoffset,
+                                      int *out_topoffset)
+{
+   /* Same trig table used in the rasterizer; kept here as a static
+    * local so this helper is self-contained.  Update both copies
+    * together if the rotation count changes. */
+   static const int cs16_pivot[16][2] =
+   {
+      { 256,    0 }, { 236,   98 }, { 181,  181 }, {  98,  236 },
+      {   0,  256 }, { -98,  236 }, {-181,  181 }, {-236,   98 },
+      {-256,    0 }, {-236,  -98 }, {-181, -181 }, { -98, -236 },
+      {   0, -256 }, {  98, -236 }, { 181, -181 }, { 236,  -98 }
+   };
+   int  cos_t, sin_t;
+   /* Voxel centre and pivot in 16.16 fixed-point voxel units.  The
+    * model stores pivots in this format (24.8 << 8 = 16.16). */
+   int  cx_fx, cy_fx;
+   int  px_fx, py_fx;
+   /* Pivot offset from centre in the patch's horizontal axis,
+    * computed in 16.16 voxel units, then converted to patch pixels. */
+   int64_t  proj_h_fx;
+   int64_t  pivot_v_voxels_x16;  /* z_pivot in voxel units, .16 */
+
+   /* Defaults: centre horizontal, foot-anchored.  Used on any
+    * degenerate input (NULL model, zero size, rotation out of
+    * range, missing pivot data). */
+   if (out_leftoffset) *out_leftoffset = (width > 0)  ? width / 2  : 0;
+   if (out_topoffset)  *out_topoffset  = (height > 0) ? height     : 0;
+
+   if (!m || width <= 0 || height <= 0)
+      return;
+   if (m->x_size <= 0 || m->y_size <= 0 || m->z_size <= 0)
+      return;
+   if (rotation < 0 || rotation >= KVX_NUM_ROTATIONS)
+      return;
+
+   cos_t = cs16_pivot[rotation][0];
+   sin_t = cs16_pivot[rotation][1];
+
+   /* Voxel centre as 16.16 fixed-point.  (x_size << 16) / 2 = (x_size
+    * / 2) << 16, but we keep precision for odd sizes. */
+   cx_fx = (m->x_size << 16) / 2;
+   cy_fx = (m->y_size << 16) / 2;
+   px_fx = m->x_pivot_fx;
+   py_fx = m->y_pivot_fx;
+
+   /* proj_h = (px - cx) * cos + (py - cy) * sin, all in .16; trig
+    * table is .8 so divide by 256.  Use int64 to avoid overflow on
+    * large voxels (x_size up to KVX_MAX_SIZE). */
+   proj_h_fx = ((int64_t)(px_fx - cx_fx) * cos_t
+              + (int64_t)(py_fx - cy_fx) * sin_t) / 256;
+
+   /* Convert .16 voxel units to patch pixels: multiply by width,
+    * divide by (x_size << 16).  Same proportional mapping the
+    * rasterizer uses for sample positions. */
+   if (out_leftoffset)
+   {
+      int64_t off_pix = (proj_h_fx * width) / ((int64_t)m->x_size << 16);
+      int     lo      = (int)(width / 2 + off_pix);
+      /* Clamp to [0, width-1] so a runaway pivot can't produce a
+       * leftoffset outside the patch (which would confuse Doom's
+       * column-drawer). */
+      if (lo < 0)         lo = 0;
+      if (lo > width - 1) lo = width - 1;
+      *out_leftoffset = lo;
+   }
+
+   if (out_topoffset)
+   {
+      int64_t off_pix;
+      int     to;
+      pivot_v_voxels_x16 = (int64_t)m->z_pivot_fx;
+      off_pix = (pivot_v_voxels_x16 * height) /
+                ((int64_t)m->z_size << 16);
+      to = (int)off_pix;
+      if (to < 0)          to = 0;
+      if (to > height)     to = height; /* note: == height is legal,
+                                          * meaning foot-anchored
+                                          * (bottom of patch) */
+      *out_topoffset = to;
+   }
+}
+
 /* Build an rpatch_t from a column-major pixels buffer.  This is the
  * back half of any rasterizer: counts posts, allocates the rpatch
  * along with its data block, fills column and post tables.  Takes
@@ -571,7 +683,19 @@ rpatch_t *R_KVX_RasterizeFrontSized(const kvx_model_t *m,
       }
    }
 
-   return kvx_pixels_to_rpatch(pixels, width, height);
+   {
+      rpatch_t *patch = kvx_pixels_to_rpatch(pixels, width, height);
+      if (patch)
+      {
+         /* Front view = rotation 0; honour KVX-header pivot data
+          * over the kvx_pixels_to_rpatch defaults. */
+         int lo, to;
+         kvx_compute_pivot_offsets(m, 0, width, height, &lo, &to);
+         patch->leftoffset = lo;
+         patch->topoffset  = to;
+      }
+      return patch;
+   }
 }
 
 /* Rasterize a voxel from one of 8 view rotations (0=front, 2=right
@@ -733,7 +857,21 @@ rpatch_t *R_KVX_RasterizeRotated(const kvx_model_t *m,
       }
    }
 
-   return kvx_pixels_to_rpatch(pixels, width, height);
+   {
+      rpatch_t *patch = kvx_pixels_to_rpatch(pixels, width, height);
+      if (patch)
+      {
+         /* Honour KVX-header pivot data per rotation; horizontal
+          * pivot rotates with the view, vertical pivot is rotation-
+          * invariant. */
+         int lo, to;
+         kvx_compute_pivot_offsets(m, rotation, width, height,
+                                   &lo, &to);
+         patch->leftoffset = lo;
+         patch->topoffset  = to;
+      }
+      return patch;
+   }
 }
 
 /* Rasterize at a default scale.  Used by the fallback test cube and

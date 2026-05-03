@@ -295,6 +295,20 @@ const rpatch_t *R_KVX_LookupSprite(int sprite, int frame);
  * Returns NULL if no voxel is registered for this (sprite, frame). */
 const rpatch_t *R_KVX_LookupSpriteRotated(int sprite, int frame,
                                           int rotation);
+
+/* Look up the spin rate for a (sprite, frame) voxel binding, in
+ * angle_t units per gametic.  The 'dropped' flag selects between
+ * the placedspin rate (initial map placement) and droppedspin rate
+ * (an item dropped by an enemy at runtime).  Returns 0 if no voxel
+ * is registered for this pair, or if the relevant rate wasn't set
+ * in the VOXELDEF.
+ *
+ * Callers add the cumulative spin (rate * leveltime) to thing->
+ * angle when computing view rotation, so the voxel appears to
+ * rotate in place over time.  The Doom engine doesn't itself
+ * advance thing->angle for static items; this is the rendering-
+ * side compensation. */
+unsigned int R_KVX_GetSpinPerTic(int sprite, int frame, int dropped);
 #endif
 
 #endif /* !KVX_PARSER_ONLY */

@@ -606,11 +606,27 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
        * underlying sprite doesn't rotate (sprframe->rotate is 0 for
        * static sprites like medikits, but the voxel cube replacing
        * them should still rotate as the player walks around).  Same
-       * formula Doom uses for sprite rotations. */
+       * formula Doom uses for sprite rotations.
+       *
+       * Spin: if the voxel has a non-zero placedspin/droppedspin
+       * rate, advance an "effective" thing angle by leveltime *
+       * rate.  The Doom engine doesn't itself rotate static items,
+       * so this is purely a voxel-rendering effect -- pickups
+       * rotate visually but their hit boxes don't move.  Engine
+       * picks placed vs dropped via the MF_DROPPED flag. */
       const rpatch_t* patch;
-      angle_t  vox_ang = R_PointToAngle(fx, fy);
-      unsigned vox_rot =
-         (vox_ang - thing->angle + (unsigned)(ANG45/2)*9) >> 29;
+      angle_t       vox_ang = R_PointToAngle(fx, fy);
+      angle_t       effective_ang = thing->angle;
+      unsigned int  spin_per_tic =
+         R_KVX_GetSpinPerTic(thing->sprite,
+                             thing->frame & FF_FRAMEMASK,
+                             (thing->flags & MF_DROPPED) ? 1 : 0);
+      unsigned int  vox_rot;
+
+      if (spin_per_tic != 0)
+         effective_ang += (angle_t)((unsigned int)leveltime * spin_per_tic);
+
+      vox_rot = (vox_ang - effective_ang + (unsigned)(ANG45/2)*9) >> 29;
 
       voxel_patch = R_KVX_LookupSpriteRotated(thing->sprite,
                                               thing->frame & FF_FRAMEMASK,

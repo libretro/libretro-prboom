@@ -945,6 +945,7 @@ kvx_model_t *R_KVX_BuiltinTestVoxel(void)
 #include "info.h"           /* sprnames[], NUMSPRITES */
 #include "w_wad.h"          /* W_CheckNumForName, W_CacheLumpNum, ... */
 #include "r_state.h"        /* firstspritelump, numsprites */
+#include "tables.h"         /* ANG45 (used in spin rate conversion) */
 #include "z_zone.h"         /* PU_STATIC, Z_Free */
 #include "lprintf.h"
 
@@ -990,6 +991,17 @@ typedef struct kvx_voxel_entry_s
     * shift the requested rotation by 2 to compensate.  Most content
     * leaves this at 0. */
    int          angle_offset_bucket;
+
+   /* Spin rates in angle_t units per gametic.  Engine code multiplies
+    * by leveltime to get a cumulative rotation that's added to thing
+    * ->angle before computing view rotation, producing the spinning-
+    * pickup effect Doom voxel mods rely on (Quake-like rotating
+    * weapons/health/armor on the floor).  Two slots so a thing can
+    * spin differently when initially-placed by the mapper vs dropped
+    * by an enemy at runtime; engine selects via MF_DROPPED.  Both
+    * default to 0 ("don't spin"). */
+   unsigned int placed_spin_per_tic;
+   unsigned int dropped_spin_per_tic;
 } kvx_voxel_entry_t;
 
 static kvx_voxel_entry_t *kvx_table          = NULL;
@@ -1021,7 +1033,9 @@ static int  kvx_load_kvx_lump(const char *lumpname,
 static void kvx_register_mapping(int sprite_idx, int frame,
                                  kvx_model_t *model,
                                  rpatch_t    *patches[KVX_NUM_ROTATIONS],
-                                 int angle_offset_bucket);
+                                 int angle_offset_bucket,
+                                 unsigned int placed_spin_per_tic,
+                                 unsigned int dropped_spin_per_tic);
 static int  kvx_rasterize_all_rotations(const kvx_model_t *m,
                                         int target_w, int target_h,
                                         int target_leftoffset,
@@ -1200,6 +1214,23 @@ const rpatch_t *R_KVX_LookupSprite(int sprite, int frame)
     * Callers that want view-dependent rotation should use
     * R_KVX_LookupSpriteRotated. */
    return R_KVX_LookupSpriteRotated(sprite, frame, 0);
+}
+
+unsigned int R_KVX_GetSpinPerTic(int sprite, int frame, int dropped)
+{
+   const kvx_voxel_entry_t *e;
+
+   if (!voxel_sprites || !kvx_table)
+      return 0;
+   if (sprite < 0 || sprite >= kvx_table_sprites)
+      return 0;
+   if (frame < 0 || frame >= KVX_MAX_FRAMES)
+      return 0;
+   e = &kvx_table[sprite * KVX_MAX_FRAMES + frame];
+   /* If no voxel is registered, both rates will be 0 (calloc'd
+    * initial state preserved); returning 0 is the right "no spin"
+    * answer regardless. */
+   return dropped ? e->dropped_spin_per_tic : e->placed_spin_per_tic;
 }
 
 /* Look up a sprite name (4 chars, e.g. "MEDI") in the sprnames[]
@@ -1402,7 +1433,9 @@ static int kvx_rasterize_all_rotations(const kvx_model_t *m,
 static void kvx_register_mapping(int sprite_idx, int frame,
                                  kvx_model_t *model,
                                  rpatch_t    *patches[KVX_NUM_ROTATIONS],
-                                 int angle_offset_bucket)
+                                 int angle_offset_bucket,
+                                 unsigned int placed_spin_per_tic,
+                                 unsigned int dropped_spin_per_tic)
 {
    int idx;
    int r;
@@ -1440,7 +1473,9 @@ static void kvx_register_mapping(int sprite_idx, int frame,
    kvx_table[idx].model = model;
    for (r = 0; r < KVX_NUM_ROTATIONS; r++)
       kvx_table[idx].patches[r] = patches[r];
-   kvx_table[idx].angle_offset_bucket = angle_offset_bucket;
+   kvx_table[idx].angle_offset_bucket  = angle_offset_bucket;
+   kvx_table[idx].placed_spin_per_tic  = placed_spin_per_tic;
+   kvx_table[idx].dropped_spin_per_tic = dropped_spin_per_tic;
 }
 
 /* Build the synthetic 8x8x8 test cube and bind it to MEDI/A as a
@@ -1476,7 +1511,9 @@ static void kvx_register_test_voxel(void)
 
    /* Frame 'A' = index 0. */
    kvx_register_mapping(sprite_idx, 0, m, patches,
-                        0 /* no angle offset for test cube */);
+                        0 /* no angle offset for test cube */,
+                        0 /* no placed spin */,
+                        0 /* no dropped spin */);
    lprintf(LO_INFO, "R_KVX: test cube bound to MEDI/A "
                     "(fallback, no VOXELDEF loaded)\n");
 }
@@ -1828,9 +1865,11 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
    /* Optional VOXELDEF properties.  Defaults: scale=1.0 means "use
     * the original sprite's dimensions verbatim"; angle_offset_deg=0
     * means "voxel was authored with the same front-facing convention
-    * Doom expects". */
+    * Doom expects".  spin rates default to 0 (don't spin). */
    double       scale_factor = 1.0;
    double       angle_offset_deg = 0.0;
+   double       placed_spin_deg_per_sec  = 0.0;
+   double       dropped_spin_deg_per_sec = 0.0;
 
    for (r = 0; r < KVX_NUM_ROTATIONS; r++)
       patches[r] = NULL;
@@ -2002,9 +2041,49 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
          continue;
       }
 
-      /* Any other property: 'droppedspin', 'placedspin', ...
-       * Recognized syntactically, ignored semantically.  Consume
-       * the '=value' or ' value' that follows. */
+      /* DroppedSpin: rotation rate (deg/sec) applied to a thing the
+       * engine flagged as MF_DROPPED -- i.e. a pickup left behind
+       * when an enemy died.  Voxel mods use this to make dropped
+       * weapons/health spin in place like Quake pickups, drawing
+       * attention even though the underlying sprite is static. */
+      if (keyword[0] == 'D' && strcmp(keyword, "DROPPEDSPIN") == 0)
+      {
+         double v;
+         if (!kvx_read_number(s, &v))
+         {
+            lprintf(LO_WARN, "VOXELDEF line %d: 'droppedspin' needs "
+                    "a numeric value (degrees/sec)\n", s->line);
+            kvx_skip_to_close_brace(s);
+            stats->syntax_error++;
+            return 0;
+         }
+         dropped_spin_deg_per_sec = v;
+         continue;
+      }
+
+      /* PlacedSpin: rotation rate (deg/sec) applied to a thing in
+       * its initial map placement (everything not flagged
+       * MF_DROPPED).  Less commonly used than droppedspin in real
+       * voxel mods, but recognised for completeness. */
+      if (keyword[0] == 'P' && strcmp(keyword, "PLACEDSPIN") == 0)
+      {
+         double v;
+         if (!kvx_read_number(s, &v))
+         {
+            lprintf(LO_WARN, "VOXELDEF line %d: 'placedspin' needs "
+                    "a numeric value (degrees/sec)\n", s->line);
+            kvx_skip_to_close_brace(s);
+            stats->syntax_error++;
+            return 0;
+         }
+         placed_spin_deg_per_sec = v;
+         continue;
+      }
+
+      /* Any other property: known DelphiDoom extras we don't yet
+       * handle, or unknown tokens.  Recognized syntactically,
+       * ignored semantically.  Consume the '=value' or ' value'
+       * that follows. */
       kvx_skip_value(s);
    }
 
@@ -2033,28 +2112,47 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
       int bucket;
       double normalised = angle_offset_deg / 45.0;
       /* Round half away from zero. */
+      unsigned int placed_per_tic;
+      unsigned int dropped_per_tic;
+
       if (normalised >= 0.0)
          bucket = (int)(normalised + 0.5);
       else
          bucket = -(int)(-normalised + 0.5);
       bucket &= (KVX_NUM_ROTATIONS - 1);  /* &7 wraps negatives */
 
+      /* Convert deg/sec to angle_t units per gametic.  ANG45 covers
+       * 45 degrees, so 1 degree = ANG45/45.  Doom runs at TICRATE
+       * (35) tics/sec, so per-tic angle = deg/sec * ANG45 / (45 *
+       * TICRATE).  Cast through double to avoid integer overflow on
+       * large rates -- ANG45 itself fits in unsigned, but the
+       * intermediate product wouldn't.  Negative spin rates produce
+       * a CCW spin (angle_t arithmetic naturally wraps). */
+      placed_per_tic  = (unsigned int)(placed_spin_deg_per_sec  *
+                                       ((double)ANG45 / 45.0 / 35.0));
+      dropped_per_tic = (unsigned int)(dropped_spin_deg_per_sec *
+                                       ((double)ANG45 / 45.0 / 35.0));
+
       /* Per-mapping success line.  Useful when debugging "voxel X
        * doesn't show up" -- if the line is here, the mapping landed
        * and the issue is downstream (rendering, lookup, etc.).
        * Logged before kvx_register_mapping takes ownership of the
        * patches so we can read width/height from patches[0]. */
-      if (scale_factor != 1.0 || bucket != 0)
+      if (scale_factor != 1.0 || bucket != 0 ||
+          placed_per_tic != 0 || dropped_per_tic != 0)
          lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, 8 rotations, "
-                          "scale=%.2f, angle_offset=%d/8)\n",
+                          "scale=%.2f, angle_offset=%d/8, "
+                          "placed_spin=%g, dropped_spin=%g deg/s)\n",
                  sprnames[sprite_idx], 'A' + frame, lump,
                  patches[0]->width, patches[0]->height,
-                 scale_factor, bucket);
+                 scale_factor, bucket,
+                 placed_spin_deg_per_sec, dropped_spin_deg_per_sec);
       else
          lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, 8 rotations)\n",
                  sprnames[sprite_idx], 'A' + frame, lump,
                  patches[0]->width, patches[0]->height);
-      kvx_register_mapping(sprite_idx, frame, m, patches, bucket);
+      kvx_register_mapping(sprite_idx, frame, m, patches, bucket,
+                           placed_per_tic, dropped_per_tic);
    }
    stats->registered++;
    return 1;

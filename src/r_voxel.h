@@ -189,6 +189,18 @@ void R_KVX_Free(kvx_model_t *m);
 #ifndef KVX_PARSER_ONLY     /* set when standalone-compiling the parser */
 #include "r_patch.h"        /* full rpatch_t definition */
 
+/* Voxel view-rotation cache size.  A power of 2 because the lookup
+ * uses (rot + offset) & (KVX_NUM_ROTATIONS - 1) to wrap.  16 buckets
+ * means views are 22.5 degrees apart, halving the "snap" between
+ * views that 8 buckets had.  Exposed in the header so the rotation
+ * index extraction in r_things.c can use the matching bit shift --
+ * if you change KVX_NUM_ROTATIONS, change KVX_ROT_SHIFT to match:
+ * shift = 32 - log2(KVX_NUM_ROTATIONS).  Allowed: 8 (shift=29) or
+ * 16 (shift=28); higher counts would need expanding the rasterizer's
+ * trig table. */
+#define KVX_NUM_ROTATIONS 16
+#define KVX_ROT_SHIFT     28
+
 /* Build a sprite-format rpatch_t from a voxel model, viewed along
  * the model's -Y axis (an arbitrary canonical "front view"). */
 rpatch_t *R_KVX_RasterizeFront(const kvx_model_t *m,

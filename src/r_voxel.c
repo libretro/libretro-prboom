@@ -603,16 +603,36 @@ rpatch_t *R_KVX_RasterizeRotated(const kvx_model_t *m,
     * 256 to keep the sampler in fixed-point integer math.
     * theta = rotation * 45deg; entries are (cos(theta)*256,
     * sin(theta)*256).  cos(45deg) = sin(45deg) ~= 181/256. */
-   static const int cs8[8][2] =
+   /* Trig table for the 16 view angles, scaled by 256 to keep the
+    * sampler in fixed-point integer math.  theta = rotation *
+    * (360/KVX_NUM_ROTATIONS) degrees; entries are
+    * (cos(theta)*256, sin(theta)*256).
+    *
+    * cos(22.5deg) ~= 236/256, sin(22.5deg) ~= 98/256.
+    * cos(45deg)  =  sin(45deg)  ~= 181/256.
+    * cos(67.5deg) ~=  98/256, sin(67.5deg) ~= 236/256.
+    *
+    * If KVX_NUM_ROTATIONS is reduced back to 8, every other entry
+    * here is the equivalent table; the half-step entries can be
+    * elided.  Synced manually with the constant above. */
+   static const int cs16[16][2] =
    {
-      { 256,    0 },   /* rot 0:   0 deg */
-      { 181,  181 },   /* rot 1:  45 deg */
-      {   0,  256 },   /* rot 2:  90 deg */
-      {-181,  181 },   /* rot 3: 135 deg */
-      {-256,    0 },   /* rot 4: 180 deg */
-      {-181, -181 },   /* rot 5: 225 deg */
-      {   0, -256 },   /* rot 6: 270 deg */
-      { 181, -181 }    /* rot 7: 315 deg */
+      { 256,    0 },   /* rot  0:   0.0 deg */
+      { 236,   98 },   /* rot  1:  22.5 deg */
+      { 181,  181 },   /* rot  2:  45.0 deg */
+      {  98,  236 },   /* rot  3:  67.5 deg */
+      {   0,  256 },   /* rot  4:  90.0 deg */
+      { -98,  236 },   /* rot  5: 112.5 deg */
+      {-181,  181 },   /* rot  6: 135.0 deg */
+      {-236,   98 },   /* rot  7: 157.5 deg */
+      {-256,    0 },   /* rot  8: 180.0 deg */
+      {-236,  -98 },   /* rot  9: 202.5 deg */
+      {-181, -181 },   /* rot 10: 225.0 deg */
+      { -98, -236 },   /* rot 11: 247.5 deg */
+      {   0, -256 },   /* rot 12: 270.0 deg */
+      {  98, -236 },   /* rot 13: 292.5 deg */
+      { 181, -181 },   /* rot 14: 315.0 deg */
+      { 236,  -98 }    /* rot 15: 337.5 deg */
    };
 
    int      width;
@@ -625,7 +645,7 @@ rpatch_t *R_KVX_RasterizeRotated(const kvx_model_t *m,
 
    if (!m)
       return NULL;
-   if (rotation < 0 || rotation >= 8)
+   if (rotation < 0 || rotation >= KVX_NUM_ROTATIONS)
       return NULL;
 
    width  = target_w;
@@ -636,8 +656,8 @@ rpatch_t *R_KVX_RasterizeRotated(const kvx_model_t *m,
    /* Voxel centre in fixed-point (.8) for the rotation math. */
    cx256 = (m->x_size * 256) / 2;
    cy256 = (m->y_size * 256) / 2;
-   cos_t = cs8[rotation][0];
-   sin_t = cs8[rotation][1];
+   cos_t = cs16[rotation][0];
+   sin_t = cs16[rotation][1];
 
    /* Worst-case depth: half the voxel's diagonal in the XY plane.
     * Add 1 to avoid edge-case under-sampling on diagonal rotations
@@ -968,12 +988,9 @@ int voxel_sprites = 0;
  * DEHACKED-extended frames can go further.  32 is comfortable. */
 #define KVX_MAX_FRAMES  32
 
-/* Number of cached view rotations per (sprite, frame).  Matches
- * Doom's 8 sprite rotations (0=front, 1=front-right at 45deg, ...,
- * 7=front-left at 315deg).  Each rotation is an independently
- * rasterized rpatch_t; lookup picks the right one based on the
- * angle from viewer to thing. */
-#define KVX_NUM_ROTATIONS 8
+/* KVX_NUM_ROTATIONS and KVX_ROT_SHIFT are defined in r_voxel.h so
+ * the engine-side rotation index computation in r_things.c can use
+ * the same constants. */
 
 typedef struct kvx_voxel_entry_s
 {
@@ -2105,12 +2122,15 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
       return 0;
    }
 
-   /* Convert degrees to eighth-turn buckets.  Round to nearest
-    * bucket, normalise into [0, 7].  Negative angles wrap correctly
-    * (-90 deg -> -2 -> 6 = three-quarters turn, equivalent to +270). */
+   /* Convert degrees to rotation-bucket units (1 bucket = 360 deg /
+    * KVX_NUM_ROTATIONS).  Round to nearest bucket, normalise into
+    * [0, KVX_NUM_ROTATIONS-1].  Negative angles wrap correctly
+    * (-90 deg -> -4 buckets at 16-rotations -> 12 = three-quarter
+    * turn, equivalent to +270 deg). */
    {
       int bucket;
-      double normalised = angle_offset_deg / 45.0;
+      double bucket_size_deg = 360.0 / (double)KVX_NUM_ROTATIONS;
+      double normalised = angle_offset_deg / bucket_size_deg;
       /* Round half away from zero. */
       unsigned int placed_per_tic;
       unsigned int dropped_per_tic;
@@ -2119,7 +2139,7 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
          bucket = (int)(normalised + 0.5);
       else
          bucket = -(int)(-normalised + 0.5);
-      bucket &= (KVX_NUM_ROTATIONS - 1);  /* &7 wraps negatives */
+      bucket &= (KVX_NUM_ROTATIONS - 1);  /* power-of-2 wrap */
 
       /* Convert deg/sec to angle_t units per gametic.  ANG45 covers
        * 45 degrees, so 1 degree = ANG45/45.  Doom runs at TICRATE
@@ -2140,17 +2160,19 @@ static int kvx_parse_voxeldef_block(kvx_scan_t *s,
        * patches so we can read width/height from patches[0]. */
       if (scale_factor != 1.0 || bucket != 0 ||
           placed_per_tic != 0 || dropped_per_tic != 0)
-         lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, 8 rotations, "
-                          "scale=%.2f, angle_offset=%d/8, "
+         lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, %d rotations, "
+                          "scale=%.2f, angle_offset=%d/%d, "
                           "placed_spin=%g, dropped_spin=%g deg/s)\n",
                  sprnames[sprite_idx], 'A' + frame, lump,
                  patches[0]->width, patches[0]->height,
-                 scale_factor, bucket,
+                 KVX_NUM_ROTATIONS,
+                 scale_factor, bucket, KVX_NUM_ROTATIONS,
                  placed_spin_deg_per_sec, dropped_spin_deg_per_sec);
       else
-         lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, 8 rotations)\n",
+         lprintf(LO_INFO, "R_KVX: %s%c -> %s (%dx%d, %d rotations)\n",
                  sprnames[sprite_idx], 'A' + frame, lump,
-                 patches[0]->width, patches[0]->height);
+                 patches[0]->width, patches[0]->height,
+                 KVX_NUM_ROTATIONS);
       kvx_register_mapping(sprite_idx, frame, m, patches, bucket,
                            placed_per_tic, dropped_per_tic);
    }

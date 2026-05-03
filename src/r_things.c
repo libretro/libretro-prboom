@@ -626,7 +626,13 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
       if (spin_per_tic != 0)
          effective_ang += (angle_t)((unsigned int)leveltime * spin_per_tic);
 
-      vox_rot = (vox_ang - effective_ang + (unsigned)(ANG45/2)*9) >> 29;
+      /* Quantise the view-relative angle to one of KVX_NUM_ROTATIONS
+       * buckets.  Bias by 180deg + half-bucket so bucket 0 covers
+       * "thing facing camera": (1u<<31) wraps the 180deg offset,
+       * (1u<<(KVX_ROT_SHIFT-1)) is the half-bucket centre offset. */
+      vox_rot = (vox_ang - effective_ang
+                 + (1u << 31)
+                 + (1u << (KVX_ROT_SHIFT - 1))) >> KVX_ROT_SHIFT;
 
       voxel_patch = R_KVX_LookupSpriteRotated(thing->sprite,
                                               thing->frame & FF_FRAMEMASK,

@@ -485,9 +485,20 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
 
    if (movement_smooth)
    {
-      fx = thing->PrevX + FixedMul (tic_vars.frac, thing->x - thing->PrevX);
-      fy = thing->PrevY + FixedMul (tic_vars.frac, thing->y - thing->PrevY);
-      fz = thing->PrevZ + FixedMul (tic_vars.frac, thing->z - thing->PrevZ);
+      /* Match R_InterpolateView's pause/menu policy: when the
+       * camera is frozen at the post-tic position (frac=FRACUNIT),
+       * sprites must freeze at the post-tic position too.  Using
+       * tic_vars.frac here while the camera uses FRACUNIT puts the
+       * local player's own thing at a non-zero distance from the
+       * camera, so the standard `tz < MINZ` skip no longer fires
+       * and the player's sprite gets projected over the viewport
+       * at huge scale (visible as a large pulsating blob when the
+       * menu is opened mid-movement at >35 fps). */
+      fixed_t frac = (paused || (menuactive && !demoplayback))
+                     ? FRACUNIT : tic_vars.frac;
+      fx = thing->PrevX + FixedMul (frac, thing->x - thing->PrevX);
+      fy = thing->PrevY + FixedMul (frac, thing->y - thing->PrevY);
+      fz = thing->PrevZ + FixedMul (frac, thing->z - thing->PrevZ);
    }
    else
    {

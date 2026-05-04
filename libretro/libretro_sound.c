@@ -138,9 +138,15 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
 
     /* Output length: input_samples * (SAMPLERATE / orig_rate),
      * rounded up so we don't drop the tail.  Computed in integer
-     * math: (sfxlump_len * SAMPLERATE + orig_rate - 1) / orig_rate. */
-    out_len = (sfxlump_len * SAMPLERATE + orig_rate - 1) /
-              (int)orig_rate;
+     * math via a 64-bit intermediate: (sfxlump_len * SAMPLERATE)
+     * overflows int32 once sfxlump_len passes ~48 KB, which can
+     * happen for the longer DMX sound lumps (e.g. DSBAREXP).  Use
+     * uint64_t to keep the computation clean and let the result
+     * fit back into int (output is at most ~4x input length so
+     * always fits int32). */
+    out_len = (int)(((uint64_t)sfxlump_len * (uint64_t)SAMPLERATE +
+                     (uint64_t)orig_rate - 1) /
+                    (uint64_t)orig_rate);
     out_data = (uint8_t*)malloc(out_len);
     if (!out_data)
     {
@@ -384,7 +390,6 @@ void I_UpdateSound(void)
    int        i;
    int        out_frames;
    int16_t   *out;
-   int16_t   *out_end;
 
    out_frames = tic_vars.sample_step ? (int)tic_vars.sample_step
                                      : SAMPLECOUNT_35;
@@ -409,57 +414,85 @@ void I_UpdateSound(void)
     * music (or silence) and is ready to submit. */
    if (n_active > 0)
    {
-      out     = mixbuffer;
-      out_end = mixbuffer + out_frames * 2;
+      /* Determine the longest contiguous prefix of frames during
+       * which all active channels still have data.  After this
+       * boundary, at least one channel runs out -- we re-collect
+       * the survivors and mix the remainder.  This lets the inner
+       * loop run without any per-sample end-of-channel check
+       * (which becomes the dominant cost when many channels are
+       * active). */
+      int frames_left = out_frames;
 
-      while (out < out_end)
+      out = mixbuffer;
+
+      while (frames_left > 0 && n_active > 0)
       {
-         int dl = out[0];
-         int dr = out[1];
+         int chunk = frames_left;
          int j;
+         int16_t *chunk_end;
 
+         /* Find the smallest "remaining samples" across active
+          * channels; that's our chunk length.  remaining = (end -
+          * start) bytes, one byte per output sample. */
          for (j = 0; j < n_active; j++)
          {
-            channel_t *c = active[j];
-            uint8_t    s;
+            int rem = (int)(active[j]->snd_end_ptr -
+                            active[j]->snd_start_ptr);
+            if (rem < chunk)
+               chunk = rem;
+         }
+         if (chunk <= 0)
+            chunk = 1;  /* defensive; shouldn't happen */
 
-            /* Defensive null check: a channel can drop out mid-frame
-             * (snd_start_ptr advanced past snd_end_ptr below); when
-             * that happens we NULL its snd_start_ptr and skip. */
-            if (!c->snd_start_ptr)
-               continue;
+         chunk_end = out + chunk * 2;
 
-            s   = *c->snd_start_ptr++;
-            dl += c->leftvol[s];
-            dr += c->rightvol[s];
+         /* Inner loop: mix `chunk` samples with no end-of-channel
+          * checks. */
+         while (out < chunk_end)
+         {
+            int dl = out[0];
+            int dr = out[1];
 
-            if (c->snd_start_ptr >= c->snd_end_ptr)
-               c->snd_start_ptr = NULL;  /* mark slot done */
+            for (j = 0; j < n_active; j++)
+            {
+               channel_t *c = active[j];
+               uint8_t    s = *c->snd_start_ptr++;
+               dl += c->leftvol[s];
+               dr += c->rightvol[s];
+            }
+
+            /* Clamp to int16 range.  GCC and Clang both compile
+             * this to a pair of conditional moves. */
+            if      (dl >  0x7fff) dl =  0x7fff;
+            else if (dl < -0x8000) dl = -0x8000;
+            if      (dr >  0x7fff) dr =  0x7fff;
+            else if (dr < -0x8000) dr = -0x8000;
+
+            out[0] = (int16_t)dl;
+            out[1] = (int16_t)dr;
+            out   += 2;
          }
 
-         /* Clamp to int16 range.  GCC and Clang both compile this
-          * branch ladder to a pair of conditional moves on x86_64
-          * and ARM64, which is as cheap as a saturating add. */
-         if      (dl >  0x7fff) dl =  0x7fff;
-         else if (dl < -0x8000) dl = -0x8000;
-         if      (dr >  0x7fff) dr =  0x7fff;
-         else if (dr < -0x8000) dr = -0x8000;
+         frames_left -= chunk;
 
-         out[0] = (int16_t)dl;
-         out[1] = (int16_t)dr;
-         out   += 2;
+         /* Reap any channels that just hit end-of-data and rebuild
+          * the active list in place. */
+         {
+            int dst = 0;
+            for (j = 0; j < n_active; j++)
+            {
+               if (active[j]->snd_start_ptr >= active[j]->snd_end_ptr)
+                  memset(active[j], 0, sizeof(channel_t));
+               else
+                  active[dst++] = active[j];
+            }
+            n_active = dst;
+         }
       }
 
-      /* Reap channels that hit end-of-data during the mix.  We
-       * only need to fully zero the slot at the end of the frame
-       * (the inner loop just nulled snd_start_ptr); a fresh
-       * I_StartSound caller looks for !snd_start_ptr to find a
-       * free slot, which is enough. */
-      for (i = 0; i < n_active; i++)
-      {
-         if (!active[i]->snd_start_ptr)
-            memset(active[i], 0, sizeof(channel_t));
-      }
+      /* If we exited because n_active reached 0 with frames left,
+       * the rest of mixbuffer already holds music/silence -- no
+       * further work needed. */
    }
 
    /* Step 4: hand off to libretro. */

@@ -1727,15 +1727,6 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
         int x0 = v->x, y0 = v->y, x1 = l->v1->x, y1 = l->v1->y;
         v->x = (int)((dx2 * x0 + dy2 * x1 + dxy * (y0 - y1)) / s);
         v->y = (int)((dy2 * y0 + dx2 * y1 + dxy * (x0 - x1)) / s);
-        /* ---- probe: log only vertices that actually moved ---- */
-        if (v->x != x0 || v->y != y0)
-           lprintf(LO_INFO,
-              "PROBE SLIMETRAIL_FIX vtx=%d ld=%d "
-              "before=(%08x,%08x) after=(%08x,%08x)\n",
-              (int)(v - vertexes),
-              (int)(l - lines),
-              (unsigned)x0, (unsigned)y0,
-              (unsigned)v->x, (unsigned)v->y);
       }
         }  // Obsfucated C contest entry:   :)
     while ((v != segs[i].v2) && (v = segs[i].v2));

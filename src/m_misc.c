@@ -65,7 +65,6 @@
 #include "lprintf.h"
 #include "d_main.h"
 #include "r_draw.h"
-#include "r_voxel.h"
 #include "r_demo.h"
 #include "r_fps.h"
 #include "r_sky.h"
@@ -333,8 +332,6 @@ default_t defaults[] =
   {"render_stretchsky",{&r_stretchsky, NULL},{1, NULL},0,1,
    def_bool,ss_gen,NULL, NULL},
   {"r_wiggle_fix",{(int*)&r_wiggle_fix, NULL},{1, NULL},0,1,
-   def_bool,ss_gen,NULL, NULL},
-  {"voxel_sprites",{&voxel_sprites, NULL},{0, NULL},0,1,
    def_bool,ss_gen,NULL, NULL},
 
   {"Mouse settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},

@@ -39,7 +39,6 @@
 #include "r_draw.h"
 #include "r_things.h"
 #include "r_fps.h"
-#include "r_voxel.h"
 #include "v_video.h"
 #include "lprintf.h"
 
@@ -285,13 +284,6 @@ void R_InitSprites(const char * const *namelist)
    for (i=0; i<MAX_SCREENWIDTH; i++)    // killough 2/8/98
       negonearray[i] = -1;
    R_InitSpriteDefs(namelist);
-   /* R_InitSpriteDefs has now populated numsprites and sprnames[]
-    * from any DEHACKED-extended state.  R_KVX_Init can finally
-    * allocate its mapping table and parse VOXELDEF.  Calling here
-    * (rather than at the end of R_Init) ensures voxel init sees the
-    * final sprite count. */
-   lprintf(LO_INFO, "R_KVX_Init\n");
-   R_KVX_Init();
 }
 
 //
@@ -391,34 +383,16 @@ void R_DrawMaskedColumn(
 // R_DrawVisSprite
 //  mfloorclip and mceilingclip should also be set.
 //
-/* CPhipps - new wad lump handling, *'s to const*'s */
+// CPhipps - new wad lump handling, *'s to const*'s
 static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 {
-  /* C89 requires all declarations to come before any statements
-   * in a block.  is_voxel snapshots vis->voxel_patch so the cleanup
-   * path at the bottom knows whether to skip R_UnlockPatchNum. */
   int      texturecolumn;
   fixed_t  frac;
-  const rpatch_t *patch;
-  dbool    is_voxel;
+  const rpatch_t *patch = R_CachePatchNum(vis->patch+firstspritelump);
   R_DrawColumn_f colfunc;
   draw_column_vars_t dcvars;
   enum draw_filter_type_e filter;
   enum draw_filter_type_e filterz;
-
-  /* Voxel hook (see r_voxel.c).  R_ProjectSprite already did the
-   * (sprite, frame) -> rpatch_t lookup and stored the result on
-   * the vissprite, so here we just consult the cached pointer.
-   * When non-NULL, the prerasterized voxel patch substitutes for
-   * the WAD sprite.  When NULL, fall through to the normal cache
-   * path.  The voxel patch lives outside patches[] and must NOT
-   * be unlocked at the end -- R_UnlockPatchNum decrements the
-   * lock count of a WAD-cached patch that nobody asked us to
-   * lock, which would corrupt the cache. */
-  patch    = vis->voxel_patch;
-  is_voxel = (patch != NULL);
-  if (!is_voxel)
-    patch  = R_CachePatchNum(vis->patch + firstspritelump);
 
   R_SetDefaultDrawColumnVars(&dcvars);
   if (vis->mobjflags & MF_PLAYERSPRITE) {
@@ -479,13 +453,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
       R_GetPatchColumnClamped(patch, texturecolumn+1)
     );
   }
-  /* When is_voxel is true, we never called R_CachePatchNum for this
-   * lump, so we must not call R_UnlockPatchNum either --
-   * R_UnlockPatchNum decrements the lock count on the WAD-cached
-   * patch unconditionally, which would corrupt the lock state of
-   * a sprite that nobody asked us to lock. */
-  if (!is_voxel)
-    R_UnlockPatchNum(vis->patch+firstspritelump); /* cph - release lump */
+  R_UnlockPatchNum(vis->patch+firstspritelump); // cph - release lump
 }
 
 //
@@ -514,13 +482,6 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    fixed_t gxt, gyt;
    fixed_t tz;
    int width;
-   /* Voxel substitution: if a voxel is registered for this thing's
-    * (sprite, frame), R_KVX_LookupSprite returns a prerasterized
-    * rpatch_t.  We use it for the projection math (width, leftoffset,
-    * topoffset) and stash it on the vissprite so R_DrawVisSprite
-    * draws it instead of the WAD sprite.  NULL means no voxel:
-    * normal sprite path. */
-   const rpatch_t *voxel_patch = NULL;
 
    if (movement_smooth)
    {
@@ -594,53 +555,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    }
 
    {
-      /* Voxel lookup happens here so we can use the voxel rpatch's
-       * width/leftoffset/topoffset for the projection math (the
-       * voxel patch is sized differently from the WAD sprite).  If
-       * no voxel is registered for this (sprite, frame), patch comes
-       * from the WAD cache as usual.  voxel_patch is preserved into
-       * the vissprite below so R_DrawVisSprite knows which one to
-       * draw without re-running the lookup.
-       *
-       * Rotation: compute the view rotation index even if the
-       * underlying sprite doesn't rotate (sprframe->rotate is 0 for
-       * static sprites like medikits, but the voxel cube replacing
-       * them should still rotate as the player walks around).  Same
-       * formula Doom uses for sprite rotations.
-       *
-       * Spin: if the voxel has a non-zero placedspin/droppedspin
-       * rate, advance an "effective" thing angle by leveltime *
-       * rate.  The Doom engine doesn't itself rotate static items,
-       * so this is purely a voxel-rendering effect -- pickups
-       * rotate visually but their hit boxes don't move.  Engine
-       * picks placed vs dropped via the MF_DROPPED flag. */
-      const rpatch_t* patch;
-      angle_t       vox_ang = R_PointToAngle(fx, fy);
-      angle_t       effective_ang = thing->angle;
-      unsigned int  spin_per_tic =
-         R_KVX_GetSpinPerTic(thing->sprite,
-                             thing->frame & FF_FRAMEMASK,
-                             (thing->flags & MF_DROPPED) ? 1 : 0);
-      unsigned int  vox_rot;
-
-      if (spin_per_tic != 0)
-         effective_ang += (angle_t)((unsigned int)leveltime * spin_per_tic);
-
-      /* Quantise the view-relative angle to one of KVX_NUM_ROTATIONS
-       * buckets.  Bias by 180deg + half-bucket so bucket 0 covers
-       * "thing facing camera": (1u<<31) wraps the 180deg offset,
-       * (1u<<(KVX_ROT_SHIFT-1)) is the half-bucket centre offset. */
-      vox_rot = (vox_ang - effective_ang
-                 + (1u << 31)
-                 + (1u << (KVX_ROT_SHIFT - 1))) >> KVX_ROT_SHIFT;
-
-      voxel_patch = R_KVX_LookupSpriteRotated(thing->sprite,
-                                              thing->frame & FF_FRAMEMASK,
-                                              (int)vox_rot);
-      if (voxel_patch)
-         patch = voxel_patch;
-      else
-         patch = R_CachePatchNum(lump+firstspritelump);
+      const rpatch_t* patch = R_CachePatchNum(lump+firstspritelump);
 
       /* calculate edges of the shape
        * cph 2003/08/1 - fraggle points out that this offset must be flipped
@@ -657,12 +572,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
 
       gzt = fz + (patch->topoffset << FRACBITS);
       width = patch->width;
-
-      /* Only unlock when patch came from R_CachePatchNum -- the
-       * voxel patch lives outside the WAD patch cache and has no
-       * lock count. */
-      if (!voxel_patch)
-         R_UnlockPatchNum(lump+firstspritelump);
+      R_UnlockPatchNum(lump+firstspritelump);
    }
 
    // off the side?
@@ -728,7 +638,6 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    if (vis->x1 > x1)
       vis->startfrac += vis->xiscale*(vis->x1-x1);
    vis->patch = lump;
-   vis->voxel_patch = voxel_patch;
 
    // get light level
    if (thing->flags & MF_SHADOW)
@@ -842,7 +751,6 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
       vis->startfrac += vis->xiscale*(vis->x1-x1);
 
    vis->patch = lump;
-   vis->voxel_patch = NULL;  /* player weapon is never voxelized */
 
    if (viewplayer->powers[pw_invisibility] > 4*32
          || viewplayer->powers[pw_invisibility] & 8)

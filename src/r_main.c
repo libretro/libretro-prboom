@@ -55,7 +55,6 @@
 #include "g_game.h"
 #include "r_demo.h"
 #include "r_fps.h"
-#include "r_voxel.h"
 
 // Fineangles in the SCREENWIDTH wide window.
 #define FIELDOFVIEW 2048
@@ -505,10 +504,6 @@ void R_Init (void)
   R_InitTranslationTables();
   lprintf(LO_INFO, "R_InitPatches\n");
   R_InitPatches();
-  /* R_KVX_Init is NOT called here -- numsprites is still 0 at this
-   * point because R_InitSpriteDefs runs later via P_Init ->
-   * R_InitSprites.  R_KVX_Init is called from R_InitSprites instead,
-   * after the sprite table has been populated. */
 }
 
 /* R_Deinit
@@ -537,12 +532,6 @@ void R_Init (void)
 void R_Deinit(void)
 {
    int i;
-
-   /* Voxel system: free the per-(sprite, frame) mapping table and
-    * every model + rpatch it holds.  Idempotent -- safe to call
-    * when uninitialized (table may be NULL if R_KVX_Init never
-    * ran or returned early). */
-   R_KVX_Shutdown();
 
    /* sprites: spritedef_t array holding per-sprite spriteframes.
     * R_InitSpriteDefs Z_Mallocs both, but only assigns spriteframes

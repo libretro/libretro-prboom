@@ -61,7 +61,6 @@
 #include "i_sound.h"
 #include "r_demo.h"
 #include "r_fps.h"
-#include "r_voxel.h"
 
 #include <libretro.h>
 #include <streams/file_stream.h>
@@ -309,7 +308,6 @@ void M_ChangeFramerate(void);
 void M_ChangeMouseLook(void);
 void M_ChangeMaxViewPitch(void);
 void M_ChangeMidiPlayer(void);
-void M_ChangeVoxelSprites(void);
 void M_General(int);      // killough 10/98
 void M_DrawCompat(void);  // killough 10/98
 void M_DrawGeneral(void); // killough 10/98
@@ -2972,7 +2970,6 @@ enum {
   general_hom,
   general_skystretch,
   general_wigglefix,
-  general_voxelsprites,
   general_menubg,
 };
 
@@ -3018,9 +3015,6 @@ setup_menu_t gen_settings3[] = { // General Settings screen2
   {"Wiggle geometry fix", S_YESNO, m_null, G_X,
    G_YC2 + general_wigglefix*8, {"r_wiggle_fix"}, 0, 0, NULL, NULL},
 
-  {"Voxel sprites", S_YESNO, m_null, G_X,
-   G_YC2 + general_voxelsprites*8, {"voxel_sprites"}, 0, 0, M_ChangeVoxelSprites, NULL},
-
   {"Fullscreen menu background", S_YESNO, m_null, G_X,
    G_YC3 + general_menubg*8, {"menu_background"}, 0, 0, NULL, NULL},
 
@@ -3055,17 +3049,6 @@ void M_ChangeFramerate(void)
 void M_ChangeMidiPlayer(void)
 {
   S_RestartMusic();
-}
-
-/* Apply the new "Voxel sprites" toggle immediately by tearing down
- * or re-populating the voxel slot.  R_KVX_Init reads the latest
- * value of voxel_sprites itself; we just call it (it tears down
- * any existing slot first via R_KVX_Shutdown).  Safe to call mid-
- * game -- the slot is consulted per-vissprite in R_DrawVisSprite
- * and there's no in-flight reference held across draw calls. */
-void M_ChangeVoxelSprites(void)
-{
-  R_KVX_Init();
 }
 
 void M_ChangeMouseLook(void)

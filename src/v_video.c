@@ -630,14 +630,26 @@ void V_SetPalette(int pal)
 // V_FillRect
 //
 // CPhipps - New function to fill a rectangle with a given colour
+//
+// memset() interprets its second argument as unsigned char, which
+// silently truncates the 16-bit pixel value down to its low byte
+// and then replicates that byte across both bytes of every pixel.
+// Any pixel value whose high and low bytes differ comes out wrong
+// (for example, palette index 0 at weight 63 = 0x10a2 becomes
+// 0xa2a2, a pinkish red instead of dark gray-green).  Use a
+// per-pixel store loop instead -- correct for every value, and
+// V_FillRect isn't on a hot path so the lost vectorisation
+// doesn't matter in practice.
 void V_FillRect(int x, int y, int width, int height, uint8_t colour)
 {
-  uint16_t *dest = (uint16_t*)screens[0].data + x + y* SURFACE_SHORT_PITCH;
-  uint16_t c = VID_PAL16(colour, VID_COLORWEIGHTMASK);
+  uint16_t *dest = (uint16_t*)screens[0].data + x + y * SURFACE_SHORT_PITCH;
+  uint16_t  c    = VID_PAL16(colour, VID_COLORWEIGHTMASK);
+  int       i;
   while (height--)
   {
-     memset(dest, c, width * sizeof(uint16_t));
-     dest += SURFACE_SHORT_PITCH;
+    for (i = 0; i < width; i++)
+      dest[i] = c;
+    dest += SURFACE_SHORT_PITCH;
   }
 }
 

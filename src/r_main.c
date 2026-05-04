@@ -80,7 +80,6 @@ fixed_t  viewcos, viewsin;
 player_t *viewplayer;
 fixed_t  focallength;
 int      fieldofview;
-fixed_t  freelookviewheight;
 extern lighttable_t **walllights;
 
 //
@@ -640,14 +639,7 @@ void R_SetupFreelook(void)
   fixed_t dy;
   int i;
 
-  //if (camera != NULL)
-  {
-    dy = FixedMul(focallength, finetangent[(ANG90-viewpitch)>>ANGLETOFINESHIFT]);
-  }
-  /*else
-  {
-    dy = 0;
-  }*/
+  dy = FixedMul(focallength, finetangent[(ANG90-viewpitch)>>ANGLETOFINESHIFT]);
 
   if (movement_mouselook){
     centeryfrac = (viewheight << (FRACBITS-1)) + dy;

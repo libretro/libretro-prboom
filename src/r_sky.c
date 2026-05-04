@@ -100,7 +100,6 @@ void R_InitSkyMap (void)
 
     if (viewwidth != 0 && viewheight != 0)
     {
-      //skyiscale = 200 * FRACUNIT / freelookviewheight;
       skyiscale = (fixed_t)(((uint64_t)FRACUNIT * SCREENWIDTH * 200) / (viewwidth * SCREENHEIGHT));
       // line below is from zdoom, but it works incorrectly with prboom
       // with widescreen resolutions (eg 1280x720) by some reasons

@@ -294,9 +294,21 @@ void D_Display (void)
   M_Drawer();          // menu is drawn even on top of everything
 #ifdef HAVE_NET
   NetUpdate();         // send out any new accumulation
-#else
-  D_BuildNewTiccmds();
 #endif
+  /* No D_BuildNewTiccmds() here in the libretro build: input
+   * collection lives entirely in TryRunTics, which runs once per
+   * retro_run.  The previous code polled input twice per frame --
+   * once at tic-update time and once again right before the
+   * framebuffer flip.  At display rates higher than the 35 Hz
+   * gametic rate this fed every poll-result into the SAME
+   * outstanding ticcmd via the angleturn += / buttons |=
+   * accumulation in D_BuildNewTiccmds's "else" branch, doubling
+   * any turn input across consecutive frames.  Worse, the amount
+   * of double-counting depended on display fps (more frames per
+   * tic = more accumulation), so the same physical mouse motion
+   * produced different in-game turns at different framerates.
+   * Removing this call leaves TryRunTics as the single source of
+   * truth and makes input -> world deterministic across fps. */
 
   // normal update
   if (!wipe)

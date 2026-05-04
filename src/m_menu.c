@@ -1069,28 +1069,6 @@ static void M_QuitResponse(int ch)
 {
   if (ch != 'y')
     return;
-#ifndef __LIBRETRO__
-  if ((!netgame || demoplayback) // killough 12/98
-      && !nosfxparm && snd_card) // avoid delay if no sound card
-  {
-    int i;
-
-    if (gamemode == commercial)
-      S_StartSound(NULL,quitsounds2[(gametic>>2)&7]);
-    else
-      S_StartSound(NULL,quitsounds[(gametic>>2)&7]);
-
-    // wait till all sounds stopped or 3 seconds are over
-    i = 30;
-    while (i>0) {
-      I_uSleep(100000); // CPhipps - don't thrash cpu in this loop
-      if (!I_AnySoundStillPlaying())
-        break;
-      i--;
-    }
-  }
-#endif
-
   quit_pressed = true;
 }
 

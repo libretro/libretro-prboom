@@ -419,58 +419,7 @@ void D_InitNetGame (void)
   if (!playeringame[consoleplayer]) I_Error("D_InitNetGame: consoleplayer not in game");
 }
 
-#if 0
-void TryRunTics (void)
-{
-  int runtics;
-  int entertime = I_GetTime();
-
-  // Wait for tics to run
-  while (1) {
-    NetUpdate();
-    runtics = (server ? remotetic : maketic) - gametic;
-    if (!runtics) {
-      if (!movement_smooth) {
-        if (server)
-          I_WaitForPacket(ms_to_next_tick);
-        else
-          I_uSleep(ms_to_next_tick*1000);
-      }
-      if (I_GetTime() - entertime > 10) {
-        if (server) {
-          char buf[sizeof(packet_header_t)+1];
-          remotesend--;
-          packet_set((packet_header_t *)buf, PKT_RETRANS, remotetic);
-          buf[sizeof(buf)-1] = consoleplayer;
-          I_SendPacket((packet_header_t *)buf, sizeof buf);
-        }
-        M_Ticker(); return;
-      }
-      {
-        WasRenderedInTryRunTics = TRUE;
-        if (movement_smooth && gamestate==wipegamestate)
-        {
-          isExtraDDisplay = TRUE;
-          D_Display();
-          isExtraDDisplay = FALSE;
-        }
-      }
-    } else break;
-  }
-
-  while (runtics--) {
-    if (server) CheckQueuedPackets();
-    if (advancedemo)
-      D_DoAdvanceDemo ();
-    M_Ticker ();
-    I_GetTime_SaveMS();
-    G_Ticker ();
-    gametic++;
-    NetUpdate(); // Keep sending our tics to avoid stalling remote nodes
-  }
-}
-#else
-void TryRunTics(void) // Avoid sleeping/timer crap, just run it. (Themaister)
+void TryRunTics(void) /* Avoid sleeping/timer crap, just run it. (Themaister) */
 {
    int runtics = maketic - gametic;
 
@@ -483,7 +432,6 @@ void TryRunTics(void) // Avoid sleeping/timer crap, just run it. (Themaister)
       gametic++;
    }
 }
-#endif
 
 
 #else

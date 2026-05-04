@@ -89,7 +89,6 @@ void M_EndGame(int choice);
 
 retro_log_printf_t log_cb;
 static retro_video_refresh_t video_cb;
-static retro_audio_sample_t audio_cb;
 retro_audio_sample_batch_t audio_batch_cb;
 static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
@@ -557,7 +556,10 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 
 void retro_set_audio_sample(retro_audio_sample_t cb)
 {
-   audio_cb = cb;
+   /* Stubbed -- this core uses retro_set_audio_sample_batch instead.
+    * The libretro frontend always calls this setter, so we keep the
+    * symbol but ignore the callback. */
+   (void)cb;
 }
 
 void retro_set_audio_sample_batch(retro_audio_sample_batch_t cb)

@@ -195,6 +195,12 @@ static int fl_init (int samplerate)
     return 0;
   }
 
+  /* Apply current volume as gain.  Without this the synth defaults
+   * to FluidSynth's stock 0.2 gain until the first fl_setvolume
+   * call lands -- which is fine for steady-state but means the
+   * very first ms of music after init is at the wrong level. */
+  fluid_synth_set_gain(f_syn, 0.5f * (float)f_volume / 15.0f);
+
   return 1;
 }
 
@@ -320,34 +326,33 @@ static void fl_stop (void)
 static void fl_setvolume (int v)
 { 
   f_volume = v;
+
+  /* Map Doom's 0..15 MIDI volume scale onto FluidSynth's gain knob.
+   *
+   * Previously the synth ran at fixed gain and we did a software
+   * float-multiply in fl_writesamples_ex.  By pushing the volume
+   * into fluid_synth_set_gain we can switch to fluid_synth_write_s16
+   * and skip an entire float buffer + per-sample clamp + cast pass.
+   *
+   * Coefficient choice: the old code produced peak amplitude
+   * 16384*v/15 (~half int16 max at v=15), so we aim for the same
+   * peak from FluidSynth's int16 output.  FluidSynth's gain knob
+   * scales linearly; 0.5 produces approximately half-scale peaks
+   * with typical SoundFonts, so gain = 0.5 * v / 15.  Users who
+   * want full-scale music can just turn it up further at the
+   * libretro frontend mixer. */
+  if (f_syn)
+    fluid_synth_set_gain(f_syn, 0.5f * (float)v / 15.0f);
 }
 
 
 static void fl_writesamples_ex (short *dest, int nsamp)
-{ // does volume conversion and then writes samples
-  int i;
-  float multiplier = 16384.0f / 15.0f * f_volume;
-
-  static float *fbuff = NULL;
-  static int fbuff_siz = 0;
-
-  if (nsamp * 2 > fbuff_siz)
-  {
-    fbuff = realloc (fbuff, nsamp * 2 * sizeof (float));
-    fbuff_siz = nsamp * 2;
-  }
-
-  fluid_synth_write_float (f_syn, nsamp, fbuff, 0, 2, fbuff, 1, 2);
-
-  for (i = 0; i < nsamp * 2; i++)
-  {
-    // data is NOT already clipped
-    if (fbuff[i] > 1.0f)
-      fbuff[i] = 1.0f;
-    if (fbuff[i] < -1.0f)
-      fbuff[i] = -1.0f;
-    dest[i] = (short) (fbuff[i] * multiplier);
-  }
+{
+  /* Write int16 stereo directly from FluidSynth.  Volume is handled
+   * via the synth gain (set in fl_setvolume), and FluidSynth clamps
+   * internally to int16 range, so this path has no software float
+   * buffer, no per-sample clamp, and no float->int conversion. */
+  fluid_synth_write_s16(f_syn, nsamp, dest, 0, 2, dest, 1, 2);
 }
 
 static void writesysex (unsigned char *data, int len)
@@ -386,8 +391,6 @@ static void fl_render (void *vdest, unsigned length)
 
   midi_event_t *currevent;
 
-  log_cb(RETRO_LOG_INFO, "Test 1\n");
-
   /* No active synth (fl_init failed -- soundfont missing, etc.):
    * write silence to the output buffer and return.  Without this
    * guard, the event-loop below would dereference NULL inside
@@ -405,14 +408,10 @@ static void fl_render (void *vdest, unsigned length)
 
   if (!f_playing || f_paused)
   { 
-    // save CPU time and allow for seamless resume after pause
+    /* save CPU time and allow for seamless resume after pause */
     memset (vdest, 0, length * 4);
-    //fl_writesamples_ex (vdest, length);
     return;
   }
-
-  log_cb(RETRO_LOG_INFO, "Test 2\n");
-
 
   while (1)
   {

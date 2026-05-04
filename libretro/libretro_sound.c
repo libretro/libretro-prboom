@@ -45,32 +45,11 @@ extern int snd_MusicVolume;
 int lengths[NUMSFX];
 int snd_card = 1;
 int mus_card = 0;
-int snd_samplerate= 11025;
 
-typedef struct
-{
-   // SFX id of the playing sound effect.
-   // Used to catch duplicates (like chainsaw).
-   int id;
-   // The channel step amount...
-   unsigned int step;
-   // ... and a 0.16 bit remainder of last step.
-   unsigned int stepremainder;
-   unsigned int samplerate;
-   // The channel data pointers, start and end.
-   const unsigned char* data;
-   const unsigned char* enddata;
-   // Hardware left and right channel volume lookup.
-   int *leftvol_lookup;
-   int *rightvol_lookup;
-} channel_info_t;
-
-channel_info_t channelinfo[MAX_CHANNELS];
-
-// The global mixing buffer.
-// Basically, samples from all active internal channels
-//  are modifed and added, and stored in the buffer
-//  that is submitted to the audio device.
+/* The global mixing buffer.
+ * Basically, samples from all active internal channels
+ *  are modifed and added, and stored in the buffer
+ *  that is submitted to the audio device. */
 int16_t mixbuffer[MIXBUFFERSIZE];
 
 typedef struct
@@ -103,85 +82,85 @@ static channel_t channels[NUM_CHANNELS];
 
 int vol_lookup[128*256];
 
-static double R_ceil(double x)
-{
-   if (x > LONG_MAX)
-      return x; /* big floats are all ints */
-   return ((long)(x+(0.99999999999999997)));
-}
-
-
-static double R_floor(double x)
-{
-   double y;
-   static const double twoTo52 = 4.50359962737049600e15;              /* 0x1p52 */
-   union {double f; uint64_t i;} u = {x};
-   int e = u.i >> 52 & 0x7ff;
-
-   if (e >= 0x3ff+52 || x == 0)
-      return x;
-   /* y = int(x) - x, where int(x) is an integer neighbor of x */
-   if (u.i >> 63)
-      y = (double)(x - twoTo52) + twoTo52 - x;
-   else
-      y = (double)(x + twoTo52) - twoTo52 - x;
-   /* special case because of non-nearest rounding modes */
-   if (e <= 0x3ff-1)
-      return u.i >> 63 ? -1 : 0;
-   if (y > 0)
-      return x + y - 1;
-   return x + y;
-}
-
 /* i_sound */
 
-/* This function loads the sound data from the WAD lump
- * for a single sound effect. */
+/* Load a single sound effect from its DS<name> WAD lump and resample
+ * it to the libretro output rate.
+ *
+ * DMX SFX format: 8-byte header (uint16 type=3, uint16 sample_rate,
+ * uint32 length) followed by `length` unsigned 8-bit PCM samples.
+ *
+ * Resampling here is nearest-neighbour with a 16.16 fixed-point step
+ * accumulator -- one add and one shift per output sample, no float
+ * division and no per-sample floor() call.  The previous version
+ * computed (float)i/times + R_floor() per sample, which was both
+ * slower and used custom-rolled R_ceil/R_floor functions that did
+ * IEEE-754 bit hacks the hardware can do for free.
+ *
+ * The output is no longer padded to a multiple of SAMPLECOUNT_35 --
+ * that padding (up to ~1259 silent bytes per loaded SFX) was a hold-
+ * over from a buffering scheme the libretro mixer doesn't use; the
+ * mix loop terminates each channel via the snd_start_ptr/snd_end_ptr
+ * comparison. */
 static void* I_SndLoadSample(const char* sfxname, int* len)
 {
-    int i, x, padded_sfx_len, sfxlump_num, sfxlump_len;
-    char sfxlump_name[20];
-    const uint8_t *sfxlump_data, *sfxlump_sound;
-    uint8_t *padded_sfx_data;
-    uint16_t orig_rate;
-    float times;
+    int             out_i, sfxlump_num, sfxlump_len, out_len;
+    char            sfxlump_name[20];
+    const uint8_t  *sfxlump_data, *sfxlump_sound;
+    uint8_t        *out_data;
+    uint16_t        orig_rate;
+    unsigned int    step_fx;     /* 16.16 input step per output sample */
+    unsigned int    pos_fx;      /* 16.16 input position accumulator */
 
     sprintf (sfxlump_name, "DS%s", sfxname);
 
-    // check if the sound lump exists
+    /* check if the sound lump exists */
     if (W_CheckNumForName(sfxlump_name) == -1)
         return 0;
 
     sfxlump_num = W_GetNumForName (sfxlump_name);
     sfxlump_len = W_LumpLength (sfxlump_num);
 
-    // if it's not at least 9 bytes (8 byte header + at least 1 sample), it's
-    // not in the correct format
+    /* DMX header is 8 bytes; need at least one PCM byte after it. */
     if (sfxlump_len < 9)
         return 0;
 
-    /* load it */
     sfxlump_data    = W_CacheLumpNum (sfxlump_num);
     sfxlump_sound   = sfxlump_data + 8;
     sfxlump_len    -= 8;
 
-    /* get original sample rate from DMX header */
+    /* Get original sample rate from DMX header (offset 2, little-
+     * endian uint16). */
     memcpy(&orig_rate, sfxlump_data+2, 2);
     orig_rate       = SHORT (orig_rate);
+    if (orig_rate == 0)
+        orig_rate = 11025;  /* defensive: malformed lump */
 
-    times           = 48000.0f / (float)orig_rate;
-
-    padded_sfx_len  = ((sfxlump_len * R_ceil(times) + (SAMPLECOUNT_35-1)) / SAMPLECOUNT_35) * SAMPLECOUNT_35;
-    padded_sfx_data = (uint8_t*)malloc(padded_sfx_len);
-
-    for (i = 0; i < padded_sfx_len; i++)
+    /* Output length: input_samples * (SAMPLERATE / orig_rate),
+     * rounded up so we don't drop the tail.  Computed in integer
+     * math: (sfxlump_len * SAMPLERATE + orig_rate - 1) / orig_rate. */
+    out_len = (sfxlump_len * SAMPLERATE + orig_rate - 1) /
+              (int)orig_rate;
+    out_data = (uint8_t*)malloc(out_len);
+    if (!out_data)
     {
-        x = R_floor ((float)i/times);
+        W_UnlockLumpNum (sfxlump_num);
+        return 0;
+    }
 
-        if (x < sfxlump_len) // 8 was already subtracted
-            padded_sfx_data[i] = sfxlump_sound[x];
-        else
-            padded_sfx_data[i] = 128; // fill the rest with silence
+    /* 16.16 fixed-point step: orig_rate / SAMPLERATE input samples
+     * per output sample.  E.g. for 11025 -> 44100 this is 0.25,
+     * encoded as (1 << 14) = 16384. */
+    step_fx = ((unsigned int)orig_rate << 16) / (unsigned int)SAMPLERATE;
+    pos_fx  = 0;
+
+    for (out_i = 0; out_i < out_len; out_i++)
+    {
+        unsigned int x = pos_fx >> 16;
+        out_data[out_i] = (x < (unsigned int)sfxlump_len)
+                           ? sfxlump_sound[x]
+                           : 128;  /* DC silence in unsigned 8-bit */
+        pos_fx += step_fx;
     }
 
     /* Release the cached lump back to the zone via the cache's
@@ -193,8 +172,8 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
      * instead of re-reading.  Use the proper unlock path. */
     W_UnlockLumpNum (sfxlump_num);
 
-    *len = padded_sfx_len;
-    return (void *)(padded_sfx_data);
+    *len = out_len;
+    return (void *)(out_data);
 }
 
 //
@@ -365,106 +344,126 @@ dbool   I_SoundIsPlaying (int handle)
     return 0;
 }
 
-//
-// This function loops all active (internal) sound
-//  channels, retrieves a given number of samples
-//  from the raw sound data, modifies it according
-//  to the current (internal) channel parameters,
-//  mixes the per channel samples into the global
-//  mixbuffer, clamping it to the allowed range,
-//  and sets up everything for transferring the
-//  contents of the mixbuffer to the (two)
-//  hardware channels (left and right, that is).
-//
-// This function currently supports only 16bit.
-//
-
+/* Mix one frame's worth of audio and submit it to libretro.
+ *
+ * Determinism: called exactly once per retro_run.  The number of
+ * frames produced is fixed by tic_vars.sample_step (audio rate /
+ * video fps), so each retro_run call submits the same-sized audio
+ * batch every time -- no rate jitter, no underrun catch-up.
+ *
+ * Pipeline:
+ *   1. Music (if any) renders int16 stereo straight into mixbuffer;
+ *      otherwise mixbuffer gets zeroed.
+ *   2. For each active SFX channel, accumulate its volume-scaled
+ *      contribution into 32-bit dl/dr, then clamp to int16 and
+ *      write back to mixbuffer.
+ *   3. One audio_batch_cb submission for the whole frame.
+ *
+ * Optimisations vs the previous version:
+ *   - No separate mad_audio_buf; music renders directly into the
+ *     output buffer.  Saves a 5 KB stack alloc + memset + read-back.
+ *   - Active channels collected into a compact list once per call,
+ *     so the inner per-sample loop iterates ~8 entries (typical
+ *     gameplay) instead of 32.
+ *   - Channel-end handling moved out of the inner loop: when a
+ *     channel runs dry mid-frame, NULL its start_ptr inline; no
+ *     more 48-byte memset per channel completion.
+ *   - Off-by-one fixed (was writing out_frames+1 frames into a
+ *     buffer the submit loop only read out_frames from).
+ *   - Single audio_batch_cb call (libretro guarantees full-batch
+ *     consumption for the standard frontends; the retry loop
+ *     guarded a non-issue).
+ */
 void I_UpdateSound(void)
 {
-   // Mix current sound data. Data, from raw sound, for right and left.
-   uint8_t sample;
-   int dl, dr, frames, out_frames, step, chan;
-   int16_t mad_audio_buf[SAMPLECOUNT_35 * 2] = { 0 }; // initialize all zero
+   /* Compact list of currently-playing SFX channels, rebuilt each
+    * call.  Pointer-based so the inner loop has one indirection
+    * fewer than indexing channels[] by integer. */
+   channel_t *active[NUM_CHANNELS];
+   int        n_active = 0;
+   int        i;
+   int        out_frames;
+   int16_t   *out;
+   int16_t   *out_end;
 
-   // Pointers in global mixbuffer, left, right, end.
-   int16_t *leftend;
+   out_frames = tic_vars.sample_step ? (int)tic_vars.sample_step
+                                     : SAMPLECOUNT_35;
 
-   // Left and right channel are in global mixbuffer, alternating.
-   int16_t *leftout  = mixbuffer;
-   int16_t *rightout = mixbuffer+1;
-   step       = 2;
-   frames     = 0;
-
-   out_frames = (tic_vars.sample_step)? tic_vars.sample_step : SAMPLECOUNT_35;
-
+   /* Step 1: music or silence into mixbuffer. */
 #ifdef MUSIC_SUPPORT
    if (music_handle && current_player)
-     current_player->render(mad_audio_buf, out_frames);
+      current_player->render(mixbuffer, out_frames);
    else
 #endif
-      memset(mad_audio_buf, 0, out_frames * 4);
+      memset(mixbuffer, 0, (size_t)out_frames * 2 * sizeof(int16_t));
 
-   // Determine end, for left channel only (right channel is implicit).
-   leftend = mixbuffer + out_frames * step;
-
-   // Mix sounds into the mixing buffer.
-   // Loop over step*SAMPLECOUNT, that is 512 values for two channels.
-
-   while (leftout <= leftend)
+   /* Step 2: gather active SFX channels. */
+   for (i = 0; i < NUM_CHANNELS; i++)
    {
-      // Reset left/right value.
-      dl = mad_audio_buf[frames * 2 + 0];
-      dr = mad_audio_buf[frames * 2 + 1];
-
-      for (chan=0; chan<NUM_CHANNELS; chan++)
-      {
-         // Check channel, if active.
-         if (channels[chan].snd_start_ptr)
-         {
-            // Get the raw data from the channel.
-            sample = *channels[chan].snd_start_ptr;
-
-            // Add left and right part for this channel (sound) to the
-            // current data. Adjust volume accordingly.
-            dl += channels[chan].leftvol[sample];
-            dr += channels[chan].rightvol[sample];
-
-            channels[chan].snd_start_ptr++;
-
-            if (!(channels[chan].snd_start_ptr < channels[chan].snd_end_ptr))
-               memset(&channels[chan], 0, sizeof(channel_t));
-         }
-      }
-
-      // Clamp to range. Left hardware channel.
-      // Has been char instead of short.
-      // if (dl > 127) *leftout = 127;
-      // else if (dl < -128) *leftout = -128;
-      // else *leftout = dl;
-
-      if (dl > 0x7fff)
-         *leftout = 0x7fff;
-      else if (dl < -0x8000)
-         *leftout = -0x8000;
-      else
-         *leftout = dl;
-
-      // Same for right hardware channel.
-      if (dr > 0x7fff)
-         *rightout = 0x7fff;
-      else if (dr < -0x8000)
-         *rightout = -0x8000;
-      else
-         *rightout = dr;
-
-      // Increment current pointers in mixbuffer.
-      leftout += step;
-      rightout += step;
-      frames++;
+      if (channels[i].snd_start_ptr)
+         active[n_active++] = &channels[i];
    }
 
-   for (frames = 0; frames < out_frames; )
-      frames += audio_batch_cb(mixbuffer + (frames << 1), out_frames - frames);
+   /* Step 3: per-sample mix.  When there are no SFX active we can
+    * skip the mix loop entirely -- the mixbuffer already holds
+    * music (or silence) and is ready to submit. */
+   if (n_active > 0)
+   {
+      out     = mixbuffer;
+      out_end = mixbuffer + out_frames * 2;
+
+      while (out < out_end)
+      {
+         int dl = out[0];
+         int dr = out[1];
+         int j;
+
+         for (j = 0; j < n_active; j++)
+         {
+            channel_t *c = active[j];
+            uint8_t    s;
+
+            /* Defensive null check: a channel can drop out mid-frame
+             * (snd_start_ptr advanced past snd_end_ptr below); when
+             * that happens we NULL its snd_start_ptr and skip. */
+            if (!c->snd_start_ptr)
+               continue;
+
+            s   = *c->snd_start_ptr++;
+            dl += c->leftvol[s];
+            dr += c->rightvol[s];
+
+            if (c->snd_start_ptr >= c->snd_end_ptr)
+               c->snd_start_ptr = NULL;  /* mark slot done */
+         }
+
+         /* Clamp to int16 range.  GCC and Clang both compile this
+          * branch ladder to a pair of conditional moves on x86_64
+          * and ARM64, which is as cheap as a saturating add. */
+         if      (dl >  0x7fff) dl =  0x7fff;
+         else if (dl < -0x8000) dl = -0x8000;
+         if      (dr >  0x7fff) dr =  0x7fff;
+         else if (dr < -0x8000) dr = -0x8000;
+
+         out[0] = (int16_t)dl;
+         out[1] = (int16_t)dr;
+         out   += 2;
+      }
+
+      /* Reap channels that hit end-of-data during the mix.  We
+       * only need to fully zero the slot at the end of the frame
+       * (the inner loop just nulled snd_start_ptr); a fresh
+       * I_StartSound caller looks for !snd_start_ptr to find a
+       * free slot, which is enough. */
+      for (i = 0; i < n_active; i++)
+      {
+         if (!active[i]->snd_start_ptr)
+            memset(active[i], 0, sizeof(channel_t));
+      }
+   }
+
+   /* Step 4: hand off to libretro. */
+   audio_batch_cb(mixbuffer, out_frames);
 }
 
 void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
@@ -531,17 +530,6 @@ void I_InitSound(void)
 
   if (log_cb)
     log_cb(RETRO_LOG_INFO, "I_InitSound: \n");
-}
-
-dbool I_AnySoundStillPlaying(void)
-{
-   int i;
-   dbool   result = false;
-
-   for (i = 0; i < MAX_CHANNELS; i++)
-      result |= channelinfo[i].data != NULL;
-
-   return result;
 }
 
 /* MUSIC API */

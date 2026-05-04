@@ -80,9 +80,6 @@ void I_StopSound(int handle);
 // Returns 0 if no longer playing, 1 if playing.
 dbool   I_SoundIsPlaying(int handle);
 
-// Called by m_menu.c to let the quit sound play and quit right after it stops
-dbool   I_AnySoundStillPlaying(void);
-
 // Updates the volume, separation,
 //  and pitch of a sound channel.
 void I_UpdateSoundParams(int handle, int vol, int sep, int pitch);
@@ -125,8 +122,5 @@ void I_UnRegisterSong(int handle);
  * registered).  Used by S_RestartMusic to skip MIDI-hardware-driven
  * restarts on MP3 streams. */
 int I_MusicIsMP3(void);
-
-// CPhipps - put these in config file
-extern int snd_samplerate;
 
 #endif

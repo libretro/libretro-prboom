@@ -93,48 +93,78 @@ static int wipe_doMelt(int ticks)
    {
       for (i=0;i<(SCREENWIDTH);i++)
       {
-         if (y_lookup[i]<0)
+         uint8_t *s, *d;
+         int j;
+         int boundary;  /* row at which end-screen meets start-screen */
+
+         /* Advance this column's melt position by one tick. */
+         if (y_lookup[i] < 0)
          {
             y_lookup[i]++;
             done = FALSE;
-            continue;
          }
-         if (y_lookup[i] < SCREENHEIGHT)
+         else if (y_lookup[i] < SCREENHEIGHT)
          {
-            uint8_t *s, *d;
-            int j, dy;
-
-            /* cph 2001/07/29 -
-             *  The original melt rate was 8 pixels/sec, i.e. 25 frames to melt
-             *  the whole screen, so make the melt rate depend on SCREENHEIGHT
-             *  so it takes no longer in high res
-             */
-            dy = (y_lookup[i] < 16) ? y_lookup[i]+1 : SCREENHEIGHT/25;
-            if (y_lookup[i]+dy >= SCREENHEIGHT)
+            /* cph 2001/07/29: melt rate depends on SCREENHEIGHT
+             * so the wipe takes the same wall-clock time at any
+             * vertical resolution. */
+            int dy = (y_lookup[i] < 16) ? y_lookup[i]+1
+                                        : SCREENHEIGHT/25;
+            if (y_lookup[i] + dy > SCREENHEIGHT)
                dy = SCREENHEIGHT - y_lookup[i];
-
-            s = wipe_scr_end.data    + (y_lookup[i] * SURFACE_BYTE_PITCH +(i * SURFACE_PIXEL_DEPTH));
-            d = wipe_scr.data        + (y_lookup[i] * SURFACE_BYTE_PITCH +(i * SURFACE_PIXEL_DEPTH));
-            for (j=dy;j;j--) {
-
-               d[0] = s[0];
-               d[1] = s[1];
-
-               d += SURFACE_BYTE_PITCH;
-               s += SURFACE_BYTE_PITCH;
-            }
             y_lookup[i] += dy;
-            s = wipe_scr_start.data  + (i * SURFACE_PIXEL_DEPTH);
-            d = wipe_scr.data        + (y_lookup[i] *  SURFACE_BYTE_PITCH +(i * SURFACE_PIXEL_DEPTH));
-            for (j=SCREENHEIGHT-y_lookup[i];j;j--) {
+            done = FALSE;
+         }
+         /* else: column already at SCREENHEIGHT, no advance. */
 
+         /* Paint the column from scratch this frame.  Under the
+          * direct-render path screens[0].data (= wipe_scr.data)
+          * points at the frontend's current buffer and rotates
+          * per frame, so we cannot rely on previous frames'
+          * writes still being there.  Each frame writes a full
+          * SCREENHEIGHT column: end-screen above the boundary,
+          * start-screen below.
+          *
+          * The boundary is max(0, y_lookup[i]) -- columns that
+          * have not yet started scrolling have boundary = 0
+          * (entire column is start-screen), columns fully
+          * scrolled in have boundary = SCREENHEIGHT (entire
+          * column is end-screen). */
+         boundary = y_lookup[i] < 0 ? 0 : y_lookup[i];
+
+         /* End-screen above the boundary. */
+         if (boundary > 0)
+         {
+            s = wipe_scr_end.data + (i * SURFACE_PIXEL_DEPTH);
+            d = wipe_scr.data     + (i * SURFACE_PIXEL_DEPTH);
+            for (j = boundary; j; j--)
+            {
                d[0] = s[0];
                d[1] = s[1];
-
                d += SURFACE_BYTE_PITCH;
                s += SURFACE_BYTE_PITCH;
             }
-            done = FALSE;
+         }
+
+         /* Start-screen below the boundary, scrolled DOWN by
+          * `boundary` rows so the source's row 0 maps to dest's
+          * row `boundary`.  This produces the iconic Doom melt
+          * look where the original screen "drips" downward as
+          * the new screen pushes in from the top. */
+         if (boundary < SCREENHEIGHT)
+         {
+            s = wipe_scr_start.data
+                + (i * SURFACE_PIXEL_DEPTH);
+            d = wipe_scr.data
+                + (boundary * SURFACE_BYTE_PITCH)
+                + (i * SURFACE_PIXEL_DEPTH);
+            for (j = SCREENHEIGHT - boundary; j; j--)
+            {
+               d[0] = s[0];
+               d[1] = s[1];
+               d += SURFACE_BYTE_PITCH;
+               s += SURFACE_BYTE_PITCH;
+            }
          }
       }
    }

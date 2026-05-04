@@ -1765,41 +1765,31 @@ void I_FinishUpdate (void)
    if (!video_cb)
      return;
 
-   if (!sw_fb_checked)
+   if (direct_fb_data)
    {
-      struct retro_framebuffer fb = {0};
-      fb.width                    = SCREENWIDTH;
-      fb.height                   = SCREENHEIGHT;
-      fb.access_flags             = RETRO_MEMORY_ACCESS_WRITE;
-
-      if (environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
-            && fb.data)
-      {
-         have_sw_fb = true;
-         if (log_cb)
-            log_cb(RETRO_LOG_INFO,
-                  "Software framebuffer acquired (pitch: %u).\n",
-                  (unsigned)fb.pitch);
-      }
-      sw_fb_checked = true;
+      /* Direct-render: the renderer wrote pixels straight into
+       * the frontend's buffer in place; just hand it back.  Per
+       * libretro.h the pointer must match exactly what
+       * GET_CURRENT_SOFTWARE_FRAMEBUFFER returned, hence the
+       * stored pitch / pointer rather than recomputing. */
+      video_cb(direct_fb_data, SCREENWIDTH, SCREENHEIGHT,
+               direct_fb_pitch);
+      direct_fb_data  = NULL;
+      direct_fb_pitch = 0;
+      /* Restore screens[0] / drawvars to the heap fallback so any
+       * code path that touches screens[0] outside retro_run sees a
+       * stable buffer (the libretro contract is that the SW FB
+       * pointer is invalid after retro_run returns). */
+      screens[0].data        = (unsigned char *)screen_buf;
+      drawvars.short_topleft = (unsigned short *)screen_buf;
+      drawvars.int_topleft   = (unsigned int   *)screen_buf;
+      return;
    }
 
-   if (have_sw_fb)
-   {
-      struct retro_framebuffer fb = {0};
-      fb.width                    = SCREENWIDTH;
-      fb.height                   = SCREENHEIGHT;
-      fb.access_flags             = RETRO_MEMORY_ACCESS_WRITE;
-
-      if (environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER, &fb)
-            && fb.data)
-      {
-         memcpy(fb.data, screen_buf, fb.pitch * SCREENHEIGHT);
-         video_cb(fb.data, SCREENWIDTH, SCREENHEIGHT, fb.pitch);
-         return;
-      }
-   }
-
+   /* Fallback path: frontend doesn't support the SW FB API, or
+    * returned a non-RGB565 buffer or a mismatched pitch this
+    * frame.  Hand video_cb our heap buffer; the frontend will
+    * copy/convert internally. */
    video_cb(screen_buf, SCREENWIDTH, SCREENHEIGHT, SCREENPITCH);
 }
 
@@ -1835,10 +1825,78 @@ static dbool   InDisplay = false;
 
 dbool   I_StartDisplay(void)
 {
+   struct retro_framebuffer fb;
+
    if (InDisplay)
       return false;
 
    InDisplay = true;
+
+   /* Direct-render acquisition.  libretro.h: the buffer returned
+    * from GET_CURRENT_SOFTWARE_FRAMEBUFFER is valid only until
+    * retro_run returns, so do this once per frame and unbind in
+    * I_FinishUpdate.  retro_load_game runs D_DoomLoop a few times
+    * during init before the frontend's video pipeline is fully up
+    * -- the in_retro_run gate skips acquisition during that
+    * window. */
+   direct_fb_data  = NULL;
+   direct_fb_pitch = 0;
+
+   if (in_retro_run && environ_cb)
+   {
+      fb.data         = NULL;
+      fb.width        = SCREENWIDTH;
+      fb.height       = SCREENHEIGHT;
+      fb.pitch        = 0;
+      fb.format       = RETRO_PIXEL_FORMAT_RGB565;
+      fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
+      fb.memory_flags = 0;
+
+      if (environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER,
+                     &fb)
+            && fb.data
+            && fb.format == RETRO_PIXEL_FORMAT_RGB565
+            && fb.pitch  == (size_t)SCREENPITCH)
+      {
+         /* Repoint screens[0] and the renderer's cached top-left
+          * pointers (latched at R_InitBuffer time) at the
+          * frontend buffer.  Every column/span drawer reads
+          * drawvars.short_topleft, so without re-latching here
+          * the renderer would keep writing to screen_buf and we
+          * would gain nothing.
+          *
+          * Pitch must match exactly -- the renderer treats
+          * SURFACE_SHORT_PITCH (= SCREENWIDTH) as a global
+          * constant, so a mismatched-pitch buffer cannot be
+          * direct-rendered without a much larger refactor.  When
+          * pitch differs we fall through to the heap path, and
+          * I_FinishUpdate hands the frontend screen_buf for it
+          * to copy into the differently-strided destination
+          * itself.
+          *
+          * Format must be RGB565 -- frontends are allowed to
+          * return a different format than SET_PIXEL_FORMAT
+          * negotiated, e.g. when running with a HW backend that
+          * needs an internal conversion stage.  We can only
+          * direct-render when the formats agree. */
+         direct_fb_data         = (unsigned char *)fb.data;
+         direct_fb_pitch        = (unsigned int)fb.pitch;
+         screens[0].data        = direct_fb_data;
+         drawvars.short_topleft = (unsigned short *)direct_fb_data;
+         drawvars.int_topleft   = (unsigned int   *)direct_fb_data;
+
+         if (!sw_fb_checked && log_cb)
+         {
+            log_cb(RETRO_LOG_INFO,
+                  "Software framebuffer acquired"
+                  " (pitch: %u, direct render).\n",
+                  (unsigned)fb.pitch);
+            sw_fb_checked = true;
+            have_sw_fb    = true;
+         }
+      }
+   }
+
    return true;
 }
 

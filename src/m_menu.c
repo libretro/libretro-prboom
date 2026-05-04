@@ -2652,7 +2652,7 @@ static void M_DrawColPal(void)
   cpx = COLORPALXORIG+color_palette_x*(CHIP_SIZE+1)-1;
   cpy = COLORPALYORIG+color_palette_y*(CHIP_SIZE+1)-1;
   // proff 12/6/98: Drawing of colorchips completly changed for hi-res, it now uses a patch
-  V_DrawNamePatch(cpx,cpy,0,"M_PALSEL",CR_DEFAULT,VPT_STRETCH); // PROFF_GL_FIX
+  V_DrawNamePatch(cpx,cpy,0,"M_PALSEL",CR_DEFAULT,VPT_STRETCH);
 }
 
 // The drawing part of the Automap Setup initialization. Draw the

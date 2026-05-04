@@ -68,7 +68,6 @@ typedef struct
   const patchnum_t* f;                    // font
   int   sc;                             // start character
   //const char *cr;                       //jff 2/16/52 output color range
-  // Proff - Made this an int again. Needed for OpenGL
   int   cm;                         //jff 2/16/52 output color range
 
   // killough 1/23/98: Support multiple lines:

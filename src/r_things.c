@@ -775,7 +775,6 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
       vis->colormap = R_ColourMap(lightlevel,
             FixedMul(pspritescale, 0x2b000));  // local light
 
-   // proff 11/99: don't use software stuff in OpenGL
    R_DrawVisSprite(vis, vis->x1, vis->x2);
 }
 

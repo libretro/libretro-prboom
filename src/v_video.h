@@ -100,14 +100,6 @@ extern uint16_t *V_Palette16;
 
 #define VID_PAL16(color, weight) V_Palette16[ (color)*VID_NUMCOLORWEIGHTS + (weight) ]
 
-extern const char *default_videomode;
-
-void V_InitMode(void);
-
-// video mode query interface
-int V_GetNumPixelBits(void);
-int V_GetPixelDepth(void);
-
 //jff 4/24/98 loads color translation lumps
 void V_InitColorTranslation(void);
 
@@ -121,8 +113,6 @@ extern void V_CopyRect(int srcx,  int srcy,  int srcscrn,
                              enum patch_translation_e flags);
 
 void V_FillRect(int x, int y, int width, int height, uint8_t colour);
-extern void V_FillRect_f(int x, int y,
-                             int width, int height, uint8_t colour);
 
 // CPhipps - patch drawing
 // Consolidated into the 3 really useful functions:
@@ -146,7 +136,7 @@ extern void V_DrawNumPatch(int x, int y, int scrn,
 /* cphipps 10/99: function to tile a flat over the screen */
 extern void V_DrawBackground(const char* flatname, int scrn);
 
-void V_DestroyUnusedTrueColorPalettes(void);
+void V_DestroyTrueColorPalette(void);
 // CPhipps - function to set the palette to palette number pal.
 void V_SetPalette(int pal);
 

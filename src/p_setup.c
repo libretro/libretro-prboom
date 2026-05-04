@@ -508,8 +508,6 @@ static void P_LoadSegs (int lump)
       int side, linedef;
       line_t *ldef;
 
-      li->iSegID = i; // proff 11/05/2000: needed for OpenGL
-
       li->v1 = &vertexes[(uint16_t)SHORT(ml->v1)];
       li->v2 = &vertexes[(uint16_t)SHORT(ml->v2)];
 
@@ -567,7 +565,6 @@ static void P_LoadGLSegs(int lump)
   {             // check for gl-vertices
     segs[i].v1 = &vertexes[checkGLVertex(SHORT(ml->v1))];
     segs[i].v2 = &vertexes[checkGLVertex(SHORT(ml->v2))];
-    segs[i].iSegID  = i;
 
     if(ml->linedef != (unsigned short)-1) // skip minisegs
     {
@@ -660,7 +657,6 @@ static void P_LoadSectors (int lump)
 
       // [kb] for R_FixWiggle()
 		ss->cachedheight = 0;
-      ss->iSectorID=i; // proff 04/05/2000: needed for OpenGL
       ss->floorheight = SHORT(ms->floorheight)<<FRACBITS;
       ss->ceilingheight = SHORT(ms->ceilingheight)<<FRACBITS;
       ss->floorpic = R_FlatNumForName(ms->floorpic);
@@ -823,7 +819,6 @@ static void P_LoadXNOD(int lump)
     seg->v1 = vertexes + v1;
     seg->v2 = vertexes + v2;
     seg->miniseg = FALSE;
-    seg->iSegID = i; // needed for OpenGL
     seg->length = GetDistance(seg->v2->x - seg->v1->x,
                               seg->v2->y - seg->v1->y);
     seg->angle = R_PointToAngle2(seg->v1->x, seg->v1->y,
@@ -969,7 +964,6 @@ static void P_LoadLineDefs (int lump)
       ld->soundorg.x = ld->bbox[BOXLEFT] / 2 + ld->bbox[BOXRIGHT] / 2;
       ld->soundorg.y = ld->bbox[BOXTOP] / 2 + ld->bbox[BOXBOTTOM] / 2;
 
-      ld->iLineID=i; // proff 04/05/2000: needed for OpenGL
       ld->sidenum[0] = SHORT(mld->sidenum[0]);
       ld->sidenum[1] = SHORT(mld->sidenum[1]);
 
@@ -1733,6 +1727,15 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
         int x0 = v->x, y0 = v->y, x1 = l->v1->x, y1 = l->v1->y;
         v->x = (int)((dx2 * x0 + dy2 * x1 + dxy * (y0 - y1)) / s);
         v->y = (int)((dy2 * y0 + dx2 * y1 + dxy * (x0 - x1)) / s);
+        /* ---- probe: log only vertices that actually moved ---- */
+        if (v->x != x0 || v->y != y0)
+           lprintf(LO_INFO,
+              "PROBE SLIMETRAIL_FIX vtx=%d ld=%d "
+              "before=(%08x,%08x) after=(%08x,%08x)\n",
+              (int)(v - vertexes),
+              (int)(l - lines),
+              (unsigned)x0, (unsigned)y0,
+              (unsigned)v->x, (unsigned)v->y);
       }
         }  // Obsfucated C contest entry:   :)
     while ((v != segs[i].v2) && (v = segs[i].v2));

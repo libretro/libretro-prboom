@@ -366,7 +366,14 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
    int   left, right, top, bottom;
    R_DrawColumn_f colfunc;
    draw_column_vars_t dcvars;
-   draw_vars_t olddrawvars = drawvars;
+   /* V_DrawMemPatch only mutates drawvars.short_topleft and
+    * drawvars.int_topleft (line ~398 below).  Saving / restoring the
+    * full draw_vars_t struct on every patch draw was unnecessary --
+    * with the status bar, HUD, and menu drawing dozens of patches per
+    * frame, those struct copies added up.  Just save the two pointer
+    * fields we actually touch. */
+   unsigned short *old_short_topleft = drawvars.short_topleft;
+   unsigned int   *old_int_topleft   = drawvars.int_topleft;
    int col = 0;
    int w   = (patch->width << 16) - 1; // CPhipps - -1 for faster flipping
    int DX  = (SCREENWIDTH<<16) / 320;
@@ -495,7 +502,8 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
    }
 
    R_ResetColumnBuffer();
-   drawvars = olddrawvars;
+   drawvars.short_topleft = old_short_topleft;
+   drawvars.int_topleft   = old_int_topleft;
 }
 
 // CPhipps - some simple, useful wrappers for that function, for drawing patches from wads
@@ -532,7 +540,6 @@ void V_UpdateTrueColorPalette(void) {
   int pplump         = W_GetNumForName("PLAYPAL");
   int gtlump         = (W_CheckNumForName)("GAMMATBL",ns_prboom);
   const uint8_t *pal = W_CacheLumpNum(pplump);
-  // opengl doesn't use the gamma
   const uint8_t *const gtable =
     ((gtlump == -1)? gammatable : (const uint8_t *)W_CacheLumpNum(gtlump)) +
     (256*(usegamma))
@@ -597,16 +604,11 @@ void V_UpdateTrueColorPalette(void) {
 //---------------------------------------------------------------------------
 // V_DestroyTrueColorPalette
 //---------------------------------------------------------------------------
-static void V_DestroyTrueColorPalette(void)
+void V_DestroyTrueColorPalette(void)
 {
     if (Palettes16) free(Palettes16);
     Palettes16 = NULL;
     V_Palette16 = NULL;
-}
-
-void V_DestroyUnusedTrueColorPalettes(void)
-{
-   V_DestroyTrueColorPalette();
 }
 
 //
@@ -651,30 +653,6 @@ void V_FillRect(int x, int y, int width, int height, uint8_t colour)
       dest[i] = c;
     dest += SURFACE_SHORT_PITCH;
   }
-}
-
-const char *default_videomode;
-
-//
-// V_InitMode
-//
-void V_InitMode(void) {
-   lprintf(LO_INFO, "V_InitMode: using 16 bit video mode\n");
-  R_FilterInit();
-}
-
-//
-// V_GetNumPixelBits
-//
-int V_GetNumPixelBits(void) {
-    return 16;
-}
-
-//
-// V_GetPixelDepth
-//
-int V_GetPixelDepth(void) {
-  return 2;
 }
 
 //

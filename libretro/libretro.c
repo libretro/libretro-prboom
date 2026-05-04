@@ -41,6 +41,7 @@
 #include "../src/st_stuff.h"
 #include "../src/w_wad.h"
 #include "../src/r_draw.h"
+#include "../src/r_filter.h"
 #include "../src/r_fps.h"
 #include "../src/lprintf.h"
 #include "../src/doomstat.h"
@@ -1746,8 +1747,8 @@ void I_StartTic(void)
 
 static void I_UpdateVideoMode(void)
 {
-   V_InitMode();
-   V_DestroyUnusedTrueColorPalettes();
+   R_FilterInit();
+   V_DestroyTrueColorPalette();
    V_FreeScreens();
 
    I_SetRes();

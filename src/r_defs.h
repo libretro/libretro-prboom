@@ -90,7 +90,6 @@ typedef struct
   int	cachedheight;
   int	scaleindex;
 
-  int iSectorID; // proff 04/05/2000: needed for OpenGL and used in debugmode by the HUD to draw sectornum
   dbool   no_toptextures;
   dbool   no_bottomtextures;
   fixed_t floorheight;
@@ -189,7 +188,6 @@ typedef enum
 
 typedef struct line_s
 {
-  int iLineID;           // proff 04/05/2000: needed for OpenGL
   vertex_t *v1, *v2;     // Vertices, from v1 to v2.
   fixed_t dx, dy;        // Precalculated v2 - v1 for side checking.
   unsigned short flags;           // Animation related.
@@ -253,7 +251,6 @@ typedef struct
   side_t* sidedef;
   line_t* linedef;
 
-  int iSegID; // proff 11/05/2000: needed for OpenGL
   // figgi -- needed for glnodes
   float     length;
   dbool     miniseg;
@@ -327,7 +324,6 @@ typedef struct drawseg_s
   int *sprtopclip, *sprbottomclip, *maskedtexturecol; // dropoff overflow
 } drawseg_t;
 
-// proff: Added for OpenGL
 typedef struct
 {
   int width,height;

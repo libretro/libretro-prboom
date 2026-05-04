@@ -92,7 +92,7 @@ int firstcolormaplump, lastcolormaplump;      // killough 4/17/98
 int       firstflat, lastflat, numflats;
 int       firstspritelump, lastspritelump, numspritelumps;
 int       numtextures;
-texture_t **textures; // proff - 04/05/2000 removed static for OpenGL
+texture_t **textures;
 fixed_t   *textureheight; //needed for texture pegging (and TFE fix - killough)
 int       *flattranslation;             // for global animation
 int       *texturetranslation;
@@ -585,7 +585,6 @@ void R_PrecacheLevel(void)
   Z_Free(hitlist);
 }
 
-// Proff - Added for OpenGL
 void R_SetPatchNum(patchnum_t *patchnum, const char *name)
 {
   const rpatch_t *patch = R_CachePatchName(name);

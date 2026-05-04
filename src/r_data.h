@@ -98,7 +98,6 @@ const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale);
 
 extern const uint8_t *main_tranmap, *tranmap;
 
-/* Proff - Added for OpenGL - cph - const char* param */
 void R_SetPatchNum(patchnum_t *patchnum, const char *name);
 
 #endif

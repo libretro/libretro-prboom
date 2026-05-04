@@ -389,7 +389,6 @@ static void ST_refreshBackground(void)
 
   if (st_statusbaron)
     {
-      // proff 05/17/2000: draw to the frontbuffer in OpenGL
       V_DrawNumPatch(ST_X, y, BG, stbarbg.lumpnum, CR_DEFAULT, VPT_STRETCH);
       if (st_armson)
         V_DrawNumPatch(ST_ARMSBGX, y, BG, armsbg.lumpnum, CR_DEFAULT, VPT_STRETCH);

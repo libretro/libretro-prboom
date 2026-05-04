@@ -41,6 +41,8 @@
 #include "v_video.h"
 #include "lprintf.h"
 
+#include "r_probe.h"
+
 seg_t     *curline;
 side_t    *sidedef;
 line_t    *linedef;
@@ -354,6 +356,42 @@ static void R_AddLine (seg_t *line)
   // killough 1/31/98: Here is where "slime trails" can SOMETIMES occur:
   x1 = viewangletox[angle1];
   x2 = viewangletox[angle2];
+
+  /* ----- slime trail probe ----- */
+  {
+    static int probe_last_tic = -1;
+    static int probe_tics_seen = 0;
+    /* Bump tic counter once per new tic. */
+    if (probe_last_tic != gametic)
+    {
+       probe_last_tic = gametic;
+       probe_tics_seen++;
+    }
+    /* Inclusive overlap with [SLIME_PROBE_X_LO, SLIME_PROBE_X_HI]. */
+    if (probe_tics_seen <= SLIME_PROBE_MAX_TICS
+          && x1 <= SLIME_PROBE_X_HI
+          && x2 >= SLIME_PROBE_X_LO)
+    {
+       lprintf(LO_INFO,
+          "PROBE SLIME tic=%d seg=%d ld=%d mini=%d "
+          "v1=(%08x,%08x) v2=(%08x,%08x) "
+          "ldv1=(%08x,%08x) ldv2=(%08x,%08x) "
+          "a1=%05x a2=%05x x1=%d x2=%d\n",
+          gametic,
+          (int)(line - segs),
+          line->linedef ? (int)(line->linedef - lines) : -1,
+          (int)line->miniseg,
+          (unsigned)line->v1->x, (unsigned)line->v1->y,
+          (unsigned)line->v2->x, (unsigned)line->v2->y,
+          line->linedef ? (unsigned)line->linedef->v1->x : 0u,
+          line->linedef ? (unsigned)line->linedef->v1->y : 0u,
+          line->linedef ? (unsigned)line->linedef->v2->x : 0u,
+          line->linedef ? (unsigned)line->linedef->v2->y : 0u,
+          (unsigned)angle1, (unsigned)angle2,
+          x1, x2);
+    }
+  }
+  /* ----- end probe ----- */
 
   // Does not cross a pixel?
   if (x1 >= x2)       // killough 1/31/98 -- change == to >= for robustness

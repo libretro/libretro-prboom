@@ -1516,7 +1516,7 @@ void D_DoomDeinit(void)
   AM_Deinit();
   G_Deinit();
   V_FreeScreens();
-  V_DestroyUnusedTrueColorPalettes();
+  V_DestroyTrueColorPalette();
   S_Shutdown();
   I_ShutdownSound();
   I_ShutdownMusic();

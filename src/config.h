@@ -23,19 +23,6 @@ extern int SCREENPITCH;
 #define HAVE_STRLWR
 #endif
 
-#ifdef HAVE_NET
-
-/* Define to 1 if you have the `inet_aton' function. */
-#define HAVE_INET_ATON 1
-
-/* Define to 1 if you have the `inet_ntop' function. */
-#define HAVE_INET_NTOP 1
-
-/* Define to 1 if you have the `inet_pton' function. */
-#define HAVE_INET_PTON 1
-
-#endif
-
 /* Define to 1 if you have the `vsnprintf' function. */
 #if !defined(_XBOX1) && _MSC_VER != 1310
 #define HAVE_VSNPRINTF 1

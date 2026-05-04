@@ -8,7 +8,7 @@ ifneq (,$(findstring msvc2003,$(platform)))
 INCFLAGS += -I$(LIBRETRO_COMM_DIR)/include/compat/msvc
 endif
 
-COREDEFINES = -D__LIBRETRO__ -DFPM_DEFAULT
+COREDEFINES = -DFPM_DEFAULT
 
 ifneq (,$(findstring msvc,$(platform)))
 COREDEFINES += -DINLINE="_inline"

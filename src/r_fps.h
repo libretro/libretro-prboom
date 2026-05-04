@@ -53,8 +53,6 @@ extern tic_vars_t tic_vars;
 void R_InitInterpolation(void);
 void R_InterpolateView(player_t *player);
 
-extern dbool   WasRenderedInTryRunTics;
-
 void R_ResetViewInterpolation (void);
 void R_UpdateInterpolations(void);
 void R_StopAllInterpolations(void);

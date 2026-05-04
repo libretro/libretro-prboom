@@ -190,6 +190,14 @@ int wipe_ScreenWipe(int ticks)
       wipe_scr = screens[0];
       wipe_initMelt(ticks);
    }
+   /* Refresh wipe_scr.data each call: under direct-render
+    * (libretro SW framebuffer), screens[0].data points at the
+    * frontend's current frame buffer and rotates per frame.
+    * The wipe blender writes pixels through wipe_scr.data, so we
+    * have to re-bind to the live screens[0].data on every entry.
+    * Other fields (height, not_on_heap) are stable so the
+    * struct-copy pattern from initial setup still works. */
+   wipe_scr.data = screens[0].data;
    // do a piece of wipe-in
    if (wipe_doMelt(ticks))     // final stuff
    {

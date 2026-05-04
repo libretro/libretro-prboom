@@ -198,15 +198,24 @@ extern int     showMessages;
 
 void D_Display (void)
 {
-  dbool wipe, viewactive, isborder = FALSE;
-  static dbool isborderstate        = FALSE;
-  static dbool borderwillneedredraw = FALSE;
+  dbool wipe, viewactive;
   static gamestate_t oldgamestate = -1;
 
-  // Reentrancy.
+  /* Wipe re-entry path: while a wipe is in progress, every
+   * subsequent retro_run goes here so the wipe blend can advance
+   * one step per display frame without the rest of the draw
+   * pipeline running.  Bracket it with I_StartDisplay /
+   * I_EndDisplay so the direct-framebuffer acquisition happens
+   * (otherwise the blender would write to a stale fb pointer
+   * left over from before the wipe).  wipe_ScreenWipe reads the
+   * fresh screens[0].data we just bound and writes blended
+   * pixels into the current frontend buffer. */
   if (in_d_wipe)
   {
+     if (!I_StartDisplay())
+        return;
      D_Wipe();
+     I_EndDisplay();
      return;
   }
 
@@ -240,8 +249,6 @@ void D_Display (void)
       break;
     }
   } else if (gametic != basetic) { // In a level
-    dbool redrawborderstuff;
-
     HU_Erase();
 
     if (setsizeneeded) {               // change the view size if needed
@@ -249,23 +256,19 @@ void D_Display (void)
       oldgamestate = -1;            // force background redraw
     }
 
-    // Work out if the player view is visible, and if there is a border
+    // Work out if the player view is visible
     viewactive = (!(automapmode & am_active) || (automapmode & am_overlay)) && !inhelpscreens;
-    isborder = viewactive ? (viewheight != SCREENHEIGHT) : (!inhelpscreens && (automapmode & am_active));
 
-    if (oldgamestate != GS_LEVEL) {
-      redrawborderstuff = isborder;
-    } else {
-      // CPhipps -
-      // If there is a border, and either there was no border last time,
-      // or the border might need refreshing, then redraw it.
-      redrawborderstuff = isborder && (!isborderstate || borderwillneedredraw);
-      // The border may need redrawing next time if the border surrounds the screen,
-      // and there is a menu being displayed
-      borderwillneedredraw = viewactive
-        ? (menuactive && isborder)
-        : (!inhelpscreens && menuactive == mnact_full);
-    }
+    /* Note: the upstream redrawborderstuff / borderwillneedredraw
+     * state machine that gates partial vs full status-bar redraws
+     * has been replaced by an unconditional refresh below.  Under
+     * libretro direct-render the frontend rotates framebuffers
+     * each frame, so cross-frame partial-redraw optimisations
+     * write to a buffer that doesn't get displayed -- forcing
+     * a full BG -> FG status-bar copy each frame is the simplest
+     * correct alternative, and the cost (~20 KB at 320x200) is
+     * a small fraction of the full-screen memcpy we avoid by
+     * direct-rendering. */
 
     // Now do the drawing
     if (viewactive)
@@ -275,12 +278,11 @@ void D_Display (void)
     ST_Drawer(
         ((viewheight != SCREENHEIGHT)
          || ((automapmode & am_active) && !(automapmode & am_overlay))),
-        redrawborderstuff,
+        TRUE,
         (menuactive == mnact_full));
     HU_Drawer();
   }
 
-  isborderstate      = isborder;
   oldgamestate = wipegamestate = gamestate;
 
   // draw pause pic
@@ -292,23 +294,16 @@ void D_Display (void)
 
   // menus go directly to the screen
   M_Drawer();          // menu is drawn even on top of everything
-#ifdef HAVE_NET
-  NetUpdate();         // send out any new accumulation
-#endif
-  /* No D_BuildNewTiccmds() here in the libretro build: input
-   * collection lives entirely in TryRunTics, which runs once per
-   * retro_run.  The previous code polled input twice per frame --
-   * once at tic-update time and once again right before the
-   * framebuffer flip.  At display rates higher than the 35 Hz
-   * gametic rate this fed every poll-result into the SAME
-   * outstanding ticcmd via the angleturn += / buttons |=
-   * accumulation in D_BuildNewTiccmds's "else" branch, doubling
-   * any turn input across consecutive frames.  Worse, the amount
-   * of double-counting depended on display fps (more frames per
-   * tic = more accumulation), so the same physical mouse motion
-   * produced different in-game turns at different framerates.
-   * Removing this call leaves TryRunTics as the single source of
-   * truth and makes input -> world deterministic across fps. */
+
+  /* Input collection lives entirely in TryRunTics, which runs
+   * once per retro_run.  The upstream code polled input again
+   * here -- at display rates higher than the 35 Hz gametic rate
+   * this fed every poll-result into the SAME outstanding ticcmd
+   * via the angleturn += / buttons |= accumulation in
+   * D_BuildNewTiccmds's "else" branch, doubling any turn input
+   * across consecutive frames and making the same physical mouse
+   * motion produce different in-game turns at different display
+   * fps.  TryRunTics is the single source of truth. */
 
   // normal update
   if (!wipe)
@@ -492,13 +487,6 @@ void D_DoAdvanceDemo(void)
 
   pagetic = TICRATE * 11;         /* killough 11/98: default behavior */
   gamestate = GS_DEMOSCREEN;
-
-#ifdef HAVE_NET
-  if (netgame && !demoplayback) {
-    demosequence = 0;
-    return;
-  }
-#endif
 
   if (!demostates[++demosequence][gamemode].func)
     demosequence = 0;
@@ -1406,11 +1394,6 @@ bool D_DoomMainSetup(void)
   }
 
 
-#ifdef HAVE_NET
-  // CPhipps - now wait for netgame start
-  D_CheckNetGame();
-#endif
-
   //jff 9/3/98 use logical output routine
   lprintf(LO_INFO,"R_Init: Init DOOM refresh daemon - ");
   R_Init();
@@ -1451,11 +1434,7 @@ bool D_DoomMainSetup(void)
 
   if (gameaction != ga_playdemo)
   {
-#ifdef HAVE_NET
-    if (autostart || netgame)
-#else
     if (autostart)
-#endif
     {
       // sets first map and first episode if unknown
       GetFirstMap(&startepisode, &startmap);
@@ -1473,15 +1452,9 @@ failed:
 //
 // D_DoomMain
 //
-#ifdef HAVE_NET
-extern void D_QuitNetGame (void);
-#endif
 
 void D_DoomLoop(void)
 {
-   //Doom loop
-   WasRenderedInTryRunTics = FALSE;
-
    if (ffmap == gamemap) ffmap = 0;
 
    TryRunTics (); // will run at least one tic
@@ -1490,12 +1463,13 @@ void D_DoomLoop(void)
    if (players[displayplayer].mo) // cph 2002/08/10
       S_UpdateSounds(players[displayplayer].mo);// move positional sounds
 
-   if (!movement_smooth || !WasRenderedInTryRunTics || gamestate != wipegamestate)
-   {
-      // Update display, next frame, with current state.
-      D_Display();
-      return;
-   }
+   /* Always render the next frame.  The libretro frontend drives
+    * one D_Display per retro_run; there is no equivalent of the
+    * netgame "skip-display-when-already-rendered-during-tic-wait"
+    * optimisation that the original WasRenderedInTryRunTics flag
+    * gated, because libretro's TryRunTics is a non-blocking single
+    * tic-step that never calls D_Display itself. */
+   D_Display();
 }
 
 //foward decl
@@ -1535,10 +1509,6 @@ void D_DoomDeinit(void)
    * lumpinfo, so the full teardown is safe.
    */
   M_QuitDOOM(0);
-#ifdef HAVE_NET
-  D_QuitNetGame();
-  I_ShutdownNetwork();
-#endif
   M_SaveDefaults();
   P_Deinit();
   R_FlushAllPatches();

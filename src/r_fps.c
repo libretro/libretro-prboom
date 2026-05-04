@@ -51,8 +51,6 @@ typedef enum
   INTERP_CeilingPanning
 } interpolation_type_e;
 
-dbool   WasRenderedInTryRunTics;
-
 typedef struct
 {
   interpolation_type_e type;

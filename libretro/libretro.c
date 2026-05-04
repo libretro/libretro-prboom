@@ -68,6 +68,26 @@ static unsigned char *screen_buf = NULL;
 static bool have_sw_fb           = false;
 static bool sw_fb_checked        = false;
 
+/* Direct-render state.  When the frontend's framebuffer pitch
+ * matches our renderer's stride (SCREENWIDTH*SURFACE_PIXEL_DEPTH),
+ * I_StartDisplay points screens[0].data at the frontend buffer so
+ * the column drawers write directly into it.  This eliminates the
+ * per-frame memcpy(fb.data, screen_buf, ...) of ~125 KB at
+ * 320x200 RGB565, scaling linearly with resolution.
+ *
+ * direct_fb_data is non-NULL only between I_StartDisplay (or the
+ * wipe-reentry equivalent) and I_FinishUpdate of the same frame. */
+static unsigned char *direct_fb_data  = NULL;
+static unsigned int   direct_fb_pitch = 0;
+
+/* True only while we are inside retro_run.  retro_load_game
+ * calls D_DoomLoop a few times during init, but the frontend's
+ * video driver isn't fully wired up at that point and
+ * GET_CURRENT_SOFTWARE_FRAMEBUFFER can crash with a nullptr deref
+ * inside the frontend's video pipeline.  Skip SW FB acquisition
+ * outside retro_run; render to screen_buf instead. */
+static bool in_retro_run = false;
+
 /* libretro */
 static char g_wad_dir[1024];
 static char g_basename[1024];
@@ -340,7 +360,6 @@ static bool libretro_supports_bitmasks = false;
 
 void retro_init(void)
 {
-   enum retro_pixel_format rgb565;
    struct retro_log_callback log;
    unsigned level = 4;
    SCREENPITCH    = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
@@ -352,9 +371,32 @@ void retro_init(void)
    else
       log_cb = NULL;
 
-   rgb565 = RETRO_PIXEL_FORMAT_RGB565;
-   if(environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565) && log_cb)
-      log_cb(RETRO_LOG_DEBUG, "Frontend supports RGB565 - will use that instead of XRGB1555.\n");
+   /* Negotiate pixel format with the frontend.  The renderer is
+    * hardcoded to write 16-bit pixels via VID_PAL16 -- the
+    * surface depth is fixed at SURFACE_PIXEL_DEPTH=2 and every
+    * draw column / span helper writes uint16_t directly.  We
+    * cannot fall through to XRGB1555 silently if RGB565 is
+    * rejected; the output would be unspecified-format garbage
+    * (with the wrong red/blue channel widths and an alpha bit
+    * smeared across the green LSB).  Log a hard error so the
+    * user sees a visible diagnostic instead of a corrupted
+    * screen. */
+   {
+      enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
+      if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
+      {
+         if (log_cb)
+            log_cb(RETRO_LOG_ERROR,
+                   "Frontend rejected RGB565 pixel format -- this "
+                   "core requires it.  Update RetroArch or your "
+                   "frontend to a build that supports RGB565.\n");
+      }
+      else if (log_cb)
+      {
+         log_cb(RETRO_LOG_DEBUG,
+                "Frontend accepted RGB565 pixel format.\n");
+      }
+   }
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
       libretro_supports_bitmasks = true;
@@ -688,6 +730,9 @@ void I_SafeExit(int rc);
 void retro_run(void)
 {
    bool updated = false;
+
+   in_retro_run = true;
+
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       update_variables(false);
 
@@ -735,6 +780,8 @@ void retro_run(void)
       if (rumble_touch_counter == 0)
          retro_set_rumble_touch(0, 0.0f);
    }
+
+   in_retro_run = false;
 }
 
 static void extract_basename(char *buf, const char *path, size_t size)

@@ -46,9 +46,7 @@
 // Input event types.
 typedef enum
 {
-#ifdef __LIBRETRO__
   ev_none,
-#endif
   ev_keydown,
   ev_keyup,
   ev_mouse,

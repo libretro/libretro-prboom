@@ -123,4 +123,12 @@ void I_UnRegisterSong(int handle);
  * restarts on MP3 streams. */
 int I_MusicIsMP3(void);
 
+/* Save-state support for music.  These dispatch to the active music
+ * backend's optional serialize/unserialize callbacks; backends that
+ * don't implement them produce zero-byte saves, which the caller
+ * treats as "no music state recorded" and restore as a no-op. */
+size_t I_MusicSerializeMaxSize(void);
+size_t I_MusicSerialize(void *dest, size_t cap);
+int    I_MusicUnserialize(const void *src, size_t size);
+
 #endif

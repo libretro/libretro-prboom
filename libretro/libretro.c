@@ -1137,6 +1137,14 @@ static menu_t *menus[] = {
 extern dbool   gamekeydown[NUMKEYS];
 static bool old_input[MAX_BUTTON_BINDS];
 
+/* Fixed-size region for music backend state.  Sized to cover the
+ * worst case the current OPL backend can produce (~16 byte header +
+ * 4 bytes per MIDI track, capped at 256 tracks); the few hundred
+ * extra bytes are negligible even for runahead, which saves state
+ * every frame and so is sensitive to size.  music_state_size records
+ * how many bytes are actually valid -- 0 means "no music state". */
+#define MUSIC_STATE_RESERVED 512
+
 struct extra_serialize {
   uint32_t extra_size;
   uint32_t gametic;
@@ -1161,6 +1169,8 @@ struct extra_serialize {
   angle_t  prevpitch;
   uint8_t  old_input[MAX_BUTTON_BINDS];
   uint8_t  gamekeydown[NUMKEYS];
+  uint32_t music_state_size;
+  uint8_t  music_state[MUSIC_STATE_RESERVED];
 };
 
 size_t retro_serialize_size(void)
@@ -1212,6 +1222,15 @@ bool retro_serialize(void *data_, size_t size)
   for (i = 0; i < MAX_BUTTON_BINDS; i++)
 	extra->old_input[i] = old_input[i];
   WI_Save(&extra->wi_state);
+
+  /* Record music backend's playback position so a later load resumes
+   * the track from here instead of letting it continue past the load
+   * point.  Backends that don't implement this return 0; we record
+   * 0 and the load path becomes a no-op. */
+  {
+    size_t n = I_MusicSerialize(extra->music_state, sizeof extra->music_state);
+    extra->music_state_size = (uint32_t)n;
+  }
   return true;
 }
 
@@ -1259,6 +1278,14 @@ bool retro_unserialize(const void *data_, size_t size)
         old_input[i] = extra->old_input[i];
      menuactive = extra->menuactive;
      tic_vars.frac = extra->gameticfrac;
+
+     /* Restore music backend's playback position.  Soft-fail: if the
+      * backend can't restore (different song loaded, version mismatch,
+      * or doesn't implement state restore), we just leave music
+      * playing as-is -- the pre-hook behaviour. */
+     if (extra->music_state_size > 0 &&
+         extra->music_state_size <= sizeof extra->music_state)
+        (void)I_MusicUnserialize(extra->music_state, extra->music_state_size);
   }
 
   return true;

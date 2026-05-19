@@ -625,6 +625,47 @@ void I_UnRegisterSong(int handle)
 #endif
 }
 
+/* ------------------------------------------------------------------ */
+/* Save-state hooks for music position.                               */
+/*                                                                    */
+/* Each music backend may optionally implement serialize/unserialize  */
+/* on its music_player_t vtable.  These wrappers dispatch to whichever*/
+/* backend is currently active and return 0 when no playback is in    */
+/* progress or the backend doesn't implement state save.  The libretro*/
+/* layer treats a 0 result as "no music state to record" -- a save    */
+/* state with zero music payload restores to "music keeps running"    */
+/* (status quo behaviour before this hook existed), so absence is     */
+/* safe.                                                              */
+
+size_t I_MusicSerializeMaxSize(void)
+{
+#ifdef MUSIC_SUPPORT
+   if (current_player && current_player->serialize)
+      return current_player->serialize(NULL, 0);
+#endif
+   return 0;
+}
+
+size_t I_MusicSerialize(void *dest, size_t cap)
+{
+#ifdef MUSIC_SUPPORT
+   if (current_player && current_player->serialize && music_handle)
+      return current_player->serialize(dest, cap);
+#endif
+   return 0;
+}
+
+int I_MusicUnserialize(const void *src, size_t size)
+{
+   if (size == 0)
+      return 1;  /* nothing to restore is success */
+#ifdef MUSIC_SUPPORT
+   if (current_player && current_player->unserialize)
+      return current_player->unserialize(src, size);
+#endif
+   return 0;
+}
+
 int I_RegisterSong(const void* data, size_t len)
 {
 #if defined(MUSIC_SUPPORT)

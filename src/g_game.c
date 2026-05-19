@@ -2291,11 +2291,41 @@ int G_ValidateMapName(const char *mapname, int *pEpi, int *pMap)
   M_Strupr(mapuname);
 
 
-  if (sscanf(mapuname, "MAP%d", &map) == 1)
-    snprintf(lumpname, 9, "MAP%02d", map);
-  else if (sscanf(mapuname, "E%dM%d", &epi, &map) == 2)
-    snprintf(lumpname, 9, "E%dM%d", epi, map);
-  else return 0;
+  /* Hand-rolled parse to avoid sscanf (slow due to format-string
+   * parsing overhead, plus internal malloc on musl/older Android/
+   * console libcs).  Map names are short and the format is fully
+   * constrained: "MAPnn" or "EnMn". */
+  {
+    const char *p = mapuname;
+    char       *end;
+    long        v;
+
+    if (p[0] == 'M' && p[1] == 'A' && p[2] == 'P')
+    {
+      v = strtol(p + 3, &end, 10);
+      if (end != p + 3)
+      {
+        map = (int)v;
+        snprintf(lumpname, 9, "MAP%02d", map);
+      }
+      else return 0;
+    }
+    else if (p[0] == 'E')
+    {
+      char *map_start;
+      v = strtol(p + 1, &end, 10);
+      if (end == p + 1 || *end != 'M')
+        return 0;
+      epi = (int)v;
+      map_start = end + 1;
+      v = strtol(map_start, &end, 10);
+      if (end == map_start)
+        return 0;
+      map = (int)v;
+      snprintf(lumpname, 9, "E%dM%d", epi, map);
+    }
+    else return 0;
+  }
 
   if (pEpi) *pEpi = epi;
   if (pMap) *pMap = map;

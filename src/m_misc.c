@@ -36,6 +36,7 @@
 #include "config.h"
 
 #include <stdarg.h>
+#include <stdlib.h>
 #include <errno.h>
 #ifdef _MSC_VER
 #include <io.h>
@@ -990,10 +991,15 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
           strparm[len-1] = 0; // clears trailing double-quote mark
           strcpy(newstring, strparm+1); // clears leading double-quote mark
         } else if ((strparm[0] == '0') && (strparm[1] == 'x')) {
-          // CPhipps - allow ints to be specified in hex
-          sscanf(strparm+2, "%x", &parm);
+          // CPhipps - allow ints to be specified in hex.
+          // Use strtoul directly instead of sscanf("%x") -- sscanf is
+          // slow (format-string parsing overhead, plus internal malloc
+          // on musl and most non-glibc libcs).
+          parm = (int)strtoul(strparm + 2, NULL, 16);
         } else {
-          sscanf(strparm, "%i", &parm);
+          // strtol with base 0 mirrors the original "%i" semantics:
+          // 0x/0X -> hex, leading 0 -> octal, else decimal.
+          parm = (int)strtol(strparm, NULL, 0);
           // Keycode hack removed
         }
 

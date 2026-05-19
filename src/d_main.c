@@ -587,7 +587,16 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
     wadinfo_t header;
 
     // read IWAD header
-    if (rfread(&header, sizeof(header), 1, fp) == 1 && !strncmp(header.identification, "IWAD", 4))
+    /* Accept either "IWAD" or "PWAD" identification.  The libretro
+     * frontend's retro_load_game promotes PWAD-magic files that
+     * carry a PLAYPAL lump (a complete standalone game like
+     * chex.wad) to -iwad routing; this is where that routing lands.
+     * The rest of the CheckIWAD logic -- scanning the lump table for
+     * level markers -- is identical for either magic, so just widen
+     * the accepted header strings here. */
+    if (rfread(&header, sizeof(header), 1, fp) == 1 &&
+        (!strncmp(header.identification, "IWAD", 4) ||
+         !strncmp(header.identification, "PWAD", 4)))
     {
       int64_t length;
       filelump_t *fileinfo;

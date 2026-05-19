@@ -850,6 +850,54 @@ static wadinfo_t get_wadinfo(const char *path)
    return header;
 }
 
+/* True if the WAD at `path` contains a PLAYPAL lump.  PLAYPAL is the
+ * master palette every playable Doom WAD needs; its presence in a
+ * PWAD-headered file is a strong signal that the file is intended as
+ * a standalone game.  chex.wad is the motivating case: it ships with
+ * PWAD magic but contains its own complete lump set (palette,
+ * colormap, textures, sprites, sounds, maps).  Without this
+ * detection the libretro path routes chex.wad as -file, then
+ * IdentifyVersion runs and errors out with "IWAD not found" because
+ * no doom.wad is present alongside.  Reads only the lump directory
+ * header, not lump data. */
+static bool wad_contains_playpal(const char *path, const wadinfo_t *header)
+{
+   bool found = false;
+   RFILE *fp;
+   filelump_t lump;
+   int i;
+   int numlumps     = LONG(header->numlumps);
+   int infotableofs = LONG(header->infotableofs);
+
+   if (numlumps <= 0 || infotableofs <= 0)
+      return false;
+   fp = filestream_open(path,
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (!fp)
+      return false;
+   if (filestream_seek(fp, infotableofs, SEEK_SET) != 0)
+   {
+      filestream_close(fp);
+      return false;
+   }
+   for (i = 0; i < numlumps; i++)
+   {
+      if (rfread(&lump, sizeof(lump), 1, fp) != 1)
+         break;
+      /* PLAYPAL is exactly 7 chars; byte 7 of the 8-byte name slot
+       * is either NUL or a trailing space-pad depending on the
+       * authoring tool, so don't require either. */
+      if (!strncmp(lump.name, "PLAYPAL", 7))
+      {
+         found = true;
+         break;
+      }
+   }
+   filestream_close(fp);
+   return found;
+}
+
 bool retro_load_game(const struct retro_game_info *info)
 {
    unsigned i;
@@ -913,8 +961,25 @@ bool retro_load_game(const struct retro_game_info *info)
          }
          else if(!strncmp(header.identification, "PWAD", 4))
          {
-            argv[argc++] = strdup("-file");
-            argv[argc++] = strdup(info->path);
+            /* Some standalone Doom-engine games ship with PWAD magic
+             * even though they contain their own complete lump set
+             * (chex.wad is the canonical example).  If the file
+             * contains a PLAYPAL lump, treat it as a standalone IWAD
+             * so the engine doesn't go looking for an external
+             * doom.wad it'll never find.  CheckIWAD accepts either
+             * magic, so the -iwad routing is followed through.
+             * Otherwise fall back to the traditional -file
+             * (genuine add-on PWAD) routing. */
+            if (wad_contains_playpal(info->path, &header))
+            {
+               argv[argc++] = strdup("-iwad");
+               argv[argc++] = strdup(g_basename);
+            }
+            else
+            {
+               argv[argc++] = strdup("-file");
+               argv[argc++] = strdup(info->path);
+            }
          }
          else
          {

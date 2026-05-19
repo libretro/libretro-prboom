@@ -2788,7 +2788,7 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX*2];  // can't use line -- double size buffer too.
   int i; // loop variable
-  int fromlen, tolen;  // as specified on the text block line
+  int fromlen = 0, tolen = 0;  // as specified on the text block line
   int usedlen;  // shorter of fromlen and tolen if not matched
   dbool   found = FALSE;  // to allow early exit once found
   char* line2 = NULL;   // duplicate line for rerouting

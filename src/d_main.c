@@ -628,7 +628,7 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
                 ++sc;
         }
 
-        free(fileinfo);
+      free(fileinfo);
       }
       else // missing IWAD tag in header
       {

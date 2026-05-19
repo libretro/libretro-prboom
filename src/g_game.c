@@ -1454,7 +1454,7 @@ void G_WorldDone (void)
         F_StartFinale();
       return;
     }
-    else if (gamemapinfo->endpic && gamemapinfo->endpic[0] && gamemapinfo->nointermission)
+    else if (gamemapinfo->endpic[0] && gamemapinfo->nointermission)
     {
       // game ends without a status screen.
       gameaction = ga_victory;
@@ -1540,12 +1540,12 @@ static uint64_t G_Signature(void)
    computed = TRUE;
    if (gamemode == commercial)
     for (map = haswolflevels ? 32 : 30; map; map--)
-      sprintf(name, "map%02d", map), s = G_UpdateSignature(s, name);
+      sprintf(name, "map%02u", (unsigned)(map & 0xff)), s = G_UpdateSignature(s, name);
    else
     for (episode = gamemode==retail ? 4 :
      gamemode==shareware ? 1 : 3; episode; episode--)
       for (map = 9; map; map--)
-  sprintf(name, "E%dM%d", episode, map), s = G_UpdateSignature(s, name);
+  sprintf(name, "E%uM%u", (unsigned)(episode & 0xff), (unsigned)(map & 0xff)), s = G_UpdateSignature(s, name);
   }
   return s;
 }
@@ -2250,8 +2250,8 @@ mapentry_t *G_LookupMapinfo(int episode, int map)
 {
   char lumpname[9];
   unsigned i;
-  if (gamemode == commercial) snprintf(lumpname, 9, "MAP%02d", map);
-  else snprintf(lumpname, 9, "E%dM%d", episode, map);
+  if (gamemode == commercial) snprintf(lumpname, 9, "MAP%02u", (unsigned)(map & 0xff));
+  else snprintf(lumpname, 9, "E%uM%u", (unsigned)(episode & 0xff), (unsigned)(map & 0xff));
   for (i = 0; i < U_mapinfo.mapcount; i++)
   {
     if (!stricmp(lumpname, U_mapinfo.maps[i].mapname))
@@ -2306,7 +2306,7 @@ int G_ValidateMapName(const char *mapname, int *pEpi, int *pMap)
       if (end != p + 3)
       {
         map = (int)v;
-        snprintf(lumpname, 9, "MAP%02d", map);
+        snprintf(lumpname, 9, "MAP%02u", (unsigned)(map & 0xff));
       }
       else return 0;
     }
@@ -2322,7 +2322,7 @@ int G_ValidateMapName(const char *mapname, int *pEpi, int *pMap)
       if (end == map_start)
         return 0;
       map = (int)v;
-      snprintf(lumpname, 9, "E%dM%d", epi, map);
+      snprintf(lumpname, 9, "E%uM%u", (unsigned)(epi & 0xff), (unsigned)(map & 0xff));
     }
     else return 0;
   }

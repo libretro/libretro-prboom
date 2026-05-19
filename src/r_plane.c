@@ -437,8 +437,18 @@ static void R_DoDrawPlane(visplane_t *pl)
          for (x = pl->minx; (dcvars.x = x) <= pl->maxx; x++)
             if ((dcvars.yl = pl->top[x]) != -1 && dcvars.yl <= (dcvars.yh = pl->bottom[x])) // dropoff overflow
             {
+               /* xtoviewangle is sized MAX_SCREENWIDTH+1 (the +1 slot
+                * covers the x+1 lookahead at x == SCREENWIDTH-1).  The
+                * x-1 lookback has no such slot, so when a sky visplane
+                * starts at column 0 (any outdoor area facing the sky --
+                * Chex Quest E1M1's starting position is the motivating
+                * case) the prevsource fetch reads xtoviewangle[-1].
+                * Clamp to xtoviewangle[0]: at the screen edge there is
+                * no previous column to filter against, so reusing the
+                * current column's angle is the natural fallback. */
+               int xm1 = x > 0 ? x - 1 : 0;
                dcvars.source = R_GetTextureColumn(tex_patch, ((an + xtoviewangle[x])^flip) >> ANGLETOSKYSHIFT);
-               dcvars.prevsource = R_GetTextureColumn(tex_patch, ((an + xtoviewangle[x-1])^flip) >> ANGLETOSKYSHIFT);
+               dcvars.prevsource = R_GetTextureColumn(tex_patch, ((an + xtoviewangle[xm1])^flip) >> ANGLETOSKYSHIFT);
                dcvars.nextsource = R_GetTextureColumn(tex_patch, ((an + xtoviewangle[x+1])^flip) >> ANGLETOSKYSHIFT);
                colfunc(&dcvars);
             }

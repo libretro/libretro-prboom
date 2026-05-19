@@ -558,11 +558,20 @@ void P_UnArchiveThinkers (void)
 
       // Must verify soundtarget. See P_ArchiveThinkers.
       // Check if 'saved' soundtarget pointer was NULL
-      // or otherwise invalid
-      if (!target || P_GetMobj(target,size) >= size)
+      // or otherwise invalid.  Cache the P_GetMobj() result so
+      // the bounds check is unambiguously unsigned (the original
+      // int >= size_t comparison flagged -Wsign-compare) and so
+      // we don't run the same call twice on the success path.
+      if (!target)
         sectors[i].soundtarget = 0;
       else
-        P_SetNewTarget(&sectors[i].soundtarget, mobj_p[P_GetMobj(target,size)]);
+      {
+        int idx = P_GetMobj(target, size);
+        if (idx < 0 || (size_t)idx >= size)
+          sectors[i].soundtarget = 0;
+        else
+          P_SetNewTarget(&sectors[i].soundtarget, mobj_p[idx]);
+      }
     }
   }
 

@@ -495,8 +495,21 @@ void HUlib_drawMBg
   const patchnum_t* bgp
 )
 {
-  // If no valid background is given, use a blackbox
-  if ( bgp == NULL || !bgp->width )
+  /* The 9-patch background expects every slot to be a real loaded
+   * patch.  If any are missing -- HU_Init only calls R_SetPatchNum
+   * when W_CheckNumForName succeeds, so missing slots stay at the
+   * memset(0) seed with lumpnum == 0 and width == 0 -- fall back to
+   * the same flat-black V_DrawBox the NULL-bgp branch uses.
+   *
+   * The original check only looked at bgp[0] (`!bgp->width`), which
+   * handles the all-9-missing case cleanly (e.g. no prboom.wad
+   * loaded and the IWAD doesn't define BOX* patches itself) but
+   * would crash on a partial set: bgp[0] loaded, bgp[5] absent, the
+   * V_DrawNumPatch(bgp[5].lumpnum=0) call below ends up handing
+   * createPatch a NULL pointer from W_CacheLumpNum (lump 0 is the
+   * IWAD's first marker, size 0) and SEGVs.  Same shape as the
+   * Final Doom font-glyph bug fixed in the previous commit. */
+  if (bgp == NULL || !bgp->width)
   {
     fline_t boxdiag = {
       { x,   y },
@@ -509,6 +522,26 @@ void HUlib_drawMBg
     int xs = bgp[0].width;
     int ys = bgp[0].height;
     int i,j;
+    int k;
+    int all_present = 1;
+
+    for (k = 0; k < 9; k++)
+    {
+      if (bgp[k].lumpnum <= 0 || !bgp[k].width)
+      {
+        all_present = 0;
+        break;
+      }
+    }
+    if (!all_present)
+    {
+      fline_t boxdiag = {
+        { x,   y },
+        { x+w, y+h },
+      };
+      V_DrawBox(&boxdiag, 0);
+      return;
+    }
 
     // CPhipps - patch drawing updated
     // top rows

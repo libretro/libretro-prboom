@@ -36,6 +36,20 @@
 static const void *music_handle;
 static void *song_data;
 
+/* Generic music save-state: counter of samples rendered since the
+ * current song started.  Tracked by the wrapper, NOT by the backend,
+ * so it's available for every backend (including ones with no
+ * backend-level serialize/unserialize, e.g. mp_player).  Reset to
+ * zero in I_PlaySong; advanced inside the render call site. */
+static uint64_t music_samples_played;
+
+/* Last looping flag passed to I_PlaySong, captured so the generic
+ * restore path can call current_player->play() again with the same
+ * argument it was given originally.  Separate from the (latently
+ * buggy) file-scope `looping` static which is read by
+ * I_QrySongPlaying -- leaving that alone here. */
+static int music_last_looping;
+
 extern retro_audio_sample_batch_t audio_batch_cb;
 extern retro_log_printf_t log_cb;
 extern int gametic;
@@ -397,7 +411,10 @@ void I_UpdateSound(void)
    /* Step 1: music or silence into mixbuffer. */
 #ifdef MUSIC_SUPPORT
    if (music_handle && current_player)
+   {
       current_player->render(mixbuffer, out_frames);
+      music_samples_played += (uint64_t)out_frames;
+   }
    else
 #endif
       memset(mixbuffer, 0, (size_t)out_frames * 2 * sizeof(int16_t));
@@ -573,7 +590,9 @@ static int	musicdies=-1;
 void I_PlaySong(int handle, int looping)
 {
   (void)handle;
-  musicdies = gametic + TICRATE * 30;
+  musicdies              = gametic + TICRATE * 30;
+  music_last_looping     = looping;
+  music_samples_played   = 0;
 
 #ifdef MUSIC_SUPPORT
   if (current_player)
@@ -637,33 +656,171 @@ void I_UnRegisterSong(int handle)
 /* (status quo behaviour before this hook existed), so absence is     */
 /* safe.                                                              */
 
+/* Generic music-state wire format -- the cross-backend layer.
+ *
+ * Every save written by this wrapper starts with a fixed 16-byte
+ * GMUS header that records only the cross-backend-meaningful state:
+ * the rendered-sample count since I_PlaySong.  Any backend-specific
+ * fast-path payload (e.g. 'OPLS' track positions, 'FLPS' eventpos)
+ * is appended after the header.  Layout:
+ *
+ *   uint32_t  magic    = 'GMUS'
+ *   uint32_t  version  = 1
+ *   uint64_t  samples_played
+ *   [optional backend payload, variable length]
+ *
+ * The GMUS prefix is what makes cross-backend save/load work: a
+ * state written while the OPL backend was active still carries the
+ * same opening header as a state written while MP3 was active, so
+ * the reader can always extract the sample count.  The reader tries
+ * the active backend's fast path on the appended payload first and
+ * only falls through to render-replay (stop, restart, render() into
+ * a throwaway buffer until samples_played catches up) if either:
+ *
+ *   - the active backend has no unserialize (e.g. mp_player), or
+ *   - the active backend rejected the appended payload because it
+ *     was written by a different backend (OPLS appended payload,
+ *     read while fl_player or mp_player is active, or vice versa).
+ *
+ * Same-backend save/load is unchanged from the pre-wrapper world:
+ * 16 bytes of GMUS overhead, then the backend's existing fast-path
+ * unserialize takes over.  Cross-backend save/load is slower (the
+ * render-replay walk is O(samples_played)) but correct -- the song
+ * resumes at the right position instead of drifting past it.  The
+ * cross-backend path is also the only available option for backends
+ * whose internal state cannot be event-replayed, MP3 being the
+ * motivating case (libmad's decoder state is opaque, so re-decoding
+ * from the start to the saved sample count is the only way to
+ * resume cleanly).
+ */
+#define MUSIC_GENERIC_MAGIC     0x474D5553u   /* 'GMUS' */
+#define MUSIC_GENERIC_VERSION   1u
+#define MUSIC_GENERIC_HDR_SIZE  16u
+
 size_t I_MusicSerializeMaxSize(void)
 {
 #ifdef MUSIC_SUPPORT
+   size_t total = MUSIC_GENERIC_HDR_SIZE;
    if (current_player && current_player->serialize)
-      return current_player->serialize(NULL, 0);
-#endif
+   {
+      size_t n = current_player->serialize(NULL, 0);
+      if (n > 0)
+         total += n;
+   }
+   return total;
+#else
    return 0;
+#endif
 }
 
 size_t I_MusicSerialize(void *dest, size_t cap)
 {
 #ifdef MUSIC_SUPPORT
-   if (current_player && current_player->serialize && music_handle)
-      return current_player->serialize(dest, cap);
-#endif
+   uint8_t *p = (uint8_t*)dest;
+   uint32_t magic;
+   uint32_t version;
+   size_t   total = MUSIC_GENERIC_HDR_SIZE;
+
+   if (!music_handle || !current_player)
+      return 0;
+   if (cap < total)
+      return 0;
+
+   /* GMUS header first -- the cross-backend portion every reader
+    * can extract regardless of which backend was active at save
+    * time.  16 bytes. */
+   magic   = MUSIC_GENERIC_MAGIC;
+   version = MUSIC_GENERIC_VERSION;
+   memcpy(p + 0, &magic,                4);
+   memcpy(p + 4, &version,              4);
+   memcpy(p + 8, &music_samples_played, 8);
+
+   /* Then the backend's fast-path payload, if any.  It writes into
+    * the buffer immediately after the GMUS header; on load the
+    * wrapper hands the backend exactly this slice.  A backend that
+    * declines (no song active, no fast-path implemented, or its
+    * payload wouldn't fit in the remaining cap) leaves the result
+    * at just the 16-byte GMUS header -- a valid state on its own,
+    * restored via render-replay. */
+   if (current_player->serialize)
+   {
+      size_t n = current_player->serialize(p + total, cap - total);
+      if (n > 0)
+         total += n;
+   }
+   return total;
+#else
+   (void)dest; (void)cap;
    return 0;
+#endif
 }
 
 int I_MusicUnserialize(const void *src, size_t size)
 {
    if (size == 0)
       return 1;  /* nothing to restore is success */
+
 #ifdef MUSIC_SUPPORT
-   if (current_player && current_player->unserialize)
-      return current_player->unserialize(src, size);
-#endif
+   {
+      const uint8_t *p = (const uint8_t*)src;
+      uint32_t magic;
+      uint32_t version;
+      uint64_t target;
+      short    tmpbuf[1024];   /* 512 stereo frames per replay chunk */
+
+      if (!music_handle || !current_player)
+         return 0;
+      if (size < MUSIC_GENERIC_HDR_SIZE)
+         return 0;
+
+      /* GMUS header is mandatory: any save written by this wrapper
+       * carries it regardless of which backend was active.  Reading
+       * it gives us the sample count we'll need if the backend's
+       * fast path declines (cross-backend save/load, or a backend
+       * with no unserialize at all). */
+      memcpy(&magic,   p + 0, 4);
+      memcpy(&version, p + 4, 4);
+      memcpy(&target,  p + 8, 8);
+      if (magic   != MUSIC_GENERIC_MAGIC)   return 0;
+      if (version != MUSIC_GENERIC_VERSION) return 0;
+
+      /* Try the backend's fast path on the appended payload.  Same-
+       * backend save/load lands here and event-replays in a few ms,
+       * unchanged from the pre-wrapper world.  Cross-backend save/
+       * load (e.g. OPLS payload, fl_player active) gets a rejection
+       * from the backend's magic check and falls through below. */
+      if (current_player->unserialize && size > MUSIC_GENERIC_HDR_SIZE)
+      {
+         if (current_player->unserialize(p + MUSIC_GENERIC_HDR_SIZE,
+                                          size - MUSIC_GENERIC_HDR_SIZE) == 1)
+            return 1;
+      }
+
+      /* Render-replay fallback using the GMUS sample count.  This
+       * is the cross-backend path and the only path for backends
+       * with no unserialize (mp_player).  Runahead's common case
+       * (save and restore at the same sample position) short-circuits
+       * here as a no-op, preserving the in-flight synth state. */
+      if (target == music_samples_played)
+         return 1;
+
+      current_player->stop();
+      current_player->play(music_handle, music_last_looping);
+      music_samples_played = 0;
+
+      while (music_samples_played < target)
+      {
+         uint64_t want  = target - music_samples_played;
+         unsigned chunk = (want > 512) ? 512u : (unsigned)want;
+         current_player->render(tmpbuf, chunk);
+         music_samples_played += chunk;
+      }
+      return 1;
+   }
+#else
+   (void)src;
    return 0;
+#endif
 }
 
 int I_RegisterSong(const void* data, size_t len)

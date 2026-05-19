@@ -15,6 +15,7 @@
 #include <libretro.h>
 #include <file/file_path.h>
 #include <streams/file_stream.h>
+#include <vfs/vfs_implementation.h>
 #include <array/rbuf.h>
 #include <compat/strl.h>
 
@@ -326,7 +327,119 @@ void retro_set_rumble_touch(unsigned intensity, float duration)
  **
  * Checks if directory contains a file with given name and extension.
  * returns the path to the file if it exists and is readable or NULL otherwise
- */
+ *
+ * On case-sensitive filesystems (Linux, *BSD, macOS HFS+ case-sensitive,
+ * etc.) the literal-name path_is_valid() check fails when the on-disk
+ * file uses different letter case than the caller asked for.  This
+ * affects users a lot in practice: many distributions of the original
+ * IWADs ship the file as DOOM.WAD / DOOM2.WAD / etc., while the
+ * engine consistently asks lowercase -- standard_iwads[] entries are
+ * all lowercase, hu_stuff and elsewhere look up "prboom.wad" in
+ * lowercase, and the basename copied to -iwad from the libretro
+ * frontend preserves whatever case the user-selected file had.  See
+ * issues #186 ("WAD detection should not be case sensitive") and
+ * #188 ("Doom1.wad megawads don't work" -- same root cause, exposed
+ * via the IWAD-not-found path when a Doom 1 PWAD is loaded next to
+ * an uppercase DOOM.WAD).
+ *
+ * After the literal lookup misses, scan `dir` once via the libretro
+ * VFS dirent API and look for an entry whose name matches `wfname`
+ * (+ optional ext) case-insensitively.  On a hit we rebuild the
+ * result path with the actual on-disk filename so subsequent
+ * filestream_open calls see a path that resolves.
+ *
+ * On Windows the literal-name path_is_valid() succeeds regardless
+ * of casing (NTFS / FAT are case-insensitive at the OS layer), so
+ * the fallback never fires there.  retro_vfs_opendir_impl handles
+ * platform differences internally; this code path is
+ * platform-portable. */
+static char *find_in_dir_case_insensitive(const char *dir,
+                                          const char *wfname,
+                                          const char *ext)
+{
+   libretro_vfs_implementation_dir *dh;
+   char *want;
+   char *match = NULL;
+   size_t want_len;
+
+   if (!dir || !wfname)
+      return NULL;
+   dh = retro_vfs_opendir_impl(dir, false);
+   if (!dh)
+      return NULL;
+
+   want_len = strlen(wfname) + (ext ? strlen(ext) : 0);
+   want = malloc(want_len + 1);
+   if (!want)
+   {
+      retro_vfs_closedir_impl(dh);
+      return NULL;
+   }
+   strcpy(want, wfname);
+   if (ext && *ext)
+      strcat(want, ext);
+
+   while (retro_vfs_readdir_impl(dh))
+   {
+      const char *de = retro_vfs_dirent_get_name_impl(dh);
+      if (de && !strcasecmp(de, want))
+      {
+         match = malloc(strlen(dir) + 1 + strlen(de) + 1);
+         if (match)
+            sprintf(match, "%s%c%s", dir, DIR_SLASH, de);
+         break;
+      }
+   }
+   free(want);
+   retro_vfs_closedir_impl(dh);
+   return match;
+}
+
+/* Given an absolute or already-prefixed file path, return a strdup'd
+ * version with the correct on-disk case for the final component,
+ * even if the supplied case doesn't match.  Returns NULL if no
+ * matching entry is in the directory.  Useful for resolving entries
+ * a user typed into an m3u playlist (`doom2.wad`) when the on-disk
+ * file is `DOOM2.WAD`: filestream_open won't tolerate the mismatch
+ * on case-sensitive filesystems.
+ *
+ * If the supplied path already resolves verbatim, returns a plain
+ * strdup of it -- no directory scan, no allocation churn beyond
+ * the dup.  Only the case-mismatch path triggers an opendir + scan.
+ *
+ * Only the final component is case-folded; the directory portion
+ * is taken as-is.  In practice the directory is one the frontend
+ * handed us (already correctly cased) and only the basename came
+ * from user-typed input. */
+static char *canonicalize_path_casefold(const char *path)
+{
+   char *sep;
+   char *dir;
+   char *match;
+
+   if (!path || !*path)
+      return NULL;
+   if (path_is_valid(path))
+      return strdup(path);
+
+   /* Split into dir + basename. */
+   sep = strrchr(path, '/');
+   if (!sep)
+      sep = strrchr(path, '\\');
+   if (!sep)
+      return NULL;  /* no directory component to scan */
+
+   dir = malloc((sep - path) + 1);
+   if (!dir)
+      return NULL;
+   memcpy(dir, path, sep - path);
+   dir[sep - path] = '\0';
+
+   match = find_in_dir_case_insensitive(dir, sep + 1, NULL);
+   free(dir);
+   return match;
+}
+
 static char *FindFileInDir(const char* dir, const char* wfname, const char* ext)
 {
    char * p;
@@ -355,7 +468,26 @@ static char *FindFileInDir(const char* dir, const char* wfname, const char* ext)
          log_cb(RETRO_LOG_DEBUG, "FindFileInDir: found %s\n", p);
       return p;
    }
-   else if (log_cb)
+
+   /* Case-insensitive fallback for case-sensitive filesystems.  See
+    * the comment on find_in_dir_case_insensitive() above.  Only
+    * attempted when a real directory was supplied (the no-dir branch
+    * above is for callers passing already-prefixed paths). */
+   if (dir)
+   {
+      char *cif = find_in_dir_case_insensitive(dir, wfname, ext);
+      if (cif)
+      {
+         free(p);
+         if (log_cb)
+            log_cb(RETRO_LOG_DEBUG,
+                   "FindFileInDir: case-insensitive match %s for %s\n",
+                   cif, wfname);
+         return cif;
+      }
+   }
+
+   if (log_cb)
       log_cb(RETRO_LOG_ERROR, "FindFileInDir: not found %s in %s\n", wfname, dir);
 
    free(p);
@@ -1006,6 +1138,21 @@ static int parse_m3u_playlist(const char *m3u_path,
       else
          snprintf(resolved, sizeof(resolved), "%s%c%s",
                   m3u_dir, DIR_SLASH, p);
+
+      /* Canonicalise letter case for the final component.  Many real
+       * IWAD distributions ship DOOM.WAD / DOOM2.WAD uppercase, but
+       * a user's m3u line might say `doom2.wad` -- on case-sensitive
+       * filesystems filestream_open won't find the uppercase file
+       * from the lowercase path.  See issues #186 / #188. */
+      {
+         char *fixed = canonicalize_path_casefold(resolved);
+         if (fixed)
+         {
+            strncpy(resolved, fixed, sizeof(resolved) - 1);
+            resolved[sizeof(resolved) - 1] = '\0';
+            free(fixed);
+         }
+      }
 
       k = classify_entry(resolved);
       if (k == ENTRY_INVALID)

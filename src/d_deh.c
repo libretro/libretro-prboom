@@ -1740,7 +1740,7 @@ static void deh_procBexCodePointers(DEHFILE *fpin, FILE* fpout, char *line)
 {
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX+1];
-  int indexnum;
+  int indexnum = 0;
   char mnemonic[DEH_MAXKEYLEN];  // to hold the codepointer mnemonic
   int i; // looper
   dbool   found; // know if we found this one during lookup or not
@@ -1929,7 +1929,7 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
-  int indexnum;
+  int indexnum = 0;
   int ix;
   char *strval;
 
@@ -2086,7 +2086,7 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
-  int indexnum;
+  int indexnum = 0;
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
 
@@ -2190,7 +2190,7 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
-  int indexnum;
+  int indexnum = 0;
   unsigned i; // looper
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
@@ -2300,7 +2300,7 @@ static void deh_procSounds(DEHFILE *fpin, FILE* fpout, char *line)
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
-  int indexnum;
+  int indexnum = 0;
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
 
@@ -2368,7 +2368,7 @@ static void deh_procAmmo(DEHFILE *fpin, FILE* fpout, char *line)
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
-  int indexnum;
+  int indexnum = 0;
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
 
@@ -2414,7 +2414,7 @@ static void deh_procWeapon(DEHFILE *fpin, FILE* fpout, char *line)
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;      // All deh values are ints or longs
-  int indexnum;
+  int indexnum = 0;
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
 
@@ -2471,7 +2471,7 @@ static void deh_procSprite(DEHFILE *fpin, FILE* fpout, char *line) // Not suppor
 {
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX+1];
-  int indexnum;
+  int indexnum = 0;
 
   // Too little is known about what this is supposed to do, and
   // there are better ways of handling sprite renaming.  Not supported.
@@ -2505,7 +2505,7 @@ static void deh_procPars(DEHFILE *fpin, FILE* fpout, char *line) // extension
 {
   char key[DEH_MAXKEYLEN];
   char inbuffer[DEH_BUFFERMAX+1];
-  int indexnum;
+  int indexnum = 0;
   int episode, level, partime, oldpar;
 
   // new item, par times

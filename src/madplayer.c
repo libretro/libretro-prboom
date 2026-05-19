@@ -60,7 +60,9 @@ const music_player_t mp_player =
   NULL,
   NULL,
   NULL,
-  NULL
+  NULL,
+  NULL,  /* serialize */
+  NULL   /* unserialize */
 };
 
 #else // HAVE_LIBMAD
@@ -330,7 +332,9 @@ const music_player_t mp_player =
   mp_unregistersong,
   mp_play,
   mp_stop,
-  mp_render
+  mp_render,
+  NULL,  /* serialize -- mp3 stream position not yet implemented */
+  NULL   /* unserialize */
 };
 
 #endif // HAVE_LIBMAD

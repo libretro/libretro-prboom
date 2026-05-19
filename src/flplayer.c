@@ -62,7 +62,9 @@ const music_player_t fl_player =
   NULL,
   NULL,
   NULL,
-  NULL
+  NULL,
+  NULL,  /* serialize */
+  NULL   /* unserialize */
 };
 
 #else // HAVE_LIBFLUIDSYNTH
@@ -542,7 +544,9 @@ const music_player_t fl_player =
   fl_unregistersong,
   fl_play,
   fl_stop,
-  fl_render
+  fl_render,
+  NULL,  /* serialize -- not implemented for fluidsynth backend */
+  NULL   /* unserialize */
 };
 
 

@@ -32,6 +32,8 @@
 #ifndef MUSICPLAYER_H
 #define MUSICPLAYER_H
 
+#include <stddef.h>
+
 /*
 Anything that implements all of these functions can play music in prboomplus.
 
@@ -82,6 +84,26 @@ typedef struct
   // s16 stereo, with samplerate as specified in init.  player needs to be able to handle
   // just about anything for nsamp.  render can be called even during pause+stop.
   void (*render)(void *dest, unsigned nsamp);
+
+  // Optional: save player-specific playback state (song position,
+  // tempo, channel state, etc.) so a save state can resume music
+  // from the same point on load.  Returns the number of bytes
+  // written to dest, or 0 if there is nothing to save, dest is too
+  // small, or the player does not implement state save.  Pass dest
+  // == NULL to query the maximum size the player might write.
+  //
+  // Implementations must be efficient: this is called every save
+  // state, including high-frequency saves driven by features such
+  // as runahead.  Targeting tens of bytes is ideal; hundreds is
+  // tolerable.  Avoid kilobytes.
+  size_t (*serialize)(void *dest, size_t cap);
+
+  // Optional: restore the state previously written by serialize().
+  // Returns 1 on success, 0 if the data is unrecognised, mismatched
+  // against the currently loaded song, or the player does not
+  // implement state restore.  On failure the player should leave
+  // playback running as-is; the caller treats this as a soft error.
+  int (*unserialize)(const void *src, size_t size);
 } music_player_t;
 
 

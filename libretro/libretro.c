@@ -1036,6 +1036,152 @@ static bool wad_contains_playpal(const char *path, const wadinfo_t *header)
    return found;
 }
 
+/* PWAD "map kind": which IWAD generation the PWAD's maps target.
+ * The libretro front-end hands us a single file via retro_load_game.
+ * For a genuine add-on PWAD we emit -file <path> and let the engine's
+ * FindIWADFile pick an IWAD by iterating standard_iwads[] in d_main.c.
+ * That list probes doom2.wad / doom2f.wad / plutonia.wad / tnt.wad /
+ * freedoom2.wad BEFORE doom.wad / doomu.wad / freedoom1.wad / ..., so
+ * a directory with both DOOM 1 and DOOM 2 IWADs side-by-side always
+ * picks the commercial one.  When the user picks an episode-5 add-on
+ * like SIGIL.WAD with a doom2.wad next to it, the engine boots in
+ * commercial mode (MAP01 plays at game start, SIGIL's E5Mx maps are
+ * unreachable, and SIGIL's missing textures cause render glitches /
+ * crashes once any unmapped texture is referenced).
+ *
+ * Peek at the PWAD's lump directory: ExMy markers (E1..E5 maps) mean
+ * "DOOM 1 add-on", MAPxx markers mean "DOOM 2 add-on".  When both
+ * are present (rare, but some compatibility shims do it), prefer the
+ * DOOM 2 reading; the commercial map set is the more permissive
+ * gamemode and standalone E maps in a Doom 2 mod usually exist for
+ * UMAPINFO override purposes rather than as the primary content. */
+typedef enum
+{
+   PWAD_MAP_NONE,        /* no map markers (graphics / sound / DEH-only PWAD) */
+   PWAD_MAP_DOOM1,       /* ExMy markers found */
+   PWAD_MAP_DOOM2        /* MAPxx markers found */
+} pwad_map_kind_t;
+
+static pwad_map_kind_t scan_pwad_map_kind(const char *path,
+                                          const wadinfo_t *header)
+{
+   RFILE *fp;
+   filelump_t lump;
+   int i;
+   int numlumps     = LONG(header->numlumps);
+   int infotableofs = LONG(header->infotableofs);
+   bool saw_exmy    = false;
+   bool saw_mapxx   = false;
+
+   if (numlumps <= 0 || infotableofs <= 0)
+      return PWAD_MAP_NONE;
+   fp = filestream_open(path,
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (!fp)
+      return PWAD_MAP_NONE;
+   if (filestream_seek(fp, infotableofs, SEEK_SET) != 0)
+   {
+      filestream_close(fp);
+      return PWAD_MAP_NONE;
+   }
+   for (i = 0; i < numlumps; i++)
+   {
+      const char *n;
+      if (rfread(&lump, sizeof(lump), 1, fp) != 1)
+         break;
+      n = lump.name;
+      /* "ExMy": e.g. E1M1..E4M9 plus the SIGIL E5Mx extension.  The
+       * 8-byte lump name slot is NUL- or space-padded after the
+       * 4 significant characters. */
+      if ((n[0] == 'E' || n[0] == 'e') &&
+          n[1] >= '1' && n[1] <= '9' &&
+          (n[2] == 'M' || n[2] == 'm') &&
+          n[3] >= '0' && n[3] <= '9' &&
+          (n[4] == '\0' || n[4] == ' '))
+         saw_exmy = true;
+      /* "MAPxx": MAP01..MAP99 (and a few mods exceeding that). */
+      else if ((n[0] == 'M' || n[0] == 'm') &&
+               (n[1] == 'A' || n[1] == 'a') &&
+               (n[2] == 'P' || n[2] == 'p') &&
+               n[3] >= '0' && n[3] <= '9' &&
+               n[4] >= '0' && n[4] <= '9' &&
+               (n[5] == '\0' || n[5] == ' '))
+         saw_mapxx = true;
+   }
+   filestream_close(fp);
+   if (saw_mapxx)
+      return PWAD_MAP_DOOM2;
+   if (saw_exmy)
+      return PWAD_MAP_DOOM1;
+   return PWAD_MAP_NONE;
+}
+
+/* Probe the wad-dir / system-dir / system-dir/prboom hierarchy for an
+ * IWAD that matches the requested map kind.  Returns a heap-allocated
+ * absolute path on first hit, NULL otherwise.  Uses the case-
+ * insensitive helper so a DOOM.WAD on a Linux ext4 matches the
+ * lowercase candidate name.
+ *
+ * Candidate order within each kind mirrors d_main.c's standard_iwads[]
+ * preference: official releases before freedoom fallbacks, common
+ * names before rare ones. */
+static char *find_iwad_for_kind(pwad_map_kind_t kind)
+{
+   static const char *const doom1_candidates[] = {
+      "doom.wad", "doomu.wad", "freedoom1.wad", "freedoom.wad", "doom1.wad"
+   };
+   static const char *const doom2_candidates[] = {
+      "doom2.wad", "doom2f.wad", "plutonia.wad", "tnt.wad", "freedoom2.wad"
+   };
+   const char *const *list;
+   size_t list_n;
+   size_t i;
+   char *system_dir = NULL;
+   char *prboom_subdir = NULL;
+   char *hit;
+
+   if (kind == PWAD_MAP_DOOM1)
+   {
+      list   = doom1_candidates;
+      list_n = sizeof(doom1_candidates)/sizeof(doom1_candidates[0]);
+   }
+   else if (kind == PWAD_MAP_DOOM2)
+   {
+      list   = doom2_candidates;
+      list_n = sizeof(doom2_candidates)/sizeof(doom2_candidates[0]);
+   }
+   else
+      return NULL;
+
+   environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
+   if (system_dir && *system_dir)
+   {
+      prboom_subdir = malloc(strlen(system_dir) + 8);
+      if (prboom_subdir)
+         sprintf(prboom_subdir, "%s%c%s", system_dir, DIR_SLASH, "prboom");
+   }
+
+   for (i = 0; i < list_n; i++)
+   {
+      /* wad dir first -- the user-visible "load location" */
+      if ((hit = FindFileInDir(g_wad_dir, list[i], NULL)))
+         goto done;
+      /* system_dir/prboom -- the canonical libretro IWAD stash */
+      if (prboom_subdir && (hit = FindFileInDir(prboom_subdir, list[i], NULL)))
+         goto done;
+      /* system_dir directly -- some users drop IWADs here */
+      if (system_dir && *system_dir && (hit = FindFileInDir(system_dir, list[i], NULL)))
+         goto done;
+   }
+   hit = NULL;
+done:
+   free(prboom_subdir);
+   return hit;
+}
+
+
+
 /* Classification of a single playlist entry.  Used by the m3u
  * loader (issue #196) so each line of the playlist is routed to
  * the correct argv chunk (-iwad / -file / -deh).  Same rules the
@@ -1323,6 +1469,62 @@ bool retro_load_game(const struct retro_game_info *info)
             }
             else
             {
+               /* Genuine add-on PWAD.  Before letting the engine pick
+                * an IWAD via FindIWADFile (which iterates
+                * standard_iwads[] commercial-first), peek at the
+                * PWAD's map markers and try to find an IWAD that
+                * matches its target generation.  Without this, a
+                * Doom-1 add-on (e.g. SIGIL.WAD's E5Mx maps) loaded
+                * next to a doom2.wad always boots in commercial mode
+                * -- engine starts at MAP01, the add-on's E maps are
+                * unreachable, and missing textures cause render
+                * glitches and crashes.
+                *
+                * On a hit we emit an explicit -iwad <path>; the
+                * engine's CheckIWAD then accepts that and skips the
+                * standard_iwads[] auto-detect entirely.  On a miss
+                * (no matching IWAD found anywhere we look) we let
+                * the auto-detect proceed and accept whatever it
+                * picks; that preserves the prior behaviour for
+                * setups where steering would otherwise downgrade
+                * to no IWAD at all. */
+               pwad_map_kind_t kind = scan_pwad_map_kind(info->path, &header);
+               char *iwad_match = (kind != PWAD_MAP_NONE)
+                                  ? find_iwad_for_kind(kind) : NULL;
+               if (iwad_match)
+               {
+                  if (log_cb)
+                     log_cb(RETRO_LOG_INFO,
+                            "retro_load_game: steering PWAD '%s' (%s) "
+                            "toward IWAD '%s'\n",
+                            g_basename,
+                            kind == PWAD_MAP_DOOM1 ? "ExMy maps" : "MAPxx maps",
+                            iwad_match);
+                  argv[argc++] = strdup("-iwad");
+                  argv[argc++] = iwad_match;  /* already heap from FindFileInDir */
+               }
+               else if (kind == PWAD_MAP_DOOM1 && log_cb)
+               {
+                  /* The PWAD wants a Doom 1 IWAD but none is reachable.
+                   * The engine will fall back to standard_iwads[] auto-
+                   * detect, which is commercial-first, so users with
+                   * only a doom2.wad nearby will see this PWAD boot in
+                   * commercial mode -- broken intro, MAP01 at game
+                   * start, render glitches once the PWAD's textures
+                   * resolve against the wrong IWAD palette / PNAMES.
+                   * Log a clear warning so the failure mode is
+                   * understandable. */
+                  log_cb(RETRO_LOG_WARN,
+                         "retro_load_game: PWAD '%s' has DOOM 1 (ExMy) "
+                         "maps but no doom.wad / doomu.wad / freedoom1.wad / "
+                         "freedoom.wad / doom1.wad found near the PWAD "
+                         "or in the system directory.  The engine will "
+                         "fall back to whatever IWAD it can find, which "
+                         "is most likely the wrong one.  Place a DOOM 1 "
+                         "IWAD next to '%s' or use an m3u playlist to "
+                         "name the IWAD explicitly.\n",
+                         g_basename, g_basename);
+               }
                argv[argc++] = strdup("-file");
                argv[argc++] = strdup(info->path);
             }

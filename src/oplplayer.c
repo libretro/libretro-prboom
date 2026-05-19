@@ -324,6 +324,11 @@ static unsigned int num_tracks = 0;
 static unsigned int running_tracks = 0;
 static dbool song_looping;
 
+// Currently-playing song handle, retained so I_OPL_UnserializeState can
+// rebuild the track iterators from the same MIDI file without needing
+// the caller to pass it back in.  Mirrors the handle PlaySong was given.
+static const midi_file_t *current_song = NULL;
+
 // Configuration file variable, containing the port number for the
 // adlib chip.
 
@@ -1188,6 +1193,7 @@ static void I_OPL_PlaySong(const void *handle, int looping)
     }
 
     file = handle;
+    current_song = file;
 
     // Allocate track data.
 
@@ -1275,7 +1281,7 @@ static void I_OPL_StopSong(void)
 
     tracks = NULL;
     num_tracks = 0;
-
+    current_song = NULL;
 }
 
 static void I_OPL_UnRegisterSong(const void *handle)
@@ -1377,6 +1383,149 @@ void I_OPL_RenderSamples (void *dest, unsigned nsamp)
     OPL_Render_Samples (dest, nsamp);
 }
 
+// State save/restore -----------------------------------------------------
+//
+// We capture the per-track MIDI iterator position plus the small amount
+// of cross-track state (running_tracks, song_looping).  On restore the
+// player tears down its in-flight scheduling, re-issues PlaySong with
+// the still-loaded MIDI handle (which the host has not destroyed), then
+// fast-forwards each track by replaying every event from position 0 up
+// to the saved position via ProcessEvent.  That walk drives channel
+// state, instrument selection, and the OPL register file to the same
+// values they had at save time; notes that were keyed on at the saved
+// position remain so via the normal voice-allocation path, so audio
+// resumes from where it was.
+//
+// Cost: O(saved_position) per track on every restore.  For typical
+// DOOM music (a few thousand events over a minute) this is well under
+// a millisecond, which is fine for runahead's per-frame restore.  An
+// incremental path (detect that saved positions are at or very near
+// current positions and just nudge the iterators) would be faster but
+// is not implemented; correctness first.
+//
+// Wire format is little-endian-host (the libretro frontend pins the
+// host endianness for save states already; we match that convention).
+
+#define OPL_STATE_MAGIC 0x4F504C53u  /* 'OPLS' */
+#define OPL_STATE_VERSION 1u
+#define OPL_STATE_MAX_TRACKS 256u    /* sanity ceiling */
+
+typedef struct {
+    uint32_t magic;
+    uint16_t version;
+    uint16_t num_tracks;
+    uint32_t running_tracks;
+    uint32_t song_looping;
+    /* followed by num_tracks * uint32_t track positions */
+} opl_state_header_t;
+
+static size_t I_OPL_SerializeState(void *dest, size_t cap)
+{
+    opl_state_header_t hdr;
+    uint8_t *p;
+    unsigned i;
+    size_t need;
+
+    if (!music_initialized)              return 0;
+    if (!current_song || tracks == NULL) return 0;
+    if (num_tracks == 0)                 return 0;
+    if (num_tracks > OPL_STATE_MAX_TRACKS) return 0;
+
+    need = sizeof(opl_state_header_t) + num_tracks * sizeof(uint32_t);
+    if (!dest)
+        return need;   /* size-query mode */
+    if (cap < need)
+        return 0;
+
+    hdr.magic          = OPL_STATE_MAGIC;
+    hdr.version        = OPL_STATE_VERSION;
+    hdr.num_tracks     = (uint16_t)num_tracks;
+    hdr.running_tracks = running_tracks;
+    hdr.song_looping   = song_looping ? 1u : 0u;
+    memcpy(dest, &hdr, sizeof hdr);
+    p = (uint8_t*)dest + sizeof hdr;
+    for (i = 0; i < num_tracks; i++)
+    {
+        uint32_t pos = (uint32_t)MIDI_IteratorPosition(tracks[i].iter);
+        memcpy(p, &pos, sizeof pos);
+        p += sizeof pos;
+    }
+    return need;
+}
+
+static int I_OPL_UnserializeState(const void *src, size_t size)
+{
+    opl_state_header_t hdr;
+    uint32_t positions[OPL_STATE_MAX_TRACKS];
+    const uint8_t *p;
+    unsigned i;
+    const midi_file_t *song;
+
+    if (!music_initialized)                       return 0;
+    if (size < sizeof(opl_state_header_t))        return 0;
+    memcpy(&hdr, src, sizeof hdr);
+    if (hdr.magic      != OPL_STATE_MAGIC)        return 0;
+    if (hdr.version    != OPL_STATE_VERSION)      return 0;
+    if (hdr.num_tracks == 0)                      return 0;
+    if (hdr.num_tracks >  OPL_STATE_MAX_TRACKS)   return 0;
+    if (size < sizeof hdr + hdr.num_tracks * sizeof(uint32_t)) return 0;
+
+    /* Need the current song to fast-forward into.  If the host stopped
+     * music between save and load, give up rather than try to synthesise
+     * playback from no handle.  Playback will stay stopped, which is the
+     * status-quo behaviour for save-state restore without this hook. */
+    song = current_song;
+    if (!song)
+        return 0;
+    /* And the saved track count must match the loaded song.  A mismatch
+     * means the state was taken under a different MIDI; refusing is
+     * safer than mis-indexing. */
+    if (hdr.num_tracks != MIDI_NumTracks(song))
+        return 0;
+
+    p = (const uint8_t*)src + sizeof hdr;
+    for (i = 0; i < hdr.num_tracks; i++)
+    {
+        memcpy(&positions[i], p, sizeof(uint32_t));
+        p += sizeof(uint32_t);
+    }
+
+    /* Tear down and rebuild from the same MIDI handle.  StopSong clears
+     * tracks and zeroes current_song; PlaySong reallocates tracks and
+     * re-schedules event 0 for each.  We then drop those just-scheduled
+     * callbacks and walk forward in track-event space. */
+    I_OPL_StopSong();
+    I_OPL_PlaySong(song, hdr.song_looping ? 1 : 0);
+    OPL_ClearCallbacks();
+    running_tracks = hdr.running_tracks;
+
+    for (i = 0; i < num_tracks; i++)
+    {
+        opl_track_data_t *t = &tracks[i];
+        midi_event_t *event;
+        int hit_end = 0;
+
+        while (MIDI_IteratorPosition(t->iter) < positions[i])
+        {
+            if (!MIDI_GetNextEvent(t->iter, &event))
+            {
+                hit_end = 1;
+                break;
+            }
+            ProcessEvent(t, event);
+            if (event->event_type == MIDI_EVENT_META &&
+                event->data.meta.type == MIDI_META_END_OF_TRACK)
+            {
+                hit_end = 1;
+                break;
+            }
+        }
+        if (!hit_end)
+            ScheduleTrack(t);
+    }
+    return 1;
+}
+
 const music_player_t opl_synth_player =
 {
   I_OPL_SynthName,
@@ -1389,5 +1538,7 @@ const music_player_t opl_synth_player =
   I_OPL_UnRegisterSong,
   I_OPL_PlaySong,
   I_OPL_StopSong,
-  I_OPL_RenderSamples
+  I_OPL_RenderSamples,
+  I_OPL_SerializeState,
+  I_OPL_UnserializeState
 };

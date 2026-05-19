@@ -704,6 +704,11 @@ void MIDI_RestartIterator(midi_track_iter_t *iter)
     iter->position = 0;
 }
 
+unsigned int MIDI_IteratorPosition(const midi_track_iter_t *iter)
+{
+    return iter->position;
+}
+
 // NSM: an alternate iterator tool.
 
 midi_event_t **MIDI_GenerateFlatList (midi_file_t *file)

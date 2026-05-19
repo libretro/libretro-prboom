@@ -1694,7 +1694,49 @@ process_input(void)
                }
 
                if(event.type == ev_keydown || event.type == ev_keyup)
+               {
                   D_PostEvent(&event);
+
+                  /* WASD movement: in addition to posting the primary
+                   * letter event (which keeps 'w' / 'a' / 's' / 'd'
+                   * usable for cheat-string entry and other text-input
+                   * paths), emit a second event for these four keys
+                   * that targets the configured movement bindings.
+                   *
+                   *   W -> key_up           (move forward, like Up)
+                   *   S -> key_down         (move back,    like Down)
+                   *   A -> key_strafeleft   (strafe left,  like ',')
+                   *   D -> key_straferight  (strafe right, like '.')
+                   *
+                   * Targeting key_up / key_down / key_strafeleft /
+                   * key_straferight rather than the hard-coded
+                   * KEYD_UPARROW etc. means rebound movement keys
+                   * continue to receive the WASD events.  Arrow-key
+                   * defaults stay wired up through their own
+                   * keyboard_lut entries, so both schemes work
+                   * simultaneously without one suppressing the
+                   * other. */
+                  {
+                     int sec = 0;
+                     switch (keyboard_lut[i][0])
+                     {
+                        case RETROK_w: sec = key_up;          break;
+                        case RETROK_s: sec = key_down;        break;
+                        case RETROK_a: sec = key_strafeleft;  break;
+                        case RETROK_d: sec = key_straferight; break;
+                        default: break;
+                     }
+                     if (sec)
+                     {
+                        event_t e2;
+                        e2.type  = event.type;
+                        e2.data1 = sec;
+                        e2.data2 = 0;
+                        e2.data3 = 0;
+                        D_PostEvent(&e2);
+                     }
+                  }
+               }
 
                old_input_kb[i] = new_input_kb[i];
             }

@@ -55,6 +55,7 @@
 just forward declare the prototype */
 int64_t rfread(void* buffer,
    size_t elem_size, size_t elem_count, RFILE* stream);
+char *rfgets(char *buffer, int maxCount, RFILE *stream);
 
 /* i_system */
 int ms_to_next_tick;
@@ -121,8 +122,13 @@ static void process_input(void);
  * machinery reads.  We populate this in retro_load_game and free
  * each heap-allocated slot in retro_unload_game (see
  * free_load_argv below).  Every populated slot is heap-allocated
- * so the cleanup is uniform. */
-static char *load_argv[32];
+ * so the cleanup is uniform.
+ *
+ * Sizing: an m3u playlist load (see issue #196) expands to
+ * `prboom -iwad <path> -file <p1> <p2> ... -deh <d1> ... -baseconfig <c>`,
+ * so the slot count grows with the playlist length.  64 covers up
+ * to ~55 entries which is well past any realistic mod stack. */
+static char *load_argv[64];
 
 static void free_load_argv(void)
 {
@@ -443,7 +449,7 @@ void retro_get_system_info(struct retro_system_info *info)
 #endif
    info->library_version  = "v2.5.0" GIT_VERSION;
    info->need_fullpath    = true;
-   info->valid_extensions = "wad|iwad|pwad|lmp";
+   info->valid_extensions = "wad|iwad|pwad|lmp|m3u";
    info->block_extract    = false;
 }
 
@@ -898,6 +904,126 @@ static bool wad_contains_playpal(const char *path, const wadinfo_t *header)
    return found;
 }
 
+/* Classification of a single playlist entry.  Used by the m3u
+ * loader (issue #196) so each line of the playlist is routed to
+ * the correct argv chunk (-iwad / -file / -deh).  Same rules the
+ * single-file retro_load_game path uses, just factored out. */
+typedef enum
+{
+   ENTRY_INVALID,
+   ENTRY_IWAD,    /* primary IWAD: header == "IWAD", or "PWAD" + PLAYPAL */
+   ENTRY_PWAD,    /* genuine add-on PWAD */
+   ENTRY_DEH      /* DeHackEd / BEX patch */
+} entry_kind_t;
+
+static entry_kind_t classify_entry(const char *path)
+{
+   const char *ext;
+   wadinfo_t header;
+
+   ext = strrchr(path, '.');
+   if (ext)
+   {
+      ext++;
+      if (!strcasecmp(ext, "deh") || !strcasecmp(ext, "bex"))
+         return ENTRY_DEH;
+   }
+   header = get_wadinfo(path);
+   if (header.identification[0] == 0)
+      return ENTRY_INVALID;
+   if (!strncmp(header.identification, "IWAD", 4))
+      return ENTRY_IWAD;
+   if (!strncmp(header.identification, "PWAD", 4))
+   {
+      if (wad_contains_playpal(path, &header))
+         return ENTRY_IWAD;
+      return ENTRY_PWAD;
+   }
+   return ENTRY_INVALID;
+}
+
+/* Parse an m3u playlist of WAD / DEH / BEX entries.  One path per
+ * line; blank lines and lines beginning with '#' are skipped.  Each
+ * entry is resolved relative to the playlist's own directory unless
+ * the line is an absolute path (leading '/' on POSIX, or 'X:' drive
+ * prefix on Windows).
+ *
+ * On return, `paths[]` holds strdup'd resolved paths the caller
+ * must free, `kinds[]` the corresponding classification, and the
+ * function value is the number of entries kept (>= 0) or -1 if the
+ * playlist could not be opened.  Unloadable / unrecognised lines
+ * are logged and skipped, not failed.
+ *
+ * Motivating use case (issue #196): users want to stack mods like
+ *   SCYTHE.WAD
+ *   D4V.WAD
+ *   D4V.deh
+ * and have them load in the listed order.  The single-WAD libretro
+ * entry point has no way to express this; an m3u playlist is the
+ * standard libretro mechanism for multi-file content and keeps the
+ * load order explicit and editable. */
+static int parse_m3u_playlist(const char *m3u_path,
+                              char **paths, entry_kind_t *kinds,
+                              int max_entries)
+{
+   char m3u_dir[PATH_MAX + 1];
+   char line[PATH_MAX + 16];
+   /* `m3u_dir` (up to PATH_MAX) + separator + `line` text (up to
+    * PATH_MAX + 15) gives a worst-case concatenation around
+    * 2 * PATH_MAX.  Size with that headroom so the compiler can
+    * see the snprintf below is non-truncating. */
+   char resolved[2 * (PATH_MAX + 1) + 32];
+   int n = 0;
+   RFILE *fp;
+
+   extract_directory(m3u_dir, m3u_path, sizeof(m3u_dir));
+   fp = filestream_open(m3u_path,
+         RETRO_VFS_FILE_ACCESS_READ,
+         RETRO_VFS_FILE_ACCESS_HINT_NONE);
+   if (!fp)
+      return -1;
+
+   while (rfgets(line, sizeof(line), fp) && n < max_entries)
+   {
+      char *p = line;
+      size_t L;
+      entry_kind_t k;
+
+      /* Trim leading whitespace. */
+      while (*p == ' ' || *p == '\t') p++;
+      /* Trim trailing whitespace and line terminators. */
+      L = strlen(p);
+      while (L > 0 &&
+             (p[L-1] == '\n' || p[L-1] == '\r' ||
+              p[L-1] == ' '  || p[L-1] == '\t'))
+         p[--L] = 0;
+      if (L == 0 || *p == '#') continue;  /* blank or comment */
+
+      /* Resolve relative to m3u dir.  Absolute paths pass through. */
+      if (p[0] == '/' || p[0] == '\\' ||
+          (p[0] && p[1] == ':'))  /* POSIX abs or DOS-style drive */
+         snprintf(resolved, sizeof(resolved), "%s", p);
+      else
+         snprintf(resolved, sizeof(resolved), "%s%c%s",
+                  m3u_dir, DIR_SLASH, p);
+
+      k = classify_entry(resolved);
+      if (k == ENTRY_INVALID)
+      {
+         if (log_cb)
+            log_cb(RETRO_LOG_WARN,
+                   "m3u: skipping unrecognised / unreadable entry '%s'\n",
+                   resolved);
+         continue;
+      }
+      paths[n] = strdup(resolved);
+      kinds[n] = k;
+      n++;
+   }
+   filestream_close(fp);
+   return n;
+}
+
 bool retro_load_game(const struct retro_game_info *info)
 {
    unsigned i;
@@ -944,6 +1070,79 @@ bool retro_load_game(const struct retro_game_info *info)
         // Play as a demo file lump
         argv[argc++] = strdup("-playdemo");
         argv[argc++] = strdup(info->path);
+      }
+      else if (strcasecmp(extension, "m3u") == 0)
+      {
+         /* M3U playlist: the user listed WAD / DEH / BEX files in
+          * load order.  Parse them, find the IWAD, and stage the
+          * rest as -file / -deh (issue #196).  The g_wad_dir was
+          * already set to the m3u's directory so I_FindFile picks
+          * up sibling lumps / configs from the same folder. */
+         enum { M3U_MAX_ENTRIES = 32 };
+         char *paths[M3U_MAX_ENTRIES];
+         entry_kind_t kinds[M3U_MAX_ENTRIES];
+         int n = parse_m3u_playlist(info->path, paths, kinds, M3U_MAX_ENTRIES);
+         int j, iwad_idx = -1, file_emitted = 0, deh_emitted = 0;
+         if (n < 0)
+         {
+            I_Error("retro_load_game: couldn't open m3u playlist '%s'",
+                    info->path);
+            goto failed;
+         }
+         for (j = 0; j < n; j++)
+            if (kinds[j] == ENTRY_IWAD) { iwad_idx = j; break; }
+         if (iwad_idx < 0)
+         {
+            for (j = 0; j < n; j++) free(paths[j]);
+            I_Error("retro_load_game: m3u '%s' has no IWAD entry",
+                    info->path);
+            goto failed;
+         }
+         /* -iwad goes first.  Pass the full resolved path so the
+          * engine doesn't fall through to standard_iwads[]; the
+          * basename alone would be ambiguous when the playlist
+          * points at a custom location. */
+         argv[argc++] = strdup("-iwad");
+         argv[argc++] = strdup(paths[iwad_idx]);
+         /* Then -file with every PWAD (and any extra IWAD-shape
+          * entries beyond the first) in playlist order. */
+         for (j = 0; j < n; j++)
+         {
+            if (j == iwad_idx) continue;
+            if (kinds[j] == ENTRY_PWAD || kinds[j] == ENTRY_IWAD)
+            {
+               if (!file_emitted)
+               {
+                  argv[argc++] = strdup("-file");
+                  file_emitted = 1;
+               }
+               argv[argc++] = strdup(paths[j]);
+            }
+         }
+         /* Then -deh with every DEH/BEX patch.  D_DoomMainSetup's
+          * dehs[] collector picks them up after wad loading. */
+         for (j = 0; j < n; j++)
+         {
+            if (kinds[j] == ENTRY_DEH)
+            {
+               if (!deh_emitted)
+               {
+                  argv[argc++] = strdup("-deh");
+                  deh_emitted = 1;
+               }
+               argv[argc++] = strdup(paths[j]);
+            }
+         }
+         /* baseconfig lookup still runs against the m3u dir, mirroring
+          * the single-WAD path: a per-playlist <name>.prboom.cfg
+          * takes priority, otherwise a generic prboom.cfg. */
+         if((baseconfig = FindFileInDir(g_wad_dir, name_without_ext, ".prboom.cfg"))
+               || (baseconfig = I_FindFile("prboom.cfg", NULL)))
+         {
+            argv[argc++] = strdup("-baseconfig");
+            argv[argc++] = baseconfig;
+         }
+         for (j = 0; j < n; j++) free(paths[j]);
       }
       else
       {
@@ -2088,6 +2287,40 @@ char* I_FindFile(const char* wfname, const char* ext)
 {
    char *p, *dir, *system_dir, *prboom_system_dir;
    int i;
+
+   /* If the caller hands us an already-absolute path, don't prepend
+    * a search dir to it.  FindFileInDir would otherwise stitch
+    * `g_wad_dir + '/' + '/abs/path/to/file'` and the result wouldn't
+    * exist.  This matters for m3u playlist support (issue #196):
+    * the playlist parser resolves each entry to an absolute path
+    * relative to the m3u file's directory and hands those paths to
+    * the engine via -iwad / -file, and the engine's FindIWADFile
+    * routes them through I_FindFile when it locates the IWAD.
+    * Mirror what FindFileInDir does with the optional extension:
+    * append `ext` if supplied. */
+   if (wfname && (wfname[0] == '/' || wfname[0] == '\\' ||
+                  (wfname[0] && wfname[1] == ':')))
+   {
+      size_t need = strlen(wfname) + (ext ? strlen(ext) : 0) + 1;
+      char *abs = malloc(need);
+      if (abs)
+      {
+         strcpy(abs, wfname);
+         if (ext && ext[0] != '\0')
+            strcat(abs, ext);
+         if (path_is_valid(abs))
+         {
+            if (log_cb)
+               log_cb(RETRO_LOG_DEBUG, "I_FindFile: using absolute path %s\n", abs);
+            return abs;
+         }
+         free(abs);
+      }
+      /* Absolute path didn't resolve; fall through to the relative
+       * search.  Almost certain to fail too, but symmetry with the
+       * existing not-found behaviour keeps the diagnostics
+       * unsurprising. */
+   }
 
    // First, check on WAD directory
    if ((p = FindFileInDir(g_wad_dir, wfname, ext)) == NULL)

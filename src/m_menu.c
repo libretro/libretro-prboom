@@ -548,10 +548,36 @@ int epi;
 void M_AddEpisode(const char *map, char *def)
 {
   if (!EpiCustom) {
+     int k;
      EpiCustom = true;
      // No more than 4 Eps expected when having UMAPINFO (prevent SIGILv1.2 from showing twice)
      if (EpiDef.numitems > 4)
         EpiDef.numitems = 4;
+     /* Issue #173: SIGIL.wad (the non-compat UMAPINFO build) ships a
+      * single `episode = E5M1` definition.  That fires this function
+      * exactly once on top of the four episodes M_Init already set
+      * up for Ultimate Doom, flipping EpiCustom to true.  From here
+      * on M_ChooseSkill switches to the EpiCustom code path:
+      *
+      *     G_DeferedInitNew(choice, EpiMenuEpi[epi], EpiMenuMap[epi])
+      *
+      * instead of the default `epi+1, 1` mapping.  But EpiMenuEpi[]
+      * and EpiMenuMap[] are only ever written by THIS function, and
+      * vanilla DOOM 1 episodes never pass through it -- their menu
+      * entries come from the static EpisodeMenu[] table and the
+      * gamemode-driven numitems setup in M_Init.  So slots 0..3
+      * stay at the BSS-zero default, and selecting Episode 2 / 3 / 4
+      * launches G_DeferedInitNew with (epi=0, map=0), which the
+      * engine clamps to E1M1 (Hangar).
+      *
+      * Backfill the slots that M_Init already populated: vanilla
+      * Doom episodes start at map 1 of their own episode number,
+      * matching the non-EpiCustom default formula. */
+     for (k = 0; k < EpiDef.numitems; k++)
+     {
+        EpiMenuEpi[k] = k + 1;
+        EpiMenuMap[k] = 1;
+     }
   }
   if (*def == '-')	// means 'clear'
   {

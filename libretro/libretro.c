@@ -2457,6 +2457,24 @@ void I_FinishUpdate (void)
        * stored pitch / pointer rather than recomputing. */
       video_cb(direct_fb_data, SCREENWIDTH, SCREENHEIGHT,
                direct_fb_pitch);
+      /* Issue #183: snapshot the just-presented frame into the
+       * persistent screen_buf.  D_Display's wipe_StartScreen runs
+       * BEFORE the next I_StartDisplay rebinds screens[0] to a
+       * fresh frontend FB; at that point screens[0].data is
+       * screen_buf, so capturing from it gives the wipe the
+       * correct previous-frame source.  Without this copy, under
+       * direct-render screen_buf is never written -- the renderer
+       * is bypassing it on every frame -- and wipe_StartScreen
+       * (whether called here or after I_StartDisplay) sees
+       * uninitialised buffer content.
+       *
+       * Cost: one read + one write of SCREENPITCH*SCREENHEIGHT
+       * bytes per frame.  ~128 KB at 320x200 RGB565.  At 35 Hz
+       * that's ~4.5 MB/s of cache-friendly streaming memcpy;
+       * trivial on any platform that can run a software Doom
+       * renderer at all. */
+      memcpy(screen_buf, direct_fb_data,
+             SCREENPITCH * SCREENHEIGHT);
       direct_fb_data  = NULL;
       direct_fb_pitch = 0;
       /* Restore screens[0] / drawvars to the heap fallback so any

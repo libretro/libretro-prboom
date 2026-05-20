@@ -219,12 +219,36 @@ void D_Display (void)
      return;
   }
 
-  if (!I_StartDisplay())
-    return;
-
-  // save the current screen if about to wipe
+  /* Issue #183: detect the wipe transition and capture the start
+   * screen BEFORE I_StartDisplay rebinds screens[0] to a fresh
+   * frontend buffer.  Under libretro direct-render, every
+   * I_StartDisplay swaps screens[0].data to whatever buffer the
+   * frontend hands us via GET_CURRENT_SOFTWARE_FRAMEBUFFER -- that
+   * buffer has never been written by us, so wipe_StartScreen run
+   * after I_StartDisplay would capture stale / uninitialised
+   * pixels into wipe_scr_start.  The wipe then animates from that
+   * garbage downward instead of from the previous frame, and the
+   * "old screen sliding off the bottom" portion of the melt shows
+   * column-wise garbage right up until the last few wipe ticks.
+   *
+   * Running wipe_StartScreen here, between the previous frame's
+   * I_FinishUpdate (which restored screens[0].data to the
+   * persistent screen_buf and -- as part of the same #183 fix --
+   * snapshotted the just-presented frame into screen_buf) and this
+   * frame's I_StartDisplay, means screens[0] still points at
+   * screen_buf with the previous frame's pixels in it.  Capturing
+   * from there yields the correct wipe-start content.
+   *
+   * The fallback (non-direct-render) path is unaffected: there
+   * screens[0].data is always screen_buf, and screen_buf is the
+   * actual render target across frames, so both before-
+   * I_StartDisplay and after-I_StartDisplay readings return the
+   * same content. */
   if ((wipe = gamestate != wipegamestate))
     wipe_StartScreen();
+
+  if (!I_StartDisplay())
+    return;
 
   if (gamestate != GS_LEVEL) { // Not a level
     switch (oldgamestate) {

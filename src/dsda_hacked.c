@@ -41,6 +41,43 @@ int num_music;
 
 actionf_t *deh_codeptr;
 
+/* DEHEXTRA reserves a fixed block of "free" sound slots that mods (and
+ * DSDHacked tools) reference by index without a Sounds block: sfx
+ * 500..699 resolve to the WAD lumps DSFRE000..DSFRE199.  vesper et al.
+ * rely on this.  We materialise the range at table-init time rather than
+ * as a designated-initialiser seed (this core's .c is MSVC-style C89: no
+ * [index]= initialisers).
+ *
+ * I_GetSfxLumpNum() builds the lump name as "ds%s" from sfx->name, so the
+ * stored name omits the "ds" prefix (e.g. "pistol" -> DSPISTOL).  The
+ * DEHEXTRA names are therefore "fre000".."fre199" -> DSFRE000..DSFRE199.
+ *
+ * The names must outlive the table and are never individually freed, so
+ * back them with a file-scope static buffer that yields stable pointers. */
+#define DEHEXTRA_SFX_FIRST 500
+#define DEHEXTRA_SFX_COUNT 200
+#define DEHEXTRA_SFX_END   (DEHEXTRA_SFX_FIRST + DEHEXTRA_SFX_COUNT) /* 700 */
+
+static char dehextra_sfx_name[DEHEXTRA_SFX_COUNT][7]; /* "freNNN" + NUL */
+static int  dehextra_sfx_ready;
+
+static void dsda_BuildDehExtraSfxNames(void)
+{
+  int n;
+  if (dehextra_sfx_ready)
+    return;
+  for (n = 0; n < DEHEXTRA_SFX_COUNT; n++)
+  {
+    char *s = dehextra_sfx_name[n];
+    s[0] = 'f'; s[1] = 'r'; s[2] = 'e';
+    s[3] = (char)('0' + (n / 100) % 10);
+    s[4] = (char)('0' + (n / 10)  % 10);
+    s[5] = (char)('0' + (n)       % 10);
+    s[6] = '\0';
+  }
+  dehextra_sfx_ready = 1;
+}
+
 /* MUSINFO uses a scratch music slot one past the last real entry
  * (S_music[NUMMUSIC]); reserve it so that index stays in bounds. */
 #define MUSIC_EXTRA 1
@@ -257,6 +294,38 @@ void dsda_InitTables(void)
   for (i = 0; i < num_sfx; i++)
     if (S_sfx[i].link)
       S_sfx[i].link = S_sfx + (S_sfx[i].link - S_sfx_seed);
+
+  /* DSDHacked/DEHEXTRA: grow to cover the reserved free-sound range and
+   * name 500..699 -> DSFRE000..DSFRE199 (see dsda_BuildDehExtraSfxNames).
+   * Only widen when the static seed does not already reach that far. */
+  if (num_sfx < DEHEXTRA_SFX_END)
+  {
+    int old_sfx = num_sfx;
+    sfxinfo_t *grown = malloc(DEHEXTRA_SFX_END * sizeof(*grown));
+    memcpy(grown, S_sfx, old_sfx * sizeof(*grown));
+    memset(grown + old_sfx, 0, (DEHEXTRA_SFX_END - old_sfx) * sizeof(*grown));
+    /* links were fixed up relative to the previous S_sfx base; recompute
+     * against the new base before discarding the old allocation. */
+    for (i = 0; i < old_sfx; i++)
+      if (grown[i].link)
+        grown[i].link = grown + (S_sfx[i].link - S_sfx);
+    free(S_sfx);
+    S_sfx   = grown;
+    num_sfx = DEHEXTRA_SFX_END;
+
+    dsda_BuildDehExtraSfxNames();
+    for (i = 0; i < DEHEXTRA_SFX_COUNT; i++)
+    {
+      sfxinfo_t *sfx = &S_sfx[DEHEXTRA_SFX_FIRST + i];
+      sfx->name       = dehextra_sfx_name[i];
+      sfx->singularity = FALSE;
+      sfx->priority    = 127;
+      sfx->pitch       = -1;
+      sfx->volume      = -1;
+      sfx->usefulness  = -1;
+      sfx->lumpnum     = -1;
+    }
+  }
 
   /* +MUSIC_EXTRA for the MUSINFO scratch slot at index NUMMUSIC. */
   S_music = malloc((num_music + MUSIC_EXTRA) * sizeof(*S_music));

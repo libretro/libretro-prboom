@@ -17,6 +17,8 @@
 #include "info.h"
 #include "sounds.h"
 #include "d_think.h"
+#include "doomstat.h"
+#include "heretic/heretic.h"
 #include "dsda_hacked.h"
 
 /* The five editable tables live in info.c / sounds.c. */
@@ -301,6 +303,61 @@ void dsda_InitTables(void)
    * the globals pointing at the seeds when not owning a heap copy, the
    * "!= seed" guard never frees a dangling pointer. */
   dsda_FreeTables();
+
+  /* Seed source is game-dependent.  For Doom (the default) the dynamic
+   * tables are seeded from the Doom statics exactly as before; for Heretic
+   * they are seeded from the Heretic tables (heretic/info.c, heretic/
+   * sounds.c).  States, sprites and sounds use Heretic's own 0-based index
+   * spaces; mobjinfo is special (see below) because Heretic mobjtypes are
+   * high-valued in the shared mobjtype_t enum. */
+  if (heretic)
+  {
+    const state_t   *seed_states   = heretic_states;
+    const char     **seed_sprnames = heretic_sprnames;
+    const sfxinfo_t *seed_sfx      = heretic_S_sfx;
+    int s;
+
+    num_states     = HERETIC_NUMSTATES;
+    num_mobj_types = HERETIC_NUMMOBJTYPES; /* full span: Doom slots unused, Heretic at offset */
+    num_sprites    = HERETIC_NUMSPRITES;
+    num_sfx        = HERETIC_NUMSFX;
+    num_music      = NUMMUSIC; /* music table shared/Doom for now */
+
+    states = malloc(num_states * sizeof(*states));
+    memcpy(states, seed_states, num_states * sizeof(*states));
+
+    /* mobjinfo: allocate the full unified span and copy the Heretic slice
+     * to [i + HERETIC_MT_ZERO], matching the enum numbering so runtime
+     * mobjinfo[HERETIC_MT_*] indexes work directly. */
+    mobjinfo = malloc(num_mobj_types * sizeof(*mobjinfo));
+    memset(mobjinfo, 0, num_mobj_types * sizeof(*mobjinfo));
+    for (s = 0; s < HERETIC_NUMMOBJTYPES - HERETIC_MT_ZERO; s++)
+      mobjinfo[s + HERETIC_MT_ZERO] = heretic_mobjinfo[s];
+
+    /* sprnames: 0-based, terminator slot after the names. */
+    sprnames = malloc((num_sprites + 1) * sizeof(*sprnames));
+    memcpy(sprnames, seed_sprnames, num_sprites * sizeof(*sprnames));
+    sprnames[num_sprites] = NULL;
+
+    S_sfx = malloc(num_sfx * sizeof(*S_sfx));
+    memcpy(S_sfx, seed_sfx, num_sfx * sizeof(*S_sfx));
+    /* Re-point any sound-alias links into the heap copy. */
+    for (i = 0; i < num_sfx; i++)
+      if (S_sfx[i].link)
+        S_sfx[i].link = S_sfx + (S_sfx[i].link - seed_sfx);
+
+    S_music = malloc((num_music + MUSIC_EXTRA) * sizeof(*S_music));
+    memcpy(S_music, S_music_seed, num_music * sizeof(*S_music));
+    memset(S_music + num_music, 0, MUSIC_EXTRA * sizeof(*S_music));
+
+    deh_codeptr = malloc(num_states * sizeof(*deh_codeptr));
+    for (i = 0; i < num_states; i++)
+      deh_codeptr[i] = states[i].action;
+
+    /* Heretic does not use the DEHEXTRA reserved sprite/sound ranges, so
+     * the range-widening below is Doom-only and skipped here. */
+    return;
+  }
 
   num_states     = NUMSTATES;
   num_mobj_types = NUMMOBJTYPES;

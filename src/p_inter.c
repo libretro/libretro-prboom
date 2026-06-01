@@ -90,6 +90,18 @@ int clipammo[NUMAMMO] = { 10,  4,  20,  1};
 // Returns FALSE if the ammo can't be picked up at all
 //
 
+/* Ammo consumed by one shot of a weapon: the MBF21 Ammo per shot when set,
+ * otherwise the vanilla per-shot amount.  Used by the MBF21 ammo-pickup
+ * autoswitch logic. */
+static int P_WeaponAmmoPerShot(weapontype_t weapon)
+{
+  if (mbf21_features && weaponinfo[weapon].ammopershot >= 0)
+    return weaponinfo[weapon].ammopershot;
+  if (weapon == WP_BFG)         return bfgcells;
+  if (weapon == WP_SUPERSHOTGUN) return 2;
+  return 1;
+}
+
 static dbool   P_GiveAmmo(player_t *player, ammotype_t ammo, int num)
 {
    int oldammo;
@@ -118,6 +130,33 @@ static dbool   P_GiveAmmo(player_t *player, ammotype_t ammo, int num)
    // If non zero ammo, don't change up weapons, player was lower on purpose.
    if (oldammo)
       return TRUE;
+
+   /* MBF21: ammo-pickup autoswitch accounts for ammo-per-shot and the
+    * AUTOSWITCHFROM / NOAUTOSWITCHTO weapon flags.  If the current weapon
+    * allows being switched away from, pick the highest-index weapon the
+    * player owns that is not NOAUTOSWITCHTO, uses the picked-up ammo, and
+    * went from "couldn't fire" to "can fire" with this pickup.  Below
+    * complevel 21 the hardcoded vanilla preferences below are used. */
+   if (mbf21_features)
+   {
+      if (weaponinfo[player->readyweapon].flags & WPF_AUTOSWITCHFROM)
+      {
+         int w;
+         for (w = NUMWEAPONS - 1; w >= 0; w--)
+         {
+            if (!player->weaponowned[w])                continue;
+            if (weaponinfo[w].flags & WPF_NOAUTOSWITCHTO) continue;
+            if (weaponinfo[w].ammo != ammo)             continue;
+            if (w == (int)player->readyweapon)          continue;
+            /* couldn't fire before the pickup, can fire now */
+            if (oldammo >= P_WeaponAmmoPerShot((weapontype_t)w))       continue;
+            if (player->ammo[ammo] < P_WeaponAmmoPerShot((weapontype_t)w)) continue;
+            player->pendingweapon = (weapontype_t)w;
+            break;
+         }
+      }
+      return TRUE;
+   }
 
    // We were down to zero, so select a new weapon.
    // Preferences are not user selectable.
@@ -790,9 +829,15 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
   // inflict thrust and push the victim out of reach,
   // thus kick away unless using the chainsaw.
 
+  /* MBF21: a weapon flagged WPF_NOTHRUST imparts no thrust.  The chainsaw
+   * carries WPF_NOTHRUST by default, so this reproduces the vanilla
+   * chainsaw exception; below complevel 21 the hardcoded chainsaw check is
+   * used unchanged. */
   if (inflictor && !(target->flags & MF_NOCLIP) &&
       (!source || !source->player ||
-       source->player->readyweapon != WP_CHAINSAW))
+       (mbf21_features
+        ? !(weaponinfo[source->player->readyweapon].flags & WPF_NOTHRUST)
+        : source->player->readyweapon != WP_CHAINSAW)))
     {
       unsigned ang = R_PointToAngle2 (inflictor->x, inflictor->y,
                                       target->x,    target->y);

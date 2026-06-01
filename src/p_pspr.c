@@ -318,7 +318,12 @@ int P_GetAmmoLevel(player_t *player, weapontype_t weapon)
   ammotype_t ammo = weaponinfo[weapon].ammo;
   int current, min, max, result;
 
-  if (weapon == WP_BFG) // Minimal amount for one shot varies.
+  /* MBF21: a weapon with an explicit Ammo per shot uses it as the minimum
+   * needed to fire.  ammopershot defaults to -1 (vanilla) for every weapon,
+   * so this branch is inert unless a deh patch set the field. */
+  if (mbf21_features && weaponinfo[weapon].ammopershot >= 0)
+    min = weaponinfo[weapon].ammopershot;
+  else if (weapon == WP_BFG) // Minimal amount for one shot varies.
     min = BFGCELLS;
   else if (weapon == WP_SUPERSHOTGUN) // Double barrel.
     min = 2;
@@ -405,7 +410,10 @@ static void P_FireWeapon(player_t *player)
 #endif
 
   P_SetPsprite(player, ps_weapon, newstate);
-  P_NoiseAlert(player->mo, player->mo);
+  /* MBF21: a SILENT weapon does not alert monsters when fired. */
+  if (!(mbf21_features &&
+        (weaponinfo[player->readyweapon].flags & WPF_SILENT)))
+    P_NoiseAlert(player->mo, player->mo);
 }
 
 /*
@@ -460,8 +468,13 @@ void A_WeaponReady(player_t *player, pspdef_t *psp)
    if (player->cmd.buttons & BT_ATTACK)
    {
 #ifndef HEXEN
-      if (!player->attackdown || (player->readyweapon != WP_MISSILE &&
-               player->readyweapon != WP_BFG))
+      /* MBF21: a weapon flagged WPF_NOAUTOFIRE won't refire while the
+       * button is held.  Below complevel 21, keep the hardcoded
+       * missile-launcher / BFG behaviour exactly. */
+      dbool noautofire = mbf21_features
+        ? (weaponinfo[player->readyweapon].flags & WPF_NOAUTOFIRE) != 0
+        : (player->readyweapon == WP_MISSILE || player->readyweapon == WP_BFG);
+      if (!player->attackdown || !noautofire)
 #endif
       {
          player->attackdown = true;
@@ -730,9 +743,23 @@ void A_Saw(player_t *player, pspdef_t *psp)
 // A_FireMissile
 //
 
+/* MBF21: subtract ammo for a native weapon attack.  When the ready weapon
+ * has an explicit Ammo per shot (>= 0), that amount is used; otherwise the
+ * vanilla amount passed by the caller.  ammopershot is -1 for every weapon
+ * unless a deh patch set it, so vanilla consumption is unchanged. */
+static void P_SubtractAmmo(player_t *player, int vanilla_amount)
+{
+  ammotype_t type = weaponinfo[player->readyweapon].ammo;
+  int amount = vanilla_amount;
+  if (mbf21_features && weaponinfo[player->readyweapon].ammopershot >= 0)
+    amount = weaponinfo[player->readyweapon].ammopershot;
+  if (type != AM_NOAMMO)
+    player->ammo[type] -= amount;
+}
+
 void A_FireMissile(player_t *player, pspdef_t *psp)
 {
-  player->ammo[weaponinfo[player->readyweapon].ammo]--;
+  P_SubtractAmmo(player, 1);
   P_SpawnPlayerMissile(player->mo, MT_ROCKET);
   retro_set_rumble_damage(50, 120.0f);
 }
@@ -743,7 +770,7 @@ void A_FireMissile(player_t *player, pspdef_t *psp)
 
 void A_FireBFG(player_t *player, pspdef_t *psp)
 {
-  player->ammo[weaponinfo[player->readyweapon].ammo] -= BFGCELLS;
+  P_SubtractAmmo(player, BFGCELLS);
   P_SpawnPlayerMissile(player->mo, MT_BFG);
   retro_set_rumble_damage(50, 120.0f);
 }
@@ -769,7 +796,7 @@ void A_FireOldBFG(player_t *player, pspdef_t *psp)
     P_Thrust(player, ANG180 + player->mo->angle,
     512*recoil_values[WP_PLASMA]);
 
-  player->ammo[weaponinfo[player->readyweapon].ammo]--;
+  P_SubtractAmmo(player, 1);
 
   player->extralight = 2;
 
@@ -819,7 +846,7 @@ void A_FireOldBFG(player_t *player, pspdef_t *psp)
 
 void A_FirePlasma(player_t *player, pspdef_t *psp)
 {
-  player->ammo[weaponinfo[player->readyweapon].ammo]--;
+  P_SubtractAmmo(player, 1);
 
   A_FireSomething(player,P_Random(pr_plasma)&1);              // phares
   P_SpawnPlayerMissile(player->mo, MT_PLASMA);
@@ -879,7 +906,7 @@ void A_FirePistol(player_t *player, pspdef_t *psp)
   S_StartSound(player->mo, sfx_pistol);
 
   P_SetMobjState(player->mo, S_PLAY_ATK2);
-  player->ammo[weaponinfo[player->readyweapon].ammo]--;
+  P_SubtractAmmo(player, 1);
 
   A_FireSomething(player,0);                                      // phares
   P_BulletSlope(player->mo);
@@ -899,7 +926,7 @@ void A_FireShotgun(player_t *player, pspdef_t *psp)
   S_StartSound(player->mo, sfx_shotgn);
   P_SetMobjState(player->mo, S_PLAY_ATK2);
 
-  player->ammo[weaponinfo[player->readyweapon].ammo]--;
+  P_SubtractAmmo(player, 1);
 
   A_FireSomething(player,0);                                      // phares
 
@@ -921,7 +948,7 @@ void A_FireShotgun2(player_t *player, pspdef_t *psp)
 
   S_StartSound(player->mo, sfx_dshtgn);
   P_SetMobjState(player->mo, S_PLAY_ATK2);
-  player->ammo[weaponinfo[player->readyweapon].ammo] -= 2;
+  P_SubtractAmmo(player, 2);
 
   A_FireSomething(player,0);                                      // phares
 
@@ -955,7 +982,7 @@ void A_FireCGun(player_t *player, pspdef_t *psp)
     return;
 
   P_SetMobjState(player->mo, S_PLAY_ATK2);
-  player->ammo[weaponinfo[player->readyweapon].ammo]--;
+  P_SubtractAmmo(player, 1);
 
   A_FireSomething(player,psp->state - &states[S_CHAIN1]);           // phares
 

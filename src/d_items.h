@@ -37,6 +37,15 @@
 
 #include "doomdef.h"
 
+/* MBF21 weapon flags ("MBF21 Bits" in a Weapon definition).  Values are
+ * fixed by the MBF21 spec. */
+#define WPF_NOTHRUST       0x00000001 /* doesn't thrust things */
+#define WPF_SILENT         0x00000002 /* weapon is silent */
+#define WPF_NOAUTOFIRE     0x00000004 /* won't autofire when swapped to */
+#define WPF_FLEEMELEE      0x00000008 /* monsters consider it a melee weapon */
+#define WPF_AUTOSWITCHFROM 0x00000010 /* can be switched away from on ammo pickup */
+#define WPF_NOAUTOSWITCHTO 0x00000020 /* cannot be switched to on ammo pickup */
+
 /* Weapon info: sprite frames, ammunition use. */
 typedef struct
 {
@@ -47,6 +56,9 @@ typedef struct
   int         atkstate;
   int         flashstate;
 
+  /* MBF21 (inert unless mbf21_features): */
+  int         flags;       /* WPF_* */
+  int         ammopershot;  /* ammo consumed per shot; -1 = use vanilla */
 } weaponinfo_t;
 
 extern  weaponinfo_t    weaponinfo[NUMWEAPONS];

@@ -1307,6 +1307,17 @@ static const char *deh_weapon[] = // CPhipps - static const*
   "Firing frame"    // .flashstate
 };
 
+// MBF21 weapon flag mnemonics ("MBF21 Bits" in a Weapon definition).
+static const struct { const char *name; int value; } deh_weaponflags_mbf21[] = {
+  {"NOTHRUST",       WPF_NOTHRUST},
+  {"SILENT",         WPF_SILENT},
+  {"NOAUTOFIRE",     WPF_NOAUTOFIRE},
+  {"FLEEMELEE",      WPF_FLEEMELEE},
+  {"AUTOSWITCHFROM", WPF_AUTOSWITCHFROM},
+  {"NOAUTOSWITCHTO", WPF_NOAUTOSWITCHTO},
+};
+#define DEH_WEAPONFLAGMAX_MBF21 (sizeof(deh_weaponflags_mbf21)/sizeof(deh_weaponflags_mbf21[0]))
+
 // CHEATS - Dehacked block name = "Cheat"
 // Usage: Cheat 0
 // Always uses a zero in the dehacked file, for consistency.  No meaning.
@@ -2525,10 +2536,13 @@ static void deh_procWeapon(DEHFILE *fpin, FILE* fpout, char *line)
 
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {
+      char *strval = NULL;
+      int bGetData;
       if (!dehfgets(inbuffer, sizeof(inbuffer), fpin)) break;
       lfstrip(inbuffer);
       if (!*inbuffer) break;       // killough 11/98
-      if (!deh_GetData(inbuffer,key,&value,NULL,fpout)) // returns TRUE if ok
+      bGetData = deh_GetData(inbuffer,key,&value,&strval,fpout);
+      if (!bGetData) // returns TRUE if ok
         {
           if (fpout) fprintf(fpout,"Bad data pair in '%s'\n",inbuffer);
           continue;
@@ -2550,6 +2564,30 @@ static void deh_procWeapon(DEHFILE *fpin, FILE* fpout, char *line)
               else
                 if (!strcasecmp(key,deh_weapon[5]))  // Firing frame
                   weaponinfo[indexnum].flashstate = (int)value;
+                else
+                  if (!strcasecmp(key,"Ammo per shot")) // MBF21
+                    weaponinfo[indexnum].ammopershot = (int)value;
+                else
+                  if (!strcasecmp(key,"MBF21 Bits")) // MBF21 weapon flags
+                  {
+                    int flags = 0;
+                    if (bGetData == 1)        // numeric
+                      flags = (int)value;
+                    else                      // mnemonic list
+                      for (; (strval = strtok(strval, ",+| \t\f\r")); strval = NULL)
+                      {
+                        size_t iy;
+                        for (iy = 0; iy < DEH_WEAPONFLAGMAX_MBF21; iy++)
+                        {
+                          if (strcasecmp(strval, deh_weaponflags_mbf21[iy].name)) continue;
+                          flags |= deh_weaponflags_mbf21[iy].value;
+                          break;
+                        }
+                        if (iy >= DEH_WEAPONFLAGMAX_MBF21 && fpout)
+                          fprintf(fpout, "Could not find MBF21 weapon bit mnemonic %s\n", strval);
+                      }
+                    weaponinfo[indexnum].flags = flags;
+                  }
                 else
                   if (fpout) fprintf(fpout,"Invalid weapon string index for '%s'\n",key);
     }
@@ -2852,7 +2890,13 @@ static void deh_procMisc(DEHFILE *fpin, FILE* fpout, char *line) // done
                                   idkfa_armor_class = (int)value;
                                 else
                                   if (!strcasecmp(key,deh_misc[14]))  // BFG Cells/Shot
+                                  {
                                     bfgcells = (int)value;
+                                    /* MBF21 backward-compat: setting BFG
+                                     * cells/shot also sets the BFG weapon's
+                                     * Ammo per shot (but not vice-versa). */
+                                    weaponinfo[WP_BFG].ammopershot = (int)value;
+                                  }
                                   else
                                     if (!strcasecmp(key,deh_misc[15])) { // Monsters Infight
                                       // e6y: Dehacked support - monsters infight

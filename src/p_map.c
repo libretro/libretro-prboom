@@ -600,6 +600,16 @@ static dbool PIT_CheckThing(mobj_t *thing) // killough 3/26/98: make static
       damage = ((P_Random(pr_damage)%8)+1)*tmthing->info->damage;
       P_DamageMobj (thing, tmthing, tmthing->target, damage);
 
+      /* MBF21: ripper projectiles pass through and keep travelling rather
+       * than exploding on impact, optionally playing a rip sound.  flags2
+       * is zero outside complevel 21, so non-ripper missiles are unchanged. */
+      if (tmthing->flags2 & MF2_RIP)
+        {
+          if (tmthing->info->ripsound)
+            S_StartSound(tmthing, tmthing->info->ripsound);
+          return TRUE; // keep traversing
+        }
+
       // don't traverse any more
       return FALSE;
     }
@@ -1796,6 +1806,14 @@ dbool PIT_RadiusAttack (mobj_t* thing)
   if (bombspot->flags & MF_BOUNCES ?
       thing->type == MT_CYBORG && bombsource->type == MT_CYBORG : // fixme: dehardcoding this might require complevel handling
       (thing->flags & MF_NORADIUSDMG))
+    return TRUE;
+
+  /* MBF21: splash-damage flags.  A thing is immune to splash if it has
+   * MF2_NORADIUSDMG or MF2_BOSS, but MF2_FORCERADIUSDMG on the source
+   * overrides that immunity.  flags2 is zero for all non-MBF21 content,
+   * so this leaves vanilla/boom/mbf behaviour unchanged. */
+  if ((thing->flags2 & (MF2_NORADIUSDMG | MF2_BOSS)) &&
+      !(bombspot->flags2 & MF2_FORCERADIUSDMG))
     return TRUE;
 
   dx = D_abs(thing->x - bombspot->x);

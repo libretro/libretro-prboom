@@ -143,11 +143,21 @@ void P_NoiseAlert(mobj_t *target, mobj_t *emitter)
 static dbool   P_CheckMeleeRange(mobj_t *actor)
 {
   mobj_t *pl = actor->target;
+  /* MBF21: use the per-thing melee range (default MELEERANGE) instead of
+   * the hardcoded constant; LONGMELEE bumps it further (revenant).  Gated
+   * on mbf21_features so vanilla/boom/mbf/prboom keep the exact constant. */
+  fixed_t range = MELEERANGE;
+  if (mbf21_features)
+    {
+      range = actor->info->meleerange;
+      if (actor->flags2 & MF2_LONGMELEE)
+        range += 12*FRACUNIT;
+    }
 
   return  // killough 7/18/98: friendly monsters don't attack other friends
     pl && !(actor->flags & pl->flags & MF_FRIEND) &&
     (P_AproxDistance(pl->x-actor->x, pl->y-actor->y) <
-     MELEERANGE - 20*FRACUNIT + pl->info->radius) &&
+     range - 20*FRACUNIT + pl->info->radius) &&
     P_CheckSight(actor, actor->target);
 }
 
@@ -214,6 +224,11 @@ static dbool   P_CheckMissileRange(mobj_t *actor)
 
   dist >>= FRACBITS;
 
+  /* MBF21: SHORTMRANGE caps the attack distance (archvile).  flags2 is
+   * zero outside complevel 21, so vanilla behaviour is unchanged. */
+  if ((actor->flags2 & MF2_SHORTMRANGE) && dist > 14*64)
+    return FALSE;
+
   if (actor->info->maxattackrange > 0 && dist > actor->info->maxattackrange)
     return FALSE;     // too far away
 
@@ -224,9 +239,17 @@ static dbool   P_CheckMissileRange(mobj_t *actor)
   if (actor->flags & MF_MISSILEMORE)
     dist >>= 1;
 
+  /* MBF21: RANGEHALF uses half distance for the probability roll;
+   * HIGHERMPROB lowers the minimum-distance floor from 150 to 50. */
+  if (actor->flags2 & MF2_RANGEHALF)
+    dist >>= 1;
+
   // Some mobs (eg. Cyberdemon) have a minimum attack chance
   if (dist > actor->info->minmissilechance)
     dist = actor->info->minmissilechance;
+
+  if ((actor->flags2 & MF2_HIGHERMPROB) && dist > 50)
+    dist = 50;
 
   if (P_Random(pr_missrange) < dist)
     return FALSE;
@@ -1064,7 +1087,8 @@ void A_Look(mobj_t *actor)
           sound = actor->info->seesound;
           break;
         }
-      if (actor->flags & MF_FULLVOLSIGHT)
+      if ((actor->flags & MF_FULLVOLSIGHT) ||
+          (actor->flags2 & (MF2_FULLVOLSOUNDS | MF2_BOSS))) /* MBF21 */
         S_StartSound(NULL, sound);          // full volume
       else
         S_StartSound(actor, sound);
@@ -2087,7 +2111,8 @@ void A_Scream(mobj_t *actor)
     }
 
   // Check for bosses.
-  if (actor->flags & MF_FULLVOLDEATH)
+  if ((actor->flags & MF_FULLVOLDEATH) ||
+      (actor->flags2 & (MF2_FULLVOLSOUNDS | MF2_BOSS))) /* MBF21 */
     S_StartSound(NULL, sound); // full volume
   else
     S_StartSound(actor, sound);
@@ -2130,6 +2155,48 @@ void A_BossDeath(mobj_t *mo)
   thinker_t *th;
   line_t    junk;
   int       i;
+
+  /* MBF21: when the dying thing carries MBF21 boss flags, qualification
+   * and the triggered action are driven by those flags instead of the
+   * hardcoded type/map checks below.  Gated on mbf21_features so vanilla/
+   * boom/mbf/prboom demos take the unchanged path. */
+  if (mbf21_features && (mo->flags2 &
+        (MF2_MAP07BOSS1 | MF2_MAP07BOSS2 | MF2_E1M8BOSS | MF2_E2M8BOSS |
+         MF2_E3M8BOSS  | MF2_E4M6BOSS  | MF2_E4M8BOSS)))
+  {
+    /* make sure there is a player alive for victory */
+    for (i = 0; i < MAXPLAYERS; i++)
+      if (playeringame[i] && players[i].health > 0)
+        break;
+    if (i == MAXPLAYERS)
+      return;
+
+    /* all bosses of this type dead? */
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+      if (th->function.arg1 == (void (*)(void *))P_MobjThinker)
+      {
+        mobj_t *mo2 = (mobj_t *) th;
+        if (mo2 != mo && mo2->type == mo->type && mo2->health > 0)
+          return;
+      }
+
+    memset(&junk, 0, sizeof(junk));
+    if (mo->flags2 & MF2_MAP07BOSS1)
+      { junk.tag = 666; EV_DoFloor(&junk, FLEV_LOWERFLOORTOLOWEST); }
+    if (mo->flags2 & MF2_MAP07BOSS2)
+      { junk.tag = 667; EV_DoFloor(&junk, FLEV_RAISETOTEXTURE); }
+    if (mo->flags2 & MF2_E1M8BOSS)
+      { junk.tag = 666; EV_DoFloor(&junk, FLEV_LOWERFLOORTOLOWEST); }
+    if (mo->flags2 & MF2_E2M8BOSS)
+      G_ExitLevel();
+    if (mo->flags2 & MF2_E3M8BOSS)
+      G_ExitLevel();
+    if (mo->flags2 & MF2_E4M6BOSS)
+      { junk.tag = 666; EV_DoDoor(&junk, blazeOpen); }
+    if (mo->flags2 & MF2_E4M8BOSS)
+      { junk.tag = 666; EV_DoFloor(&junk, FLEV_LOWERFLOORTOLOWEST); }
+    return;
+  }
 
   // numbossactions == 0 means to use the defaults.
   // numbossactions == -1 means to do nothing.

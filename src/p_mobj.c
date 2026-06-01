@@ -595,9 +595,20 @@ floater:
   else // still above the floor                                     // phares
     if (!(mo->flags & MF_NOGRAVITY))
       {
-  if (!mo->momz)
-    mo->momz = -GRAVITY;
-        mo->momz -= GRAVITY;
+  /* MBF21: LOGRAV things fall at 1/8 gravity.  flags2 is zero for all
+   * non-MBF21 content, so this is naturally inert outside complevel 21. */
+  if (mo->flags2 & MF2_LOGRAV)
+    {
+      if (!mo->momz)
+        mo->momz = -(GRAVITY>>3)*2;
+      mo->momz -= GRAVITY>>3;
+    }
+  else
+    {
+      if (!mo->momz)
+        mo->momz = -GRAVITY;
+      mo->momz -= GRAVITY;
+    }
       }
 
   if (mo->z + mo->height > mo->ceilingz)
@@ -830,6 +841,13 @@ mobj_t* P_SpawnMobj(fixed_t x,fixed_t y,fixed_t z,mobjtype_t type)
   mobj->height = info->height;                                      // phares
   mobj->flags  = info->flags;
   mobj->flags2 = info->flags2; /* MBF21 thing flags */
+
+  /* MBF21 thing flags must not affect sub-21 demos even if a deh patch set
+   * them, so strip flags2 entirely below complevel 21.  This is the single
+   * choke point that keeps every MF2_* behaviour inert outside MBF21,
+   * mirroring the friends/bouncers strip below. */
+  if (!mbf21_features)
+    mobj->flags2 = 0;
 
   /* killough 8/23/98: no friends, bouncers, or touchy things in old demos */
   if (!mbf_features)

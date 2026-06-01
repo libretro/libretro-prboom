@@ -760,7 +760,7 @@ static bool IdentifyVersion (void)
   // locate the IWAD and determine game mode from it
 
   iwad = FindIWADFile();
-  lprintf(LO_INFO, "iwad: %s\n", iwad);
+  lprintf(LO_INFO, "iwad: %s\n", iwad ? iwad : "(none)");
 
   if (iwad && *iwad)
   {
@@ -885,7 +885,7 @@ static bool FindResponseFile (void)
             indexinfile = 0;
             indexinfile++;  // SKIP PAST ARGV[0] (KEEP IT)
             do {
-               while (size > 0 && isspace(*infile)) { infile++; size--; }
+               while (size > 0 && isspace((unsigned char)*infile)) { infile++; size--; }
                if (size > 0) {
                   char *s = malloc(size+1);
                   char *p = s;
@@ -893,7 +893,7 @@ static bool FindResponseFile (void)
 
                   while (size > 0) {
                      // Whitespace terminates the token unless quoted
-                     if (!quoted && isspace(*infile)) break;
+                     if (!quoted && isspace((unsigned char)*infile)) break;
                      if (*infile == '\"') {
                         // Quotes are removed but remembered
                         infile++; size--; quoted ^= 1;

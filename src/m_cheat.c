@@ -273,7 +273,7 @@ static void cheat_mus(char buf[3])
   //jff 3/20/98 note: this cheat allowed in netgame/demorecord
 
   //jff 3/17/98 avoid musnum being negative and crashing
-  if (!isdigit(buf[0]) || !isdigit(buf[1]))
+  if (!isdigit((unsigned char)buf[0]) || !isdigit((unsigned char)buf[1]))
     return;
 
   plyr->message = s_STSTR_MUS; // Ty 03/27/98 - externalized

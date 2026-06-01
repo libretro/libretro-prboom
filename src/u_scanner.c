@@ -426,7 +426,7 @@ dbool   U_GetNextToken(u_scanner_t* scanner, dbool   expandState)
       char *p = nextState->string;
       while (*p)
       {
-        *p = tolower(*p);
+        *p = tolower((unsigned char)*p);
         p++;
       }
       // Check for a boolean constant.

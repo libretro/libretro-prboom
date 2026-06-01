@@ -5324,7 +5324,7 @@ int M_StringWidth(const char* string)
   int i, c, w = 0;
   size_t string_len = strlen(string);
   for (i = 0;(size_t)i < string_len; i++)
-    w += (c = toupper(string[i]) - HU_FONTSTART) < 0 || c >= HU_FONTSIZE ?
+    w += (c = toupper((unsigned char)string[i]) - HU_FONTSTART) < 0 || c >= HU_FONTSIZE ?
       4 : hu_font[c].width;
   return w;
 }

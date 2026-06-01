@@ -82,7 +82,7 @@ void ExtractFileBase (const char *path, char *dest)
 
   while ((*src) && (*src != '.') && (++length<9))
   {
-    *dest++ = toupper(*src);
+    *dest++ = toupper((unsigned char)*src);
     (void)*src++;
   }
   /* cph - length check removed, just truncate at 8 chars.
@@ -307,14 +307,14 @@ unsigned W_LumpNameHash(const char *s)
 {
   unsigned hash;
   if (!s[0]) return 0;
-  (void) ((hash =        toupper(s[0]), s[1]) &&
-          (hash = hash*3+toupper(s[1]), s[2]) &&
-          (hash = hash*2+toupper(s[2]), s[3]) &&
-          (hash = hash*2+toupper(s[3]), s[4]) &&
-          (hash = hash*2+toupper(s[4]), s[5]) &&
-          (hash = hash*2+toupper(s[5]), s[6]) &&
-          (hash = hash*2+toupper(s[6]),
-           hash = hash*2+toupper(s[7]))
+  (void) ((hash =        toupper((unsigned char)s[0]), s[1]) &&
+          (hash = hash*3+toupper((unsigned char)s[1]), s[2]) &&
+          (hash = hash*2+toupper((unsigned char)s[2]), s[3]) &&
+          (hash = hash*2+toupper((unsigned char)s[3]), s[4]) &&
+          (hash = hash*2+toupper((unsigned char)s[4]), s[5]) &&
+          (hash = hash*2+toupper((unsigned char)s[5]), s[6]) &&
+          (hash = hash*2+toupper((unsigned char)s[6]),
+           hash = hash*2+toupper((unsigned char)s[7]))
          );
   return hash;
 }

@@ -150,7 +150,7 @@ int M_ReadFile(char const *name, uint8_t **buffer)
 char* M_Strupr(char* str)
 {
   char* p;
-  for (p=str; *p; p++) *p = toupper(*p);
+  for (p=str; *p; p++) *p = toupper((unsigned char)*p);
   return str;
 }
 
@@ -968,7 +968,7 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
   char  def[80] = {0};
   char  strparm[100] = {0};
   char* newstring = NULL;   // killough
-  int   parm;
+  int   parm = 0;
   dbool   isstring;
   // read the file in, overriding any set defaults
   RFILE *f = filestream_open (file,
@@ -982,7 +982,7 @@ void M_LoadDefaultsFile (char *file, dbool   basedefault)
       if (rfscanf(f, "%79s %99[^\n]\n", def, strparm) == 2)
       {
         //jff 3/3/98 skip lines not starting with an alphanum
-        if (!isalnum(def[0]))
+        if (!isalnum((unsigned char)def[0]))
           continue;
 
         if (strparm[0] == '"') {

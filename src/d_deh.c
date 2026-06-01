@@ -71,7 +71,7 @@
 static char* strlwr(char* str)
 {
   char* p;
-  for (p=str; *p; p++) *p = tolower(*p);
+  for (p=str; *p; p++) *p = tolower((unsigned char)*p);
   return str;
 }
 #endif
@@ -3370,7 +3370,7 @@ void lfstrip(char *s)  // strip the \r and/or \n off of a line
 void rstrip(char *s)  // strip trailing whitespace
 {
   char *p = s+strlen(s);         // killough 4/4/98: same here
-  while (p > s && isspace(*--p)) // break on first non-whitespace
+  while (p > s && isspace((unsigned char)*--p)) // break on first non-whitespace
     *p='\0';
 }
 
@@ -3383,7 +3383,7 @@ void rstrip(char *s)  // strip trailing whitespace
 //
 char *ptr_lstrip(char *p)  // point past leading whitespace
 {
-  while (isspace(*p))
+  while (isspace((unsigned char)*p))
     p++;
   return p;
 }

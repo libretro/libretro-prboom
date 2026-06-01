@@ -228,6 +228,16 @@ void dsda_InitTables(void)
 
   S_sfx = malloc(num_sfx * sizeof(*S_sfx));
   memcpy(S_sfx, seed_sfx, num_sfx * sizeof(*S_sfx));
+  /* Any sfx 'link' that pointed into the static seed array (sound aliases
+   * such as chgun -> pistol) must be re-pointed into this heap copy, or
+   * pointer arithmetic like (link - S_sfx) computes against the wrong base
+   * and indexes out of bounds. */
+  {
+    int i;
+    for (i = 0; i < num_sfx; i++)
+      if (S_sfx[i].link)
+        S_sfx[i].link = S_sfx + (S_sfx[i].link - seed_sfx);
+  }
 
   S_music = malloc(num_music * sizeof(*S_music));
   memcpy(S_music, seed_music, num_music * sizeof(*S_music));

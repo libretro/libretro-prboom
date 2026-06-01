@@ -2570,8 +2570,11 @@ static void deh_procAmmo(DEHFILE *fpin, FILE* fpout, char *line)
   if (fpout) fprintf(fpout,"Processing Ammo at index %d: %s\n",
                      indexnum, key);
   if (indexnum < 0 || indexnum >= NUMAMMO)
-    if (fpout) fprintf(fpout,"Bad ammo number %d of %d\n",
-                       indexnum,NUMAMMO);
+    {
+      if (fpout) fprintf(fpout,"Bad ammo number %d of %d\n",
+                         indexnum,NUMAMMO);
+      return; /* fix SegViol: do not write ammo arrays out of bounds */
+    }
 
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {
@@ -2616,8 +2619,11 @@ static void deh_procWeapon(DEHFILE *fpin, FILE* fpout, char *line)
   if (fpout) fprintf(fpout,"Processing Weapon at index %d: %s\n",
                      indexnum, key);
   if (indexnum < 0 || indexnum >= NUMWEAPONS)
-    if (fpout) fprintf(fpout,"Bad weapon number %d of %d\n",
-                       indexnum, NUMAMMO);
+    {
+      if (fpout) fprintf(fpout,"Bad weapon number %d of %d\n",
+                         indexnum, NUMWEAPONS);
+      return; /* fix SegViol: do not write weaponinfo out of bounds */
+    }
 
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {
@@ -2636,19 +2642,24 @@ static void deh_procWeapon(DEHFILE *fpin, FILE* fpout, char *line)
         weaponinfo[indexnum].ammo = (ammotype_t)value;
       else
         if (!strcasecmp(key,deh_weapon[1]))  // Deselect frame
-          weaponinfo[indexnum].upstate = (int)value;
+          { if ((int)value >= 0 && (int)value < 1000000) dsda_GetState((int)value);
+            weaponinfo[indexnum].upstate = (int)value; }
         else
           if (!strcasecmp(key,deh_weapon[2]))  // Select frame
-            weaponinfo[indexnum].downstate = (int)value;
+            { if ((int)value >= 0 && (int)value < 1000000) dsda_GetState((int)value);
+              weaponinfo[indexnum].downstate = (int)value; }
           else
             if (!strcasecmp(key,deh_weapon[3]))  // Bobbing frame
-              weaponinfo[indexnum].readystate = (int)value;
+              { if ((int)value >= 0 && (int)value < 1000000) dsda_GetState((int)value);
+                weaponinfo[indexnum].readystate = (int)value; }
             else
               if (!strcasecmp(key,deh_weapon[4]))  // Shooting frame
-                weaponinfo[indexnum].atkstate = (int)value;
+                { if ((int)value >= 0 && (int)value < 1000000) dsda_GetState((int)value);
+                  weaponinfo[indexnum].atkstate = (int)value; }
               else
                 if (!strcasecmp(key,deh_weapon[5]))  // Firing frame
-                  weaponinfo[indexnum].flashstate = (int)value;
+                  { if ((int)value >= 0 && (int)value < 1000000) dsda_GetState((int)value);
+                    weaponinfo[indexnum].flashstate = (int)value; }
                 else
                   if (!strcasecmp(key,"Ammo per shot")) // MBF21
                     weaponinfo[indexnum].ammopershot = (int)value;
@@ -3067,8 +3078,12 @@ static void deh_procText(DEHFILE *fpin, FILE* fpout, char *line)
   if (fromlen==4 && tolen==4)
     {
       i=0;
-      while (sprnames[i])  // null terminated list in info.c //jff 3/19/98
-        {                                                      //check pointer
+      /* DSDHacked: sprnames_state[] is sized to the base NUMSPRITES, and
+       * BEX renames only target original sprite names, so bound by
+       * NUMSPRITES (not num_sprites) and skip any NULL gaps. */
+      while (i < NUMSPRITES)
+        {
+          if (!sprnames[i]) { i++; continue; }
           if (!strncasecmp(sprnames[i],inbuffer,fromlen) && !sprnames_state[i])         //not first char
             {
               if (fpout) fprintf(fpout,

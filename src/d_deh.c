@@ -3495,6 +3495,34 @@ static void deh_procBexSounds(DEHFILE *fpin, FILE *fpout, char *line)
 	 }
 	 rover++;
       }
+
+      /* DSDHacked: as with [SPRITES], the key may be a numeric sfx index
+       * rather than an existing stock sound name -- "<index> = NAME" with
+       * no stock name to substitute.  Grow the sound table to cover the
+       * index and install the name (which I_GetSfxLumpNum turns into the
+       * lump "ds%s"), so referencing the sound by index resolves to the
+       * WAD lump.  A hit in the stock list above leaves deh_soundnames
+       * [rover] non-NULL; this branch covers everything past it. */
+      if (!deh_soundnames[rover])
+      {
+	 const char *c = key;
+	 int is_num = (*c != '\0');
+	 while (*c)
+	 {
+	    if (*c < '0' || *c > '9') { is_num = 0; break; }
+	    c++;
+	 }
+	 if (is_num)
+	 {
+	    int idx = atoi(key);
+	    if (idx >= 1 && idx < 1000000)
+	    {
+	       sfxinfo_t *sfx = dsda_GetSfx(idx);
+	       deh_log("Naming sound %d '%s'\n", idx, candidate);
+	       sfx->name = strdup(candidate);
+	    }
+	 }
+      }
    }
 }
 

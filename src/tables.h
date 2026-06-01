@@ -93,13 +93,13 @@ int SlopeDiv(unsigned num, unsigned den);
 
 /* MBF21 helpers (used by the MBF21 codepointers).  These mirror the
  * Eternity/DSDA conversions so demos stay in sync. */
-static inline angle_t FixedToAngle(fixed_t a)
+static INLINE angle_t FixedToAngle(fixed_t a)
 {
   return (angle_t)(((uint64_t)a * ANG1) >> FRACBITS);
 }
 
 /* Clamped angle->slope. */
-static inline fixed_t AngleToSlope(int a)
+static INLINE fixed_t AngleToSlope(int a)
 {
   if (a > (int)ANG90)
     return finetangent[0];
@@ -110,7 +110,7 @@ static inline fixed_t AngleToSlope(int a)
 }
 
 /* Fixed-point-degrees -> slope. */
-static inline fixed_t DegToSlope(fixed_t a)
+static INLINE fixed_t DegToSlope(fixed_t a)
 {
   if (a >= 0)
     return AngleToSlope(FixedToAngle(a));

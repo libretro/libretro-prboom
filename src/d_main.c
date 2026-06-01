@@ -415,6 +415,8 @@ static void D_PageDrawer(void)
   // proff/nicolas 09/14/98 -- now stretchs bitmaps to fullscreen!
   // CPhipps - updated for new patch drawing
   // proff - added M_DrawCredits
+
+
   if (pagename)
   {
     const size_t fb_bytes = (size_t)SCREENWIDTH * SCREENHEIGHT
@@ -886,16 +888,19 @@ static bool IdentifyVersion (void)
     /* jff 8/23/98 set gamemission global appropriately in all cases
      * cphipps 12/1999 - no version output here, leave that to the caller
      */
+    if (heretic)
+    {
+      /* CheckIWAD already recognised a Heretic IWAD and set
+       * gamemission = heretic_mission; do not overwrite it with a Doom
+       * mission below. */
+    }
+    else
     switch(gamemode)
     {
       case retail:
       case registered:
       case shareware:
-        i = strlen(iwad);
         gamemission = doom;
-        if ( (i>=11 && !strncasecmp(iwad+i-11,"heretic.wad",11)) ||
-             (i>=13 && (!strncasecmp(iwad+i-13,"hereticsr.wad",13))) )
-          return I_Error("IdentifyVersion: Heretic is not supported");
         break;
       case commercial:
         i = strlen(iwad);

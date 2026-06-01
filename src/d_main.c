@@ -614,6 +614,18 @@ void D_DoAdvanceDemo(void)
   pagetic = TICRATE * 11;         /* killough 11/98: default behavior */
   gamestate = GS_DEMOSCREEN;
 
+  /* Heretic's attract-mode demos are recorded in a Heretic-specific demo
+   * format that this engine's Doom demo reader (G_ReadDemoHeader) cannot
+   * parse, which hangs the attract loop. Until Heretic demo playback is
+   * wired up, keep showing the title page instead of advancing into a
+   * demo. */
+  if (heretic)
+  {
+    pagetic = TICRATE * 11;
+    pagename = "TITLE";
+    return;
+  }
+
   if (!demostates[++demosequence][gamemode].func)
     demosequence = 0;
   demostates[demosequence][gamemode].func

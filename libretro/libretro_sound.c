@@ -174,12 +174,32 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
     step_fx = ((unsigned int)orig_rate << 16) / (unsigned int)SAMPLERATE;
     pos_fx  = 0;
 
+    /* Linear interpolation between adjacent input samples.  The DMX
+     * SFX are 8-bit PCM at 11025/22050 Hz; upsampling to 44100 by
+     * nearest-neighbour (sample-and-hold) was cheap but turned each
+     * input sample into a 2x/4x staircase, audibly aliased/harsh.
+     * Interpolating between sfxlump_sound[x] and [x+1] by the 16.16
+     * fractional position removes the staircase for the same single
+     * pass.  This is load-time work (once per distinct SFX lump), so
+     * the extra multiply/add per output sample is irrelevant.  Samples
+     * are unsigned 8-bit; blend in that domain and store back as u8. */
     for (out_i = 0; out_i < out_len; out_i++)
     {
-        unsigned int x = pos_fx >> 16;
-        out_data[out_i] = (x < (unsigned int)sfxlump_len)
-                           ? sfxlump_sound[x]
-                           : 128;  /* DC silence in unsigned 8-bit */
+        unsigned int x    = pos_fx >> 16;
+        unsigned int frac = pos_fx & 0xffff;
+
+        if (x + 1 < (unsigned int)sfxlump_len)
+        {
+            unsigned int a = sfxlump_sound[x];
+            unsigned int b = sfxlump_sound[x + 1];
+            out_data[out_i] =
+                (uint8_t)((a * (0x10000 - frac) + b * frac) >> 16);
+        }
+        else if (x < (unsigned int)sfxlump_len)
+            out_data[out_i] = sfxlump_sound[x]; /* last sample: hold */
+        else
+            out_data[out_i] = 128;              /* past end: DC silence */
+
         pos_fx += step_fx;
     }
 

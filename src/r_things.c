@@ -32,6 +32,7 @@
  *-----------------------------------------------------------------------------*/
 
 #include "doomstat.h"
+#include "dsda_hacked.h"
 #include "w_wad.h"
 #include "r_main.h"
 #include "r_bsp.h"
@@ -158,11 +159,11 @@ static void R_InitSpriteDefs(const char * const * namelist)
    if (!numentries || !*namelist)
       return;
 
-   // count the number of sprite names
-   for (i=0; namelist[i]; i++)
-      ;
-
-   numsprites = i;
+   // DSDHacked: the sprite-name table can be grown by dehacked and may
+   // contain NULL gaps at unfilled indices, so its length is the runtime
+   // num_sprites count rather than a NULL-terminator scan (which would stop
+   // at the first gap and, post-growth, could miss the terminator entirely).
+   numsprites = num_sprites;
 
    sprites = Z_Malloc(numsprites *sizeof(*sprites), PU_STATIC, NULL);
    /* Zero-init: the for(i) loop below only writes sprites[i].numframes
@@ -195,7 +196,12 @@ static void R_InitSpriteDefs(const char * const * namelist)
    for (i=0 ; i<numsprites ; i++)
    {
       const char *spritename = namelist[i];
-      int j = hash[R_SpriteNameHash(spritename) % numentries].index;
+      int j;
+
+      if (!spritename)   /* DSDHacked: unfilled sparse index, no sprite here */
+         continue;
+
+      j = hash[R_SpriteNameHash(spritename) % numentries].index;
 
       if (j >= 0)
       {

@@ -127,8 +127,9 @@ static void ensure_sprites(int index)
     return;
 
   cap = next_capacity(num_sprites, index);
-  sprnames = realloc(sprnames, cap * sizeof(*sprnames));
-  for (i = old; i < cap; i++)
+  /* +1 for the NULL terminator R_InitSpriteDefs scans for. */
+  sprnames = realloc(sprnames, (cap + 1) * sizeof(*sprnames));
+  for (i = old; i <= cap; i++)
     sprnames[i] = NULL;
   num_sprites = cap;
 }
@@ -219,8 +220,11 @@ void dsda_InitTables(void)
   mobjinfo = malloc(num_mobj_types * sizeof(*mobjinfo));
   memcpy(mobjinfo, seed_mobjinfo, num_mobj_types * sizeof(*mobjinfo));
 
-  sprnames = malloc(num_sprites * sizeof(*sprnames));
+  /* sprnames is NULL-terminated (R_InitSpriteDefs scans for the NULL), so
+   * allocate one extra slot and copy the terminator the seed array had. */
+  sprnames = malloc((num_sprites + 1) * sizeof(*sprnames));
   memcpy(sprnames, seed_sprnames, num_sprites * sizeof(*sprnames));
+  sprnames[num_sprites] = NULL;
 
   S_sfx = malloc(num_sfx * sizeof(*S_sfx));
   memcpy(S_sfx, seed_sfx, num_sfx * sizeof(*S_sfx));

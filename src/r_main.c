@@ -793,6 +793,26 @@ int autodetect_hom = 0;       // killough 2/7/98: HOM autodetection flag
 //
 void R_RenderPlayerView (player_t* player)
 {
+#ifdef PRBOOM_RENDER_PROFILE
+  /* Optional per-phase render profiler.  Compile with
+   * -DPRBOOM_RENDER_PROFILE to build it in; it is entirely absent
+   * otherwise (zero cost, zero risk to normal builds).  It times the
+   * three main render phases with a high-resolution monotonic clock and
+   * logs a rolling average every PROF_REPORT frames so the relative cost
+   * of BSP+walls vs floors/ceilings vs sprites is visible on real
+   * hardware -- replacing guesswork about where the frame goes. */
+# include <time.h>
+# define PROF_REPORT 120
+  static double acc_bsp = 0.0, acc_planes = 0.0, acc_masked = 0.0,
+                acc_setup = 0.0;
+  static unsigned prof_frames = 0;
+  struct timespec ts;
+  double t0, t1, t2, t3, t4;
+# define PROF_NOW (clock_gettime(CLOCK_MONOTONIC, &ts), \
+                   (double)ts.tv_sec * 1.0e9 + (double)ts.tv_nsec)
+  t0 = PROF_NOW;
+#endif
+
   R_SetupFrame (player);
 
   // Clear buffers.
@@ -823,14 +843,52 @@ void R_RenderPlayerView (player_t* player)
       V_FillRect(viewwidth - m, 0, m, viewheight, 0);
     }
 
+#ifdef PRBOOM_RENDER_PROFILE
+  t1 = PROF_NOW;
+#endif
+
   // The head node is the last node output.
   R_RenderBSPNode (numnodes-1);
   R_ResetColumnBuffer();
 
+#ifdef PRBOOM_RENDER_PROFILE
+  t2 = PROF_NOW;
+#endif
+
     R_DrawPlanes ();
+
+#ifdef PRBOOM_RENDER_PROFILE
+  t3 = PROF_NOW;
+#endif
 
     R_DrawMasked ();
     R_ResetColumnBuffer();
+
+#ifdef PRBOOM_RENDER_PROFILE
+  t4 = PROF_NOW;
+  acc_setup  += (t1 - t0);
+  acc_bsp    += (t2 - t1);   /* BSP traversal + wall/clip + visplane build */
+  acc_planes += (t3 - t2);   /* floor/ceiling span fill */
+  acc_masked += (t4 - t3);   /* sprites + masked midtextures */
+  if (++prof_frames >= PROF_REPORT)
+  {
+    double n = (double)prof_frames;
+    lprintf(LO_INFO,
+      "R_RenderProfile (avg over %u frames, us): "
+      "setup+clear %.1f | bsp+walls %.1f | planes %.1f | masked %.1f | "
+      "total %.1f\n",
+      prof_frames,
+      acc_setup / n / 1000.0,
+      acc_bsp / n / 1000.0,
+      acc_planes / n / 1000.0,
+      acc_masked / n / 1000.0,
+      (acc_setup + acc_bsp + acc_planes + acc_masked) / n / 1000.0);
+    acc_setup = acc_bsp = acc_planes = acc_masked = 0.0;
+    prof_frames = 0;
+  }
+# undef PROF_NOW
+# undef PROF_REPORT
+#endif
 
   R_RestoreInterpolations();
 }

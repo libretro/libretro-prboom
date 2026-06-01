@@ -405,8 +405,21 @@ void I_UpdateSound(void)
    int        out_frames;
    int16_t   *out;
 
-   out_frames = tic_vars.sample_step ? (int)tic_vars.sample_step
-                                     : SAMPLECOUNT_35;
+   /* sample_step is 16.16 fixed-point samples-per-frame.  Carry the
+    * fractional remainder across frames so the emitted frame count is
+    * floor or floor+1 each call and the long-run average equals
+    * sample_rate/fps exactly -- otherwise the dropped fraction makes the
+    * core under-produce at any fps that doesn't divide the sample rate,
+    * engaging the frontend resampler and drifting A/V sync. */
+   if (tic_vars.sample_step)
+   {
+      static fixed_t sample_acc = 0;
+      sample_acc += tic_vars.sample_step;
+      out_frames  = sample_acc >> FRACBITS;
+      sample_acc &= (FRACUNIT - 1);
+   }
+   else
+      out_frames = SAMPLECOUNT_35;
 
    /* Step 1: music or silence into mixbuffer. */
 #ifdef MUSIC_SUPPORT

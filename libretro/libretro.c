@@ -2934,7 +2934,17 @@ void R_InitInterpolation(void)
 
      tic_vars.fps = info.timing.fps;
      tic_vars.frac_step = FRACUNIT * TICRATE / tic_vars.fps;
-     tic_vars.sample_step = info.timing.sample_rate / tic_vars.fps;
+     /* 16.16 fixed-point samples-per-frame.  Integer truncation here
+      * (44100 / fps) drops the fractional remainder every frame, so for
+      * any fps that does not divide the sample rate the core emits fewer
+      * than sample_rate samples per second (e.g. 120fps -> 44040/s, a
+      * 60-sample/s deficit) -- which silently forces the frontend's
+      * dynamic-rate-control resampler to stretch the stream and slowly
+      * drifts A/V sync.  Keep the fraction and let I_UpdateSound emit
+      * floor or floor+1 frames via an accumulator so the long-run rate
+      * is exact. */
+     tic_vars.sample_step = (fixed_t)(((int64_t)info.timing.sample_rate
+                                       << FRACBITS) / (int64_t)tic_vars.fps);
 
      if (log_cb)
         log_cb(RETRO_LOG_DEBUG, "R_InitInterpolation: Framerate set to %.2f FPS\n", info.timing.fps);

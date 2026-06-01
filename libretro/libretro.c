@@ -1426,6 +1426,22 @@ bool retro_load_game(const struct retro_game_info *info)
 
    argv[argc++] = strdup("prboom");
 
+   /* Compatibility level: if the user picked a specific complevel in the
+    * core options, pass it as -complevel so it overrides the config and the
+    * engine's automatic choice.  "-1" means "Default (Auto)" -> don't force.
+    * This is how MBF21 WADs (complevel 21) get the MBF21 feature gate. */
+   {
+      struct retro_variable cvar;
+      cvar.key = "prboom-complevel";
+      cvar.value = NULL;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &cvar) && cvar.value &&
+          strcmp(cvar.value, "-1") != 0)
+      {
+         argv[argc++] = strdup("-complevel");
+         argv[argc++] = strdup(cvar.value);
+      }
+   }
+
    if(info->path)
    {
       wadinfo_t header;

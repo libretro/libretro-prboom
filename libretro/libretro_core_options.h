@@ -140,6 +140,25 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "16"
    },
 #endif
+   {
+      "prboom-complevel",
+      "Compatibility Level (Restart Required)",
+      NULL,
+      "Forces a demo-compatibility level. 'Default' uses the engine's automatic choice. Set 'MBF21' to play MBF21 WADs that require complevel 21.",
+      NULL,
+      NULL,
+      {
+         { "-1", "Default (Auto)" },
+         { "4",  "Ultimate Doom" },
+         { "5",  "Final Doom" },
+         { "9",  "Boom" },
+         { "11", "MBF" },
+         { "17", "PrBoom latest" },
+         { "18", "MBF21" },
+         { NULL, NULL },
+      },
+      "-1"
+   },
    { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
 };
 

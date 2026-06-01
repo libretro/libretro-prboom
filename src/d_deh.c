@@ -2238,8 +2238,13 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
   { char *p = deh_scan_word(inbuffer, key, sizeof(key)); if (p) deh_scan_int(p, &indexnum); }
   if (fpout) fprintf(fpout,"Processing Frame at index %d: %s\n",indexnum,key);
   if (indexnum < 0 || indexnum >= NUMSTATES)
-    if (fpout) fprintf(fpout,"Bad frame number %d of %d\n",indexnum, NUMSTATES);
-
+    {
+      if (fpout) fprintf(fpout,"Bad frame number %d of %d\n",indexnum, NUMSTATES);
+      return; // killough 10/98: fix SegViol -- do not write out of bounds.
+              // This core has no DEHEXTRA/dsdhacked state expansion, so a
+              // patch referencing frames beyond NUMSTATES (common in MBF21
+              // WADs) must be skipped rather than corrupting adjacent globals.
+    }
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {
       char *strval = NULL;

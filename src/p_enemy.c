@@ -3158,8 +3158,11 @@ void A_JumpIfFlagsSet(mobj_t *actor)
   if (!mbf21_features || !actor)
     return;
   state  = actor->state->args[0];
-  flags  = (uint64_t)actor->state->args[1];
-  flags2 = (uint64_t)actor->state->args[2];
+  /* args[] is a 32-bit (signed) long on LLP64 targets; cast through
+   * uint32_t first so a flag value with bit 31 set is not sign-extended
+   * into the high 32 bits of the 64-bit flag word. */
+  flags  = (uint64_t)(uint32_t)actor->state->args[1];
+  flags2 = (uint64_t)(uint32_t)actor->state->args[2];
   if ((actor->flags & flags) == flags &&
       (actor->flags2 & flags2) == flags2)
     P_SetMobjState(actor, state);
@@ -3171,8 +3174,9 @@ void A_AddFlags(mobj_t *actor)
   dbool update_blockmap;
   if (!mbf21_features || !actor)
     return;
-  flags  = (uint64_t)actor->state->args[0];
-  flags2 = (uint64_t)actor->state->args[1];
+  /* see A_JumpIfFlagsSet: avoid sign-extending a bit-31 flag value */
+  flags  = (uint64_t)(uint32_t)actor->state->args[0];
+  flags2 = (uint64_t)(uint32_t)actor->state->args[1];
   update_blockmap = ((flags & MF_NOBLOCKMAP) && !(actor->flags & MF_NOBLOCKMAP))
                  || ((flags & MF_NOSECTOR)   && !(actor->flags & MF_NOSECTOR));
   if (update_blockmap)
@@ -3189,8 +3193,9 @@ void A_RemoveFlags(mobj_t *actor)
   dbool update_blockmap;
   if (!mbf21_features || !actor)
     return;
-  flags  = (uint64_t)actor->state->args[0];
-  flags2 = (uint64_t)actor->state->args[1];
+  /* see A_JumpIfFlagsSet: avoid sign-extending a bit-31 flag value */
+  flags  = (uint64_t)(uint32_t)actor->state->args[0];
+  flags2 = (uint64_t)(uint32_t)actor->state->args[1];
   update_blockmap = ((flags & MF_NOBLOCKMAP) && (actor->flags & MF_NOBLOCKMAP))
                  || ((flags & MF_NOSECTOR)   && (actor->flags & MF_NOSECTOR));
   if (update_blockmap)

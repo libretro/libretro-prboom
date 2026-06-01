@@ -38,6 +38,10 @@ extern int ms_to_next_tick;
 dbool   I_StartDisplay(void);
 void I_EndDisplay(void);
 
+/* High-resolution wall-clock in microseconds (libretro perf interface),
+ * for the optional -DPRBOOM_RENDER_PROFILE render profiler. */
+double I_RenderProfileUsec(void);
+
 unsigned long I_GetRandomTimeSeed(void); /* cphipps */
 /* cphipps - I_SigString
  * Returns a string describing a signal number

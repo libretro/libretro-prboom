@@ -797,20 +797,17 @@ void R_RenderPlayerView (player_t* player)
   /* Optional per-phase render profiler.  Compile with
    * -DPRBOOM_RENDER_PROFILE to build it in; it is entirely absent
    * otherwise (zero cost, zero risk to normal builds).  It times the
-   * three main render phases with a high-resolution monotonic clock and
-   * logs a rolling average every PROF_REPORT frames so the relative cost
-   * of BSP+walls vs floors/ceilings vs sprites is visible on real
-   * hardware -- replacing guesswork about where the frame goes. */
-# include <time.h>
+   * three main render phases using the libretro perf interface's
+   * high-resolution microsecond clock (I_RenderProfileUsec) and logs a
+   * rolling average every PROF_REPORT frames so the relative cost of
+   * BSP+walls vs floors/ceilings vs sprites is visible on real hardware
+   * -- replacing guesswork about where the frame goes. */
 # define PROF_REPORT 120
   static double acc_bsp = 0.0, acc_planes = 0.0, acc_masked = 0.0,
                 acc_setup = 0.0;
   static unsigned prof_frames = 0;
-  struct timespec ts;
   double t0, t1, t2, t3, t4;
-# define PROF_NOW (clock_gettime(CLOCK_MONOTONIC, &ts), \
-                   (double)ts.tv_sec * 1.0e9 + (double)ts.tv_nsec)
-  t0 = PROF_NOW;
+  t0 = I_RenderProfileUsec();
 #endif
 
   R_SetupFrame (player);
@@ -844,7 +841,7 @@ void R_RenderPlayerView (player_t* player)
     }
 
 #ifdef PRBOOM_RENDER_PROFILE
-  t1 = PROF_NOW;
+  t1 = I_RenderProfileUsec();
 #endif
 
   // The head node is the last node output.
@@ -852,20 +849,20 @@ void R_RenderPlayerView (player_t* player)
   R_ResetColumnBuffer();
 
 #ifdef PRBOOM_RENDER_PROFILE
-  t2 = PROF_NOW;
+  t2 = I_RenderProfileUsec();
 #endif
 
     R_DrawPlanes ();
 
 #ifdef PRBOOM_RENDER_PROFILE
-  t3 = PROF_NOW;
+  t3 = I_RenderProfileUsec();
 #endif
 
     R_DrawMasked ();
     R_ResetColumnBuffer();
 
 #ifdef PRBOOM_RENDER_PROFILE
-  t4 = PROF_NOW;
+  t4 = I_RenderProfileUsec();
   acc_setup  += (t1 - t0);
   acc_bsp    += (t2 - t1);   /* BSP traversal + wall/clip + visplane build */
   acc_planes += (t3 - t2);   /* floor/ceiling span fill */
@@ -878,15 +875,14 @@ void R_RenderPlayerView (player_t* player)
       "setup+clear %.1f | bsp+walls %.1f | planes %.1f | masked %.1f | "
       "total %.1f\n",
       prof_frames,
-      acc_setup / n / 1000.0,
-      acc_bsp / n / 1000.0,
-      acc_planes / n / 1000.0,
-      acc_masked / n / 1000.0,
-      (acc_setup + acc_bsp + acc_planes + acc_masked) / n / 1000.0);
+      acc_setup / n,
+      acc_bsp / n,
+      acc_planes / n,
+      acc_masked / n,
+      (acc_setup + acc_bsp + acc_planes + acc_masked) / n);
     acc_setup = acc_bsp = acc_planes = acc_masked = 0.0;
     prof_frames = 0;
   }
-# undef PROF_NOW
 # undef PROF_REPORT
 #endif
 

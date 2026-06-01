@@ -123,6 +123,7 @@ void I_UpdateSound(void);
 void M_EndGame(int choice);
 
 retro_log_printf_t log_cb;
+static retro_perf_get_time_usec_t perf_get_time_usec_cb = NULL;
 static retro_video_refresh_t video_cb;
 retro_audio_sample_batch_t audio_batch_cb;
 static retro_environment_t environ_cb;
@@ -509,6 +510,16 @@ static char *FindFileInDir(const char* dir, const char* wfname, const char* ext)
 
 static bool libretro_supports_bitmasks = false;
 
+/* High-resolution wall-clock in microseconds for the optional render
+ * profiler, sourced from the libretro perf interface.  Returns 0.0 if the
+ * frontend did not provide a perf interface. */
+double I_RenderProfileUsec(void)
+{
+   if (perf_get_time_usec_cb)
+      return (double)perf_get_time_usec_cb();
+   return 0.0;
+}
+
 void retro_init(void)
 {
    struct retro_log_callback log;
@@ -521,6 +532,16 @@ void retro_init(void)
       log_cb = log.log;
    else
       log_cb = NULL;
+
+   {
+      /* Optional: high-resolution timer for the compile-time render
+       * profiler (I_RenderProfileUsec).  Harmless if unsupported. */
+      struct retro_perf_callback perf;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_PERF_INTERFACE, &perf))
+         perf_get_time_usec_cb = perf.get_time_usec;
+      else
+         perf_get_time_usec_cb = NULL;
+   }
 
    /* Negotiate pixel format with the frontend.  The renderer is
     * hardcoded to write 16-bit pixels via VID_PAL16 -- the

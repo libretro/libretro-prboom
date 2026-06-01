@@ -46,6 +46,12 @@ ifneq ($(GIT_VERSION)," unknown")
 	CFLAGS += -DGIT_VERSION=\"$(GIT_VERSION)\"
 endif
 
+# Optional per-phase render profiler (logs R_RenderProfile timings).
+# Enable with: make RENDER_PROFILE=1
+ifeq ($(RENDER_PROFILE), 1)
+	CFLAGS += -DPRBOOM_RENDER_PROFILE
+endif
+
 LIBS    :=
 
 ifeq (,$(findstring msvc,$(platform)))

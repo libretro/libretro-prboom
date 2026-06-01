@@ -80,6 +80,11 @@ fixed_t  viewcos, viewsin;
 player_t *viewplayer;
 fixed_t  focallength;
 int      fieldofview;
+/* Display aspect ratio selector (in-game General/Video menu).
+ * 0 = 4:3, 1 = 16:9, 2 = 16:10, 3 = 32:9.  The libretro layer reads
+ * this to size the render buffer width; the renderer itself derives
+ * FOV from the resulting buffer dimensions and needs no other input. */
+int      render_aspect;
 extern lighttable_t **walllights;
 
 //
@@ -305,8 +310,38 @@ static void R_InitTextureMapping (void)
   //
   // Calc focallength
   //  so FIELDOFVIEW angles covers SCREENWIDTH.
+  //
+  // For widescreen (buffer wider than 4:3 for the current height) we
+  // derive focallength from the 4:3-equivalent half-width instead of
+  // the real half-width.  This keeps the vertical FOV fixed at the
+  // vanilla value and widens the horizontal FOV to match the buffer
+  // aspect (hor+), rather than stretching the 90 degree image.
 
-  focallength = FixedDiv(centerxfrac, finetangent[FINEANGLES/4 + fieldofview/2]);
+  {
+    /* hor+ widescreen: widen the horizontal FOV for wider-than-4:3
+     * buffers while keeping the vertical FOV at the vanilla value.
+     *
+     * The buffer width was produced by scaling a 4:3 reference width
+     * by render_aspect's ratio (num/den vs 4:3).  Recover the 4:3
+     * reference half-width by dividing centerx back down by that same
+     * ratio, then anchor focallength to it.  At 4:3 the ratio is 1:1
+     * so cx43frac == centerxfrac and the result is bit-identical to
+     * vanilla. */
+    static const int num[4] = { 4, 16, 16, 32 };
+    static const int den[4] = { 3,  9, 10,  9 };
+    int a = render_aspect;
+    fixed_t cx43frac;
+
+    if (a < 0 || a > 3)
+      a = 0;
+
+    /* centerx_4:3 = centerx * (4:3) / (num/den)
+     *            = centerx * 4 * den / (3 * num) */
+    cx43frac = (fixed_t)(((int64_t)centerx * 4 * den[a]) / (3 * num[a])) << FRACBITS;
+    if (cx43frac <= 0 || cx43frac > centerxfrac)
+      cx43frac = centerxfrac;
+    focallength = FixedDiv(cx43frac, finetangent[FINEANGLES/4 + fieldofview/2]);
+  }
 
   for (i=0 ; i<FINEANGLES/2 ; i++)
     {

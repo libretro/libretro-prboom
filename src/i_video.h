@@ -40,6 +40,7 @@
 #include "v_video.h"
 
 void I_SetRes(void); /* set resolution */
+void I_SetAspectRatio(void); /* apply display aspect ratio (resize buffer) */
 void I_InitGraphics (void);
 void I_ShutdownGraphics(void);
 

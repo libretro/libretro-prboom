@@ -305,6 +305,7 @@ void M_DrawChatStrings(void);
 void M_Compat(int);       // killough 10/98
 void M_ChangeDemoSmoothTurns(void);
 void M_ChangeFramerate(void);
+void M_ChangeAspectRatio(void);
 void M_ChangeMouseLook(void);
 void M_ChangeMaxViewPitch(void);
 void M_ChangeMidiPlayer(void);
@@ -2832,6 +2833,7 @@ enum {
   general_title_video,
   general_fps,
   general_gamma,
+  general_aspect,
 
   general_title_sound,
   general_sndchan,
@@ -2853,6 +2855,7 @@ enum {
 
 static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "90fps", "100fps", "119fps", "120fps", "140fps", "144fps", "155fps", "160fps", "165fps", "180fps", "200fps", "240fps", "244fps", "300fps", "320fps", "360fps", "480fps", "540fps", NULL};
 static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4", NULL};
+static const char *aspect_opts[] = {"4:3", "16:9", "16:10", "32:9", NULL};
 static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD", NULL};
 static const char *midi_player_opts[] = {
   "Off",
@@ -2872,6 +2875,9 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
 
   {"Gamma Correction", S_CHOICE, m_null, G_X,
   G_YA + general_gamma*8, {"usegamma"}, 0, 0, NULL, gamma_lvls},
+
+  {"Aspect Ratio", S_CHOICE, m_null, G_X,
+  G_YA + general_aspect*8, {"render_aspect"}, 0, 0, M_ChangeAspectRatio, aspect_opts},
 
 
   SETUP_MENU_TITLE("Sound & Music", G_X, G_YA2 + general_title_sound*8 - 2),
@@ -3042,6 +3048,16 @@ void M_ChangeFramerate(void)
 {
   R_InitInterpolation();
   G_ScaleMovementToFramerate();
+}
+
+/* Apply the new display aspect ratio immediately.  The platform
+ * layer owns the framebuffer width, so it recomputes SCREENWIDTH
+ * for the current height, reallocates its buffers, pushes the new
+ * geometry to the frontend and triggers a view-size recalc.  The
+ * renderer derives FOV from the resulting buffer dimensions. */
+void M_ChangeAspectRatio(void)
+{
+  I_SetAspectRatio();
 }
 
 /* Re-issue I_RegisterSong / I_PlaySong on the currently playing

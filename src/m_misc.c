@@ -66,6 +66,7 @@
 #include "lprintf.h"
 #include "d_main.h"
 #include "r_draw.h"
+#include "r_main.h"
 #include "r_demo.h"
 #include "r_fps.h"
 #include "r_sky.h"
@@ -331,6 +332,8 @@ default_t defaults[] =
    RDRAW_MASKEDCOLUMNEDGE_SQUARE, RDRAW_MASKEDCOLUMNEDGE_SLOPED, def_int,ss_gen, NULL, NULL},
   {"render_stretchsky",{&r_stretchsky, NULL},{1, NULL},0,1,
    def_bool,ss_gen,NULL, NULL},
+  {"render_aspect",{&render_aspect, NULL},{0, NULL},0,3,
+   def_int,ss_gen,NULL, NULL},
   {"r_wiggle_fix",{(int*)&r_wiggle_fix, NULL},{1, NULL},0,1,
    def_bool,ss_gen,NULL, NULL},
 

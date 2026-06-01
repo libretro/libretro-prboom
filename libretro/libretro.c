@@ -42,6 +42,8 @@
 #include "../src/st_stuff.h"
 #include "../src/w_wad.h"
 #include "../src/r_draw.h"
+#include "../src/r_main.h"
+#include "../src/doomdef.h"
 #include "../src/r_filter.h"
 #include "../src/r_fps.h"
 #include "../src/lprintf.h"
@@ -65,6 +67,10 @@ int mus_opl_gain = 250; /* fine tune OPL output level */
 int SCREENPITCH;
 int SCREENWIDTH  = 320;
 int SCREENHEIGHT = 200;
+/* Width a 4:3 buffer of the current height would have.  Set whenever
+ * the resolution option is parsed; the aspect-ratio selector scales
+ * SCREENWIDTH relative to this so the vertical FOV stays vanilla. */
+static int base_width_43 = 320;
 
 /* i_video */
 static unsigned char *screen_buf = NULL;
@@ -107,6 +113,7 @@ void D_DoomLoop(void);
 void M_QuitDOOM(int choice);
 void D_DoomDeinit(void);
 void I_SetRes(void);
+void I_SetAspectRatio(void);
 void I_UpdateSound(void);
 void M_EndGame(int choice);
 
@@ -671,9 +678,15 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
   info->timing.sample_rate    = 44100.0;
   info->geometry.base_width   = SCREENWIDTH;
   info->geometry.base_height  = SCREENHEIGHT;
-  info->geometry.max_width    = SCREENWIDTH;
-  info->geometry.max_height   = SCREENHEIGHT;
-  info->geometry.aspect_ratio = 4.0 / 3.0;
+  info->geometry.max_width    = MAX_SCREENWIDTH;
+  info->geometry.max_height   = MAX_SCREENHEIGHT;
+  switch (render_aspect)
+  {
+    case 1:  info->geometry.aspect_ratio = 16.0 / 9.0;  break;
+    case 2:  info->geometry.aspect_ratio = 16.0 / 10.0; break;
+    case 3:  info->geometry.aspect_ratio = 32.0 / 9.0;  break;
+    default: info->geometry.aspect_ratio = 4.0 / 3.0;   break;
+  }
 }
 
 
@@ -812,6 +825,12 @@ static void update_variables(bool startup)
          SCREENHEIGHT = 200;
 	 SCREENPITCH  = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
       }
+
+      /* The parsed width is the 4:3 reference for this height; the
+       * aspect-ratio selector widens SCREENWIDTH relative to it.
+       * render_aspect isn't known until the config is loaded, so the
+       * initial widen happens later in retro_load_game. */
+      base_width_43 = SCREENWIDTH;
    }
 
    var.key = "prboom-mouse_on";
@@ -1581,13 +1600,21 @@ bool retro_load_game(const struct retro_game_info *info)
    myargc = argc;
    myargv = (const char **) argv;
 
-   /* cphipps - call to video specific startup code */
-   screen_buf = (unsigned char*)malloc(SURFACE_PIXEL_DEPTH * SCREENWIDTH * SCREENHEIGHT);
+   /* cphipps - call to video specific startup code.
+    * Allocate the framebuffer at the worst-case widescreen size
+    * (MAX_SCREENWIDTH*MAX_SCREENHEIGHT) so the Aspect Ratio selector
+    * can widen SCREENWIDTH at runtime without ever reallocating. */
+   screen_buf = (unsigned char*)malloc(SURFACE_PIXEL_DEPTH * MAX_SCREENWIDTH * MAX_SCREENHEIGHT);
    if (!screen_buf)
       goto failed;
 
    if (!D_DoomMainSetup())
       goto failed;
+
+   /* Config is now loaded, so render_aspect is valid.  Apply the
+    * saved aspect ratio: widen the buffer (no-op for 4:3) and rebuild
+    * the video mode before the first frame is presented. */
+   I_SetAspectRatio();
 
    // Run few cycles to finish init.
    for (i = 0; i < 3; i++)
@@ -2423,6 +2450,35 @@ void I_StartTic(void)
    process_input();
 }
 
+/* Map render_aspect (0=4:3 1=16:9 2=16:10 3=32:9) to a buffer width
+ * for the current 4:3 base width.  Width scales as ratio/(4:3); the
+ * result is forced even and clamped to the renderer's MAX_SCREENWIDTH.
+ * At 4:3 this returns base_width_43 unchanged. */
+static int I_AspectWidth(void)
+{
+   /* ratio = num/den, expressed against a 4:3 reference. */
+   static const int num[4] = { 4, 16, 16, 32 };
+   static const int den[4] = { 3,  9, 10,  9 };
+   int idx = render_aspect;
+   int w;
+
+   if (idx < 0 || idx > 3)
+      idx = 0;
+
+   /* base_width_43 corresponds to 4:3, i.e. (height*4/3).  Scale to
+    * the target ratio: w = base_width_43 * (num/den) / (4/3). */
+   w = (int)(((int64_t)base_width_43 * num[idx] * 3) / (den[idx] * 4));
+
+   w &= ~1; /* even width keeps SCREENPITCH and drawers happy */
+
+   if (w < base_width_43)
+      w = base_width_43;
+   if (w > MAX_SCREENWIDTH)
+      w = MAX_SCREENWIDTH;
+
+   return w;
+}
+
 static void I_UpdateVideoMode(void)
 {
    R_FilterInit();
@@ -2514,6 +2570,34 @@ void I_SetRes(void)
       screens[i].height = SCREENHEIGHT;
 
    screens[4].height = (ST_SCALED_HEIGHT+1);
+}
+
+/* Apply the in-game Aspect Ratio selection at runtime.  screen_buf
+ * is allocated once at MAX_SCREENWIDTH*MAX_SCREENHEIGHT, so changing
+ * the aspect only changes SCREENWIDTH/SCREENPITCH (never reallocates).
+ * We rebuild the video mode, recompute the view size (the renderer
+ * derives the widened FOV from the new buffer dimensions) and tell
+ * the frontend the geometry changed so it can re-fit the window. */
+void I_SetAspectRatio(void)
+{
+   extern int screenblocks;
+   int new_width = I_AspectWidth();
+
+   if (new_width == SCREENWIDTH)
+      return;
+
+   SCREENWIDTH = new_width;
+   SCREENPITCH = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
+
+   I_UpdateVideoMode();
+   R_SetViewSize(screenblocks);
+
+   if (environ_cb)
+   {
+      struct retro_system_av_info av;
+      retro_get_system_av_info(&av);
+      environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av);
+   }
 }
 
 /* i_system - i_main */

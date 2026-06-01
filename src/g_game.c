@@ -2668,8 +2668,10 @@ static dbool   CheckForOverrun(const uint8_t *start_p, const uint8_t *current_p,
   {
     if (failonerror)
       I_Error("G_ReadDemoHeader: wrong demo header\n");
-    else
-      return TRUE;
+    /* I_Error is non-fatal in this core (it logs and returns), so we must
+     * still report the overrun to the caller -- otherwise G_ReadDemoHeader
+     * keeps reading past the end of the demo buffer and crashes. */
+    return TRUE;
   }
   return FALSE;
 }
@@ -2707,10 +2709,16 @@ static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, dbool
      // This prepended 255 is here to prevent non-UMAPINFO ports from recognizing the demo.
      demover = *demo_p++;
      if (!U_mapinfo.mapcount)
+     {
        I_Error("UMAPINFO not loaded but trying to play a demo recorded with it");
+       return NULL;
+     }
    }
    else if (U_mapinfo.mapcount)
+   {
      I_Error("UMAPINFO loaded but trying to play a demo recorded without it");
+     return NULL;
+   }
 
    // e6y
    // Handling of unrecognized demo formats
@@ -2723,6 +2731,7 @@ static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, dbool
             (demover == 221)))
    {
       I_Error("G_ReadDemoHeader: Unknown demo format %d.", demover);
+      return NULL; /* I_Error is non-fatal here; bail rather than parse garbage */
    }
 
    if (demover < 200)     // Autodetect old demos
@@ -2871,7 +2880,10 @@ static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, dbool
    }
 
    if (sizeof(comp_lev_str)/sizeof(comp_lev_str[0]) != MAX_COMPATIBILITY_LEVEL)
+   {
       I_Error("G_ReadDemoHeader: compatibility level strings incomplete");
+      return NULL;
+   }
    lprintf(LO_INFO, "G_DoPlayDemo: playing demo with %s compatibility\n",
          comp_lev_str[compatibility_level]);
 
@@ -2926,6 +2938,23 @@ void G_DoPlayDemo(void)
   demolength = W_LumpLength(demolumpnum);
 
   demo_p = G_ReadDemoHeader(demobuffer, demolength, TRUE);
+
+  if (!demo_p)
+  {
+    /* Invalid / truncated demo header.  G_ReadDemoHeader has already
+     * logged the reason.  Don't enter playback with a NULL demo pointer
+     * (the ticker would dereference it); release the lump and advance the
+     * title-screen demo loop to the next item instead. */
+    if (demolumpnum != -1)
+    {
+      W_UnlockLumpNum(demolumpnum);
+      demolumpnum = -1;
+    }
+    gameaction = ga_nothing;
+    demoplayback = FALSE;
+    D_AdvanceDemo();
+    return;
+  }
 
   gameaction = ga_nothing;
   usergame = FALSE;

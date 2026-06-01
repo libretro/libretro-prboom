@@ -837,6 +837,74 @@ static void ST_drawWidgets(dbool refresh)
 
 
 
+/*
+ * Minimal Heretic status bar.
+ *
+ * Heretic's bar is a 42px-tall strip at the bottom built from its own
+ * lumps (BARBACK background, STATBAR stat panel) with the big "IN" number
+ * font for health and ammo. This is intentionally a reduced version: it
+ * draws the bar frame and the health / ready-ammo readouts so the bottom
+ * of the screen shows the real bar instead of framebuffer residue. The
+ * artifact bar, life-gem chain, key/armor icons and the inventory are a
+ * later, fuller sb_bar port.
+ *
+ * Coordinates are in the 320x200 base space (V_DrawNumPatch with
+ * VPT_STRETCH maps them to the scaled screen). The bar top is at
+ * y = 200 - 42 = 158.
+ */
+
+#define HST_Y        158   /* top of the 42px Heretic bar */
+
+/* Draw a right-aligned up-to-3-digit number using the Heretic IN font
+ * (each glyph 9px wide). x is the left edge of the hundreds glyph. */
+static void ST_HereticDrawINumber(int val, int x, int y)
+{
+  char name[9];
+  int  d;
+
+  if (val < 0)
+    val = 0;
+
+  if (val > 99)
+  {
+    d = (val / 100) % 10;
+    sprintf(name, "IN%d", d);
+    if (W_CheckNumForName(name) >= 0)
+      V_DrawNamePatch(x, y, FG, name, CR_DEFAULT, VPT_STRETCH);
+  }
+  if (val > 9)
+  {
+    d = (val / 10) % 10;
+    sprintf(name, "IN%d", d);
+    if (W_CheckNumForName(name) >= 0)
+      V_DrawNamePatch(x + 9, y, FG, name, CR_DEFAULT, VPT_STRETCH);
+  }
+  d = val % 10;
+  sprintf(name, "IN%d", d);
+  if (W_CheckNumForName(name) >= 0)
+    V_DrawNamePatch(x + 18, y, FG, name, CR_DEFAULT, VPT_STRETCH);
+}
+
+static void ST_HereticDrawer(void)
+{
+  player_t *plyr = &players[displayplayer];
+  int       ammo;
+
+  /* Background frame + stat panel. */
+  if (W_CheckNumForName("BARBACK") >= 0)
+    V_DrawNamePatch(ST_X, HST_Y, FG, "BARBACK", CR_DEFAULT, VPT_STRETCH);
+  if (W_CheckNumForName("STATBAR") >= 0)
+    V_DrawNamePatch(34, HST_Y + 11, FG, "STATBAR", CR_DEFAULT, VPT_STRETCH);
+
+  /* Health (vanilla Heretic position). */
+  ST_HereticDrawINumber(plyr->health, 57, HST_Y + 12);
+
+  /* Ready-weapon ammo (the staff/gauntlets use no ammo). */
+  ammo = plyr->ammo[weaponinfo[plyr->readyweapon].ammo];
+  if (weaponinfo[plyr->readyweapon].ammo != AM_NOAMMO)
+    ST_HereticDrawINumber(ammo, 109, HST_Y + 4);
+}
+
 void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)
 {
   /* cph - let status bar on be controlled
@@ -848,10 +916,14 @@ void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)
   ST_doPaletteStuff();  // Do red-/gold-shifts from damage/items
 
   /* The Doom status bar widgets/background are not loaded for Heretic
-   * (see ST_loadGraphics). Drawing them would use uninitialised patches.
-   * The Heretic status bar is drawn elsewhere; skip the Doom bar. */
+   * (see ST_loadGraphics). Draw the Heretic bar instead (its own lumps),
+   * then return before the Doom bar code. */
   if (heretic)
+  {
+    if (statusbaron)
+      ST_HereticDrawer();
     return;
+  }
 
   if (statusbaron) {
     if (st_firsttime)

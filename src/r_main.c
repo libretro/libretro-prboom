@@ -806,6 +806,22 @@ void R_RenderPlayerView (player_t* player)
       unsigned char color=(gametic % 20) < 9 ? 0xb0 : 0;
       V_FillRect(0, 0, viewwidth, viewheight, color);
     }
+    else if (render_aspect != 0)
+    {
+      /* hor+ widescreen: projection rounding at the extreme view edges
+       * can leave a 1-2px column with no wall or plane covering it,
+       * which then shows stale framebuffer content (the direct-render
+       * buffer is never otherwise cleared).  Paint the two edge columns
+       * black up front so any such gap is defined rather than garbage.
+       * This is cheap (a few columns) and only runs in widened aspects;
+       * 4:3 always achieves full coverage and keeps the zero-clear
+       * path.  A wider margin than 1px guards against rounding landing
+       * on either of the outermost columns. */
+      int m = 4;
+      if (m > viewwidth) m = viewwidth;
+      V_FillRect(0, 0, m, viewheight, 0);
+      V_FillRect(viewwidth - m, 0, m, viewheight, 0);
+    }
 
   // The head node is the last node output.
   R_RenderBSPNode (numnodes-1);

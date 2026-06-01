@@ -275,6 +275,7 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
       new_pl->yoffs = pl->yoffs;
       new_pl->minx = start;
       new_pl->maxx = stop;
+      new_pl->modified = 0;
       memset(new_pl->top, 0xff, sizeof new_pl->top);
       return new_pl;
 }
@@ -312,6 +313,7 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
    check->maxx = -1;
    check->xoffs = xoffs;               // killough 2/28/98: Save offsets
    check->yoffs = yoffs;
+   check->modified = 0;
 
    memset (check->top, 0xff, sizeof check->top);
 
@@ -390,6 +392,9 @@ static void R_DoDrawPlane(visplane_t *pl)
    R_DrawColumn_f colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, drawvars.filterwall, drawvars.filterz);
 
    R_SetDefaultDrawColumnVars(&dcvars);
+
+   if (!pl->modified)
+      return;
 
    if (pl->minx <= pl->maxx)
    {

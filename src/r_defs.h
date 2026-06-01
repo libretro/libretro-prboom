@@ -409,6 +409,7 @@ typedef struct visplane
   int picnum, lightlevel, minx, maxx;
   fixed_t height;
   fixed_t xoffs, yoffs;         // killough 2/28/98: Support scrolling flats
+  byte modified;              // set when a seg actually writes a span here
   unsigned int pad1;          // leave pads for [minx-1]/[maxx+1]
   unsigned int top[MAX_SCREENWIDTH];
   unsigned int pad2, pad3;    // killough 2/8/98, 4/25/98

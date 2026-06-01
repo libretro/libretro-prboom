@@ -390,12 +390,20 @@ static void R_RenderSegLoop (void)
 
    for ( ; rw_x < rw_stopx ; rw_x++)
    {
+      /* cache the per-column clip bounds in locals for the body of the
+       * iteration; the array slots are only re-read/written here, so we
+       * load once, work in registers, and store back at the end.  This
+       * removes the repeated ceilingclip[rw_x]/floorclip[rw_x] address
+       * computations from the renderer's hottest loop. */
+      int cc_rwx = ceilingclip[rw_x];
+      int fc_rwx = floorclip[rw_x];
+
       /* mark floor / ceiling areas */
       int yh = bottomfrac>>heightbits;
       int yl = (topfrac+heightunit-1)>>heightbits;
 
       // no space above wall?
-      int bottom,top = ceilingclip[rw_x]+1;
+      int bottom,top = cc_rwx+1;
 
       if (yl < top)
          yl = top;
@@ -404,36 +412,38 @@ static void R_RenderSegLoop (void)
       {
          bottom = yl-1;
 
-         if (bottom >= floorclip[rw_x])
-            bottom = floorclip[rw_x]-1;
+         if (bottom >= fc_rwx)
+            bottom = fc_rwx-1;
 
          if (top <= bottom)
          {
             ceilingplane->top[rw_x] = top;
             ceilingplane->bottom[rw_x] = bottom;
+            ceilingplane->modified = 1;
          }
          // SoM: this should be set here
-         ceilingclip[rw_x] = bottom;
+         cc_rwx = bottom;
       }
 
       //      yh = bottomfrac>>heightbits;
 
-      bottom = floorclip[rw_x]-1;
+      bottom = fc_rwx-1;
       if (yh > bottom)
          yh = bottom;
 
       if (markfloor)
       {
 
-         top  = yh < ceilingclip[rw_x] ? ceilingclip[rw_x] : yh;
+         top  = yh < cc_rwx ? cc_rwx : yh;
 
          if (++top <= bottom)
          {
             floorplane->top[rw_x] = top;
             floorplane->bottom[rw_x] = bottom;
+            floorplane->modified = 1;
          }
          // SoM: This should be set here to prevent overdraw
-         floorclip[rw_x] = top;
+         fc_rwx = top;
       }
 
       // texturecolumn and lighting are independent of wall tiers
@@ -471,8 +481,8 @@ static void R_RenderSegLoop (void)
          colfunc (&dcvars);
          R_UnlockTextureCompositePatchNum(midtexture);
          tex_patch = NULL;
-         ceilingclip[rw_x] = viewheight;
-         floorclip[rw_x] = -1;
+         cc_rwx = viewheight;
+         fc_rwx = -1;
       }
       else
       {
@@ -484,8 +494,8 @@ static void R_RenderSegLoop (void)
             int mid = pixhigh>>heightbits;
             pixhigh += pixhighstep;
 
-            if (mid >= floorclip[rw_x])
-               mid = floorclip[rw_x]-1;
+            if (mid >= fc_rwx)
+               mid = fc_rwx-1;
 
             if (mid >= yl)
             {
@@ -500,16 +510,16 @@ static void R_RenderSegLoop (void)
                colfunc (&dcvars);
                R_UnlockTextureCompositePatchNum(toptexture);
                tex_patch = NULL;
-               ceilingclip[rw_x] = mid;
+               cc_rwx = mid;
             }
             else
-               ceilingclip[rw_x] = yl-1;
+               cc_rwx = yl-1;
          }
          else  // no top wall
          {
 
             if (markceiling)
-               ceilingclip[rw_x] = yl-1;
+               cc_rwx = yl-1;
          }
 
          if (bottomtexture)          // bottom wall
@@ -518,8 +528,8 @@ static void R_RenderSegLoop (void)
             pixlow += pixlowstep;
 
             // no space above wall?
-            if (mid <= ceilingclip[rw_x])
-               mid = ceilingclip[rw_x]+1;
+            if (mid <= cc_rwx)
+               mid = cc_rwx+1;
 
             if (mid <= yh)
             {
@@ -534,21 +544,21 @@ static void R_RenderSegLoop (void)
                colfunc (&dcvars);
                R_UnlockTextureCompositePatchNum(bottomtexture);
                tex_patch = NULL;
-               floorclip[rw_x] = mid;
+               fc_rwx = mid;
             }
             else
-               floorclip[rw_x] = yh+1;
+               fc_rwx = yh+1;
          }
          else        // no bottom wall
          {
             if (markfloor)
-               floorclip[rw_x] = yh+1;
+               fc_rwx = yh+1;
          }
 
          // cph - if we completely blocked further sight through this column,
          // add this info to the solid columns array for r_bsp.c
          if ((markceiling || markfloor) &&
-               (floorclip[rw_x] <= ceilingclip[rw_x] + 1)) {
+               (fc_rwx <= cc_rwx + 1)) {
             solidcol[rw_x] = 1; didsolidcol = 1;
          }
 
@@ -556,6 +566,10 @@ static void R_RenderSegLoop (void)
          if (maskedtexture)
             maskedtexturecol[rw_x] = texturecolumn;
       }
+
+      /* store the cached clip bounds back for this column */
+      ceilingclip[rw_x] = cc_rwx;
+      floorclip[rw_x]   = fc_rwx;
 
       rw_scale += rw_scalestep;
       topfrac += topstep;

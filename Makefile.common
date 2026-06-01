@@ -105,7 +105,6 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/z_bmalloc.c \
 				 $(CORE_DIR)/lprintf.c \
 				 $(CORE_DIR)/wi_stuff.c \
-				 $(CORE_DIR)/md5.c \
 				 $(CORE_DIR)/d_client.c \
 				 $(CORE_DIR)/memio.c \
 				 $(CORE_DIR)/mus2mid.c \

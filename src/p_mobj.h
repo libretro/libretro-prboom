@@ -315,6 +315,21 @@ enum {
 #define MF2_COUNTSECRET   0x0004000000000000ull /* pickup counts as secret */
 #define MF2_BLASTED       0x0008000000000000ull /* blasted by Hexen disc */
 
+/* Heretic weapon-ammo pickup amounts (encoded in the spawnhealth field of
+ * the weapon mobjinfo entries). */
+#define AMMO_GWND_WIMPY 10
+#define AMMO_GWND_HEFTY 50
+#define AMMO_CBOW_WIMPY 5
+#define AMMO_CBOW_HEFTY 20
+#define AMMO_BLSR_WIMPY 10
+#define AMMO_BLSR_HEFTY 25
+#define AMMO_SKRD_WIMPY 20
+#define AMMO_SKRD_HEFTY 100
+#define AMMO_PHRD_WIMPY 1
+#define AMMO_PHRD_HEFTY 10
+#define AMMO_MACE_WIMPY 20
+#define AMMO_MACE_HEFTY 100
+
 
 // Map Object definition.
 //

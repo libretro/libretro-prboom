@@ -146,17 +146,15 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
       dsvars->ystep = cachedystep[y] = FixedMul (viewcos, planeheight) / dy;
 
       /* hor+ widescreen widens the horizontal FOV (focallength <
-       * centerxfrac), but xstep/ystep are derived from the vertical
-       * focal length via dy, implicitly assuming the vanilla isotropic
-       * 4:3 projection where horizontal and vertical focal lengths are
-       * equal.  Left uncorrected the floor/ceiling texture is mapped
-       * with a narrower horizontal spread than the widened walls, so it
-       * slides relative to the geometry as the view moves -- most
-       * visible at 32:9.  Scale the per-pixel horizontal step by
-       * centerxfrac/projectionx so the plane mapping matches the
-       * widened column-to-angle relation; the dx*xstep span origin then
-       * follows automatically and spans do not shear.  At 4:3
-       * projectionx == centerxfrac, so the scale is unity. */
+       * centerxfrac).  The plane walk rate xstep/ystep is derived from
+       * the vertical focal length via dy, implicitly assuming the
+       * vanilla isotropic 4:3 projection (horizontal focal == vertical).
+       * Uncorrected, the floor is mapped with the narrow centerxfrac
+       * column-to-world relation while the walls use the widened
+       * focallength one, so the floor slides against the geometry as the
+       * view turns.  Scale the walk by centerxfrac/projectionx
+       * (projectionx == focallength) to match.  At 4:3 projectionx ==
+       * centerxfrac and this is a no-op. */
       {
          extern fixed_t projectionx;
          if (projectionx && projectionx != centerxfrac)
@@ -175,9 +173,17 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
       dsvars->ystep = cachedystep[y];
    }
 
+   /* dx*xstep must be computed in 64 bits: at wide aspects dx reaches
+    * +/-(viewwidth/2) (~1280 at 2560) and xstep is large for near rows,
+    * so the 32-bit product overflows and wraps -- which manifests as the
+    * floor texture warping/jumping as the view pans (panning changes
+    * which spans are near and flips the overflow on and off).  Vanilla
+    * narrowly avoided this at 320-wide; widescreen does not. */
    dx = x1 - centerx;
-   dsvars->xfrac = xoffs + viewx + FixedMul(viewcos, distance) + dx * dsvars->xstep;
-   dsvars->yfrac = yoffs - viewy - FixedMul(viewsin, distance) + dx * dsvars->ystep;
+   dsvars->xfrac = xoffs + viewx + FixedMul(viewcos, distance)
+                 + (fixed_t)((int64_t)dx * dsvars->xstep);
+   dsvars->yfrac = yoffs - viewy - FixedMul(viewsin, distance)
+                 + (fixed_t)((int64_t)dx * dsvars->ystep);
 
    if (drawvars.filterfloor == RDRAW_FILTER_LINEAR) {
       dsvars->xfrac -= (FRACUNIT>>1);

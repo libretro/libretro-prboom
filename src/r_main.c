@@ -87,7 +87,7 @@ player_t *viewplayer;
 fixed_t  focallength;
 int      fieldofview;
 /* Display aspect ratio selector (in-game General/Video menu).
- * 0 = 4:3, 1 = 16:9, 2 = 16:10, 3 = 32:9.  The libretro layer reads
+ * 0 = 4:3, 1 = 16:9, 2 = 16:10, 3 = 32:9, 4 = 21:9.  The libretro layer reads
  * this to size the render buffer width; the renderer itself derives
  * FOV from the resulting buffer dimensions and needs no other input. */
 int      render_aspect;
@@ -333,12 +333,12 @@ static void R_InitTextureMapping (void)
      * ratio, then anchor focallength to it.  At 4:3 the ratio is 1:1
      * so cx43frac == centerxfrac and the result is bit-identical to
      * vanilla. */
-    static const int num[4] = { 4, 16, 16, 32 };
-    static const int den[4] = { 3,  9, 10,  9 };
+    static const int num[5] = { 4, 16, 16, 32, 64 };
+    static const int den[5] = { 3,  9, 10,  9, 27 };
     int a = render_aspect;
     fixed_t cx43frac;
 
-    if (a < 0 || a > 3)
+    if (a < 0 || a > 4)
       a = 0;
 
     /* centerx_4:3 = centerx * (4:3) / (num/den)

@@ -690,6 +690,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
     case 1:  info->geometry.aspect_ratio = 16.0 / 9.0;  break;
     case 2:  info->geometry.aspect_ratio = 16.0 / 10.0; break;
     case 3:  info->geometry.aspect_ratio = 32.0 / 9.0;  break;
+    case 4:  info->geometry.aspect_ratio = 64.0 / 27.0; break;
     default: info->geometry.aspect_ratio = 4.0 / 3.0;   break;
   }
 }
@@ -2476,12 +2477,12 @@ void I_StartTic(void)
 static int I_AspectWidth(void)
 {
    /* ratio = num/den, expressed against a 4:3 reference. */
-   static const int num[4] = { 4, 16, 16, 32 };
-   static const int den[4] = { 3,  9, 10,  9 };
+   static const int num[5] = { 4, 16, 16, 32, 64 };
+   static const int den[5] = { 3,  9, 10,  9, 27 };
    int idx = render_aspect;
    int w;
 
-   if (idx < 0 || idx > 3)
+   if (idx < 0 || idx > 4)
       idx = 0;
 
    /* base_width_43 corresponds to 4:3, i.e. (height*4/3).  Scale to
@@ -2654,6 +2655,7 @@ static void I_ApplyAspectRatio(void)
          case 1:  geom.aspect_ratio = 16.0f / 9.0f;  break;
          case 2:  geom.aspect_ratio = 16.0f / 10.0f; break;
          case 3:  geom.aspect_ratio = 32.0f / 9.0f;  break;
+         case 4:  geom.aspect_ratio = 64.0f / 27.0f; break;
          default: geom.aspect_ratio = 4.0f / 3.0f;   break;
       }
       environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geom);

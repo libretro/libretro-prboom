@@ -137,6 +137,7 @@ extern void V_DrawNumPatch(int x, int y, int scrn,
 extern void V_DrawBackground(const char* flatname, int scrn);
 
 void V_DestroyTrueColorPalette(void);
+void V_UpdateTrueColorPalette(void);
 // CPhipps - function to set the palette to palette number pal.
 void V_SetPalette(int pal);
 

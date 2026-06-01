@@ -2630,6 +2630,15 @@ static void I_ApplyAspectRatio(void)
    I_UpdateVideoMode();
    R_SetViewSize(screenblocks);
 
+   /* I_UpdateVideoMode -> V_DestroyTrueColorPalette frees the 16-bit
+    * palette and leaves V_Palette16 NULL.  At startup the subsequent
+    * V_SetPalette rebuilds it, but on a runtime aspect change nothing
+    * else does, so the next R_RenderPlayerView dereferences a NULL
+    * V_Palette16 in the column/span drawers.  Rebuild it here from the
+    * current palette index. */
+   if (W_CheckNumForName("PLAYPAL") >= 0)
+      V_UpdateTrueColorPalette();
+
    /* SET_GEOMETRY may only be called from within retro_run().  At
     * load (before the main loop) we skip it: retro_get_system_av_info
     * already reports the correct aspect for the initial geometry. */

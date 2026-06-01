@@ -549,19 +549,14 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    // decide which patch to use for sprite relative to player
    sprdef = &sprites[thing->sprite];
 
-   if (!sprdef->numframes)
-   {
-      const spritenum_t fallback = states[S_NULL].sprite; // Use the sprite from the dummy state
-      I_Error ("R_ProjectSprite: Using fallback for sprite (%i) with missing spriteframes!",
-               thing->sprite);
-      *sprdef = sprites[fallback];
-      if (!sprdef->spriteframes)
-      {
-         I_Error ("R_ProjectSprite: fallback missing! sprite won't be rendered");
-         *sprdef = sprites[SPR_TNT1];
-         return;
-      }
-   }
+   /* If the sprite has no frames (an extended sprite whose name was never
+    * registered, or whose lumps are absent), there is nothing to draw.
+    * The old code substituted states[S_NULL].sprite (SPR_TROO) -- which
+    * made such things render as an imp -- and worse, wrote that into the
+    * shared sprites[] entry, permanently corrupting it for every other
+    * actor using the same sprite.  Just skip rendering instead. */
+   if (!sprdef->numframes || !sprdef->spriteframes)
+      return;
 
    sprframe = &sprdef->spriteframes[thing->frame & FF_FRAMEMASK];
 

@@ -78,6 +78,40 @@ static void dsda_BuildDehExtraSfxNames(void)
   dehextra_sfx_ready = 1;
 }
 
+/* DEHEXTRA also reserves a fixed block of "free" sprite slots: the 100
+ * names SP00..SP99 occupy sprite indices 145..244 in the standard
+ * DEHEXTRA layout (dsda-doom ships them as stock sprnames entries).  This
+ * Doom-only core's sprnames seed stops at the vanilla NUMSPRITES (144),
+ * so mods built against the DEHEXTRA base (e.g. Eviternity II) referenced
+ * sprites that did not exist -- their things rendered with the wrong
+ * sprite or none at all.  Materialise the range here, same as the sounds
+ * above; the [SPRITES] block then renames whichever slots the mod uses.
+ *
+ * sprnames entries are "const char *" and are not individually freed, so
+ * back them with a stable file-scope buffer. */
+#define DEHEXTRA_SPR_FIRST 145
+#define DEHEXTRA_SPR_COUNT 100
+#define DEHEXTRA_SPR_END   (DEHEXTRA_SPR_FIRST + DEHEXTRA_SPR_COUNT) /* 245 */
+
+static char dehextra_spr_name[DEHEXTRA_SPR_COUNT][5]; /* "SPNN" + NUL */
+static int  dehextra_spr_ready;
+
+static void dsda_BuildDehExtraSpriteNames(void)
+{
+  int n;
+  if (dehextra_spr_ready)
+    return;
+  for (n = 0; n < DEHEXTRA_SPR_COUNT; n++)
+  {
+    char *s = dehextra_spr_name[n];
+    s[0] = 'S'; s[1] = 'P';
+    s[2] = (char)('0' + (n / 10) % 10);
+    s[3] = (char)('0' + (n)      % 10);
+    s[4] = '\0';
+  }
+  dehextra_spr_ready = 1;
+}
+
 /* MUSINFO uses a scratch music slot one past the last real entry
  * (S_music[NUMMUSIC]); reserve it so that index stays in bounds. */
 #define MUSIC_EXTRA 1
@@ -283,9 +317,25 @@ void dsda_InitTables(void)
   /* sprnames keeps its trailing NULL terminator slot (seed is [NUMSPRITES+1]
    * with sprnames_seed[NUMSPRITES] == NULL); copy it so any terminator-aware
    * consumer still sees a NULL after the real names. */
-  sprnames = malloc((num_sprites + 1) * sizeof(*sprnames));
-  memcpy(sprnames, sprnames_seed, num_sprites * sizeof(*sprnames));
-  sprnames[num_sprites] = NULL;
+  {
+    int spr_alloc = num_sprites;
+    if (spr_alloc < DEHEXTRA_SPR_END)
+      spr_alloc = DEHEXTRA_SPR_END;
+    sprnames = malloc((spr_alloc + 1) * sizeof(*sprnames));
+    memcpy(sprnames, sprnames_seed, num_sprites * sizeof(*sprnames));
+    if (num_sprites < DEHEXTRA_SPR_END)
+    {
+      int s;
+      /* zero the gap between the seed end and the DEHEXTRA range start */
+      for (s = num_sprites; s < DEHEXTRA_SPR_FIRST; s++)
+        sprnames[s] = NULL;
+      dsda_BuildDehExtraSpriteNames();
+      for (s = 0; s < DEHEXTRA_SPR_COUNT; s++)
+        sprnames[DEHEXTRA_SPR_FIRST + s] = dehextra_spr_name[s];
+      num_sprites = DEHEXTRA_SPR_END;
+    }
+    sprnames[num_sprites] = NULL;
+  }
 
   S_sfx = malloc(num_sfx * sizeof(*S_sfx));
   memcpy(S_sfx, S_sfx_seed, num_sfx * sizeof(*S_sfx));

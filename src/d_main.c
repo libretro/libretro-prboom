@@ -83,6 +83,7 @@
 #include "r_fps.h"
 #include "d_main.h"
 #include "d_deh.h"  // Ty 04/08/98 - Externalizations
+#include "dsda_hacked.h"
 #include "lprintf.h"  // jff 08/03/98 - declaration of lprintf
 #include "am_map.h"
 #include "u_mapinfo.h"
@@ -1246,6 +1247,14 @@ bool D_DoomMainSetup(void)
   DoLooseFiles();  // Ty 08/29/98 - handle "loose" files on command line
   if (!IdentifyVersion())
      goto failed;
+
+  /* D_BuildBEXTables above seeded the dynamic tables before the game type
+   * was known (it runs before IdentifyVersion), so they were seeded as
+   * Doom. Now that IdentifyVersion has set heretic/gamemission, re-seed so
+   * Heretic gets its own states/mobjinfo/sprites/sounds. dsda_InitTables
+   * frees the previous copies first, so re-running is safe. For Doom this
+   * is a harmless reseed of identical data. */
+  dsda_InitTables();
 
   // Load prboom.wad after IWAD but before everything else
   {

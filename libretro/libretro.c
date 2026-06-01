@@ -2464,9 +2464,15 @@ void I_StartTic(void)
 }
 
 /* Map render_aspect (0=4:3 1=16:9 2=16:10 3=32:9) to a buffer width
- * for the current 4:3 base width.  Width scales as ratio/(4:3); the
- * result is forced even and clamped to the renderer's MAX_SCREENWIDTH.
- * At 4:3 this returns base_width_43 unchanged. */
+ * for the current 4:3 base width.  Width scales as ratio/(4:3) and is
+ * rounded DOWN to a multiple of 4, then clamped to MAX_SCREENWIDTH.
+ * The multiple-of-4 requirement is hard: the software column drawer
+ * batches four columns and quad-flushes them (R_FlushQuad16 writes
+ * dest[0..3] per row), so a viewwidth that isn't a multiple of 4
+ * makes the final batch write past the view edge and corrupts memory.
+ * Every stock 4:3 resolution width is already a multiple of 4, so the
+ * widened width must preserve that.  At 4:3 this returns
+ * base_width_43 unchanged. */
 static int I_AspectWidth(void)
 {
    /* ratio = num/den, expressed against a 4:3 reference. */
@@ -2482,7 +2488,7 @@ static int I_AspectWidth(void)
     * the target ratio: w = base_width_43 * (num/den) / (4/3). */
    w = (int)(((int64_t)base_width_43 * num[idx] * 3) / (den[idx] * 4));
 
-   w &= ~1; /* even width keeps SCREENPITCH and drawers happy */
+   w &= ~3; /* MUST be a multiple of 4 for the quad-column drawer */
 
    if (w < base_width_43)
       w = base_width_43;

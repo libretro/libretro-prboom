@@ -489,12 +489,21 @@ void D_AdvanceDemo (void)
 
 static void D_SetPageName(const char *name)
 {
+  /* Heretic's full-screen title lump is named TITLE, not Doom's TITLEPIC;
+   * the rest of the demo-sequence page names (HELP1/HELP2/CREDIT) match.
+   * Map the one that differs so the boot title does not abort on a
+   * missing lump. */
+  if (heretic && name && !strcmp(name, "TITLEPIC"))
+    name = "TITLE";
   pagename = name;
 }
 
 static void D_DrawTitle1(const char *name)
 {
-  S_StartMusic(mus_intro);
+  /* mus_intro is a Doom music index; the Heretic music table is not wired
+   * up yet, so do not start Doom title music under Heretic. */
+  if (!heretic)
+    S_StartMusic(mus_intro);
   pagetic = (TICRATE*170)/35;
   if (W_CheckNumForName("SIGILINT") != -1) // Sigil: Longer wait before playing a demo to give the title theme time to end.
     pagetic = (TICRATE*404)/35;
@@ -503,7 +512,8 @@ static void D_DrawTitle1(const char *name)
 
 static void D_DrawTitle2(const char *name)
 {
-  S_StartMusic(mus_dm2ttl);
+  if (!heretic)
+    S_StartMusic(mus_dm2ttl);
   D_SetPageName(name);
 }
 

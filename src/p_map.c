@@ -39,6 +39,7 @@
 #include "p_map.h"
 #include "p_setup.h"
 #include "p_spec.h"
+#include "map_format.h"
 #include "s_sound.h"
 #include "sounds.h"
 #include "p_inter.h"
@@ -919,7 +920,7 @@ dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
     int oldside;
     if ((oldside = P_PointOnLineSide(oldx, oldy, spechit[numspechit])) !=
         P_PointOnLineSide(thing->x, thing->y, spechit[numspechit]))
-      P_CrossSpecialLine(spechit[numspechit], oldside, thing);
+      map_format.cross_special_line(spechit[numspechit], oldside, thing);
   }
 
   return TRUE;
@@ -1544,7 +1545,7 @@ dbool PTR_ShootTraverse (intercept_t* in)
       line_t *li = in->d.line;
 
       if (li->special)
-         P_ShootSpecialLine (shootthing, li);
+         map_format.shoot_special_line(shootthing, li);
 
       if (li->flags & ML_TWOSIDED)
       {  // crosses a two sided (really 2s) line

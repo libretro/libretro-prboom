@@ -46,6 +46,7 @@
 #include "p_map.h"
 #include "p_setup.h"
 #include "p_spec.h"
+#include "map_format.h"
 #include "p_tick.h"
 #include "p_enemy.h"
 #include "s_sound.h"
@@ -1753,6 +1754,11 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    int   gl_lumpnum;
 
    R_StopAllInterpolations();
+
+   /* Select the per-game map format before any linedefs/specials are
+    * processed.  For Doom this installs the Doom descriptor (no behaviour
+    * change); Heretic/Hexen selection is added later. */
+   P_ApplyMapFormat();
 
    totallive = totalkills = totalitems = totalsecret = wminfo.maxfrags = 0;
    wminfo.partime = 180;

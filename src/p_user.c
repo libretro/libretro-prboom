@@ -38,6 +38,7 @@
 #include "r_main.h"
 #include "p_map.h"
 #include "p_spec.h"
+#include "map_format.h"
 #include "p_user.h"
 #include "r_demo.h"
 #include "r_fps.h"
@@ -823,7 +824,7 @@ void P_PlayerThink (player_t* player)
    // going to affect you, like painful floors.
 
    if (player->mo->subsector->sector->special)
-      P_PlayerInSpecialSector (player);
+      map_format.player_in_special_sector(player);
 
 #ifdef HEXEN
    if((floorType = P_GetThingFloorType(player->mo)) != FLOOR_SOLID)

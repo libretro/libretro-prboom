@@ -274,6 +274,72 @@ static gamepad_layout_t gp_modern = { // Based on Original XBOX Doom 3 Collectio
 	16,
 };
 
+/* Heretic "Gamepad Modern" layout.
+ *
+ * Heretic adds inventory and look controls on top of the Doom action set.
+ * The engine bindings the core currently exposes are the shared movement /
+ * fire / use / weapon-cycle / map / menu keys, so the inventory and look
+ * actions are labelled per the intended Heretic scheme and mapped to the
+ * nearest available engine action until dedicated Heretic binds
+ * (key_invleft / key_invright / key_useartifact / key_lookcenter / jump)
+ * are plumbed through. Movement / aim are on the analog sticks.
+ *
+ *   Left stick : Move / Strafe
+ *   Right stick: Aim / Look (turn)
+ *   R2         : Fire
+ *   L2         : Use / activate selected inventory item
+ *   R1 / L1    : Cycle inventory (right / left)
+ *   X (Cross)  : Jump / confirm
+ *   Square     : Interact / open doors
+ *   Circle     : Run / alt-fire
+ *   Triangle   : Look center
+ *   Select     : Automap
+ *   Start      : Pause menu
+ */
+static gamepad_layout_t gp_heretic_modern = {
+	{
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "D-Pad Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Run / Alt-Fire" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Jump / Confirm" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Interact / Open Door" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Look Center" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Cycle Inventory Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Cycle Inventory Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Use Inventory Item" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Fire" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "Toggle Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "180 Turn" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Automap" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Pause Menu" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Strafe" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Move" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Look" },
+		{ 0 },
+	},
+	{	// gamekey,             menukey      (indexed by RETRO_DEVICE_ID_JOYPAD)
+		{ &key_speed,           &key_menu_backspace }, // 0  B  : Run / Alt-Fire
+		{ &key_use,             &key_menu_enter },     // 1  Y  : Look Center (stand-in: use)
+		{ &key_map,             &key_menu_backspace }, // 2  SELECT: Automap
+		{ &key_menu_escape,     &key_menu_escape },    // 3  START : Pause Menu
+		{ &key_map_up,          &key_menu_up },        // 4  UP
+		{ &key_map_down,        &key_menu_down },      // 5  DOWN
+		{ &key_map_left,        &key_menu_left },      // 6  LEFT
+		{ &key_map_right,       &key_menu_right },     // 7  RIGHT
+		{ &key_menu_enter,      &key_menu_enter },     // 8  A  : Jump / Confirm (stand-in)
+		{ &key_use,             &key_menu_backspace }, // 9  X  : Interact / Open Door
+		{ &key_weaponcycledown, &key_menu_left },      // 10 L1 : Cycle Inventory Left
+		{ &key_weaponcycleup,   &key_menu_right },     // 11 R1 : Cycle Inventory Right
+		{ &key_use,             &key_menu_backspace }, // 12 L2 : Use Inventory Item (stand-in: use)
+		{ &key_fire,            &key_menu_enter },     // 13 R2 : Fire
+		{ &key_autorun,         &key_menu_enter },     // 14 L3 : Toggle Run
+		{ &key_reverse,         &key_menu_backspace }, // 15 R3 : 180 Turn
+	},
+	16,
+};
+
 static struct retro_rumble_interface rumble = {0};
 static bool rumble_enabled                  = false;
 static uint16_t rumble_damage_strength      = 0;
@@ -761,9 +827,9 @@ void retro_set_environment(retro_environment_t cb)
    struct retro_vfs_interface_info vfs_iface_info;
    static bool libretro_supports_option_categories = false;
    static const struct retro_controller_description port[] = {
-		{ "Gamepad Modern", RETROPAD_MODERN },
-		{ "Gamepad Classic", RETROPAD_CLASSIC },
-		{ "RetroKeyboard/Mouse", RETRO_DEVICE_KEYBOARD },
+		{ "Gamepad Modern (OG Xbox Doom 3)", RETROPAD_MODERN },
+		{ "Doom Gamepad Classic (PS1)", RETROPAD_CLASSIC },
+		{ "Doom RetroKeyboard/Mouse", RETRO_DEVICE_KEYBOARD },
 		{ 0 },
    };
 
@@ -798,7 +864,11 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 			break;
 		case RETROPAD_MODERN:
 			doom_devices[port] = RETROPAD_MODERN;
-			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_modern.desc);
+			{
+				extern dbool heretic;
+				environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+				           heretic ? gp_heretic_modern.desc : gp_modern.desc);
+			}
 			break;
 		case RETRO_DEVICE_KEYBOARD:
 			doom_devices[port] = RETRO_DEVICE_KEYBOARD;
@@ -1711,6 +1781,31 @@ bool retro_load_game(const struct retro_game_info *info)
    if (!D_DoomMainSetup())
       goto failed;
 
+   /* Game type (Doom vs Heretic) is now known. The controller info was
+    * registered with Doom device names in retro_set_environment (before
+    * any game was loaded); for Heretic, re-register with Heretic names so
+    * the frontend's device list and the Gamepad Modern bindings reflect
+    * the Heretic control scheme. */
+   {
+      extern dbool heretic;
+      if (heretic)
+      {
+         static const struct retro_controller_description heretic_port[] = {
+            { "Heretic Gamepad Modern", RETROPAD_MODERN },
+            { "Heretic Gamepad Classic", RETROPAD_CLASSIC },
+            { "Heretic RetroKeyboard/Mouse", RETRO_DEVICE_KEYBOARD },
+            { 0 },
+         };
+         static const struct retro_controller_info heretic_ports[] = {
+            { heretic_port, 3 },
+            { NULL, 0 },
+         };
+         environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)heretic_ports);
+         /* Refresh the active descriptors for the current device. */
+         retro_set_controller_port_device(0, doom_devices[0]);
+      }
+   }
+
    /* Config is now loaded, so render_aspect is valid.  Apply the
     * saved aspect ratio directly here: this runs before the main
     * loop starts, so there is no in-flight render to race -- widen
@@ -2408,7 +2503,11 @@ process_input(void)
                if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i))
                   ret |= (1 << i);
          }
-			process_gamepad_buttons(ret, gp_modern.num_buttons, gp_modern.action_lut);
+         {
+            extern dbool heretic;
+            gamepad_layout_t *gp = heretic ? &gp_heretic_modern : &gp_modern;
+            process_gamepad_buttons(ret, gp->num_buttons, gp->action_lut);
+         }
 			process_gamepad_left_analog();
 			process_gamepad_right_analog(ret & (1 << RETRO_DEVICE_ID_JOYPAD_Y), ret & (1 << RETRO_DEVICE_ID_JOYPAD_L2));
 			break;

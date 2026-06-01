@@ -2794,7 +2794,10 @@ void A_WeaponBulletAttack(player_t *player, pspdef_t *psp)
 
   for (i = 0; i < numbullets; i++)
   {
-    damage = (P_Random(pr_mbf21) % damagemod + 1) * damagebase;
+    /* MBF21 allows damagemod == 0 (deterministic damage); guard the
+     * modulo so a WAD-supplied 0 cannot raise SIGFPE.  mod 0 => no spread. */
+    int dmgrand = (damagemod > 0) ? (P_Random(pr_mbf21) % damagemod) : 0;
+    damage = (dmgrand + 1) * damagebase;
     angle  = (int)player->mo->angle + P_RandomHitscanAngle(pr_mbf21, hspread);
     slope  = bulletslope + P_RandomHitscanSlope(pr_mbf21, vspread);
     P_LineAttack(player->mo, angle, MISSILERANGE, slope, damage);
@@ -2819,7 +2822,8 @@ void A_WeaponMeleeAttack(player_t *player, pspdef_t *psp)
   if (range == 0)
     range = player->mo->info->meleerange;
 
-  damage = (P_Random(pr_mbf21) % damagemod + 1) * damagebase;
+  /* MBF21 allows damagemod == 0 (deterministic damage); guard the modulo. */
+  damage = ((damagemod > 0 ? (P_Random(pr_mbf21) % damagemod) : 0) + 1) * damagebase;
   if (player->powers[pw_strength])
     damage = (damage * zerkfactor) >> FRACBITS;
 

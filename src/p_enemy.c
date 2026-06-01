@@ -3028,7 +3028,8 @@ void A_MonsterMeleeAttack(mobj_t *actor)
     return;
 
   S_StartSound(actor, hitsound);
-  damage = (P_Random(pr_mbf21) % damagemod + 1) * damagebase;
+  /* MBF21 allows damagemod == 0 (deterministic damage); guard the modulo. */
+  damage = ((damagemod > 0 ? (P_Random(pr_mbf21) % damagemod) : 0) + 1) * damagebase;
   P_DamageMobj(actor->target, actor, actor, damage);
 }
 

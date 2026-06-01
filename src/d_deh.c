@@ -1858,12 +1858,18 @@ static void deh_procBexCodePointers(DEHFILE *fpin, FILE* fpout, char *line)
 
       deh_log("Processing pointer at index %d: %s\n",
                          indexnum, mnemonic);
-      if (indexnum < 0 || indexnum >= NUMSTATES)
+      /* DSDHacked: a [CODEPTR] line may target a state beyond the static
+       * NUMSTATES seed (extended frames are created on demand).  Bound the
+       * index by the same sanity cap the Frame/Pointer blocks use and grow
+       * the state table so the action pointer lands on a real slot, rather
+       * than rejecting every extended frame against the static count. */
+      if (indexnum < 0 || indexnum >= 1000000)
         {
           deh_log("Bad pointer number %d of %d\n",
-                             indexnum, NUMSTATES);
+                             indexnum, 1000000);
           return; // killough 10/98: fix SegViol
         }
+      dsda_GetState(indexnum);
       strcpy(key,"A_");  // reusing the key area to prefix the mnemonic
       strcat(key,ptr_lstrip(mnemonic));
 

@@ -686,7 +686,7 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
 		  RETRO_VFS_FILE_ACCESS_HINT_NONE
 		  )))
   {
-    int ud=0,rg=0,sw=0,cm=0,sc=0;
+    int ud=0,rg=0,sw=0,cm=0,sc=0,htic=0;
 
     // Identify IWAD correctly
     wadinfo_t header;
@@ -741,6 +741,13 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
                   fileinfo[length].name[4] == '2')
                 ++sc;
         }
+        else if (!strncmp(fileinfo[length].name, "M_HTIC", 6))
+        {
+          /* M_HTIC is the Heretic main-menu title graphic; it is unique to
+           * a Heretic IWAD (Doom never carries it).  This distinguishes a
+           * Heretic IWAD from Doom even though both use ExMy level names. */
+          ++htic;
+        }
 
       free(fileinfo);
       }
@@ -758,7 +765,23 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
 
     *gmode = indetermined;
     *hassec = FALSE;
-    if (cm>=30)
+    if (htic)
+    {
+      /* Heretic IWAD.  Episodes use the same ExMy markers as Doom, so the
+       * sw/rg counts above already tallied them: shareware is E1 only,
+       * the registered/extended set has E1..E3 (and the SoSR E4..E5).
+       * Map the Doom gamemode slots onto Heretic's episode layout. */
+      extern dbool heretic;
+      extern dbool raven;
+      heretic = true;
+      raven   = true;
+      gamemission = heretic_mission;
+      if (rg >= 18 || ud >= 9)
+        *gmode = registered;   /* full Heretic (3+ episodes) */
+      else
+        *gmode = shareware;    /* Heretic shareware (E1 only) */
+    }
+    else if (cm>=30)
     {
       *gmode = commercial;
       *hassec = sc>=2;

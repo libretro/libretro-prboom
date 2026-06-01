@@ -1560,67 +1560,64 @@ bool retro_load_game(const struct retro_game_info *info)
          }
          else if(!strncmp(header.identification, "PWAD", 4))
          {
-            /* Some standalone Doom-engine games ship with PWAD magic
-             * even though they contain their own complete lump set
-             * (chex.wad is the canonical example).  If the file
-             * contains a PLAYPAL lump, treat it as a standalone IWAD
-             * so the engine doesn't go looking for an external
-             * doom.wad it'll never find.  CheckIWAD accepts either
-             * magic, so the -iwad routing is followed through.
-             * Otherwise fall back to the traditional -file
-             * (genuine add-on PWAD) routing. */
-            if (wad_contains_playpal(info->path, &header))
+            /* Decide whether this PWAD is a genuine add-on (needs an
+             * external IWAD) or a standalone game shipped with PWAD magic
+             * but a complete lump set (chex.wad is the canonical example).
+             *
+             * A PLAYPAL lump alone is NOT sufficient to call something a
+             * standalone IWAD: many add-on PWADs (notably DSDHacked total
+             * conversions like Dwelling / vesper) bundle a custom PLAYPAL
+             * while still depending on a real IWAD for the status bar,
+             * textures, flats and sprites.  If we mis-route those to
+             * -iwad, the engine never loads doom2.wad and dies later on a
+             * missing IWAD lump (STKEYS*, STF*, MFLR8_4, ...).
+             *
+             * So: if the PWAD carries map markers AND we can actually find
+             * an IWAD of the matching generation nearby, treat it as an
+             * add-on and steer it onto that IWAD -- this takes priority
+             * over the PLAYPAL heuristic.  Only when no suitable IWAD can
+             * be found do we fall back to treating a PLAYPAL-bearing PWAD
+             * as a standalone IWAD (preserving the chex.wad-with-no-doom
+             * case). */
+            pwad_map_kind_t kind = scan_pwad_map_kind(info->path, &header);
+            char *iwad_match = (kind != PWAD_MAP_NONE)
+                               ? find_iwad_for_kind(kind) : NULL;
+
+            if (iwad_match)
             {
+               /* Genuine add-on with a real IWAD available: use it. */
+               if (log_cb)
+                  log_cb(RETRO_LOG_INFO,
+                         "retro_load_game: steering PWAD '%s' (%s) "
+                         "toward IWAD '%s'\n",
+                         g_basename,
+                         kind == PWAD_MAP_DOOM1 ? "ExMy maps" : "MAPxx maps",
+                         iwad_match);
+               argv[argc++] = strdup("-iwad");
+               argv[argc++] = iwad_match;  /* already heap from FindFileInDir */
+               argv[argc++] = strdup("-file");
+               argv[argc++] = strdup(info->path);
+            }
+            else if (wad_contains_playpal(info->path, &header))
+            {
+               /* No matching IWAD found, but the PWAD has its own palette:
+                * treat it as a standalone IWAD (chex.wad and friends).
+                * CheckIWAD accepts PWAD magic, so -iwad routing works. */
+               if (log_cb)
+                  log_cb(RETRO_LOG_INFO,
+                         "retro_load_game: no external IWAD found for '%s'; "
+                         "it has a PLAYPAL, treating it as a standalone "
+                         "IWAD\n", g_basename);
                argv[argc++] = strdup("-iwad");
                argv[argc++] = strdup(g_basename);
             }
             else
             {
-               /* Genuine add-on PWAD.  Before letting the engine pick
-                * an IWAD via FindIWADFile (which iterates
-                * standard_iwads[] commercial-first), peek at the
-                * PWAD's map markers and try to find an IWAD that
-                * matches its target generation.  Without this, a
-                * Doom-1 add-on (e.g. SIGIL.WAD's E5Mx maps) loaded
-                * next to a doom2.wad always boots in commercial mode
-                * -- engine starts at MAP01, the add-on's E maps are
-                * unreachable, and missing textures cause render
-                * glitches and crashes.
-                *
-                * On a hit we emit an explicit -iwad <path>; the
-                * engine's CheckIWAD then accepts that and skips the
-                * standard_iwads[] auto-detect entirely.  On a miss
-                * (no matching IWAD found anywhere we look) we let
-                * the auto-detect proceed and accept whatever it
-                * picks; that preserves the prior behaviour for
-                * setups where steering would otherwise downgrade
-                * to no IWAD at all. */
-               pwad_map_kind_t kind = scan_pwad_map_kind(info->path, &header);
-               char *iwad_match = (kind != PWAD_MAP_NONE)
-                                  ? find_iwad_for_kind(kind) : NULL;
-               if (iwad_match)
-               {
-                  if (log_cb)
-                     log_cb(RETRO_LOG_INFO,
-                            "retro_load_game: steering PWAD '%s' (%s) "
-                            "toward IWAD '%s'\n",
-                            g_basename,
-                            kind == PWAD_MAP_DOOM1 ? "ExMy maps" : "MAPxx maps",
-                            iwad_match);
-                  argv[argc++] = strdup("-iwad");
-                  argv[argc++] = iwad_match;  /* already heap from FindFileInDir */
-               }
-               else if (kind == PWAD_MAP_DOOM1 && log_cb)
-               {
-                  /* The PWAD wants a Doom 1 IWAD but none is reachable.
-                   * The engine will fall back to standard_iwads[] auto-
-                   * detect, which is commercial-first, so users with
-                   * only a doom2.wad nearby will see this PWAD boot in
-                   * commercial mode -- broken intro, MAP01 at game
-                   * start, render glitches once the PWAD's textures
-                   * resolve against the wrong IWAD palette / PNAMES.
-                   * Log a clear warning so the failure mode is
-                   * understandable. */
+               /* Add-on PWAD with no findable matching IWAD and no own
+                * palette.  Let the engine's FindIWADFile auto-detect pick
+                * whatever standard IWAD it can find; warn for the Doom 1
+                * case where the commercial-first fallback is likely wrong. */
+               if (kind == PWAD_MAP_DOOM1 && log_cb)
                   log_cb(RETRO_LOG_WARN,
                          "retro_load_game: PWAD '%s' has DOOM 1 (ExMy) "
                          "maps but no doom.wad / doomu.wad / freedoom1.wad / "
@@ -1631,7 +1628,6 @@ bool retro_load_game(const struct retro_game_info *info)
                          "IWAD next to '%s' or use an m3u playlist to "
                          "name the IWAD explicitly.\n",
                          g_basename, g_basename);
-               }
                argv[argc++] = strdup("-file");
                argv[argc++] = strdup(info->path);
             }

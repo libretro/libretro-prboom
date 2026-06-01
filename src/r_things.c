@@ -537,14 +537,23 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    // Do not attempt to render special TNT1 invisible sprite
    if (thing->sprite == SPR_TNT1) return;
 
+   /* A DSDHacked thing can carry a sprite index past the built sprite
+    * table (numsprites), e.g. an extended projectile whose sprite was
+    * never defined.  Indexing sprites[]/sprnames[] with it reads out of
+    * bounds; the old fallback block then passed a garbage sprnames[]
+    * pointer to I_Error's "%s" and crashed in strlen.  Don't render a
+    * thing whose sprite is not a real table entry. */
+   if ((unsigned)thing->sprite >= (unsigned)numsprites)
+      return;
+
    // decide which patch to use for sprite relative to player
    sprdef = &sprites[thing->sprite];
 
    if (!sprdef->numframes)
    {
       const spritenum_t fallback = states[S_NULL].sprite; // Use the sprite from the dummy state
-      I_Error ("R_ProjectSprite: Using fallback '%s' for sprite '%s' (%i) with missing spriteframes!",
-               sprnames[fallback], sprnames[thing->sprite], thing->sprite);
+      I_Error ("R_ProjectSprite: Using fallback for sprite (%i) with missing spriteframes!",
+               thing->sprite);
       *sprdef = sprites[fallback];
       if (!sprdef->spriteframes)
       {

@@ -124,6 +124,7 @@ typedef enum {
   pr_randomjump,              // #61
   pr_defect,                  // #62  // Start new entries -- add new entries below
   pr_mbf21,                   // #63  MBF21 codepointers
+  pr_heretic,                 // #64  Heretic codepointers (shared class)
 
   // End of new entries
   NUMPRCLASS               // MUST be last item in list

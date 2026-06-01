@@ -58,6 +58,7 @@ void A_Pain(mobj_t *);
 void A_PlayerScream(mobj_t *);
 void A_Fall(mobj_t *);
 void A_XScream(mobj_t *);
+dbool P_CheckMeleeRange(mobj_t *actor);
 void A_Look(mobj_t *);
 void A_Chase(mobj_t *);
 void A_FaceTarget(mobj_t *);

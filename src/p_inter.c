@@ -250,7 +250,7 @@ static dbool   P_GiveWeapon(player_t *player, weapontype_t weapon, dbool   dropp
 // Returns FALSE if the body isn't needed at all
 //
 
-static dbool   P_GiveBody(player_t *player, int num)
+dbool P_GiveBody(player_t *player, int num)
 {
   if (player->health >= maxhealth)
     return FALSE; // Ty 03/09/98 externalized MAXHEALTH to maxhealth

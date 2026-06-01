@@ -140,7 +140,7 @@ void P_NoiseAlert(mobj_t *target, mobj_t *emitter)
 // P_CheckMeleeRange
 //
 
-static dbool   P_CheckMeleeRange(mobj_t *actor)
+dbool P_CheckMeleeRange(mobj_t *actor)
 {
   mobj_t *pl = actor->target;
   /* MBF21: use the per-thing melee range (default MELEERANGE) instead of

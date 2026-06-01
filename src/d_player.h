@@ -262,6 +262,14 @@ typedef struct player_s
   int         artifactCount;
   int         inventorySlotNum;
   int         flyheight;
+  /* Heretic player extras (inert for Doom). */
+  int         lookdir;        /* free look pitch */
+  int         flamecount;     /* phoenix-rod flame duration */
+  int         chickenTics;    /* >0 while morphed into a chicken */
+  int         chickenPeck;    /* chicken peck countdown */
+  struct mobj_s *rain1;       /* active rainmaker 1 */
+  struct mobj_s *rain2;       /* active rainmaker 2 */
+  int         pclass;         /* player class (Heretic: single class) */
 
 } player_t;
 

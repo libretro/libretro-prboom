@@ -350,6 +350,14 @@ enum {
 /* cph 2006/08/28 - move Prev[XYZ] fields to the end of the struct. Add any
  * other new fields to the end, and make sure you don't break savegames! */
 
+/* Heretic: general-purpose actor scratch.  Many Heretic codepointers stash
+ * either an int (.i) or a mobj pointer (.m) per actor. */
+typedef struct
+{
+    int i;
+    struct mobj_s *m;
+} specialval_t;
+
 typedef struct mobj_s
 {
     // List: thinker links.
@@ -462,6 +470,12 @@ typedef struct mobj_s
     short               iden_num;
 
     fixed_t             pad; // cph - needed so I can get the size unambiguously on amd64
+
+    /* Heretic actor scratch (inert for Doom actors, which never touch them). */
+    specialval_t        special1;
+    specialval_t        special2;
+    int                 special_args[5];
+    int                 damage;     /* Heretic: per-missile damage override */
 
     // SEE WARNING ABOVE ABOUT POINTER FIELDS!!!
 } mobj_t;

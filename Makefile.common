@@ -78,6 +78,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/map_format.c \
 				 $(CORE_DIR)/heretic/info.c \
 				 $(CORE_DIR)/heretic/sounds.c \
+				 $(CORE_DIR)/heretic/p_action.c \
 				 $(CORE_DIR)/p_sight.c \
 				 $(CORE_DIR)/p_spec.c \
 				 $(CORE_DIR)/p_switch.c \

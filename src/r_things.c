@@ -714,7 +714,19 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
 
    // decide which patch to use
 
+   /* DSDHacked: a weapon's flash/attack frame can name an extended sprite
+    * that has no patches in the loaded WADs (numframes == 0, so
+    * spriteframes is NULL), or a sprite index past the built table.  Unlike
+    * R_ProjectSprite this routine had no guard, so firing such a weapon
+    * dereferenced a NULL spriteframes / out-of-bounds spritedef and crashed.
+    * A missing psprite simply isn't drawn. */
+   if ((unsigned)psp->state->sprite >= (unsigned)numsprites)
+      return;
+
    sprdef = &sprites[psp->state->sprite];
+
+   if (!sprdef->numframes || !sprdef->spriteframes)
+      return;
 
    sprframe = &sprdef->spriteframes[psp->state->frame & FF_FRAMEMASK];
 

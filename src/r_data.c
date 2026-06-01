@@ -440,7 +440,15 @@ int R_FlatNumForName(const char *name)    // killough -- const added
 {
   int i = (W_CheckNumForName)(name, ns_flats);
   if (i == -1)
+  {
+    /* I_Error is non-fatal in this core (logs and returns).  A missing
+     * flat usually means a wrong/absent IWAD; don't fall through and
+     * return a negative index that callers use to index flat arrays out
+     * of bounds.  Clamp to the first flat so the level loads (with a
+     * placeholder flat) instead of crashing. */
     I_Error("R_FlatNumForName: %.8s not found", name);
+    return 0;
+  }
   return i - firstflat;
 }
 
@@ -478,7 +486,13 @@ int R_TextureNumForName(const char *name)  // const added -- killough
 {
   int i = R_CheckTextureNumForName(name);
   if (i == -1)
+  {
+    /* See R_FlatNumForName: I_Error does not abort here, so return a safe
+     * texture index (NO_TEXTURE) rather than -1, which callers would use
+     * to index the textures[] array out of bounds. */
     I_Error("R_TextureNumForName: %.8s not found", name);
+    return NO_TEXTURE;
+  }
   return i;
 }
 

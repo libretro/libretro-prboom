@@ -3411,6 +3411,35 @@ static void deh_procBexSprites(DEHFILE *fpin, FILE *fpout, char *line)
 	 }
 	 rover++;
       }
+
+      /* DSDHacked: the key may be a numeric sprite index rather than an
+       * existing 4-char sprite name.  Mods (e.g. Eviternity II) name their
+       * extended sprites this way -- "<index> = NAME" -- with no matching
+       * stock name to substitute.  Grow the sprite-name table to cover the
+       * index and install the name so R_InitSpriteDefs can build it.
+       * deh_spritenames[] is the (static) stock list, so a hit there above
+       * already handled stock renames; this branch covers everything past
+       * it. */
+      if (!deh_spritenames[rover])
+      {
+	 const char *c = key;
+	 int is_num = (*c != '\0');
+	 while (*c)
+	 {
+	    if (*c < '0' || *c > '9') { is_num = 0; break; }
+	    c++;
+	 }
+	 if (is_num)
+	 {
+	    int idx = atoi(key);
+	    if (idx >= 0 && idx < 1000000)
+	    {
+	       const char **slot = dsda_GetSprite(idx);
+	       deh_log("Naming sprite %d '%s'\n", idx, candidate);
+	       *slot = strdup(candidate);
+	    }
+	 }
+      }
    }
 }
 

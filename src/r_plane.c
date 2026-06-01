@@ -145,24 +145,26 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
       dsvars->xstep = cachedxstep[y] = FixedMul (viewsin, planeheight) / dy;
       dsvars->ystep = cachedystep[y] = FixedMul (viewcos, planeheight) / dy;
 
-      /* hor+ widescreen widens the horizontal FOV (focallength <
-       * centerxfrac).  The plane walk rate xstep/ystep is derived from
-       * the vertical focal length via dy, implicitly assuming the
-       * vanilla isotropic 4:3 projection (horizontal focal == vertical).
-       * Uncorrected, the floor is mapped with the narrow centerxfrac
-       * column-to-world relation while the walls use the widened
-       * focallength one, so the floor slides against the geometry as the
-       * view turns.  Scale the walk by centerxfrac/projectionx
-       * (projectionx == focallength) to match.  At 4:3 projectionx ==
-       * centerxfrac and this is a no-op. */
+      /* hor+ widescreen uses anisotropic focal lengths: the horizontal
+       * focal is projectionx (== focallength) while the vertical focal
+       * is projectiony.  The plane walk xstep/ystep is built through the
+       * vertical dy/yslope path, so it carries the vertical focal; the
+       * horizontal world rate must therefore be scaled by
+       * projectiony/projectionx (the focal-length anisotropy), per the
+       * pinhole floor projection d(worldX)/d(screenX) = worldZ/fx.  At
+       * 4:3 projectionx == projectiony and this is a no-op.
+       *
+       * NB: the reference is projectiony, NOT centerxfrac -- they happen
+       * to coincide at 4:3 but diverge once the buffer width is clamped
+       * (16:9 at the MAX_SCREENWIDTH ceiling needs ~unity here even
+       * though centerxfrac/projectionx would be 1.33). */
       {
-         extern fixed_t projectionx;
-         if (projectionx && projectionx != centerxfrac)
+         if (projectionx && projectionx != projectiony)
          {
             dsvars->xstep = cachedxstep[y] =
-               (fixed_t)(((int64_t)dsvars->xstep * centerxfrac) / projectionx);
+               (fixed_t)(((int64_t)dsvars->xstep * projectiony) / projectionx);
             dsvars->ystep = cachedystep[y] =
-               (fixed_t)(((int64_t)dsvars->ystep * centerxfrac) / projectionx);
+               (fixed_t)(((int64_t)dsvars->ystep * projectiony) / projectionx);
          }
       }
    }

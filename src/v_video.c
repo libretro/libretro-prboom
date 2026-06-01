@@ -328,6 +328,70 @@ void V_DrawBackground(const char* flatname, int scrn)
   W_UnlockLumpNum(lump);
 }
 
+/*
+ * V_DrawRawScreen
+ *
+ * Heretic (and other Raven) full-screen images such as TITLE, CREDIT,
+ * HELP1/HELP2 and the finale screens are stored as raw column-major
+ * 8-bit bitmaps (width * 200 bytes), not as Doom patch_t graphics, so
+ * they cannot go through the patch drawer.  This is a reduced,
+ * software-only blit: it stretches the source image to the current
+ * screen dimensions with simple nearest-sampling via V_FillRect.  No
+ * widescreen / aspect-ratio modes or GL path -- those are not present
+ * in this core.
+ */
+void V_DrawRawScreen(const char *lump_name)
+{
+  int          i, j;
+  int          lump_num   = W_CheckNumForName(lump_name);
+  int          lump_len;
+  int          lump_width;
+  int          x_offset;
+  float        x_factor, y_factor;
+  const uint8_t *raw;
+
+  if (lump_num < 0)
+    return;
+
+  lump_len   = W_LumpLength(lump_num);
+  lump_width = lump_len / 200;          /* raw images are 200 rows tall */
+  if (lump_width <= 0)
+    return;
+
+  x_factor = (float)SCREENWIDTH  / (float)lump_width;
+  y_factor = (float)SCREENHEIGHT / 200.0f;
+  if (y_factor < x_factor)
+    x_factor = y_factor;                /* keep aspect, letterbox sides */
+
+  x_offset = (int)((SCREENWIDTH - (x_factor * lump_width)) / 2);
+
+  raw = (const uint8_t *)W_CacheLumpNum(lump_num);
+
+  /* Source is row-major: byte index = row*width + column. */
+  for (i = 0; i < lump_width; i++)
+  {
+    int x     = (int)(i * x_factor);
+    int width = (int)((i + 1) * x_factor) - x;
+    int x_pos = x_offset + x;
+
+    if (width <= 0 || x_pos < 0 || x_pos > SCREENWIDTH - width)
+      continue;
+
+    for (j = 0; j < 200; j++)
+    {
+      int y      = (int)(j * y_factor);
+      int height = (int)((j + 1) * y_factor) - y;
+
+      if (height <= 0)
+        continue;
+
+      V_FillRect(x_pos, y, width, height, raw[j * lump_width + i]);
+    }
+  }
+
+  W_UnlockLumpNum(lump_num);
+}
+
 //
 // V_Init
 //

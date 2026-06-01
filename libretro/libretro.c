@@ -97,6 +97,10 @@ static unsigned int   direct_fb_pitch = 0;
  * outside retro_run; render to screen_buf instead. */
 static bool in_retro_run = false;
 
+/* Set by the in-game Aspect Ratio menu item; consumed at a safe
+ * point in retro_run (see I_SetAspectRatio / I_ApplyAspectRatio). */
+static bool aspect_change_pending = false;
+
 /* libretro */
 static char g_wad_dir[1024];
 static char g_basename[1024];
@@ -114,6 +118,7 @@ void M_QuitDOOM(int choice);
 void D_DoomDeinit(void);
 void I_SetRes(void);
 void I_SetAspectRatio(void);
+static void I_ApplyAspectRatio(void);
 void I_UpdateSound(void);
 void M_EndGame(int choice);
 
@@ -894,6 +899,12 @@ void retro_run(void)
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE_UPDATE, &updated) && updated)
       update_variables(false);
 
+   /* Apply a deferred aspect-ratio change here, before any rendering
+    * this frame, so the framebuffer rebuild never races an in-flight
+    * render or the menu draw that requested it. */
+   if (aspect_change_pending)
+      I_ApplyAspectRatio();
+
    /* Check for pending cheats */
    if (cheats_pending && (gamestate == GS_LEVEL) && !demoplayback)
    {
@@ -1612,9 +1623,11 @@ bool retro_load_game(const struct retro_game_info *info)
       goto failed;
 
    /* Config is now loaded, so render_aspect is valid.  Apply the
-    * saved aspect ratio: widen the buffer (no-op for 4:3) and rebuild
-    * the video mode before the first frame is presented. */
-   I_SetAspectRatio();
+    * saved aspect ratio directly here: this runs before the main
+    * loop starts, so there is no in-flight render to race -- widen
+    * the buffer (no-op for 4:3) and rebuild the video mode before
+    * the first frame is presented. */
+   I_ApplyAspectRatio();
 
    // Run few cycles to finish init.
    for (i = 0; i < 3; i++)
@@ -2572,17 +2585,36 @@ void I_SetRes(void)
    screens[4].height = (ST_SCALED_HEIGHT+1);
 }
 
-/* Apply the in-game Aspect Ratio selection at runtime.  screen_buf
- * is allocated once at MAX_SCREENWIDTH*MAX_SCREENHEIGHT, so changing
- * the aspect only changes SCREENWIDTH/SCREENPITCH (never reallocates).
- * We rebuild the video mode, recompute the view size (the renderer
- * derives the widened FOV from the new buffer dimensions) and tell
- * the frontend the geometry changed so it can re-fit the window. */
+/* Aspect-ratio changes must NOT rebuild the framebuffer from inside
+ * the menu callback: that path runs in the middle of D_DoomLoop, so
+ * freeing/reallocating screens[] there leaves the renderer's cached
+ * topleft pointers dangling and corrupts the very next frame (the
+ * BSP traversal reads trampled seg data and segfaults).  Instead the
+ * menu just flags the change; retro_run applies it at a safe point
+ * before D_DoomLoop, when no render is in flight. */
+
 void I_SetAspectRatio(void)
 {
-   extern int screenblocks;
-   int new_width = I_AspectWidth();
+   aspect_change_pending = true;
+}
 
+/* Perform the deferred aspect-ratio change.  Called only from a safe
+ * point in retro_run (no active render, no live cached pointers).
+ * screen_buf is allocated once at MAX_SCREENWIDTH*MAX_SCREENHEIGHT so
+ * widening never reallocates it.  We update SCREENWIDTH/SCREENPITCH,
+ * rebuild the video mode, request a view-size recalc (the renderer
+ * derives the widened FOV from the new dimensions) and push the new
+ * geometry with SET_GEOMETRY -- the soft variant that is guaranteed
+ * not to reinitialise the frontend's video driver (max_width/height
+ * were already set to MAX_SCREENWIDTH/HEIGHT at load). */
+static void I_ApplyAspectRatio(void)
+{
+   extern int screenblocks;
+   int new_width;
+
+   aspect_change_pending = false;
+
+   new_width = I_AspectWidth();
    if (new_width == SCREENWIDTH)
       return;
 
@@ -2592,11 +2624,24 @@ void I_SetAspectRatio(void)
    I_UpdateVideoMode();
    R_SetViewSize(screenblocks);
 
-   if (environ_cb)
+   /* SET_GEOMETRY may only be called from within retro_run().  At
+    * load (before the main loop) we skip it: retro_get_system_av_info
+    * already reports the correct aspect for the initial geometry. */
+   if (environ_cb && in_retro_run)
    {
-      struct retro_system_av_info av;
-      retro_get_system_av_info(&av);
-      environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &av);
+      struct retro_game_geometry geom;
+      geom.base_width   = SCREENWIDTH;
+      geom.base_height  = SCREENHEIGHT;
+      geom.max_width    = MAX_SCREENWIDTH;
+      geom.max_height   = MAX_SCREENHEIGHT;
+      switch (render_aspect)
+      {
+         case 1:  geom.aspect_ratio = 16.0f / 9.0f;  break;
+         case 2:  geom.aspect_ratio = 16.0f / 10.0f; break;
+         case 3:  geom.aspect_ratio = 32.0f / 9.0f;  break;
+         default: geom.aspect_ratio = 4.0f / 3.0f;   break;
+      }
+      environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geom);
    }
 }
 

@@ -551,9 +551,37 @@ void R_RenderBSPNode(int bspnum)
   while (!(bspnum & NF_SUBSECTOR))  // Found a subsector?
     {
       const node_t *bsp = &nodes[bspnum];
+      int side;
 
-      // Decide which side the view point is on.
-      int side = R_PointOnSide(viewx, viewy, bsp);
+      /* Decide which side the view point is on.  This is R_PointOnSide
+       * inlined: it is the single hottest caller (once per node, every
+       * frame) and GCC does not inline the out-of-line function here, so
+       * the call overhead was pure waste.  Inlining keeps R_PointOnSide's
+       * cheap paths -- axis-aligned splits (dx==0 / dy==0, the majority of
+       * Doom nodes) resolve with compares and no multiply, and the
+       * sign-bit test skips the multiply in the general case too -- rather
+       * than the PSX-style unconditional double cross-product. */
+      {
+         fixed_t ndx = bsp->dx;
+         fixed_t ndy = bsp->dy;
+
+         if (!ndx)
+            side = (viewx <= bsp->x) ? (ndy > 0) : (ndy < 0);
+         else if (!ndy)
+            side = (viewy <= bsp->y) ? (ndx < 0) : (ndx > 0);
+         else
+         {
+            fixed_t dx = viewx - bsp->x;
+            fixed_t dy = viewy - bsp->y;
+
+            /* quick sign-bit decision */
+            if ((ndy ^ ndx ^ dx ^ dy) < 0)
+               side = (ndy ^ dx) < 0;
+            else
+               side = FixedMul(dy, ndx>>FRACBITS) >= FixedMul(ndy>>FRACBITS, dx);
+         }
+      }
+
       // Recursively divide front space.
       R_RenderBSPNode(bsp->children[side]);
 

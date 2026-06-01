@@ -1496,6 +1496,13 @@ void D_BuildBEXTables(void)
     * preserve that behaviour by default. */
    mobjinfo[MT_BRUISER].projectile_group = PG_BARON;
    mobjinfo[MT_KNIGHT].projectile_group  = PG_BARON;
+   /* Vanilla halves the demon's run/pain frame durations under fast/
+    * nightmare.  MBF21 generalises this to the SKILL5FAST frame flag, so
+    * tag the demon's default states with it; G_SetFastParms then halves
+    * every SKILL5FAST frame, reproducing vanilla for stock content while
+    * honouring the flag on deh-modified frames. */
+   for (i = S_SARG_RUN1; i <= S_SARG_PAIN2; i++)
+     states[i].flags |= STATEF_SKILL5FAST;
 
    for(i = 0; i < NUMSPRITES; i++)
       deh_spritenames[i] = strdup(sprnames[i]);
@@ -2206,10 +2213,13 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
 
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {
+      char *strval = NULL;
+      int bGetData;
       if (!dehfgets(inbuffer, sizeof(inbuffer), fpin)) break;
       lfstrip(inbuffer);
       if (!*inbuffer) break;         // killough 11/98
-      if (!deh_GetData(inbuffer,key,&value,NULL,fpout)) // returns TRUE if ok
+      bGetData = deh_GetData(inbuffer,key,&value,&strval,fpout);
+      if (!bGetData) // returns TRUE if ok
         {
           if (fpout) fprintf(fpout,"Bad data pair in '%s'\n",inbuffer);
           continue;
@@ -2279,6 +2289,24 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
 #endif
                       states[indexnum].misc2 = (long)value; // long
                     }
+                  else
+                    if (!strncasecmp(key,"Args",4) && key[4] >= '1' && key[4] <= '8' && key[5] == '\0')
+                      /* MBF21 state codepointer args (Args1..Args8) */
+                      states[indexnum].args[key[4]-'1'] = (long)value;
+                  else
+                    if (!strcasecmp(key,"MBF21 Bits")) /* MBF21 frame flags */
+                      {
+                        long fl = 0;
+                        if (bGetData == 1)        /* numeric */
+                          fl = (long)value;
+                        else                      /* mnemonic list */
+                          for (; (strval = strtok(strval, ",+| \t\f\r")); strval = NULL)
+                            if (!strcasecmp(strval, "SKILL5FAST"))
+                              fl |= STATEF_SKILL5FAST;
+                            else if (fpout)
+                              fprintf(fpout, "Could not find MBF21 frame bit mnemonic %s\n", strval);
+                        states[indexnum].flags = fl;
+                      }
                   else
                     if (fpout) fprintf(fpout,"Invalid frame string index for '%s'\n",key);
     }

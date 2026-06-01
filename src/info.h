@@ -1278,7 +1278,14 @@ typedef struct
   actionf_t   action;       /* code pointer to function for action if any  */
   statenum_t  nextstate;    /* linked list pointer to next state or zero   */
   long        misc1, misc2; /* apparently never used in DOOM               */
+  /* MBF21 (inert unless mbf21_features): 8 codepointer arg fields and
+   * a frame-flags field (MBF21 Bits on a Frame). */
+  long        args[8];
+  long        flags;
 } state_t;
+
+/* MBF21 frame flags ("MBF21 Bits" in a Frame definition). */
+#define STATEF_SKILL5FAST 0x00000001 /* tics halve on nightmare/-fast */
 
 /* these are in info.c */
 extern state_t  states[NUMSTATES];

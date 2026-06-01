@@ -104,6 +104,15 @@ const char *sprnames[NUMSPRITES+1] = {
 // parts where frame rewiring is done for more details and the
 // extended way a BEX file can handle this.
 
+/* The trailing MBF21 state fields (args[8], flags) are intentionally left
+ * to default zero here and are inert unless an MBF21 deh patch sets them
+ * and mbf21_features is active.  Silence -Wmissing-field-initializers
+ * (-Wextra) for this array rather than touching every entry. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 state_t states[NUMSTATES] = {
     {SPR_TROO,0,-1,{(arg0_t)NULL},S_NULL,0,0},  // S_NULL
     {SPR_SHTG,4,0,{(arg0_t)A_Light0},S_NULL,0,0}, // S_LIGHTDONE
@@ -1185,6 +1194,9 @@ state_t states[NUMSTATES] = {
   {SPR_PLAY,21,5,{(arg0_t)NULL},S_PLAY_GDIE9,0,0},        // S_PLAY_GDIE8
   {SPR_PLAY,22,-1,{(arg0_t)NULL},S_NULL,0,0},             // S_PLAY_GDIE9
 };
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif
 
 // ********************************************************************
 // Object "Thing" definitions

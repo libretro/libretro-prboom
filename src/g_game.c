@@ -2218,10 +2218,25 @@ void G_SetFastParms(int fast_pending)
   static int fast = 0;            // remembers fast state
   int i;
   if (fast != fast_pending) {     /* only change if necessary */
+    /* MBF21: a thing with a "Fast speed" (altspeed) uses it under fast/
+     * nightmare.  Swap speed<->altspeed on toggle.  altspeed is
+     * NO_ALTSPEED for stock things, so this is inert for vanilla. */
+    for (i=0; i<NUMMOBJTYPES; i++)
+      if (mobjinfo[i].altspeed != NO_ALTSPEED)
+      {
+        int swap = mobjinfo[i].speed;
+        mobjinfo[i].speed = mobjinfo[i].altspeed;
+        mobjinfo[i].altspeed = swap;
+      }
     if ((fast = fast_pending))
       {
-        for (i=S_SARG_RUN1; i<=S_SARG_PAIN2; i++)
-          if (states[i].tics != 1 || demo_compatibility) // killough 4/10/98
+        /* MBF21: halve the tics of every SKILL5FAST frame.  The demon's
+         * default states carry the flag (set in D_BuildBEXTables), so this
+         * reproduces the vanilla SARG behaviour for stock content while
+         * also honouring the flag on MBF21 deh-modified frames. */
+        for (i=0; i<NUMSTATES; i++)
+          if ((states[i].flags & STATEF_SKILL5FAST) &&
+              (states[i].tics != 1 || demo_compatibility)) // killough 4/10/98
             states[i].tics >>= 1;  // don't change 1->0 since it causes cycles
         mobjinfo[MT_BRUISERSHOT].speed = 20*FRACUNIT;
         mobjinfo[MT_HEADSHOT].speed = 20*FRACUNIT;
@@ -2229,8 +2244,9 @@ void G_SetFastParms(int fast_pending)
       }
     else
       {
-        for (i=S_SARG_RUN1; i<=S_SARG_PAIN2; i++)
-          states[i].tics <<= 1;
+        for (i=0; i<NUMSTATES; i++)
+          if (states[i].flags & STATEF_SKILL5FAST)
+            states[i].tics <<= 1;
         mobjinfo[MT_BRUISERSHOT].speed = 15*FRACUNIT;
         mobjinfo[MT_HEADSHOT].speed = 10*FRACUNIT;
         mobjinfo[MT_TROOPSHOT].speed = 10*FRACUNIT;

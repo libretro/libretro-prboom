@@ -70,6 +70,12 @@ int      centerx, centery;
 fixed_t  centerxfrac, centeryfrac;
 fixed_t  viewheightfrac; //e6y: for correct clipping of things
 fixed_t  projection;
+/* Horizontal projection anchor for sprite x-placement.  Equals
+ * focallength, so sprites use the same horizontal scale as walls.  At
+ * 4:3 this equals centerxfrac (== projection); under hor+ widescreen
+ * focallength is smaller, and using it here keeps sprites aligned with
+ * the widened wall projection instead of drifting toward the edge. */
+fixed_t  projectionx;
 // proff 11/06/98: Added for high-res
 fixed_t  projectiony;
 fixed_t  skyiscale;
@@ -500,10 +506,26 @@ void R_ExecuteSetViewSize (void)
 
   R_InitTextureMapping();
 
+  /* focallength is now valid; sprites project horizontally against it
+   * so they line up with the (hor+ widened) wall projection. */
+  projectionx = focallength;
+
   // psprite scales
 // proff 08/17/98: Changed for high-res
-  pspritescale = FRACUNIT*viewwidth/320;
-  pspriteiscale = FRACUNIT*320/viewwidth;
+  /* The player weapon is a screen-space HUD sprite, not world geometry,
+   * so it must keep its vanilla 4:3 proportions and stay centred rather
+   * than stretch with the hor+ widened viewwidth.  focallength is the
+   * 4:3-equivalent half-width (== centerxfrac at 4:3), so the 4:3
+   * reference viewwidth is 2*focallength.  Scaling the psprite against
+   * that keeps the weapon the same on-screen size and centred at any
+   * aspect; at 4:3 it reduces to the vanilla FRACUNIT*viewwidth/320. */
+  {
+    int psp_w = 2 * (focallength >> FRACBITS);
+    if (psp_w <= 0)
+      psp_w = viewwidth;
+    pspritescale  = FRACUNIT * psp_w / 320;
+    pspriteiscale = FRACUNIT * 320 / psp_w;
+  }
 // proff 11/06/98: Added for high-res
   pspriteyscale = (((SCREENHEIGHT*viewwidth)/SCREENWIDTH) << FRACBITS) / 200;
 

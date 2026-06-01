@@ -518,7 +518,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    if (tz < MINZ)
       return;
 
-   xscale = FixedDiv(projection, tz);
+   xscale = FixedDiv(projectionx, tz);
 
    gxt = -FixedMul(tr_x,viewsin);
    gyt = FixedMul(tr_y,viewcos);

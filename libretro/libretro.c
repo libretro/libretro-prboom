@@ -2245,8 +2245,6 @@ process_input(void)
 {
    int port;
    unsigned i;
-   static int cur_mx;
-   static int cur_my;
    int mx, my;
    static bool old_input_kb[117];
    bool new_input_kb[117];
@@ -2370,12 +2368,10 @@ process_input(void)
       mx = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_X);
       my = input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_Y);
 
-      if (mx != cur_mx || my != cur_my)
+      if (mx || my)
       {
          event_mouse.data2 = mx * 4;
          event_mouse.data3 = my * 4;
-         cur_mx = mx;
-         cur_my = my;
       }
 
       if (input_state_cb(0, RETRO_DEVICE_MOUSE, 0, RETRO_DEVICE_ID_MOUSE_LEFT))

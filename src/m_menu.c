@@ -377,7 +377,9 @@ menu_t MainDef =
 void M_DrawMainMenu(void)
 {
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(94, 2, 0, "M_DOOM", CR_DEFAULT, VPT_STRETCH);
+  /* M_DOOM is Doom's main-menu title; Heretic has no such lump. */
+  if (W_CheckNumForName("M_DOOM") >= 0)
+    V_DrawNamePatch(94, 2, 0, "M_DOOM", CR_DEFAULT, VPT_STRETCH);
 }
 
 /////////////////////////////
@@ -615,7 +617,8 @@ void M_AddEpisode(const char *map, char *def)
 void M_DrawEpisode(void)
 {
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(54, EpiDef.y - 25, 0, "M_EPISOD", CR_DEFAULT, VPT_STRETCH);
+  if (W_CheckNumForName("M_EPISOD") >= 0)
+    V_DrawNamePatch(54, EpiDef.y - 25, 0, "M_EPISOD", CR_DEFAULT, VPT_STRETCH);
 }
 
 void M_Episode(int choice)
@@ -675,8 +678,10 @@ menu_t NewDef =
 void M_DrawNewGame(void)
 {
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(96, 14, 0, "M_NEWG", CR_DEFAULT, VPT_STRETCH);
-  V_DrawNamePatch(54, 38, 0, "M_SKILL",CR_DEFAULT, VPT_STRETCH);
+  if (W_CheckNumForName("M_NEWG") >= 0)
+    V_DrawNamePatch(96, 14, 0, "M_NEWG", CR_DEFAULT, VPT_STRETCH);
+  if (W_CheckNumForName("M_SKILL") >= 0)
+    V_DrawNamePatch(54, 38, 0, "M_SKILL",CR_DEFAULT, VPT_STRETCH);
 }
 
 /* cph - make `New Game' restart the level in a netgame */
@@ -5190,8 +5195,12 @@ void M_Drawer (void)
   // DRAW SKULL
 
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(x + SKULLXOFF, currentMenu->y - 5 + itemOn*LINEHEIGHT,0,
-      skullName[whichSkull], CR_DEFAULT, VPT_STRETCH);
+  /* The Doom skull cursor lumps (M_SKULL1/2) do not exist in Heretic;
+   * drawing a missing lump would feed garbage to the patch decoder. Skip
+   * it when absent (the Heretic arrow cursor is separate wiring). */
+  if (W_CheckNumForName(skullName[whichSkull]) >= 0)
+    V_DrawNamePatch(x + SKULLXOFF, currentMenu->y - 5 + itemOn*LINEHEIGHT,0,
+        skullName[whichSkull], CR_DEFAULT, VPT_STRETCH);
       }
 }
 

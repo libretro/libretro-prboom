@@ -310,6 +310,35 @@ void HU_Init(void)
   memset(hu_font,  0, sizeof(hu_font));
   memset(hu_msgbg, 0, sizeof(hu_msgbg));
 
+  /* Heretic uses its own font (the FONTA set, between the FONTA_S and
+   * FONTA_E markers) rather than Doom's STCFN glyphs. FONTA01 is the
+   * first printable character ('!', ASCII 33), which is exactly
+   * HU_FONTSTART, so lump (FONTA_S + 1 + i) maps to hu_font[i]. Heretic's
+   * font is uppercase-only, so fold lowercase letters onto their
+   * uppercase glyph. */
+  if (heretic && W_CheckNumForName("FONTA_S") != -1)
+  {
+    int base = W_GetNumForName("FONTA_S") + 1;
+    int last = W_CheckNumForName("FONTA_E");
+    int count = (last > base) ? (last - base) : 0;
+
+    for (i = 0; i < HU_FONTSIZE; i++)
+    {
+      int ch = HU_FONTSTART + i;
+      int src = ch - HU_FONTSTART;             /* glyph index into FONTA */
+
+      if (ch >= 'a' && ch <= 'z')              /* uppercase fold */
+        src = (ch - 32) - HU_FONTSTART;
+
+      if (src >= 0 && (count == 0 || src < count))
+        R_SetPatchNum(&hu_font[i], W_GetNameForNum(base + src));
+
+      hu_font2[i] = hu_font[i];                /* no separate big font */
+    }
+    /* hu_fontk (STKEYS) is Doom-only; leave it zeroed for Heretic. */
+    return;
+  }
+
   // load the heads-up font
   j = HU_FONTSTART;
   for (i=0;i<HU_FONTSIZE;i++,j++)

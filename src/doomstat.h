@@ -70,6 +70,10 @@ extern complevel_t compatibility_level, default_compatibility_level;
 #define compatibility (compatibility_level<=boom_compatibility_compatibility)
 #define demo_compatibility (compatibility_level < boom_compatibility_compatibility)
 #define mbf_features (compatibility_level>=mbf_compatibility)
+/* MBF21 (complevel 21): the new feature set layered on top of boom/mbf.
+ * Every MBF21-specific behavioral change must gate on this so it stays
+ * inert for vanilla/boom/mbf/prboom demos and playback. */
+#define mbf21_features (compatibility_level>=mbf21_compatibility)
 
 // v1.1-like pitched sounds
 extern int pitched_sounds;        // killough

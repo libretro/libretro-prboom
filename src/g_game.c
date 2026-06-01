@@ -1620,7 +1620,7 @@ const char * comp_lev_str[MAX_COMPATIBILITY_LEVEL] =
 { "doom v1.2", "doom v1.666", "doom/doom2 v1.9", "ultimate doom", "final doom",
   "dosdoom compatibility", "tasdoom compatibility", "\"boom compatibility\"", "boom v2.01", "boom v2.02", "lxdoom v1.3.2+",
   "MBF", "PrBoom 2.03beta", "PrBoom v2.1.0-2.1.1", "PrBoom v2.1.2-v2.2.6",
-  "PrBoom v2.3.x", "PrBoom 2.4.0", "Current PrBoom"  };
+  "PrBoom v2.3.x", "PrBoom 2.4.0", "Current PrBoom", "MBF21"  };
 
 // comp_options_by_version removed - see G_Compatibility
 
@@ -2702,7 +2702,8 @@ static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, dbool
    // BOOM's demoversion starts from 200
    if (!((demover >=   0  && demover <=   4) ||
             (demover >= 104  && demover <= 111) ||
-            (demover >= 200  && demover <= 214)))
+            (demover >= 200  && demover <= 214) ||
+            (demover == 221)))
    {
       I_Error("G_ReadDemoHeader: Unknown demo format %d.", demover);
    }
@@ -2819,6 +2820,11 @@ static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, dbool
             break;
          case 214:
             compatibility_level = prboom_6_compatibility;
+            longtics = 1;
+            demo_p++;
+            break;
+         case 221:
+            compatibility_level = mbf21_compatibility;
             longtics = 1;
             demo_p++;
             break;

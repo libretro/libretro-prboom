@@ -76,6 +76,10 @@ typedef enum {
   doom2,        // DOOM 2
   pack_tnt,     // TNT mission pack
   pack_plut,    // Plutonia pack
+  /* Raven games appended last so existing ordinal comparisons such as
+   * (gamemission >= pack_tnt) keep their meaning for the Doom missions. */
+  heretic_mission, // Heretic
+  hexen_mission,   // Hexen
   none
 } GameMission_t;
 

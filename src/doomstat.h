@@ -60,6 +60,10 @@ extern  dbool   fastparm; // checkparm of -fast
 extern GameMode_t gamemode;
 extern GameMission_t  gamemission;
 
+/* Raven (Heretic/Hexen) game identification; see doomstat.c. */
+extern dbool heretic;
+extern dbool raven;
+
 // Set if homebrew PWAD stuff has been added.
 extern  dbool   modifiedgame;
 

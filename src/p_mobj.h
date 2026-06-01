@@ -273,6 +273,48 @@ enum {
 #define MF2_RIP           0x00020000 /* ripper projectile (does not disappear on impact) */
 #define MF2_FULLVOLSOUNDS 0x00040000 /* full volume see/death sounds */
 
+/* Raven (Heretic/Hexen) thing flags.  The fork's flags2 field doubles as the
+ * MBF21 flag word (bits 0..18 above), so these occupy free bits 19 and up.
+ * They are deliberately NOT given dsda-doom's bit values: dsda uses a single
+ * unified namespace where the MBF21 names take different bits than this fork
+ * assigns them.  What matters is internal consistency -- Raven code sets and
+ * tests these by name -- so any free bits work, and keeping the MBF21 bits
+ * untouched protects the existing DSDHacked/MBF21 behaviour.  64-bit (ull)
+ * because flags2 is uint64_t.  Names already present above (e.g. MF2_LOGRAV)
+ * have the same meaning for Raven and are reused as-is. */
+#define MF2_WINDTHRUST    0x0000000000100000ull /* pushed by wind */
+#define MF2_FLOORBOUNCE   0x0000000000200000ull /* bounces off the floor */
+#define MF2_THRUGHOST     0x0000000000400000ull /* missile passes through ghosts */
+#define MF2_FLY           0x0000000000800000ull /* fly mode active */
+#define MF2_FOOTCLIP      0x0000000001000000ull /* feet may be clipped */
+#define MF2_SPAWNFLOAT    0x0000000002000000ull /* spawn at random float z */
+#define MF2_NOTELEPORT    0x0000000004000000ull /* does not teleport */
+#define MF2_PUSHABLE      0x0000000008000000ull /* can be pushed by others */
+#define MF2_SLIDE         0x0000000010000000ull /* slides against walls */
+#define MF2_ONMOBJ        0x0000000020000000ull /* resting on top of another mobj */
+#define MF2_PASSMOBJ      0x0000000040000000ull /* z block checking (pass over/under) */
+#define MF2_CANNOTPUSH    0x0000000080000000ull /* cannot push pushables */
+#define MF2_FEETARECLIPPED 0x0000000100000000ull /* feet currently clipped */
+#define MF2_FIREDAMAGE    0x0000000200000000ull /* does fire damage */
+#define MF2_NODMGTHRUST   0x0000000400000000ull /* no thrust on damage */
+#define MF2_TELESTOMP     0x0000000800000000ull /* can telestomp */
+#define MF2_FLOATBOB      0x0000001000000000ull /* float-bob z movement */
+#define MF2_DONTDRAW      0x0000002000000000ull /* no vissprite */
+#define MF2_IMPACT        0x0000004000000000ull /* missile activates impact specials */
+#define MF2_PUSHWALL      0x0000008000000000ull /* can push walls */
+#define MF2_MCROSS        0x0000010000000000ull /* activates monster-cross lines */
+#define MF2_PCROSS        0x0000020000000000ull /* activates projectile-cross lines */
+#define MF2_CANTLEAVEFLOORPIC 0x0000040000000000ull /* stay within a floor type */
+#define MF2_NONSHOOTABLE  0x0000080000000000ull /* non-shootable but solid */
+#define MF2_INVULNERABLE  0x0000100000000000ull /* invulnerable */
+#define MF2_DORMANT       0x0000200000000000ull /* dormant */
+#define MF2_ICEDAMAGE     0x0000400000000000ull /* does ice damage */
+#define MF2_SEEKERMISSILE 0x0000800000000000ull /* seeker missile */
+#define MF2_REFLECTIVE    0x0001000000000000ull /* reflects missiles */
+#define MF2_CANUSEWALLS   0x0002000000000000ull /* can activate use lines */
+#define MF2_COUNTSECRET   0x0004000000000000ull /* pickup counts as secret */
+#define MF2_BLASTED       0x0008000000000000ull /* blasted by Hexen disc */
+
 
 // Map Object definition.
 //

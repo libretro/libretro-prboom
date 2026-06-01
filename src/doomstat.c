@@ -38,6 +38,12 @@
 GameMode_t gamemode = indetermined;
 GameMission_t   gamemission = doom;
 
+/* Raven game identification.  'heretic' is set when a Heretic IWAD is loaded;
+ * 'raven' is the union (heretic || hexen) used by code shared between the two.
+ * Both default off so a Doom session is byte-for-byte unaffected. */
+dbool heretic;
+dbool raven;
+
 // Language.
 Language_t   language = english;
 

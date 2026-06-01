@@ -37,6 +37,7 @@
 #include "p_map.h"
 #include "p_inter.h"
 #include "p_pspr.h"
+#include "dsda_hacked.h"
 #include "p_enemy.h"
 #include "p_tick.h"
 #include "m_random.h"
@@ -85,6 +86,16 @@ static void P_SetPsprite(player_t *player, int position, statenum_t stnum)
       if (!stnum)
       {
          /* object removed itself */
+         psp->state = NULL;
+         break;
+      }
+
+      /* DSDHacked: stnum comes from editable weapon-frame data
+       * (nextstate, or a codepointer's target state) and may fall outside
+       * the grown state table.  Indexing states[] with it would be out of
+       * bounds; treat it like state 0 (psprite removed) rather than crash. */
+      if ((unsigned)stnum >= (unsigned)num_states)
+      {
          psp->state = NULL;
          break;
       }

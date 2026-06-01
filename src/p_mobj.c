@@ -95,6 +95,18 @@ dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
       break;                 // killough 4/9/98
       }
 
+    /* DSDHacked: nextstate comes from editable frame data and may point
+     * outside the (grown) state table or be negative.  Indexing states[]
+     * and seenstate[] with it would read/write out of bounds, so treat an
+     * invalid state like S_NULL: stop the actor rather than crash. */
+    if ((unsigned)state >= (unsigned)num_states)
+      {
+      mobj->state = (state_t *) S_NULL;
+      P_RemoveMobj (mobj);
+      ret = FALSE;
+      break;
+      }
+
     st = &states[state];
     mobj->state = st;
     mobj->tics = st->tics;
@@ -863,6 +875,14 @@ mobj_t* P_SpawnMobj(fixed_t x,fixed_t y,fixed_t z,mobjtype_t type)
   state_t*    st;
   mobjinfo_t* info;
 
+  /* DSDHacked: type can come from editable codepointer args (e.g.
+   * A_WeaponProjectile/A_MonsterProjectile use args[0]-1) and may be out
+   * of range for the (grown) mobjinfo table.  Indexing mobjinfo[type]
+   * would be out of bounds, so refuse the spawn.  Callers that can pass an
+   * editable type null-check the result. */
+  if ((unsigned)type >= (unsigned)num_mobj_types)
+    return NULL;
+
   mobj = Z_Malloc (sizeof(*mobj), PU_LEVEL, NULL);
   memset (mobj, 0, sizeof (*mobj));
   info = &mobjinfo[type];
@@ -899,7 +919,12 @@ mobj_t* P_SpawnMobj(fixed_t x,fixed_t y,fixed_t z,mobjtype_t type)
   // do not set the state with P_SetMobjState,
   // because action routines can not be called yet
 
-  st = &states[info->spawnstate];
+  /* DSDHacked: spawnstate is editable and may be out of range; clamp to
+   * S_NULL rather than index states[] out of bounds. */
+  if ((unsigned)info->spawnstate >= (unsigned)num_states)
+    st = &states[S_NULL];
+  else
+    st = &states[info->spawnstate];
 
   mobj->state  = st;
   mobj->tics   = st->tics;
@@ -1485,6 +1510,8 @@ mobj_t* P_SpawnMissile(mobj_t* source,mobj_t* dest,mobjtype_t type)
   int     dist;
 
   th = P_SpawnMobj (source->x,source->y,source->z + 4*8*FRACUNIT,type);
+  if (!th)
+    return NULL;
 
   if (th->info->seesound)
     S_StartSound (th, th->info->seesound);
@@ -1555,6 +1582,8 @@ mobj_t *P_SpawnPlayerMissile(mobj_t* source,mobjtype_t type)
   z = source->z + 4*8*FRACUNIT;
 
   th = P_SpawnMobj (x,y,z, type);
+  if (!th)
+    return NULL;
 
   if (th->info->seesound)
     S_StartSound (th, th->info->seesound);

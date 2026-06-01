@@ -379,6 +379,37 @@ void D_PageTicker(void)
 //
 // D_PageDrawer
 //
+// The page/title screen is a single full-screen patch stretched to the
+// current resolution.  At high internal resolutions (e.g. 2560x1200) that
+// stretch runs the per-pixel column drawer over millions of pixels, and
+// D_Display calls this every frame -- so a static, unchanging image was
+// being fully re-rasterised 120 times a second (the title screen measured
+// ~10 ms/frame at 4K while live gameplay is ~2 ms).
+//
+// Since the result depends only on the page lump, the screen dimensions
+// and the palette, rasterise it once into a persistent buffer and memcpy
+// that into the frame buffer on subsequent frames.  A full-screen memcpy
+// of SCREENWIDTH*SCREENHEIGHT*2 bytes is a cheap streaming copy compared
+// with the stretched-patch redraw.  The cache is rebuilt whenever the
+// page, the resolution or the palette (V_Palette16) changes.  The
+// M_DrawCredits() branch (pagename == NULL) is not cached.
+//
+static uint16_t   *page_cache       = NULL;
+static const char *page_cache_name  = NULL;
+static int         page_cache_w     = -1;
+static int         page_cache_h     = -1;
+static const uint16_t *page_cache_pal = NULL;
+
+void D_FreePageCache(void)
+{
+  free(page_cache);
+  page_cache      = NULL;
+  page_cache_name = NULL;
+  page_cache_w    = -1;
+  page_cache_h    = -1;
+  page_cache_pal  = NULL;
+}
+
 static void D_PageDrawer(void)
 {
   // proff/nicolas 09/14/98 -- now stretchs bitmaps to fullscreen!
@@ -386,7 +417,57 @@ static void D_PageDrawer(void)
   // proff - added M_DrawCredits
   if (pagename)
   {
-    V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
+    const size_t fb_bytes = (size_t)SCREENWIDTH * SCREENHEIGHT
+                            * SURFACE_PIXEL_DEPTH;
+
+    if (!page_cache
+        || page_cache_name != pagename
+        || page_cache_w    != SCREENWIDTH
+        || page_cache_h    != SCREENHEIGHT
+        || page_cache_pal  != V_Palette16)
+    {
+      /* (Re)build the cache.  Render the stretched patch once into the
+       * persistent page_cache by temporarily pointing screens[0] and the
+       * renderer's cached top-left at it, then restore.  The frontend
+       * buffer always has SCREENWIDTH pitch when direct-rendering (the
+       * direct path is gated on pitch == SCREENPITCH), so the cache is
+       * layout-compatible with both the direct and fallback buffers. */
+      unsigned char  *saved_data       = screens[0].data;
+      uint16_t       *saved_short_tl    = drawvars.short_topleft;
+      unsigned int   *saved_int_tl      = drawvars.int_topleft;
+
+      if (!page_cache)
+        page_cache = (uint16_t*)malloc((size_t)MAX_SCREENWIDTH
+                                       * MAX_SCREENHEIGHT
+                                       * SURFACE_PIXEL_DEPTH);
+
+      if (page_cache)
+      {
+        screens[0].data        = (unsigned char *)page_cache;
+        drawvars.short_topleft = page_cache;
+        drawvars.int_topleft   = (unsigned int *)page_cache;
+
+        V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
+
+        screens[0].data        = saved_data;
+        drawvars.short_topleft = saved_short_tl;
+        drawvars.int_topleft   = saved_int_tl;
+
+        page_cache_name = pagename;
+        page_cache_w    = SCREENWIDTH;
+        page_cache_h    = SCREENHEIGHT;
+        page_cache_pal  = V_Palette16;
+      }
+      else
+      {
+        /* Allocation failed -- fall back to drawing directly every
+         * frame (correct, just not accelerated). */
+        V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
+        return;
+      }
+    }
+
+    memcpy(screens[0].data, page_cache, fb_bytes);
   }
   else
     M_DrawCredits();
@@ -1548,6 +1629,7 @@ void D_DoomDeinit(void)
   R_Deinit();
   AM_Deinit();
   G_Deinit();
+  D_FreePageCache();
   V_FreeScreens();
   V_DestroyTrueColorPalette();
   S_Shutdown();

@@ -629,55 +629,85 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
       info->timing.fps = 100.0;
       break;
     case 9:
-      info->timing.fps = 119.0;
+      info->timing.fps = 105.0;
       break;
     case 10:
-      info->timing.fps = 120.0;
+      info->timing.fps = 119.0;
       break;
     case 11:
-      info->timing.fps = 140.0;
+      info->timing.fps = 120.0;
       break;
     case 12:
-      info->timing.fps = 144.0;
+      info->timing.fps = 140.0;
       break;
     case 13:
-      info->timing.fps = 155.0;
+      info->timing.fps = 144.0;
       break;
     case 14:
-      info->timing.fps = 160.0;
+      info->timing.fps = 155.0;
       break;
     case 15:
-      info->timing.fps = 165.0;
+      info->timing.fps = 160.0;
       break;
     case 16:
-      info->timing.fps = 180.0;
+      info->timing.fps = 165.0;
       break;
     case 17:
-      info->timing.fps = 200.0;
+      info->timing.fps = 175.0;
       break;
     case 18:
-      info->timing.fps = 240.0;
+      info->timing.fps = 180.0;
       break;
     case 19:
-      info->timing.fps = 244.0;
+      info->timing.fps = 200.0;
       break;
     case 20:
-      info->timing.fps = 300.0;
+      info->timing.fps = 210.0;
       break;
     case 21:
-      info->timing.fps = 320.0;
+      info->timing.fps = 240.0;
       break;
     case 22:
-      info->timing.fps = 360.0;
+      info->timing.fps = 244.0;
       break;
     case 23:
-      info->timing.fps = 480.0;
+      info->timing.fps = 245.0;
       break;
     case 24:
-      info->timing.fps = 540.0;
+      info->timing.fps = 280.0;
       break;
     case 25:
-      info->timing.fps = 105.0;
+      info->timing.fps = 300.0;
+      break;
+    case 26:
+      info->timing.fps = 315.0;
+      break;
+    case 27:
+      info->timing.fps = 320.0;
+      break;
+    case 28:
+      info->timing.fps = 350.0;
+      break;
+    case 29:
+      info->timing.fps = 360.0;
+      break;
+    case 30:
+      info->timing.fps = 385.0;
+      break;
+    case 31:
+      info->timing.fps = 420.0;
+      break;
+    case 32:
+      info->timing.fps = 455.0;
+      break;
+    case 33:
+      info->timing.fps = 480.0;
+      break;
+    case 34:
+      info->timing.fps = 490.0;
+      break;
+    case 35:
+      info->timing.fps = 540.0;
       break;
     default:
       info->timing.fps = TICRATE;

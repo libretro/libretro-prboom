@@ -341,6 +341,27 @@ static void R_InitTextureMapping (void)
     if (cx43frac <= 0 || cx43frac > centerxfrac)
       cx43frac = centerxfrac;
     focallength = FixedDiv(cx43frac, finetangent[FINEANGLES/4 + fieldofview/2]);
+
+    /* hor+ widens focallength so the real screen edge (centerx) sits
+     * at a larger angle than half of the vanilla fieldofview.  The
+     * viewangletox clamp below rejects any finetangent[] beyond
+     * finetangent[FINEANGLES/4 + fieldofview/2] as off-screen, so with
+     * the unwidened fieldofview the outermost columns get no angle
+     * mapping and are never drawn (HOM at the left/right edges).
+     * Widen fieldofview to the angle actually subtended by the full
+     * half-width: find the fine angle whose tangent reaches
+     * centerx/focallength and set fieldofview to twice its offset from
+     * the centre.  At 4:3 this reproduces the vanilla fieldofview. */
+    if (cx43frac < centerxfrac)
+    {
+      fixed_t edgetan = FixedDiv(centerxfrac, focallength);
+      int hi = FINEANGLES/4;
+      while (hi < FINEANGLES/2 - 1 && finetangent[hi] < edgetan)
+        hi++;
+      fieldofview = 2 * (hi - FINEANGLES/4);
+      if (fieldofview >= FINEANGLES/2)
+        fieldofview = FINEANGLES/2 - 1;
+    }
   }
 
   for (i=0 ; i<FINEANGLES/2 ; i++)

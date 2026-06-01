@@ -44,6 +44,10 @@
 #include "am_map.h"
 #include "lprintf.h"
 
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
+
 //
 // All drawing to the view buffer is accomplished in this file.
 // The other refresh files only know about ccordinates,
@@ -5103,6 +5107,61 @@ static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
       spancomposed_pal = V_Palette16;
    }
    lut = spancomposed_lut;
+
+#if defined(__SSE2__)
+   /* The per-pixel index math (two arithmetic shifts, two masks, an OR,
+    * and the two fixed-point accumulator adds) is the bulk of this loop;
+    * the texel/LUT gather is cheap because the 64x64 source tile and the
+    * 256-entry LUT stay resident in L1.  SSE2 has no gather, so the
+    * gather + store stay scalar, but computing four spot indices at once
+    * removes most of the loop's arithmetic.  Output is bit-identical to
+    * the scalar path: srai matches the signed >> on fixed_t, and the
+    * mask/or and accumulator progression are the same per lane.
+    *
+    * Spans shorter than 8 px (screen edges, and any span too narrow to
+    * amortise the vector setup over more than one iteration) fall through
+    * to the scalar loop below; the vector block handles the count & ~3
+    * prefix and the scalar loop finishes the remainder with the same
+    * xfrac/yfrac. */
+   if (count >= 8)
+   {
+      unsigned blocks = count >> 2;
+      __m128i vx  = _mm_set_epi32(xfrac + 3*xstep, xfrac + 2*xstep,
+                                  xfrac + xstep,   xfrac);
+      __m128i vy  = _mm_set_epi32(yfrac + 3*ystep, yfrac + 2*ystep,
+                                  yfrac + ystep,   yfrac);
+      const __m128i vxs   = _mm_set1_epi32(xstep << 2);
+      const __m128i vys   = _mm_set1_epi32(ystep << 2);
+      const __m128i m63   = _mm_set1_epi32(63);
+      const __m128i m4032 = _mm_set1_epi32(4032);
+      unsigned consumed   = blocks << 2;
+
+      while (blocks--)
+      {
+         uint32_t idx[4];
+         __m128i xt   = _mm_and_si128(_mm_srai_epi32(vx, 16), m63);
+         __m128i yt   = _mm_and_si128(_mm_srai_epi32(vy, 10), m4032);
+         __m128i spot = _mm_or_si128(xt, yt);
+
+         _mm_storeu_si128((__m128i *)idx, spot);
+
+         dest[0] = lut[ source[idx[0]] ];
+         dest[1] = lut[ source[idx[1]] ];
+         dest[2] = lut[ source[idx[2]] ];
+         dest[3] = lut[ source[idx[3]] ];
+         dest += 4;
+
+         vx = _mm_add_epi32(vx, vxs);
+         vy = _mm_add_epi32(vy, vys);
+      }
+
+      /* Advance scalar accumulators past the vectorised prefix and
+       * leave only count & 3 iterations for the scalar tail. */
+      xfrac += (fixed_t)consumed * xstep;
+      yfrac += (fixed_t)consumed * ystep;
+      count -= consumed;
+   }
+#endif
 
    while (count)
    {

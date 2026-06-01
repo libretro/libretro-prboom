@@ -416,6 +416,13 @@ static void D_PageDrawer(void)
   // CPhipps - updated for new patch drawing
   // proff - added M_DrawCredits
 
+  /* Heretic's full-screen lumps (TITLE, CREDIT, HELP1, HELP2) are raw
+   * 320x200 bitmaps, not Doom patch_t graphics. Feeding them to the
+   * patch decoder reads a bogus width/height and aborts. Raw-screen
+   * drawing for these is separate wiring; skip the page draw for now so
+   * the game still boots. */
+  if (heretic)
+    return;
 
   if (pagename)
   {

@@ -571,6 +571,14 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
       flip = (dbool) sprframe->flip[0];
    }
 
+   /* A DSDHacked sprite frame may name a rotation that was never installed
+    * (sentinel lump -1), or carry an out-of-range lump from a partial
+    * sprite in the WAD.  R_CachePatchNum would then return NULL (or index
+    * the patch table out of bounds), and the patch->width dereference below
+    * crashed.  Skip rendering a sprite whose lump is not a real entry. */
+   if (lump < 0 || lump >= numspritelumps)
+      return;
+
    {
       const rpatch_t* patch = R_CachePatchNum(lump+firstspritelump);
 
@@ -732,6 +740,12 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
 
    lump = sprframe->lump[0];
    flip = (dbool) sprframe->flip[0];
+
+   /* As in R_ProjectSprite: a frame's rotation lump may be the uninstalled
+    * sentinel (-1) or out of range for a partial sprite; don't draw it
+    * rather than dereference a NULL/garbage patch. */
+   if (lump < 0 || lump >= numspritelumps)
+      return;
 
    {
       const rpatch_t* patch = R_CachePatchNum(lump+firstspritelump);

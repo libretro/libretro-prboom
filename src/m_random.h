@@ -123,6 +123,7 @@ typedef enum {
   pr_dropoff,                 // #60
   pr_randomjump,              // #61
   pr_defect,                  // #62  // Start new entries -- add new entries below
+  pr_mbf21,                   // #63  MBF21 codepointers
 
   // End of new entries
   NUMPRCLASS               // MUST be last item in list
@@ -140,6 +141,10 @@ extern unsigned long rngseed;          // The starting seed (not part of state)
 
 // As M_Random, but used by the play simulation.
 int P_Random(pr_class_t);
+
+/* MBF21 hitscan spread helpers (spread is fixed-point degrees). */
+int P_RandomHitscanAngle(pr_class_t pr_class, fixed_t spread);
+int P_RandomHitscanSlope(pr_class_t pr_class, fixed_t spread);
 
 // Returns a number from 0 to 255,
 #define M_Random() P_Random(pr_misc)

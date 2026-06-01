@@ -1576,6 +1576,9 @@ mobj_t* corpsehit;
 mobj_t* vileobj;
 fixed_t viletryx;
 fixed_t viletryy;
+/* MBF21: A_HealChase heals corpses within an arbitrary radius; A_VileChase
+ * uses the archvile's radius.  PIT_VileCheck reads this. */
+fixed_t viletryradius;
 
 static dbool   PIT_VileCheck(mobj_t *thing)
 {
@@ -1591,7 +1594,7 @@ static dbool   PIT_VileCheck(mobj_t *thing)
   if (thing->info->raisestate == S_NULL)
     return TRUE;        // monster doesn't have a raise state
 
-  maxdist = thing->info->radius + mobjinfo[MT_VILE].radius;
+  maxdist = thing->info->radius + viletryradius;
 
   if (D_abs(thing->x-viletryx) > maxdist || D_abs(thing->y-viletryy) > maxdist)
     return TRUE;                // not actually touching
@@ -1654,6 +1657,8 @@ void A_VileChase(mobj_t* actor)
         actor->x + actor->info->speed*xspeed[actor->movedir];
       viletryy =
         actor->y + actor->info->speed*yspeed[actor->movedir];
+
+      viletryradius = mobjinfo[MT_VILE].radius;
 
       xl = (viletryx - bmaporgx - MAXRADIUS*2)>>MAPBLOCKSHIFT;
       xh = (viletryx - bmaporgx + MAXRADIUS*2)>>MAPBLOCKSHIFT;
@@ -2722,4 +2727,475 @@ void A_LineEffect(mobj_t *mo)
     P_CrossSpecialLine(&junk, 0, mo);
   mo->state->misc1 = junk.special;
   mo->player = oldplayer;
+}
+
+/* ====================================================================
+ * MBF21 codepointers (thing side)
+ *
+ * Each reads its parameters from the calling state's args[] and is inert
+ * unless mbf21_features is active (the actor's state->args are only
+ * populated by an MBF21 deh patch, and the gate makes them no-ops at lower
+ * complevels regardless).  Mechanics follow the MBF21 spec.
+ * ==================================================================== */
+
+/* Heal a nearby corpse within 'radius', like the archvile but
+ * parameterised; returns TRUE if one was raised.  Adapted from
+ * A_VileChase. */
+static dbool P_HealCorpse(mobj_t *actor, fixed_t radius,
+                          statenum_t healstate, int healsound)
+{
+  int xl, xh, yl, yh, bx, by;
+
+  if (actor->movedir != DI_NODIR)
+  {
+    viletryx = actor->x + actor->info->speed*xspeed[actor->movedir];
+    viletryy = actor->y + actor->info->speed*yspeed[actor->movedir];
+    viletryradius = radius;
+
+    xl = (viletryx - bmaporgx - MAXRADIUS*2)>>MAPBLOCKSHIFT;
+    xh = (viletryx - bmaporgx + MAXRADIUS*2)>>MAPBLOCKSHIFT;
+    yl = (viletryy - bmaporgy - MAXRADIUS*2)>>MAPBLOCKSHIFT;
+    yh = (viletryy - bmaporgy + MAXRADIUS*2)>>MAPBLOCKSHIFT;
+
+    vileobj = actor;
+    for (bx=xl ; bx<=xh ; bx++)
+      for (by=yl ; by<=yh ; by++)
+        if (!P_BlockThingsIterator(bx,by,PIT_VileCheck))
+        {
+          mobjinfo_t *info;
+          mobj_t *temp = actor->target;
+          actor->target = corpsehit;
+          A_FaceTarget(actor);
+          actor->target = temp;
+
+          P_SetMobjState(actor, healstate);
+          S_StartSound(corpsehit, healsound);
+          info = corpsehit->info;
+
+          P_SetMobjState(corpsehit,info->raisestate);
+
+          if (comp[comp_vile])
+            corpsehit->height <<= 2;
+          else
+          {
+            corpsehit->height = info->height;
+            corpsehit->radius = info->radius;
+          }
+
+          corpsehit->flags =
+            (info->flags & ~MF_FRIEND) | (actor->flags & MF_FRIEND);
+          corpsehit->intflags = corpsehit->intflags | MIF_RESURRECTED;
+
+          if (!((corpsehit->flags ^ MF_COUNTKILL) & (MF_FRIEND | MF_COUNTKILL)))
+            totallive++;
+
+          corpsehit->health = info->spawnhealth;
+          P_SetTarget(&corpsehit->target, NULL);
+
+          if (mbf_features)
+          {
+            P_SetTarget(&corpsehit->lastenemy, NULL);
+            corpsehit->flags &= ~MF_JUSTHIT;
+          }
+
+          P_UpdateThinker(&corpsehit->thinker);
+          return TRUE;
+        }
+  }
+  return FALSE;
+}
+
+/* True if t2 lies within 'fov' of t1's facing angle. */
+static dbool P_CheckFov(mobj_t *t1, mobj_t *t2, angle_t fov)
+{
+  angle_t angle, minang, maxang;
+  angle = R_PointToAngle2(t1->x, t1->y, t2->x, t2->y);
+  minang = t1->angle - fov / 2;
+  maxang = t1->angle + fov / 2;
+  return (minang > maxang) ? (angle >= minang || angle <= maxang)
+                           : (angle >= minang && angle <= maxang);
+}
+
+/* Melee-range check for A_MonsterMeleeAttack (distance + sight, ignoring
+ * friend-on-friend). */
+static dbool P_CheckRange(mobj_t *actor, fixed_t range)
+{
+  mobj_t *pl = actor->target;
+  return pl &&
+    !(actor->flags & pl->flags & MF_FRIEND) &&
+    P_AproxDistance(pl->x-actor->x, pl->y-actor->y) < range &&
+    P_CheckSight(actor, actor->target);
+}
+
+/* Home a missile toward *seekTarget by up to turnMax per call (halving the
+ * turn rate once within thresh).  Adapted from A_Tracer's seeking math. */
+static dbool P_SeekerMissile(mobj_t *actor, mobj_t **seekTarget,
+                             angle_t thresh, angle_t turnMax)
+{
+  angle_t exact, delta;
+  fixed_t dist, slope;
+  int dir;
+  mobj_t *target = *seekTarget;
+
+  if (!target)
+    return FALSE;
+  if (!(target->flags & MF_SHOOTABLE)) /* target died */
+  {
+    *seekTarget = NULL;
+    return FALSE;
+  }
+
+  exact = R_PointToAngle2(actor->x, actor->y, target->x, target->y);
+  if (exact > actor->angle)
+  {
+    delta = exact - actor->angle;
+    dir = 1;                 /* clockwise */
+  }
+  else
+  {
+    delta = actor->angle - exact;
+    dir = 0;
+  }
+  if (delta > thresh)
+  {
+    delta >>= 1;
+    if (delta > turnMax)
+      delta = turnMax;
+  }
+  if (dir)
+    actor->angle += delta;
+  else
+    actor->angle -= delta;
+
+  exact = actor->angle >> ANGLETOFINESHIFT;
+  actor->momx = FixedMul(actor->info->speed, finecosine[exact]);
+  actor->momy = FixedMul(actor->info->speed, finesine[exact]);
+
+  dist = P_AproxDistance(target->x - actor->x, target->y - actor->y);
+  dist = dist / actor->info->speed;
+  if (dist < 1)
+    dist = 1;
+  slope = (target->z + (target->height >> 1) -
+           (actor->z + (actor->height >> 1))) / dist;
+  actor->momz = slope;
+  return TRUE;
+}
+
+/* Search surrounding blockmap for a valid auto-target within fov/distance.
+ * Adapted from Hexen's rough monster search (as used by dsda). */
+static mobj_t *P_RoughTargetSearch(mobj_t *mo, angle_t fov, int distance)
+{
+  int startX, startY, count, bx, by;
+  mobj_t *link;
+
+  startX = (mo->x - bmaporgx) >> MAPBLOCKSHIFT;
+  startY = (mo->y - bmaporgy) >> MAPBLOCKSHIFT;
+
+  for (count = 0; count <= distance; count++)
+    for (by = startY - count; by <= startY + count; by++)
+    {
+      if (by < 0 || by >= bmapheight)
+        continue;
+      for (bx = startX - count; bx <= startX + count; bx++)
+      {
+        /* only scan the ring at radius 'count' */
+        if (count && bx != startX - count && bx != startX + count &&
+            by != startY - count && by != startY + count)
+          continue;
+        if (bx < 0 || bx >= bmapwidth)
+          continue;
+        for (link = blocklinks[by*bmapwidth + bx]; link; link = link->bnext)
+        {
+          if (!(link->flags & MF_SHOOTABLE))
+            continue;
+          if (link == mo->target)
+            continue;
+          if (mo->target &&
+              !((link->flags ^ mo->target->flags) & MF_FRIEND) &&
+              mo->target->target != link &&
+              !(deathmatch && link->player && mo->target->player))
+            continue;
+          if (fov > 0 && !P_CheckFov(mo, link, fov))
+            continue;
+          if (!P_CheckSight(mo, link))
+            continue;
+          return link;
+        }
+      }
+    }
+  return NULL;
+}
+
+void A_SpawnObject(mobj_t *actor)
+{
+  int type, angle, ofs_x, ofs_y, ofs_z, vel_x, vel_y, vel_z;
+  angle_t an;
+  int fan, dx, dy;
+  mobj_t *mo;
+
+  if (!mbf21_features || !actor->state->args[0])
+    return;
+
+  type  = actor->state->args[0] - 1;
+  angle = actor->state->args[1];
+  ofs_x = actor->state->args[2];
+  ofs_y = actor->state->args[3];
+  ofs_z = actor->state->args[4];
+  vel_x = actor->state->args[5];
+  vel_y = actor->state->args[6];
+  vel_z = actor->state->args[7];
+
+  an = actor->angle + (unsigned int)(((int64_t)angle << 16) / 360);
+  fan = an >> ANGLETOFINESHIFT;
+  dx = FixedMul(ofs_x, finecosine[fan]) - FixedMul(ofs_y, finesine[fan]);
+  dy = FixedMul(ofs_x, finesine[fan])   + FixedMul(ofs_y, finecosine[fan]);
+
+  mo = P_SpawnMobj(actor->x + dx, actor->y + dy, actor->z + ofs_z, type);
+  if (!mo)
+    return;
+
+  mo->angle = an;
+  mo->momx = FixedMul(vel_x, finecosine[fan]) - FixedMul(vel_y, finesine[fan]);
+  mo->momy = FixedMul(vel_x, finesine[fan])   + FixedMul(vel_y, finecosine[fan]);
+  mo->momz = vel_z;
+
+  if (mo->info->flags & (MF_MISSILE | MF_BOUNCES))
+  {
+    if (actor->info->flags & (MF_MISSILE | MF_BOUNCES))
+    {
+      P_SetTarget(&mo->target, actor->target);
+      P_SetTarget(&mo->tracer, actor->tracer);
+    }
+    else
+    {
+      P_SetTarget(&mo->target, actor);
+      P_SetTarget(&mo->tracer, actor->target);
+    }
+  }
+}
+
+void A_MonsterProjectile(mobj_t *actor)
+{
+  int type, angle, pitch, spawnofs_xy, spawnofs_z, an;
+  mobj_t *mo;
+
+  if (!mbf21_features || !actor->target || !actor->state->args[0])
+    return;
+
+  type        = actor->state->args[0] - 1;
+  angle       = actor->state->args[1];
+  pitch       = actor->state->args[2];
+  spawnofs_xy = actor->state->args[3];
+  spawnofs_z  = actor->state->args[4];
+
+  A_FaceTarget(actor);
+  mo = P_SpawnMissile(actor, actor->target, type);
+  if (!mo)
+    return;
+
+  mo->angle += (unsigned int)(((int64_t)angle << 16) / 360);
+  an = mo->angle >> ANGLETOFINESHIFT;
+  mo->momx = FixedMul(mo->info->speed, finecosine[an]);
+  mo->momy = FixedMul(mo->info->speed, finesine[an]);
+  mo->momz += FixedMul(mo->info->speed, DegToSlope(pitch));
+
+  an = (actor->angle - ANG90) >> ANGLETOFINESHIFT;
+  mo->x += FixedMul(spawnofs_xy, finecosine[an]);
+  mo->y += FixedMul(spawnofs_xy, finesine[an]);
+  mo->z += spawnofs_z;
+
+  P_SetTarget(&mo->tracer, actor->target);
+}
+
+void A_MonsterMeleeAttack(mobj_t *actor)
+{
+  int damagebase, damagemod, hitsound, range, damage;
+
+  if (!mbf21_features || !actor->target)
+    return;
+
+  damagebase = actor->state->args[0];
+  damagemod  = actor->state->args[1];
+  hitsound   = actor->state->args[2];
+  range      = actor->state->args[3];
+
+  if (range == 0)
+    range = actor->info->meleerange;
+  range += actor->target->info->radius - 20 * FRACUNIT;
+
+  A_FaceTarget(actor);
+  if (!P_CheckRange(actor, range))
+    return;
+
+  S_StartSound(actor, hitsound);
+  damage = (P_Random(pr_mbf21) % damagemod + 1) * damagebase;
+  P_DamageMobj(actor->target, actor, actor, damage);
+}
+
+void A_RadiusDamage(mobj_t *actor)
+{
+  if (!mbf21_features || !actor->state)
+    return;
+  /* args[0] = damage, args[1] = blast radius */
+  P_RadiusAttackEx(actor, actor->target,
+                   actor->state->args[0], actor->state->args[1]);
+}
+
+void A_NoiseAlert(mobj_t *actor)
+{
+  if (!mbf21_features || !actor->target)
+    return;
+  P_NoiseAlert(actor->target, actor);
+}
+
+void A_HealChase(mobj_t *actor)
+{
+  int state, sound;
+  if (!mbf21_features || !actor)
+    return;
+  state = actor->state->args[0];
+  sound = actor->state->args[1];
+  if (!P_HealCorpse(actor, actor->info->radius, state, sound))
+    A_Chase(actor);
+}
+
+void A_SeekTracer(mobj_t *actor)
+{
+  angle_t threshold, maxturnangle;
+  if (!mbf21_features || !actor)
+    return;
+  threshold    = FixedToAngle(actor->state->args[0]);
+  maxturnangle = FixedToAngle(actor->state->args[1]);
+  P_SeekerMissile(actor, &actor->tracer, threshold, maxturnangle);
+}
+
+void A_FindTracer(mobj_t *actor)
+{
+  angle_t fov;
+  int dist;
+  if (!mbf21_features || !actor || actor->tracer)
+    return;
+  fov  = FixedToAngle(actor->state->args[0]);
+  dist =             (actor->state->args[1]);
+  P_SetTarget(&actor->tracer, P_RoughTargetSearch(actor, fov, dist));
+}
+
+void A_ClearTracer(mobj_t *actor)
+{
+  if (!mbf21_features || !actor)
+    return;
+  P_SetTarget(&actor->tracer, NULL);
+}
+
+void A_JumpIfHealthBelow(mobj_t *actor)
+{
+  int state, health;
+  if (!mbf21_features || !actor)
+    return;
+  state  = actor->state->args[0];
+  health = actor->state->args[1];
+  if (actor->health < health)
+    P_SetMobjState(actor, state);
+}
+
+void A_JumpIfTargetInSight(mobj_t *actor)
+{
+  int state;
+  angle_t fov;
+  if (!mbf21_features || !actor || !actor->target)
+    return;
+  state =             (actor->state->args[0]);
+  fov   = FixedToAngle(actor->state->args[1]);
+  if (fov > 0 && !P_CheckFov(actor, actor->target, fov))
+    return;
+  if (P_CheckSight(actor, actor->target))
+    P_SetMobjState(actor, state);
+}
+
+void A_JumpIfTargetCloser(mobj_t *actor)
+{
+  int state, distance;
+  if (!mbf21_features || !actor || !actor->target)
+    return;
+  state    = actor->state->args[0];
+  distance = actor->state->args[1];
+  if (distance > P_AproxDistance(actor->x - actor->target->x,
+                                 actor->y - actor->target->y))
+    P_SetMobjState(actor, state);
+}
+
+void A_JumpIfTracerInSight(mobj_t *actor)
+{
+  int state;
+  angle_t fov;
+  if (!mbf21_features || !actor || !actor->tracer)
+    return;
+  state =             (actor->state->args[0]);
+  fov   = FixedToAngle(actor->state->args[1]);
+  if (fov > 0 && !P_CheckFov(actor, actor->tracer, fov))
+    return;
+  if (P_CheckSight(actor, actor->tracer))
+    P_SetMobjState(actor, state);
+}
+
+void A_JumpIfTracerCloser(mobj_t *actor)
+{
+  int state, distance;
+  if (!mbf21_features || !actor || !actor->tracer)
+    return;
+  state    = actor->state->args[0];
+  distance = actor->state->args[1];
+  if (distance > P_AproxDistance(actor->x - actor->tracer->x,
+                                 actor->y - actor->tracer->y))
+    P_SetMobjState(actor, state);
+}
+
+void A_JumpIfFlagsSet(mobj_t *actor)
+{
+  int state;
+  uint64_t flags, flags2;
+  if (!mbf21_features || !actor)
+    return;
+  state  = actor->state->args[0];
+  flags  = (uint64_t)actor->state->args[1];
+  flags2 = (uint64_t)actor->state->args[2];
+  if ((actor->flags & flags) == flags &&
+      (actor->flags2 & flags2) == flags2)
+    P_SetMobjState(actor, state);
+}
+
+void A_AddFlags(mobj_t *actor)
+{
+  uint64_t flags, flags2;
+  dbool update_blockmap;
+  if (!mbf21_features || !actor)
+    return;
+  flags  = (uint64_t)actor->state->args[0];
+  flags2 = (uint64_t)actor->state->args[1];
+  update_blockmap = ((flags & MF_NOBLOCKMAP) && !(actor->flags & MF_NOBLOCKMAP))
+                 || ((flags & MF_NOSECTOR)   && !(actor->flags & MF_NOSECTOR));
+  if (update_blockmap)
+    P_UnsetThingPosition(actor);
+  actor->flags  |= flags;
+  actor->flags2 |= flags2;
+  if (update_blockmap)
+    P_SetThingPosition(actor);
+}
+
+void A_RemoveFlags(mobj_t *actor)
+{
+  uint64_t flags, flags2;
+  dbool update_blockmap;
+  if (!mbf21_features || !actor)
+    return;
+  flags  = (uint64_t)actor->state->args[0];
+  flags2 = (uint64_t)actor->state->args[1];
+  update_blockmap = ((flags & MF_NOBLOCKMAP) && (actor->flags & MF_NOBLOCKMAP))
+                 || ((flags & MF_NOSECTOR)   && (actor->flags & MF_NOSECTOR));
+  if (update_blockmap)
+    P_UnsetThingPosition(actor);
+  actor->flags  &= ~flags;
+  actor->flags2 &= ~flags2;
+  if (update_blockmap)
+    P_SetThingPosition(actor);
 }

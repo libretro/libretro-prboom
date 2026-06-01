@@ -2734,3 +2734,190 @@ void P_MovePsprites(player_t *player)
   player->psprites[ps_flash].sx = player->psprites[ps_weapon].sx;
   player->psprites[ps_flash].sy = player->psprites[ps_weapon].sy;
 }
+
+/* ====================================================================
+ * MBF21 codepointers (weapon side)
+ *
+ * Read parameters from the calling psprite state's args[] and are inert
+ * unless mbf21_features is active.  Live here (rather than a separate TU)
+ * for access to the static P_SetPsprite / bulletslope / P_BulletSlope /
+ * P_GunShot helpers.  Mechanics follow the MBF21 spec.
+ * ==================================================================== */
+
+void A_WeaponProjectile(player_t *player, pspdef_t *psp)
+{
+  int type, angle, pitch, spawnofs_xy, spawnofs_z, an;
+  mobj_t *mo;
+
+  if (!mbf21_features || !psp->state || !psp->state->args[0])
+    return;
+
+  type        = psp->state->args[0] - 1;
+  angle       = psp->state->args[1];
+  pitch       = psp->state->args[2];
+  spawnofs_xy = psp->state->args[3];
+  spawnofs_z  = psp->state->args[4];
+
+  mo = P_SpawnPlayerMissile(player->mo, type);
+  if (!mo)
+    return;
+
+  mo->angle += (unsigned int)(((int64_t)angle << 16) / 360);
+  an = mo->angle >> ANGLETOFINESHIFT;
+  mo->momx = FixedMul(mo->info->speed, finecosine[an]);
+  mo->momy = FixedMul(mo->info->speed, finesine[an]);
+  mo->momz += FixedMul(mo->info->speed, DegToSlope(pitch));
+
+  an = (player->mo->angle - ANG90) >> ANGLETOFINESHIFT;
+  mo->x += FixedMul(spawnofs_xy, finecosine[an]);
+  mo->y += FixedMul(spawnofs_xy, finesine[an]);
+  mo->z += spawnofs_z;
+
+  P_SetTarget(&mo->tracer, linetarget);
+}
+
+void A_WeaponBulletAttack(player_t *player, pspdef_t *psp)
+{
+  int hspread, vspread, numbullets, damagebase, damagemod;
+  int i, damage, angle, slope;
+
+  if (!mbf21_features || !psp->state)
+    return;
+
+  hspread    = psp->state->args[0];
+  vspread    = psp->state->args[1];
+  numbullets = psp->state->args[2];
+  damagebase = psp->state->args[3];
+  damagemod  = psp->state->args[4];
+
+  P_BulletSlope(player->mo);
+
+  for (i = 0; i < numbullets; i++)
+  {
+    damage = (P_Random(pr_mbf21) % damagemod + 1) * damagebase;
+    angle  = (int)player->mo->angle + P_RandomHitscanAngle(pr_mbf21, hspread);
+    slope  = bulletslope + P_RandomHitscanSlope(pr_mbf21, vspread);
+    P_LineAttack(player->mo, angle, MISSILERANGE, slope, damage);
+  }
+}
+
+void A_WeaponMeleeAttack(player_t *player, pspdef_t *psp)
+{
+  int damagebase, damagemod, zerkfactor, hitsound, range;
+  angle_t angle;
+  int t, slope, damage;
+
+  if (!mbf21_features || !psp->state)
+    return;
+
+  damagebase = psp->state->args[0];
+  damagemod  = psp->state->args[1];
+  zerkfactor = psp->state->args[2];
+  hitsound   = psp->state->args[3];
+  range      = psp->state->args[4];
+
+  if (range == 0)
+    range = player->mo->info->meleerange;
+
+  damage = (P_Random(pr_mbf21) % damagemod + 1) * damagebase;
+  if (player->powers[pw_strength])
+    damage = (damage * zerkfactor) >> FRACBITS;
+
+  angle = player->mo->angle;
+  t = P_Random(pr_mbf21);
+  angle += (t - P_Random(pr_mbf21)) << 18;
+
+  /* prefer enemies for autoaim */
+  slope = P_AimLineAttack(player->mo, angle, range, MF_FRIEND);
+  if (!linetarget)
+    slope = P_AimLineAttack(player->mo, angle, range, 0);
+
+  P_LineAttack(player->mo, angle, range, slope, damage);
+
+  if (!linetarget)
+    return;
+
+  S_StartSound(player->mo, hitsound);
+  player->mo->angle = R_PointToAngle2(player->mo->x, player->mo->y,
+                                      linetarget->x, linetarget->y);
+}
+
+void A_WeaponSound(player_t *player, pspdef_t *psp)
+{
+  if (!mbf21_features || !psp->state)
+    return;
+  S_StartSound(psp->state->args[1] ? NULL : player->mo, psp->state->args[0]);
+}
+
+void A_WeaponAlert(player_t *player, pspdef_t *psp)
+{
+  if (!mbf21_features)
+    return;
+  P_NoiseAlert(player->mo, player->mo);
+}
+
+void A_ConsumeAmmo(player_t *player, pspdef_t *psp)
+{
+  int amount;
+  ammotype_t type;
+
+  if (!mbf21_features)
+    return;
+
+  type = weaponinfo[player->readyweapon].ammo;
+  if (!psp->state || type == AM_NOAMMO)
+    return;
+
+  if (psp->state->args[0] != 0)
+    amount = psp->state->args[0];
+  else
+    amount = weaponinfo[player->readyweapon].ammopershot;
+
+  if (player->ammo[type] >= amount)
+    player->ammo[type] -= amount;
+  else
+    player->ammo[type] = 0;
+}
+
+void A_CheckAmmo(player_t *player, pspdef_t *psp)
+{
+  int amount;
+  ammotype_t type;
+
+  if (!mbf21_features)
+    return;
+
+  type = weaponinfo[player->readyweapon].ammo;
+  if (!psp->state || type == AM_NOAMMO)
+    return;
+
+  if (psp->state->args[1] != 0)
+    amount = psp->state->args[1];
+  else
+    amount = weaponinfo[player->readyweapon].ammopershot;
+
+  if (player->ammo[type] < amount)
+    P_SetPsprite(player, ps_weapon, psp->state->args[0]);
+}
+
+void A_RefireTo(player_t *player, pspdef_t *psp)
+{
+  if (!mbf21_features || !psp->state)
+    return;
+
+  if ((psp->state->args[1] || P_CheckAmmo(player)) &&
+      (player->cmd.buttons & BT_ATTACK) &&
+      (player->pendingweapon == WP_NOCHANGE && player->health))
+    P_SetPsprite(player, ps_weapon, psp->state->args[0]);
+}
+
+void A_GunFlashTo(player_t *player, pspdef_t *psp)
+{
+  if (!mbf21_features || !psp->state)
+    return;
+
+  if (!psp->state->args[1])
+    P_SetMobjState(player->mo, S_PLAY_ATK2);
+
+  P_SetPsprite(player, ps_flash, psp->state->args[0]);
+}

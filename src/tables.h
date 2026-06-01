@@ -60,6 +60,7 @@
 #define ANG90   0x40000000
 #define ANG180  0x80000000
 #define ANG270  0xc0000000
+#define ANG1    (ANG45/45)
 #ifndef M_PI
 #define M_PI    3.14159265358979323846
 #endif
@@ -89,5 +90,32 @@ extern angle_t tantoangle[SLOPERANGE+1];
 
 // Utility function, called by R_PointToAngle.
 int SlopeDiv(unsigned num, unsigned den);
+
+/* MBF21 helpers (used by the MBF21 codepointers).  These mirror the
+ * Eternity/DSDA conversions so demos stay in sync. */
+static inline angle_t FixedToAngle(fixed_t a)
+{
+  return (angle_t)(((uint64_t)a * ANG1) >> FRACBITS);
+}
+
+/* Clamped angle->slope. */
+static inline fixed_t AngleToSlope(int a)
+{
+  if (a > (int)ANG90)
+    return finetangent[0];
+  else if (-a > (int)ANG90)
+    return finetangent[FINEANGLES / 2 - 1];
+  else
+    return finetangent[(ANG90 - a) >> ANGLETOFINESHIFT];
+}
+
+/* Fixed-point-degrees -> slope. */
+static inline fixed_t DegToSlope(fixed_t a)
+{
+  if (a >= 0)
+    return AngleToSlope(FixedToAngle(a));
+  else
+    return AngleToSlope(-(int)FixedToAngle(-a));
+}
 
 #endif

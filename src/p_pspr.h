@@ -93,6 +93,16 @@ typedef struct player_s player_t;
 
 void A_Light0(player_t *player, pspdef_t *psp);
 void A_WeaponReady(player_t *player, pspdef_t *psp);
+/* MBF21 weapon codepointers */
+void A_WeaponProjectile(player_t *player, pspdef_t *psp);
+void A_WeaponBulletAttack(player_t *player, pspdef_t *psp);
+void A_WeaponMeleeAttack(player_t *player, pspdef_t *psp);
+void A_WeaponSound(player_t *player, pspdef_t *psp);
+void A_WeaponAlert(player_t *player, pspdef_t *psp);
+void A_ConsumeAmmo(player_t *player, pspdef_t *psp);
+void A_CheckAmmo(player_t *player, pspdef_t *psp);
+void A_RefireTo(player_t *player, pspdef_t *psp);
+void A_GunFlashTo(player_t *player, pspdef_t *psp);
 void A_Lower(player_t *player, pspdef_t *psp);
 void A_Raise(player_t *player, pspdef_t *psp);
 void A_Punch(player_t *player, pspdef_t *psp);

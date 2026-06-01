@@ -1803,6 +1803,10 @@ void P_UseLines (player_t*  player)
 
 static mobj_t *bombsource, *bombspot;
 static int bombdamage;
+/* MBF21: A_RadiusDamage can specify a blast radius distinct from the
+ * damage figure.  For vanilla callers bombdistance == bombdamage, which
+ * reproduces the original behaviour exactly. */
+static int bombdistance;
 
 
 //
@@ -1865,7 +1869,7 @@ dbool PIT_RadiusAttack (mobj_t* thing)
   if (dist < 0)
   dist = 0;
 
-  if (dist >= bombdamage)
+  if (dist >= bombdistance)
     return TRUE;  // out of range
 
   if ( P_CheckSight (thing, bombspot) )
@@ -1882,7 +1886,7 @@ dbool PIT_RadiusAttack (mobj_t* thing)
 // P_RadiusAttack
 // Source is the creature that caused the explosion at spot.
 //
-void P_RadiusAttack(mobj_t* spot,mobj_t* source,int damage)
+void P_RadiusAttackEx(mobj_t* spot,mobj_t* source,int damage,int distance)
 {
   int x;
   int y;
@@ -1894,7 +1898,7 @@ void P_RadiusAttack(mobj_t* spot,mobj_t* source,int damage)
 
   fixed_t dist;
 
-  dist = (damage+MAXRADIUS)<<FRACBITS;
+  dist = (distance+MAXRADIUS)<<FRACBITS;
   yh = (spot->y + dist - bmaporgy)>>MAPBLOCKSHIFT;
   yl = (spot->y - dist - bmaporgy)>>MAPBLOCKSHIFT;
   xh = (spot->x + dist - bmaporgx)>>MAPBLOCKSHIFT;
@@ -1902,10 +1906,17 @@ void P_RadiusAttack(mobj_t* spot,mobj_t* source,int damage)
   bombspot = spot;
   bombsource = source;
   bombdamage = damage;
+  bombdistance = distance;
 
   for (y=yl ; y<=yh ; y++)
     for (x=xl ; x<=xh ; x++)
       P_BlockThingsIterator (x, y, PIT_RadiusAttack );
+}
+
+void P_RadiusAttack(mobj_t* spot,mobj_t* source,int damage)
+{
+  /* vanilla: blast radius equals the damage figure */
+  P_RadiusAttackEx(spot, source, damage, damage);
 }
 
 

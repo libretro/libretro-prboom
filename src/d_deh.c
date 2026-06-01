@@ -45,6 +45,7 @@
 #include "m_cheat.h"
 #include "p_inter.h"
 #include "p_enemy.h"
+#include "p_pspr.h"
 #include "g_game.h"
 #include "d_think.h"
 #include "w_wad.h"
@@ -1455,6 +1456,34 @@ static const deh_bexptr deh_bexptrs[] = // CPhipps - static const
     {{(arg0_t)A_FireOldBFG},      "A_FireOldBFG"},      // killough 7/19/98: classic BFG firing function
     {{(arg0_t)A_BetaSkullAttack}, "A_BetaSkullAttack"}, // killough 10/98: beta lost souls attacked different
     {{(arg0_t)A_Stop},            "A_Stop"},
+
+    /* MBF21 codepointers */
+    {{(arg0_t)A_SpawnObject},         "A_SpawnObject"},
+    {{(arg0_t)A_MonsterProjectile},   "A_MonsterProjectile"},
+    {{(arg0_t)A_MonsterMeleeAttack},  "A_MonsterMeleeAttack"},
+    {{(arg0_t)A_RadiusDamage},        "A_RadiusDamage"},
+    {{(arg0_t)A_NoiseAlert},          "A_NoiseAlert"},
+    {{(arg0_t)A_HealChase},           "A_HealChase"},
+    {{(arg0_t)A_SeekTracer},          "A_SeekTracer"},
+    {{(arg0_t)A_FindTracer},          "A_FindTracer"},
+    {{(arg0_t)A_ClearTracer},         "A_ClearTracer"},
+    {{(arg0_t)A_JumpIfHealthBelow},   "A_JumpIfHealthBelow"},
+    {{(arg0_t)A_JumpIfTargetInSight}, "A_JumpIfTargetInSight"},
+    {{(arg0_t)A_JumpIfTargetCloser},  "A_JumpIfTargetCloser"},
+    {{(arg0_t)A_JumpIfTracerInSight}, "A_JumpIfTracerInSight"},
+    {{(arg0_t)A_JumpIfTracerCloser},  "A_JumpIfTracerCloser"},
+    {{(arg0_t)A_JumpIfFlagsSet},      "A_JumpIfFlagsSet"},
+    {{(arg0_t)A_AddFlags},            "A_AddFlags"},
+    {{(arg0_t)A_RemoveFlags},         "A_RemoveFlags"},
+    {{(arg0_t)A_WeaponProjectile},    "A_WeaponProjectile"},
+    {{(arg0_t)A_WeaponBulletAttack},  "A_WeaponBulletAttack"},
+    {{(arg0_t)A_WeaponMeleeAttack},   "A_WeaponMeleeAttack"},
+    {{(arg0_t)A_WeaponSound},         "A_WeaponSound"},
+    {{(arg0_t)A_WeaponAlert},         "A_WeaponAlert"},
+    {{(arg0_t)A_ConsumeAmmo},         "A_ConsumeAmmo"},
+    {{(arg0_t)A_CheckAmmo},           "A_CheckAmmo"},
+    {{(arg0_t)A_RefireTo},            "A_RefireTo"},
+    {{(arg0_t)A_GunFlashTo},          "A_GunFlashTo"},
 
     // This NULL entry must be the last in the list
     {{NULL},              "A_NULL"},  // Ty 05/16/98

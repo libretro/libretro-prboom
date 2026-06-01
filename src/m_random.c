@@ -41,6 +41,7 @@
 #include "doomstat.h"
 #include "m_random.h"
 #include "lprintf.h"
+#include "tables.h"
 
 /*
 ===============
@@ -141,4 +142,30 @@ void M_ClearRandom (void)
   for (i=0; i<NUMPRCLASS; i++)         // go through each pr_class and set
     rng.seed[i] = seed *= 69069ul;     // each starting seed differently
   rng.prndindex = rng.rndindex = 0;    // clear two compatibility indices
+}
+
+/* MBF21: random hitscan spread helpers.  'spread' is a maximum angle in
+ * fixed-point *degrees* (not BAM).  Returns a signed angle in BAM. */
+int P_RandomHitscanAngle(pr_class_t pr_class, fixed_t spread)
+{
+  int t;
+  int64_t spread_bam;
+
+  /* FixedToAngle doesn't handle negatives; take the magnitude. */
+  spread_bam = (spread < 0 ? FixedToAngle(-spread) : FixedToAngle(spread));
+  t = P_Random(pr_class);
+  return (int)((spread_bam * (t - P_Random(pr_class))) / 255);
+}
+
+/* MBF21: as above but converted to a slope value (clamped to +/-90deg). */
+int P_RandomHitscanSlope(pr_class_t pr_class, fixed_t spread)
+{
+  int angle = P_RandomHitscanAngle(pr_class, spread);
+
+  if (angle > (int)ANG90)
+    return finetangent[0];
+  else if (-angle > (int)ANG90)
+    return finetangent[FINEANGLES/2 - 1];
+  else
+    return finetangent[(ANG90 - angle) >> ANGLETOFINESHIFT];
 }

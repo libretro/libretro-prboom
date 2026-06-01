@@ -1487,7 +1487,7 @@ mobj_t* P_SpawnMissile(mobj_t* source,mobj_t* dest,mobjtype_t type)
 // Tries to aim at a nearby monster
 //
 
-void P_SpawnPlayerMissile(mobj_t* source,mobjtype_t type)
+mobj_t *P_SpawnPlayerMissile(mobj_t* source,mobjtype_t type)
 {
   mobj_t *th;
   fixed_t x, y, z, slope = 0;
@@ -1530,4 +1530,5 @@ void P_SpawnPlayerMissile(mobj_t* source,mobjtype_t type)
   th->momz = FixedMul(th->info->speed,slope);
 
   P_CheckMissileSpawn(th);
+  return th;
   }

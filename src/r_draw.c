@@ -103,6 +103,28 @@ static INLINE const uint16_t *R_GetComposedColormap(const lighttable_t *colormap
    return composed_lut;
 }
 
+/* No-colormap variant for the patch/HUD/UI point column
+ * (R_DrawColumn16_PointUV): that path has no colormap (full-bright 2D
+ * blitting), so the per-pixel expression is just V_Palette16[texel*64+63].
+ * That is still a fixed 8bpp->16bpp function of the texel, composable into
+ * one table keyed solely on V_Palette16 (rebuilt on a palette/gamma/video-
+ * mode change).  Speeds HUD/status-bar/menu blits and the title/inter-
+ * mission background-cache builds, which all run through this column. */
+static const uint16_t *composed_nolight_pal = NULL;
+static uint16_t        composed_nolight_lut[256];
+
+static INLINE const uint16_t *R_GetComposedPalette(void)
+{
+   if (V_Palette16 != composed_nolight_pal)
+   {
+      int i;
+      for (i = 0; i < 256; i++)
+         composed_nolight_lut[i] = V_Palette16[ i*64 + (64-1) ];
+      composed_nolight_pal = V_Palette16;
+   }
+   return composed_nolight_lut;
+}
+
 // Color tables for different players,
 //  translate a limited part to another
 //  (color ramps used for  suit colors).
@@ -562,6 +584,9 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
 
    {
       const uint8_t *source = dcvars->source;
+      /* No colormap on this path: composed palette table collapses
+       * V_Palette16[texel*64+63] to lut[texel] (see R_GetComposedPalette). */
+      const uint16_t *lut = R_GetComposedPalette();
       count++;
 
       if (dcvars->texheight == 128)
@@ -569,7 +594,7 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
 
          while(count--)
          {
-            *dest = (V_Palette16[ ((source[(frac & ((127<<16)|0xffff))>>16]))*64 + ((64 -1)) ]);
+            *dest = lut[ source[(frac & ((127<<16)|0xffff))>>16] ];
             ;
             dest += 4;
             frac += fracstep;
@@ -580,7 +605,7 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
 
          while (count--)
          {
-            *dest = (V_Palette16[ ((source[(frac)>>16]))*64 + ((64 -1)) ]);
+            *dest = lut[ source[(frac)>>16] ];
             ;
             dest += 4;
             frac += fracstep;
@@ -594,17 +619,17 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
             fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
             while ((count-=2)>=0)
             {
-               *dest = (V_Palette16[ ((source[(frac & fixedt_heightmask)>>16]))*64 + ((64 -1)) ]);
+               *dest = lut[ source[(frac & fixedt_heightmask)>>16] ];
                ;
                dest += 4;
                frac += fracstep;
-               *dest = (V_Palette16[ ((source[(frac & fixedt_heightmask)>>16]))*64 + ((64 -1)) ]);
+               *dest = lut[ source[(frac & fixedt_heightmask)>>16] ];
                ;
                dest += 4;
                frac += fracstep;
             }
             if (count & 1)
-               *dest = (V_Palette16[ ((source[(frac & fixedt_heightmask)>>16]))*64 + ((64 -1)) ]);
+               *dest = lut[ source[(frac & fixedt_heightmask)>>16] ];
             ;
          }
          else
@@ -624,7 +649,7 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
 
 
 
-               *dest = (V_Palette16[ ((source[(frac)>>16]))*64 + ((64 -1)) ]);
+               *dest = lut[ source[(frac)>>16] ];
                ;
                dest += 4;
                if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;

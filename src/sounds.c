@@ -43,7 +43,7 @@
 // Information about all the music
 //
 
-musicinfo_t S_music[] = {
+musicinfo_t S_music_seed[] = {
   { 0 },
   { "e1m1", 0, NULL, 0 },
   { "e1m2", 0, NULL, 0 },
@@ -133,12 +133,15 @@ musicinfo_t S_music[] = {
   { NULL,     0, NULL, 0 } // custom music
 };
 
+/* DSDHacked: repointed to a growable allocation by dsda_InitTables(). */
+musicinfo_t *S_music = S_music_seed;
+
 
 //
 // Information about all the sfx
 //
 
-sfxinfo_t S_sfx[] = {
+sfxinfo_t S_sfx_seed[] = {
   // S_sfx[0] needs to be a dummy for odd reasons.
   { "none", FALSE,  0, 0, -1, -1, 0, 0, 0 },
 
@@ -227,7 +230,7 @@ sfxinfo_t S_sfx[] = {
   { "punch", FALSE, 64, 0, -1, -1,  0, 0, 0 },
   { "hoof", FALSE, 70, 0, -1, -1,   0, 0, 0 },
   { "metal", FALSE, 70, 0, -1, -1,  0, 0, 0 },
-  { "chgun", FALSE, 64, &S_sfx[sfx_pistol], 150, 0, 0, 0, 0 },
+  { "chgun", FALSE, 64, &S_sfx_seed[sfx_pistol], 150, 0, 0, 0, 0 },
   { "tink", FALSE, 60, 0, -1, -1,   0, 0, 0 },
   { "bdopn", FALSE, 100, 0, -1, -1, 0, 0, 0 },
   { "bdcls", FALSE, 100, 0, -1, -1, 0, 0, 0 },
@@ -262,3 +265,6 @@ sfxinfo_t S_sfx[] = {
   { "secret", FALSE, 60, 0, -1, -1, 0, 0, 0 },
   { "gibdth", FALSE, 60, 0, -1, -1, 0, 0, 0 },
 };
+
+/* DSDHacked: see S_music above. */
+sfxinfo_t *S_sfx = S_sfx_seed;

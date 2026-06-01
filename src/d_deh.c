@@ -42,6 +42,7 @@
 #include "d_deh.h"
 #include "sounds.h"
 #include "info.h"
+#include "dsda_hacked.h"
 #include "m_cheat.h"
 #include "p_inter.h"
 #include "p_enemy.h"
@@ -1491,7 +1492,7 @@ static const deh_bexptr deh_bexptrs[] = // CPhipps - static const
 
 // to hold startup code pointers from INFO.C
 // CPhipps - static
-static actionf_t deh_codeptr[NUMSTATES];
+// DSDHacked: deh_codeptr is owned by dsda_hacked.c and grows with states[].
 
 // haleyjd: support for BEX SPRITES, SOUNDS, and MUSIC
 char *deh_spritenames[NUMSPRITES + 1];
@@ -1501,6 +1502,10 @@ char *deh_soundnames[NUMSFX + 1];
 void D_BuildBEXTables(void)
 {
    int i;
+
+   /* DSDHacked: copy the static seed tables into growable allocations
+    * before anything reads or edits them. */
+   dsda_InitTables();
 
    // moved from ProcessDehFile, then we don't need the static int i
    for (i = 0; i < NUMSTATES; i++)  // remember what they start as for deh xref
@@ -1970,8 +1975,19 @@ static uint64_t getConvertedDEHBits(uint64_t bits) {
 //---------------------------------------------------------------------------
 static void setMobjInfoValue(int mobjInfoIndex, int keyIndex, uint64_t value) {
   mobjinfo_t *mi;
-  if (mobjInfoIndex >= NUMMOBJTYPES || mobjInfoIndex < 0) return;
+  if (mobjInfoIndex < 0 || mobjInfoIndex >= num_mobj_types) return;
   mi = &mobjinfo[mobjInfoIndex];
+  /* DSDHacked: state-reference fields may point at frames beyond the
+   * vanilla count; ensure the state table covers them so the engine can
+   * index states[] safely at runtime even with no explicit Frame block. */
+  switch (keyIndex) {
+    case 1: case 3: case 7: case 10:
+    case 11: case 12: case 13: case 24:
+      if ((int)value >= 0 && (int)value < 1000000)
+        dsda_GetState((int)value);
+      break;
+    default: break;
+  }
   switch (keyIndex) {
     case 0: mi->doomednum = (int)value; return;
     case 1: mi->spawnstate = (int)value; return;
@@ -2038,11 +2054,13 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
   // in the dehacked file start with one.  Grumble.
   --indexnum;
 
-  if (indexnum >= NUMMOBJTYPES || indexnum < 0)
+  if (indexnum < 0 || indexnum >= 1000000)
   {
-    fprintf(fpout,"Invalid Thing id: %d", indexnum+1);
+    if (fpout) fprintf(fpout,"Invalid Thing id: %d", indexnum+1);
     return;
   }
+  /* DSDHacked: grow the mobjinfo table to cover this thing index. */
+  dsda_GetMobjInfo(indexnum);
 
   if (fpout) fprintf(fpout,"Thing %d (%s) -> line: '%s'\n", indexnum+1,
                       mobjinfo[indexnum].actorname, inbuffer);
@@ -2237,14 +2255,13 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
   // killough 8/98: allow hex numbers in input:
   { char *p = deh_scan_word(inbuffer, key, sizeof(key)); if (p) deh_scan_int(p, &indexnum); }
   if (fpout) fprintf(fpout,"Processing Frame at index %d: %s\n",indexnum,key);
-  if (indexnum < 0 || indexnum >= NUMSTATES)
+  if (indexnum < 0 || indexnum >= 1000000)
     {
-      if (fpout) fprintf(fpout,"Bad frame number %d of %d\n",indexnum, NUMSTATES);
-      return; // killough 10/98: fix SegViol -- do not write out of bounds.
-              // This core has no DEHEXTRA/dsdhacked state expansion, so a
-              // patch referencing frames beyond NUMSTATES (common in MBF21
-              // WADs) must be skipped rather than corrupting adjacent globals.
+      if (fpout) fprintf(fpout,"Bad frame number %d\n",indexnum);
+      return;
     }
+  /* DSDHacked: grow the state table to cover this index if needed. */
+  dsda_GetState(indexnum);
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {
       char *strval = NULL;
@@ -2295,6 +2312,9 @@ static void deh_procFrame(DEHFILE *fpin, FILE* fpout, char *line)
 #else
                 if (fpout) fprintf(fpout," - nextstate = %"PRIu64"\n",(uint64_t)value);
 #endif
+                /* DSDHacked: ensure the target frame exists. */
+                if ((uint64_t)value < 1000000)
+                  dsda_GetState((int)value);
                 states[indexnum].nextstate = (statenum_t)value;
               }
             else
@@ -2394,12 +2414,14 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
   }
 
   if (fpout) fprintf(fpout,"Processing Pointer at index %d: %s\n",indexnum, key);
-  if (indexnum < 0 || indexnum >= NUMSTATES)
+  if (indexnum < 0 || indexnum >= 1000000)
     {
       if (fpout)
-        fprintf(fpout,"Bad pointer number %d of %d\n",indexnum, NUMSTATES);
+        fprintf(fpout,"Bad pointer number %d\n",indexnum);
       return;
     }
+  /* DSDHacked: grow the state table to cover the target frame. */
+  dsda_GetState(indexnum);
 
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {
@@ -2412,17 +2434,14 @@ static void deh_procPointer(DEHFILE *fpin, FILE* fpout, char *line) // done
           continue;
         }
 
-      if (value >= NUMSTATES)
+      if (value >= 1000000) /* sanity cap to bound table growth */
         {
           if (fpout)
-#ifdef PSX
-            fprintf(fpout,"Bad pointer number %llu of %d\n",
-#else
-            fprintf(fpout,"Bad pointer number %"PRIu64" of %d\n",
-#endif
-                  (uint64_t)value, NUMSTATES);
+            fprintf(fpout,"Pointer number out of range: %"PRIu64"\n",(uint64_t)value);
           return;
         }
+      /* DSDHacked: ensure deh_codeptr[value] is in range. */
+      dsda_GetState((int)value);
 
       if (!strcasecmp(key,deh_state[4]))  // Codep frame (not set in Frame deh block)
         {
@@ -2478,9 +2497,13 @@ static void deh_procSounds(DEHFILE *fpin, FILE* fpout, char *line)
   { char *p = deh_scan_word(inbuffer, key, sizeof(key)); if (p) deh_scan_int(p, &indexnum); }
   if (fpout) fprintf(fpout,"Processing Sounds at index %d: %s\n",
                      indexnum, key);
-  if (indexnum < 0 || indexnum >= NUMSFX)
-    if (fpout) fprintf(fpout,"Bad sound number %d of %d\n",
-                       indexnum, NUMSFX);
+  if (indexnum < 0 || indexnum >= 1000000)
+    {
+      if (fpout) fprintf(fpout,"Bad sound number %d\n", indexnum);
+      return;
+    }
+  /* DSDHacked: grow the sfx table to cover this index. */
+  dsda_GetSfx(indexnum);
 
   while (!dehfeof(fpin) && *inbuffer && (*inbuffer != ' '))
     {

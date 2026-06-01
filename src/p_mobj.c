@@ -39,6 +39,7 @@
 #include "p_map.h"
 #include "p_tick.h"
 #include "p_spec.h"
+#include "dsda_hacked.h"
 #include "sounds.h"
 #include "st_stuff.h"
 #include "hu_stuff.h"
@@ -60,16 +61,29 @@ dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
   state_t*  st;
 
   // killough 4/9/98: remember states seen, to detect cycles:
-
-  static statenum_t seenstate_tab[NUMSTATES]; // fast transition table
-  statenum_t *seenstate = seenstate_tab;      // pointer to table
+  // DSDHacked: these are sized to the (growable) state count rather than
+  // the fixed vanilla NUMSTATES.
+  static statenum_t *seenstate_tab = NULL;    // fast transition table
+  static int seenstate_size = 0;
+  statenum_t *seenstate;                      // pointer to table
+  statenum_t *tempstate = NULL;               // for use with recursion
   static int recursion;                       // detects recursion
   statenum_t i = state;                       // initial state
   dbool ret = TRUE;                         // return value
-  statenum_t tempstate[NUMSTATES];            // for use with recursion
+
+  if (seenstate_size < num_states)
+    {
+      seenstate_tab = realloc(seenstate_tab, num_states * sizeof(*seenstate_tab));
+      memset(seenstate_tab, 0, num_states * sizeof(*seenstate_tab));
+      seenstate_size = num_states;
+    }
+  seenstate = seenstate_tab;
 
   if (recursion++)                            // if recursion detected,
-    memset(seenstate=tempstate,0,sizeof tempstate); // clear state table
+    {
+      tempstate = calloc(num_states, sizeof(*tempstate));
+      seenstate = tempstate;                  // use a private cleared table
+    }
 
   do
     {
@@ -104,6 +118,9 @@ dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
   if (!--recursion)
     for (;(state=seenstate[i]);i=state-1)
       seenstate[i] = 0;  // killough 4/9/98: erase memory of states
+
+  if (tempstate)
+    free(tempstate);     // DSDHacked: release the recursion-private table
 
   return ret;
 }
@@ -998,20 +1015,23 @@ static int P_FindDoomedNum(unsigned type)
 
   if (!hash)
     {
-      hash = Z_Malloc(sizeof *hash * NUMMOBJTYPES, PU_CACHE, (void **) &hash);
-      for (i=0; i<NUMMOBJTYPES; i++)
-  hash[i].first = NUMMOBJTYPES;
-      for (i=0; i<NUMMOBJTYPES; i++)
+      /* DSDHacked: size and populate the lookup over the (growable) thing
+       * count so map things with high doomednums (new DSDHacked monsters)
+       * can be spawned by their editor number. */
+      hash = Z_Malloc(sizeof *hash * num_mobj_types, PU_CACHE, (void **) &hash);
+      for (i=0; i<num_mobj_types; i++)
+  hash[i].first = num_mobj_types;
+      for (i=0; i<num_mobj_types; i++)
   if (mobjinfo[i].doomednum != -1)
     {
-      unsigned h = (unsigned) mobjinfo[i].doomednum % NUMMOBJTYPES;
+      unsigned h = (unsigned) mobjinfo[i].doomednum % num_mobj_types;
       hash[i].next = hash[h].first;
       hash[h].first = i;
     }
     }
 
-  i = hash[type % NUMMOBJTYPES].first;
-  while ((i < NUMMOBJTYPES) && ((unsigned)mobjinfo[i].doomednum != type))
+  i = hash[type % num_mobj_types].first;
+  while ((i < num_mobj_types) && ((unsigned)mobjinfo[i].doomednum != type))
     i = hash[i].next;
   return i;
 }

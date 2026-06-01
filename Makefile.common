@@ -45,6 +45,7 @@ SOURCES_C += $(DEPS_DIR)/libmad/bit.c \
 
 SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/d_deh.c \
+				 $(CORE_DIR)/dsda_hacked.c \
 				 $(CORE_DIR)/d_items.c \
 				 $(CORE_DIR)/d_main.c \
 				 $(CORE_DIR)/doomstat.c \

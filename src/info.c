@@ -59,7 +59,7 @@
 // NUMSPRITES is an enum from info.h where all these are listed
 // as SPR_xxxx
 
-const char *sprnames[NUMSPRITES+1] = {
+const char *sprnames_seed[NUMSPRITES+1] = {
   "TROO","SHTG","PUNG","PISG","PISF","SHTF","SHT2","CHGG","CHGF","MISG",
   "MISF","SAWG","PLSG","PLSF","BFGG","BFGF","BLUD","PUFF","BAL1","BAL2",
   "PLSS","PLSE","MISL","BFS1","BFE1","BFE2","TFOG","IFOG","PLAY","POSS",
@@ -84,6 +84,9 @@ const char *sprnames[NUMSPRITES+1] = {
   "BON4", // killough 7/11/98: unholy bible in the beta version
   NULL
 };
+
+/* DSDHacked: see states above. */
+const char **sprnames = sprnames_seed;
 
 // ********************************************************************
 // State or "frame" information
@@ -113,7 +116,7 @@ const char *sprnames[NUMSPRITES+1] = {
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-state_t states[NUMSTATES] = {
+state_t state_seed[NUMSTATES] = {
     {SPR_TROO,0,-1,{(arg0_t)NULL},S_NULL,0,0},  // S_NULL
     {SPR_SHTG,4,0,{(arg0_t)A_Light0},S_NULL,0,0}, // S_LIGHTDONE
     {SPR_PUNG,0,1,{(arg0_t)A_WeaponReady},S_PUNCH,0,0}, // S_PUNCH
@@ -1198,6 +1201,10 @@ state_t states[NUMSTATES] = {
 #pragma GCC diagnostic pop
 #endif
 
+/* DSDHacked: 'states' starts pointing at the static seed array above and is
+ * repointed at a growable allocation by dsda_InitTables(). */
+state_t *states = state_seed;
+
 // ********************************************************************
 // Object "Thing" definitions
 // ********************************************************************
@@ -1233,7 +1240,7 @@ state_t states[NUMSTATES] = {
 #pragma GCC diagnostic ignored "-Wmissing-field-initializers"
 #endif
 
-mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
+mobjinfo_t mobjinfo_seed[NUMMOBJTYPES] = {
   {   // MT_PLAYER
      "DoomPlayer", // actorname
     -1,   // doomednum
@@ -5771,3 +5778,6 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
 #if defined(__GNUC__) || defined(__clang__)
 #pragma GCC diagnostic pop
 #endif
+
+/* DSDHacked: see states above. */
+mobjinfo_t *mobjinfo = mobjinfo_seed;

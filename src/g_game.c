@@ -77,6 +77,7 @@
 #include "d_deh.h"              // Ty 3/27/98 deh declarations
 #include "p_inter.h"
 #include "g_game.h"
+#include "dsda_hacked.h"
 #include "lprintf.h"
 #include "i_main.h"
 #include "i_system.h"
@@ -2221,7 +2222,7 @@ void G_SetFastParms(int fast_pending)
     /* MBF21: a thing with a "Fast speed" (altspeed) uses it under fast/
      * nightmare.  Swap speed<->altspeed on toggle.  altspeed is
      * NO_ALTSPEED for stock things, so this is inert for vanilla. */
-    for (i=0; i<NUMMOBJTYPES; i++)
+    for (i=0; i<num_mobj_types; i++)
       if (mobjinfo[i].altspeed != NO_ALTSPEED)
       {
         int swap = mobjinfo[i].speed;
@@ -2234,7 +2235,7 @@ void G_SetFastParms(int fast_pending)
          * default states carry the flag (set in D_BuildBEXTables), so this
          * reproduces the vanilla SARG behaviour for stock content while
          * also honouring the flag on MBF21 deh-modified frames. */
-        for (i=0; i<NUMSTATES; i++)
+        for (i=0; i<num_states; i++)
           if ((states[i].flags & STATEF_SKILL5FAST) &&
               (states[i].tics != 1 || demo_compatibility)) // killough 4/10/98
             states[i].tics >>= 1;  // don't change 1->0 since it causes cycles
@@ -2244,7 +2245,7 @@ void G_SetFastParms(int fast_pending)
       }
     else
       {
-        for (i=0; i<NUMSTATES; i++)
+        for (i=0; i<num_states; i++)
           if (states[i].flags & STATEF_SKILL5FAST)
             states[i].tics <<= 1;
         mobjinfo[MT_BRUISERSHOT].speed = 15*FRACUNIT;

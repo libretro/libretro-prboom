@@ -1288,8 +1288,8 @@ typedef struct
 #define STATEF_SKILL5FAST 0x00000001 /* tics halve on nightmare/-fast */
 
 /* these are in info.c */
-extern state_t  states[NUMSTATES];
-extern const char *sprnames[]; /* 1/17/98 killough - CPhipps - const */
+extern state_t *states;
+extern const char **sprnames;
 
 /********************************************************************
  * Thing enumeration -- must match info.c                           *
@@ -1547,6 +1547,6 @@ enum { SG_DEFAULT, SG_END };
 #define NO_ALTSPEED (-1)   /* altspeed sentinel: no skill-5/-fast override */
 
 /* See p_mobj_h for addition more technical info */
-extern mobjinfo_t mobjinfo[NUMMOBJTYPES];
+extern mobjinfo_t *mobjinfo;
 
 #endif

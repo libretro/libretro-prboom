@@ -1219,6 +1219,13 @@ void P_SpawnPlayer (int n, const mapthing_t* mthing)
 
 dbool P_IsDoomnumAllowed(int doomnum)
 {
+  /* This filter blocks the Doom II monsters from Doom 1 gamemodes. Under
+   * Heretic those same editor numbers (64/65/66/68/69 = Gargoyle, Fire
+   * Gargoyle, Golem, Mummy, Mummy Leader, etc.) are core Heretic monsters,
+   * so the Doom-specific restriction must not apply. */
+  if (heretic)
+    return TRUE;
+
   // Do not spawn cool, new monsters if !commercial
   if (gamemode != commercial)
     switch(doomnum)

@@ -5059,6 +5059,23 @@ void R_InitTranslationTables (void)
 //  and the inner loop has to step in texture space u and v.
 //
 
+/* For the common point-sampled floor/ceiling span the colormap is
+ * constant across the whole span, so V_Palette16[colormap[i]*64+63] is a
+ * fixed function of the source texel i for the entire run.  Each pixel
+ * otherwise pays two dependent lookups (colormap[], then V_Palette16[])
+ * plus the *64+63 index arithmetic.  Pre-compose those into one direct
+ * 8bpp->16bpp table and reduce the inner loop to a single lookup.
+ *
+ * Spans are wide (up to the full view width) so building 256 entries
+ * amortises easily; the table is rebuilt only when the colormap pointer
+ * actually changes, so adjacent spans in the same light/distance band
+ * reuse it.  (This is gated to point sampling with a single colormap --
+ * the dithered LinearZ and the filtered UV paths blend multiple weights
+ * and cannot use a single composed table.) */
+static const lighttable_t *spancomposed_cm = NULL;
+static const uint16_t      *spancomposed_pal = NULL;
+static uint16_t            spancomposed_lut[256];
+
 static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
 {
    unsigned count = dsvars->x2 - dsvars->x1 + 1;
@@ -5068,10 +5085,25 @@ static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
    const fixed_t ystep = dsvars->ystep;
    const uint8_t *source = dsvars->source;
 
-
    const uint8_t *colormap = dsvars->colormap;
+   const uint16_t *lut;
 
    uint16_t *dest = drawvars.short_topleft + dsvars->y* SCREENWIDTH + dsvars->x1;
+
+   /* Rebuild when the colormap changes, or when the truecolor palette
+    * itself was rebuilt (V_Palette16 reassigned by a palette/gamma change
+    * or a runtime video-mode change); keying on both pointers detects the
+    * latter without any cross-module invalidation hook. */
+   if (colormap != spancomposed_cm || V_Palette16 != spancomposed_pal)
+   {
+      int i;
+      for (i = 0; i < 256; i++)
+         spancomposed_lut[i] = V_Palette16[ colormap[i]*64 + (64-1) ];
+      spancomposed_cm = colormap;
+      spancomposed_pal = V_Palette16;
+   }
+   lut = spancomposed_lut;
+
    while (count)
    {
       const fixed_t xtemp = (xfrac >> 16) & 63;
@@ -5080,7 +5112,7 @@ static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
       const fixed_t spot = xtemp | ytemp;
       xfrac += xstep;
       yfrac += ystep;
-      *dest++ = V_Palette16[ (colormap[(source[spot])])*64 + ((64 -1)) ];
+      *dest++ = lut[ source[spot] ];
       count--;
    }
 }

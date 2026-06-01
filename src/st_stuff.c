@@ -847,6 +847,12 @@ void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)
 
   ST_doPaletteStuff();  // Do red-/gold-shifts from damage/items
 
+  /* The Doom status bar widgets/background are not loaded for Heretic
+   * (see ST_loadGraphics). Drawing them would use uninitialised patches.
+   * The Heretic status bar is drawn elsewhere; skip the Doom bar. */
+  if (heretic)
+    return;
+
   if (statusbaron) {
     if (st_firsttime)
     {
@@ -879,6 +885,12 @@ static void ST_loadGraphics(dbool doload)
   char namebuf[9];
   // cph - macro that either acquires a pointer and lock for a lump, or
   // unlocks it. var is referenced exactly once in either case, so ++ in arg works
+
+  /* Heretic has no Doom status bar lumps (STBAR, STARMS, STF* faces,
+   * STTNUM, ...). Requesting them would abort on the missing lump. The
+   * Heretic status bar is handled separately; skip the Doom graphics. */
+  if (heretic)
+    return;
 
   // Load the numbers, tall and short
   for (i=0;i<10;i++)

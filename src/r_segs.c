@@ -181,6 +181,29 @@ void R_FixWiggle (sector_t *sector)
 		heightbits = scale_values[sector->scaleindex].heightbits;
 		heightunit = (1 << heightbits);
 		invhgtbits = FRACBITS - heightbits;
+
+		/* hor+ widescreen: the wall scale (rw_scale) at the oblique
+		 * edge columns of a widened FOV grows by ~centerxfrac/focallength
+		 * (= 1/cos of the wider half-angle) relative to the vanilla
+		 * +/-45deg view.  The wiggle fix clamps rw_scale at max_rwscale,
+		 * and clamping is exactly what produces visible wiggle, so with
+		 * the vanilla clamp the widened side columns get clamped far more
+		 * often and wiggle reappears there even though the fix is active.
+		 * Scale the clamp up by the same factor so the legitimately
+		 * larger edge scales are not clipped.  projectionx == focallength
+		 * (the widened horizontal anchor); at 4:3 it equals centerxfrac
+		 * and the factor is unity, leaving max_rwscale unchanged. */
+		{
+			if (projectionx && projectionx < centerxfrac)
+			{
+				int64_t w = ((int64_t)max_rwscale * centerxfrac) / projectionx;
+				/* keep within the fixed-point headroom the chosen
+				 * heightbits allows (2048<<FRACBITS is the table max) */
+				if (w > (int64_t)2048 * FRACUNIT)
+					w = (int64_t)2048 * FRACUNIT;
+				max_rwscale = (int)w;
+			}
+		}
 	}
 }
 

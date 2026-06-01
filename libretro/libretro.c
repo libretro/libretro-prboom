@@ -1583,16 +1583,35 @@ bool retro_load_game(const struct retro_game_info *info)
             char *iwad_match = (kind != PWAD_MAP_NONE)
                                ? find_iwad_for_kind(kind) : NULL;
 
+            if (log_cb)
+               log_cb(RETRO_LOG_INFO,
+                      "retro_load_game: PWAD '%s' map kind=%s, "
+                      "matching IWAD=%s\n", g_basename,
+                      kind == PWAD_MAP_DOOM1 ? "ExMy(DOOM1)" :
+                      kind == PWAD_MAP_DOOM2 ? "MAPxx(DOOM2)" : "none",
+                      iwad_match ? iwad_match : "(none found)");
+
+            /* If the matching-generation probe missed, try the other
+             * generation too: a MAPxx probe can miss when only a Doom 1
+             * IWAD is present and vice versa, and a kind==none scan (some
+             * WADs hide their maps behind UMAPINFO or non-standard markers)
+             * still needs a real IWAD if one exists.  Only fall back to the
+             * PLAYPAL standalone-IWAD path when NO standard IWAD is findable
+             * anywhere -- that is the genuine chex.wad case. */
+            if (!iwad_match)
+            {
+               iwad_match = find_iwad_for_kind(PWAD_MAP_DOOM2);
+               if (!iwad_match)
+                  iwad_match = find_iwad_for_kind(PWAD_MAP_DOOM1);
+            }
+
             if (iwad_match)
             {
-               /* Genuine add-on with a real IWAD available: use it. */
+               /* Add-on PWAD with a real IWAD available: pair them. */
                if (log_cb)
                   log_cb(RETRO_LOG_INFO,
-                         "retro_load_game: steering PWAD '%s' (%s) "
-                         "toward IWAD '%s'\n",
-                         g_basename,
-                         kind == PWAD_MAP_DOOM1 ? "ExMy maps" : "MAPxx maps",
-                         iwad_match);
+                         "retro_load_game: steering PWAD '%s' toward "
+                         "IWAD '%s'\n", g_basename, iwad_match);
                argv[argc++] = strdup("-iwad");
                argv[argc++] = iwad_match;  /* already heap from FindFileInDir */
                argv[argc++] = strdup("-file");
@@ -1600,9 +1619,10 @@ bool retro_load_game(const struct retro_game_info *info)
             }
             else if (wad_contains_playpal(info->path, &header))
             {
-               /* No matching IWAD found, but the PWAD has its own palette:
-                * treat it as a standalone IWAD (chex.wad and friends).
-                * CheckIWAD accepts PWAD magic, so -iwad routing works. */
+               /* No standard IWAD found anywhere, but the PWAD carries its
+                * own palette: a genuine standalone game shipped with PWAD
+                * magic (chex.wad and friends).  CheckIWAD accepts PWAD
+                * magic, so -iwad routing works. */
                if (log_cb)
                   log_cb(RETRO_LOG_INFO,
                          "retro_load_game: no external IWAD found for '%s'; "
@@ -1613,18 +1633,14 @@ bool retro_load_game(const struct retro_game_info *info)
             }
             else
             {
-               /* Add-on PWAD with no findable matching IWAD and no own
-                * palette.  Let the engine's FindIWADFile auto-detect pick
-                * whatever standard IWAD it can find; warn for the Doom 1
-                * case where the commercial-first fallback is likely wrong. */
+               /* No IWAD found and no own palette.  Let the engine's
+                * FindIWADFile auto-detect try; warn for the Doom 1 case. */
                if (kind == PWAD_MAP_DOOM1 && log_cb)
                   log_cb(RETRO_LOG_WARN,
                          "retro_load_game: PWAD '%s' has DOOM 1 (ExMy) "
                          "maps but no doom.wad / doomu.wad / freedoom1.wad / "
                          "freedoom.wad / doom1.wad found near the PWAD "
-                         "or in the system directory.  The engine will "
-                         "fall back to whatever IWAD it can find, which "
-                         "is most likely the wrong one.  Place a DOOM 1 "
+                         "or in the system directory.  Place a DOOM 1 "
                          "IWAD next to '%s' or use an m3u playlist to "
                          "name the IWAD explicitly.\n",
                          g_basename, g_basename);

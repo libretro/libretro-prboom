@@ -144,6 +144,29 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
       distance = cacheddistance[y] = FixedMul (planeheight, yslope[y]);
       dsvars->xstep = cachedxstep[y] = FixedMul (viewsin, planeheight) / dy;
       dsvars->ystep = cachedystep[y] = FixedMul (viewcos, planeheight) / dy;
+
+      /* hor+ widescreen widens the horizontal FOV (focallength <
+       * centerxfrac), but xstep/ystep are derived from the vertical
+       * focal length via dy, implicitly assuming the vanilla isotropic
+       * 4:3 projection where horizontal and vertical focal lengths are
+       * equal.  Left uncorrected the floor/ceiling texture is mapped
+       * with a narrower horizontal spread than the widened walls, so it
+       * slides relative to the geometry as the view moves -- most
+       * visible at 32:9.  Scale the per-pixel horizontal step by
+       * centerxfrac/projectionx so the plane mapping matches the
+       * widened column-to-angle relation; the dx*xstep span origin then
+       * follows automatically and spans do not shear.  At 4:3
+       * projectionx == centerxfrac, so the scale is unity. */
+      {
+         extern fixed_t projectionx;
+         if (projectionx && projectionx != centerxfrac)
+         {
+            dsvars->xstep = cachedxstep[y] =
+               (fixed_t)(((int64_t)dsvars->xstep * centerxfrac) / projectionx);
+            dsvars->ystep = cachedystep[y] =
+               (fixed_t)(((int64_t)dsvars->ystep * centerxfrac) / projectionx);
+         }
+      }
    }
    else
    {

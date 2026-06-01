@@ -204,6 +204,25 @@ draw_vars_t drawvars = {
   49152 // mag_threshold
 };
 
+/* "Diminished Lighting" setting (General > Video menu).
+ *   0 = Default  : point-sampled light selection -- the standard 32
+ *                  discrete distance/light colormap bands.
+ *   1 = Enhanced : the dithered-Z path (filterz = LINEAR), which ordered-
+ *                  dithers between adjacent light colormaps so the band
+ *                  boundaries blend into apparent smooth light gradients.
+ *                  Stays 16bpp (no extra colormap memory); costs a little
+ *                  more per drawn pixel, hence opt-in.
+ * R_ApplyDiminishedLighting() pushes the value into drawvars.filterz; it
+ * is called once at R_Init (after the config is loaded) and again from
+ * the menu change callback. */
+int diminished_lighting = 0;
+
+void R_ApplyDiminishedLighting(void)
+{
+   drawvars.filterz = diminished_lighting ? RDRAW_FILTER_LINEAR
+                                          : RDRAW_FILTER_POINT;
+}
+
 //
 // Error functions that will abort if R_FlushColumns tries to flush 
 // columns without a column type.

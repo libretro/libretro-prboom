@@ -103,6 +103,7 @@ subsector_t *R_PointInSubsector(fixed_t x, fixed_t y);
 
 void R_RenderPlayerView(player_t *player);   // Called by G_Drawer.
 void R_Init(void);                           // Called by startup code.
+void R_ApplyDiminishedLighting(void);        // sync General>Video setting into drawvars.filterz
 void R_Deinit(void);                         // Called by D_DoomDeinit.
 void R_SetViewSize(int blocks);              // Called by M_Responder.
 void R_ExecuteSetViewSize(void);             // cph - called by D_Display to complete a view resize

@@ -119,6 +119,8 @@ typedef struct {
 
 extern draw_vars_t drawvars;
 
+extern int diminished_lighting;       /* General > Video menu setting; applied via R_ApplyDiminishedLighting (r_main.h) */
+
 extern uint8_t playernumtotrans[MAXPLAYERS]; // CPhipps - what translation table for what player
 extern uint8_t       *translationtables;
 

@@ -581,6 +581,7 @@ void R_Init (void)
   R_InitTranslationTables();
   lprintf(LO_INFO, "R_InitPatches\n");
   R_InitPatches();
+  R_ApplyDiminishedLighting(); /* sync General>Video setting into filterz */
 }
 
 /* R_Deinit

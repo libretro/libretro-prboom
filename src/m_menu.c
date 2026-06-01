@@ -306,6 +306,7 @@ void M_Compat(int);       // killough 10/98
 void M_ChangeDemoSmoothTurns(void);
 void M_ChangeFramerate(void);
 void M_ChangeAspectRatio(void);
+void M_ChangeDiminishedLighting(void);
 void M_ChangeMouseLook(void);
 void M_ChangeMaxViewPitch(void);
 void M_ChangeMidiPlayer(void);
@@ -2834,6 +2835,7 @@ enum {
   general_fps,
   general_gamma,
   general_aspect,
+  general_dimlight,
 
   general_title_sound,
   general_sndchan,
@@ -2856,6 +2858,7 @@ enum {
 static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", "72fps", "75fps", "90fps", "100fps", "105fps", "119fps", "120fps", "140fps", "144fps", "155fps", "160fps", "165fps", "175fps", "180fps", "200fps", "210fps", "240fps", "244fps", "245fps", "280fps", "300fps", "315fps", "320fps", "350fps", "360fps", "385fps", "420fps", "455fps", "480fps", "490fps", "540fps", NULL};
 static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4", NULL};
 static const char *aspect_opts[] = {"4:3", "16:9", "16:10", "32:9", "21:9", NULL};
+static const char *dimlight_opts[] = {"Default", "Enhanced", NULL};
 static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD", NULL};
 static const char *midi_player_opts[] = {
   "Off",
@@ -2878,6 +2881,9 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
 
   {"Aspect Ratio", S_CHOICE, m_null, G_X,
   G_YA + general_aspect*8, {"render_aspect"}, 0, 0, M_ChangeAspectRatio, aspect_opts},
+
+  {"Diminished Lighting", S_CHOICE, m_null, G_X,
+  G_YA + general_dimlight*8, {"diminished_lighting"}, 0, 0, M_ChangeDiminishedLighting, dimlight_opts},
 
 
   SETUP_MENU_TITLE("Sound & Music", G_X, G_YA2 + general_title_sound*8 - 2),
@@ -3058,6 +3064,11 @@ void M_ChangeFramerate(void)
 void M_ChangeAspectRatio(void)
 {
   I_SetAspectRatio();
+}
+
+void M_ChangeDiminishedLighting(void)
+{
+  R_ApplyDiminishedLighting();
 }
 
 /* Re-issue I_RegisterSong / I_PlaySong on the currently playing

@@ -36,6 +36,7 @@
 #include "doomtype.h"
 #include "info.h"
 
+#include "doomstat.h"
 #include "d_items.h"
 
 
@@ -51,7 +52,7 @@
 //  atkstate, i.e. attack/fire/hit frame
 //  flashstate, muzzle flash
 //
-weaponinfo_t    weaponinfo[NUMWEAPONS] =
+weaponinfo_t    doom_weaponinfo[NUMWEAPONS] =
 {
   {
     // fist
@@ -153,3 +154,42 @@ weaponinfo_t    weaponinfo[NUMWEAPONS] =
     -1  // ammopershot (vanilla)
   },
 };
+
+/*
+ * Heretic weapon table (level-1 / no-tome forms).
+ *
+ * Heretic reuses the player weapon slots (wp_fist..wp_supershotgun) for its
+ * own arsenal: staff, gold wand, crossbow, blaster, skull rod, phoenix rod,
+ * mace, gauntlets and the chicken beak. The frame numbers are Heretic state
+ * indices, so this table must be selected when running Heretic -- otherwise
+ * the player psprite is driven by Doom weapon states, which index into the
+ * Heretic state table as garbage and crash on the first tic.
+ *
+ * Heretic has its own ammo types that this build's ammotype_t does not yet
+ * enumerate; the per-weapon ammo here is mapped onto the existing slots as a
+ * placeholder (AM_NOAMMO for the no-ammo weapons). Ammo accounting is not the
+ * subject of this table -- correct weapon frames are -- and the Tome-of-Power
+ * level-2 forms are a later addition.
+ */
+weaponinfo_t    heretic_weaponinfo[NUMWEAPONS] =
+{
+  { /* staff      */ AM_NOAMMO, HERETIC_S_STAFFUP,    HERETIC_S_STAFFDOWN,    HERETIC_S_STAFFREADY,    HERETIC_S_STAFFATK1_1,    S_NULL, 0, -1 },
+  { /* gold wand  */ AM_CLIP,   HERETIC_S_GOLDWANDUP, HERETIC_S_GOLDWANDDOWN, HERETIC_S_GOLDWANDREADY, HERETIC_S_GOLDWANDATK1_1, S_NULL, 0, -1 },
+  { /* crossbow   */ AM_CLIP,   HERETIC_S_CRBOWUP,    HERETIC_S_CRBOWDOWN,    HERETIC_S_CRBOW1,        HERETIC_S_CRBOWATK1_1,    S_NULL, 0, -1 },
+  { /* blaster    */ AM_CLIP,   HERETIC_S_BLASTERUP,  HERETIC_S_BLASTERDOWN,  HERETIC_S_BLASTERREADY,  HERETIC_S_BLASTERATK1_1,  S_NULL, 0, -1 },
+  { /* skull rod  */ AM_CLIP,   HERETIC_S_HORNRODUP,  HERETIC_S_HORNRODDOWN,  HERETIC_S_HORNRODREADY,  HERETIC_S_HORNRODATK1_1,  S_NULL, 0, -1 },
+  { /* phoenix    */ AM_CLIP,   HERETIC_S_PHOENIXUP,  HERETIC_S_PHOENIXDOWN,  HERETIC_S_PHOENIXREADY,  HERETIC_S_PHOENIXATK1_1,  S_NULL, WPF_NOAUTOFIRE, -1 },
+  { /* mace       */ AM_CLIP,   HERETIC_S_MACEUP,     HERETIC_S_MACEDOWN,     HERETIC_S_MACEREADY,     HERETIC_S_MACEATK1_1,     S_NULL, 0, -1 },
+  { /* gauntlets  */ AM_NOAMMO, HERETIC_S_GAUNTLETUP, HERETIC_S_GAUNTLETDOWN, HERETIC_S_GAUNTLETREADY, HERETIC_S_GAUNTLETATK1_1, S_NULL, 0, -1 },
+  { /* beak       */ AM_NOAMMO, HERETIC_S_BEAKUP,     HERETIC_S_BEAKDOWN,     HERETIC_S_BEAKREADY,     HERETIC_S_BEAKATK1_1,     S_NULL, 0, -1 }
+};
+
+/* Active weapon table. Points at the Doom table by default; swapped to the
+ * Heretic table by D_InitWeaponInfo once the game type is known. All weapon
+ * code indexes through this pointer. */
+weaponinfo_t   *weaponinfo = doom_weaponinfo;
+
+void D_InitWeaponInfo(void)
+{
+  weaponinfo = heretic ? heretic_weaponinfo : doom_weaponinfo;
+}

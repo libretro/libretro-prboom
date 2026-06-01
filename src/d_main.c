@@ -1256,6 +1256,11 @@ bool D_DoomMainSetup(void)
    * is a harmless reseed of identical data. */
   dsda_InitTables();
 
+  /* Select the weapon frame table for the game now that the type is known,
+   * so the player's weapon psprite is driven by the correct (Heretic vs
+   * Doom) weapon states. */
+  D_InitWeaponInfo();
+
   // Load prboom.wad after IWAD but before everything else
   {
     char *data_wad_path = I_FindFile(PACKAGE ".wad", NULL);

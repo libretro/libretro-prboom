@@ -61,6 +61,12 @@ typedef struct
   int         ammopershot;  /* ammo consumed per shot; -1 = use vanilla */
 } weaponinfo_t;
 
-extern  weaponinfo_t    weaponinfo[NUMWEAPONS];
+extern  weaponinfo_t   *weaponinfo;
+extern  weaponinfo_t    doom_weaponinfo[NUMWEAPONS];
+extern  weaponinfo_t    heretic_weaponinfo[NUMWEAPONS];
+
+/* Select the weapon table for the current game (Doom or Heretic). Call once
+ * the game type is known. */
+void D_InitWeaponInfo(void);
 
 #endif

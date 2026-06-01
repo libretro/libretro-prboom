@@ -20,6 +20,7 @@
 #include "info.h"
 #include "r_main.h"
 #include "p_enemy.h"
+#include "p_inter.h"
 #include "heretic/p_action.h"
 
 extern int bodyqueslot, bodyquesize;
@@ -103,17 +104,6 @@ extern mobj_t **bodyque;
 #define hexen_sfx_serpentfx_continuous       0
 #define hexen_sfx_fighter_hammer_continuous  0
 
-/* Heretic has no free-look pitch system in this core; look direction is
- * the player's lookdir and the autoaim slope derives from it. */
-static int dsda_PlayerLookDir(player_t *player)
-{
-  return player->lookdir;
-}
-
-static fixed_t dsda_PlayerSlope(player_t *player)
-{
-  return ((player->lookdir) << FRACBITS) / 173;
-}
 
 int P_SubRandom(void)
 {

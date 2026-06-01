@@ -869,6 +869,10 @@ void P_MobjThinker (mobj_t* mobj)
 //
 // P_SpawnMobj
 //
+/* Heretic helpers defined across translation units / later in this file. */
+int  P_HitFloor(mobj_t *thing);
+int  P_FaceMobj(mobj_t *source, mobj_t *target, angle_t *delta);
+
 /* Heretic attack globals: current attack puff type and the last missile
  * spawned (consumed by some Heretic weapon codepointers).  Inert for Doom. */
 #ifndef FOOTCLIPSIZE

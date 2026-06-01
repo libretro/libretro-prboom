@@ -2950,6 +2950,7 @@ void A_GunFlashTo(player_t *player, pspdef_t *psp)
 extern mobjtype_t PuffType;
 extern mobj_t *MissileMobj;
 extern void P_BlasterMobjThinker(mobj_t *mobj);
+void A_FireMacePL1B(player_t *player, pspdef_t *psp);
 
 #define FOOTCLIPSIZE (10*FRACUNIT)
 #define FLAME_THROWER_TICS (10*35)
@@ -3384,7 +3385,7 @@ void A_GauntletAttack(player_t * player, pspdef_t * psp)
                             linetarget->x, linetarget->y);
     if (angle - player->mo->angle > ANG180)
     {
-        if (angle - player->mo->angle < -ANG90 / 20)
+        if (angle - player->mo->angle < (angle_t)(-ANG90 / 20))
             player->mo->angle = angle + ANG90 / 21;
         else
             player->mo->angle -= ANG90 / 20;

@@ -134,6 +134,7 @@ void P_Massacre(void);
 void P_DSparilTeleport(mobj_t *actor);
 dbool P_UpdateChicken(mobj_t *actor, int tics);
 dbool P_TestMobjLocation(mobj_t *mobj);
+void P_RepositionMace(mobj_t *mo);
 
 int P_GetPlayerNum(player_t *player);
 void P_ThrustMobj(mobj_t *mo, angle_t angle, fixed_t move);

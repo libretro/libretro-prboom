@@ -64,6 +64,45 @@ int  viewwidth;
 int  scaledviewwidth;
 int  viewheight;
 
+/* Shared composed colormap+palette table.
+ *
+ * Point-sampled drawing turns an 8-bit texel into a 16-bit pixel via two
+ * dependent lookups plus index arithmetic: V_Palette16[colormap[texel]*64
+ * + 63] (the colormap applies the per-distance light level, V_Palette16
+ * converts the lit index to RGB565 at full/point weight 63).  Because the
+ * colormap is constant across a span or column, that whole expression is
+ * a fixed function of the texel, so it can be pre-composed into a single
+ * 256-entry 8bpp->16bpp table and the inner loop reduced to one lookup.
+ *
+ * The table is shared by the floor/ceiling spans AND the wall/sprite
+ * point columns: both draw their colormaps from the same set of light-
+ * level colormaps (R_ColourMap / planezlight / fixedcolormap), so a span
+ * and a column at the same light level use the identical colormap pointer
+ * and reuse the same composed table.  Keying on the colormap pointer means
+ * the 256-entry build happens once per distinct light level per frame and
+ * amortises across every span and column at that level -- which is why a
+ * column, too short to amortise a private rebuild, still benefits here.
+ * Keying also on V_Palette16 rebuilds on a palette/gamma/video-mode
+ * change.  Restricted to point sampling with a single colormap: the
+ * filtered (Linear/Rounded UV) and dithered (LinearZ) paths blend several
+ * palette weights / two colormaps per pixel and cannot use one table. */
+static const lighttable_t *composed_cm  = NULL;
+static const uint16_t     *composed_pal = NULL;
+static uint16_t            composed_lut[256];
+
+static INLINE const uint16_t *R_GetComposedColormap(const lighttable_t *colormap)
+{
+   if (colormap != composed_cm || V_Palette16 != composed_pal)
+   {
+      int i;
+      for (i = 0; i < 256; i++)
+         composed_lut[i] = V_Palette16[ colormap[i]*64 + (64-1) ];
+      composed_cm  = colormap;
+      composed_pal = V_Palette16;
+   }
+   return composed_lut;
+}
+
 // Color tables for different players,
 //  translate a limited part to another
 //  (color ramps used for  suit colors).
@@ -690,7 +729,11 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
 
    {
       const uint8_t *source = dcvars->source;
-      const lighttable_t *colormap = dcvars->colormap;
+      /* Shared composed colormap+palette table: collapses
+       * V_Palette16[colormap[texel]*64+63] to lut[texel].  Reuses the
+       * table the spans (and other lit columns) already built for this
+       * colormap pointer, so there is no per-column rebuild cost. */
+      const uint16_t *lut = R_GetComposedColormap(dcvars->colormap);
       count++;
 
       if (dcvars->texheight == 128)
@@ -698,7 +741,7 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
 
          while(count--)
          {
-            *dest = (V_Palette16[ (colormap[(source[(frac & ((127<<16)|0xffff))>>16])])*64 + ((64 -1)) ]);
+            *dest = lut[ source[(frac & ((127<<16)|0xffff))>>16] ];
             ;
             dest += 4;
             frac += fracstep;
@@ -709,7 +752,7 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
 
          while (count--)
          {
-            *dest = (V_Palette16[ (colormap[(source[(frac)>>16])])*64 + ((64 -1)) ]);
+            *dest = lut[ source[(frac)>>16] ];
             ;
             dest += 4;
             frac += fracstep;
@@ -723,17 +766,17 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
             fixed_t fixedt_heightmask = (heightmask<<16)|0xffff;
             while ((count-=2)>=0)
             {
-               *dest = (V_Palette16[ (colormap[(source[(frac & fixedt_heightmask)>>16])])*64 + ((64 -1)) ]);
+               *dest = lut[ source[(frac & fixedt_heightmask)>>16] ];
                ;
                dest += 4;
                frac += fracstep;
-               *dest = (V_Palette16[ (colormap[(source[(frac & fixedt_heightmask)>>16])])*64 + ((64 -1)) ]);
+               *dest = lut[ source[(frac & fixedt_heightmask)>>16] ];
                ;
                dest += 4;
                frac += fracstep;
             }
             if (count & 1)
-               *dest = (V_Palette16[ (colormap[(source[(frac & fixedt_heightmask)>>16])])*64 + ((64 -1)) ]);
+               *dest = lut[ source[(frac & fixedt_heightmask)>>16] ];
             ;
          }
          else
@@ -753,7 +796,7 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
 
 
 
-               *dest = (V_Palette16[ (colormap[(source[(frac)>>16])])*64 + ((64 -1)) ]);
+               *dest = lut[ source[(frac)>>16] ];
                ;
                dest += 4;
                if ((frac += fracstep) >= (int)heightmask) frac -= heightmask;;
@@ -5065,23 +5108,6 @@ void R_InitTranslationTables (void)
 //  and the inner loop has to step in texture space u and v.
 //
 
-/* For the common point-sampled floor/ceiling span the colormap is
- * constant across the whole span, so V_Palette16[colormap[i]*64+63] is a
- * fixed function of the source texel i for the entire run.  Each pixel
- * otherwise pays two dependent lookups (colormap[], then V_Palette16[])
- * plus the *64+63 index arithmetic.  Pre-compose those into one direct
- * 8bpp->16bpp table and reduce the inner loop to a single lookup.
- *
- * Spans are wide (up to the full view width) so building 256 entries
- * amortises easily; the table is rebuilt only when the colormap pointer
- * actually changes, so adjacent spans in the same light/distance band
- * reuse it.  (This is gated to point sampling with a single colormap --
- * the dithered LinearZ and the filtered UV paths blend multiple weights
- * and cannot use a single composed table.) */
-static const lighttable_t *spancomposed_cm = NULL;
-static const uint16_t      *spancomposed_pal = NULL;
-static uint16_t            spancomposed_lut[256];
-
 static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
 {
    unsigned count = dsvars->x2 - dsvars->x1 + 1;
@@ -5091,24 +5117,12 @@ static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
    const fixed_t ystep = dsvars->ystep;
    const uint8_t *source = dsvars->source;
 
-   const uint8_t *colormap = dsvars->colormap;
-   const uint16_t *lut;
-
    uint16_t *dest = drawvars.short_topleft + dsvars->y* SCREENWIDTH + dsvars->x1;
 
-   /* Rebuild when the colormap changes, or when the truecolor palette
-    * itself was rebuilt (V_Palette16 reassigned by a palette/gamma change
-    * or a runtime video-mode change); keying on both pointers detects the
-    * latter without any cross-module invalidation hook. */
-   if (colormap != spancomposed_cm || V_Palette16 != spancomposed_pal)
-   {
-      int i;
-      for (i = 0; i < 256; i++)
-         spancomposed_lut[i] = V_Palette16[ colormap[i]*64 + (64-1) ];
-      spancomposed_cm = colormap;
-      spancomposed_pal = V_Palette16;
-   }
-   lut = spancomposed_lut;
+   /* Shared composed colormap+palette table (see R_GetComposedColormap):
+    * collapses V_Palette16[colormap[texel]*64+63] to one lookup, rebuilt
+    * only when the colormap pointer or V_Palette16 changes. */
+   const uint16_t *lut = R_GetComposedColormap(dsvars->colormap);
 
 #if defined(__SSE2__)
    /* The per-pixel index math (two arithmetic shifts, two masks, an OR,

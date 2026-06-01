@@ -616,6 +616,15 @@ floater:
 	compatibility_level <= doom2_19_compatibility)
       mo->momz = -mo->momz; // the skull slammed into something
 
+    /* Raven: a dying thing with a crashstate (e.g. the Gargoyle) runs its
+     * crash sequence when its falling corpse reaches the floor, instead of
+     * staying frozen in its in-air death frame. */
+    if (mo->info->crashstate && (mo->flags & MF_CORPSE))
+      {
+      P_SetMobjState(mo, mo->info->crashstate);
+      return;
+      }
+
     if ( (mo->flags & MF_MISSILE) && !(mo->flags & MF_NOCLIP) )
       {
       P_ExplodeMissile (mo);

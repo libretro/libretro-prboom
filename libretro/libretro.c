@@ -34,6 +34,7 @@
 /* prboom includes */
 
 #include "../src/d_main.h"
+#include "../src/dsda_hacked.h"
 #include "../src/m_fixed.h"
 #include "../src/m_argv.h"
 #include "../src/i_system.h"
@@ -591,6 +592,11 @@ void retro_deinit(void)
    rumble_damage_counter  = -1;
    rumble_touch_strength  = 0;
    rumble_touch_counter   = -1;
+
+   /* Free the dsdhacked growable tables and reset their globals to the
+    * static seeds before the zone is torn down, so a subsequent content
+    * load re-seeds cleanly instead of dangling. */
+   dsda_FreeTables();
 
    /* Z_Close() must be the very last
     * function that is called, since

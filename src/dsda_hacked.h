@@ -1,17 +1,12 @@
-/* dsda_hacked.h
+/* dsda_hacked.h -- DSDHacked: dynamic growth of the dehacked-editable
+ * tables (states, mobjinfo, sprite names, sfx, music) beyond their vanilla
+ * counts.  Faithful port of dsda-doom's per-table growth, trimmed to this
+ * Doom-only core.
  *
- * DSDHacked support: dynamic growth of the dehacked-editable tables
- * (states, mobjinfo, sprite names, sfx, music) beyond their vanilla
- * counts.  A dehacked patch may reference an arbitrarily high index; the
- * accessors below grow the relevant table on demand (doubling capacity and
- * zero/sentinel-initialising the new entries) and return a pointer to the
- * requested slot.
- *
- * The tables themselves (states, mobjinfo, sprnames, S_sfx, S_music) and
- * their runtime counts (num_states, num_mobj_types, num_sprites, num_sfx,
- * num_music) live in info.c / sounds.c; this module owns the growth logic
- * and the deh_codeptr / seenstate companion arrays that must grow with
- * states.
+ * The tables (states, mobjinfo, sprnames, S_sfx, S_music) and their runtime
+ * counts (num_states, num_mobj_types, num_sprites, num_sfx, num_music) live
+ * here; the static seed arrays in info.c / sounds.c remain pristine so the
+ * tables can be rebuilt from them on every (re)load.
  */
 
 #ifndef __DSDA_HACKED__
@@ -21,30 +16,29 @@
 #include "sounds.h"
 #include "d_think.h"
 
-/* Runtime table sizes (start at the vanilla NUM* counts). */
 extern int num_states;
 extern int num_mobj_types;
 extern int num_sprites;
 extern int num_sfx;
 extern int num_music;
 
-/* Companion to states[], grows in lockstep: the per-state original action
- * pointer used by the BEX [CODEPTR] cross-reference. */
+/* Grows with states[]: per-state original action pointer (BEX [CODEPTR]). */
 extern actionf_t *deh_codeptr;
 
-/* Grow-on-demand accessors.  Each ensures the table is large enough to hold
- * 'index', then returns a pointer to that slot. */
-state_t    *dsda_GetState(int index);
-mobjinfo_t *dsda_GetMobjInfo(int index);
-sfxinfo_t  *dsda_GetSfx(int index);
-musicinfo_t*dsda_GetMusic(int index);
-/* Sprite names are an array of char*; this ensures capacity and returns the
- * slot so the caller can assign a duplicated name string. */
+/* Grow-on-demand accessors: ensure the table covers 'index', return the slot. */
+state_t     *dsda_GetState(int index);
+mobjinfo_t  *dsda_GetMobjInfo(int index);
+sfxinfo_t   *dsda_GetSfx(int index);
+musicinfo_t *dsda_GetMusic(int index);
 const char **dsda_GetSprite(int index);
 
-/* One-time initialisation: copy the static seed tables into growable
- * allocations and set the num_* counters.  Called from D_BuildBEXTables
- * before any dehacked patch is processed. */
+/* (Re)build the growable tables from the static seed arrays.  Safe to call
+ * on every load: it frees any prior allocation and starts fresh, so the
+ * tables never dangle after a Z_Close between content loads. */
 void dsda_InitTables(void);
+
+/* Frees the growable copies and resets the table globals to the static
+ * seeds.  Call at teardown before the zone allocator is closed. */
+void dsda_FreeTables(void);
 
 #endif

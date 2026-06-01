@@ -1,4 +1,12 @@
-/* dsda_hacked.c  -- see dsda_hacked.h for the overview. */
+/* dsda_hacked.c -- see dsda_hacked.h.  Faithful port of dsda-doom's
+ * dsdhacked table growth, trimmed to this Doom-only core.
+ *
+ * Memory: allocations go through the zone allocator (z_zone.h remaps
+ * malloc/realloc/calloc/free to Z_Malloc/Z_Realloc/Z_Calloc/Z_Free with
+ * PU_STATIC).  Z_Close frees all PU_STATIC at content unload, so the table
+ * pointers would dangle on a subsequent load; dsda_InitTables therefore
+ * rebuilds everything from the pristine static seed arrays on every call.
+ */
 
 #include <stdlib.h>
 #include <string.h>
@@ -11,14 +19,19 @@
 #include "d_think.h"
 #include "dsda_hacked.h"
 
-/* The five editable tables live in info.c / sounds.c.  Before
- * dsda_InitTables runs they point at the static seed arrays; afterwards
- * they point at growable malloc'd copies. */
-extern state_t    *states;
-extern mobjinfo_t *mobjinfo;
+/* The five editable tables live in info.c / sounds.c. */
+extern state_t     *states;
+extern mobjinfo_t  *mobjinfo;
 extern const char **sprnames;
-extern sfxinfo_t  *S_sfx;
-extern musicinfo_t*S_music;
+extern sfxinfo_t   *S_sfx;
+extern musicinfo_t *S_music;
+
+/* The pristine static seed arrays. */
+extern state_t      state_seed[];
+extern mobjinfo_t   mobjinfo_seed[];
+extern const char  *sprnames_seed[];
+extern sfxinfo_t    S_sfx_seed[];
+extern musicinfo_t  S_music_seed[];
 
 int num_states;
 int num_mobj_types;
@@ -28,46 +41,38 @@ int num_music;
 
 actionf_t *deh_codeptr;
 
-/* Generic doubling growth.  Returns the new count (>= needed). */
-static int next_capacity(int current, int needed)
-{
-  int cap = current;
-  if (cap < 1)
-    cap = 1;
-  while (needed >= cap)
-    cap *= 2;
-  return cap;
-}
+/* MUSINFO uses a scratch music slot one past the last real entry
+ * (S_music[NUMMUSIC]); reserve it so that index stays in bounds. */
+#define MUSIC_EXTRA 1
 
 /* --- states ----------------------------------------------------------- */
 
-static void ensure_states(int index)
+static void reset_states(int from, int to)
 {
-  int old = num_states;
-  int cap;
   int i;
-
-  if (index < num_states)
-    return;
-
-  cap = next_capacity(num_states, index);
-
-  states      = realloc(states, cap * sizeof(*states));
-  deh_codeptr = realloc(deh_codeptr, cap * sizeof(*deh_codeptr));
-
-  memset(states + old,      0, (cap - old) * sizeof(*states));
-  memset(deh_codeptr + old, 0, (cap - old) * sizeof(*deh_codeptr));
-
-  /* New frames default to a harmless "do nothing, stay put" state, matching
-   * dsdhacked: invisible sprite, infinite tics, self-loop. */
-  for (i = old; i < cap; i++)
+  for (i = from; i < to; ++i)
   {
     states[i].sprite    = SPR_TNT1;
     states[i].tics      = -1;
     states[i].nextstate = (statenum_t)i;
   }
+}
 
-  num_states = cap;
+static void ensure_states(int limit)
+{
+  while (limit >= num_states)
+  {
+    int old = num_states;
+    num_states *= 2;
+
+    states = realloc(states, num_states * sizeof(*states));
+    memset(states + old, 0, (num_states - old) * sizeof(*states));
+
+    deh_codeptr = realloc(deh_codeptr, num_states * sizeof(*deh_codeptr));
+    memset(deh_codeptr + old, 0, (num_states - old) * sizeof(*deh_codeptr));
+
+    reset_states(old, num_states);
+  }
 }
 
 state_t *dsda_GetState(int index)
@@ -78,13 +83,12 @@ state_t *dsda_GetState(int index)
 
 /* --- mobjinfo --------------------------------------------------------- */
 
-static void init_new_mobjinfo(int from, int to)
+static void reset_mobjinfo(int from, int to)
 {
   int i;
-  for (i = from; i < to; i++)
+  for (i = from; i < to; ++i)
   {
-    /* sensible inert defaults plus the MBF21 sentinels */
-    mobjinfo[i].droppeditem    = MT_NULL;
+    mobjinfo[i].droppeditem      = MT_NULL;
     mobjinfo[i].infighting_group = IG_DEFAULT;
     mobjinfo[i].projectile_group = PG_DEFAULT;
     mobjinfo[i].splash_group     = SG_DEFAULT;
@@ -94,19 +98,18 @@ static void init_new_mobjinfo(int from, int to)
   }
 }
 
-static void ensure_mobjinfo(int index)
+static void ensure_mobjinfo(int limit)
 {
-  int old = num_mobj_types;
-  int cap;
+  while (limit >= num_mobj_types)
+  {
+    int old = num_mobj_types;
+    num_mobj_types *= 2;
 
-  if (index < num_mobj_types)
-    return;
+    mobjinfo = realloc(mobjinfo, num_mobj_types * sizeof(*mobjinfo));
+    memset(mobjinfo + old, 0, (num_mobj_types - old) * sizeof(*mobjinfo));
 
-  cap = next_capacity(num_mobj_types, index);
-  mobjinfo = realloc(mobjinfo, cap * sizeof(*mobjinfo));
-  memset(mobjinfo + old, 0, (cap - old) * sizeof(*mobjinfo));
-  init_new_mobjinfo(old, cap);
-  num_mobj_types = cap;
+    reset_mobjinfo(old, num_mobj_types);
+  }
 }
 
 mobjinfo_t *dsda_GetMobjInfo(int index)
@@ -117,21 +120,16 @@ mobjinfo_t *dsda_GetMobjInfo(int index)
 
 /* --- sprite names ----------------------------------------------------- */
 
-static void ensure_sprites(int index)
+static void ensure_sprites(int limit)
 {
-  int old = num_sprites;
-  int cap;
-  int i;
+  while (limit >= num_sprites)
+  {
+    int old = num_sprites;
+    num_sprites *= 2;
 
-  if (index < num_sprites)
-    return;
-
-  cap = next_capacity(num_sprites, index);
-  /* +1 for the NULL terminator R_InitSpriteDefs scans for. */
-  sprnames = realloc(sprnames, (cap + 1) * sizeof(*sprnames));
-  for (i = old; i <= cap; i++)
-    sprnames[i] = NULL;
-  num_sprites = cap;
+    sprnames = realloc(sprnames, num_sprites * sizeof(*sprnames));
+    memset(sprnames + old, 0, (num_sprites - old) * sizeof(*sprnames));
+  }
 }
 
 const char **dsda_GetSprite(int index)
@@ -142,18 +140,29 @@ const char **dsda_GetSprite(int index)
 
 /* --- sfx -------------------------------------------------------------- */
 
-static void ensure_sfx(int index)
+static void reset_sfx(int from, int to)
 {
-  int old = num_sfx;
-  int cap;
+  int i;
+  for (i = from; i < to; ++i)
+  {
+    S_sfx[i].priority = 127;
+    S_sfx[i].pitch    = -1;
+    S_sfx[i].volume   = -1;
+  }
+}
 
-  if (index < num_sfx)
-    return;
+static void ensure_sfx(int limit)
+{
+  while (limit >= num_sfx)
+  {
+    int old = num_sfx;
+    num_sfx *= 2;
 
-  cap = next_capacity(num_sfx, index);
-  S_sfx = realloc(S_sfx, cap * sizeof(*S_sfx));
-  memset(S_sfx + old, 0, (cap - old) * sizeof(*S_sfx));
-  num_sfx = cap;
+    S_sfx = realloc(S_sfx, num_sfx * sizeof(*S_sfx));
+    memset(S_sfx + old, 0, (num_sfx - old) * sizeof(*S_sfx));
+
+    reset_sfx(old, num_sfx);
+  }
 }
 
 sfxinfo_t *dsda_GetSfx(int index)
@@ -164,18 +173,17 @@ sfxinfo_t *dsda_GetSfx(int index)
 
 /* --- music ------------------------------------------------------------ */
 
-static void ensure_music(int index)
+static void ensure_music(int limit)
 {
-  int old = num_music;
-  int cap;
+  /* Keep the +MUSIC_EXTRA scratch slot valid as the table grows. */
+  while (limit >= num_music)
+  {
+    int old = num_music;
+    num_music *= 2;
 
-  if (index < num_music)
-    return;
-
-  cap = next_capacity(num_music, index);
-  S_music = realloc(S_music, cap * sizeof(*S_music));
-  memset(S_music + old, 0, (cap - old) * sizeof(*S_music));
-  num_music = cap;
+    S_music = realloc(S_music, (num_music + MUSIC_EXTRA) * sizeof(*S_music));
+    memset(S_music + old, 0, (num_music + MUSIC_EXTRA - old) * sizeof(*S_music));
+  }
 }
 
 musicinfo_t *dsda_GetMusic(int index)
@@ -186,61 +194,67 @@ musicinfo_t *dsda_GetMusic(int index)
 
 /* --- init ------------------------------------------------------------- */
 
+/* Free the growable copies and point the globals back at the static seeds.
+ * Called at teardown (before Z_Close) so that a subsequent dsda_InitTables
+ * sees seed pointers rather than dangling ones. */
+void dsda_FreeTables(void)
+{
+  if (states     && states   != state_seed)    free(states);
+  if (mobjinfo   && mobjinfo != mobjinfo_seed)  free(mobjinfo);
+  if (sprnames   && sprnames != sprnames_seed)  free(sprnames);
+  if (S_sfx      && S_sfx    != S_sfx_seed)     free(S_sfx);
+  if (S_music    && S_music  != S_music_seed)   free(S_music);
+  if (deh_codeptr)                              free(deh_codeptr);
+
+  states      = state_seed;
+  mobjinfo    = mobjinfo_seed;
+  sprnames    = sprnames_seed;
+  S_sfx       = S_sfx_seed;
+  S_music     = S_music_seed;
+  deh_codeptr = NULL;
+}
+
 void dsda_InitTables(void)
 {
-  static int done = 0;
-  state_t    *seed_states;
-  mobjinfo_t *seed_mobjinfo;
-  const char **seed_sprnames;
-  sfxinfo_t  *seed_sfx;
-  musicinfo_t*seed_music;
+  int i;
 
-  if (done)
-    return;
-  done = 1;
+  /* Start fresh: free any previous content load's copies (a content swap
+   * without an intervening Z_Close) and re-seed.  Because we always leave
+   * the globals pointing at the seeds when not owning a heap copy, the
+   * "!= seed" guard never frees a dangling pointer. */
+  dsda_FreeTables();
 
-  /* The pointers currently reference the static seed arrays in info.c /
-   * sounds.c.  Copy each into a heap allocation we can grow, and repoint
-   * the global at it.  num_* start at the vanilla counts. */
   num_states     = NUMSTATES;
   num_mobj_types = NUMMOBJTYPES;
   num_sprites    = NUMSPRITES;
   num_sfx        = NUMSFX;
   num_music      = NUMMUSIC;
 
-  seed_states   = states;
-  seed_mobjinfo = mobjinfo;
-  seed_sprnames = sprnames;
-  seed_sfx      = S_sfx;
-  seed_music    = S_music;
-
   states = malloc(num_states * sizeof(*states));
-  memcpy(states, seed_states, num_states * sizeof(*states));
+  memcpy(states, state_seed, num_states * sizeof(*states));
 
   mobjinfo = malloc(num_mobj_types * sizeof(*mobjinfo));
-  memcpy(mobjinfo, seed_mobjinfo, num_mobj_types * sizeof(*mobjinfo));
+  memcpy(mobjinfo, mobjinfo_seed, num_mobj_types * sizeof(*mobjinfo));
 
-  /* sprnames is NULL-terminated (R_InitSpriteDefs scans for the NULL), so
-   * allocate one extra slot and copy the terminator the seed array had. */
+  /* sprnames keeps its trailing NULL terminator slot (seed is [NUMSPRITES+1]
+   * with sprnames_seed[NUMSPRITES] == NULL); copy it so any terminator-aware
+   * consumer still sees a NULL after the real names. */
   sprnames = malloc((num_sprites + 1) * sizeof(*sprnames));
-  memcpy(sprnames, seed_sprnames, num_sprites * sizeof(*sprnames));
+  memcpy(sprnames, sprnames_seed, num_sprites * sizeof(*sprnames));
   sprnames[num_sprites] = NULL;
 
   S_sfx = malloc(num_sfx * sizeof(*S_sfx));
-  memcpy(S_sfx, seed_sfx, num_sfx * sizeof(*S_sfx));
-  /* Any sfx 'link' that pointed into the static seed array (sound aliases
-   * such as chgun -> pistol) must be re-pointed into this heap copy, or
-   * pointer arithmetic like (link - S_sfx) computes against the wrong base
-   * and indexes out of bounds. */
-  {
-    int i;
-    for (i = 0; i < num_sfx; i++)
-      if (S_sfx[i].link)
-        S_sfx[i].link = S_sfx + (S_sfx[i].link - seed_sfx);
-  }
+  memcpy(S_sfx, S_sfx_seed, num_sfx * sizeof(*S_sfx));
+  /* Re-point sound-alias links (e.g. chgun -> pistol) into the heap copy so
+   * pointer arithmetic (link - S_sfx) is computed against the right base. */
+  for (i = 0; i < num_sfx; i++)
+    if (S_sfx[i].link)
+      S_sfx[i].link = S_sfx + (S_sfx[i].link - S_sfx_seed);
 
-  S_music = malloc(num_music * sizeof(*S_music));
-  memcpy(S_music, seed_music, num_music * sizeof(*S_music));
+  /* +MUSIC_EXTRA for the MUSINFO scratch slot at index NUMMUSIC. */
+  S_music = malloc((num_music + MUSIC_EXTRA) * sizeof(*S_music));
+  memcpy(S_music, S_music_seed, num_music * sizeof(*S_music));
+  memset(S_music + num_music, 0, MUSIC_EXTRA * sizeof(*S_music));
 
   deh_codeptr = calloc(num_states, sizeof(*deh_codeptr));
 }

@@ -11,6 +11,7 @@
 #include "libretro.h"
 
 #include "../src/i_sound.h"
+#include "../src/dsda_hacked.h"
 #include "../src/musicplayer.h"
 #include "../src/flplayer.h"
 #include "../src/oplplayer.h"
@@ -56,7 +57,8 @@ extern int gametic;
 extern int snd_SfxVolume;
 extern int snd_MusicVolume;
 
-int lengths[NUMSFX];
+int *lengths = NULL;
+static int lengths_size = 0;
 int snd_card = 1;
 int mus_card = 0;
 
@@ -581,7 +583,7 @@ void I_ShutdownSound(void)
 {
    int i;
 
-   for(i = 0; i < NUMSFX; i++)
+   for(i = 0; i < num_sfx; i++)
    {
       if (!S_sfx[i].link)
       {
@@ -595,9 +597,16 @@ void I_InitSound(void)
 {
   int i;
 
-  memset(&lengths, 0, sizeof(int)*NUMSFX);
+  /* lengths[] tracks the (growable) sfx count; reallocate to cover any
+   * dsdhacked-added sounds. */
+  if (lengths_size < num_sfx)
+  {
+    lengths = (int*)realloc(lengths, num_sfx * sizeof(int));
+    lengths_size = num_sfx;
+  }
+  memset(lengths, 0, sizeof(int) * num_sfx);
 
-  for (i = 1; i < NUMSFX; i++)
+  for (i = 1; i < num_sfx; i++)
   {
      // Alias? Example is the chaingun sound linked to pistol.
      if (!S_sfx[i].link) // Load data from WAD file.
@@ -605,7 +614,9 @@ void I_InitSound(void)
      else // Previously loaded already?
      {
         S_sfx[i].data = S_sfx[i].link->data;
-        lengths[i]    = lengths[(S_sfx[i].link - S_sfx)/sizeof(sfxinfo_t)];
+        /* link - S_sfx is already an element index (pointer subtraction of
+         * sfxinfo_t*); do not divide by sizeof again. */
+        lengths[i]    = lengths[S_sfx[i].link - S_sfx];
      }
   }
 

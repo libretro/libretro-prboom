@@ -43,6 +43,7 @@ GameMission_t   gamemission = doom;
  * Both default off so a Doom session is byte-for-byte unaffected. */
 dbool heretic;
 dbool raven;
+mobjtype_t g_mt_player = MT_PLAYER; /* player mobjtype; set per-game */
 
 // Language.
 Language_t   language = english;

@@ -63,6 +63,7 @@ extern GameMission_t  gamemission;
 /* Raven (Heretic/Hexen) game identification; see doomstat.c. */
 extern dbool heretic;
 extern dbool raven;
+extern mobjtype_t g_mt_player;
 
 // Set if homebrew PWAD stuff has been added.
 extern  dbool   modifiedgame;

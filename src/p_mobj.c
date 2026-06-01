@@ -1167,7 +1167,7 @@ void P_SpawnPlayer (int n, const mapthing_t* mthing)
   x    = mthing->x << FRACBITS;
   y    = mthing->y << FRACBITS;
   z    = ONFLOORZ;
-  mobj = P_SpawnMobj (x,y,z, MT_PLAYER);
+  mobj = P_SpawnMobj (x,y,z, g_mt_player);
 
   // set color translations for player sprites
 

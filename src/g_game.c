@@ -1235,11 +1235,16 @@ void G_DoReborn (int playernum)
 }
 
 // DOOM Par Times
-int pars[4][10] = {
+// killough/BFG: Episode 4 (Thy Flesh Consumed) par times were absent
+// from the original Ultimate DOOM release; the values below were added
+// in DOOM 3 BFG Edition.  The table is [5][10] so gameepisode 4 (E4) is
+// in bounds -- previously it was [4][10] and E4 read past the end.
+int pars[5][10] = {
   {0},
   {0,30,75,120,90,165,180,180,30,165},
   {0,90,90,90,120,90,360,240,30,170},
-  {0,90,45,90,150,90,90,165,30,135}
+  {0,90,45,90,150,90,90,165,30,135},
+  {0,165,255,135,150,180,390,135,360,180}
 };
 
 // DOOM II Par Times

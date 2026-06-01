@@ -2517,7 +2517,7 @@ static void deh_procPars(DEHFILE *fpin, FILE* fpout, char *line) // extension
   // second one makes the par for MAP14 be 230 seconds.  The number
   // of parameters on the line determines which group of par values
   // is being changed.  Error checking is done based on current fixed
-  // array sizes of[4][10] and [32]
+  // array sizes of[5][10] and [32]
 
   strncpy(inbuffer,line,DEH_BUFFERMAX);
 
@@ -2582,12 +2582,12 @@ static void deh_procPars(DEHFILE *fpin, FILE* fpout, char *line) // extension
         }
       else
         { // is 3
-          // note that though it's a [4][10] array, the "left" and "top" aren't used,
+          // note that though it's a [5][10] array, the "left" and "top" aren't used,
           // effectively making it a base 1 array.
           // Ty 07/11/98 - level was being checked against max 3 - dumb error
-          // Note that episode 4 does not have par times per original design
-          // in Ultimate DOOM so that is not supported here.
-          if (episode < 1 || episode > 3 || level < 1 || level > 9)
+          // Episode 4 par times (Thy Flesh Consumed) were added in DOOM 3
+          // BFG Edition, so E4 is now a valid deh [Par] target as well.
+          if (episode < 1 || episode > 4 || level < 1 || level > 9)
             {
               if (fpout) fprintf(fpout,
                                  "Invalid ExMx values E%dM%d\n",episode, level);

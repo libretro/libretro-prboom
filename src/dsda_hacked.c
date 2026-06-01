@@ -148,6 +148,13 @@ static void reset_sfx(int from, int to)
     S_sfx[i].priority = 127;
     S_sfx[i].pitch    = -1;
     S_sfx[i].volume   = -1;
+    /* S_Init seeds lumpnum/usefulness to -1 only over the static range;
+     * mirror that for grown entries so S_StartSound's lazy
+     * "if (lumpnum < 0) lumpnum = I_GetSfxLumpNum()" lookup actually runs.
+     * Left at the memset's 0, an extended sound would be treated as
+     * already-cached at lump 0 and play the wrong data. */
+    S_sfx[i].lumpnum    = -1;
+    S_sfx[i].usefulness = -1;
   }
 }
 

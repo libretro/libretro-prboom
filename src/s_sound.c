@@ -44,6 +44,7 @@
 #include "m_random.h"
 #include "w_wad.h"
 #include "lprintf.h"
+#include "dsda_hacked.h"
 
 // when to clip out sounds
 // Does not fit the large outdoor areas.
@@ -147,7 +148,8 @@ void S_Init(int sfxVolume, int musicVolume)
       (channel_t *) calloc(numChannels,sizeof(channel_t));
 
     // Note that sounds have not been cached (yet).
-    for (i=1 ; i<NUMSFX ; i++)
+    // DSDHacked: cover the runtime-grown table, not just the static seed.
+    for (i=1 ; i<num_sfx ; i++)
       S_sfx[i].lumpnum = S_sfx[i].usefulness = -1;
   }
 
@@ -264,8 +266,15 @@ static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
   sfx_id &= ~PICKUP_SOUND;
 
   // check for bogus sound #
-  if (sfx_id < 1 || sfx_id > NUMSFX)
+  // DSDHacked: valid ids are 1..num_sfx-1 against the runtime-grown S_sfx
+  // table, not the static NUMSFX seed.  I_Error is non-fatal in this build
+  // (it logs and returns), so we must also bail out explicitly -- otherwise
+  // execution falls through into the out-of-bounds S_sfx[sfx_id] below.
+  if (sfx_id < 1 || sfx_id >= num_sfx)
+  {
     I_Error("S_StartSoundAtVolume: Bad sfx #: %d", sfx_id);
+    return;
+  }
 
   sfx = &S_sfx[sfx_id];
 
@@ -507,7 +516,8 @@ void S_ChangeMusic(int musicnum, int looping)
   if (nomusicparm)
     return;
 
-  if (musicnum <= mus_None || musicnum >= NUMMUSIC)
+  /* DSDHacked: bound against the runtime-grown S_music table. */
+  if (musicnum <= mus_None || musicnum >= num_music)
   {
     I_Error("S_ChangeMusic: Bad music number %d", musicnum);
     return;

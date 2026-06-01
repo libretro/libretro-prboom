@@ -479,6 +479,30 @@ dbool PIT_CheckLine (line_t* ld)
 // PIT_CheckThing
 //
 
+/* MBF21: decide whether a projectile from source may NOT damage target,
+ * based on projectile groups.  A PG_GROUPLESS target has no immunity even
+ * to its own species; a PG_DEFAULT target keeps vanilla same-species
+ * immunity; otherwise things in the same group are mutually immune.  Only
+ * consulted under mbf21_features, so vanilla behaviour is unchanged. */
+static dbool P_ProjectileImmune(mobj_t *target, mobj_t *source)
+{
+  return
+    ( /* PG_GROUPLESS means no immunity, even to own species */
+      mobjinfo[target->type].projectile_group != PG_GROUPLESS ||
+      target == source
+    ) &&
+    (
+      ( /* default behaviour, and things are the same type */
+        mobjinfo[target->type].projectile_group == PG_DEFAULT &&
+        source->type == target->type
+      ) ||
+      ( /* special behaviour, and things share a group */
+        mobjinfo[target->type].projectile_group != PG_DEFAULT &&
+        mobjinfo[target->type].projectile_group == mobjinfo[source->type].projectile_group
+      )
+    );
+}
+
 static dbool PIT_CheckThing(mobj_t *thing) // killough 3/26/98: make static
 {
   fixed_t blockdist;
@@ -562,9 +586,12 @@ static dbool PIT_CheckThing(mobj_t *thing) // killough 3/26/98: make static
       if (tmthing->z+tmthing->height < thing->z)
   return TRUE;    // underneath
 
-      if (tmthing->target && (tmthing->target->type == thing->type ||
-    (tmthing->target->type == MT_KNIGHT && thing->type == MT_BRUISER)||
-    (tmthing->target->type == MT_BRUISER && thing->type == MT_KNIGHT)))
+      if (tmthing->target &&
+          (mbf21_features
+           ? P_ProjectileImmune(thing, tmthing->target)
+           : (tmthing->target->type == thing->type ||
+              (tmthing->target->type == MT_KNIGHT && thing->type == MT_BRUISER)||
+              (tmthing->target->type == MT_BRUISER && thing->type == MT_KNIGHT))))
       {
   if (thing == tmthing->target)
     return TRUE;                // Don't hit same species as originator.
@@ -1784,6 +1811,15 @@ static int bombdamage;
 // that caused the explosion at "bombspot".
 //
 
+/* MBF21: two things in the same (non-default) splash group are immune to
+ * each other's splash damage.  Only consulted under mbf21_features. */
+static dbool P_SplashImmune(mobj_t *target, mobj_t *spot)
+{
+  return
+    mobjinfo[target->type].splash_group != SG_DEFAULT &&
+    mobjinfo[target->type].splash_group == mobjinfo[spot->type].splash_group;
+}
+
 dbool PIT_RadiusAttack (mobj_t* thing)
 {
   fixed_t dx;
@@ -1814,6 +1850,10 @@ dbool PIT_RadiusAttack (mobj_t* thing)
    * so this leaves vanilla/boom/mbf behaviour unchanged. */
   if ((thing->flags2 & (MF2_NORADIUSDMG | MF2_BOSS)) &&
       !(bombspot->flags2 & MF2_FORCERADIUSDMG))
+    return TRUE;
+
+  /* MBF21: splash-group immunity (target vs. the explosion origin). */
+  if (mbf21_features && P_SplashImmune(thing, bombspot))
     return TRUE;
 
   dx = D_abs(thing->x - bombspot->x);

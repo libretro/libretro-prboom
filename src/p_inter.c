@@ -756,6 +756,17 @@ static void P_KillMobj(mobj_t *source, mobj_t *target)
 // and other environmental stuff.
 //
 
+/* MBF21: two things in the same (non-default) infighting group will not
+ * retaliate against each other after taking damage.  Inert below complevel
+ * 21 because all groups are IG_DEFAULT unless an MBF21 deh patch changed
+ * them and mbf21_features is active. */
+static dbool P_InfightingImmune(mobj_t *target, mobj_t *source)
+{
+  return
+    mobjinfo[target->type].infighting_group != IG_DEFAULT &&
+    mobjinfo[target->type].infighting_group == mobjinfo[source->type].infighting_group;
+}
+
 void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
 {
   player_t *player;
@@ -897,6 +908,7 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
    * flags2 is zero outside complevel 21, so vanilla behaviour is preserved. */
   if (source && source != target && !(source->flags & MF_NOTARGET) &&
       !(source->flags2 & MF2_DMGIGNORED) &&
+      !(mbf21_features && P_InfightingImmune(target, source)) &&
       (!target->threshold || (target->flags2 & MF2_NOTHRESHOLD) ||
        (target->flags & MF_QUICKTORETALIATE)) &&
       ((source->flags ^ target->flags) & MF_FRIEND ||

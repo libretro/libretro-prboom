@@ -1479,6 +1479,12 @@ void D_BuildBEXTables(void)
      mobjinfo[i].altspeed         = NO_ALTSPEED;
      mobjinfo[i].meleerange       = 64*FRACUNIT; /* MELEERANGE (p_map.h) */
    }
+   /* Vanilla immunizes baron and hell knight projectiles against each
+    * other via a hardcoded type pair.  Under MBF21 the type pair is
+    * replaced by projectile groups, so put both in a shared group to
+    * preserve that behaviour by default. */
+   mobjinfo[MT_BRUISER].projectile_group = PG_BARON;
+   mobjinfo[MT_KNIGHT].projectile_group  = PG_BARON;
 
    for(i = 0; i < NUMSPRITES; i++)
       deh_spritenames[i] = strdup(sprnames[i]);

@@ -1535,7 +1535,7 @@ typedef struct
  * offset above the reserved defaults at parse time so they can't collide
  * with the "default" group.  Values follow the MBF21 reference port. */
 enum { IG_DEFAULT, IG_END };
-enum { PG_GROUPLESS = -1, PG_DEFAULT, PG_END };
+enum { PG_GROUPLESS = -1, PG_DEFAULT, PG_BARON, PG_END };
 enum { SG_DEFAULT, SG_END };
 #define NO_ALTSPEED (-1)   /* altspeed sentinel: no skill-5/-fast override */
 

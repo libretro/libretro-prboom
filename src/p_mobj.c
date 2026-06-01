@@ -38,6 +38,7 @@
 #include "p_maputl.h"
 #include "p_map.h"
 #include "p_tick.h"
+#include "p_spec.h"
 #include "sounds.h"
 #include "st_stuff.h"
 #include "hu_stuff.h"
@@ -778,6 +779,21 @@ void P_MobjThinker (mobj_t* mobj)
       P_ApplyTorque(mobj);               // Apply torque
     else
       mobj->intflags &= ~MIF_FALLING, mobj->gear = 0;  // Reset torque
+  }
+
+  /* MBF21: a grounded, shootable, non-floating monster standing in a
+   * kill-monsters sector (special bit 13) is destroyed.  Inert below
+   * complevel 21. */
+  if (mbf21_features &&
+      (mobj->subsector->sector->special & KILL_MONSTERS_MASK) &&
+      mobj->z == mobj->floorz &&
+      mobj->player == NULL &&
+      (mobj->flags & MF_SHOOTABLE) &&
+      !(mobj->flags & MF_FLOAT))
+  {
+    P_DamageMobj(mobj, NULL, NULL, 10000);
+    if (mobj->thinker.function.arg1 != (void (*)(void *))P_MobjThinker)
+      return; /* removed */
   }
 
   // cycle through states,

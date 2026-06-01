@@ -143,6 +143,10 @@ typedef struct {
 //allow multiple push/switch triggers to be used on one push
 #define ML_PASSUSE      512
 
+/* MBF21 line flags (only honoured at complevel 21). */
+#define ML_BLOCKLANDMONSTERS 0x1000 /* bit 12: blocks non-floating monsters */
+#define ML_BLOCKPLAYERS      0x2000 /* bit 13: blocks players */
+
 // Sector definition, from editing.
 typedef struct {
   short floorheight;

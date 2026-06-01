@@ -2290,6 +2290,36 @@ void P_PlayerInSpecialSector (player_t* player)
   }
   else //jff 3/14/98 handle extended sector types for secrets and damage
   {
+    /* MBF21: instant-death sector (bit 12).  The damage-type bits select
+     * the variant.  Inert below complevel 21. */
+    if (mbf21_features && (sector->special & DEATH_MASK))
+    {
+      int i;
+      switch ((sector->special & DAMAGE_MASK) >> DAMAGE_SHIFT)
+      {
+        case 0: /* kill player, unless protected */
+          if (!player->powers[pw_invulnerability] && !player->powers[pw_ironfeet])
+            P_DamageMobj(player->mo, NULL, NULL, 10000);
+          break;
+        case 1: /* kill player, ignore protection */
+          P_DamageMobj(player->mo, NULL, NULL, 10000);
+          break;
+        case 2: /* kill all players, then exit */
+          for (i = 0; i < MAXPLAYERS; i++)
+            if (playeringame[i])
+              P_DamageMobj(players[i].mo, NULL, NULL, 10000);
+          G_ExitLevel();
+          break;
+        case 3: /* kill all players, then secret exit */
+          for (i = 0; i < MAXPLAYERS; i++)
+            if (playeringame[i])
+              P_DamageMobj(players[i].mo, NULL, NULL, 10000);
+          G_SecretExitLevel();
+          break;
+      }
+      return;
+    }
+
     switch ((sector->special&DAMAGE_MASK)>>DAMAGE_SHIFT)
     {
       case 0: // no damage
@@ -2866,6 +2896,29 @@ static void P_SpawnScrollers(void)
           s = lines[i].sidenum[0];
           Add_Scroller(sc_side, -sides[s].textureoffset,
                        sides[s].rowoffset, -1, s, accel);
+          break;
+
+        /* MBF21: tag-controlled side scrollers, scrolling every tagged
+         * line's first side by this line's sidedef offsets / 8.  1024 is
+         * uncontrolled, 1025 is controlled by this line's sidedef sector,
+         * 1026 is controlled and accelerative.  Inert below complevel 21. */
+        case 1024:
+        case 1025:
+        case 1026:
+          if (mbf21_features)
+          {
+            int sided = lines[i].sidenum[0];
+            fixed_t sdx = -sides[sided].textureoffset / 8;
+            fixed_t sdy =  sides[sided].rowoffset / 8;
+            if (special > 1024)
+              control = sides[*l->sidenum].sector - sectors;
+            if (special == 1026)
+              accel = 1;
+            for (s=-1; (s = P_FindLineFromLineTag(l,s)) >= 0;)
+              if (s != i)
+                Add_Scroller(sc_side, sdx, sdy, control,
+                             lines[s].sidenum[0], accel);
+          }
           break;
 
         case 48:                  // scroll first side

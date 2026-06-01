@@ -424,12 +424,18 @@ dbool PIT_CheckLine (line_t* ld)
   // killough 8/10/98: allow bouncing objects to pass through as missiles
   if (!(tmthing->flags & (MF_MISSILE | MF_BOUNCES)))
     {
-      if (ld->flags & ML_BLOCKING)           // explicitly blocking everything
+      if (ld->flags & ML_BLOCKING ||        // explicitly blocking everything
+          /* MBF21: line blocks players (bit 13) */
+          (mbf21_features && tmthing->player &&
+           (ld->flags & ML_BLOCKPLAYERS)))
   return tmunstuck && !untouched(ld);  // killough 8/1/98: allow escape
 
       // killough 8/9/98: monster-blockers don't affect friends
       if (!(tmthing->flags & MF_FRIEND || tmthing->player)
-    && ld->flags & ML_BLOCKMONSTERS)
+    && (ld->flags & ML_BLOCKMONSTERS ||
+        /* MBF21: line blocks land (non-floating) monsters (bit 12) */
+        (mbf21_features && (ld->flags & ML_BLOCKLANDMONSTERS) &&
+         !(tmthing->flags & MF_FLOAT))))
   return FALSE; // block monsters only
     }
 

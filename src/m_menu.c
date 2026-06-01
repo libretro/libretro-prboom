@@ -3022,7 +3022,7 @@ setup_menu_t gen_settings3[] = { // General Settings screen2
   {"Stretch sky on freelook", S_YESNO, m_null, G_X,
    G_YC2 + general_skystretch*8, {"render_stretchsky"}, 0, 0, M_ChangeMouseLook, NULL},
 
-  {"Wiggle geometry fix", S_YESNO, m_null, G_X,
+  {"Wall Wiggle Fix", S_YESNO, m_null, G_X,
    G_YC2 + general_wigglefix*8, {"r_wiggle_fix"}, 0, 0, NULL, NULL},
 
   {"Fullscreen menu background", S_YESNO, m_null, G_X,

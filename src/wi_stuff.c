@@ -427,6 +427,34 @@ void WI_levelNameLump(char* buf, dbool   isNextLevel)
 // Args:    none
 // Returns: void
 //
+// The background is a single full-screen patch stretched to the current
+// resolution, redrawn every frame by every WI_draw* path.  At high
+// internal resolutions that stretch runs the per-pixel column drawer over
+// millions of pixels, which made the intermission cost ~11 ms/frame at 4K
+// even though the background image is static (only the foreground stat
+// counters animate, and those are drawn on top afterwards).
+//
+// Cache the rasterised background, keyed on the resolved lump name, the
+// dimensions and the palette, and memcpy it into the frame buffer on
+// subsequent frames instead of re-rasterising.  The animated map overlays
+// (WI_drawAnimatedBack) and the counters draw on top as before, so only
+// the expensive static layer is accelerated.
+static uint16_t       *wi_bg_cache      = NULL;
+static char            wi_bg_cache_name[9] = {0};
+static int             wi_bg_cache_w    = -1;
+static int             wi_bg_cache_h    = -1;
+static const uint16_t *wi_bg_cache_pal  = NULL;
+
+void WI_FreeBackgroundCache(void)
+{
+  free(wi_bg_cache);
+  wi_bg_cache         = NULL;
+  wi_bg_cache_name[0] = 0;
+  wi_bg_cache_w       = -1;
+  wi_bg_cache_h       = -1;
+  wi_bg_cache_pal     = NULL;
+}
+
 static void WI_slamBackground(void)
 {
   char  name[9];  // limited to 8 characters
@@ -447,8 +475,56 @@ static void WI_slamBackground(void)
       // default intermission for extra custom episodes
       strcpy(name, "INTERPIC");
   }
-  // background
-  V_DrawNamePatch(0, 0, FB, name, CR_DEFAULT, VPT_STRETCH);
+
+  // background -- cached: the resolved patch stretched to the screen is a
+  // pure function of name + dimensions + palette, none of which change
+  // between frames of a given intermission screen.
+  {
+    const size_t fb_bytes = (size_t)SCREENWIDTH * SCREENHEIGHT
+                            * SURFACE_PIXEL_DEPTH;
+
+    if (!wi_bg_cache
+        || strcmp(wi_bg_cache_name, name)
+        || wi_bg_cache_w   != SCREENWIDTH
+        || wi_bg_cache_h   != SCREENHEIGHT
+        || wi_bg_cache_pal != V_Palette16)
+    {
+      unsigned char *saved_data     = screens[FB].data;
+      uint16_t      *saved_short_tl  = drawvars.short_topleft;
+      unsigned int  *saved_int_tl    = drawvars.int_topleft;
+
+      if (!wi_bg_cache)
+        wi_bg_cache = (uint16_t*)malloc((size_t)MAX_SCREENWIDTH
+                                        * MAX_SCREENHEIGHT
+                                        * SURFACE_PIXEL_DEPTH);
+
+      if (wi_bg_cache)
+      {
+        screens[FB].data       = (unsigned char *)wi_bg_cache;
+        drawvars.short_topleft = wi_bg_cache;
+        drawvars.int_topleft   = (unsigned int *)wi_bg_cache;
+
+        V_DrawNamePatch(0, 0, FB, name, CR_DEFAULT, VPT_STRETCH);
+
+        screens[FB].data       = saved_data;
+        drawvars.short_topleft = saved_short_tl;
+        drawvars.int_topleft   = saved_int_tl;
+
+        strcpy(wi_bg_cache_name, name);
+        wi_bg_cache_w   = SCREENWIDTH;
+        wi_bg_cache_h   = SCREENHEIGHT;
+        wi_bg_cache_pal = V_Palette16;
+      }
+      else
+      {
+        /* allocation failed -- draw directly, uncached */
+        V_DrawNamePatch(0, 0, FB, name, CR_DEFAULT, VPT_STRETCH);
+        return;
+      }
+    }
+
+    memcpy(screens[FB].data, wi_bg_cache, fb_bytes);
+  }
 }
 
 
@@ -900,6 +976,7 @@ static void WI_drawTime(int x, int y, int t)
 //
 void WI_End(void)
 {
+  WI_FreeBackgroundCache();
   if (deathmatch)
     WI_endDeathmatchStats();
   else if (netgame)

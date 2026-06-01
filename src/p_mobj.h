@@ -250,6 +250,29 @@ enum {
   MIF_RESURRECTED = 0x00000004, // Object has been resurrected
 };
 
+// MBF21 thing flags ("MBF21 Bits" dehacked field).  These live in a
+// separate flags2 namespace because the main flags field is full.
+// Values are fixed by the MBF21 spec and must not be renumbered.
+#define MF2_LOGRAV        0x00000001 /* lower gravity (1/8) */
+#define MF2_SHORTMRANGE   0x00000002 /* short missile range (archvile) */
+#define MF2_DMGIGNORED    0x00000004 /* other things ignore its attacks (archvile) */
+#define MF2_NORADIUSDMG   0x00000008 /* doesn't take splash damage */
+#define MF2_FORCERADIUSDMG 0x00000010 /* causes splash damage even if target shouldn't */
+#define MF2_HIGHERMPROB   0x00000020 /* higher missile attack probability (cyberdemon) */
+#define MF2_RANGEHALF     0x00000040 /* use half distance for missile attack probability */
+#define MF2_NOTHRESHOLD   0x00000080 /* no targeting threshold (archvile) */
+#define MF2_LONGMELEE     0x00000100 /* long melee range (revenant) */
+#define MF2_BOSS          0x00000200 /* full volume see/death sound & splash immunity */
+#define MF2_MAP07BOSS1    0x00000400 /* tag 666 "boss" on doom2 map 7 (mancubus) */
+#define MF2_MAP07BOSS2    0x00000800 /* tag 667 "boss" on doom2 map 7 (arachnotron) */
+#define MF2_E1M8BOSS      0x00001000 /* E1M8 boss (baron) */
+#define MF2_E2M8BOSS      0x00002000 /* E2M8 boss (cyberdemon) */
+#define MF2_E3M8BOSS      0x00004000 /* E3M8 boss (mastermind) */
+#define MF2_E4M6BOSS      0x00008000 /* E4M6 boss (cyberdemon) */
+#define MF2_E4M8BOSS      0x00010000 /* E4M8 boss (mastermind) */
+#define MF2_RIP           0x00020000 /* ripper projectile (does not disappear on impact) */
+#define MF2_FULLVOLSOUNDS 0x00040000 /* full volume see/death sounds */
+
 
 // Map Object definition.
 //
@@ -322,6 +345,7 @@ typedef struct mobj_s
     int                 tics;   // state tic counter
     state_t*            state;
     uint64_t            flags;
+    uint64_t            flags2;    /* MBF21 thing flags (MF2_*) */
     int                 intflags;  // killough 9/15/98: internal flags
     int                 health;
 

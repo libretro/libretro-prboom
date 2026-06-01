@@ -829,6 +829,7 @@ mobj_t* P_SpawnMobj(fixed_t x,fixed_t y,fixed_t z,mobjtype_t type)
   mobj->radius = info->radius;
   mobj->height = info->height;                                      // phares
   mobj->flags  = info->flags;
+  mobj->flags2 = info->flags2; /* MBF21 thing flags */
 
   /* killough 8/23/98: no friends, bouncers, or touchy things in old demos */
   if (!mbf_features)

@@ -1201,6 +1201,31 @@ static const struct deh_mobjflags_s deh_mobjflags[] = {
   {"DONTFALL",     MF_DONTFALL},     // doesn't fall down after being killed (for the Lost Soul)
 };
 
+// MBF21 thing flag mnemonics ("MBF21 Bits = LOGRAV+...").  Separate
+// namespace from the Bits table above; these map into mobjinfo.flags2.
+static const struct deh_mobjflags_s deh_mobjflags_mbf21[] = {
+  {"LOGRAV",         MF2_LOGRAV},
+  {"SHORTMRANGE",    MF2_SHORTMRANGE},
+  {"DMGIGNORED",     MF2_DMGIGNORED},
+  {"NORADIUSDMG",    MF2_NORADIUSDMG},
+  {"FORCERADIUSDMG", MF2_FORCERADIUSDMG},
+  {"HIGHERMPROB",    MF2_HIGHERMPROB},
+  {"RANGEHALF",      MF2_RANGEHALF},
+  {"NOTHRESHOLD",    MF2_NOTHRESHOLD},
+  {"LONGMELEE",      MF2_LONGMELEE},
+  {"BOSS",           MF2_BOSS},
+  {"MAP07BOSS1",     MF2_MAP07BOSS1},
+  {"MAP07BOSS2",     MF2_MAP07BOSS2},
+  {"E1M8BOSS",       MF2_E1M8BOSS},
+  {"E2M8BOSS",       MF2_E2M8BOSS},
+  {"E3M8BOSS",       MF2_E3M8BOSS},
+  {"E4M6BOSS",       MF2_E4M6BOSS},
+  {"E4M8BOSS",       MF2_E4M8BOSS},
+  {"RIP",            MF2_RIP},
+  {"FULLVOLSOUNDS",  MF2_FULLVOLSOUNDS},
+};
+#define DEH_MOBJFLAGMAX_MBF21 (sizeof(deh_mobjflags_mbf21)/sizeof(deh_mobjflags_mbf21[0]))
+
 // STATE - Dehacked block name = "Frame" and "Pointer"
 // Usage: Frame nn
 // Usage: Pointer nn (Frame nn)
@@ -1440,6 +1465,20 @@ void D_BuildBEXTables(void)
    // moved from ProcessDehFile, then we don't need the static int i
    for (i = 0; i < NUMSTATES; i++)  // remember what they start as for deh xref
      deh_codeptr[i] = states[i].action;
+
+   /* MBF21 thing defaults: set before any deh file is processed so deh
+    * can override them.  Groups default to their reserved "default" value
+    * (vanilla species behaviour), altspeed to "no override", and
+    * meleerange to the standard 64*FRACUNIT.  These are inert unless
+    * mbf21_features is active. */
+   for (i = 0; i < NUMMOBJTYPES; i++)
+   {
+     mobjinfo[i].infighting_group = IG_DEFAULT;
+     mobjinfo[i].projectile_group = PG_DEFAULT;
+     mobjinfo[i].splash_group     = SG_DEFAULT;
+     mobjinfo[i].altspeed         = NO_ALTSPEED;
+     mobjinfo[i].meleerange       = 64*FRACUNIT; /* MELEERANGE (p_map.h) */
+   }
 
    for(i = 0; i < NUMSPRITES; i++)
       deh_spritenames[i] = strdup(sprnames[i]);
@@ -1982,6 +2021,58 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
       if (fpout) fprintf(fpout,"Bad data pair in '%s'\n",inbuffer);
       continue;
     }
+
+    /* MBF21 named thing fields.  These are not part of the positional
+     * deh_mobjinfo[] table, so handle them here and skip the loop.  The
+     * stored data is inert unless mbf21_features is active at play time. */
+    if (!strcasecmp(key, "MBF21 Bits")) {
+      uint64_t flags2 = 0;
+      if (bGetData == 1) {           /* numeric value */
+        flags2 = value;
+      } else {                       /* mnemonic list */
+        for (; (strval = strtok(strval, ",+| \t\f\r")); strval = NULL) {
+          size_t iy;
+          for (iy = 0; iy < DEH_MOBJFLAGMAX_MBF21; iy++) {
+            if (strcasecmp(strval, deh_mobjflags_mbf21[iy].name)) continue;
+            flags2 |= deh_mobjflags_mbf21[iy].value;
+            break;
+          }
+          if (iy >= DEH_MOBJFLAGMAX_MBF21 && fpout)
+            fprintf(fpout, "Could not find MBF21 bit mnemonic %s\n", strval);
+        }
+      }
+      mobjinfo[indexnum].flags2 = flags2;
+      continue;
+    }
+    if (!strcasecmp(key, "Infighting group")) {
+      /* offset user value above the reserved default groups */
+      mobjinfo[indexnum].infighting_group = (int)value + IG_END;
+      continue;
+    }
+    if (!strcasecmp(key, "Projectile group")) {
+      int pg = (int)value;
+      /* negative => groupless (no immunity even within species) */
+      mobjinfo[indexnum].projectile_group =
+        (pg < 0) ? PG_GROUPLESS : pg + PG_END;
+      continue;
+    }
+    if (!strcasecmp(key, "Splash group")) {
+      mobjinfo[indexnum].splash_group = (int)value + SG_END;
+      continue;
+    }
+    if (!strcasecmp(key, "Rip sound")) {
+      mobjinfo[indexnum].ripsound = (int)value;
+      continue;
+    }
+    if (!strcasecmp(key, "Fast speed")) {
+      mobjinfo[indexnum].altspeed = (int)value;
+      continue;
+    }
+    if (!strcasecmp(key, "Melee range")) {
+      mobjinfo[indexnum].meleerange = (int)value;
+      continue;
+    }
+
     for (ix=0; ix<DEH_MOBJINFOMAX; ix++) {
       if (strcasecmp(key,deh_mobjinfo[ix])) continue;
 

@@ -1210,6 +1210,17 @@ state_t states[NUMSTATES] = {
 //
 // This goes on for the next 3000+ lines...
 
+/* The trailing MBF21 fields (flags2, infighting_group, projectile_group,
+ * splash_group, ripsound, altspeed, meleerange) are intentionally left
+ * to default zero-initialisation here and given their real defaults at
+ * runtime in D_BuildBEXTables().  Silence -Wmissing-field-initializers
+ * (-Wextra) for this array rather than appending boilerplate to every
+ * one of the hundreds of entries. */
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic push
+#pragma GCC diagnostic ignored "-Wmissing-field-initializers"
+#endif
+
 mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
   {   // MT_PLAYER
      "DoomPlayer", // actorname
@@ -5745,3 +5756,6 @@ mobjinfo_t mobjinfo[NUMMOBJTYPES] = {
     200,            // minmissilechance
   },
 };
+#if defined(__GNUC__) || defined(__clang__)
+#pragma GCC diagnostic pop
+#endif

@@ -1520,7 +1520,24 @@ typedef struct
   int meleethreshold; /* Distance to switch from missile to melee attack */
   int maxattackrange; /* Maximum distance range to start shooting */
   int minmissilechance; /* Minimum chance for firing a missile */
+  /* MBF21 fields (named dehacked fields, not part of the positional
+   * deh_mobjinfo[] table).  Inert unless mbf21_features is active. */
+  uint64_t flags2;       /* MBF21 thing flags (MF2_*) */
+  int infighting_group;  /* things in the same group won't target each other */
+  int projectile_group;  /* things in the same group won't projectile-damage each other */
+  int splash_group;      /* things in the same group are immune to each other's splash */
+  int ripsound;          /* sound played when a ripper projectile rips through */
+  int altspeed;          /* speed used on skill 5 / -fast */
+  int meleerange;        /* range at which a monster initiates a melee attack */
 } mobjinfo_t;
+
+/* MBF21 thing-group default sentinels.  User-supplied group numbers are
+ * offset above the reserved defaults at parse time so they can't collide
+ * with the "default" group.  Values follow the MBF21 reference port. */
+enum { IG_DEFAULT, IG_END };
+enum { PG_GROUPLESS = -1, PG_DEFAULT, PG_END };
+enum { SG_DEFAULT, SG_END };
+#define NO_ALTSPEED (-1)   /* altspeed sentinel: no skill-5/-fast override */
 
 /* See p_mobj_h for addition more technical info */
 extern mobjinfo_t mobjinfo[NUMMOBJTYPES];

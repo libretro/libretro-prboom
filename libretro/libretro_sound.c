@@ -270,9 +270,18 @@ void I_SetMusicVolume(int volume)
  * for a given SFX name. */
 int I_GetSfxLumpNum(sfxinfo_t* sfx)
 {
+    extern dbool heretic;   /* doomstat.h */
     char namebuf[9];
-    sprintf(namebuf, "ds%s", sfx->name);
-    return W_GetNumForName(namebuf);
+
+    /* Doom names its sfx lumps DS<name> (e.g. DSPISTOL); Heretic uses the
+     * bare name (e.g. GLDHIT, IMPAT1) with no prefix. W_GetNumForName
+     * uppercases internally, so just pass the name through for Heretic. */
+    if (heretic)
+        snprintf(namebuf, sizeof(namebuf), "%s", sfx->name);
+    else
+        snprintf(namebuf, sizeof(namebuf), "ds%s", sfx->name);
+
+    return W_CheckNumForName(namebuf);
 }
 
 void I_StopSound (int handle)

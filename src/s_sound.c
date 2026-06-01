@@ -535,8 +535,13 @@ void S_ChangeMusic(int musicnum, int looping)
   if (!music->lumpnum)
   {
     char namebuf[9];
-    sprintf(namebuf, "d_%s", music->name);
-    music->lumpnum = W_GetNumForName(namebuf);
+    /* Doom music lumps are D_<name> (e.g. D_E1M1); Heretic uses MUS_<name>
+     * (e.g. MUS_E1M1). */
+    if (heretic)
+      snprintf(namebuf, sizeof(namebuf), "MUS_%s", music->name);
+    else
+      snprintf(namebuf, sizeof(namebuf), "d_%s", music->name);
+    music->lumpnum = W_CheckNumForName(namebuf);
   }
   if (music->lumpnum < 0) {
     I_Error("S_ChangeMusic: No valid music lump");

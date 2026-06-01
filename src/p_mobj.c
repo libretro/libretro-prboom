@@ -1050,6 +1050,14 @@ static int P_FindDoomedNum(unsigned type)
   static struct { int first, next; } *hash;
   register int i;
 
+  /* Doom and Heretic share one mobjinfo[] array: Doom occupies
+   * [0, HERETIC_MT_ZERO) and Heretic [HERETIC_MT_ZERO, ...). Many editor
+   * numbers collide between the two games (e.g. doomednum 66 is the Doom
+   * Revenant and the Heretic Golem), so the lookup must only consider
+   * entries from the game in play -- otherwise Heretic map things spawn
+   * the Doom monster that shares the doomednum. */
+  int lo = heretic ? (int)HERETIC_MT_ZERO : 0;
+
   if (!hash)
     {
       /* DSDHacked: size and populate the lookup over the (growable) thing
@@ -1058,7 +1066,7 @@ static int P_FindDoomedNum(unsigned type)
       hash = Z_Malloc(sizeof *hash * num_mobj_types, PU_CACHE, (void **) &hash);
       for (i=0; i<num_mobj_types; i++)
   hash[i].first = num_mobj_types;
-      for (i=0; i<num_mobj_types; i++)
+      for (i=lo; i<num_mobj_types; i++)
   if (mobjinfo[i].doomednum != -1)
     {
       unsigned h = (unsigned) mobjinfo[i].doomednum % num_mobj_types;
@@ -1379,8 +1387,13 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   // phares 5/16/98:
   // Do not abort because of an unknown thing. Ignore it, but post a
   // warning message for the player.
+  //
+  // P_FindDoomedNum returns num_mobj_types (the grown count) on a miss,
+  // which equals NUMMOBJTYPES only when the tables have not grown; compare
+  // against the value actually returned so Heretic / DSDHacked misses are
+  // caught instead of indexing past the array.
 
-  if (i == NUMMOBJTYPES)
+  if (i >= num_mobj_types)
   {
     doom_printf("Unknown Thing type %i at (%i, %i)",mthing->type,mthing->x,mthing->y);
     return;

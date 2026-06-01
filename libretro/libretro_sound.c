@@ -128,7 +128,16 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
     unsigned int    step_fx;     /* 16.16 input step per output sample */
     unsigned int    pos_fx;      /* 16.16 input position accumulator */
 
-    sprintf (sfxlump_name, "DS%s", sfxname);
+    /* Doom sfx lumps are DS<name> (DSPISTOL); Heretic uses the bare name
+     * (GLDHIT, IMPAT1, ...). Build the right one. W_CheckNumForName
+     * uppercases internally. */
+    {
+        extern dbool heretic;   /* doomstat.h */
+        if (heretic)
+            snprintf(sfxlump_name, sizeof(sfxlump_name), "%s", sfxname);
+        else
+            snprintf(sfxlump_name, sizeof(sfxlump_name), "DS%s", sfxname);
+    }
 
     /* check if the sound lump exists */
     if (W_CheckNumForName(sfxlump_name) == -1)

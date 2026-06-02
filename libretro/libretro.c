@@ -340,6 +340,50 @@ static gamepad_layout_t gp_heretic_modern = {
 	16,
 };
 
+/* Heretic "Gamepad Classic" layout: the PS1-style Doom classic mapping
+ * with Heretic-appropriate labels (the shoulder weapon-cycle buttons
+ * double as inventory cycling). Same engine binds as Doom classic. */
+static gamepad_layout_t gp_heretic_classic = {
+	{
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "D-Pad Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Strafe" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Use / Open Door" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Fire" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Strafe Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Strafe Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Cycle Inventory Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Cycle Inventory Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "Toggle Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "180 Turn" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Automap" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Pause Menu" },
+		{ 0 },
+	},
+	{	// gamekey,             menukey      (indexed by RETRO_DEVICE_ID_JOYPAD)
+		{ &key_strafe,          &key_menu_backspace }, // 0  B
+		{ &key_speed,           &key_menu_backspace }, // 1  Y
+		{ &key_map,             &key_menu_backspace }, // 2  SELECT
+		{ &key_menu_escape,     &key_menu_escape },    // 3  START
+		{ &key_up,              &key_menu_up },        // 4  UP
+		{ &key_down,            &key_menu_down },      // 5  DOWN
+		{ &key_left,            &key_menu_left },      // 6  LEFT
+		{ &key_right,           &key_menu_right },     // 7  RIGHT
+		{ &key_use,             &key_menu_enter },     // 8  A
+		{ &key_fire,            &key_menu_enter },     // 9  X
+		{ &key_strafeleft,      &key_menu_left },      // 10 L1
+		{ &key_straferight,     &key_menu_right },     // 11 R1
+		{ &key_weaponcycledown, &key_menu_backspace }, // 12 L2 : Cycle Inventory Left
+		{ &key_weaponcycleup,   &key_menu_enter },     // 13 R2 : Cycle Inventory Right
+		{ &key_autorun,         &key_menu_enter },     // 14 L3
+		{ &key_reverse,         &key_menu_backspace }, // 15 R3
+	},
+	16,
+};
+
 static struct retro_rumble_interface rumble = {0};
 static bool rumble_enabled                  = false;
 static uint16_t rumble_damage_strength      = 0;
@@ -860,7 +904,11 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 	{
 		case RETROPAD_CLASSIC:
 			doom_devices[port] = RETROPAD_CLASSIC;
-			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_classic.desc);
+			{
+				extern dbool heretic;
+				environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+				           heretic ? gp_heretic_classic.desc : gp_classic.desc);
+			}
 			break;
 		case RETROPAD_MODERN:
 			doom_devices[port] = RETROPAD_MODERN;
@@ -874,13 +922,21 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 			doom_devices[port] = RETRO_DEVICE_KEYBOARD;
 			// Input descriptors are irrelevant in this case, but don't want
 			// to leave undefined...
-			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_classic.desc);
+			{
+				extern dbool heretic;
+				environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+				           heretic ? gp_heretic_classic.desc : gp_classic.desc);
+			}
 			break;
 		default:
 			if (log_cb)
 				log_cb(RETRO_LOG_ERROR, "Invalid libretro controller device, using default: RETROPAD_CLASSIC\n");
 			doom_devices[port] = RETROPAD_CLASSIC;
-			environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS, gp_classic.desc);
+			{
+				extern dbool heretic;
+				environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+				           heretic ? gp_heretic_classic.desc : gp_classic.desc);
+			}
 	}
 }
 
@@ -2491,7 +2547,11 @@ process_input(void)
                if (input_state_cb(0, RETRO_DEVICE_JOYPAD, 0, i))
                   ret |= (1 << i);
          }
-			process_gamepad_buttons(ret, gp_classic.num_buttons, gp_classic.action_lut);
+         {
+            extern dbool heretic;
+            gamepad_layout_t *gp = heretic ? &gp_heretic_classic : &gp_classic;
+            process_gamepad_buttons(ret, gp->num_buttons, gp->action_lut);
+         }
 			break;
 		case RETROPAD_MODERN:
          if (libretro_supports_bitmasks)

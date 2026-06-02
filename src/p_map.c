@@ -1629,7 +1629,8 @@ dbool PTR_ShootTraverse (intercept_t* in)
 
    // Spawn bullet puffs or blod spots,
    // depending on target type.
-   if (in->d.thing->flags & MF_NOBLOOD)
+   // Heretic has no blood -- a shot thing always produces a puff.
+   if (heretic || (in->d.thing->flags & MF_NOBLOOD))
       P_SpawnPuff (x,y,z);
    else
       P_SpawnBlood (x,y,z, la_damage);

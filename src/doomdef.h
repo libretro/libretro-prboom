@@ -227,6 +227,18 @@ typedef enum {
   pw_ironfeet,
   pw_allmap,
   pw_infrared,
+
+  /* Raven (Heretic/Hexen). Defined unconditionally so the shared power code
+   * compiles; Heretic uses weaponlevel2/flight/shield/health2. */
+  pw_weaponlevel2,
+  pw_flight,
+  pw_shield,
+  pw_health2,
+
+  /* Hexen */
+  pw_speed,
+  pw_minotaur,
+
   NUMPOWERS
 } powertype_t;
 
@@ -235,8 +247,17 @@ typedef enum {
   INVULNTICS  = (30*TICRATE),
   INVISTICS   = (60*TICRATE),
   INFRATICS   = (120*TICRATE),
-  IRONTICS    = (60*TICRATE)
+  IRONTICS    = (60*TICRATE),
+  WPNLEV2TICS = (40*TICRATE),
+  FLIGHTTICS  = (60*TICRATE),
+  SPEEDTICS   = (45*TICRATE),
+  MORPHTICS   = (40*TICRATE),
+  MAULATORTICS = (25*TICRATE)
 } powerduration_t;
+
+/* A power whose remaining time drops below this starts blinking the player
+ * (and re-use of the matching artifact is refused above it). */
+#define BLINKTHRESHOLD (4*32)
 
 // DOOM keyboard definition.
 // This is the stuff configured by Setup.Exe.

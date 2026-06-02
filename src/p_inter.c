@@ -349,7 +349,18 @@ dbool   P_GivePower(player_t *player, int power)
   static const int tics[NUMPOWERS] = {
     INVULNTICS, 1 /* strength */, INVISTICS,
     IRONTICS, 1 /* allmap */, INFRATICS,
+    WPNLEV2TICS, FLIGHTTICS, 1 /* shield */, 1 /* health2 */,
+    SPEEDTICS, MAULATORTICS
    };
+
+  /* Raven: re-using an artifact whose power is still well above the blink
+   * threshold is refused (you can't stack invuln/etc.). Ironfeet/minotaur
+   * and the instantaneous powers (tics==1) are exempt. */
+  if (raven
+      && tics[power] > 1
+      && power != pw_ironfeet && power != pw_minotaur
+      && player->powers[power] > BLINKTHRESHOLD)
+    return FALSE;
 
   switch (power)
     {
@@ -362,6 +373,12 @@ dbool   P_GivePower(player_t *player, int power)
         break;
       case pw_strength:
         P_GiveBody(player,100);
+        break;
+      case pw_flight:
+        player->mo->flags2 |= MF2_FLY;
+        player->mo->flags  |= MF_NOGRAVITY;
+        if (player->mo->z <= player->mo->floorz)
+          player->flyheight = 10;     /* thrust the player up a bit */
         break;
     }
 

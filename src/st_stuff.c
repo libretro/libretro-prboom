@@ -924,12 +924,40 @@ static void ST_HereticDrawINumber(int val, int x, int y)
     V_DrawNamePatch(x + 18, y, FG, name, CR_DEFAULT, VPT_STRETCH);
 }
 
+/* Draw a small two-digit number using the Heretic SMALLIN font (each glyph
+ * 4px wide). Used for artifact counts. A count of 1 draws nothing, matching
+ * the Raven HUD (a single item shows just the icon). */
+static void ST_HereticDrawSmallNumber(int val, int x, int y)
+{
+  char name[9];
+  int  d;
+
+  if (val <= 1)
+    return;
+  if (val > 9)
+  {
+    d = (val / 10) % 10;
+    sprintf(name, "SMALLIN%d", d);
+    if (W_CheckNumForName(name) >= 0)
+      V_DrawNamePatch(x, y, FG, name, CR_DEFAULT, VPT_STRETCH);
+  }
+  d = val % 10;
+  sprintf(name, "SMALLIN%d", d);
+  if (W_CheckNumForName(name) >= 0)
+    V_DrawNamePatch(x + 4, y, FG, name, CR_DEFAULT, VPT_STRETCH);
+}
+
 static void ST_HereticDrawer(void)
 {
   /* Ammo-type icon next to the ammo count, indexed by ammotype_t
    * (am_goldwand=0 .. am_mace=5), matching the Raven artwork order. */
   static const char *const ammo_icon[HERETIC_NUMAMMO] = {
     "INAMGLD", "INAMBOW", "INAMBST", "INAMRAM", "INAMPNX", "INAMLOB"
+  };
+  /* Artifact sprite per arti type (arti_none=0 .. arti_teleport=10). */
+  static const char *const arti_icon[NUMARTIFACTS] = {
+    "ARTIBOX",  "ARTIINVU", "ARTIINVS", "ARTIPTN2", "ARTISPHL", "ARTIPWBK",
+    "ARTITRCH", "ARTIFBMB", "ARTIEGGC", "ARTISOAR", "ARTIATLP"
   };
   player_t   *plyr = &players[displayplayer];
   ammotype_t  at;
@@ -956,6 +984,34 @@ static void ST_HereticDrawer(void)
     if ((int)at >= 0 && (int)at < HERETIC_NUMAMMO &&
         W_CheckNumForName(ammo_icon[at]) >= 0)
       V_DrawNamePatch(111, 172, FG, ammo_icon[at], CR_DEFAULT, VPT_STRETCH);
+  }
+
+  /* Ready-artifact box (x=180,y=160): the currently selected artifact, its
+   * count, and the use-flash animation when one has just been used. */
+  {
+    extern int inv_ptr, ArtifactFlash;
+
+    if (ArtifactFlash)
+    {
+      char fname[9];
+      if (W_CheckNumForName("BLACKSQ") >= 0)
+        V_DrawNamePatch(180, 161, FG, "BLACKSQ", CR_DEFAULT, VPT_STRETCH);
+      /* USEARTIA..D are the flash frames; ArtifactFlash counts down 4->1. */
+      sprintf(fname, "USEARTI%c", 'A' + (ArtifactFlash - 1));
+      if (W_CheckNumForName(fname) >= 0)
+        V_DrawNamePatch(182, 161, FG, fname, CR_DEFAULT, VPT_STRETCH);
+      ArtifactFlash--;
+    }
+    else if (plyr->readyArtifact > 0 && plyr->readyArtifact < NUMARTIFACTS)
+    {
+      if (W_CheckNumForName("ARTIBOX") >= 0)
+        V_DrawNamePatch(180, 161, FG, "ARTIBOX", CR_DEFAULT, VPT_STRETCH);
+      if (W_CheckNumForName(arti_icon[plyr->readyArtifact]) >= 0)
+        V_DrawNamePatch(179, 160, FG, arti_icon[plyr->readyArtifact],
+                        CR_DEFAULT, VPT_STRETCH);
+      if (plyr->inventorySlotNum > 0)
+        ST_HereticDrawSmallNumber(plyr->inventory[inv_ptr].count, 201, 182);
+    }
   }
 
   /* Health chain along the bottom: a gem slides between the two gargoyle

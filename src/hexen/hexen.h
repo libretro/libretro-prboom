@@ -10,5 +10,6 @@
 
 extern sfxinfo_t hexen_S_sfx[HEXEN_NUMSFX];
 extern const char *hexen_sprnames[HEXEN_NUMSPRITES + 1];
+extern state_t hexen_states[HEXEN_NUMSTATES];
 
 #endif

@@ -508,26 +508,50 @@ static void R_DoDrawPlane(visplane_t *pl)
          {
             /* Heretic 200-tall single-patch sky: draw straight from the raw
              * patch (full 200 rows) instead of the 128-tall composite, so the
-             * sky does not mirror/tile when free-look pitches the view up.
-             * Use the engine's skytexturemid/skyiscale (already computed for
-             * this resolution) rather than hardcoded constants -- only the
-             * source patch and texheight differ from the composite path. */
+             * sky does not mirror/tile.  Anchor it the way dsda-doom does
+             * (row 200 at the horizon, scaled across the screen height) and,
+             * crucially, clamp each column's top so the texture coordinate
+             * never runs above row 0 of the patch.  Without the clamp, looking
+             * far enough up pushes centery past the patch and the column
+             * drawer -- which wraps non-power-of-two textures -- tiles the sky,
+             * producing a hard horizontal seam.  Clamping makes the sky scale
+             * to fill and hold its top edge instead of wrapping. */
             const rpatch_t *hacked = R_HackedSkyPatch(texture);
             if (hacked)
             {
                int xm1;
                int skypatchnum = textures[texture]->patches[0].patch;
+               /* Smallest screen row whose texture coordinate is still >= 0:
+                *   frac(y) = texturemid + (y-centery)*iscale >= 0
+                *   y >= centery - texturemid/iscale
+                * With texturemid = 200<<FRACBITS and iscale = (200<<FRACBITS)/
+                * SCREENHEIGHT, texturemid/iscale == SCREENHEIGHT. */
+               int sky_top_clamp;
+
                dcvars.texheight = hacked->height;
+               dcvars.texturemid = 200 << FRACBITS;
+               dcvars.iscale = (200 << FRACBITS) / SCREENHEIGHT;
+               sky_top_clamp = centery - SCREENHEIGHT;
 
                for (x = pl->minx; (dcvars.x = x) <= pl->maxx; x++)
-                  if ((dcvars.yl = pl->top[x]) != -1 && dcvars.yl <= (dcvars.yh = pl->bottom[x])) // dropoff overflow
+               {
+                  int yl = pl->top[x];
+                  if (yl != -1 && yl <= (dcvars.yh = pl->bottom[x])) // dropoff overflow
                   {
+                     /* Raise the column top to where the sky still has texture,
+                      * so the coordinate clamps at row 0 instead of wrapping. */
+                     if (yl < sky_top_clamp)
+                        yl = sky_top_clamp;
+                     if (yl > dcvars.yh)
+                        continue;
+                     dcvars.yl = yl;
                      xm1 = x > 0 ? x - 1 : 0;
                      dcvars.source = R_GetPatchColumn(hacked, ((an + xtoviewangle[x])^flip) >> ANGLETOSKYSHIFT)->pixels;
                      dcvars.prevsource = R_GetPatchColumn(hacked, ((an + xtoviewangle[xm1])^flip) >> ANGLETOSKYSHIFT)->pixels;
                      dcvars.nextsource = R_GetPatchColumn(hacked, ((an + xtoviewangle[x+1])^flip) >> ANGLETOSKYSHIFT)->pixels;
                      colfunc(&dcvars);
                   }
+               }
 
                /* R_HackedSkyPatch took a lock via R_CachePatchNum; release it
                 * so the patch does not stay pinned and leak a lock per frame. */

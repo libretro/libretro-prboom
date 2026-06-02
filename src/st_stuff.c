@@ -1105,6 +1105,49 @@ static void ST_HereticDrawer(void)
     V_DrawNamePatch(276, 190, FG, "RTFACE", CR_DEFAULT, VPT_STRETCH);
 }
 
+/* Fullscreen overlay shown when the status bar is hidden: health at the
+ * lower-left, the ready weapon's ammo and icon at the lower-right, and the
+ * ready-artifact box in the corner -- all drawn directly over the play view
+ * with no bar background. Uses 320x200 coordinates (VPT_STRETCH scales). */
+static void ST_HereticFullscreenDrawer(void)
+{
+  static const char *const ammo_icon[HERETIC_NUMAMMO] = {
+    "INAMGLD", "INAMBOW", "INAMBST", "INAMRAM", "INAMPNX", "INAMLOB"
+  };
+  static const char *const arti_icon[NUMARTIFACTS] = {
+    "ARTIBOX",  "ARTIINVU", "ARTIINVS", "ARTIPTN2", "ARTISPHL", "ARTIPWBK",
+    "ARTITRCH", "ARTIFBMB", "ARTIEGGC", "ARTISOAR", "ARTIATLP"
+  };
+  extern int  inv_ptr;
+  player_t   *plyr = &players[displayplayer];
+  ammotype_t  at;
+
+  /* Health, lower-left. */
+  ST_HereticDrawINumber(plyr->health, 5, 180);
+
+  /* Ready-weapon ammo and its icon, lower-right. */
+  at = weaponinfo[plyr->readyweapon].ammo;
+  if (at != AM_NOAMMO)
+  {
+    ST_HereticDrawINumber(plyr->ammo[at], 274, 180);
+    if ((int)at >= 0 && (int)at < HERETIC_NUMAMMO &&
+        W_CheckNumForName(ammo_icon[at]) >= 0)
+      V_DrawNamePatch(252, 180, FG, ammo_icon[at], CR_DEFAULT, VPT_STRETCH);
+  }
+
+  /* Ready-artifact box in the lower-right corner. */
+  if (plyr->readyArtifact > 0 && plyr->readyArtifact < NUMARTIFACTS)
+  {
+    if (W_CheckNumForName("ARTIBOX") >= 0)
+      V_DrawNamePatch(286, 170, FG, "ARTIBOX", CR_DEFAULT, VPT_STRETCH);
+    if (W_CheckNumForName(arti_icon[plyr->readyArtifact]) >= 0)
+      V_DrawNamePatch(286, 170, FG, arti_icon[plyr->readyArtifact],
+                      CR_DEFAULT, VPT_STRETCH);
+    if (plyr->inventorySlotNum > 0)
+      ST_HereticDrawSmallNumber(plyr->inventory[inv_ptr].count, 307, 192);
+  }
+}
+
 void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)
 {
   /* cph - let status bar on be controlled
@@ -1122,6 +1165,8 @@ void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)
   {
     if (statusbaron)
       ST_HereticDrawer();
+    else
+      ST_HereticFullscreenDrawer();
     return;
   }
 

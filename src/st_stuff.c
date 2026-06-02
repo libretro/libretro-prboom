@@ -729,8 +729,17 @@ void ST_Ticker(void)
    * chain while it moves. Mirrors the Raven SB_Ticker behaviour. */
   if (heretic)
   {
+    extern int inventory, inventoryTics, inv_ptr;
     int curhealth = plyr->health;
     int delta;
+
+    /* Auto-close the inventory bar after its display timer runs out,
+     * leaving the highlighted artifact selected. */
+    if (inventory && inventoryTics > 0 && !--inventoryTics)
+    {
+      inventory = FALSE;
+      plyr->readyArtifact = plyr->inventory[inv_ptr].type;
+    }
 
     if (curhealth < 0)
       curhealth = 0;
@@ -947,6 +956,41 @@ static void ST_HereticDrawSmallNumber(int val, int x, int y)
     V_DrawNamePatch(x + 4, y, FG, name, CR_DEFAULT, VPT_STRETCH);
 }
 
+/* Draw the full inventory bar (shown while the player is cycling artifacts):
+ * the INVBAR row, up to 7 artifact icons with counts, and the selection box
+ * over the current cursor position. Replaces the stat panel while open. */
+static void ST_HereticDrawInvBar(player_t *plyr, const char *const *arti_icon)
+{
+  extern int inv_ptr, curpos;
+  int i, base;
+
+  if (W_CheckNumForName("INVBAR") >= 0)
+    V_DrawNamePatch(34, 160, FG, "INVBAR", CR_DEFAULT, VPT_STRETCH);
+
+  base = inv_ptr - curpos;
+  if (base < 0)
+    base = 0;
+
+  for (i = 0; i < 7; i++)
+  {
+    int slot = base + i;
+    if (slot < plyr->inventorySlotNum &&
+        plyr->inventory[slot].type != arti_none)
+    {
+      int t = plyr->inventory[slot].type;
+      if (t > 0 && t < NUMARTIFACTS && W_CheckNumForName(arti_icon[t]) >= 0)
+        V_DrawNamePatch(50 + i * 31, 160, FG, arti_icon[t],
+                        CR_DEFAULT, VPT_STRETCH);
+      ST_HereticDrawSmallNumber(plyr->inventory[slot].count,
+                                69 + i * 31, 182);
+    }
+  }
+
+  if (W_CheckNumForName("SELECTBO") >= 0)
+    V_DrawNamePatch(50 + curpos * 31, 189, FG, "SELECTBO",
+                    CR_DEFAULT, VPT_STRETCH);
+}
+
 static void ST_HereticDrawer(void)
 {
   /* Ammo-type icon next to the ammo count, indexed by ammotype_t
@@ -959,15 +1003,25 @@ static void ST_HereticDrawer(void)
     "ARTIBOX",  "ARTIINVU", "ARTIINVS", "ARTIPTN2", "ARTISPHL", "ARTIPWBK",
     "ARTITRCH", "ARTIFBMB", "ARTIEGGC", "ARTISOAR", "ARTIATLP"
   };
+  extern int  inventory;
   player_t   *plyr = &players[displayplayer];
   ammotype_t  at;
   int         ammo;
   int         health, gempos, chainy;
 
-  /* Background frame + stat panel (positions match the Raven layout:
-   * BARBACK fills y=158, the STATBAR stat panel sits at x=34,y=160). */
+  /* Background frame (always). */
   if (W_CheckNumForName("BARBACK") >= 0)
     V_DrawNamePatch(ST_X, HST_Y, FG, "BARBACK", CR_DEFAULT, VPT_STRETCH);
+
+  /* While the inventory bar is open it replaces the stat panel and its
+   * widgets; the health chain below is still drawn either way. */
+  if (inventory)
+  {
+    ST_HereticDrawInvBar(plyr, arti_icon);
+  }
+  else
+  {
+  /* Stat panel (x=34,y=160). */
   if (W_CheckNumForName("STATBAR") >= 0)
     V_DrawNamePatch(34, 160, FG, "STATBAR", CR_DEFAULT, VPT_STRETCH);
 
@@ -1013,6 +1067,7 @@ static void ST_HereticDrawer(void)
         ST_HereticDrawSmallNumber(plyr->inventory[inv_ptr].count, 201, 182);
     }
   }
+  } /* end stat-panel (inventory closed) */
 
   /* Health chain along the bottom: a gem slides between the two gargoyle
    * heads (LTFACE at the left -- the "demon's mouth" the chain runs from --

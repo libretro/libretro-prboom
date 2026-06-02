@@ -150,6 +150,8 @@ int     key_fire;
 int     key_use;
 int     key_use_artifact;
 int     pending_artifact = 0;  /* Heretic: artifact staged for use this tic */
+int     inventory = 0;         /* Heretic: inventory bar currently displayed */
+int     inventoryTics = 0;     /* Heretic: tics until the bar auto-closes */
 int     key_inv_left;
 int     key_inv_right;
 int     key_strafe;
@@ -361,11 +363,17 @@ void G_BuildTiccmd(ticcmd_t* cmd)
       gamekeydown[key_inv_right] = FALSE;
       if (players[consoleplayer].inventorySlotNum > 0)
       {
-        inv_ptr++;
-        if (inv_ptr >= players[consoleplayer].inventorySlotNum)
-          inv_ptr = players[consoleplayer].inventorySlotNum - 1;
-        else if (++curpos > 6)
-          curpos = 6;
+        inventoryTics = 5 * 35;        /* keep the bar up for 5s */
+        if (!inventory)
+          inventory = TRUE;            /* first press just opens the bar */
+        else
+        {
+          inv_ptr++;
+          if (inv_ptr >= players[consoleplayer].inventorySlotNum)
+            inv_ptr = players[consoleplayer].inventorySlotNum - 1;
+          else if (++curpos > 6)
+            curpos = 6;
+        }
         players[consoleplayer].readyArtifact =
           players[consoleplayer].inventory[inv_ptr].type;
       }
@@ -375,11 +383,17 @@ void G_BuildTiccmd(ticcmd_t* cmd)
       gamekeydown[key_inv_left] = FALSE;
       if (players[consoleplayer].inventorySlotNum > 0)
       {
-        inv_ptr--;
-        if (inv_ptr < 0)
-          inv_ptr = 0;
-        else if (--curpos < 0)
-          curpos = 0;
+        inventoryTics = 5 * 35;
+        if (!inventory)
+          inventory = TRUE;
+        else
+        {
+          inv_ptr--;
+          if (inv_ptr < 0)
+            inv_ptr = 0;
+          else if (--curpos < 0)
+            curpos = 0;
+        }
         players[consoleplayer].readyArtifact =
           players[consoleplayer].inventory[inv_ptr].type;
       }
@@ -387,11 +401,23 @@ void G_BuildTiccmd(ticcmd_t* cmd)
     if (gamekeydown[key_use_artifact])
     {
       gamekeydown[key_use_artifact] = FALSE;
-      /* Single-player: route the artifact-use request through a dedicated
-       * pending global rather than the ticcmd, whose ring-buffer slots are
-       * reused across tics and would drop or duplicate the request. The
-       * ticcmd arti field stays reserved for a future netgame/demo path. */
-      pending_artifact = players[consoleplayer].readyArtifact;
+      /* If the inventory bar is open, the use key just closes it (selecting
+       * the highlighted artifact as ready) rather than using immediately --
+       * matching Heretic. Otherwise it uses the ready artifact. */
+      if (inventory)
+      {
+        inventory = FALSE;
+        players[consoleplayer].readyArtifact =
+          players[consoleplayer].inventory[inv_ptr].type;
+      }
+      else
+      {
+        /* Single-player: route the artifact-use request through a dedicated
+         * pending global rather than the ticcmd, whose ring-buffer slots are
+         * reused across tics and would drop or duplicate the request. The
+         * ticcmd arti field stays reserved for a future netgame/demo path. */
+        pending_artifact = players[consoleplayer].readyArtifact;
+      }
     }
   }
 

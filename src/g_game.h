@@ -112,6 +112,8 @@ extern int  key_fire;
 extern int  key_use;
 extern int  key_use_artifact;
 extern int  pending_artifact;
+extern int  inventory;
+extern int  inventoryTics;
 extern int  key_inv_left;
 extern int  key_inv_right;
 extern int  key_strafe;

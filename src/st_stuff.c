@@ -1232,6 +1232,13 @@ void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)
 
   ST_doPaletteStuff();  // Do red-/gold-shifts from damage/items
 
+  /* Hexen has its own status bar and does not carry the Doom bar graphics;
+   * drawing the Doom bar over a Hexen game looks for missing patches and has
+   * produced bad patch-size allocations.  The Hexen status bar is a later
+   * commit, so draw nothing here for now (the 3D view still renders). */
+  if (hexen)
+    return;
+
   /* The Doom status bar widgets/background are not loaded for Heretic
    * (see ST_loadGraphics). Draw the Heretic bar instead (its own lumps),
    * then return before the Doom bar code. */

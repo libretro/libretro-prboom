@@ -97,6 +97,18 @@ typedef struct {
   unsigned short sidenum[2];
 } PACKEDATTR maplinedef_t;
 
+/* Hexen-format linedef: the Doom special/tag pair is replaced by a one-byte
+ * special and five one-byte args.  Geometry (v1/v2/flags/sidenum) is the
+ * same as Doom. */
+typedef struct {
+  unsigned short v1;
+  unsigned short v2;
+  unsigned short flags;
+  unsigned char  special;
+  unsigned char  args[5];
+  unsigned short sidenum[2];
+} PACKEDATTR hexen_maplinedef_t;
+
 #define NO_INDEX ((unsigned short)-1)
 
 //
@@ -200,6 +212,21 @@ typedef struct {
   short type;
   short options;
 } PACKEDATTR mapthing_t;
+
+/* Hexen-format thing: adds a thing id (tid), a spawn height, and a one-byte
+ * special with five one-byte args.  The Doom fields (x/y/angle/type/options)
+ * are present but reordered and the options field is a different width. */
+typedef struct {
+  short tid;
+  short x;
+  short y;
+  short height;
+  short angle;
+  short type;
+  short options;
+  unsigned char special;
+  unsigned char args[5];
+} PACKEDATTR hexen_mapthing_t;
 
 #ifdef _MSC_VER
 #pragma pack(pop)

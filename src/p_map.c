@@ -1739,7 +1739,12 @@ dbool PTR_UseTraverse (intercept_t* in)
 
   //  return FALSE;   // don't use back side
 
-  P_UseSpecialLine (usething, in->d.line, side);
+  /* Hexen line specials use a byte special + args encoding that the Doom
+   * P_UseSpecialLine cannot interpret; dispatching it here has crashed in
+   * the Doom special handlers.  Skip use-activation on Hexen maps until the
+   * Hexen line specials layer is implemented. */
+  if (!hexen)
+    P_UseSpecialLine (usething, in->d.line, side);
 
   //WAS can't use for than one special line in a row
   //jff 3/21/98 NOW multiple use allowed with enabling line flag

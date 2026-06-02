@@ -878,23 +878,58 @@ static void P_LoadXNOD(int lump)
 
 static void P_LoadThings (int lump)
 {
-  int  i, numthings = W_LumpLength (lump) / sizeof(mapthing_t);
-  const mapthing_t *data = W_CacheLumpNum (lump);
+  int  i;
+  int  hexen_fmt = map_format.hexen;
+  size_t recsize = hexen_fmt ? sizeof(hexen_mapthing_t)
+                             : sizeof(mapthing_t);
+  int  numthings = W_LumpLength (lump) / recsize;
+  const void *data = W_CacheLumpNum (lump);
 
   if ((!data) || (!numthings))
     I_Error("P_LoadThings: no things in level");
 
   for (i=0; i<numthings; i++)
     {
-      mapthing_t mt = data[i];
+      mapthing_t mt;
 
-      mt.x = SHORT(mt.x);
-      mt.y = SHORT(mt.y);
-      mt.angle = SHORT(mt.angle);
-      mt.type = SHORT(mt.type);
-      mt.options = SHORT(mt.options);
+      if (hexen_fmt)
+        {
+          const hexen_mapthing_t *hmt =
+            (const hexen_mapthing_t *) data + i;
+          /* Translate the Hexen-format thing into the engine's mapthing_t.
+           * The Hexen-only fields (tid, spawn height and the byte args) are
+           * not consumed yet -- the actors, polyobject spawn-spots and ACS
+           * that use them arrive in later commits; for now the common
+           * placement fields are enough to spawn map things in the right
+           * spot without misreading the larger record. */
+          mt.x       = SHORT(hmt->x);
+          mt.y       = SHORT(hmt->y);
+          mt.angle   = SHORT(hmt->angle);
+          mt.type    = SHORT(hmt->type);
+          mt.options = SHORT(hmt->options);
+        }
+      else
+        {
+          const mapthing_t *md = (const mapthing_t *) data + i;
+          mt = *md;
+          mt.x = SHORT(mt.x);
+          mt.y = SHORT(mt.y);
+          mt.angle = SHORT(mt.angle);
+          mt.type = SHORT(mt.type);
+          mt.options = SHORT(mt.options);
+        }
 
       if (!P_IsDoomnumAllowed(mt.type))
+        continue;
+
+      /* Hexen actor spawning needs the Hexen actor tables, the class-based
+       * player setup, polyobject spawn spots and the Hexen line/thing
+       * specials -- none of which exist yet.  Until they land, spawn only the
+       * player starts (editor numbers 1-4, shared with Doom) so the map has a
+       * camera and can be loaded/rendered, and skip every other thing rather
+       * than feeding a Hexen doomednum into the Doom lookup (which would
+       * resolve to the wrong actor or index out of range). */
+      if (hexen_fmt && !(mt.type >= 1 && mt.type <= 4))
         continue;
 
       // Do spawn all other stuff.
@@ -916,22 +951,52 @@ static void P_LoadLineDefs (int lump)
 {
   const uint8_t *data; // cph - const*
   int  i;
+  int  hexen_fmt = map_format.hexen;
+  size_t recsize = hexen_fmt ? sizeof(hexen_maplinedef_t)
+                             : sizeof(maplinedef_t);
 
-  numlines = W_LumpLength (lump) / sizeof(maplinedef_t);
+  numlines = W_LumpLength (lump) / recsize;
   lines = Z_Calloc (numlines,sizeof(line_t),PU_LEVEL,0);
   data = W_CacheLumpNum (lump); // cph - wad lump handling updated
 
   for (i=0; i<numlines; i++)
     {
-      const maplinedef_t *mld = (const maplinedef_t *) data + i;
       line_t *ld = lines+i;
       vertex_t *v1, *v2;
+      unsigned short mv1, mv2;
 
-      ld->flags = (unsigned short)SHORT(mld->flags);
-      ld->special = SHORT(mld->special);
-      ld->tag = SHORT(mld->tag);
-      v1 = ld->v1 = &vertexes[(unsigned short)SHORT(mld->v1)];
-      v2 = ld->v2 = &vertexes[(unsigned short)SHORT(mld->v2)];
+      if (hexen_fmt)
+        {
+          const hexen_maplinedef_t *mld =
+            (const hexen_maplinedef_t *) data + i;
+          int a;
+          ld->flags   = (unsigned short)SHORT(mld->flags);
+          /* Hexen replaces the Doom special/tag with a byte special and
+           * five byte args.  Store the special and args; the dedicated
+           * arg0-as-tag handling lives in the Hexen specials layer. */
+          ld->special = mld->special;
+          ld->tag     = 0;
+          for (a = 0; a < 5; a++)
+            ld->args[a] = mld->args[a];
+          mv1 = (unsigned short)SHORT(mld->v1);
+          mv2 = (unsigned short)SHORT(mld->v2);
+          ld->sidenum[0] = SHORT(mld->sidenum[0]);
+          ld->sidenum[1] = SHORT(mld->sidenum[1]);
+        }
+      else
+        {
+          const maplinedef_t *mld = (const maplinedef_t *) data + i;
+          ld->flags   = (unsigned short)SHORT(mld->flags);
+          ld->special = SHORT(mld->special);
+          ld->tag     = SHORT(mld->tag);
+          mv1 = (unsigned short)SHORT(mld->v1);
+          mv2 = (unsigned short)SHORT(mld->v2);
+          ld->sidenum[0] = SHORT(mld->sidenum[0]);
+          ld->sidenum[1] = SHORT(mld->sidenum[1]);
+        }
+
+      v1 = ld->v1 = &vertexes[mv1];
+      v2 = ld->v2 = &vertexes[mv2];
       ld->dx = v2->x - v1->x;
       ld->dy = v2->y - v1->y;
 
@@ -965,10 +1030,7 @@ static void P_LoadLineDefs (int lump)
       ld->soundorg.x = ld->bbox[BOXLEFT] / 2 + ld->bbox[BOXRIGHT] / 2;
       ld->soundorg.y = ld->bbox[BOXTOP] / 2 + ld->bbox[BOXBOTTOM] / 2;
 
-      ld->sidenum[0] = SHORT(mld->sidenum[0]);
-      ld->sidenum[1] = SHORT(mld->sidenum[1]);
-
-      { 
+      {
         /* cph 2006/09/30 - fix sidedef errors right away.
          * cph 2002/07/20 - these errors are fatal if not fixed, so apply them
          * in compatibility mode - a desync is better than a crash! */
@@ -1806,9 +1868,14 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    // killough 4/4/98: split load of sidedefs into two parts,
    // to allow texture names to be used in special linedefs
 
-   // refuse to load Hexen-format maps, avoid segfaults
+   /* Hexen-format maps carry a BEHAVIOR lump right after BLOCKMAP.  When the
+    * Hexen game flag is set the Hexen-sized linedef/thing loaders (selected via
+    * map_format) handle the larger records, so allow the load to proceed.  If
+    * a BEHAVIOR-bearing map turns up without the Hexen flag, the loaders would
+    * misread the records, so refuse it as before. */
    if ((i = lumpnum + ML_BLOCKMAP + 1) < numlumps
-         && !strncasecmp(lumpinfo[i].name, "BEHAVIOR", 8))
+         && !strncasecmp(lumpinfo[i].name, "BEHAVIOR", 8)
+         && !hexen)
       I_Error("P_SetupLevel: %s: Hexen format not supported", lumpname);
 
    // figgi 10/19/00 -- check for gl lumps and load them
@@ -1900,7 +1967,14 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    iquehead = iquetail = 0;
 
    // set up world state
-   P_SpawnSpecials();
+   /* The Doom/Boom line- and sector-special spawners interpret line->special
+    * as a Doom special number.  Hexen uses a completely different byte special
+    * plus args encoding, so running these over a Hexen map would create
+    * scrollers/movers from misread specials (and has produced wild affectee
+    * indices and bad allocations).  The Hexen specials layer is a later
+    * commit; until then, skip Doom special spawning on Hexen maps. */
+   if (!hexen)
+      P_SpawnSpecials();
 
    P_MapEnd();
 

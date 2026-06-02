@@ -31,11 +31,31 @@ static const map_format_t doom_map_format =
   VF_DOOM
 };
 
+/* Hexen map format.  The format flags drive the Hexen-sized linedef/thing
+ * parsing in p_setup; polyobjs/acs/sndseq/animdefs are declared here but
+ * their handlers are added in later commits.  The per-line trigger
+ * dispatchers still point at the Doom functions for now -- Hexen's scripted
+ * line specials land with the specials layer -- so a Hexen map currently
+ * loads and renders with Doom-style line activation. */
+static const map_format_t hexen_map_format =
+{
+  false,                      /* zdoom    */
+  true,                       /* hexen    */
+  true,                       /* polyobjs */
+  true,                       /* acs      */
+  true,                       /* sndseq   */
+  true,                       /* animdefs */
+  false,                      /* doublesky*/
+  P_CrossSpecialLine,
+  P_ShootSpecialLine,
+  P_PlayerInSpecialSector,
+  VF_HEXEN
+};
+
 void P_ApplyMapFormat(void)
 {
-  /* Only the Doom format exists at this stage.  Heretic and Hexen
-   * descriptors (and the game selection) land with their handlers in
-   * later commits; until then every game uses Doom dispatch, which is
-   * exactly the prior behaviour. */
-  map_format = doom_map_format;
+  if (hexen)
+    map_format = hexen_map_format;
+  else
+    map_format = doom_map_format;
 }

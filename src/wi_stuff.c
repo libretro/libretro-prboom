@@ -39,6 +39,7 @@
 #include "r_main.h"
 #include "v_video.h"
 #include "wi_stuff.h"
+#include "heretic/in_lude.h"
 #include "s_sound.h"
 #include "sounds.h"
 #include "lprintf.h"  // jff 08/03/98 - declaration of lprintf
@@ -2016,6 +2017,7 @@ void WI_checkForAccelerate(void)
 //
 void WI_Ticker(void)
 {
+  if (heretic) { IN_Ticker(); return; }
   // counter for general background animation
   bcnt++;
 
@@ -2111,6 +2113,7 @@ void WI_loadData(void)
 //
 void WI_Drawer (void)
 {
+  if (heretic) { IN_Drawer(); return; }
   switch (state)
   {
     case StatCount:
@@ -2174,6 +2177,7 @@ void WI_initVariables(wbstartstruct_t* wbstartstruct)
 //
 void WI_Start(wbstartstruct_t* wbstartstruct)
 {
+  if (heretic) { IN_Start(wbstartstruct); return; }
   WI_initVariables(wbstartstruct);
   WI_loadData();
 

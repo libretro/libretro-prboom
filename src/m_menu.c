@@ -5195,10 +5195,17 @@ void M_Drawer (void)
   // DRAW SKULL
 
   // CPhipps - patch drawing updated
-  /* The Doom skull cursor lumps (M_SKULL1/2) do not exist in Heretic;
-   * drawing a missing lump would feed garbage to the patch decoder. Skip
-   * it when absent (the Heretic arrow cursor is separate wiring). */
-  if (W_CheckNumForName(skullName[whichSkull]) >= 0)
+  /* The Doom skull cursor lumps (M_SKULL1/2) do not exist in Heretic, which
+   * uses the blinking arrow selector M_SLCTR1/2 instead.  Pick the right
+   * cursor for the game; whichSkull already provides the blink phase. */
+  if (heretic)
+    {
+      const char *selName = whichSkull ? "M_SLCTR1" : "M_SLCTR2";
+      if (W_CheckNumForName(selName) >= 0)
+        V_DrawNamePatch(x - 28, currentMenu->y - 1 + itemOn*LINEHEIGHT, 0,
+            selName, CR_DEFAULT, VPT_STRETCH);
+    }
+  else if (W_CheckNumForName(skullName[whichSkull]) >= 0)
     V_DrawNamePatch(x + SKULLXOFF, currentMenu->y - 5 + itemOn*LINEHEIGHT,0,
         skullName[whichSkull], CR_DEFAULT, VPT_STRETCH);
       }

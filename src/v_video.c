@@ -314,11 +314,36 @@ void V_DrawBackground(const char* flatname, int scrn)
   const uint8_t *src;
   int         flatnum = R_FlatNumForName(flatname);
 
+  /* The tiled background is identical every frame for a given flat,
+   * palette and resolution, but the finale (and the menu drawn over it)
+   * re-tile it on every frame -- at high internal resolutions that is
+   * millions of pixels of scale-blit + strided copy per frame for a
+   * static image.  Cache the finished background and, when nothing that
+   * affects it has changed, just memcpy the cache into the target screen.
+   * Keyed on (flatnum, palette, dimensions): the palette key (V_Palette16)
+   * catches gamma changes and mid-finale palette swaps (e.g. Heretic's
+   * E2END), exactly as R_GetComposedColormap keys its LUT. */
+  static uint8_t  *bg_cache       = NULL;
+  static int       bg_flatnum     = -1;
+  static const uint16_t *bg_pal   = NULL;
+  static int       bg_w           = -1;
+  static int       bg_h           = -1;
+  const  size_t    surf_bytes     = (size_t)SURFACE_BYTE_PITCH * SCREENHEIGHT;
+
   /* A missing flat (e.g. a Doom-only menu flat requested under another
    * game) yields flatnum -1; firstflat-1 then caches a bogus lump and the
    * tiling loop dereferences a NULL source. Skip drawing instead. */
   if (flatnum < 0)
     return;
+
+  /* Fast path: the cached background is still valid -- copy it straight
+   * into the requested screen and we are done. */
+  if (bg_cache && flatnum == bg_flatnum && V_Palette16 == bg_pal &&
+      SCREENWIDTH == bg_w && SCREENHEIGHT == bg_h)
+  {
+    memcpy(screens[scrn].data, bg_cache, surf_bytes);
+    return;
+  }
 
   // killough 4/17/98:
   src = W_CacheLumpNum(lump = firstflat + flatnum);
@@ -334,6 +359,31 @@ void V_DrawBackground(const char* flatname, int scrn)
       V_CopyRect(0, 0, scrn, ((SCREENWIDTH-x) < w) ? (SCREENWIDTH-x) : w,
      ((SCREENHEIGHT-y) < h) ? (SCREENHEIGHT-y) : h, x, y, scrn, VPT_NONE);
   W_UnlockLumpNum(lump);
+
+  /* Snapshot the just-built background so subsequent frames (same flat,
+   * palette and resolution) take the memcpy fast path above.  Realloc to
+   * the current surface size; a resolution change invalidates the key, so
+   * a stale-size cache is never read. */
+  {
+    uint8_t *nc = (uint8_t *)realloc(bg_cache, surf_bytes);
+    if (nc)
+    {
+      bg_cache   = nc;
+      memcpy(bg_cache, screens[scrn].data, surf_bytes);
+      bg_flatnum = flatnum;
+      bg_pal     = V_Palette16;
+      bg_w       = SCREENWIDTH;
+      bg_h       = SCREENHEIGHT;
+    }
+    else
+    {
+      /* Allocation failed: drop any stale cache so we never copy from a
+       * wrong-size buffer; the slow rebuild path still drew correctly. */
+      free(bg_cache);
+      bg_cache   = NULL;
+      bg_flatnum = -1;
+    }
+  }
 }
 
 /*

@@ -445,6 +445,121 @@ int EV_DoDoor
 //
 // jff 2/12/98 added int return value, fixed all returns
 //
+
+/* Raven: Heretic manual (no-tag) doors.  Heretic uses its own key set
+ * (blue/yellow/green, mapped onto the Doom card slots), its own door sound,
+ * and a simpler activation path than Doom's demo-compatibility version.  A
+ * monster that bumps a type-1 door opens it but never closes one. */
+static void Heretic_EV_VerticalDoor(line_t *line, mobj_t *thing)
+{
+  player_t *player;
+  sector_t *sec;
+  vldoor_t *door;
+
+  player = thing->player;
+
+  /* Check for locks.  Heretic's green key occupies the it_redcard slot. */
+  switch (line->special)
+  {
+    case 26: /* Blue lock */
+    case 32:
+      if (!player)
+        return;
+      if (!player->cards[it_bluecard])
+      {
+        S_StartSound(NULL, heretic_sfx_plroof);
+        return;
+      }
+      break;
+    case 27: /* Yellow lock */
+    case 34:
+      if (!player)
+        return;
+      if (!player->cards[it_yellowcard])
+      {
+        S_StartSound(NULL, heretic_sfx_plroof);
+        return;
+      }
+      break;
+    case 28: /* Green lock (red card slot in this port) */
+    case 33:
+      if (!player)
+        return;
+      if (!player->cards[it_redcard])
+      {
+        S_StartSound(NULL, heretic_sfx_plroof);
+        return;
+      }
+      break;
+    default:
+      break;
+  }
+
+  /* Front side only; the door sector is on the back of the linedef. */
+  sec = sides[line->sidenum[1]].sector;
+
+  /* If the door is already moving, reuse its thinker. */
+  if (sec->ceilingdata)
+  {
+    door = sec->ceilingdata;
+    switch (line->special)
+    {
+      case 1:  /* only raise-doors reverse, not opens */
+      case 26:
+      case 27:
+      case 28:
+        if (door->direction == -1)
+          door->direction = 1;          /* go back up */
+        else
+        {
+          if (!thing->player)
+            return;                      /* monsters don't close doors */
+          door->direction = -1;          /* start going down */
+        }
+        return;
+      default:
+        break;
+    }
+  }
+
+  S_StartSound((mobj_t *)&sec->soundorg, heretic_sfx_doropn);
+
+  /* new door thinker */
+  door = Z_Malloc(sizeof(*door), PU_LEVSPEC, 0);
+  memset(door, 0, sizeof(*door));
+  P_AddThinker(&door->thinker);
+  sec->ceilingdata = door;
+  door->thinker.function.arg1 = (void (*)(void *))T_VerticalDoor;
+  door->sector = sec;
+  door->direction = 1;
+  door->speed = VDOORSPEED;
+  door->topwait = VDOORWAIT;
+  door->line = line;
+  door->lighttag = 0;
+
+  switch (line->special)
+  {
+    case 1:
+    case 26:
+    case 27:
+    case 28:
+      door->type = normal;
+      break;
+    case 31:
+    case 32:
+    case 33:
+    case 34:
+      door->type = open;
+      line->special = 0;
+      break;
+    default:
+      break;
+  }
+
+  door->topheight = P_FindLowestCeilingSurrounding(sec);
+  door->topheight -= 4 * FRACUNIT;
+}
+
 int EV_VerticalDoor
 ( line_t* line,
   mobj_t* thing )
@@ -453,6 +568,13 @@ int EV_VerticalDoor
   int   secnum;
   sector_t* sec;
   vldoor_t* door;
+
+  /* Raven: Heretic doors have their own activation routine. */
+  if (heretic)
+  {
+    Heretic_EV_VerticalDoor(line, thing);
+    return 0;
+  }
 
   //  Check for locks
   player = thing->player;

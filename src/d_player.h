@@ -264,6 +264,7 @@ typedef struct player_s
   int         flyheight;
   /* Heretic player extras (inert for Doom). */
   int         lookdir;        /* free look pitch */
+  dbool       centering;      /* true while recentering the view to level */
   int         flamecount;     /* phoenix-rod flame duration */
   int         chickenTics;    /* >0 while morphed into a chicken */
   int         chickenPeck;    /* chicken peck countdown */

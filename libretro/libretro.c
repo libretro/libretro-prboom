@@ -318,6 +318,7 @@ static gamepad_layout_t gp_heretic_modern = {
 		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Strafe" },
 		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Move" },
 		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Look" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_Y, "Look Up/Down" },
 		{ 0 },
 	},
 	{	// gamekey,             menukey      (indexed by RETRO_DEVICE_ID_JOYPAD)
@@ -2520,13 +2521,31 @@ static void process_gamepad_right_analog(bool pressed_y, bool pressed_l2)
 
 	if (rsy < -analog_deadzone || rsy > analog_deadzone)
 	{
+		extern dbool raven;
+		extern dbool movement_mouselook;
+		extern int gamepad_lookdelta;
+
 		if (rsy > analog_deadzone)
 			rsy = rsy - analog_deadzone;
 		if (rsy < -analog_deadzone)
 			rsy = rsy + analog_deadzone;
-		event_mouse.type = ev_mouse;
-		event_mouse.data3 = ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone)
+
+		if (raven && !movement_mouselook)
+		{
+			/* Heretic keyboard-look path: stage a per-tic look step from
+			 * the stick deflection.  Stick up (rsy < 0) looks up, so negate
+			 * to match lookdir's +up convention.  Magnitude is 1 inside the
+			 * deadzone-adjusted range and 2 near full deflection, mirroring
+			 * the vanilla slow/fast look speeds. */
+			int mag = (abs(rsy) > (ANALOG_RANGE - analog_deadzone) / 2) ? 2 : 1;
+			gamepad_lookdelta = (rsy < 0) ? mag : -mag;
+		}
+		else
+		{
+			event_mouse.type = ev_mouse;
+			event_mouse.data3 = ANALOG_MOUSE_SPEED * rsy / (ANALOG_RANGE - analog_deadzone)
                          * analog_turn_speed * TICRATE / (float)tic_vars.fps;
+		}
 	}
 
 	if(event_mouse.type == ev_mouse)

@@ -63,6 +63,10 @@
 
 #define MAXBOB  0x100000
 
+/* Heretic look-recenter sentinel: a look delta of -8 in the lookfly nibble
+ * means "recenter the view" rather than a normal tilt step. */
+#define TOCENTER_LOOK (-8)
+
 dbool   onground; // whether player is on ground or in air
 
 // max/min values for pitch angle
@@ -456,6 +460,43 @@ void P_MovePlayer (player_t* player)
      }
      if (mo->state == states+g_s_play)
         P_SetMobjState(mo,g_s_play_run1);
+  }
+
+  /* Heretic keyboard look: decode cmd->lookfly into player->lookdir.  The
+   * original decode lived only in the HEXEN branch above (compiled out), so
+   * lookdir never moved in this build -- which left both the autoaim slope
+   * and the view pitch (see P_SetPitch) stuck at level.  Mirror that logic
+   * here, gated on raven, so look up / down / centre work.  The low nibble
+   * of lookfly is a signed look delta (-8..+7); -8 (TOCENTER) requests a
+   * recenter.  lookdir is clamped to Heretic's +90 / -110 range. */
+  if (raven)
+  {
+    int look = cmd->lookfly & 15;
+    if (look > 7)
+      look -= 16;
+    if (look)
+    {
+      if (look == TOCENTER_LOOK)
+        player->centering = true;
+      else
+      {
+        player->lookdir += 5 * look;
+        if (player->lookdir > 90 || player->lookdir < -110)
+          player->lookdir -= 5 * look;
+      }
+    }
+    if (player->centering)
+    {
+      if (player->lookdir > 0)
+        player->lookdir -= 8;
+      else if (player->lookdir < 0)
+        player->lookdir += 8;
+      if (abs(player->lookdir) < 8)
+      {
+        player->lookdir = 0;
+        player->centering = false;
+      }
+    }
   }
 #endif
 }

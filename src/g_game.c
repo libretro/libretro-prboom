@@ -212,6 +212,10 @@ int     mousebstrafe;
 int     mousebforward;
 int     mousebbackward;
 int     mlooky;
+/* Heretic keyboard-look: signed per-tic look step staged by the gamepad
+ * right stick (when mouselook is off) and consumed into cmd->lookfly in
+ * G_BuildTiccmd.  Negative = look down, positive = look up. */
+int     gamepad_lookdelta;
 
 #define MAXPLMOVE   (forwardmove[1])
 #define TURBOTHRESHOLD  0x32
@@ -554,6 +558,20 @@ void G_BuildTiccmd(ticcmd_t* cmd)
         mlooky -= mousey;
      else
         mlooky += mousey;
+  }
+  else if (raven && gamepad_lookdelta)
+  {
+     /* Heretic keyboard look without mouselook: encode the staged look step
+      * into the low nibble of cmd->lookfly (signed -8..+7), which
+      * P_MovePlayer decodes into player->lookdir.  Clamp to the encodable
+      * range and mask to the nibble so negative steps wrap correctly. */
+     int look = gamepad_lookdelta;
+     if (look > 7)
+        look = 7;
+     else if (look < -7)
+        look = -7;
+     cmd->lookfly = (uint8_t)((cmd->lookfly & 0xF0) | (look & 0x0F));
+     gamepad_lookdelta = 0;
   }
 
   mousex = mousey = 0;

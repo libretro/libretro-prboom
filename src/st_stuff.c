@@ -890,19 +890,21 @@ static void ST_HereticDrawer(void)
   player_t *plyr = &players[displayplayer];
   int       ammo;
 
-  /* Background frame + stat panel. */
+  /* Background frame + stat panel (positions match the Raven layout:
+   * BARBACK fills y=158, the STATBAR stat panel sits at x=34,y=160). */
   if (W_CheckNumForName("BARBACK") >= 0)
     V_DrawNamePatch(ST_X, HST_Y, FG, "BARBACK", CR_DEFAULT, VPT_STRETCH);
   if (W_CheckNumForName("STATBAR") >= 0)
-    V_DrawNamePatch(34, HST_Y + 11, FG, "STATBAR", CR_DEFAULT, VPT_STRETCH);
+    V_DrawNamePatch(34, 160, FG, "STATBAR", CR_DEFAULT, VPT_STRETCH);
 
-  /* Health (vanilla Heretic position). */
-  ST_HereticDrawINumber(plyr->health, 57, HST_Y + 12);
+  /* Health (x=57,y=170) and ready-weapon ammo (x=109,y=162), matching
+   * the Raven HUD coordinates. */
+  ST_HereticDrawINumber(plyr->health, 57, 170);
 
-  /* Ready-weapon ammo (the staff/gauntlets use no ammo). */
+  /* The staff and gauntlets use no ammo. */
   ammo = plyr->ammo[weaponinfo[plyr->readyweapon].ammo];
   if (weaponinfo[plyr->readyweapon].ammo != AM_NOAMMO)
-    ST_HereticDrawINumber(ammo, 109, HST_Y + 4);
+    ST_HereticDrawINumber(ammo, 109, 162);
 }
 
 void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)

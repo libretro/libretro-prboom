@@ -737,6 +737,71 @@ void V_DrawNumPatch(int x, int y, int scrn, int lump,
   R_UnlockPatchNum(lump);
 }
 
+/*
+ * V_DrawNumPatchFullScreenCached
+ *
+ * Draws a full-screen patch (a 320x200 art lump such as CREDIT / HELP2 /
+ * VICTORY2 / ENDPIC) stretched to the whole surface, caching the rendered
+ * result.  These finale/help art screens redraw the same static lump every
+ * frame; at a high internal resolution the VPT_STRETCH blit scales ~3M
+ * output pixels through the column drawer each frame (measured at ~11 ms at
+ * 2560x1200 -- essentially the entire frame for a screen that draws nothing
+ * else).  The output only depends on (lump, palette, resolution, colour
+ * remap), so cache it and memcpy on a hit.
+ *
+ * Keyed like the other caches in this file: the palette pointer
+ * (V_Palette16) catches gamma changes and mid-screen palette swaps, the
+ * dimensions catch a resolution/aspect change (and the pitch change that
+ * comes with it).  Only the explicit full-screen art callers use this; the
+ * hundreds of small dynamic HUD / menu / status-bar patches keep going
+ * through V_DrawMemPatch unchanged.
+ */
+void V_DrawNumPatchFullScreenCached(int scrn, int lump, int cm)
+{
+  static uint8_t        *fs_cache  = NULL;
+  static int             fs_lump   = -1;
+  static const uint16_t *fs_pal    = NULL;
+  static int             fs_cm     = -2;
+  static int             fs_w      = -1;
+  static int             fs_h      = -1;
+  const  size_t          surf_bytes = (size_t)SURFACE_BYTE_PITCH * SCREENHEIGHT;
+
+  if (lump < 0)
+    return;
+
+  /* Fast path: cached image still valid -> straight copy. */
+  if (fs_cache && lump == fs_lump && V_Palette16 == fs_pal && cm == fs_cm &&
+      SCREENWIDTH == fs_w && SCREENHEIGHT == fs_h)
+  {
+    memcpy(screens[scrn].data, fs_cache, surf_bytes);
+    return;
+  }
+
+  /* Miss: render the stretched patch the normal way, then snapshot it. */
+  V_DrawMemPatch(0, 0, scrn, R_CachePatchNum(lump), cm, VPT_STRETCH);
+  R_UnlockPatchNum(lump);
+
+  {
+    uint8_t *nc = (uint8_t *)realloc(fs_cache, surf_bytes);
+    if (nc)
+    {
+      fs_cache = nc;
+      memcpy(fs_cache, screens[scrn].data, surf_bytes);
+      fs_lump  = lump;
+      fs_pal   = V_Palette16;
+      fs_cm    = cm;
+      fs_w     = SCREENWIDTH;
+      fs_h     = SCREENHEIGHT;
+    }
+    else
+    {
+      free(fs_cache);
+      fs_cache = NULL;
+      fs_lump  = -1;
+    }
+  }
+}
+
 uint16_t *V_Palette16 = NULL;
 static uint16_t *Palettes16 = NULL;
 static int currentPaletteIndex = 0;

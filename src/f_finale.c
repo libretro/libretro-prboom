@@ -750,7 +750,7 @@ void F_Drawer (void)
        F_BunnyScroll ();
     else
     {
-      V_DrawNamePatch(0, 0, 0, gamemapinfo->endpic, CR_DEFAULT, VPT_STRETCH);
+      V_DrawNamePatchFullScreenCached(0, gamemapinfo->endpic, CR_DEFAULT);
       // e6y: wide-res
       //V_FillBorder(-1, 0);
     }
@@ -762,21 +762,21 @@ void F_Drawer (void)
       // CPhipps - patch drawing updated
       case 1:
         if ( gamemode == retail )
-          V_DrawNamePatch(0, 0, 0, "CREDIT", CR_DEFAULT, VPT_STRETCH);
+          V_DrawNamePatchFullScreenCached(0, "CREDIT", CR_DEFAULT);
         else
-          V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
+          V_DrawNamePatchFullScreenCached(0, "HELP2", CR_DEFAULT);
         break;
       case 2:
-        V_DrawNamePatch(0, 0, 0, "VICTORY2", CR_DEFAULT, VPT_STRETCH);
+        V_DrawNamePatchFullScreenCached(0, "VICTORY2", CR_DEFAULT);
         break;
       case 3:
         F_BunnyScroll ();
         break;
       case 4:
-           V_DrawNamePatch(0, 0, 0, "ENDPIC", CR_DEFAULT, VPT_STRETCH);
+           V_DrawNamePatchFullScreenCached(0, "ENDPIC", CR_DEFAULT);
            break;
       case 5:
-           V_DrawNamePatch(0, 0, 0, "SIGILEND", CR_DEFAULT, VPT_STRETCH);
+           V_DrawNamePatchFullScreenCached(0, "SIGILEND", CR_DEFAULT);
            break;
     }
   }

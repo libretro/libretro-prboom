@@ -5200,23 +5200,34 @@ void M_Drawer (void)
   // killough 9/29/98: simplified code, removed 40-character width limit
   if (messageToPrint)
     {
-      /* cph - strdup string to writable memory */
-      char *ms = strdup(messageString);
-      char *p = ms;
-
+      /* The message text is constant while displayed, and M_Drawer runs
+       * every frame, so walk it line by line without copying it to a
+       * writable buffer -- M_WriteText only needs a start pointer and a
+       * length-bounded view, so no per-frame strdup/free is needed. */
+      const char *p = messageString;
       int y = 100 - M_StringHeight(messageString)/2;
+
       while (*p)
       {
-        char *string = p, c;
-        while ((c = *p) && *p != '\n')
-          p++;
-        *p = 0;
-        M_WriteText(160 - M_StringWidth(string)/2, y, string, CR_DEFAULT);
+        const char *line = p;
+        char        tmp[128];
+        int         len  = 0;
+
+        while (p[len] && p[len] != '\n')
+          len++;
+
+        if (len > (int)sizeof(tmp) - 1)
+          len = (int)sizeof(tmp) - 1;
+        memcpy(tmp, line, len);
+        tmp[len] = 0;
+
+        M_WriteText(160 - M_StringWidth(tmp)/2, y, tmp, CR_DEFAULT);
         y += hu_font[0].height;
-        if ((*p = c))
+
+        p += len;
+        if (*p == '\n')
           p++;
       }
-      free(ms);
     }
   else
     if (menuactive)

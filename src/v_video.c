@@ -375,6 +375,15 @@ void V_DrawRawScreen(const char *lump_name)
 
   raw = (const uint8_t *)W_CacheLumpNum(lump_num);
 
+  /* The image is centred and aspect-preserved, so it can leave bars on the
+   * sides (x_offset > 0) or top/bottom (scaled height < SCREENHEIGHT).
+   * Under the libretro rotating-buffer model those bars are never otherwise
+   * painted, so clear the whole framebuffer to black first -- otherwise they
+   * keep whatever the previous screen (e.g. the menu we came from) left
+   * there. */
+  if (x_offset > 0 || (int)(x_factor * 200.0f) < SCREENHEIGHT)
+    V_FillRect(0, 0, SCREENWIDTH, SCREENHEIGHT, 0);
+
   /* Source is row-major: byte index = row*width + column. */
   for (i = 0; i < lump_width; i++)
   {

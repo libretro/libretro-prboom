@@ -395,17 +395,42 @@ static void ST_refreshBackground(void)
 
   if (st_statusbaron)
     {
-      V_DrawNumPatch(ST_X, y, BG, stbarbg.lumpnum, CR_DEFAULT, VPT_STRETCH);
-      if (st_armson)
-        V_DrawNumPatch(ST_ARMSBGX, y, BG, armsbg.lumpnum, CR_DEFAULT, VPT_STRETCH);
+      /* The background patches (stbarbg, armsbg, and the netgame faceback)
+       * are static art.  Re-stretching them from 320-space into the BG buffer
+       * with VPT_STRETCH every frame is the dominant status-bar cost at high
+       * internal resolutions (~1.1 ms/frame at 2560x1200); only the final
+       * BG -> FG copy actually has to happen each frame (the libretro frontend
+       * rotates framebuffers, so the visible buffer must be refilled).  Stretch
+       * into BG once and rebuild only when something that affects the cached
+       * pixels changes: the internal resolution, the arms-panel visibility, or
+       * (netgame only) the displayed player's face background. */
+      static int cached_w        = -1;
+      static int cached_h        = -1;
+      static int cached_armson   = -1;
+      static int cached_netface   = -2;
+      int        netface         = netgame ? displayplayer : -1;
 
-      // killough 3/7/98: make face background change with displayplayer
-      if (netgame)
-      {
-        V_DrawNumPatch(ST_FX, y, BG, faceback.lumpnum,
-           displayplayer ? CR_LIMIT+displayplayer : CR_DEFAULT,
-           displayplayer ? (VPT_TRANS | VPT_STRETCH) : VPT_STRETCH);
-      }
+      if (cached_w      != SCREENWIDTH || cached_h       != SCREENHEIGHT ||
+          cached_armson != st_armson   || cached_netface != netface)
+        {
+          V_DrawNumPatch(ST_X, y, BG, stbarbg.lumpnum, CR_DEFAULT, VPT_STRETCH);
+          if (st_armson)
+            V_DrawNumPatch(ST_ARMSBGX, y, BG, armsbg.lumpnum, CR_DEFAULT, VPT_STRETCH);
+
+          // killough 3/7/98: make face background change with displayplayer
+          if (netgame)
+            {
+              V_DrawNumPatch(ST_FX, y, BG, faceback.lumpnum,
+                 displayplayer ? CR_LIMIT+displayplayer : CR_DEFAULT,
+                 displayplayer ? (VPT_TRANS | VPT_STRETCH) : VPT_STRETCH);
+            }
+
+          cached_w       = SCREENWIDTH;
+          cached_h       = SCREENHEIGHT;
+          cached_armson  = st_armson;
+          cached_netface = netface;
+        }
+
       V_CopyRect(ST_X, y, BG, ST_SCALED_WIDTH, ST_SCALED_HEIGHT, ST_X, ST_SCALED_Y, FG, VPT_NONE);
     }
 }

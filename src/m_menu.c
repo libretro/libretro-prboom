@@ -5505,6 +5505,16 @@ void M_WriteText (int x,int y, const char* string, int cm)
     w = hu_font[c].width;
     if (cx+w > SCREENWIDTH)
       break;
+    /* Defensive skip for glyphs the font does not provide: HU_Init zeroes
+     * hu_font, so an unpopulated slot has lumpnum <= 0.  Heretic's FONTA has
+     * no '_' (and other high-ASCII) glyphs, so the save-name cursor would
+     * otherwise call V_DrawNumPatch with lump 0 and crash decoding it as a
+     * patch (mirrors the same guard in hu_lib.c). */
+    if (hu_font[c].lumpnum <= 0)
+    {
+      cx += 4;
+      continue;
+    }
     // proff/nicolas 09/20/98 -- changed for hi-res
     // CPhipps - patch drawing updated
     V_DrawNumPatch(cx, cy, 0, hu_font[c].lumpnum, cm, flags);

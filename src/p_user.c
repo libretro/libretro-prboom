@@ -248,9 +248,28 @@ void P_SetPitch(player_t *player)
     {
       if (!mo->reactiontime && (!(automapmode & am_active) || (automapmode & am_overlay)))
       {
-        mo->pitch += (mlooky << 16);
-        P_CheckPitch(&mo->pitch);
-        mlooky = 0;
+        if (raven && !movement_mouselook)
+        {
+          /* Heretic keyboard look (look up / down / centre) is a core
+           * gameplay feature.  P_MovePlayer maintains player->lookdir (the
+           * Heretic look angle, +up / -down, clamped to +90 / -110) and it
+           * already drives autoaim slope; feed it into mo->pitch so the
+           * view tilts to match.  Scale follows dsda-doom's
+           * dsda_PlayerPitch: pitch = lookdir * ANG1 / PI, which keeps the
+           * rendered tilt within a comfortable range (~+28 / -35 degrees of
+           * view pitch at the +90 / -110 lookdir extremes) rather than a
+           * literal degree-for-degree tilt.  +pitch is up, matching
+           * lookdir's sign.  lookdir is already clamped in P_MovePlayer, so
+           * no further P_CheckPitch is applied here. */
+          mo->pitch = (angle_t)((double)player->lookdir * (double)ANG1 / 3.14159265358979323846);
+          mlooky = 0;
+        }
+        else
+        {
+          mo->pitch += (mlooky << 16);
+          P_CheckPitch(&mo->pitch);
+          mlooky = 0;
+        }
       }
       else
       {

@@ -720,7 +720,7 @@ void R_SetupFreelook(void)
 
   dy = FixedMul(focallength, finetangent[(ANG90-viewpitch)>>ANGLETOFINESHIFT]);
 
-  if (movement_mouselook){
+  if (movement_mouselook || raven){
     centeryfrac = (viewheight << (FRACBITS-1)) + dy;
     centery = centeryfrac >> FRACBITS;
   }

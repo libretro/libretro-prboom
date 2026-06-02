@@ -90,6 +90,7 @@ static int         finalecount;
 static const char *finaletext;
 static const char *finaleflat;
 static int         FontABaseLump;
+static int         FontACount;   /* number of FONTA glyphs (chars 33..) */
 
 void Heretic_F_StartFinale(void)
 {
@@ -128,6 +129,10 @@ void Heretic_F_StartFinale(void)
   finalestage   = 0;
   finalecount   = 0;
   FontABaseLump = W_GetNumForName("FONTA_S") + 1;
+  {
+    int e = W_CheckNumForName("FONTA_E");
+    FontACount = (e > FontABaseLump) ? (e - FontABaseLump) : 0;
+  }
   /* Clear any lingering E2 finale palette tint from a previous episode. */
   V_RestorePalette();
   /* Heretic ending music (mus_cptd) is only defined in HEXEN builds; leave
@@ -184,6 +189,14 @@ static void Heretic_F_TextWrite(void)
     }
     c = toupper(c);
     if (c < 33)
+    {
+      cx += 5;
+      continue;
+    }
+    /* FONTA is uppercase-only and covers a limited range (chars 33..). A
+     * character past the last glyph (e.g. from deh/bex-overridden text)
+     * would index past FONTA_E into an unrelated lump, so skip it. */
+    if (FontACount > 0 && c - 33 >= FontACount)
     {
       cx += 5;
       continue;

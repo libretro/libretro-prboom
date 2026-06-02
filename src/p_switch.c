@@ -132,12 +132,15 @@ void P_InitSwitchList(void)
     2 : gamemode == commercial ? 3 : 1;
   const switchlist_t *alphSwitchList;         //jff 3/23/98 pointer to switch table
 
-  // It a predefined SWITCHES lump exists use it, otherwise use fallback
-  int lump = W_CheckNumForName("SWITCHES");
-  if (lump != -1)
-    alphSwitchList = (const switchlist_t *)W_CacheLumpNum(lump);
-  else if (heretic)
+  // Heretic uses its own built-in switch list; the SWITCHES lump (carried by
+  // prboom.wad and other Doom-oriented merge wads) holds Doom switch names
+  // that do not exist in a Heretic IWAD, so it must not be consulted here.
+  // For Doom, prefer a predefined SWITCHES lump and fall back to the table.
+  int lump = -1;
+  if (heretic)
     alphSwitchList = heretic_alphSwitchList;
+  else if ((lump = W_CheckNumForName("SWITCHES")) != -1)
+    alphSwitchList = (const switchlist_t *)W_CacheLumpNum(lump);
   else
     alphSwitchList = doom_alphSwitchList;
 

@@ -282,20 +282,32 @@ static void IN_CheckForSkip(void)
   int i;
   player_t *player;
 
+  /* Edge-triggered: only a fresh press advances the intermission.  The
+   * previous test fired on any held button, so a player still holding
+   * fire/use from the exit switch skipped the results screen on the
+   * first tic.  Track per-player button-down state as Doom's WI_ and
+   * the original Heretic IN_CheckForSkip do. */
   for (i = 0, player = players; i < MAXPLAYERS; i++, player++)
   {
     if (playeringame[i])
     {
       if (player->cmd.buttons & BT_ATTACK)
       {
-        if (!(player->cmd.buttons & BT_SPECIAL))
+        if (!player->attackdown)
           skipintermission = 1;
+        player->attackdown = true;
       }
+      else
+        player->attackdown = false;
+
       if (player->cmd.buttons & BT_USE)
       {
-        if (!(player->cmd.buttons & BT_SPECIAL))
+        if (!player->usedown)
           skipintermission = 1;
+        player->usedown = true;
       }
+      else
+        player->usedown = false;
     }
   }
 }

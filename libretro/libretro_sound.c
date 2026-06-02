@@ -70,10 +70,10 @@ int16_t mixbuffer[MIXBUFFERSIZE];
 
 typedef struct
 {
-    uint8_t *snd_start_ptr, *snd_end_ptr;
+    int16_t *snd_start_ptr, *snd_end_ptr;
     unsigned int starttic;
     int sfxid;
-    int *leftvol, *rightvol;
+    int leftvol, rightvol;   /* 0..127 per-channel volume scalars */
     int handle;
 } channel_t;
 
@@ -96,7 +96,6 @@ music_player_t* current_player = NULL;
 
 static channel_t channels[NUM_CHANNELS];
 
-int vol_lookup[128*256];
 
 /* i_sound */
 
@@ -123,7 +122,7 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
     int             out_i, sfxlump_num, sfxlump_len, out_len;
     char            sfxlump_name[20];
     const uint8_t  *sfxlump_data, *sfxlump_sound;
-    uint8_t        *out_data;
+    int16_t        *out_data;
     uint16_t        orig_rate;
     unsigned int    step_fx;     /* 16.16 input step per output sample */
     unsigned int    pos_fx;      /* 16.16 input position accumulator */
@@ -172,7 +171,7 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
     out_len = (int)(((uint64_t)sfxlump_len * (uint64_t)SAMPLERATE +
                      (uint64_t)orig_rate - 1) /
                     (uint64_t)orig_rate);
-    out_data = (uint8_t*)malloc(out_len);
+    out_data = (int16_t*)malloc((size_t)out_len * sizeof(int16_t));
     if (!out_data)
     {
         W_UnlockLumpNum (sfxlump_num);
@@ -185,31 +184,32 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
     step_fx = ((unsigned int)orig_rate << 16) / (unsigned int)SAMPLERATE;
     pos_fx  = 0;
 
-    /* Linear interpolation between adjacent input samples.  The DMX
-     * SFX are 8-bit PCM at 11025/22050 Hz; upsampling to 44100 by
-     * nearest-neighbour (sample-and-hold) was cheap but turned each
-     * input sample into a 2x/4x staircase, audibly aliased/harsh.
-     * Interpolating between sfxlump_sound[x] and [x+1] by the 16.16
-     * fractional position removes the staircase for the same single
-     * pass.  This is load-time work (once per distinct SFX lump), so
-     * the extra multiply/add per output sample is irrelevant.  Samples
-     * are unsigned 8-bit; blend in that domain and store back as u8. */
+    /* Linear interpolation between adjacent input samples, written out
+     * as signed 16-bit.  The DMX SFX are unsigned 8-bit PCM at
+     * 11025/22050 Hz.  Interpolating between sfxlump_sound[x] and [x+1]
+     * by the 16.16 fractional position removes the upsampling staircase;
+     * keeping the result in 16-bit (rather than re-quantising back to
+     * 8-bit) preserves that interpolated precision all the way into the
+     * mixer.  Convert unsigned 8-bit (centre 128) to signed and scale to
+     * the 16-bit range: (s - 128) << 8 maps 0..255 to -32768..+32512. */
     for (out_i = 0; out_i < out_len; out_i++)
     {
         unsigned int x    = pos_fx >> 16;
         unsigned int frac = pos_fx & 0xffff;
+        int          val;
 
         if (x + 1 < (unsigned int)sfxlump_len)
         {
-            unsigned int a = sfxlump_sound[x];
-            unsigned int b = sfxlump_sound[x + 1];
-            out_data[out_i] =
-                (uint8_t)((a * (0x10000 - frac) + b * frac) >> 16);
+            int a = (int)sfxlump_sound[x]     - 128;
+            int b = (int)sfxlump_sound[x + 1] - 128;
+            val = (int)((a * (int)(0x10000 - frac) + b * (int)frac) >> 16);
         }
         else if (x < (unsigned int)sfxlump_len)
-            out_data[out_i] = sfxlump_sound[x]; /* last sample: hold */
+            val = (int)sfxlump_sound[x] - 128;  /* last sample: hold */
         else
-            out_data[out_i] = 128;              /* past end: DC silence */
+            val = 0;                            /* past end: silence */
+
+        out_data[out_i] = (int16_t)(val << 8);
 
         pos_fx += step_fx;
     }
@@ -244,19 +244,11 @@ void I_SetChannels(void)
     * the mixing process.
     */
 
-   int i, j;
+   int i;
 
    /* Okay, reset internal mixing channels to zero. */
    for (i = 0; i < NUM_CHANNELS; i++)
       memset(&channels[i], 0, sizeof(channel_t));
-
-   /* Generates volume lookup tables which also turn the unsigned
-    * samples into signed samples. */
-   for (i = 0; i < 128; i++)
-   {
-      for (j = 0; j < 256; j++)
-         vol_lookup[i*256+j] = (i*(j-128)*256)/127;
-   }
 }
 
 
@@ -357,7 +349,7 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     channels[slot].handle = ++currenthandle;
 
     // Set pointers to raw sound data start & end.
-    channels[slot].snd_start_ptr = (uint8_t*)S_sfx[id].data;
+    channels[slot].snd_start_ptr = (int16_t*)S_sfx[id].data;
     channels[slot].snd_end_ptr   = channels[slot].snd_start_ptr + lengths[id];
 
     // Save starting gametic.
@@ -379,10 +371,10 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     if (leftvol < 0 || leftvol > 127)
        I_Error("addsfx: leftvol out of bounds");
 
-    // Get the proper lookup table piece
-    //  for this volume level???
-    channels[slot].leftvol = &vol_lookup[leftvol*256];
-    channels[slot].rightvol = &vol_lookup[rightvol*256];
+    /* Store the per-channel volume scalars (0..127); the mixer scales
+     * each 16-bit sample by these directly. */
+    channels[slot].leftvol  = leftvol;
+    channels[slot].rightvol = rightvol;
 
     // Preserve sound SFX id,
     //  e.g. for avoiding duplicates of chainsaw.
@@ -526,9 +518,12 @@ void I_UpdateSound(void)
             for (j = 0; j < n_active; j++)
             {
                channel_t *c = active[j];
-               uint8_t    s = *c->snd_start_ptr++;
-               dl += c->leftvol[s];
-               dr += c->rightvol[s];
+               int        s = *c->snd_start_ptr++;
+               /* s is signed 16-bit; leftvol/rightvol are 0..127.
+                * (s * vol) >> 7 scales by vol/128, keeping full
+                * precision and the int16 output range. */
+               dl += (s * c->leftvol)  >> 7;
+               dr += (s * c->rightvol) >> 7;
             }
 
             /* Clamp to int16 range.  GCC and Clang both compile
@@ -589,8 +584,8 @@ void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)
          if (leftvol < 0 || leftvol > 127)
             I_Error("I_UpdateSoundParams: leftvol out of bounds.");
 
-         channels[i].leftvol = &vol_lookup[leftvol*256];
-         channels[i].rightvol = &vol_lookup[rightvol*256];
+         channels[i].leftvol  = leftvol;
+         channels[i].rightvol = rightvol;
          return;
       }
    }

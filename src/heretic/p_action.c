@@ -29,12 +29,6 @@ extern mobj_t **bodyque;
 /* Floor-type return values used by P_HitFloor (terrain splashes are not
  * implemented here, so it always reports a solid floor). */
 /* Heretic ammo types (separate space from this core's Doom AM_* enum). */
-#define am_goldwand   0
-#define am_crossbow   1
-#define am_blaster    2
-#define am_skullrod   3
-#define am_phoenixrod 4
-#define am_mace       5
 
 /* Heretic per-shot ammo costs. */
 #define USE_GWND_AMMO_1 1

@@ -1034,10 +1034,17 @@ void G_PlayerReborn (int player)
   p->readyweapon = p->pendingweapon = WP_PISTOL;
   p->weaponowned[WP_FIST] = true;
   p->weaponowned[WP_PISTOL] = true;
-  p->ammo[AM_CLIP] = initial_bullets; // Ty 03/12/98 - use dehacked values
+
+  /* Heretic reuses the WP_FIST / WP_PISTOL slots for the staff and gold
+   * wand (see heretic_weaponinfo). The gold wand uses am_goldwand ammo and
+   * the player starts with 50; Doom starts with AM_CLIP bullets. */
+  if (heretic)
+    p->ammo[am_goldwand] = 50;
+  else
+    p->ammo[AM_CLIP] = initial_bullets; // Ty 03/12/98 - use dehacked values
 
   for (i=0 ; i<NUMAMMO ; i++)
-    p->maxammo[i] = maxammo[i];
+    p->maxammo[i] = heretic ? heretic_maxammo[i] : maxammo[i];
 }
 
 /*

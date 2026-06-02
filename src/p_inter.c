@@ -76,8 +76,16 @@ int monsters_infight = 0; // e6y: Dehacked support - monsters infight
 
 // a weapon is found with two clip loads,
 // a big item has five clip loads
-int maxammo[NUMAMMO]  = {200, 50, 300, 50};
-int clipammo[NUMAMMO] = { 10,  4,  20,  1};
+// Sized to NUMAMMO (6, Heretic). Doom uses the first four; the trailing
+// two are unused under Doom. Heretic values are selected at player init
+// (see G_PlayerReborn) via heretic_maxammo / heretic_clipammo.
+int maxammo[NUMAMMO]  = {200, 50, 300, 50, 0, 0};
+int clipammo[NUMAMMO] = { 10,  4,  20,  1, 0, 0};
+
+/* Heretic per-type maximum ammo and pickup clip sizes (vanilla Heretic):
+ *   goldwand, crossbow, blaster, skullrod, phoenixrod, mace */
+int heretic_maxammo[NUMAMMO]  = {100, 50, 200, 200, 20, 150};
+int heretic_clipammo[NUMAMMO] = { 10,  5,  10,  20,  1,  10};
 
 //
 // GET STUFF

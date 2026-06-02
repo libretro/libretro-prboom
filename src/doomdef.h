@@ -202,8 +202,21 @@ typedef enum {
   AM_SHELL,   // Shotgun / double barreled shotgun.
   AM_CELL,    // Plasma rifle, BFG.
   AM_MISL,    // Missile launcher.
-  NUMAMMO,
-  AM_NOAMMO   // Unlimited for chainsaw / fist.
+  DOOM_NUMAMMO,
+
+  /* Heretic ammo, overlaid on the same slots (a Heretic game never uses
+   * the Doom ammo names and vice versa). Heretic has six types, so the
+   * ammo[] / maxammo[] arrays are sized to the larger count via NUMAMMO. */
+  am_goldwand = 0,
+  am_crossbow,
+  am_blaster,
+  am_skullrod,
+  am_phoenixrod,
+  am_mace,
+  HERETIC_NUMAMMO,
+
+  NUMAMMO = HERETIC_NUMAMMO,  /* array sizing: max of Doom(4)/Heretic(6) */
+  AM_NOAMMO   // Unlimited for chainsaw / fist / staff / gauntlets.
 } ammotype_t;
 
 // Power up artifacts.

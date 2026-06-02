@@ -2868,7 +2868,15 @@ void I_SetRes(void)
    for (i=0; i<3; i++)
       screens[i].height = SCREENHEIGHT;
 
+   /* The BG offscreen screen caches the status-bar background. The Doom bar
+    * is ST_HEIGHT (32) rows; the Heretic bar is taller (42 rows, y 158..199),
+    * so size BG for the larger of the two scaled heights. */
    screens[4].height = (ST_SCALED_HEIGHT+1);
+   {
+      int heretic_bar_scaled = (42 * SCREENHEIGHT) / 200 + 1;
+      if (heretic_bar_scaled > screens[4].height)
+         screens[4].height = heretic_bar_scaled;
+   }
 }
 
 /* Aspect-ratio changes must NOT rebuild the framebuffer from inside

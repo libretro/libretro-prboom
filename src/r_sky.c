@@ -55,7 +55,7 @@ dbool   skystretch;
 //
 void R_InitSkyMap (void)
 {
-  if (!movement_mouselook)
+  if (!movement_mouselook && !raven)
   {
     skystretch = FALSE;
     skytexturemid = 100*FRACUNIT;
@@ -86,6 +86,21 @@ void R_InitSkyMap (void)
     //                  of the texture is at the top of the screen when looking fully up.
 
     skyheight = textureheight[skytexture]>>FRACBITS;
+
+    /* Heretic skies are declared 128 tall but their single patch is really
+     * 200 (see R_HackedSkyPatch in r_plane.c, which draws them from the raw
+     * patch).  Use the true 200 height here so the h==200 case below picks
+     * the correct baseline/scale instead of the 128-tall stretch path. */
+    if (heretic && textures[skytexture]->patchcount == 1)
+    {
+      int pnum = textures[skytexture]->patches[0].patch;
+      const rpatch_t *p = R_CachePatchNum(pnum);
+      int realh = p->height;
+      R_UnlockPatchNum(pnum);
+      if (realh == 200)
+        skyheight = 200;
+    }
+
     skystretch = FALSE;
     skytexturemid = 0;
     if (skyheight >= 128 && skyheight < 200)

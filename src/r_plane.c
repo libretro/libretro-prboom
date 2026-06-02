@@ -507,16 +507,17 @@ static void R_DoDrawPlane(visplane_t *pl)
 
          {
             /* Heretic 200-tall single-patch sky: draw straight from the raw
-             * patch with a 200-anchored texturemid so the full sky shows
-             * when looking up, instead of mirroring the 128-tall composite. */
+             * patch (full 200 rows) instead of the 128-tall composite, so the
+             * sky does not mirror/tile when free-look pitches the view up.
+             * Use the engine's skytexturemid/skyiscale (already computed for
+             * this resolution) rather than hardcoded constants -- only the
+             * source patch and texheight differ from the composite path. */
             const rpatch_t *hacked = R_HackedSkyPatch(texture);
             if (hacked)
             {
                int xm1;
                int skypatchnum = textures[texture]->patches[0].patch;
                dcvars.texheight = hacked->height;
-               dcvars.texturemid = 200 << FRACBITS;
-               dcvars.iscale = (200 << FRACBITS) / SCREENHEIGHT;
 
                for (x = pl->minx; (dcvars.x = x) <= pl->maxx; x++)
                   if ((dcvars.yl = pl->top[x]) != -1 && dcvars.yl <= (dcvars.yh = pl->bottom[x])) // dropoff overflow

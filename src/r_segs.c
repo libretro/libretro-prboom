@@ -43,6 +43,7 @@
 #include "w_wad.h"
 #include "v_video.h"
 #include "lprintf.h"
+#include "i_system.h"
 
 // OPTIMIZE: closed two sided lines as single sided
 
@@ -600,7 +601,19 @@ static fixed_t R_PointToDist(fixed_t x, fixed_t y)
 // A wall segment will be drawn
 //  between start and stop pixels (inclusive).
 //
+#ifdef PRBOOM_RENDER_PROFILE
+static void R_StoreWallRange_impl(const int start, const int stop);
 void R_StoreWallRange(const int start, const int stop)
+{
+   extern double prof_storewall_usec;
+   double _t0 = I_RenderProfileUsec();
+   R_StoreWallRange_impl(start, stop);
+   prof_storewall_usec += (I_RenderProfileUsec() - _t0);
+}
+static void R_StoreWallRange_impl(const int start, const int stop)
+#else
+void R_StoreWallRange(const int start, const int stop)
+#endif
 {
    fixed_t hyp;
    angle_t offsetangle;

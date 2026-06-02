@@ -62,6 +62,8 @@
 
 #ifdef PRBOOM_RENDER_PROFILE
 double prof_wallfill_usec = 0.0;  /* us spent writing wall/sprite columns to the framebuffer (R_FlushColumns) */
+double prof_storewall_usec = 0.0; /* us spent in R_StoreWallRange (wall seg setup + RenderSegLoop) */
+double prof_findplane_usec = 0.0; /* us spent in R_FindPlane (visplane hash + alloc) */
 #endif
 
 uint8_t *viewimage;

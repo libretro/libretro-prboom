@@ -57,6 +57,7 @@
 #include "r_plane.h"
 #include "v_video.h"
 #include "lprintf.h"
+#include "i_system.h"
 
 #define MAXVISPLANES 128    /* must be a power of 2 */
 
@@ -284,8 +285,25 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
 //
 // killough 2/28/98: Add offsets
 
+#ifdef PRBOOM_RENDER_PROFILE
+static visplane_t *R_FindPlane_impl(fixed_t height, int picnum, int lightlevel,
+                        fixed_t xoffs, fixed_t yoffs);
 visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
                         fixed_t xoffs, fixed_t yoffs)
+{
+   extern double prof_findplane_usec;
+   visplane_t *r;
+   double _t0 = I_RenderProfileUsec();
+   r = R_FindPlane_impl(height, picnum, lightlevel, xoffs, yoffs);
+   prof_findplane_usec += (I_RenderProfileUsec() - _t0);
+   return r;
+}
+static visplane_t *R_FindPlane_impl(fixed_t height, int picnum, int lightlevel,
+                        fixed_t xoffs, fixed_t yoffs)
+#else
+visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
+                        fixed_t xoffs, fixed_t yoffs)
+#endif
 {
    visplane_t *check;
    unsigned hash;                      // killough

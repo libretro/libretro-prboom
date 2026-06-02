@@ -805,11 +805,12 @@ void R_RenderPlayerView (player_t* player)
    * -- replacing guesswork about where the frame goes. */
 # define PROF_REPORT 120
   static double acc_bsp = 0.0, acc_planes = 0.0, acc_masked = 0.0,
-                acc_setup = 0.0, acc_wallfill = 0.0;
+                acc_setup = 0.0, acc_wallfill = 0.0,
+                acc_storewall = 0.0, acc_findplane = 0.0;
   static unsigned prof_frames = 0;
   double t0, t1, t2, t3, t4;
-  extern double prof_wallfill_usec;
-  prof_wallfill_usec = 0.0;
+  extern double prof_wallfill_usec, prof_storewall_usec, prof_findplane_usec;
+  prof_wallfill_usec = prof_storewall_usec = prof_findplane_usec = 0.0;
   t0 = I_RenderProfileUsec();
 #endif
 
@@ -870,22 +871,31 @@ void R_RenderPlayerView (player_t* player)
   acc_bsp    += (t2 - t1);   /* BSP traversal + wall/clip + visplane build */
   acc_planes += (t3 - t2);   /* floor/ceiling span fill */
   acc_masked += (t4 - t3);   /* sprites + masked midtextures */
-  acc_wallfill += prof_wallfill_usec; /* subset of bsp+walls: pixel writes */
+  acc_wallfill += prof_wallfill_usec; /* subset: wall pixel writes */
+  acc_storewall += prof_storewall_usec; /* subset of bsp+walls: seg setup+fill */
+  acc_findplane += prof_findplane_usec; /* subset of bsp+walls: visplane hash */
   if (++prof_frames >= PROF_REPORT)
   {
     double n = (double)prof_frames;
+    double bsp = acc_bsp / n;
+    double sw  = acc_storewall / n;
+    double fp  = acc_findplane / n;
     lprintf(LO_INFO,
       "R_RenderProfile (avg over %u frames, us): "
-      "setup+clear %.1f | bsp+walls %.1f (fill %.1f) | planes %.1f | masked %.1f | "
-      "total %.1f\n",
+      "setup %.1f | bsp+walls %.1f [traverse %.1f, storewall %.1f (fill %.1f), "
+      "findplane %.1f] | planes %.1f | masked %.1f | total %.1f\n",
       prof_frames,
       acc_setup / n,
-      acc_bsp / n,
+      bsp,
+      bsp - sw - fp,            /* pure traversal/clip remainder */
+      sw,
       acc_wallfill / n,
+      fp,
       acc_planes / n,
       acc_masked / n,
       (acc_setup + acc_bsp + acc_planes + acc_masked) / n);
     acc_setup = acc_bsp = acc_planes = acc_masked = acc_wallfill = 0.0;
+    acc_storewall = acc_findplane = 0.0;
     prof_frames = 0;
   }
 # undef PROF_REPORT

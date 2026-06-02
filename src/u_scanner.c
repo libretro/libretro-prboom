@@ -198,25 +198,53 @@ void U_ExpandState(u_scanner_t* s)
   s->tokenLinePosition = s->nextState.tokenLinePosition;
 }
 
-void U_SaveState(u_scanner_t* s, u_scanner_t savedstate)
+/* Save the scanner state into *saved so a speculative scan can be rolled
+ * back. The two heap-owned strings are duplicated into *saved; the rest is a
+ * shallow copy (data is shared and must not be touched on restore). The
+ * caller either restores (on a failed scan) or frees the saved copy (on a
+ * successful scan) via U_FreeState. */
+void U_SaveState(const u_scanner_t *s, u_scanner_t *saved)
 {
-  // This saves the entire parser state except for the data pointer.
-  if (savedstate.string != NULL) free(savedstate.string);
-  if (savedstate.nextState.string != NULL) free(savedstate.nextState.string);
-
-  memcpy(&savedstate, s, sizeof(*s));
-  savedstate.string = strdup(s->string);
-  savedstate.nextState.string = strdup(s->nextState.string);
-  savedstate.data = NULL;
+  memcpy(saved, s, sizeof(*saved));
+  saved->string           = s->string           ? strdup(s->string)           : NULL;
+  saved->nextState.string = s->nextState.string ? strdup(s->nextState.string) : NULL;
+  saved->data             = NULL;   /* not owned by the saved copy */
 }
 
-void U_RestoreState(u_scanner_t* s, u_scanner_t savedstate)
+/* Restore a previously saved state into *s, rolling back a speculative scan.
+ * s's current (advanced) strings are freed and replaced by the saved copies;
+ * s->data is preserved (it was never part of the saved copy). Ownership of
+ * the saved strings moves to s, so the saved copy is emptied and needs no
+ * separate free. */
+void U_RestoreState(u_scanner_t *s, u_scanner_t *saved)
 {
-  if (savedstate.data == NULL)
+  char *saveddata = s->data;
+
+  if (s->string != NULL)
+    free(s->string);
+  if (s->nextState.string != NULL)
+    free(s->nextState.string);
+
+  memcpy(s, saved, sizeof(*s));
+  s->data = saveddata;
+
+  saved->string           = NULL;   /* ownership moved to s */
+  saved->nextState.string = NULL;
+}
+
+/* Free the duplicated strings held by a saved state that was not restored
+ * (the speculative scan succeeded, so the save is discarded). */
+void U_FreeState(u_scanner_t *saved)
+{
+  if (saved->string != NULL)
   {
-    char *saveddata = s->data;
-    U_SaveState(&savedstate, *s);
-    s->data = saveddata;
+    free(saved->string);
+    saved->string = NULL;
+  }
+  if (saved->nextState.string != NULL)
+  {
+    free(saved->nextState.string);
+    saved->nextState.string = NULL;
   }
 }
 
@@ -595,10 +623,12 @@ dbool   U_CheckInteger(u_scanner_t* s)
 {
   dbool   res;
   u_scanner_t savedstate = {0};
-  U_SaveState(s, savedstate);
+  U_SaveState(s, &savedstate);
   res = U_ScanInteger(s);
   if (!res)
-     U_RestoreState(s, savedstate);
+     U_RestoreState(s, &savedstate);
+  else
+     U_FreeState(&savedstate);
   return res;
 }
 
@@ -606,10 +636,12 @@ dbool   U_CheckFloat(u_scanner_t* s)
 {
   dbool   res;
   u_scanner_t savedstate = {0};
-  U_SaveState(s, savedstate);
+  U_SaveState(s, &savedstate);
   res = U_ScanFloat(s);
   if (!res)
-     U_RestoreState(s, savedstate);
+     U_RestoreState(s, &savedstate);
+  else
+     U_FreeState(&savedstate);
   return res;
 }
 

@@ -128,6 +128,8 @@ void Heretic_F_StartFinale(void)
   finalestage   = 0;
   finalecount   = 0;
   FontABaseLump = W_GetNumForName("FONTA_S") + 1;
+  /* Clear any lingering E2 finale palette tint from a previous episode. */
+  V_RestorePalette();
   /* Heretic ending music (mus_cptd) is only defined in HEXEN builds; leave
    * the current music rather than reference a missing enum. */
 }
@@ -232,6 +234,9 @@ void Heretic_F_Drawer(void)
 {
   if (!finalestage)
   {
+    /* Text stage: ensure the normal palette (in case we somehow re-enter
+     * here with the E2 tint still active). */
+    V_RestorePalette();
     Heretic_F_TextWrite();
     return;
   }
@@ -239,17 +244,25 @@ void Heretic_F_Drawer(void)
   switch (gameepisode)
   {
     case 1:
+      V_RestorePalette();
       V_DrawRawScreen("CREDIT");
       break;
     case 2:
+      /* The E2 end screen has its own palette (E2PAL) giving it the
+       * distinct tinted look; swap to it while drawing E2END. The palette
+       * is restored when the finale ends (see Heretic_F_StartFinale and
+       * the stage transition in Heretic_F_Ticker). */
+      V_SetRawPalette("E2PAL");
       V_DrawRawScreen("E2END");
       break;
     case 3:
+      V_RestorePalette();
       Heretic_F_DemonScroll();
       break;
     case 4:
     case 5:
     default:
+      V_RestorePalette();
       V_DrawRawScreen("CREDIT");
       break;
   }

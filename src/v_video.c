@@ -774,6 +774,86 @@ void V_DestroyTrueColorPalette(void)
 }
 
 //
+// V_SetRawPalette
+//
+// Point V_Palette16 at a 16-bit palette built from an arbitrary 256-colour
+// (768-byte) palette lump, e.g. Heretic's E2PAL for the episode-2 finale.
+// Built into a dedicated static buffer so the normal Palettes16 cache is
+// untouched; call V_RestorePalette to revert. The build mirrors
+// V_UpdateTrueColorPalette's per-colour, per-weight expansion.
+//
+static uint16_t *RawPalette16 = NULL;
+
+void V_SetRawPalette(const char *lump_name)
+{
+  int            i, w;
+  int            lump = W_CheckNumForName(lump_name);
+  int            gtlump;
+  const uint8_t *pal;
+  const uint8_t *gtable;
+
+  if (lump < 0 || W_LumpLength(lump) < 768)
+    return;
+
+  if (!RawPalette16)
+  {
+    RawPalette16 = (uint16_t*)malloc(256 * sizeof(uint16_t) * VID_NUMCOLORWEIGHTS);
+    if (!RawPalette16)
+      return;
+  }
+
+  gtlump = (W_CheckNumForName)("GAMMATBL", ns_prboom);
+  pal    = (const uint8_t *)W_CacheLumpNum(lump);
+  gtable = ((gtlump == -1) ? gammatable
+                           : (const uint8_t *)W_CacheLumpNum(gtlump))
+           + (256 * usegamma);
+
+  for (i = 0; i < 256; i++)
+  {
+    uint8_t r = gtable[pal[i*3+0]];
+    uint8_t g = gtable[pal[i*3+1]];
+    uint8_t b = gtable[pal[i*3+2]];
+    float roundUpR = (r > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+    float roundUpG = (g > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+    float roundUpB = (b > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+
+    for (w = 0; w < VID_NUMCOLORWEIGHTS; w++)
+    {
+      float t = (float)(w)/(float)(VID_NUMCOLORWEIGHTS-1);
+#if defined(ABGR1555)
+      int nr = (int)((r>>3)*t+roundUpR);
+      int ng = (int)((g>>3)*t+roundUpG);
+      int nb = (int)((b>>3)*t+roundUpB);
+      RawPalette16[i*VID_NUMCOLORWEIGHTS + w] = (uint16_t)((nb<<10)|(ng<<5)|nr);
+#else
+      int nr = (int)((r>>3)*t+roundUpR);
+      int ng = (int)((g>>2)*t+roundUpG);
+      int nb = (int)((b>>3)*t+roundUpB);
+      RawPalette16[i*VID_NUMCOLORWEIGHTS + w] = (uint16_t)((nr<<11)|(ng<<5)|nb);
+#endif
+    }
+  }
+
+  if (gtlump != -1)
+    W_UnlockLumpNum(gtlump);
+  W_UnlockLumpNum(lump);
+
+  V_Palette16 = RawPalette16;
+}
+
+//
+// V_RestorePalette
+//
+// Revert V_Palette16 to the standard PLAYPAL-derived palette after a
+// V_SetRawPalette swap.
+//
+void V_RestorePalette(void)
+{
+  if (Palettes16)
+    V_Palette16 = Palettes16 + currentPaletteIndex*256*VID_NUMCOLORWEIGHTS;
+}
+
+//
 // V_SetPalette
 //
 // CPhipps - New function to set the palette to palette number pal.

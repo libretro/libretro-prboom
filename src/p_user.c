@@ -262,10 +262,13 @@ void P_SetPitch(player_t *player)
            * dsda_PlayerPitch: pitch = lookdir * ANG1 / PI, which keeps the
            * rendered tilt within a comfortable range (~+28 / -35 degrees of
            * view pitch at the +90 / -110 lookdir extremes) rather than a
-           * literal degree-for-degree tilt.  +pitch is up, matching
-           * lookdir's sign.  lookdir is already clamped in P_MovePlayer, so
-           * no further P_CheckPitch is applied here. */
-          mo->pitch = (angle_t)((double)player->lookdir * (double)ANG1 / 3.14159265358979323846);
+           * literal degree-for-degree tilt.  The mapping is negated because
+           * this renderer's viewpitch is positive looking *down* (centery is
+           * shifted down for positive pitch), the opposite of Heretic's
+           * lookdir convention where positive is up -- without the negation,
+           * looking up tilts the view down into the floor.  lookdir is
+           * already clamped in P_MovePlayer, so no P_CheckPitch is applied. */
+          mo->pitch = (angle_t)(-(double)player->lookdir * (double)ANG1 / 3.14159265358979323846);
           mlooky = 0;
         }
         else

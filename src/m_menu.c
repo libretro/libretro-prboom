@@ -490,7 +490,12 @@ void M_FinishHelp(int choice)        // killough 10/98
 void M_DrawReadThis1(void)
 {
   inhelpscreens = TRUE;
-  if (gamemode == shareware)
+  if (heretic)
+    /* Heretic ships HELP1/HELP2 full-screen pages; draw them directly.
+     * The Doom credits path tiles a flat (MFLR8_4) that Heretic lacks,
+     * which crashed when "Read This!" was selected. */
+    V_DrawNamePatch(0, 0, 0, "HELP1", CR_DEFAULT, VPT_STRETCH);
+  else if (gamemode == shareware)
     V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
   else
     M_DrawCredits();
@@ -504,7 +509,9 @@ void M_DrawReadThis1(void)
 void M_DrawReadThis2(void)
 {
   inhelpscreens = TRUE;
-  if (gamemode == shareware)
+  if (heretic)
+    V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
+  else if (gamemode == shareware)
     M_DrawCredits();
   else
     V_DrawNamePatch(0, 0, 0, "CREDIT", CR_DEFAULT, VPT_STRETCH);

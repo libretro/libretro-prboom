@@ -810,6 +810,33 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    // killough 12/98: fix psprite positioning problem
    vis->texturemid = (BASEYCENTER<<FRACBITS) /* +  FRACUNIT/2 */ -
       (psp->sy-topoffset);
+
+   /* Heretic draws weapons lower when the status bar is hidden (full view).
+    * Vanilla/dsda apply a per-weapon downward offset in that case; without
+    * it the weapon floats at its status-bar-up position, leaving it
+    * hovering in mid-screen at fullscreen.  Indices follow the Heretic
+    * readyweapon order (staff, gold wand, crossbow, blaster, skull rod,
+    * phoenix rod, mace, gauntlets, beak).  R_FullView is viewheight ==
+    * SCREENHEIGHT (no status bar). */
+   if (raven && viewheight == SCREENHEIGHT)
+   {
+      static const fixed_t heretic_psprite_sy[NUMWEAPONS] =
+      {
+         0,              /* staff      */
+         5  * FRACUNIT,  /* gold wand  */
+         15 * FRACUNIT,  /* crossbow   */
+         15 * FRACUNIT,  /* blaster    */
+         15 * FRACUNIT,  /* skull rod  */
+         15 * FRACUNIT,  /* phoenix rod*/
+         15 * FRACUNIT,  /* mace       */
+         15 * FRACUNIT,  /* gauntlets  */
+         15 * FRACUNIT   /* beak       */
+      };
+      int rw = viewplayer->readyweapon;
+      if (rw >= 0 && rw < NUMWEAPONS)
+         vis->texturemid -= heretic_psprite_sy[rw];
+   }
+
    vis->x1 = x1 < 0 ? 0 : x1;
    vis->x2 = x2 >= viewwidth ? viewwidth-1 : x2;
    // proff 11/06/98: Added for high-res

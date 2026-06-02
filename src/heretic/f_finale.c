@@ -195,12 +195,35 @@ static void Heretic_F_TextWrite(void)
   }
 }
 
-/* E3 demon scroll: the fork has no sectioned raw blit, so show the first
- * page, then switch to the second once the scroll period elapses. */
+/* E3 demon scroll: FINAL1 scrolls up off the top while FINAL2 scrolls in
+ * from the bottom.  yval is the scroll offset in 200-space rows: the bottom
+ * yval rows of FINAL2 sit at the top, and the top (200 - yval) rows of
+ * FINAL1 sit below them.  The offset advances every few tics until FINAL2
+ * fully covers the screen. */
 static void Heretic_F_DemonScroll(void)
 {
-  if (finalecount < 140)
+  static int yval        = 0;
+  static int nextscroll  = 0;
+
+  if (finalecount < 70)
+  {
     V_DrawRawScreen("FINAL1");
+    yval       = 0;
+    nextscroll = finalecount;
+  }
+  else if (yval < 200)
+  {
+    /* FINAL2's bottom yval rows at the top, FINAL1's top (200 - yval)
+     * rows below.  Together they cover the whole image area, so no
+     * separate clear is needed. */
+    V_DrawRawScreenSection("FINAL2", 200 - yval, 0, yval);
+    V_DrawRawScreenSection("FINAL1", 0, yval, 200 - yval);
+    if (finalecount >= nextscroll)
+    {
+      yval++;
+      nextscroll = finalecount + 3;
+    }
+  }
   else
     V_DrawRawScreen("FINAL2");
 }

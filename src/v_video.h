@@ -136,6 +136,8 @@ extern void V_DrawNumPatch(int x, int y, int scrn,
 /* cphipps 10/99: function to tile a flat over the screen */
 extern void V_DrawBackground(const char* flatname, int scrn);
 void V_DrawRawScreen(const char *lump_name);
+void V_DrawRawScreenSection(const char *lump_name, int src_row,
+                            int dst_row, int num_rows);
 
 void V_DestroyTrueColorPalette(void);
 void V_UpdateTrueColorPalette(void);

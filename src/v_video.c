@@ -337,6 +337,77 @@ void V_DrawBackground(const char* flatname, int scrn)
 }
 
 /*
+ * V_DrawRawScreenSection
+ *
+ * Draw a horizontal band of a raw full-screen image: source rows
+ * [src_row, src_row + num_rows) placed so that source row src_row lands at
+ * destination 200-space row dst_row.  Used by the Heretic E3 finale, which
+ * scrolls one raw screen up off the top while the next scrolls in from the
+ * bottom.  Geometry (aspect-preserving fit, horizontal centring) matches
+ * V_DrawRawScreen; the caller is responsible for clearing/!filling the
+ * background as needed (the finale draws two adjoining sections that cover
+ * the image area between them).
+ */
+void V_DrawRawScreenSection(const char *lump_name, int src_row,
+                            int dst_row, int num_rows)
+{
+  int          i, j;
+  int          lump_num   = W_CheckNumForName(lump_name);
+  int          lump_len;
+  int          lump_width;
+  int          x_offset;
+  float        x_factor, y_factor;
+  const uint8_t *raw;
+
+  if (lump_num < 0 || num_rows <= 0)
+    return;
+
+  lump_len   = W_LumpLength(lump_num);
+  lump_width = lump_len / 200;
+  if (lump_width <= 0)
+    return;
+
+  x_factor = (float)SCREENWIDTH  / (float)lump_width;
+  y_factor = (float)SCREENHEIGHT / 200.0f;
+  if (y_factor < x_factor)
+    x_factor = y_factor;
+  y_factor = x_factor;                  /* uniform scale (aspect preserved) */
+
+  x_offset = (int)((SCREENWIDTH - (x_factor * lump_width)) / 2);
+
+  raw = (const uint8_t *)W_CacheLumpNum(lump_num);
+
+  for (i = 0; i < lump_width; i++)
+  {
+    int x     = (int)(i * x_factor);
+    int width = (int)((i + 1) * x_factor) - x;
+    int x_pos = x_offset + x;
+
+    if (width <= 0 || x_pos < 0 || x_pos > SCREENWIDTH - width)
+      continue;
+
+    for (j = 0; j < num_rows; j++)
+    {
+      int srcrow = src_row + j;
+      int dstrow = dst_row + j;
+      int y, height;
+
+      if (srcrow < 0 || srcrow >= 200 || dstrow < 0 || dstrow >= 200)
+        continue;
+
+      y      = (int)(dstrow * y_factor);
+      height = (int)((dstrow + 1) * y_factor) - y;
+      if (height <= 0)
+        continue;
+
+      V_FillRect(x_pos, y, width, height, raw[srcrow * lump_width + i]);
+    }
+  }
+
+  W_UnlockLumpNum(lump_num);
+}
+
+/*
  * V_DrawRawScreen
  *
  * Heretic (and other Raven) full-screen images such as TITLE, CREDIT,

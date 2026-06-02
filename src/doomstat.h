@@ -68,6 +68,11 @@ extern int g_s_play;       /* player idle state; set per-game */
 extern int g_s_play_run1;  /* first player run state; set per-game */
 extern int g_s_play_atk1;  /* first player attack state; set per-game */
 extern int g_s_play_atk2;  /* second player attack state; set per-game */
+
+#define TELEFOGHEIGHT (32*FRACUNIT)
+extern mobjtype_t g_mt_tfog;      /* teleport-fog mobjtype; set per-game */
+extern int g_telefog_height;      /* teleport-fog spawn height; set per-game */
+extern int g_sfx_telept;          /* teleport sound; set per-game */
 extern const char *g_menu_flat;
 
 // Set if homebrew PWAD stuff has been added.

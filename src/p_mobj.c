@@ -738,20 +738,20 @@ static void P_NightmareRespawn(mobj_t* mobj)
 
   mo = P_SpawnMobj (mobj->x,
                     mobj->y,
-                    mobj->subsector->sector->floorheight,
-                    MT_TFOG);
+                    mobj->subsector->sector->floorheight + g_telefog_height,
+                    g_mt_tfog);
 
   // initiate teleport sound
 
-  S_StartSound (mo, sfx_telept);
+  S_StartSound (mo, g_sfx_telept);
 
   // spawn a teleport fog at the new spot
 
   ss = R_PointInSubsector (x,y);
 
-  mo = P_SpawnMobj (x, y, ss->sector->floorheight , MT_TFOG);
+  mo = P_SpawnMobj (x, y, ss->sector->floorheight + g_telefog_height, g_mt_tfog);
 
-  S_StartSound (mo, sfx_telept);
+  S_StartSound (mo, g_sfx_telept);
 
   // spawn the new monster
 

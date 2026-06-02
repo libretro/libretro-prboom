@@ -98,6 +98,14 @@ const switchlist_t doom_alphSwitchList[] =
   {"SW1SKULL",	"SW2SKULL",	3},
 };
 
+/* Heretic has only two switch textures. */
+const switchlist_t heretic_alphSwitchList[] =
+{
+  {"SW1OFF",	"SW1ON",	1},
+  {"SW2OFF",	"SW2ON",	1},
+  {"",		"",		0}
+};
+
 //
 // P_InitSwitchList()
 //
@@ -126,10 +134,12 @@ void P_InitSwitchList(void)
 
   // It a predefined SWITCHES lump exists use it, otherwise use fallback
   int lump = W_CheckNumForName("SWITCHES");
-  if (lump == -1)
-    alphSwitchList = doom_alphSwitchList;
-  else
+  if (lump != -1)
     alphSwitchList = (const switchlist_t *)W_CacheLumpNum(lump);
+  else if (heretic)
+    alphSwitchList = heretic_alphSwitchList;
+  else
+    alphSwitchList = doom_alphSwitchList;
 
   for (i=0;;i++)
   {

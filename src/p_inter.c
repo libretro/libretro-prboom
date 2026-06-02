@@ -298,6 +298,47 @@ static void P_GiveCard(player_t *player, card_t card)
 }
 
 //
+// P_GiveArtifact
+//
+// Heretic: add an artifact to the player's inventory. Returns false if the
+// inventory cannot accept it (already holding the per-item limit). This is
+// the Heretic path only -- the Hexen puzzle-item handling and the on-screen
+// inventory-cursor bookkeeping are omitted (the Hexen inventory UI is not
+// built here).
+//
+#define ARTI_LIMIT 16
+
+dbool P_GiveArtifact(player_t *player, int arti, mobj_t *mo)
+{
+  int i = 0;
+
+  while (i < player->inventorySlotNum && player->inventory[i].type != arti)
+    i++;
+
+  if (i == player->inventorySlotNum)
+  {
+    player->inventory[i].count = 1;
+    player->inventory[i].type  = arti;
+    player->inventorySlotNum++;
+  }
+  else
+  {
+    if (player->inventory[i].count >= ARTI_LIMIT)
+      return FALSE;
+    player->inventory[i].count++;
+  }
+
+  if (player->artifactCount == 0)
+    player->readyArtifact = arti;
+  player->artifactCount++;
+
+  if (mo && (mo->flags & MF_COUNTITEM))
+    player->itemcount++;
+
+  return TRUE;
+}
+
+//
 // P_GivePower
 //
 // Rewritten by Lee Killough
@@ -337,12 +378,20 @@ dbool   P_GivePower(player_t *player, int power)
 
 extern void retro_set_rumble_touch(unsigned intensity, float duration);
 
+static void Heretic_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher);
+
 void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
 {
   player_t *player;
   int      i;
   int      sound;
   fixed_t  delta = special->z - toucher->z;
+
+  if (heretic)
+  {
+    Heretic_P_TouchSpecialThing(special, toucher);
+    return;
+  }
 
   if (delta > toucher->height || delta < -8*FRACUNIT)
     return;        // out of reach
@@ -678,36 +727,7 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       retro_set_rumble_touch(16, 180.0f);
       break;
 
-    /* Heretic keys. The Heretic sprite table maps these names to the key
-     * pickups: BKYY = blue, CKYY = yellow, AKYY = green. They are stored in
-     * the same cards[] slots the Heretic locked-door checks read
-     * (blue/yellow/green == slots 0/1/2 == it_bluecard/yellowcard/redcard),
-     * so granting them here lets the matching doors open. Guarded by heretic
-     * because these sprite enum values only mean keys under the Heretic
-     * sprite table. */
-    case HERETIC_SPR_BKYY: /* blue */
-      if (!heretic)
-        goto unknown_special;
-      P_GiveCard(player, it_bluecard);
-      sound = heretic_sfx_keyup;
-      break;
-
-    case HERETIC_SPR_CKYY: /* yellow */
-      if (!heretic)
-        goto unknown_special;
-      P_GiveCard(player, it_yellowcard);
-      sound = heretic_sfx_keyup;
-      break;
-
-    case HERETIC_SPR_AKYY: /* green */
-      if (!heretic)
-        goto unknown_special;
-      P_GiveCard(player, it_redcard);
-      sound = heretic_sfx_keyup;
-      break;
-
     default:
-    unknown_special:
       I_Error ("P_SpecialThing: Unknown gettable thing");
     }
 
@@ -721,6 +741,267 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
   // displayplayer, not consoleplayer, for viewing multiplayer demos
   if (!comp[comp_sound] || player == &players[displayplayer])
     S_StartSound (player->mo, sound | PICKUP_SOUND);   // killough 4/25/98
+}
+
+/*
+ * Heretic pickups.
+ *
+ * Heretic identifies pickups by sprite (a distinct sprite table from
+ * Doom). This grants the matching item, ammo, key, artifact or weapon.
+ * Messages are posted via player->message (the engine's HUD message
+ * mechanism) using plain text. Weapon slots map onto the shared
+ * weapontype_t enum (staff=WP_FIST .. gauntlets=WP_CHAINSAW); ammo uses
+ * the am_* slots, keys use cards[] slots 0/1/2, and artifacts use the
+ * Raven inventory via P_GiveArtifact. The pickup amount for ammo items is
+ * carried in special->health (the ammo mobj's spawnhealth).
+ */
+static void Heretic_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
+{
+  player_t *player;
+  int       i;
+  int       sound;
+  fixed_t   delta = special->z - toucher->z;
+
+  if (delta > toucher->height || delta < -32 * FRACUNIT)
+    return;                 /* out of reach */
+  if (toucher->health <= 0)
+    return;                 /* toucher is dead */
+
+  sound  = heretic_sfx_itemup;
+  player = toucher->player;
+
+  switch (special->sprite)
+  {
+    /* Items */
+    case HERETIC_SPR_PTN1:        /* healing potion */
+      if (!P_GiveBody(player, 10))
+        return;
+      player->message = "CRYSTAL VIAL";
+      break;
+    case HERETIC_SPR_SHLD:        /* silver shield */
+      if (!P_GiveArmor(player, 1))
+        return;
+      player->message = "SILVER SHIELD";
+      break;
+    case HERETIC_SPR_SHD2:        /* enchanted shield */
+      if (!P_GiveArmor(player, 2))
+        return;
+      player->message = "ENCHANTED SHIELD";
+      break;
+    case HERETIC_SPR_BAGH:        /* bag of holding */
+      if (!player->backpack)
+      {
+        for (i = 0; i < NUMAMMO; i++)
+          player->maxammo[i] *= 2;
+        player->backpack = TRUE;
+      }
+      P_GiveAmmo(player, am_goldwand, AMMO_GWND_WIMPY);
+      P_GiveAmmo(player, am_blaster, AMMO_BLSR_WIMPY);
+      P_GiveAmmo(player, am_crossbow, AMMO_CBOW_WIMPY);
+      P_GiveAmmo(player, am_skullrod, AMMO_SKRD_WIMPY);
+      P_GiveAmmo(player, am_phoenixrod, AMMO_PHRD_WIMPY);
+      player->message = "BAG OF HOLDING";
+      break;
+    case HERETIC_SPR_SPMP:        /* map scroll */
+      if (!P_GivePower(player, pw_allmap))
+        return;
+      player->message = "MAP SCROLL";
+      break;
+
+    /* Keys (blue/yellow/green map to cards[] slots 0/1/2). */
+    case HERETIC_SPR_BKYY:        /* blue key */
+      P_GiveCard(player, it_bluecard);
+      player->message = "BLUE KEY";
+      sound = heretic_sfx_keyup;
+      if (!netgame)
+        break;
+      return;
+    case HERETIC_SPR_CKYY:        /* yellow key */
+      P_GiveCard(player, it_yellowcard);
+      player->message = "YELLOW KEY";
+      sound = heretic_sfx_keyup;
+      if (!netgame)
+        break;
+      return;
+    case HERETIC_SPR_AKYY:        /* green key */
+      P_GiveCard(player, it_redcard);
+      player->message = "GREEN KEY";
+      sound = heretic_sfx_keyup;
+      if (!netgame)
+        break;
+      return;
+
+    /* Artifacts (inventory). These never disappear in netgames. */
+    case HERETIC_SPR_PTN2:        /* quartz flask */
+      if (P_GiveArtifact(player, arti_health, special))
+      {
+        player->message = "QUARTZ FLASK";
+        if (!netgame)
+          break;
+      }
+      return;
+    case HERETIC_SPR_SOAR:        /* wings of wrath */
+      if (P_GiveArtifact(player, arti_fly, special))
+      {
+        player->message = "WINGS OF WRATH";
+        if (!netgame)
+          break;
+      }
+      return;
+    case HERETIC_SPR_INVU:        /* ring of invincibility */
+      if (P_GiveArtifact(player, arti_invulnerability, special))
+      {
+        player->message = "RING OF INVINCIBILITY";
+        if (!netgame)
+          break;
+      }
+      return;
+    case HERETIC_SPR_PWBK:        /* tome of power */
+      if (P_GiveArtifact(player, arti_tomeofpower, special))
+      {
+        player->message = "TOME OF POWER";
+        if (!netgame)
+          break;
+      }
+      return;
+    case HERETIC_SPR_INVS:        /* shadowsphere */
+      if (P_GiveArtifact(player, arti_invisibility, special))
+      {
+        player->message = "SHADOWSPHERE";
+        if (!netgame)
+          break;
+      }
+      return;
+    case HERETIC_SPR_EGGC:        /* morph ovum */
+      if (P_GiveArtifact(player, arti_egg, special))
+      {
+        player->message = "MORPH OVUM";
+        if (!netgame)
+          break;
+      }
+      return;
+    case HERETIC_SPR_SPHL:        /* mystic urn */
+      if (P_GiveArtifact(player, arti_superhealth, special))
+      {
+        player->message = "MYSTIC URN";
+        if (!netgame)
+          break;
+      }
+      return;
+    case HERETIC_SPR_TRCH:        /* torch */
+      if (P_GiveArtifact(player, arti_torch, special))
+      {
+        player->message = "TORCH";
+        if (!netgame)
+          break;
+      }
+      return;
+    case HERETIC_SPR_FBMB:        /* time bomb of the ancients */
+      if (P_GiveArtifact(player, arti_firebomb, special))
+      {
+        player->message = "TIME BOMB OF THE ANCIENTS";
+        if (!netgame)
+          break;
+      }
+      return;
+    case HERETIC_SPR_ATLP:        /* chaos device */
+      if (P_GiveArtifact(player, arti_teleport, special))
+      {
+        player->message = "CHAOS DEVICE";
+        if (!netgame)
+          break;
+      }
+      return;
+
+    /* Ammo (pickup amount in special->health). */
+    case HERETIC_SPR_AMG1:        /* wand crystal */
+    case HERETIC_SPR_AMG2:        /* crystal geode */
+      if (!P_GiveAmmo(player, am_goldwand, special->health))
+        return;
+      player->message = "WAND CRYSTAL";
+      break;
+    case HERETIC_SPR_AMM1:        /* mace spheres */
+    case HERETIC_SPR_AMM2:
+      if (!P_GiveAmmo(player, am_mace, special->health))
+        return;
+      player->message = "MACE SPHERES";
+      break;
+    case HERETIC_SPR_AMC1:        /* ethereal arrows */
+    case HERETIC_SPR_AMC2:
+      if (!P_GiveAmmo(player, am_crossbow, special->health))
+        return;
+      player->message = "ETHEREAL ARROWS";
+      break;
+    case HERETIC_SPR_AMB1:        /* claw orb */
+    case HERETIC_SPR_AMB2:
+      if (!P_GiveAmmo(player, am_blaster, special->health))
+        return;
+      player->message = "CLAW ORB";
+      break;
+    case HERETIC_SPR_AMS1:        /* lesser/greater runes */
+    case HERETIC_SPR_AMS2:
+      if (!P_GiveAmmo(player, am_skullrod, special->health))
+        return;
+      player->message = "RUNES";
+      break;
+    case HERETIC_SPR_AMP1:        /* flame orb */
+    case HERETIC_SPR_AMP2:
+      if (!P_GiveAmmo(player, am_phoenixrod, special->health))
+        return;
+      player->message = "FLAME ORB";
+      break;
+
+    /* Weapons (Heretic slots overlay the Doom weapontype_t slots). */
+    case HERETIC_SPR_WMCE:        /* firemace */
+      if (!P_GiveWeapon(player, WP_BFG /* mace */, FALSE))
+        return;
+      player->message = "FIREMACE";
+      sound = heretic_sfx_wpnup;
+      break;
+    case HERETIC_SPR_WBOW:        /* ethereal crossbow */
+      if (!P_GiveWeapon(player, WP_SHOTGUN /* crossbow */, FALSE))
+        return;
+      player->message = "ETHEREAL CROSSBOW";
+      sound = heretic_sfx_wpnup;
+      break;
+    case HERETIC_SPR_WBLS:        /* dragon claw */
+      if (!P_GiveWeapon(player, WP_CHAINGUN /* blaster */, FALSE))
+        return;
+      player->message = "DRAGON CLAW";
+      sound = heretic_sfx_wpnup;
+      break;
+    case HERETIC_SPR_WSKL:        /* hellstaff */
+      if (!P_GiveWeapon(player, WP_MISSILE /* skullrod */, FALSE))
+        return;
+      player->message = "HELLSTAFF";
+      sound = heretic_sfx_wpnup;
+      break;
+    case HERETIC_SPR_WPHX:        /* phoenix rod */
+      if (!P_GiveWeapon(player, WP_PLASMA /* phoenixrod */, FALSE))
+        return;
+      player->message = "PHOENIX ROD";
+      sound = heretic_sfx_wpnup;
+      break;
+    case HERETIC_SPR_WGNT:        /* gauntlets of the necromancer */
+      if (!P_GiveWeapon(player, WP_CHAINSAW /* gauntlets */, FALSE))
+        return;
+      player->message = "GAUNTLETS OF THE NECROMANCER";
+      sound = heretic_sfx_wpnup;
+      break;
+
+    default:
+      /* Unknown Heretic pickup: leave it in the world rather than
+       * silently removing it. */
+      return;
+  }
+
+  if (special->flags & MF_COUNTITEM)
+    player->itemcount++;
+  P_RemoveMobj(special);
+  player->bonuscount += BONUSADD;
+
+  if (!comp[comp_sound] || player == &players[displayplayer])
+    S_StartSound(player->mo, sound | PICKUP_SOUND);
 }
 
 //

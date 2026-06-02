@@ -2979,8 +2979,6 @@ static fixed_t p_pspr_PlayerSlope(player_t *player) { return (player->lookdir <<
 #define USE_MACE_AMMO_1 1
 #define USE_MACE_AMMO_2 5
 
-/* Tome-of-power weapon-level-2 power index. */
-#define pw_weaponlevel2 NUMPOWERS
 
 
 void A_BeakAttackPL1(player_t * player, pspdef_t * psp)

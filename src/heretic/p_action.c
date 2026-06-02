@@ -44,9 +44,6 @@ extern mobj_t **bodyque;
 #define USE_MACE_AMMO_1 1
 #define USE_MACE_AMMO_2 5
 
-/* Heretic weapon-level-2 power index (tome of power).  Defined as a
- * constant here; the player power array is indexed by it. */
-#define pw_weaponlevel2 NUMPOWERS
 
 #define FLOOR_SOLID 0
 #define TELEFOGHEIGHT (32*FRACUNIT)

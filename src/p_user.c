@@ -43,6 +43,13 @@
 #include "r_demo.h"
 #include "r_fps.h"
 #include "g_game.h"
+#include "m_random.h"
+#include "s_sound.h"
+#include "sounds.h"
+#include "p_inter.h"
+#include "p_pspr.h"
+#include "heretic/p_action.h"
+#include "p_tick.h"
 
 // Index of the special effects (INVUL inverse) map.
 
@@ -737,6 +744,212 @@ dbool   P_UndoPlayerMorph(player_t *player)
    return(true);
 }
 #endif
+
+/*
+=================
+=
+= Heretic artifact use
+=
+= P_GiveArtifact stores artifacts in player->inventory[]; these routines
+= apply an artifact's effect and remove it.  inv_ptr/curpos track the
+= on-screen inventory cursor for the local player (used by the eventual
+= inventory bar; kept consistent here so the cursor follows removals).
+=
+=================
+*/
+
+int inv_ptr;
+int curpos;
+int ArtifactFlash;
+
+
+void P_PlayerNextArtifact(player_t *player)
+{
+  if (player == &players[consoleplayer])
+  {
+    inv_ptr--;
+    if (inv_ptr < 6)
+    {
+      curpos--;
+      if (curpos < 0)
+        curpos = 0;
+    }
+    if (inv_ptr < 0)
+    {
+      inv_ptr = player->inventorySlotNum - 1;
+      curpos = (inv_ptr < 6) ? inv_ptr : 6;
+    }
+    if (inv_ptr >= 0 && inv_ptr < player->inventorySlotNum)
+      player->readyArtifact = player->inventory[inv_ptr].type;
+  }
+}
+
+void P_PlayerRemoveArtifact(player_t *player, int slot)
+{
+  int i;
+
+  player->artifactCount--;
+  if (!(--player->inventory[slot].count))
+  {                             /* used the last of this type - compact list */
+    player->readyArtifact        = arti_none;
+    player->inventory[slot].type = arti_none;
+    for (i = slot + 1; i < player->inventorySlotNum; i++)
+      player->inventory[i - 1] = player->inventory[i];
+    player->inventorySlotNum--;
+    if (player == &players[consoleplayer])
+    {
+      inv_ptr--;
+      if (inv_ptr < 6)
+      {
+        curpos--;
+        if (curpos < 0)
+          curpos = 0;
+      }
+      if (inv_ptr >= player->inventorySlotNum)
+        inv_ptr = player->inventorySlotNum - 1;
+      if (inv_ptr < 0)
+        inv_ptr = 0;
+      if (player->inventorySlotNum > 0)
+        player->readyArtifact = player->inventory[inv_ptr].type;
+    }
+  }
+}
+
+/* Chaos device: warp to the level's first start (or a random DM start). */
+static void P_ArtiTele(player_t *player)
+{
+  fixed_t destX, destY;
+  angle_t destAngle;
+  fixed_t oldx, oldy, oldz;
+
+  if (deathmatch)
+  {
+    int selections = deathmatch_p - deathmatchstarts;
+    int i = P_Random(pr_heretic) % selections;
+    destX = deathmatchstarts[i].x << FRACBITS;
+    destY = deathmatchstarts[i].y << FRACBITS;
+    destAngle = ANG45 * (deathmatchstarts[i].angle / 45);
+  }
+  else
+  {
+    destX = playerstarts[0].x << FRACBITS;
+    destY = playerstarts[0].y << FRACBITS;
+    destAngle = ANG45 * (playerstarts[0].angle / 45);
+  }
+
+  oldx = player->mo->x;
+  oldy = player->mo->y;
+  oldz = player->mo->z;
+  if (P_TeleportMove(player->mo, destX, destY, FALSE))
+  {
+    S_StartSound(P_SpawnMobj(oldx, oldy, oldz, HERETIC_MT_TFOG),
+                 heretic_sfx_telept);
+    player->mo->angle = destAngle;
+    player->mo->z = player->mo->floorz;
+    player->mo->momx = player->mo->momy = player->mo->momz = 0;
+    S_StartSound(NULL, heretic_sfx_wpnup); /* full-volume laugh */
+  }
+}
+
+dbool P_UseArtifact(player_t *player, int arti)
+{
+  mobj_t *mo;
+  angle_t angle;
+
+  switch (arti)
+  {
+    case arti_invulnerability:
+      if (!P_GivePower(player, pw_invulnerability))
+        return FALSE;
+      break;
+    case arti_invisibility:
+      if (!P_GivePower(player, pw_invisibility))
+        return FALSE;
+      break;
+    case arti_health:
+      if (!P_GiveBody(player, 25))
+        return FALSE;
+      break;
+    case arti_superhealth:
+      if (!P_GiveBody(player, 100))
+        return FALSE;
+      break;
+    case arti_tomeofpower:
+      if (player->chickenTics)
+      {                         /* would undo a chicken morph; the morph
+                                 * system is not active for Heretic yet, so
+                                 * just clear the timer for now. */
+        player->chickenTics = 0;
+        S_StartSound(player->mo, heretic_sfx_wpnup);
+      }
+      else
+      {
+        if (!P_GivePower(player, pw_weaponlevel2))
+          return FALSE;
+        /* The weapon-ready code selects the tome-powered ready/attack frames
+         * from player->powers[pw_weaponlevel2], so no explicit psprite set
+         * is needed here. */
+      }
+      break;
+    case arti_torch:
+      if (!P_GivePower(player, pw_infrared))
+        return FALSE;
+      break;
+    case arti_firebomb:
+      angle = player->mo->angle >> ANGLETOFINESHIFT;
+      mo = P_SpawnMobj(player->mo->x + 24 * finecosine[angle],
+                       player->mo->y + 24 * finesine[angle],
+                       player->mo->z
+                       - 15 * FRACUNIT * (player->mo->flags2 & 1),
+                       HERETIC_MT_FIREBOMB);
+      P_SetTarget(&mo->target, player->mo);
+      break;
+    case arti_egg:
+      mo = player->mo;
+      P_SpawnPlayerMissile(mo, HERETIC_MT_EGGFX);
+      P_SPMAngle(mo, HERETIC_MT_EGGFX, mo->angle - (ANG45 / 6));
+      P_SPMAngle(mo, HERETIC_MT_EGGFX, mo->angle + (ANG45 / 6));
+      P_SPMAngle(mo, HERETIC_MT_EGGFX, mo->angle - (ANG45 / 3));
+      P_SPMAngle(mo, HERETIC_MT_EGGFX, mo->angle + (ANG45 / 3));
+      break;
+    case arti_fly:
+      if (!P_GivePower(player, pw_flight))
+        return FALSE;
+      break;
+    case arti_teleport:
+      P_ArtiTele(player);
+      break;
+    default:
+      return FALSE;
+  }
+  return TRUE;
+}
+
+void P_PlayerUseArtifact(player_t *player, int arti)
+{
+  int i;
+
+  for (i = 0; i < player->inventorySlotNum; i++)
+  {
+    if (player->inventory[i].type == arti)
+    {                           /* found a match - try to use it */
+      if (P_UseArtifact(player, arti))
+      {
+        P_PlayerRemoveArtifact(player, i);
+        if (player == &players[consoleplayer])
+        {
+          S_StartSound(NULL, heretic_sfx_artiuse);
+          ArtifactFlash = 4;
+        }
+      }
+      else
+      {                         /* couldn't use it - advance the cursor */
+        P_PlayerNextArtifact(player);
+      }
+      break;
+    }
+  }
+}
 
 /*
 =================

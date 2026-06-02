@@ -888,6 +888,9 @@ int  P_FaceMobj(mobj_t *source, mobj_t *target, angle_t *delta);
 #define FOOTCLIPSIZE (10*FRACUNIT)
 #endif
 mobjtype_t PuffType;
+mobj_t *PuffSpawned;   /* last puff P_SpawnPuff created (Raven games) */
+int P_SubRandom(void);  /* heretic/p_action.c */
+void S_StartMobjSound(mobj_t *mobj, int sfx_id);  /* heretic/p_action.c */
 mobj_t *MissileMobj;
 
 mobj_t* P_SpawnMobj(fixed_t x,fixed_t y,fixed_t z,mobjtype_t type)
@@ -1478,8 +1481,37 @@ extern fixed_t attackrange;
 void P_SpawnPuff(fixed_t x,fixed_t y,fixed_t z)
 {
   mobj_t* th;
+  int t;
+
+  /* Heretic uses its own puff actor (PuffType, set by the firing weapon)
+   * rather than the Doom MT_PUFF, and plays the puff's own sound. Without
+   * this, a Heretic hitscan (e.g. the gold wand) spawned the Doom puff,
+   * which has no valid Heretic sprite/states, so nothing was drawn at the
+   * impact point. */
+  if (heretic)
+  {
+    th = P_SpawnMobj(x, y, z + (P_SubRandom() << 10), PuffType);
+    if (th->info->attacksound)
+      S_StartMobjSound(th, th->info->attacksound);
+    switch (PuffType)
+    {
+      case HERETIC_MT_BEAKPUFF:
+      case HERETIC_MT_STAFFPUFF:
+        th->momz = FRACUNIT;
+        break;
+      case HERETIC_MT_GAUNTLETPUFF1:
+      case HERETIC_MT_GAUNTLETPUFF2:
+        th->momz = (fixed_t)(FRACUNIT * 4 / 5); /* .8 */
+        break;
+      default:
+        break;
+    }
+    PuffSpawned = th;
+    return;
+  }
+
   // killough 5/5/98: remove dependence on order of evaluation:
-  int t = P_Random(pr_spawnpuff);
+  t = P_Random(pr_spawnpuff);
   z += (t - P_Random(pr_spawnpuff))<<10;
 
   th = P_SpawnMobj (x,y,z, MT_PUFF);

@@ -377,8 +377,13 @@ menu_t MainDef =
 void M_DrawMainMenu(void)
 {
   // CPhipps - patch drawing updated
-  /* M_DOOM is Doom's main-menu title; Heretic has no such lump. */
-  if (W_CheckNumForName("M_DOOM") >= 0)
+  /* M_DOOM is Doom's main-menu title; Heretic uses M_HTIC instead. */
+  if (heretic)
+  {
+    if (W_CheckNumForName("M_HTIC") >= 0)
+      V_DrawNamePatch(88, 0, 0, "M_HTIC", CR_DEFAULT, VPT_STRETCH);
+  }
+  else if (W_CheckNumForName("M_DOOM") >= 0)
     V_DrawNamePatch(94, 2, 0, "M_DOOM", CR_DEFAULT, VPT_STRETCH);
 }
 
@@ -5135,6 +5140,38 @@ void M_StartControlPanel (void)
 // killough 9/29/98: Significantly reformatted source
 //
 
+/* Draw a string in Heretic's big FONTB menu font. FONTB_S+1 is glyph '!'
+ * (ASCII 33); characters below 33 (space) advance a fixed width. Used for
+ * Heretic menu items, which have no per-item graphic lumps. */
+static void M_DrawTextB(int x, int y, const char *text)
+{
+  static int fontb_base = -2;   /* -2 = not looked up, -1 = absent */
+  char c;
+
+  if (fontb_base == -2)
+  {
+    int s = W_CheckNumForName("FONTB_S");
+    fontb_base = (s >= 0) ? s + 1 : -1;
+  }
+  if (fontb_base < 0)
+  {
+    M_WriteText(x, y, text, CR_DEFAULT);   /* fall back to the small font */
+    return;
+  }
+
+  while ((c = *text++) != 0)
+  {
+    if (c < 33)
+      x += 8;
+    else
+    {
+      int lump = fontb_base + c - 33;
+      V_DrawNumPatch(x, y, 0, lump, CR_DEFAULT, VPT_STRETCH);
+      x += R_NumPatchWidth(lump) - 1;
+    }
+  }
+}
+
 void M_Drawer (void)
 {
   inhelpscreens = FALSE;
@@ -5196,7 +5233,12 @@ void M_Drawer (void)
     {
       const char *alttext = currentMenu->menuitems[i].alttext;
       if (alttext)
-        M_WriteText(x, y+8-(M_StringHeight(alttext)/2), alttext, CR_DEFAULT);
+      {
+        if (heretic)
+          M_DrawTextB(x, y, alttext);     /* Heretic's big FONTB font */
+        else
+          M_WriteText(x, y+8-(M_StringHeight(alttext)/2), alttext, CR_DEFAULT);
+      }
       y += LINEHEIGHT;
     }
 

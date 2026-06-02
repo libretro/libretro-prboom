@@ -375,6 +375,12 @@ static int      keyboxes[3];
 // a random number per tick
 static int      st_randomnumber;
 
+/* Heretic health-chain animation: HealthMarker chases the real health so the
+ * life gem glides rather than snapping, and ChainWiggle bobs the chain by a
+ * pixel while it is moving. Updated once per tic in ST_Ticker. */
+static int      HealthMarker;
+static int      ChainWiggle;
+
 extern char     *mapnames[];
 
 //
@@ -718,6 +724,39 @@ void ST_Ticker(void)
 
   st_oldhealth = plyr->health;
   st_oldarmour = plyr->armorpoints;
+
+  /* Heretic: glide the health gem toward the real health and wiggle the
+   * chain while it moves. Mirrors the Raven SB_Ticker behaviour. */
+  if (heretic)
+  {
+    int curhealth = plyr->health;
+    int delta;
+
+    if (curhealth < 0)
+      curhealth = 0;
+
+    if (leveltime & 1)
+      ChainWiggle = P_Random(pr_heretic) & 1;
+
+    if (curhealth < HealthMarker)
+    {
+      delta = (HealthMarker - curhealth) >> 2;
+      if (delta < 1)
+        delta = 1;
+      else if (delta > 6)
+        delta = 6;
+      HealthMarker -= delta;
+    }
+    else if (curhealth > HealthMarker)
+    {
+      delta = (curhealth - HealthMarker) >> 2;
+      if (delta < 1)
+        delta = 1;
+      else if (delta > 6)
+        delta = 6;
+      HealthMarker += delta;
+    }
+  }
 }
 
 int st_palette = 0;
@@ -895,7 +934,7 @@ static void ST_HereticDrawer(void)
   player_t   *plyr = &players[displayplayer];
   ammotype_t  at;
   int         ammo;
-  int         health, gempos;
+  int         health, gempos, chainy;
 
   /* Background frame + stat panel (positions match the Raven layout:
    * BARBACK fills y=158, the STATBAR stat panel sits at x=34,y=160). */
@@ -921,18 +960,21 @@ static void ST_HereticDrawer(void)
 
   /* Health chain along the bottom: a gem slides between the two gargoyle
    * heads (LTFACE at the left -- the "demon's mouth" the chain runs from --
-   * and RTFACE at the right) to show health 0..100. LIFEGEM2 is the
-   * single-player red gem. Geometry follows the Raven HUD. */
-  health = plyr->health;
+   * and RTFACE at the right) to show health 0..100. The gem follows the
+   * smoothed HealthMarker so it glides, and the chain bobs by ChainWiggle
+   * while the marker is still catching up to the real health. LIFEGEM2 is
+   * the single-player red gem. Geometry follows the Raven HUD. */
+  health = HealthMarker;
   if (health < 0)
     health = 0;
   else if (health > 100)
     health = 100;
   gempos = (health * 256) / 100;
+  chainy = (HealthMarker == plyr->health) ? 191 : 191 + ChainWiggle;
   if (W_CheckNumForName("CHAIN") >= 0)
-    V_DrawNamePatch(2 + (gempos % 17), 191, FG, "CHAIN", CR_DEFAULT, VPT_STRETCH);
+    V_DrawNamePatch(2 + (gempos % 17), chainy, FG, "CHAIN", CR_DEFAULT, VPT_STRETCH);
   if (W_CheckNumForName("LIFEGEM2") >= 0)
-    V_DrawNamePatch(17 + gempos, 191, FG, "LIFEGEM2", CR_DEFAULT, VPT_STRETCH);
+    V_DrawNamePatch(17 + gempos, chainy, FG, "LIFEGEM2", CR_DEFAULT, VPT_STRETCH);
   if (W_CheckNumForName("LTFACE") >= 0)
     V_DrawNamePatch(0, 190, FG, "LTFACE", CR_DEFAULT, VPT_STRETCH);
   if (W_CheckNumForName("RTFACE") >= 0)
@@ -1086,6 +1128,11 @@ static void ST_initData(void)
 
   st_firsttime = TRUE;
   plyr = &players[displayplayer];            // killough 3/7/98
+
+  /* Seed the Heretic health-chain marker so the gem starts at the current
+   * health rather than gliding up from empty on every level load. */
+  HealthMarker = plyr->health;
+  ChainWiggle  = 0;
 
   st_clock = 0;
   st_chatstate = StartChatState;

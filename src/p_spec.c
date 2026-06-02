@@ -1167,9 +1167,105 @@ dbool P_WasSecret(const sector_t *sec)
 //  crossed. Change is qualified by demo_compatibility.
 //
 // CPhipps - take a line_t pointer instead of a line number, as in MBF
+/* Raven: Heretic walk-over (cross) line specials.  Heretic renumbered a
+ * number of Doom's linedef types -- most importantly special 100 is a fast
+ * "raise door" here, not Doom's build-stairs -- so the Doom dispatcher below
+ * would run the wrong action (e.g. building stairs instead of opening the
+ * door that releases an ambush monster).  This mirrors Heretic's own table. */
+static void P_CrossHereticSpecialLine(line_t *line, int side, mobj_t *thing)
+{
+  /* Triggers a non-player mobj is allowed to activate. */
+  if (!thing->player)
+  {
+    switch (line->special)
+    {
+      case 39:   /* teleport */
+      case 97:   /* teleport (re-triggerable) */
+      case 4:    /* raise door */
+        break;
+      default:
+        return;
+    }
+  }
+
+  switch (line->special)
+  {
+    /* Single-use triggers (W1) */
+    case 2:   EV_DoDoor(line, open);                 line->special = 0; break;
+    case 3:   EV_DoDoor(line, close);                line->special = 0; break;
+    case 4:   EV_DoDoor(line, normal);               line->special = 0; break;
+    case 5:   EV_DoFloor(line, FLEV_RAISEFLOOR);     line->special = 0; break;
+    case 6:   EV_DoCeiling(line, fastCrushAndRaise); line->special = 0; break;
+    case 8:   EV_BuildStairs(line, build8);          line->special = 0; break;
+    case 106: EV_BuildStairs(line, turbo16);         line->special = 0; break;
+    case 10:  EV_DoPlat(line, downWaitUpStay, 0);    line->special = 0; break;
+    case 12:  EV_LightTurnOn(line, 0);               line->special = 0; break;
+    case 13:  EV_LightTurnOn(line, 255);             line->special = 0; break;
+    case 16:  EV_DoDoor(line, close30ThenOpen);      line->special = 0; break;
+    case 17:  EV_StartLightStrobing(line);           line->special = 0; break;
+    case 19:  EV_DoFloor(line, FLEV_LOWERFLOOR);     line->special = 0; break;
+    case 22:  EV_DoPlat(line, raiseToNearestAndChange, 0); line->special = 0; break;
+    case 25:  EV_DoCeiling(line, crushAndRaise);     line->special = 0; break;
+    case 30:  EV_DoFloor(line, FLEV_RAISETOTEXTURE); line->special = 0; break;
+    case 35:  EV_LightTurnOn(line, 35);              line->special = 0; break;
+    case 36:  EV_DoFloor(line, FLEV_TURBOLOWER);     line->special = 0; break;
+    case 37:  EV_DoFloor(line, FLEV_LOWERANDCHANGE); line->special = 0; break;
+    case 38:  EV_DoFloor(line, FLEV_LOWERFLOORTOLOWEST); line->special = 0; break;
+    case 39:  EV_Teleport(line, side, thing);        line->special = 0; break;
+    case 40:  EV_DoCeiling(line, raiseToHighest);
+              EV_DoFloor(line, FLEV_LOWERFLOORTOLOWEST); line->special = 0; break;
+    case 44:  EV_DoCeiling(line, lowerAndCrush);     line->special = 0; break;
+    case 52:  G_ExitLevel();                         line->special = 0; break;
+    case 53:  EV_DoPlat(line, perpetualRaise, 0);    line->special = 0; break;
+    case 54:  EV_StopPlat(line);                     line->special = 0; break;
+    case 56:  EV_DoFloor(line, FLEV_RAISEFLOORCRUSH); line->special = 0; break;
+    case 57:  EV_CeilingCrushStop(line);             line->special = 0; break;
+    case 58:  EV_DoFloor(line, FLEV_RAISEFLOOR24);   line->special = 0; break;
+    case 59:  EV_DoFloor(line, FLEV_RAISEFLOOR24ANDCHANGE); line->special = 0; break;
+    case 104: EV_TurnTagLightsOff(line);             line->special = 0; break;
+    case 105: G_SecretExitLevel();                   line->special = 0; break;
+
+    /* Re-doable triggers (WR) */
+    case 72:  EV_DoCeiling(line, lowerAndCrush);     break;
+    case 73:  EV_DoCeiling(line, crushAndRaise);     break;
+    case 74:  EV_CeilingCrushStop(line);             break;
+    case 75:  EV_DoDoor(line, close);                break;
+    case 76:  EV_DoDoor(line, close30ThenOpen);      break;
+    case 77:  EV_DoCeiling(line, fastCrushAndRaise); break;
+    case 79:  EV_LightTurnOn(line, 35);              break;
+    case 80:  EV_LightTurnOn(line, 0);               break;
+    case 81:  EV_LightTurnOn(line, 255);             break;
+    case 82:  EV_DoFloor(line, FLEV_LOWERFLOORTOLOWEST); break;
+    case 83:  EV_DoFloor(line, FLEV_LOWERFLOOR);     break;
+    case 84:  EV_DoFloor(line, FLEV_LOWERANDCHANGE); break;
+    case 86:  EV_DoDoor(line, open);                 break;
+    case 87:  EV_DoPlat(line, perpetualRaise, 0);    break;
+    case 88:  EV_DoPlat(line, downWaitUpStay, 0);    break;
+    case 89:  EV_StopPlat(line);                     break;
+    case 90:  EV_DoDoor(line, normal);               break;
+    case 100: EV_DoDoor(line, blazeRaise);           break;
+    case 91:  EV_DoFloor(line, FLEV_RAISEFLOOR);     break;
+    case 92:  EV_DoFloor(line, FLEV_RAISEFLOOR24);   break;
+    case 93:  EV_DoFloor(line, FLEV_RAISEFLOOR24ANDCHANGE); break;
+    case 94:  EV_DoFloor(line, FLEV_RAISEFLOORCRUSH); break;
+    case 95:  EV_DoPlat(line, raiseToNearestAndChange, 0); break;
+    case 96:  EV_DoFloor(line, FLEV_RAISETOTEXTURE); break;
+    case 97:  EV_Teleport(line, side, thing);        break;
+    case 98:  EV_DoFloor(line, FLEV_TURBOLOWER);     break;
+    default:  break;
+  }
+}
+
 void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing)
 {
   int         ok;
+
+  /* Raven: Heretic has its own walk-over special table. */
+  if (heretic)
+  {
+    P_CrossHereticSpecialLine(line, side, thing);
+    return;
+  }
 
   //  Things that should never trigger lines
   if (!thing->player)

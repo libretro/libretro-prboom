@@ -82,6 +82,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/heretic/in_lude.c \
 				 $(CORE_DIR)/heretic/f_finale.c \
 				 $(CORE_DIR)/hexen/sounds.c \
+				 $(CORE_DIR)/hexen/info.c \
 				 $(CORE_DIR)/p_sight.c \
 				 $(CORE_DIR)/p_spec.c \
 				 $(CORE_DIR)/p_switch.c \

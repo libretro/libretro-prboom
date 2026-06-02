@@ -4,8 +4,11 @@
 #ifndef __HEXEN_HEXEN__
 #define __HEXEN_HEXEN__
 
+#include "doomtype.h"
+#include "info.h"
 #include "sounds.h"
 
 extern sfxinfo_t hexen_S_sfx[HEXEN_NUMSFX];
+extern const char *hexen_sprnames[HEXEN_NUMSPRITES + 1];
 
 #endif

@@ -956,6 +956,22 @@ static void ST_HereticDrawSmallNumber(int val, int x, int y)
     V_DrawNamePatch(x + 4, y, FG, name, CR_DEFAULT, VPT_STRETCH);
 }
 
+/* Draw an artifact icon by lump name. The Heretic artifact graphics
+ * (ARTIPTN2, ARTIINVU, ...) live in the sprite namespace (between the
+ * S_START/S_END markers) because they double as the in-world pickup
+ * sprites, so a plain W_CheckNumForName/W_GetNumForName -- which search
+ * ns_global -- never finds them and the icon silently fails to draw.
+ * Resolve in ns_sprites first, falling back to ns_global (ARTIBOX is a
+ * global lump). */
+static void ST_HereticDrawArtiIcon(const char *name, int x, int y)
+{
+  int lump = (W_CheckNumForName)(name, ns_sprites);
+  if (lump < 0)
+    lump = W_CheckNumForName(name);
+  if (lump >= 0)
+    V_DrawNumPatch(x, y, FG, lump, CR_DEFAULT, VPT_STRETCH);
+}
+
 /* Draw the full inventory bar (shown while the player is cycling artifacts):
  * the INVBAR row, up to 7 artifact icons with counts, and the selection box
  * over the current cursor position. Replaces the stat panel while open. */
@@ -978,9 +994,8 @@ static void ST_HereticDrawInvBar(player_t *plyr, const char *const *arti_icon)
         plyr->inventory[slot].type != arti_none)
     {
       int t = plyr->inventory[slot].type;
-      if (t > 0 && t < NUMARTIFACTS && W_CheckNumForName(arti_icon[t]) >= 0)
-        V_DrawNamePatch(50 + i * 31, 160, FG, arti_icon[t],
-                        CR_DEFAULT, VPT_STRETCH);
+      if (t > 0 && t < NUMARTIFACTS)
+        ST_HereticDrawArtiIcon(arti_icon[t], 50 + i * 31, 160);
       ST_HereticDrawSmallNumber(plyr->inventory[slot].count,
                                 69 + i * 31, 182);
     }
@@ -1073,9 +1088,7 @@ static void ST_HereticDrawer(void)
     {
       if (W_CheckNumForName("ARTIBOX") >= 0)
         V_DrawNamePatch(180, 161, FG, "ARTIBOX", CR_DEFAULT, VPT_STRETCH);
-      if (W_CheckNumForName(arti_icon[plyr->readyArtifact]) >= 0)
-        V_DrawNamePatch(179, 160, FG, arti_icon[plyr->readyArtifact],
-                        CR_DEFAULT, VPT_STRETCH);
+      ST_HereticDrawArtiIcon(arti_icon[plyr->readyArtifact], 179, 160);
       if (plyr->inventorySlotNum > 0)
         ST_HereticDrawSmallNumber(plyr->inventory[inv_ptr].count, 201, 182);
     }
@@ -1140,9 +1153,7 @@ static void ST_HereticFullscreenDrawer(void)
   {
     if (W_CheckNumForName("ARTIBOX") >= 0)
       V_DrawNamePatch(286, 170, FG, "ARTIBOX", CR_DEFAULT, VPT_STRETCH);
-    if (W_CheckNumForName(arti_icon[plyr->readyArtifact]) >= 0)
-      V_DrawNamePatch(286, 170, FG, arti_icon[plyr->readyArtifact],
-                      CR_DEFAULT, VPT_STRETCH);
+    ST_HereticDrawArtiIcon(arti_icon[plyr->readyArtifact], 286, 170);
     if (plyr->inventorySlotNum > 0)
       ST_HereticDrawSmallNumber(plyr->inventory[inv_ptr].count, 307, 192);
   }

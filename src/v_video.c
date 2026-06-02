@@ -348,6 +348,19 @@ void V_DrawBackground(const char* flatname, int scrn)
   // killough 4/17/98:
   src = W_CacheLumpNum(lump = firstflat + flatnum);
 
+  /* R_FlatNumForName returns 0 (not -1) for a flat that is absent from the
+   * IWAD -- e.g. the menu background flat under shareware Heretic, which
+   * lacks FLAT513.  flatnum 0 passes the < 0 guard above but firstflat+0
+   * can resolve to a lump that is not a real 64x64 flat (or, when the flat
+   * namespace is empty, a zero-length / NULL lump).  V_DRAWFLAT then
+   * dereferences src unconditionally and crashes.  Bail out if the lump is
+   * not a usable 64x64 (4096-byte) flat. */
+  if (!src || W_LumpLength(lump) < 4096)
+  {
+    W_UnlockLumpNum(lump);
+    return;
+  }
+
   /* V_DrawBlock(0, 0, scrn, 64, 64, src, 0); */
 
   V_DRAWFLAT(scrn, int16_t, GETCOL16);

@@ -521,17 +521,24 @@ static void R_DoDrawPlane(visplane_t *pl)
             {
                int xm1;
                int skypatchnum = textures[texture]->patches[0].patch;
-               /* Smallest screen row whose texture coordinate is still >= 0:
-                *   frac(y) = texturemid + (y-centery)*iscale >= 0
-                *   y >= centery - texturemid/iscale
-                * With texturemid = 200<<FRACBITS and iscale = (200<<FRACBITS)/
-                * SCREENHEIGHT, texturemid/iscale == SCREENHEIGHT. */
+               /* Smallest screen row whose texture coordinate is still inside
+                * the patch.  The column drawer's linear-filter path samples at
+                * frac - FRACUNIT/2, so require frac >= FRACUNIT/2 at the top
+                * row to avoid reading row -1 (garbage) right at the clamp:
+                *   texturemid + (y-centery)*iscale >= FRACUNIT/2
+                *   y >= centery - (texturemid - FRACUNIT/2)/iscale
+                * Computed from the actual texturemid/iscale rather than the
+                * algebraic SCREENHEIGHT so integer truncation in iscale cannot
+                * leave the boundary row a fraction below zero. */
                int sky_top_clamp;
+               fixed_t sky_texturemid = 200 << FRACBITS;
+               fixed_t sky_iscale     = (200 << FRACBITS) / SCREENHEIGHT;
 
                dcvars.texheight = hacked->height;
-               dcvars.texturemid = 200 << FRACBITS;
-               dcvars.iscale = (200 << FRACBITS) / SCREENHEIGHT;
-               sky_top_clamp = centery - SCREENHEIGHT;
+               dcvars.texturemid = sky_texturemid;
+               dcvars.iscale = sky_iscale;
+               sky_top_clamp = centery -
+                  (int)((sky_texturemid - (FRACUNIT >> 1)) / sky_iscale);
 
                for (x = pl->minx; (dcvars.x = x) <= pl->maxx; x++)
                {

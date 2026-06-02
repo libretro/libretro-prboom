@@ -1602,7 +1602,19 @@ void AM_Drawer (void)
      return;
 
   if (!(automapmode & am_overlay)) // cph - If not overlay mode, clear background for the automap
-    V_FillRect(f_x, f_y, f_w, f_h, (uint8_t)mapcolor_back); //jff 1/5/98 background default color
+    {
+      /* mapcolor_back defaults to 247, which jff chose as a symbolic
+       * "transparent/black" token -- AM_drawFline already maps 247 -> 0
+       * before drawing.  Index 247 is black in Doom's palette but bright
+       * red in Heretic's, so filling the background with the raw 247 paints
+       * the whole automap red under Heretic.  Apply the same 247 -> 0
+       * translation here; index 0 is black in both palettes, so this is a
+       * no-op for Doom and fixes the red Heretic automap. */
+      int back = mapcolor_back;
+      if (back == 247) // jff 4/3/98 247 is the symbolic black token
+        back = 0;
+      V_FillRect(f_x, f_y, f_w, f_h, (uint8_t)back); //jff 1/5/98 background default color
+    }
   if (automapmode & am_grid)
     AM_drawGrid(mapcolor_grid);      //jff 1/7/98 grid default color
   AM_drawWalls();

@@ -5161,7 +5161,12 @@ static void M_DrawTextB(int x, int y, const char *text)
 
   while ((c = *text++) != 0)
   {
-    if (c < 33)
+    /* FONTB only has glyphs for ASCII 33('!')..90('Z') -- uppercase only.
+     * Uppercase letters and treat anything outside the range as a space so
+     * an index past FONTB_E can't run into sprite/texture lumps. */
+    if (c >= 'a' && c <= 'z')
+      c -= 'a' - 'A';
+    if (c < 33 || c > 90)
       x += 8;
     else
     {

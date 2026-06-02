@@ -670,7 +670,36 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       retro_set_rumble_touch(16, 180.0f);
       break;
 
+    /* Heretic keys. The Heretic sprite table maps these names to the key
+     * pickups: BKYY = blue, CKYY = yellow, AKYY = green. They are stored in
+     * the same cards[] slots the Heretic locked-door checks read
+     * (blue/yellow/green == slots 0/1/2 == it_bluecard/yellowcard/redcard),
+     * so granting them here lets the matching doors open. Guarded by heretic
+     * because these sprite enum values only mean keys under the Heretic
+     * sprite table. */
+    case HERETIC_SPR_BKYY: /* blue */
+      if (!heretic)
+        goto unknown_special;
+      P_GiveCard(player, it_bluecard);
+      sound = heretic_sfx_keyup;
+      break;
+
+    case HERETIC_SPR_CKYY: /* yellow */
+      if (!heretic)
+        goto unknown_special;
+      P_GiveCard(player, it_yellowcard);
+      sound = heretic_sfx_keyup;
+      break;
+
+    case HERETIC_SPR_AKYY: /* green */
+      if (!heretic)
+        goto unknown_special;
+      P_GiveCard(player, it_redcard);
+      sound = heretic_sfx_keyup;
+      break;
+
     default:
+    unknown_special:
       I_Error ("P_SpecialThing: Unknown gettable thing");
     }
 

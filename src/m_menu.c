@@ -491,10 +491,11 @@ void M_DrawReadThis1(void)
 {
   inhelpscreens = TRUE;
   if (heretic)
-    /* Heretic ships HELP1/HELP2 full-screen pages; draw them directly.
-     * The Doom credits path tiles a flat (MFLR8_4) that Heretic lacks,
-     * which crashed when "Read This!" was selected. */
-    V_DrawNamePatch(0, 0, 0, "HELP1", CR_DEFAULT, VPT_STRETCH);
+    /* Heretic's HELP1/HELP2 are raw 320x200 bitmaps, not patch_t graphics;
+     * drawing them through the patch decoder reads a bogus width/height and
+     * tries to allocate ~4 GB.  Use the raw-screen blit (same path used for
+     * Heretic's TITLE/CREDIT pages). */
+    V_DrawRawScreen("HELP1");
   else if (gamemode == shareware)
     V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
   else
@@ -510,7 +511,7 @@ void M_DrawReadThis2(void)
 {
   inhelpscreens = TRUE;
   if (heretic)
-    V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
+    V_DrawRawScreen("HELP2");
   else if (gamemode == shareware)
     M_DrawCredits();
   else

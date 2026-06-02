@@ -512,13 +512,22 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
          col = (patch->width<<FRACBITS)-(FRACUNIT>>1);
    }
 
+   /* prevcolumn/nextcolumn (and the prevsource/nextsource they feed) are
+    * only consumed by the RDRAW_FILTER_LINEAR edge-interpolation column
+    * functions. For RDRAW_FILTER_NONE -- which is what all UI patches (menu,
+    * HUD, status bar) use -- they are dead, so skip the two extra
+    * R_GetPatchColumn lookups per output column in that case. At a high
+    * internal resolution each patch spans many output columns, so this
+    * removes a large number of redundant lookups per frame. */
+   {
+   const int filter_linear = (drawvars.filterpatch == RDRAW_FILTER_LINEAR);
    for (dcvars.x=left; dcvars.x<right; dcvars.x++, col+= DXI)
    {
       int i;
       const int colindex          = (flags & VPT_FLIP) ? ((w - col)>>16): (col>>16);
       const rcolumn_t *column     = R_GetPatchColumn(patch, colindex);
-      const rcolumn_t *prevcolumn = R_GetPatchColumn(patch, colindex-1);
-      const rcolumn_t *nextcolumn = R_GetPatchColumn(patch, colindex+1);
+      const rcolumn_t *prevcolumn = filter_linear ? R_GetPatchColumn(patch, colindex-1) : NULL;
+      const rcolumn_t *nextcolumn = filter_linear ? R_GetPatchColumn(patch, colindex+1) : NULL;
 
       // ignore this column if it's to the left of our clampRect
       if (dcvars.x < 0)
@@ -571,6 +580,7 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
 
          colfunc(&dcvars);
       }
+   }
    }
 
    R_ResetColumnBuffer();

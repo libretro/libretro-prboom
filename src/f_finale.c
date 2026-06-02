@@ -40,7 +40,8 @@
 #include "s_sound.h"
 #include "sounds.h"
 #include "d_deh.h"  // Ty 03/22/98 - externalizations
-#include "f_finale.h" // CPhipps - hmm...
+#include "f_finale.h"
+#include "heretic/f_finale.h" // CPhipps - hmm...
 
 // Stage of animation:
 //  0 = text, 1 = art screen, 2 = character cast
@@ -77,6 +78,7 @@ static int midstage;                 // whether we're in "mid-stage"
 */
 void F_StartFinale (void)
 {
+  if (heretic) { Heretic_F_StartFinale(); return; }
   gameaction   = ga_nothing;
   gamestate    = GS_FINALE;
   automapmode &= ~am_active;
@@ -204,6 +206,7 @@ void F_StartFinale (void)
 
 dbool   F_Responder (event_t *event)
 {
+  if (heretic) return Heretic_F_Responder(event);
 #ifndef HEXEN
   if (FinaleStage == 2)
     return F_CastResponder (event);
@@ -238,6 +241,7 @@ static float Get_TextSpeed(void)
 void F_Ticker(void)
 {
   int i;
+  if (heretic) { Heretic_F_Ticker(); return; }
 
   if (!demo_compatibility)
     WI_checkForAccelerate();  // killough 3/28/98: check for acceleration
@@ -731,6 +735,7 @@ static void F_BunnyScroll (void)
 */
 void F_Drawer (void)
 {
+  if (heretic) { Heretic_F_Drawer(); return; }
   if (!FinaleStage)
     F_TextWrite ();
   else if (FinaleStage == 2)

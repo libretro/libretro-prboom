@@ -50,6 +50,7 @@
 #include "r_main.h"
 #include "p_maputl.h"
 #include "p_map.h"
+#include "p_user.h"
 #include "g_game.h"
 #include "p_inter.h"
 #include "s_sound.h"
@@ -2331,6 +2332,102 @@ void P_ShootSpecialLine
 
 
 //
+/* Heretic terrain splash hook (stubbed to a solid-floor no-op in this
+ * core's heretic/p_action.c); declared locally as p_mobj.c does. */
+int P_HitFloor(mobj_t *thing);
+
+/* Raven: Heretic uses its own sector-special numbering.  Several values
+ * that mean "damage" under Doom mean "scroll/current", "wind" or "low
+ * friction" in Heretic (and vice-versa), so running the Doom handler on a
+ * Heretic map makes harmless current sectors -- e.g. the water past the
+ * E1M1 teleporter -- injure the player.  This mirrors the Doom-lineage
+ * P_HitFloor terrain stub (a no-op here) and dsda-doom's Heretic table.
+ * NULL is passed as the damage inflictor on purpose: this core's
+ * P_DamageMobj has no MF2_NODMGTHRUST handling, so a positioned lava
+ * inflictor would shove the player toward the map origin every tic. */
+static void P_PlayerInHereticSector(player_t *player, sector_t *sector)
+{
+  /* Heretic wind/scroll push magnitudes (sector special - base index). */
+  static const int pushTab[5] =
+  {
+    2048 * 5,
+    2048 * 10,
+    2048 * 25,
+    2048 * 30,
+    2048 * 35
+  };
+
+  switch (sector->special)
+  {
+    case 7:                            /* Damage_Sludge */
+      if (!(leveltime & 31))
+        P_DamageMobj(player->mo, NULL, NULL, 4);
+      break;
+
+    case 5:                            /* Damage_LavaWimpy */
+      if (!(leveltime & 15))
+      {
+        P_DamageMobj(player->mo, NULL, NULL, 5);
+        P_HitFloor(player->mo);
+      }
+      break;
+
+    case 16:                           /* Damage_LavaHefty */
+      if (!(leveltime & 15))
+      {
+        P_DamageMobj(player->mo, NULL, NULL, 8);
+        P_HitFloor(player->mo);
+      }
+      break;
+
+    case 4:                            /* Scroll_EastLavaDamage */
+      P_Thrust(player, 0, 2048 * 28);
+      if (!(leveltime & 15))
+      {
+        P_DamageMobj(player->mo, NULL, NULL, 5);
+        P_HitFloor(player->mo);
+      }
+      break;
+
+    case 9:                            /* SecretArea */
+      player->secretcount++;
+      sector->special = 0;
+      break;
+
+    case 11:                           /* Exit_SuperDamage (unused in Heretic) */
+      break;
+
+    case 25: case 26: case 27: case 28: case 29:   /* Scroll_North */
+      P_Thrust(player, ANG90, pushTab[sector->special - 25]);
+      break;
+
+    case 20: case 21: case 22: case 23: case 24:   /* Scroll_East */
+      P_Thrust(player, 0, pushTab[sector->special - 20]);
+      break;
+
+    case 30: case 31: case 32: case 33: case 34:   /* Scroll_South */
+      P_Thrust(player, ANG270, pushTab[sector->special - 30]);
+      break;
+
+    case 35: case 36: case 37: case 38: case 39:   /* Scroll_West */
+      P_Thrust(player, ANG180, pushTab[sector->special - 35]);
+      break;
+
+    case 40: case 41: case 42: case 43: case 44: case 45:
+    case 46: case 47: case 48: case 49: case 50: case 51:
+      /* Wind specials: handled in P_XYMovement, inert here. */
+      break;
+
+    case 15:                           /* Friction_Low */
+      /* Handled in P_XYMovement / P_Thrust, inert here. */
+      break;
+
+    default:
+      /* Unknown special: ignore (do not exit, matching the Doom path). */
+      break;
+  }
+}
+
 // P_PlayerInSpecialSector()
 //
 // Called every tick frame
@@ -2348,6 +2445,13 @@ void P_PlayerInSpecialSector (player_t* player)
   // Sector specials don't apply in mid-air
   if (player->mo->z != sector->floorheight)
     return;
+
+  /* Raven: Heretic has its own sector-special table. */
+  if (heretic)
+  {
+    P_PlayerInHereticSector(player, sector);
+    return;
+  }
 
   // Has hit ground.
   //jff add if to handle old vs generalized types

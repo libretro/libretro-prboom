@@ -403,6 +403,26 @@ static void R_MakeSpans(int x, unsigned int t1, unsigned int b1,
 
 // New function, by Lee Killough
 
+/* Heretic sky hack (from dsda-doom): Heretic sky textures are declared 128
+ * tall but their single patch is actually 200 pixels.  Drawing them through
+ * the normal composite path tiles/mirrors the 128-tall texture, which only
+ * showed once free-look let the view pitch up far enough to expose the area
+ * above the horizon.  When the texture is Heretic and is a single 200-tall
+ * patch, return that raw patch so the sky can be drawn from the full 200-row
+ * data with a 200-anchored texturemid (see R_DoDrawPlane). */
+static const rpatch_t *R_HackedSkyPatch(int texturenum)
+{
+   if (heretic && textures[texturenum]->patchcount == 1)
+   {
+      int patchnum = textures[texturenum]->patches[0].patch;
+      const rpatch_t *patch = R_CachePatchNum(patchnum);
+      if (patch->height == 200)
+         return patch;          /* caller releases the lock after drawing */
+      R_UnlockPatchNum(patchnum);
+   }
+   return NULL;
+}
+
 static void R_DoDrawPlane(visplane_t *pl)
 {
    int x;
@@ -484,6 +504,36 @@ static void R_DoDrawPlane(visplane_t *pl)
          //dcvars.texturemid = skytexturemid;
          dcvars.texheight = textureheight[texture]>>FRACBITS; // killough
          dcvars.iscale = skyiscale;
+
+         {
+            /* Heretic 200-tall single-patch sky: draw straight from the raw
+             * patch with a 200-anchored texturemid so the full sky shows
+             * when looking up, instead of mirroring the 128-tall composite. */
+            const rpatch_t *hacked = R_HackedSkyPatch(texture);
+            if (hacked)
+            {
+               int xm1;
+               int skypatchnum = textures[texture]->patches[0].patch;
+               dcvars.texheight = hacked->height;
+               dcvars.texturemid = 200 << FRACBITS;
+               dcvars.iscale = (200 << FRACBITS) / SCREENHEIGHT;
+
+               for (x = pl->minx; (dcvars.x = x) <= pl->maxx; x++)
+                  if ((dcvars.yl = pl->top[x]) != -1 && dcvars.yl <= (dcvars.yh = pl->bottom[x])) // dropoff overflow
+                  {
+                     xm1 = x > 0 ? x - 1 : 0;
+                     dcvars.source = R_GetPatchColumn(hacked, ((an + xtoviewangle[x])^flip) >> ANGLETOSKYSHIFT)->pixels;
+                     dcvars.prevsource = R_GetPatchColumn(hacked, ((an + xtoviewangle[xm1])^flip) >> ANGLETOSKYSHIFT)->pixels;
+                     dcvars.nextsource = R_GetPatchColumn(hacked, ((an + xtoviewangle[x+1])^flip) >> ANGLETOSKYSHIFT)->pixels;
+                     colfunc(&dcvars);
+                  }
+
+               /* R_HackedSkyPatch took a lock via R_CachePatchNum; release it
+                * so the patch does not stay pinned and leak a lock per frame. */
+               R_UnlockPatchNum(skypatchnum);
+               return;
+            }
+         }
 
          tex_patch = R_CacheTextureCompositePatchNum(texture);
 

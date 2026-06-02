@@ -299,12 +299,204 @@ void P_ChangeSwitchTexture
  * Passed the thing using the line, the line being used, and the side used
  * Returns TRUE if a thinker was created
 */
+/*
+ * Heretic_P_UseSpecialLine
+ *
+ * Heretic's use-activated linedef specials differ from Doom's. This
+ * dispatches the Heretic special numbers (doors, switches, buttons,
+ * stairs, donuts, exits) onto the EV_* movers the engine already
+ * provides. Without it, Heretic switches and hidden/secret doors do not
+ * respond to "use".
+ */
+dbool Heretic_P_UseSpecialLine(mobj_t *thing, line_t *line, int side)
+{
+  /* Heretic only triggers use-specials from the front side. */
+  if (side)
+    return FALSE;
+
+  /* Switches that monsters can activate: only manual doors. */
+  if (!thing->player)
+  {
+    if (line->flags & ML_SECRET)
+      return FALSE;             /* never open secret doors */
+    switch (line->special)
+    {
+      case 1:                   /* MANUAL DOOR RAISE */
+      case 32:                  /* MANUAL BLUE */
+      case 33:                  /* MANUAL RED */
+      case 34:                  /* MANUAL YELLOW */
+        break;
+      default:
+        return FALSE;
+    }
+  }
+
+  switch (line->special)
+  {
+    /* Manual doors */
+    case 1:    /* Vertical Door */
+    case 26:   /* Blue Door / Locked */
+    case 27:   /* Yellow Door / Locked */
+    case 28:   /* Red Door / Locked */
+    case 31:   /* Manual door open */
+    case 32:   /* Blue locked door open */
+    case 33:   /* Red locked door open */
+    case 34:   /* Yellow locked door open */
+      EV_VerticalDoor(line, thing);
+      break;
+
+    /* Switches (S1 -- change the SW1 texture to SW2) */
+    case 7:    /* Build stairs (8) */
+      if (EV_BuildStairs(line, build8))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 107:  /* Build stairs (16) */
+      if (EV_BuildStairs(line, turbo16))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 9:    /* Donut */
+      if (EV_DoDonut(line))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 11:   /* Exit level */
+      G_ExitLevel();
+      P_ChangeSwitchTexture(line, 0);
+      break;
+    case 14:   /* Raise floor 32 and change texture */
+      if (EV_DoPlat(line, raiseAndChange, 32))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 15:   /* Raise floor 24 and change texture */
+      if (EV_DoPlat(line, raiseAndChange, 24))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 18:   /* Raise floor to next highest floor */
+      if (EV_DoFloor(line, FLEV_RAISEFLOORTONEAREST))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 20:   /* Raise plat next highest floor and change texture */
+      if (EV_DoPlat(line, raiseToNearestAndChange, 0))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 21:   /* PlatDownWaitUpStay */
+      if (EV_DoPlat(line, downWaitUpStay, 0))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 23:   /* Lower floor to lowest */
+      if (EV_DoFloor(line, FLEV_LOWERFLOORTOLOWEST))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 29:   /* Raise door */
+      if (EV_DoDoor(line, normal))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 41:   /* Lower ceiling to floor */
+      if (EV_DoCeiling(line, lowerToFloor))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 71:   /* Turbo lower floor */
+      if (EV_DoFloor(line, FLEV_TURBOLOWER))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 49:   /* Lower ceiling and crush */
+      if (EV_DoCeiling(line, lowerAndCrush))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 50:   /* Close door */
+      if (EV_DoDoor(line, close))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 51:   /* Secret exit */
+      G_SecretExitLevel();
+      P_ChangeSwitchTexture(line, 0);
+      break;
+    case 55:   /* Raise floor crush */
+      if (EV_DoFloor(line, FLEV_RAISEFLOORCRUSH))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 101:  /* Raise floor */
+      if (EV_DoFloor(line, FLEV_RAISEFLOOR))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 102:  /* Lower floor to surrounding floor height */
+      if (EV_DoFloor(line, FLEV_LOWERFLOOR))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+    case 103:  /* Open door */
+      if (EV_DoDoor(line, open))
+        P_ChangeSwitchTexture(line, 0);
+      break;
+
+    /* Buttons (SR -- change the texture but switch back) */
+    case 42:   /* Close door */
+      if (EV_DoDoor(line, close))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 43:   /* Lower ceiling to floor */
+      if (EV_DoCeiling(line, lowerToFloor))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 45:   /* Lower floor to surrounding floor height */
+      if (EV_DoFloor(line, FLEV_LOWERFLOOR))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 60:   /* Lower floor to lowest */
+      if (EV_DoFloor(line, FLEV_LOWERFLOORTOLOWEST))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 61:   /* Open door */
+      if (EV_DoDoor(line, open))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 62:   /* PlatDownWaitUpStay */
+      if (EV_DoPlat(line, downWaitUpStay, 1))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 63:   /* Raise door */
+      if (EV_DoDoor(line, normal))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 64:   /* Raise floor to ceiling */
+      if (EV_DoFloor(line, FLEV_RAISEFLOOR))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 66:   /* Raise floor 24 and change texture */
+      if (EV_DoPlat(line, raiseAndChange, 24))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 67:   /* Raise floor 32 and change texture */
+      if (EV_DoPlat(line, raiseAndChange, 32))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 65:   /* Raise floor crush */
+      if (EV_DoFloor(line, FLEV_RAISEFLOORCRUSH))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 68:   /* Raise plat to next highest floor and change texture */
+      if (EV_DoPlat(line, raiseToNearestAndChange, 0))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 69:   /* Raise floor to next highest floor */
+      if (EV_DoFloor(line, FLEV_RAISEFLOORTONEAREST))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+    case 70:   /* Turbo lower floor */
+      if (EV_DoFloor(line, FLEV_TURBOLOWER))
+        P_ChangeSwitchTexture(line, 1);
+      break;
+  }
+
+  return TRUE;
+}
+
 dbool  
 P_UseSpecialLine
 ( mobj_t*       thing,
   line_t*       line,
   int           side )
 {
+  if (heretic)
+    return Heretic_P_UseSpecialLine(thing, line, side);
 
   // e6y
   // b.m. side test was broken in boom201

@@ -1072,6 +1072,7 @@ void P_UpdateSpecials
 ( void );
 
 // when needed
+dbool Heretic_P_UseSpecialLine(mobj_t *thing, line_t *line, int side);
 dbool P_UseSpecialLine
 ( mobj_t* thing,
   line_t* line,

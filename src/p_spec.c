@@ -142,6 +142,21 @@ const animdef_t doom_animdefs[] =
   {-1,        "",             "",	0},
 };
 
+/* Heretic's animated flats and textures. istexture: FALSE = flat. */
+static const animdef_t heretic_animdefs[] =
+{
+  {FALSE,	"FLTWAWA3",	"FLTWAWA1",	8}, /* water       */
+  {FALSE,	"FLTSLUD3",	"FLTSLUD1",	8}, /* sludge      */
+  {FALSE,	"FLTTELE4",	"FLTTELE1",	6}, /* teleport    */
+  {FALSE,	"FLTFLWW3",	"FLTFLWW1",	9}, /* river west  */
+  {FALSE,	"FLTLAVA4",	"FLTLAVA1",	8}, /* lava        */
+  {FALSE,	"FLATHUH4",	"FLATHUH1",	8}, /* super lava  */
+  {TRUE,	"LAVAFL3",	"LAVAFL1",	6}, /* lavaflow    */
+  {TRUE,	"WATRWAL3",	"WATRWAL1",	4}, /* waterfall   */
+
+  {-1,        "",             "",	0},
+};
+
 // killough 3/7/98: Initialize generalized scrolling
 static void P_SpawnScrollers(void);
 
@@ -174,14 +189,19 @@ void P_InitPicAnims (void)
 {
   int         i;
   const animdef_t *animdefs; //jff 3/23/98 pointer to animation lump
-  int         lump = W_CheckNumForName("ANIMATED"); // cph - new wad lump handling
+  int         lump = -1;
   //  Init animation
 
-  // read from predefined or wad lump if available, otherwise use known table
-  if (lump == -1)
-    animdefs = doom_animdefs;
-  else
+  // Heretic uses its own built-in animation table. The ANIMATED lump carried
+  // by prboom.wad holds Doom flat/texture names absent from a Heretic IWAD, so
+  // those animations would silently never register (lava, water, etc. would be
+  // static). For Doom, prefer an ANIMATED lump and fall back to the table.
+  if (heretic)
+    animdefs = heretic_animdefs;
+  else if ((lump = W_CheckNumForName("ANIMATED")) != -1)
     animdefs = (const animdef_t *)W_CacheLumpNum(lump);
+  else
+    animdefs = doom_animdefs;
 
   lastanim = anims;
   for (i=0 ; animdefs[i].istexture != -1 ; i++)

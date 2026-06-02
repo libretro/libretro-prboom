@@ -727,7 +727,7 @@ static unsigned int FrequencyForVoice(opl_voice_t *voice)
 
     if ((voice->current_instr->flags & GENMIDI_FLAG_FIXED) == 0)
     {
-        note += (signed short) doom_htows(gm_voice->base_note_offset);
+        note += doom_htows(gm_voice->base_note_offset);
     }
 
     // Avoid possible overflow due to base note offset:

@@ -418,15 +418,10 @@ static void D_PageDrawer(void)
   // proff - added M_DrawCredits
 
   /* Heretic's full-screen lumps (TITLE, CREDIT, HELP1, HELP2) are raw
-   * 320x200 bitmaps, not Doom patch_t graphics, so they go through the
-   * raw-screen blit rather than the patch decoder / page cache. */
-  if (heretic)
-  {
-    if (pagename)
-      V_DrawRawScreen(pagename);
-    return;
-  }
-
+   * 320x200 bitmaps, not Doom patch_t graphics, so they render through the
+   * raw-screen blit rather than the patch decoder.  They are otherwise
+   * just as static and just as expensive to re-stretch every frame, so
+   * they share the same page cache; only the render-on-miss call differs. */
   if (pagename)
   {
     const size_t fb_bytes = (size_t)SCREENWIDTH * SCREENHEIGHT
@@ -438,7 +433,7 @@ static void D_PageDrawer(void)
         || page_cache_h    != SCREENHEIGHT
         || page_cache_pal  != V_Palette16)
     {
-      /* (Re)build the cache.  Render the stretched patch once into the
+      /* (Re)build the cache.  Render the stretched image once into the
        * persistent page_cache by temporarily pointing screens[0] and the
        * renderer's cached top-left at it, then restore.  The frontend
        * buffer always has SCREENWIDTH pitch when direct-rendering (the
@@ -459,7 +454,10 @@ static void D_PageDrawer(void)
         drawvars.short_topleft = page_cache;
         drawvars.int_topleft   = (unsigned int *)page_cache;
 
-        V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
+        if (heretic)
+          V_DrawRawScreen(pagename);
+        else
+          V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
 
         screens[0].data        = saved_data;
         drawvars.short_topleft = saved_short_tl;
@@ -474,14 +472,17 @@ static void D_PageDrawer(void)
       {
         /* Allocation failed -- fall back to drawing directly every
          * frame (correct, just not accelerated). */
-        V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
+        if (heretic)
+          V_DrawRawScreen(pagename);
+        else
+          V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
         return;
       }
     }
 
     memcpy(screens[0].data, page_cache, fb_bytes);
   }
-  else
+  else if (!heretic)
     M_DrawCredits();
 }
 

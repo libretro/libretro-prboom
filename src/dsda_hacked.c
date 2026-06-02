@@ -320,6 +320,10 @@ void dsda_InitTables(void)
     /* Raven game parameters needed at boot (added incrementally as the
      * boot path requires them). */
     g_mt_player = HERETIC_MT_PLAYER;
+    g_s_play = HERETIC_S_PLAY;
+    g_s_play_run1 = HERETIC_S_PLAY_RUN1;
+    g_s_play_atk1 = HERETIC_S_PLAY_ATK1;
+    g_s_play_atk2 = HERETIC_S_PLAY_ATK2;
     g_menu_flat = "FLAT513";
 
     num_states     = HERETIC_NUMSTATES;
@@ -365,6 +369,10 @@ void dsda_InitTables(void)
   }
 
   g_mt_player = MT_PLAYER;
+  g_s_play = S_PLAY;
+  g_s_play_run1 = S_PLAY_RUN1;
+  g_s_play_atk1 = S_PLAY_ATK1;
+  g_s_play_atk2 = S_PLAY_ATK2;
   g_menu_flat = "FLOOR4_6";
 
   num_states     = NUMSTATES;

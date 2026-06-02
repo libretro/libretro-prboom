@@ -64,6 +64,10 @@ extern GameMission_t  gamemission;
 extern dbool heretic;
 extern dbool raven;
 extern mobjtype_t g_mt_player;
+extern int g_s_play;       /* player idle state; set per-game */
+extern int g_s_play_run1;  /* first player run state; set per-game */
+extern int g_s_play_atk1;  /* first player attack state; set per-game */
+extern int g_s_play_atk2;  /* second player attack state; set per-game */
 extern const char *g_menu_flat;
 
 // Set if homebrew PWAD stuff has been added.

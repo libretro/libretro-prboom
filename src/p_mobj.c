@@ -366,9 +366,9 @@ static void P_XYMovement (mobj_t* mo)
 
 //    if ( player&&(unsigned)((player->mo->state - states)- S_PLAY_RUN1) < 4)
 //      P_SetMobjState (player->mo, S_PLAY);
-      if (player && (unsigned)(player->mo->state - states - S_PLAY_RUN1) < 4
+      if (player && (unsigned)(player->mo->state - states - g_s_play_run1) < 4
     && (player->mo == mo || compatibility_level >= lxdoom_1_compatibility))
-  P_SetMobjState(player->mo, S_PLAY);
+  P_SetMobjState(player->mo, g_s_play);
 
       mo->momx = mo->momy = 0;
 

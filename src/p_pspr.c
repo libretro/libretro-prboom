@@ -416,7 +416,7 @@ static void P_FireWeapon(player_t *player)
         WeaponInfo[player->readyweapon][player->class].holdatkstate
         : WeaponInfo[player->readyweapon][player->class].atkstate;
 #else
-  P_SetMobjState(player->mo, S_PLAY_ATK1);
+  P_SetMobjState(player->mo, g_s_play_atk1);
   newstate = weaponinfo[player->readyweapon].atkstate;
 #endif
 
@@ -454,9 +454,9 @@ void A_WeaponReady(player_t *player, pspdef_t *psp)
       P_SetMobjState(player->mo, PStateNormal[player->class]);
 #else
    /* get out of attack state */
-   if (player->mo->state == &states[S_PLAY_ATK1]
-         || player->mo->state == &states[S_PLAY_ATK2] )
-      P_SetMobjState(player->mo, S_PLAY);
+   if (player->mo->state == &states[g_s_play_atk1]
+         || player->mo->state == &states[g_s_play_atk2] )
+      P_SetMobjState(player->mo, g_s_play);
 #endif
 
    if (player->readyweapon == WP_CHAINSAW && psp->state == &states[S_SAW])

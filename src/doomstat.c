@@ -44,6 +44,10 @@ GameMission_t   gamemission = doom;
 dbool heretic;
 dbool raven;
 mobjtype_t g_mt_player = MT_PLAYER; /* player mobjtype; set per-game */
+int g_s_play      = S_PLAY;      /* player idle state; set per-game */
+int g_s_play_run1 = S_PLAY_RUN1; /* first player run state; set per-game */
+int g_s_play_atk1 = S_PLAY_ATK1; /* first player attack state; set per-game */
+int g_s_play_atk2 = S_PLAY_ATK2; /* second player attack state; set per-game */
 const char *g_menu_flat = "FLOOR4_6"; /* fullscreen-menu background flat; set per-game */
 
 // Language.

@@ -428,8 +428,8 @@ void P_MovePlayer (player_t* player)
            P_Thrust(player,mo->angle-ANG90,cmd->sidemove*movefactor);
         }
      }
-     if (mo->state == states+S_PLAY)
-        P_SetMobjState(mo,S_PLAY_RUN1);
+     if (mo->state == states+g_s_play)
+        P_SetMobjState(mo,g_s_play_run1);
   }
 #endif
 }

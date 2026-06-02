@@ -1783,7 +1783,6 @@ static void M_DrawItem(const setup_menu_t* s)
         CR_DEFAULT, VPT_STRETCH);
 
   else { // Draw the item string
-    char *p, *t;
     int w = 0;
     int color =
   flags & S_SELECT ? CR_SELECT :
@@ -1793,16 +1792,32 @@ static void M_DrawItem(const setup_menu_t* s)
     /* killough 10/98:
      * Enhance to support multiline text separated by newlines.
      * This supports multiline items on horizontally-crowded menus.
+     *
+     * The item text is a constant from a static table, so the common
+     * single-line case is drawn in place with no allocation. Only the
+     * rare multiline item (one containing '\n') needs the strdup/strtok
+     * split, so the per-frame malloc/free is confined to that case
+     * instead of running for every item every frame.
      */
 
-    for (p = t = strdup(s->m_text); (p = strtok(p,"\n")); y += 8, p = NULL)
-      {      /* killough 10/98: support left-justification: */
-  strcpy(menu_buffer,p);
+    if (!strchr(s->m_text, '\n'))
+      {
+  strcpy(menu_buffer, s->m_text);
   if (!(flags & S_LEFTJUST))
     w = M_GetPixelWidth(menu_buffer) + 4;
-  M_DrawMenuString(x - w, y ,color);
+  M_DrawMenuString(x - w, y, color);
       }
-    free(t);
+    else
+      {
+  char *p, *t;
+  for (p = t = strdup(s->m_text); (p = strtok(p,"\n")); y += 8, p = NULL)
+    {      /* killough 10/98: support left-justification: */
+      strcpy(menu_buffer,p);
+      w = (flags & S_LEFTJUST) ? 0 : M_GetPixelWidth(menu_buffer) + 4;
+      M_DrawMenuString(x - w, y ,color);
+    }
+  free(t);
+      }
   }
 }
 

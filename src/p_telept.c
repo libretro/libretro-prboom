@@ -56,7 +56,7 @@ static mobj_t* P_TeleportDestination(line_t* line)
             continue;
 
          m = (mobj_t*)th;
-         if (m->type == MT_TELEPORTMAN  &&
+         if (m->type == g_mt_teleportman  &&
                m->subsector->sector-sectors == i)
             return m;
       }
@@ -103,15 +103,15 @@ int EV_Teleport(line_t *line, int side, mobj_t *thing)
         player->viewz = thing->z + player->viewheight;
 
      // spawn teleport fog and emit sound at source
-     S_StartSound(P_SpawnMobj(oldx, oldy, oldz, MT_TFOG), sfx_telept);
+     S_StartSound(P_SpawnMobj(oldx, oldy, oldz, g_mt_tfog), g_sfx_telept);
 
      // spawn teleport fog and emit sound at destination
      S_StartSound(P_SpawnMobj(m->x +
               20*finecosine[m->angle>>ANGLETOFINESHIFT],
               m->y +
               20*finesine[m->angle>>ANGLETOFINESHIFT],
-              thing->z, MT_TFOG),
-           sfx_telept);
+              thing->z, g_mt_tfog),
+           g_sfx_telept);
 
      /* don't move for a bit
       * cph - DEMOSYNC - BOOM had (player) here? */

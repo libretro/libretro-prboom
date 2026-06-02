@@ -325,6 +325,7 @@ void dsda_InitTables(void)
     g_s_play_atk1 = HERETIC_S_PLAY_ATK1;
     g_s_play_atk2 = HERETIC_S_PLAY_ATK2;
     g_mt_tfog = HERETIC_MT_TFOG;
+    g_mt_teleportman = HERETIC_MT_TELEPORTMAN;
     g_telefog_height = TELEFOGHEIGHT;
     g_sfx_telept = heretic_sfx_telept;
     g_menu_flat = "FLAT513";
@@ -377,6 +378,7 @@ void dsda_InitTables(void)
   g_s_play_atk1 = S_PLAY_ATK1;
   g_s_play_atk2 = S_PLAY_ATK2;
   g_mt_tfog = MT_TFOG;
+  g_mt_teleportman = MT_TELEPORTMAN;
   g_telefog_height = 0;
   g_sfx_telept = sfx_telept;
   g_menu_flat = "FLOOR4_6";

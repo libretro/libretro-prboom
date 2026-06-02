@@ -144,14 +144,25 @@ dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
 
 void P_ExplodeMissile (mobj_t* mo)
 {
+  /* Heretic: the whirlwind lingers, only exploding after ~60 tics. */
+  if (heretic && mo->type == HERETIC_MT_WHIRLWIND)
+  {
+    if (++mo->special2.i < 60)
+      return;
+  }
+
   mo->momx = mo->momy = mo->momz = 0;
 
   P_SetMobjState (mo, mobjinfo[mo->type].deathstate);
 
-  mo->tics -= P_Random(pr_explode)&3;
+  /* Heretic does not randomize the explosion's death tics. */
+  if (!heretic)
+  {
+    mo->tics -= P_Random(pr_explode)&3;
 
-  if (mo->tics < 1)
-    mo->tics = 1;
+    if (mo->tics < 1)
+      mo->tics = 1;
+  }
 
   mo->flags &= ~MF_MISSILE;
 

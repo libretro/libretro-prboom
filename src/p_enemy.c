@@ -2145,7 +2145,34 @@ void A_Fall(mobj_t *actor)
 //
 void A_Explode(mobj_t *thingy)
 {
-  P_RadiusAttack( thingy, thingy->target, 128 );
+  int damage   = 128;
+  int distance = 128;
+
+  /* Heretic gives several actors their own blast damage/radius, and the
+   * firebomb raises itself before bursting. Without this they all used the
+   * Doom 128/128 default. */
+  if (heretic)
+  {
+    switch (thingy->type)
+    {
+      case HERETIC_MT_FIREBOMB:        /* time bomb of the ancients */
+        thingy->z += 32 * FRACUNIT;
+        thingy->flags &= ~MF_SHADOW;
+        break;
+      case HERETIC_MT_MNTRFX2:         /* minotaur floor fire */
+        damage = 24;
+        distance = damage;
+        break;
+      case HERETIC_MT_SOR2FX1:         /* D'Sparil missile */
+        damage = 80 + (P_Random(pr_heretic) & 31);
+        distance = damage;
+        break;
+      default:
+        break;
+    }
+  }
+
+  P_RadiusAttackEx(thingy, thingy->target, damage, distance);
   retro_set_rumble_damage(60, 500.f);
 }
 

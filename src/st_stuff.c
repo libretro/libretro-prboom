@@ -1153,7 +1153,9 @@ static void ST_HereticFullscreenDrawer(void)
   {
     if (W_CheckNumForName("ARTIBOX") >= 0)
       V_DrawNamePatch(286, 170, FG, "ARTIBOX", CR_DEFAULT, VPT_STRETCH);
-    ST_HereticDrawArtiIcon(arti_icon[plyr->readyArtifact], 286, 170);
+    /* Inset the icon by 1px inside the box, matching the stat-panel box
+     * (box at x,y; icon at x-1,y-1) rather than drawing it flush. */
+    ST_HereticDrawArtiIcon(arti_icon[plyr->readyArtifact], 285, 169);
     if (plyr->inventorySlotNum > 0)
       ST_HereticDrawSmallNumber(plyr->inventory[inv_ptr].count, 307, 192);
   }

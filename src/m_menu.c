@@ -503,7 +503,7 @@ void M_DrawReadThis1(void)
      * Heretic's TITLE/CREDIT pages). */
     V_DrawRawScreen("HELP1");
   else if (gamemode == shareware)
-    V_DrawNamePatch(0, 0, 0, "HELP2", CR_DEFAULT, VPT_STRETCH);
+    V_DrawNamePatchFullScreenCached(0, "HELP2", CR_DEFAULT);
   else
     M_DrawCredits();
 }
@@ -521,7 +521,7 @@ void M_DrawReadThis2(void)
   else if (gamemode == shareware)
     M_DrawCredits();
   else
-    V_DrawNamePatch(0, 0, 0, "CREDIT", CR_DEFAULT, VPT_STRETCH);
+    V_DrawNamePatchFullScreenCached(0, "CREDIT", CR_DEFAULT);
 }
 
 /////////////////////////////

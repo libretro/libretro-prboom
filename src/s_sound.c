@@ -361,6 +361,15 @@ void S_StartSound(void *origin, int sfx_id)
   S_StartSoundAtVolume(origin, sfx_id, snd_SfxVolume);
 }
 
+/* Heretic ambient sound sequences play at a script-chosen volume rather
+ * than the global sfx volume. */
+void S_StartAmbientSound(void *origin, int sfx_id, int volume)
+{
+  if (sfx_id == heretic_sfx_None || volume <= 0)
+    return;
+  S_StartSoundAtVolume((degenmobj_t *)origin, sfx_id, volume);
+}
+
 void S_StopSound(void *origin)
 {
   int cnum;

@@ -1397,11 +1397,16 @@ void P_SpawnMapThing (const mapthing_t* mthing)
 
   /* Heretic/Raven ambient sound sequence markers occupy editor numbers
    * 1200-1299 (ambient sfx) and 1400-1409 (sound sequences). They spawn
-   * no map object -- they drive an ambient-sound subsystem this port does
-   * not implement. Consume them quietly so they don't fall through to the
-   * mobjinfo lookup and trigger a spurious "Unknown Thing type" warning. */
-  if (raven && ((thingtype >= 1200 && thingtype < 1300) ||
-                (thingtype >= 1400 && thingtype < 1410)))
+   * no map object. The 1200-1299 markers register an ambient-sound
+   * sequence with the ambient subsystem (P_AmbientSound plays them); the
+   * 1400-1409 sound-sequence markers are not yet implemented and are
+   * consumed quietly so they don't fall through to the mobjinfo lookup. */
+  if (raven && thingtype >= 1200 && thingtype < 1300)
+  {
+    P_AddAmbientSfx(thingtype - 1200);
+    return;
+  }
+  if (raven && thingtype >= 1400 && thingtype < 1410)
     return;
 
   // Thing types from 14100 to 14164 are used for MUSINFO entities

@@ -1865,6 +1865,11 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    P_MapStart();
 
+   /* Reset the Heretic ambient-sound sequence list before loading things,
+    * since the 1200-1299 markers register their sequences during spawn. */
+   if (heretic)
+      P_InitAmbientSound();
+
    P_LoadThings(lumpnum+ML_THINGS);
 
    // if deathmatch, randomly spawn the active players

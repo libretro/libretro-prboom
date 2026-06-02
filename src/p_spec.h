@@ -1142,4 +1142,9 @@ int P_ActivateInStasisCeiling
 
 mobj_t* P_GetPushThing(int);                                // phares 3/23/98
 
+/* Heretic ambient sound sequences */
+void P_AddAmbientSfx(int sequence);
+void P_InitAmbientSound(void);
+void P_AmbientSound(void);
+
 #endif

@@ -61,6 +61,7 @@ void S_Start(void);
 //  using <sound_id> from sounds.h
 //
 void S_StartSound(void *origin, int sound_id);
+void S_StartAmbientSound(void *origin, int sound_id, int volume);
 
 // killough 4/25/98: mask used to indicate sound origin is player item pickup
 #define PICKUP_SOUND (0x8000)

@@ -1080,10 +1080,20 @@ static void P_KillMobj(mobj_t *source, mobj_t *target)
         AM_Stop();    // don't die in auto map; switch view prior to dying
     }
 
-  if (target->health < -target->info->spawnhealth && target->info->xdeathstate)
-    P_SetMobjState (target, target->info->xdeathstate);
-  else
-    P_SetMobjState (target, target->info->deathstate);
+  /* Heretic uses a more lenient extreme-death (gib) threshold than Doom:
+   * a thing gibs once its health falls below negative half its spawn
+   * health, where Doom requires it to fall below negative full spawn
+   * health. Using the Doom threshold under Heretic makes monsters far too
+   * hard to gib, so they leave a normal-death body where the extreme
+   * death (which removes the body) should have played. */
+  {
+    int gib_threshold = heretic ? -(target->info->spawnhealth >> 1)
+                                 : -target->info->spawnhealth;
+    if (target->health < gib_threshold && target->info->xdeathstate)
+      P_SetMobjState (target, target->info->xdeathstate);
+    else
+      P_SetMobjState (target, target->info->deathstate);
+  }
 
   target->tics -= P_Random(pr_killtics)&3;
 

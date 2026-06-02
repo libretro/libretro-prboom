@@ -604,9 +604,24 @@ void M_AddEpisode(const char *map, char *def)
   else
   {
     int episodenum, mapnum;
-    const char *gfx = strtok(def, "\n");
-    const char *txt = strtok(NULL, "\n");
-    const char *alpha = strtok(NULL, "\n");
+    /* Split def in place on newlines into up to three fields without strtok
+     * (avoids its static state). def is caller-owned and persists, and txt
+     * is stored as a long-lived alttext pointer into it. */
+    char *gfx = def;
+    char *txt = NULL;
+    char *alpha = NULL;
+    char *nl = strchr(gfx, '\n');
+    if (nl)
+    {
+      *nl = '\0';
+      txt = nl + 1;
+      nl  = strchr(txt, '\n');
+      if (nl)
+      {
+        *nl   = '\0';
+        alpha = nl + 1;
+      }
+    }
     if (EpiDef.numitems >= 8)
        return;
     G_ValidateMapName(map, &episodenum, &mapnum);

@@ -986,26 +986,28 @@ static void update_variables(bool startup)
 
       if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       {
-         char *pch;
          char str[100];
+         char *sep;
          strlcpy(str, var.value, sizeof(str));
 
+         /* Parse "WIDTHxHEIGHT" without strtok: split on the first 'x'. */
+         sep = strchr(str, 'x');
+         if (sep)
+            *sep = '\0';
 #ifdef PSX
-          if ((pch = strtok(str, "x")))
           {
-             SCREENWIDTH = (unsigned long)strtol(pch, NULL, 0);
+             SCREENWIDTH = (unsigned long)strtol(str, NULL, 0);
 	     SCREENPITCH = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
           }
-          if ((pch = strtok(NULL, "x")))
-             SCREENHEIGHT = (unsigned long)strtol(pch, NULL, 0);
+          if (sep)
+             SCREENHEIGHT = (unsigned long)strtol(sep + 1, NULL, 0);
 #else
-         if ((pch = strtok(str, "x")))
          {
-            SCREENWIDTH = strtoul(pch, NULL, 0);
+            SCREENWIDTH = strtoul(str, NULL, 0);
 	    SCREENPITCH = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
          }
-         if ((pch = strtok(NULL, "x")))
-            SCREENHEIGHT = strtoul(pch, NULL, 0);
+         if (sep)
+            SCREENHEIGHT = strtoul(sep + 1, NULL, 0);
 #endif
 
          if (log_cb)

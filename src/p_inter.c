@@ -1015,6 +1015,12 @@ static void P_KillMobj(mobj_t *source, mobj_t *target)
   if (!(target->flags & MF_DONTFALL))
     target->flags &= ~MF_NOGRAVITY;
 
+  /* Raven: a corpse must not keep pass-over/under (z-clip) behaviour, or its
+   * floorz can be computed over other things and it never settles onto the
+   * real floor -- a flying monster (e.g. the Gargoyle) would then hang in its
+   * in-air death frame instead of falling and running its crash/gib state. */
+  target->flags2 &= ~MF2_PASSMOBJ;
+
   target->flags |= MF_CORPSE|MF_DROPOFF;
   target->height >>= 2;
 

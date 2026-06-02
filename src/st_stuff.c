@@ -1040,6 +1040,19 @@ static void ST_HereticDrawer(void)
       V_DrawNamePatch(111, 172, FG, ammo_icon[at], CR_DEFAULT, VPT_STRETCH);
   }
 
+  /* Keys: the three key icons stack at x=153. Heretic's blue/yellow/green
+   * keys map onto the it_bluecard/it_yellowcard/it_redcard slots (green
+   * reuses the red slot). */
+  if (plyr->cards[it_yellowcard] && W_CheckNumForName("YKEYICON") >= 0)
+    V_DrawNamePatch(153, 164, FG, "YKEYICON", CR_DEFAULT, VPT_STRETCH);
+  if (plyr->cards[it_redcard] && W_CheckNumForName("GKEYICON") >= 0)
+    V_DrawNamePatch(153, 172, FG, "GKEYICON", CR_DEFAULT, VPT_STRETCH);
+  if (plyr->cards[it_bluecard] && W_CheckNumForName("BKEYICON") >= 0)
+    V_DrawNamePatch(153, 180, FG, "BKEYICON", CR_DEFAULT, VPT_STRETCH);
+
+  /* Armor amount (x=228,y=170). */
+  ST_HereticDrawINumber(plyr->armorpoints, 224, 170);
+
   /* Ready-artifact box (x=180,y=160): the currently selected artifact, its
    * count, and the use-flash animation when one has just been used. */
   {

@@ -887,8 +887,15 @@ static void ST_HereticDrawINumber(int val, int x, int y)
 
 static void ST_HereticDrawer(void)
 {
-  player_t *plyr = &players[displayplayer];
-  int       ammo;
+  /* Ammo-type icon next to the ammo count, indexed by ammotype_t
+   * (am_goldwand=0 .. am_mace=5), matching the Raven artwork order. */
+  static const char *const ammo_icon[HERETIC_NUMAMMO] = {
+    "INAMGLD", "INAMBOW", "INAMBST", "INAMRAM", "INAMPNX", "INAMLOB"
+  };
+  player_t   *plyr = &players[displayplayer];
+  ammotype_t  at;
+  int         ammo;
+  int         health, gempos;
 
   /* Background frame + stat panel (positions match the Raven layout:
    * BARBACK fills y=158, the STATBAR stat panel sits at x=34,y=160). */
@@ -897,14 +904,39 @@ static void ST_HereticDrawer(void)
   if (W_CheckNumForName("STATBAR") >= 0)
     V_DrawNamePatch(34, 160, FG, "STATBAR", CR_DEFAULT, VPT_STRETCH);
 
-  /* Health (x=57,y=170) and ready-weapon ammo (x=109,y=162), matching
-   * the Raven HUD coordinates. */
+  /* Health number (x=57,y=170). */
   ST_HereticDrawINumber(plyr->health, 57, 170);
 
-  /* The staff and gauntlets use no ammo. */
-  ammo = plyr->ammo[weaponinfo[plyr->readyweapon].ammo];
-  if (weaponinfo[plyr->readyweapon].ammo != AM_NOAMMO)
+  /* Ready-weapon ammo count plus its type icon. The staff and gauntlets
+   * use no ammo (AM_NOAMMO), so nothing is drawn for them. */
+  at = weaponinfo[plyr->readyweapon].ammo;
+  if (at != AM_NOAMMO)
+  {
+    ammo = plyr->ammo[at];
     ST_HereticDrawINumber(ammo, 109, 162);
+    if ((int)at >= 0 && (int)at < HERETIC_NUMAMMO &&
+        W_CheckNumForName(ammo_icon[at]) >= 0)
+      V_DrawNamePatch(111, 172, FG, ammo_icon[at], CR_DEFAULT, VPT_STRETCH);
+  }
+
+  /* Health chain along the bottom: a gem slides between the two gargoyle
+   * heads (LTFACE at the left -- the "demon's mouth" the chain runs from --
+   * and RTFACE at the right) to show health 0..100. LIFEGEM2 is the
+   * single-player red gem. Geometry follows the Raven HUD. */
+  health = plyr->health;
+  if (health < 0)
+    health = 0;
+  else if (health > 100)
+    health = 100;
+  gempos = (health * 256) / 100;
+  if (W_CheckNumForName("CHAIN") >= 0)
+    V_DrawNamePatch(2 + (gempos % 17), 191, FG, "CHAIN", CR_DEFAULT, VPT_STRETCH);
+  if (W_CheckNumForName("LIFEGEM2") >= 0)
+    V_DrawNamePatch(17 + gempos, 191, FG, "LIFEGEM2", CR_DEFAULT, VPT_STRETCH);
+  if (W_CheckNumForName("LTFACE") >= 0)
+    V_DrawNamePatch(0, 190, FG, "LTFACE", CR_DEFAULT, VPT_STRETCH);
+  if (W_CheckNumForName("RTFACE") >= 0)
+    V_DrawNamePatch(276, 190, FG, "RTFACE", CR_DEFAULT, VPT_STRETCH);
 }
 
 void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)

@@ -295,6 +295,7 @@ static int M_GetPixelWidth(const char*);
 void M_DrawKeybnd(void);
 void M_DrawWeapons(void);
 static void M_DrawMenuString(int,int,int);
+static void M_DrawTextB(int x, int y, const char *text);
 static void M_DrawStringCentered(int,int,int,const char*);
 void M_DrawStatusHUD(void);
 void M_DrawExtHelp(void);
@@ -803,7 +804,12 @@ void M_DrawLoad(void)
 
   //jff 3/15/98 use symbolic load position
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(72 ,LOADGRAPHIC_Y, 0, "M_LOADG", CR_DEFAULT, VPT_STRETCH);
+  /* M_LOADG is a Doom-only title graphic; draw the Heretic title in its
+   * big font instead. */
+  if (heretic)
+    M_DrawTextB(70, LOADGRAPHIC_Y, "LOAD GAME");
+  else
+    V_DrawNamePatch(72 ,LOADGRAPHIC_Y, 0, "M_LOADG", CR_DEFAULT, VPT_STRETCH);
   for (i = 0 ; i < load_end ; i++) {
     M_DrawSaveLoadBorder(LoadDef.x,LoadDef.y+LINEHEIGHT*i);
     M_WriteText(LoadDef.x,LoadDef.y+LINEHEIGHT*i,savegamestrings[i], CR_DEFAULT);
@@ -817,6 +823,13 @@ void M_DrawLoad(void)
 void M_DrawSaveLoadBorder(int x,int y)
 {
   int i;
+
+  /* Heretic has none of Doom's M_LSLEFT/M_LSCNTR/M_LSRGHT border graphics.
+   * The Doom path tiles the centre patch 24 times per slot, which at a high
+   * internal resolution is a huge number of stretched blits per frame for a
+   * border that does not even exist here -- so skip it for Heretic. */
+  if (heretic)
+    return;
 
   V_DrawNamePatch(x-8, y+7, 0, "M_LSLEFT", CR_DEFAULT, VPT_STRETCH);
 
@@ -942,7 +955,10 @@ void M_DrawSave(void)
 
   //jff 3/15/98 use symbolic load position
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(72, LOADGRAPHIC_Y, 0, "M_SAVEG", CR_DEFAULT, VPT_STRETCH);
+  if (heretic)
+    M_DrawTextB(70, LOADGRAPHIC_Y, "SAVE GAME");
+  else
+    V_DrawNamePatch(72, LOADGRAPHIC_Y, 0, "M_SAVEG", CR_DEFAULT, VPT_STRETCH);
   for (i = 0 ; i < load_end ; i++)
     {
     M_DrawSaveLoadBorder(LoadDef.x,LoadDef.y+LINEHEIGHT*i);

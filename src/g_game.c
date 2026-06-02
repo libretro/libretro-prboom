@@ -2460,6 +2460,29 @@ void G_InitNew(skill_t skill, int episode, int map)
   if (episode < 1)
     episode = 1;
 
+  if (heretic)
+    {
+      /* Heretic is mapped onto the Doom 'registered' gamemode, but it has
+       * more than three episodes (the registered/extended set runs E1..E5,
+       * and UMAPINFO or extra IWAD content can add more).  The plain Doom
+       * clamp below would force any episode past 3 down to 3 -- which made
+       * the 6-episode menu start episodes 3..6 all at E3M1.  Clamp instead
+       * to the highest episode whose ExM1 map actually exists, mirroring
+       * how the episode menu counts available episodes. */
+      int last = 1;
+      int e;
+      for (e = 1; e <= MAX_EPISODE_NUM; e++)
+        {
+          char mapname[9];
+          sprintf(mapname, "E%uM1", (unsigned)e);
+          if (W_CheckNumForName(mapname) == -1)
+            break;
+          last = e;
+        }
+      if (episode > last)
+        episode = last;
+    }
+  else
   if (gamemode == retail)
     {
       if (episode > MAX_EPISODE_NUM)

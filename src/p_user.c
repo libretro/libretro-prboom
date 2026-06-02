@@ -1030,6 +1030,16 @@ void P_PlayerThink (player_t* player)
    else
       P_MovePlayer (player);
 
+   /* Heretic: use the staged artifact (from G_BuildTiccmd) this tic. */
+   /* Heretic: use the artifact staged by the local player's input. Only the
+    * console player drives the single-player pending-artifact global. */
+   if (heretic && player == &players[consoleplayer] &&
+       pending_artifact > 0 && pending_artifact < NUMARTIFACTS)
+   {
+      P_PlayerUseArtifact(player, pending_artifact);
+      pending_artifact = 0;
+   }
+
    P_SetPitch(player); /* Determines view pitch */
    P_CalcHeight (player); /* Determines view height and bobbing */
 

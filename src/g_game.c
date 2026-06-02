@@ -148,6 +148,10 @@ int     key_strafeleft;
 int     key_straferight;
 int     key_fire;
 int     key_use;
+int     key_use_artifact;
+int     pending_artifact = 0;  /* Heretic: artifact staged for use this tic */
+int     key_inv_left;
+int     key_inv_right;
 int     key_strafe;
 int     key_speed;
 int     key_escape = KEYD_ESCAPE;                           // phares 4/13/98
@@ -344,6 +348,52 @@ void G_BuildTiccmd(ticcmd_t* cmd)
     {
       cmd->buttons |= BT_USE;
     }
+
+  /* Heretic inventory input: cycle the ready artifact with the inv keys and
+   * use it with the use-artifact key. inv_ptr/curpos and readyArtifact live
+   * in p_user.c; we just nudge the cursor and stage the artifact to use. */
+  if (heretic)
+  {
+    extern int inv_ptr, curpos;
+
+    if (gamekeydown[key_inv_right])
+    {
+      gamekeydown[key_inv_right] = FALSE;
+      if (players[consoleplayer].inventorySlotNum > 0)
+      {
+        inv_ptr++;
+        if (inv_ptr >= players[consoleplayer].inventorySlotNum)
+          inv_ptr = players[consoleplayer].inventorySlotNum - 1;
+        else if (++curpos > 6)
+          curpos = 6;
+        players[consoleplayer].readyArtifact =
+          players[consoleplayer].inventory[inv_ptr].type;
+      }
+    }
+    if (gamekeydown[key_inv_left])
+    {
+      gamekeydown[key_inv_left] = FALSE;
+      if (players[consoleplayer].inventorySlotNum > 0)
+      {
+        inv_ptr--;
+        if (inv_ptr < 0)
+          inv_ptr = 0;
+        else if (--curpos < 0)
+          curpos = 0;
+        players[consoleplayer].readyArtifact =
+          players[consoleplayer].inventory[inv_ptr].type;
+      }
+    }
+    if (gamekeydown[key_use_artifact])
+    {
+      gamekeydown[key_use_artifact] = FALSE;
+      /* Single-player: route the artifact-use request through a dedicated
+       * pending global rather than the ticcmd, whose ring-buffer slots are
+       * reused across tics and would drop or duplicate the request. The
+       * ticcmd arti field stays reserved for a future netgame/demo path. */
+      pending_artifact = players[consoleplayer].readyArtifact;
+    }
+  }
 
   // Toggle between the top 2 favorite weapons.                   // phares
   // If not currently aiming one of these, switch to              // phares
@@ -2458,6 +2508,10 @@ void G_ReadDemoTiccmd (ticcmd_t* cmd)
       cmd->angleturn = (((signed int)(*demo_p++))<<8) + lowbyte;
     }
     cmd->buttons = (unsigned char)*demo_p++;
+    /* arti/lookfly are not part of the Doom demo format; clear them so a
+     * stale ring-buffer value can't leak into playback. */
+    cmd->arti    = 0;
+    cmd->lookfly = 0;
     // e6y: ability to play tasdoom demos directly
     if (compatibility_level == tasdoom_compatibility)
     {

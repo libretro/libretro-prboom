@@ -50,6 +50,11 @@ typedef struct
   short consistancy;          /* checks for net game  */
   uint8_t  chatchar;
   uint8_t  buttons;
+  /* Raven (Heretic): artifact to use this tic (artitype_t, 0 = none) and
+   * look/fly nibble.  These are not serialized in the Doom demo format, so
+   * adding them does not affect Doom demo/netgame compatibility. */
+  uint8_t  arti;
+  uint8_t  lookfly;
 } ticcmd_t;
 
 #endif

@@ -1294,6 +1294,19 @@ bool D_DoomMainSetup(void)
     // cph - code cleaned and made smaller
     const char* doomverstr;
 
+    if (heretic)
+    {
+      /* The Doom gamemode slots are reused for Heretic (see IdentifyVersion):
+       * shareware = E1 only, registered = the full game. Distinguish the
+       * Shadow of the Serpent Riders release by its extra episodes (E4). */
+      if (gamemode == shareware)
+        doomverstr = "Heretic Shareware";
+      else if (W_CheckNumForName("E4M1") >= 0)
+        doomverstr = "Heretic: Shadow of the Serpent Riders";
+      else
+        doomverstr = "Heretic Registered";
+    }
+    else
     switch ( gamemode ) {
     case retail:
       doomverstr = "The Ultimate DOOM";

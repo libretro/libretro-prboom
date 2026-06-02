@@ -279,6 +279,38 @@ static void R_InitSpriteDefs(const char * const * namelist)
 static vissprite_t *vissprites, **vissprite_ptrs;  // killough
 static size_t num_vissprite, num_vissprite_alloc, num_vissprite_ptrs;
 
+/* e6y/entryway (via PrBoom+): drawseg X-range partitioning for sprite
+ * clipping. R_DrawSprite has to test each sprite against the drawsegs that
+ * could obscure it; the classic loop scans every drawseg for every sprite,
+ * which becomes quadratic on maps with thousands of drawsegs and sprites.
+ *
+ * Once per frame we collect the silhouette/masked drawsegs into three
+ * pre-extracted lists: range 0 holds all of them, range 1 only those that
+ * touch the left half of the screen (x1 < cx), range 2 only those touching
+ * the right half (x2 >= cx). A sprite lying entirely on one side then scans
+ * just that half's list; a sprite straddling the centre uses the full list.
+ * Each entry is a packed {x1, x2, user} record so the hot x1/x2 reject test
+ * reads a small contiguous array instead of chasing full drawseg_t structs,
+ * which also cuts cache misses. */
+typedef struct drawseg_xrange_item_s
+{
+  short x1, x2;
+  drawseg_t *user;
+} drawseg_xrange_item_t;
+
+typedef struct drawsegs_xrange_s
+{
+  drawseg_xrange_item_t *items;
+  int count;
+} drawsegs_xrange_t;
+
+#define DS_RANGES_COUNT 3
+static drawsegs_xrange_t drawsegs_xranges[DS_RANGES_COUNT];
+
+static drawseg_xrange_item_t *drawsegs_xrange;
+static unsigned int drawsegs_xrange_size = 0;
+static int drawsegs_xrange_count = 0;
+
 //
 // R_InitSprites
 // Called at program start.
@@ -932,47 +964,60 @@ static void R_DrawSprite (vissprite_t* spr)
 
    //    for (ds=ds_p-1 ; ds >= drawsegs ; ds--)    old buggy code
 
-   for (ds=ds_p ; ds-- > drawsegs ; )  // new -- killough
-   {      // determine if the drawseg obscures the sprite
-      if (ds->x1 > spr->x2 || ds->x2 < spr->x1 ||
-            (!ds->silhouette && !ds->maskedtexturecol))
-         continue;      // does not cover sprite
+   // e6y: optimization -- walk only the pre-partitioned drawseg X-range
+   //      that R_DrawMasked selected for this sprite, rather than every
+   //      drawseg in the frame.
+   if (drawsegs_xrange_size)
+   {
+      const drawseg_xrange_item_t *last =
+         &drawsegs_xrange[drawsegs_xrange_count - 1];
+      drawseg_xrange_item_t *curr = &drawsegs_xrange[-1];
 
-      r1 = ds->x1 < spr->x1 ? spr->x1 : ds->x1;
-      r2 = ds->x2 > spr->x2 ? spr->x2 : ds->x2;
-
-      if (ds->scale1 > ds->scale2)
+      while (++curr <= last)
       {
-         lowscale = ds->scale2;
-         scale = ds->scale1;
+         // determine if the drawseg obscures the sprite
+         if (curr->x1 > spr->x2 || curr->x2 < spr->x1)
+            continue;      // does not cover sprite
+
+         ds = curr->user;
+
+         r1 = ds->x1 < spr->x1 ? spr->x1 : ds->x1;
+         r2 = ds->x2 > spr->x2 ? spr->x2 : ds->x2;
+
+         if (ds->scale1 > ds->scale2)
+         {
+            lowscale = ds->scale2;
+            scale = ds->scale1;
+         }
+         else
+         {
+            lowscale = ds->scale1;
+            scale = ds->scale2;
+         }
+
+         if (scale < spr->scale || (lowscale < spr->scale &&
+                  !R_PointOnSegSide (spr->gx, spr->gy, ds->curline)))
+         {
+            if (ds->maskedtexturecol)       // masked mid texture?
+               R_RenderMaskedSegRange(ds, r1, r2);
+            continue;               // seg is behind sprite
+         }
+
+         // clip this piece of the sprite
+         // killough 3/27/98: optimized and made much shorter
+
+         if (ds->silhouette&SIL_BOTTOM && spr->gz < ds->bsilheight) //bottom sil
+            for (x=r1 ; x<=r2 ; x++)
+               if (clipbot[x] == -2)
+                  clipbot[x] = ds->sprbottomclip[x];
+
+         if (ds->silhouette&SIL_TOP && spr->gzt > ds->tsilheight)   // top sil
+            for (x=r1 ; x<=r2 ; x++)
+               if (cliptop[x] == -2)
+                  cliptop[x] = ds->sprtopclip[x];
       }
-      else
-      {
-         lowscale = ds->scale1;
-         scale = ds->scale2;
-      }
-
-      if (scale < spr->scale || (lowscale < spr->scale &&
-               !R_PointOnSegSide (spr->gx, spr->gy, ds->curline)))
-      {
-         if (ds->maskedtexturecol)       // masked mid texture?
-            R_RenderMaskedSegRange(ds, r1, r2);
-         continue;               // seg is behind sprite
-      }
-
-      // clip this piece of the sprite
-      // killough 3/27/98: optimized and made much shorter
-
-      if (ds->silhouette&SIL_BOTTOM && spr->gz < ds->bsilheight) //bottom sil
-         for (x=r1 ; x<=r2 ; x++)
-            if (clipbot[x] == -2)
-               clipbot[x] = ds->sprbottomclip[x];
-
-      if (ds->silhouette&SIL_TOP && spr->gzt > ds->tsilheight)   // top sil
-         for (x=r1 ; x<=r2 ; x++)
-            if (cliptop[x] == -2)
-               cliptop[x] = ds->sprtopclip[x];
    }
+
 
    // killough 3/27/98:
    // Clip the sprite against deep water and/or fake ceilings.
@@ -1041,13 +1086,79 @@ void R_DrawMasked(void)
 {
    int i;
    drawseg_t *ds;
+   int cx = SCREENWIDTH / 2;
 
    R_SortVisSprites();
+
+   // e6y: build the per-frame drawseg X-range lists used by R_DrawSprite.
+   // Only silhouette/masked drawsegs can clip sprites, so collect those into
+   // range 0 (all), range 1 (touches left half), range 2 (touches right
+   // half). Skipped entirely when there are no sprites to draw.
+   for (i = 0; i < DS_RANGES_COUNT; i++)
+      drawsegs_xranges[i].count = 0;
+
+   if (num_vissprite > 0)
+   {
+      if (drawsegs_xrange_size < maxdrawsegs)
+      {
+         drawsegs_xrange_size = 2 * maxdrawsegs;
+         for (i = 0; i < DS_RANGES_COUNT; i++)
+            drawsegs_xranges[i].items = Z_Realloc(
+               drawsegs_xranges[i].items,
+               drawsegs_xrange_size * sizeof(drawsegs_xranges[i].items[0]),
+               PU_STATIC, NULL);
+      }
+
+      for (ds = ds_p; ds-- > drawsegs; )
+      {
+         if (ds->silhouette || ds->maskedtexturecol)
+         {
+            drawsegs_xranges[0].items[drawsegs_xranges[0].count].x1 = ds->x1;
+            drawsegs_xranges[0].items[drawsegs_xranges[0].count].x2 = ds->x2;
+            drawsegs_xranges[0].items[drawsegs_xranges[0].count].user = ds;
+
+            if (ds->x1 < cx)
+            {
+               drawsegs_xranges[1].items[drawsegs_xranges[1].count] =
+                  drawsegs_xranges[0].items[drawsegs_xranges[0].count];
+               drawsegs_xranges[1].count++;
+            }
+            if (ds->x2 >= cx)
+            {
+               drawsegs_xranges[2].items[drawsegs_xranges[2].count] =
+                  drawsegs_xranges[0].items[drawsegs_xranges[0].count];
+               drawsegs_xranges[2].count++;
+            }
+
+            drawsegs_xranges[0].count++;
+         }
+      }
+   }
 
    // draw all vissprites back to front
 
    for (i = num_vissprite ;--i>=0; )
-      R_DrawSprite(vissprite_ptrs[i]);         // killough
+   {
+      vissprite_t *spr = vissprite_ptrs[i];
+
+      if (spr->x2 < cx)
+      {
+         drawsegs_xrange       = drawsegs_xranges[1].items;
+         drawsegs_xrange_count = drawsegs_xranges[1].count;
+      }
+      else if (spr->x1 >= cx)
+      {
+         drawsegs_xrange       = drawsegs_xranges[2].items;
+         drawsegs_xrange_count = drawsegs_xranges[2].count;
+      }
+      else
+      {
+         drawsegs_xrange       = drawsegs_xranges[0].items;
+         drawsegs_xrange_count = drawsegs_xranges[0].count;
+      }
+
+      R_DrawSprite(spr);         // killough
+   }
 
    // render any remaining masked mid textures
 

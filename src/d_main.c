@@ -721,7 +721,7 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
 		  RETRO_VFS_FILE_ACCESS_HINT_NONE
 		  )))
   {
-    int ud=0,rg=0,sw=0,cm=0,sc=0,htic=0;
+    int ud=0,rg=0,sw=0,cm=0,sc=0,htic=0,hexn=0;
 
     // Identify IWAD correctly
     wadinfo_t header;
@@ -780,8 +780,18 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
         {
           /* M_HTIC is the Heretic main-menu title graphic; it is unique to
            * a Heretic IWAD (Doom never carries it).  This distinguishes a
-           * Heretic IWAD from Doom even though both use ExMy level names. */
+           * Heretic IWAD from Doom even though both use ExMy level names.
+           * NOTE: Hexen IWADs also carry M_HTIC, so Hexen must be tested
+           * before Heretic below (see the hexn check). */
           ++htic;
+        }
+        else if (!strncmp(fileinfo[length].name, "MAPINFO", 7) &&
+                 fileinfo[length].name[7] == 0)
+        {
+          /* MAPINFO is unique to a Hexen IWAD among the games this core
+           * supports (Doom/Doom2 and Heretic carry no such lump), so it is
+           * the unambiguous Hexen signature. */
+          ++hexn;
         }
 
       free(fileinfo);
@@ -800,7 +810,21 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
 
     *gmode = indetermined;
     *hassec = FALSE;
-    if (htic)
+    if (hexn)
+    {
+      /* Hexen IWAD.  Hexen uses MAP## levels like commercial Doom and shares
+       * a great deal of code with Heretic, so set both the hexen flag and the
+       * raven umbrella (raven == heretic || hexen).  The full game has 30+
+       * maps; the 4-map demo IWAD also carries MAPINFO, so treat anything
+       * with the Hexen signature as commercial and let the map count stand. */
+      extern dbool hexen;
+      extern dbool raven;
+      hexen       = true;
+      raven       = true;
+      gamemission = hexen_mission;
+      *gmode      = commercial;
+    }
+    else if (htic)
     {
       /* Heretic IWAD.  Episodes use the same ExMy markers as Doom, so the
        * sw/rg counts above already tallied them: shareware is E1 only,

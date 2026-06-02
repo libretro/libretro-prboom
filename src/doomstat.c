@@ -43,6 +43,7 @@ GameMission_t   gamemission = doom;
  * 'raven' is the union (heretic || hexen) used by code shared between the two.
  * Both default off so a Doom session is byte-for-byte unaffected. */
 dbool heretic;
+dbool hexen;
 dbool raven;
 mobjtype_t g_mt_player = MT_PLAYER; /* player mobjtype; set per-game */
 int g_s_play      = S_PLAY;      /* player idle state; set per-game */

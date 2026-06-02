@@ -62,6 +62,7 @@ extern GameMission_t  gamemission;
 
 /* Raven (Heretic/Hexen) game identification; see doomstat.c. */
 extern dbool heretic;
+extern dbool hexen;
 extern dbool raven;
 extern mobjtype_t g_mt_player;
 extern int g_s_play;       /* player idle state; set per-game */

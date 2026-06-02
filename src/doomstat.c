@@ -44,6 +44,7 @@ GameMission_t   gamemission = doom;
 dbool heretic;
 dbool raven;
 mobjtype_t g_mt_player = MT_PLAYER; /* player mobjtype; set per-game */
+const char *g_menu_flat = "FLOOR4_6"; /* fullscreen-menu background flat; set per-game */
 
 // Language.
 Language_t   language = english;

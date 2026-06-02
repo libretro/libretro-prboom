@@ -64,6 +64,7 @@ extern GameMission_t  gamemission;
 extern dbool heretic;
 extern dbool raven;
 extern mobjtype_t g_mt_player;
+extern const char *g_menu_flat;
 
 // Set if homebrew PWAD stuff has been added.
 extern  dbool   modifiedgame;

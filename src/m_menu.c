@@ -2344,7 +2344,7 @@ void M_DrawKeybnd(void)
 
   // Set up the Key Binding screen
 
-  M_DrawBackground("FLOOR4_6", 0); // Draw background
+  M_DrawBackground(g_menu_flat, 0); // Draw background
 
   // proff/nicolas 09/20/98 -- changed for hi-res
   M_DrawTitle(84, 2, "M_KEYBND", CR_DEFAULT, "KEY BINDINGS", CR_GOLD);
@@ -2453,7 +2453,7 @@ void M_DrawWeapons(void)
 {
   menuactive = mnact_full;
 
-  M_DrawBackground("FLOOR4_6", 0); // Draw background
+  M_DrawBackground(g_menu_flat, 0); // Draw background
 
   // proff/nicolas 09/20/98 -- changed for hi-res
   M_DrawTitle(109, 2, "M_WEAP", CR_DEFAULT, "WEAPONS", CR_GOLD);
@@ -2545,7 +2545,7 @@ void M_DrawStatusHUD(void)
 {
   menuactive = mnact_full;
 
-  M_DrawBackground("FLOOR4_6", 0); // Draw background
+  M_DrawBackground(g_menu_flat, 0); // Draw background
 
   // proff/nicolas 09/20/98 -- changed for hi-res
   M_DrawTitle(59, 2, "M_STAT", CR_DEFAULT, "STATUS BAR / HUD", CR_GOLD);
@@ -2695,7 +2695,7 @@ void M_DrawAutoMap(void)
 {
   menuactive = mnact_full;
 
-  M_DrawBackground("FLOOR4_6", 0); // Draw background
+  M_DrawBackground(g_menu_flat, 0); // Draw background
 
   // CPhipps - patch drawing updated
   M_DrawTitle(109, 2, "M_AUTO", CR_DEFAULT, "AUTOMAP", CR_GOLD);
@@ -2803,7 +2803,7 @@ void M_DrawEnemy(void)
 {
   menuactive = mnact_full;
 
-  M_DrawBackground("FLOOR4_6", 0); // Draw background
+  M_DrawBackground(g_menu_flat, 0); // Draw background
 
   // proff/nicolas 09/20/98 -- changed for hi-res
   M_DrawTitle(114, 2, "M_ENEM", CR_DEFAULT, "ENEMIES", CR_GOLD);
@@ -3140,7 +3140,7 @@ void M_DrawGeneral(void)
 {
   menuactive = mnact_full;
 
-  M_DrawBackground("FLOOR4_6", 0); // Draw background
+  M_DrawBackground(g_menu_flat, 0); // Draw background
 
   // proff/nicolas 09/20/98 -- changed for hi-res
   M_DrawTitle(114, 2, "M_GENERL", CR_DEFAULT, "GENERAL", CR_GOLD);
@@ -3330,7 +3330,7 @@ void M_DrawCompat(void)
 {
   menuactive = mnact_full;
 
-  M_DrawBackground("FLOOR4_6", 0); // Draw background
+  M_DrawBackground(g_menu_flat, 0); // Draw background
 
   M_DrawTitle(52, 2, "M_COMPAT", CR_DEFAULT, "DOOM COMPATIBILITY", CR_GOLD);
   M_DrawInstructions();
@@ -3450,7 +3450,7 @@ void M_DrawMessages(void)
 {
   menuactive = mnact_full;
 
-  M_DrawBackground("FLOOR4_6", 0); // Draw background
+  M_DrawBackground(g_menu_flat, 0); // Draw background
 
   // CPhipps - patch drawing updated
   M_DrawTitle(103, 2, "M_MESS", CR_DEFAULT, "MESSAGES", CR_GOLD);
@@ -3523,7 +3523,7 @@ void M_DrawChatStrings(void)
 {
   menuactive = mnact_full;
 
-  M_DrawBackground("FLOOR4_6", 0); // Draw background
+  M_DrawBackground(g_menu_flat, 0); // Draw background
 
   // CPhipps - patch drawing updated
   M_DrawTitle(83, 2, "M_CHAT", CR_DEFAULT, "CHAT STRINGS", CR_GOLD);
@@ -4033,7 +4033,7 @@ void M_DrawHelp (void)
 {
   menuactive = mnact_full;
 
-  M_DrawBackground("FLOOR4_6", 0);
+  M_DrawBackground(g_menu_flat, 0);
 
   M_DrawScreenItems(helpstrings);
 }

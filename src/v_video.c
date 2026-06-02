@@ -311,9 +311,17 @@ void V_DrawBackground(const char* flatname, int scrn)
   int         x,y;
   int         lump;
   const int   w = (64*SCREENWIDTH/320), h = (64*SCREENHEIGHT/200);
+  const uint8_t *src;
+  int         flatnum = R_FlatNumForName(flatname);
+
+  /* A missing flat (e.g. a Doom-only menu flat requested under another
+   * game) yields flatnum -1; firstflat-1 then caches a bogus lump and the
+   * tiling loop dereferences a NULL source. Skip drawing instead. */
+  if (flatnum < 0)
+    return;
 
   // killough 4/17/98:
-  const uint8_t *src = W_CacheLumpNum(lump = firstflat + R_FlatNumForName(flatname));
+  src = W_CacheLumpNum(lump = firstflat + flatnum);
 
   /* V_DrawBlock(0, 0, scrn, 64, 64, src, 0); */
 

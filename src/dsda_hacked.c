@@ -320,6 +320,7 @@ void dsda_InitTables(void)
     /* Raven game parameters needed at boot (added incrementally as the
      * boot path requires them). */
     g_mt_player = HERETIC_MT_PLAYER;
+    g_menu_flat = "FLAT513";
 
     num_states     = HERETIC_NUMSTATES;
     num_mobj_types = HERETIC_NUMMOBJTYPES; /* full span: Doom slots unused, Heretic at offset */
@@ -364,6 +365,7 @@ void dsda_InitTables(void)
   }
 
   g_mt_player = MT_PLAYER;
+  g_menu_flat = "FLOOR4_6";
 
   num_states     = NUMSTATES;
   num_mobj_types = NUMMOBJTYPES;

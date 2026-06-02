@@ -36,6 +36,7 @@
 #include "doomstat.h"
 #include "w_wad.h"
 #include "r_main.h"
+#include "i_system.h"
 #include "r_draw.h"
 #include "r_filter.h"
 #include "v_video.h"
@@ -58,6 +59,10 @@
 //  and we need only the base address,
 //  and the total size == width*height*depth/8.,
 //
+
+#ifdef PRBOOM_RENDER_PROFILE
+double prof_wallfill_usec = 0.0;  /* us spent writing wall/sprite columns to the framebuffer (R_FlushColumns) */
+#endif
 
 uint8_t *viewimage;
 int  viewwidth;
@@ -249,6 +254,9 @@ static void (*R_FlushQuadColumn)(void) = R_QuadFlushError;
 
 static void R_FlushColumns(void)
 {
+#ifdef PRBOOM_RENDER_PROFILE
+   double _t0 = I_RenderProfileUsec();
+#endif
    if(temp_x != 4 || commontop >= commonbot)
       R_FlushWholeColumns();
    else
@@ -257,6 +265,9 @@ static void R_FlushColumns(void)
       R_FlushQuadColumn();
    }
    temp_x = 0;
+#ifdef PRBOOM_RENDER_PROFILE
+   prof_wallfill_usec += (I_RenderProfileUsec() - _t0);
+#endif
 }
 
 //

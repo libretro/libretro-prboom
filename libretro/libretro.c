@@ -11,6 +11,7 @@
 #endif
 #include <errno.h>
 #include <stdarg.h>
+#include <time.h>
 
 #include <libretro.h>
 #include <file/file_path.h>
@@ -628,6 +629,16 @@ double I_RenderProfileUsec(void)
 {
    if (perf_get_time_usec_cb)
       return (double)perf_get_time_usec_cb();
+#if defined(CLOCK_MONOTONIC)
+   {
+      /* Fallback when the frontend exposes no perf interface (e.g. a
+       * headless test harness): use the monotonic clock directly so the
+       * compile-time render profiler still produces real numbers. */
+      struct timespec ts;
+      if (clock_gettime(CLOCK_MONOTONIC, &ts) == 0)
+         return (double)ts.tv_sec * 1000000.0 + (double)ts.tv_nsec / 1000.0;
+   }
+#endif
    return 0.0;
 }
 

@@ -3549,6 +3549,27 @@ void A_FreezeDeathChunks(mobj_t *actor)
   actor->flags2 |= MF2_DONTDRAW;
 }
 
+/* Hexen bell (Winnowing Hall's clocktower).  The bell is a hanging
+ * MF_SPAWNCEILING|MF_NOGRAVITY decoration whose "death" is its ring: when
+ * shot, P_KillMobj corpse-ifies it like any other shootable - it strips
+ * MF_NOGRAVITY and quarters the height - and the long BBLL ring animation
+ * plays.  A_BellReset1 on the first ring frame immediately restores the
+ * hanging flags so the bell never actually falls, and A_BellReset2 on the
+ * final frame re-arms it as a shootable with fresh health so it can be rung
+ * again. */
+void A_BellReset1(mobj_t *actor)
+{
+  actor->flags |= MF_NOGRAVITY;
+  actor->height <<= 2;
+}
+
+void A_BellReset2(mobj_t *actor)
+{
+  actor->flags |= MF_SHOOTABLE;
+  actor->flags &= ~MF_CORPSE;
+  actor->health = 5;
+}
+
 /* Hexen breakable pottery.  ZPottery decorations are shootable; on death
  * they run A_PotteryExplode, flinging a handful of pottery-bit gibs.  Each
  * bit picks a random resting sprite (A_PotteryChooseBit) and lingers until

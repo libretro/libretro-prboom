@@ -67,6 +67,8 @@ void A_EttinAttack(mobj_t *);
 void A_LeafSpawn(mobj_t *);
 void A_LeafThrust(mobj_t *);
 void A_LeafCheck(mobj_t *);
+void A_BellReset1(mobj_t *);
+void A_BellReset2(mobj_t *);
 void A_PotteryExplode(mobj_t *);
 void A_PotteryChooseBit(mobj_t *);
 void A_PotteryCheck(mobj_t *);

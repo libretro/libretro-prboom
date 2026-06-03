@@ -922,16 +922,6 @@ static void P_LoadThings (int lump)
       if (!P_IsDoomnumAllowed(mt.type))
         continue;
 
-      /* Hexen actor spawning needs the Hexen actor tables, the class-based
-       * player setup, polyobject spawn spots and the Hexen line/thing
-       * specials -- none of which exist yet.  Until they land, spawn only the
-       * player starts (editor numbers 1-4, shared with Doom) so the map has a
-       * camera and can be loaded/rendered, and skip every other thing rather
-       * than feeding a Hexen doomednum into the Doom lookup (which would
-       * resolve to the wrong actor or index out of range). */
-      if (hexen_fmt && !(mt.type >= 1 && mt.type <= 4))
-        continue;
-
       // Do spawn all other stuff.
       P_SpawnMapThing(&mt);
     }

@@ -240,6 +240,18 @@ typedef enum
 #define WPIECE2 2
 #define WPIECE3 4
 
+/* Raven (Hexen/Heretic) floor terrain types.  Any type >= FLOOR_LIQUID is a
+ * liquid surface (it floorclips sprites and lets things sink/splash). */
+typedef enum
+{
+  FLOOR_SOLID,
+  FLOOR_ICE,
+  FLOOR_LIQUID,
+  FLOOR_WATER,
+  FLOOR_LAVA,
+  FLOOR_SLUDGE
+} floortype_t;
+
 // Ammunition types defined.
 typedef enum {
   AM_CLIP,    // Pistol / chaingun ammo.

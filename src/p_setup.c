@@ -1987,6 +1987,7 @@ void P_Init (void)
 {
    P_InitSwitchList();
    P_InitPicAnims();
+   P_InitTerrainTypes();
    R_InitSprites(sprnames);
 }
 /*

@@ -250,10 +250,69 @@ void P_InitPicAnims (void)
     W_UnlockLumpNum(lump);
 }
 
-///////////////////////////////////////////////////////////////
-//
-// Linedef and Sector Special Implementation Utility Functions
-//
+/* ==========================================================================
+ * Raven floor terrain types (Hexen/Heretic)
+ *
+ * Each flat (floor texture) can map to a terrain type -- water, lava,
+ * sludge, ice -- which drives splashes, sprite floorclipping, fire/ice
+ * monster behaviour, and the burrowing Serpent's surface/dive logic.
+ * TerrainTypes[] is indexed by floorpic (flat number relative to firstflat)
+ * and is filled at level init from the flat-name table below.
+ * ======================================================================== */
+
+int *TerrainTypes = NULL;
+
+static const struct
+{
+  const char *name;
+  int         type;
+} TerrainTypeDefs[2][6] =
+{
+  { /* Heretic */
+    { "FLTWAWA1", FLOOR_WATER  },
+    { "FLTFLWW1", FLOOR_WATER  },
+    { "FLTLAVA1", FLOOR_LAVA   },
+    { "FLATHUH1", FLOOR_LAVA   },
+    { "FLTSLUD1", FLOOR_SLUDGE },
+    { "END",      -1           }
+  },
+  { /* Hexen */
+    { "X_005", FLOOR_WATER  },
+    { "X_001", FLOOR_LAVA   },
+    { "X_009", FLOOR_SLUDGE },
+    { "F_033", FLOOR_ICE    },
+    { "END",   -1           },
+    { "END",   -1           }
+  }
+};
+
+void P_InitTerrainTypes(void)
+{
+  int i;
+  int lump;
+  int size;
+
+  if (!raven)
+    return;
+
+  size = (numflats + 1) * (int)sizeof(int);
+  TerrainTypes = (int *)Z_Malloc(size, PU_STATIC, 0);
+  memset(TerrainTypes, 0, size);
+  for (i = 0; TerrainTypeDefs[hexen][i].type != -1; i++)
+  {
+    lump = (W_CheckNumForName)(TerrainTypeDefs[hexen][i].name, ns_flats);
+    if (lump != -1)
+      TerrainTypes[lump - firstflat] = TerrainTypeDefs[hexen][i].type;
+  }
+}
+
+int P_GetThingFloorType(mobj_t *thing)
+{
+  if (!TerrainTypes)
+    return FLOOR_SOLID;
+  return TerrainTypes[thing->subsector->sector->floorpic];
+}
+
 ///////////////////////////////////////////////////////////////
 
 //

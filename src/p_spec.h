@@ -1060,6 +1060,10 @@ int EV_DoGenLockedDoor
 void P_InitPicAnims
 ( void );
 
+void P_InitTerrainTypes(void);
+int  P_GetThingFloorType(mobj_t *thing);
+extern int *TerrainTypes;
+
 void P_InitSwitchList
 ( void );
 

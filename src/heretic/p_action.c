@@ -20,6 +20,7 @@
 #include "info.h"
 #include "r_main.h"
 #include "p_enemy.h"
+#include "p_spec.h"
 #include "p_inter.h"
 #include "heretic/p_action.h"
 
@@ -45,7 +46,6 @@ extern mobj_t **bodyque;
 #define USE_MACE_AMMO_2 5
 
 
-#define FLOOR_SOLID 0
 #define TELEFOGHEIGHT (32*FRACUNIT)
 
 /* Heretic game-parameter constants.  dsda carries these as run-time
@@ -157,10 +157,10 @@ void P_DropItem(mobj_t *source, mobjtype_t type, int special, int chance)
 
 int P_HitFloor(mobj_t *thing)
 {
-  /* Terrain splashes (water/lava/sludge) are not implemented in this core;
-   * report a solid floor so callers take the no-splash path. */
-  (void)thing;
-  return FLOOR_SOLID;
+  /* Report the floor terrain type so callers can take liquid-specific
+   * behaviour (the Serpent's surface/dive logic, fire/ice monsters, sprite
+   * floorclipping).  Terrain splash effect mobjs are not spawned yet. */
+  return P_GetThingFloorType(thing);
 }
 
 void P_Massacre(void)

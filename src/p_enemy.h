@@ -62,6 +62,8 @@ dbool P_CheckMeleeRange(mobj_t *actor);
 void A_Look(mobj_t *);
 void A_Chase(mobj_t *);
 void A_FaceTarget(mobj_t *);
+/* Hexen monster codepointers. */
+void A_EttinAttack(mobj_t *);
 void A_PosAttack(mobj_t *);
 void A_Scream(mobj_t *);
 void A_SPosAttack(mobj_t *);

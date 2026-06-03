@@ -3232,3 +3232,22 @@ void A_RemoveFlags(mobj_t *actor)
   if (update_blockmap)
     P_SetThingPosition(actor);
 }
+
+/* ------------------------------------------------------------------------
+ * Hexen monster codepointers (active port).
+ *
+ * Ported from the dormant vanilla-Hexen actor code and adapted to this
+ * core's API.  These let Hexen enemies actually attack; the look/chase/
+ * face/pain/death pointers they share with the Doom/Heretic AI are already
+ * implemented.  Started with the Ettin (the first enemy encountered).
+ * --------------------------------------------------------------------- */
+
+#define HX_HITDICE(a) ((1 + (P_Random(pr_heretic) & 7)) * (a))
+
+void A_EttinAttack(mobj_t *actor)
+{
+  if (!actor->target)
+    return;
+  if (P_CheckMeleeRange(actor))
+    P_DamageMobj(actor->target, actor, actor, HX_HITDICE(2));
+}

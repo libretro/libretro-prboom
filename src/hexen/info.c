@@ -2453,7 +2453,7 @@ state_t hexen_states[HEXEN_NUMSTATES] = {
     {HEXEN_SPR_ETTN, 7, 7, {(arg0_t)A_Pain}, HEXEN_S_ETTIN_CHASE1, 0, 0},     // HEXEN_S_ETTIN_PAIN1
     {HEXEN_SPR_ETTN, 4, 6, {(arg0_t)A_FaceTarget}, HEXEN_S_ETTIN_ATK1_2, 0, 0},       // HEXEN_S_ETTIN_ATK1_1
     {HEXEN_SPR_ETTN, 5, 6, {(arg0_t)A_FaceTarget}, HEXEN_S_ETTIN_ATK1_3, 0, 0},       // HEXEN_S_ETTIN_ATK1_2
-    {HEXEN_SPR_ETTN, 6, 8, {(arg0_t)NULL}, HEXEN_S_ETTIN_CHASE1, 0, 0},      // HEXEN_S_ETTIN_ATK1_3
+    {HEXEN_SPR_ETTN, 6, 8, {(arg0_t)A_EttinAttack}, HEXEN_S_ETTIN_CHASE1, 0, 0},      // HEXEN_S_ETTIN_ATK1_3
     {HEXEN_SPR_ETTN, 8, 4, {(arg0_t)NULL}, HEXEN_S_ETTIN_DEATH1_2, 0, 0},     // HEXEN_S_ETTIN_DEATH1_1
     {HEXEN_SPR_ETTN, 9, 4, {(arg0_t)NULL}, HEXEN_S_ETTIN_DEATH1_3, 0, 0},     // HEXEN_S_ETTIN_DEATH1_2
     {HEXEN_SPR_ETTN, 10, 4, {(arg0_t)A_Scream}, HEXEN_S_ETTIN_DEATH1_4, 0, 0},        // HEXEN_S_ETTIN_DEATH1_3

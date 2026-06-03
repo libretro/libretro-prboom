@@ -3250,6 +3250,63 @@ void A_RemoveFlags(mobj_t *actor)
 
 #define HX_HITDICE(a) ((1 + (P_Random(pr_heretic) & 7)) * (a))
 
+int P_SubRandom(void);  /* heretic/p_action.c */
+
+/* Hexen tree leaf-spawner.  ZLeafSpawner things (the trees) periodically
+ * fling a few leaf sprites out on the wind; each leaf drifts, occasionally
+ * gets another upward gust (A_LeafThrust), and fades out (A_LeafCheck). */
+void A_LeafSpawn(mobj_t *actor)
+{
+  mobj_t *mo;
+  int     i;
+
+  for (i = (P_Random(pr_heretic) & 3) + 1; i; i--)
+  {
+    fixed_t x = actor->x + (P_SubRandom() << 14);
+    fixed_t y = actor->y + (P_SubRandom() << 14);
+    fixed_t z = actor->z + (P_Random(pr_heretic) << 14);
+    mobjtype_t type = HEXEN_MT_LEAF1 + (P_Random(pr_heretic) & 1);
+
+    mo = P_SpawnMobj(x, y, z, type);
+    if (mo)
+    {
+      P_ThrustMobj(mo, actor->angle, (P_Random(pr_heretic) << 9) + 3 * FRACUNIT);
+      P_SetTarget(&mo->target, actor);
+      mo->special1.i = 0;
+    }
+  }
+}
+
+void A_LeafThrust(mobj_t *actor)
+{
+  if (P_Random(pr_heretic) > 96)
+    return;
+  actor->momz += (P_Random(pr_heretic) << 9) + FRACUNIT;
+}
+
+void A_LeafCheck(mobj_t *actor)
+{
+  actor->special1.i++;
+  if (actor->special1.i >= 20)
+  {
+    P_SetMobjState(actor, HEXEN_S_NULL);
+    return;
+  }
+  if (P_Random(pr_heretic) > 64)
+  {
+    if (!actor->momx && !actor->momy && actor->target)
+      P_ThrustMobj(actor, actor->target->angle,
+                   (P_Random(pr_heretic) << 9) + FRACUNIT);
+    return;
+  }
+  P_SetMobjState(actor, HEXEN_S_LEAF1_8);
+  actor->momz = (P_Random(pr_heretic) << 9) + FRACUNIT;
+  if (actor->target)
+    P_ThrustMobj(actor, actor->target->angle,
+                 (P_Random(pr_heretic) << 9) + 2 * FRACUNIT);
+  actor->flags |= MF_MISSILE;
+}
+
 void A_EttinAttack(mobj_t *actor)
 {
   if (!actor->target)

@@ -64,6 +64,9 @@ void A_Chase(mobj_t *);
 void A_FaceTarget(mobj_t *);
 /* Hexen monster codepointers. */
 void A_EttinAttack(mobj_t *);
+void A_LeafSpawn(mobj_t *);
+void A_LeafThrust(mobj_t *);
+void A_LeafCheck(mobj_t *);
 void A_CentaurAttack(mobj_t *);
 void A_CentaurDefend(mobj_t *);
 void A_SetInvulnerable(mobj_t *);

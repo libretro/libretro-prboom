@@ -1657,6 +1657,18 @@ bool D_DoomMainSetup(void)
 
   // start the apropriate game based on parms
 
+  /* Hexen is class-based; until the class-selection menu exists, default
+   * every player to the Fighter (matching the Fighter foundation defaults
+   * the runtime tables are seeded with).  This makes player->class correct
+   * at spawn so the class-indexed weapon/mana code resolves to the Fighter
+   * rather than the empty PCLASS_NULL column. */
+  if (hexen)
+  {
+    int pc;
+    for (pc = 0; pc < MAXPLAYERS; pc++)
+      PlayerClass[pc] = PCLASS_FIGHTER;
+  }
+
   if (gameaction != ga_playdemo)
   {
     if (autostart)

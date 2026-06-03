@@ -386,6 +386,112 @@ static gamepad_layout_t gp_heretic_classic = {
 	16,
 };
 
+/* "Hexen Gamepad Modern" layout.
+ *
+ * Hexen on a modern pad: sticks move and turn, triggers run and fire, and
+ * the Hexen-specific actions sit on real engine binds (key_jump,
+ * key_use_artifact, key_inv_left / key_inv_right, key_fly_up /
+ * key_fly_down) rather than stand-ins.  With only four weapons per class
+ * the weapon cycle moves to the d-pad, freeing the shoulders for the
+ * inventory and the face buttons for Jump and the artifact.
+ *
+ *   Left stick : Move / Strafe        Right stick: Turn
+ *   R2 / L2    : Fire / Run           L1 / R1    : Cycle inventory
+ *   A          : Jump                 Y          : Use / open door
+ *   X          : Use inventory item   B          : Show last message
+ *   D-pad Up/Down   : Fly up / down (with the Wings of Wrath)
+ *   D-pad Left/Right: Previous / next weapon
+ */
+static gamepad_layout_t gp_hexen_modern = {
+	{
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "Previous Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "Fly Up" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "Fly Down" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "Next Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Show Last Message" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Jump" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Use Inventory Item" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Use / Open Door" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Cycle Inventory Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Cycle Inventory Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Fire" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "Toggle Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "180 Turn" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Automap" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Pause Menu" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_X, "Strafe" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_LEFT, RETRO_DEVICE_ID_ANALOG_Y, "Move" },
+		{ 0, RETRO_DEVICE_ANALOG, RETRO_DEVICE_INDEX_ANALOG_RIGHT, RETRO_DEVICE_ID_ANALOG_X, "Turn" },
+		{ 0 },
+	},
+	{	// gamekey,             menukey      (indexed by RETRO_DEVICE_ID_JOYPAD)
+		{ &key_enter,           &key_menu_backspace }, // 0  B  : Show Last Message
+		{ &key_use,             &key_menu_enter },     // 1  Y  : Use / Open Door
+		{ &key_map,             &key_menu_backspace }, // 2  SELECT: Automap
+		{ &key_menu_escape,     &key_menu_escape },    // 3  START : Pause Menu
+		{ &key_fly_up,          &key_menu_up },        // 4  UP : Fly Up
+		{ &key_fly_down,        &key_menu_down },      // 5  DOWN : Fly Down
+		{ &key_weaponcycledown, &key_menu_left },      // 6  LEFT : Previous Weapon
+		{ &key_weaponcycleup,   &key_menu_right },     // 7  RIGHT: Next Weapon
+		{ &key_jump,            &key_menu_enter },     // 8  A  : Jump
+		{ &key_use_artifact,    &key_menu_backspace }, // 9  X  : Use Inventory Item
+		{ &key_inv_left,        &key_menu_left },      // 10 L1 : Cycle Inventory Left
+		{ &key_inv_right,       &key_menu_right },     // 11 R1 : Cycle Inventory Right
+		{ &key_speed,           &key_menu_backspace }, // 12 L2 : Run
+		{ &key_fire,            &key_menu_enter },     // 13 R2 : Fire
+		{ &key_autorun,         &key_menu_enter },     // 14 L3 : Toggle Run
+		{ &key_reverse,         &key_menu_backspace }, // 15 R3 : 180 Turn
+	},
+	16,
+};
+
+/* "Hexen Gamepad Classic" layout: the PS1-style classic mapping with the
+ * Hexen actions on real binds.  Run becomes the L3 toggle so that Jump can
+ * take the Y face button; the shoulders cycle the inventory, the triggers
+ * cycle the four weapons, and the right stick click uses the selected
+ * artifact. */
+static gamepad_layout_t gp_hexen_classic = {
+	{
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_LEFT,   "D-Pad Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_UP,     "D-Pad Up" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_DOWN,   "D-Pad Down" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_RIGHT,  "D-Pad Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_B,      "Strafe" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_A,      "Use / Open Door" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_X,      "Fire" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_Y,      "Jump" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L,      "Cycle Inventory Left" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R,      "Cycle Inventory Right" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L2,     "Previous Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R2,     "Next Weapon" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_L3,     "Toggle Run" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_R3,     "Use Inventory Item" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_SELECT, "Automap" },
+		{ 0, RETRO_DEVICE_JOYPAD, 0, RETRO_DEVICE_ID_JOYPAD_START,  "Pause Menu" },
+		{ 0 },
+	},
+	{	// gamekey,             menukey      (indexed by RETRO_DEVICE_ID_JOYPAD)
+		{ &key_strafe,          &key_menu_backspace }, // 0  B  : Strafe
+		{ &key_jump,            &key_menu_backspace }, // 1  Y  : Jump
+		{ &key_map,             &key_menu_backspace }, // 2  SELECT: Automap
+		{ &key_menu_escape,     &key_menu_escape },    // 3  START : Pause Menu
+		{ &key_up,              &key_menu_up },        // 4  UP
+		{ &key_down,            &key_menu_down },      // 5  DOWN
+		{ &key_left,            &key_menu_left },      // 6  LEFT
+		{ &key_right,           &key_menu_right },     // 7  RIGHT
+		{ &key_use,             &key_menu_enter },     // 8  A  : Use / Open Door
+		{ &key_fire,            &key_menu_enter },     // 9  X  : Fire
+		{ &key_inv_left,        &key_menu_left },      // 10 L1 : Cycle Inventory Left
+		{ &key_inv_right,       &key_menu_right },     // 11 R1 : Cycle Inventory Right
+		{ &key_weaponcycledown, &key_menu_backspace }, // 12 L2 : Previous Weapon
+		{ &key_weaponcycleup,   &key_menu_enter },     // 13 R2 : Next Weapon
+		{ &key_autorun,         &key_menu_enter },     // 14 L3 : Toggle Run
+		{ &key_use_artifact,    &key_menu_backspace }, // 15 R3 : Use Inventory Item
+	},
+	16,
+};
+
 /* Keyboard / mouse descriptors.  Unlike the gamepad layouts these document
  * the keyboard keys the Raven games bind: movement / fire / use plus the
  * inventory and flight keys.  Heretic uses spacebar for Use; Hexen reserves
@@ -923,7 +1029,7 @@ void retro_set_environment(retro_environment_t cb)
    struct retro_vfs_interface_info vfs_iface_info;
    static bool libretro_supports_option_categories = false;
    static const struct retro_controller_description port[] = {
-		{ "Gamepad Modern (OG Xbox Doom 3)", RETROPAD_MODERN },
+		{ "Doom Gamepad Modern (OG Xbox Doom 3)", RETROPAD_MODERN },
 		{ "Doom Gamepad Classic (PS1)", RETROPAD_CLASSIC },
 		{ "Doom RetroKeyboard/Mouse", RETRO_DEVICE_KEYBOARD },
 		{ 0 },
@@ -957,16 +1063,18 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 		case RETROPAD_CLASSIC:
 			doom_devices[port] = RETROPAD_CLASSIC;
 			{
-				extern dbool heretic;
+				extern dbool heretic, hexen;
 				environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+				           hexen   ? gp_hexen_classic.desc :
 				           heretic ? gp_heretic_classic.desc : gp_classic.desc);
 			}
 			break;
 		case RETROPAD_MODERN:
 			doom_devices[port] = RETROPAD_MODERN;
 			{
-				extern dbool heretic;
+				extern dbool heretic, hexen;
 				environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+				           hexen   ? gp_hexen_modern.desc :
 				           heretic ? gp_heretic_modern.desc : gp_modern.desc);
 			}
 			break;
@@ -990,8 +1098,9 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 				log_cb(RETRO_LOG_ERROR, "Invalid libretro controller device, using default: RETROPAD_CLASSIC\n");
 			doom_devices[port] = RETROPAD_CLASSIC;
 			{
-				extern dbool heretic;
+				extern dbool heretic, hexen;
 				environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+				           hexen   ? gp_hexen_classic.desc :
 				           heretic ? gp_heretic_classic.desc : gp_classic.desc);
 			}
 	}
@@ -2638,8 +2747,9 @@ process_input(void)
                   ret |= (1 << i);
          }
          {
-            extern dbool heretic;
-            gamepad_layout_t *gp = heretic ? &gp_heretic_classic : &gp_classic;
+            extern dbool heretic, hexen;
+            gamepad_layout_t *gp = hexen   ? &gp_hexen_classic :
+                                   heretic ? &gp_heretic_classic : &gp_classic;
             process_gamepad_buttons(ret, gp->num_buttons, gp->action_lut);
          }
 			break;
@@ -2654,8 +2764,9 @@ process_input(void)
                   ret |= (1 << i);
          }
          {
-            extern dbool heretic;
-            gamepad_layout_t *gp = heretic ? &gp_heretic_modern : &gp_modern;
+            extern dbool heretic, hexen;
+            gamepad_layout_t *gp = hexen   ? &gp_hexen_modern :
+                                   heretic ? &gp_heretic_modern : &gp_modern;
             process_gamepad_buttons(ret, gp->num_buttons, gp->action_lut);
          }
 			process_gamepad_left_analog();

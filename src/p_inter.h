@@ -70,4 +70,5 @@ extern int maxammo[], clipammo[];
 extern int heretic_maxammo[], heretic_clipammo[];
 
 dbool P_GiveBody(player_t *player, int num);
+dbool P_GiveMana(player_t *player, manatype_t mana, int count);
 #endif

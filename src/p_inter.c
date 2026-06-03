@@ -396,6 +396,7 @@ dbool   P_GivePower(player_t *player, int power)
 extern void retro_set_rumble_touch(unsigned intensity, float duration);
 
 static void Heretic_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher);
+static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher);
 
 void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
 {
@@ -407,6 +408,12 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
   if (heretic)
   {
     Heretic_P_TouchSpecialThing(special, toucher);
+    return;
+  }
+
+  if (hexen)
+  {
+    Hexen_P_TouchSpecialThing(special, toucher);
     return;
   }
 
@@ -1021,10 +1028,127 @@ static void Heretic_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
     S_StartSound(player->mo, sound | PICKUP_SOUND);
 }
 
+/* --------------------------------------------------------------------------
+ * Hexen item pickups.
+ *
+ * Single-player handling for the Hexen mana and (Fighter) weapon pickups.
+ * Mana uses the dedicated player->mana[] pool; weapons set weaponowned and
+ * auto-switch to a more powerful slot.  Picking up the first blue mana while
+ * the axe is ready switches it to its glowing/powered form.  Cleric/Mage
+ * weapons and the assembled fourth weapon (weapon pieces) are not handled
+ * yet.
+ * ------------------------------------------------------------------------ */
+
+dbool P_GiveMana(player_t *player, manatype_t mana, int count)
+{
+  int prevMana;
+
+  if (mana == MANA_NONE || mana == MANA_BOTH)
+    return false;
+  if ((unsigned int)mana >= NUMMANA)
+    return false;
+  if (player->mana[mana] == MAX_MANA)
+    return false;
+
+  prevMana = player->mana[mana];
+  player->mana[mana] += count;
+  if (player->mana[mana] > MAX_MANA)
+    player->mana[mana] = MAX_MANA;
+  (void)prevMana;
+
+  return true;
+}
+
+/* Give a Hexen weapon (single-player): own it, top up its mana, and switch
+ * to it if it is more powerful than the current weapon. Returns true if the
+ * pickup should be consumed. */
+static dbool Hexen_GiveWeapon(player_t *player, weapontype_t weaponType)
+{
+  dbool gaveMana;
+  dbool gaveWeapon;
+
+  if (weaponType == WP_SECOND)
+    gaveMana = P_GiveMana(player, MANA_1, 25);
+  else
+    gaveMana = P_GiveMana(player, MANA_2, 25);
+
+  if (player->weaponowned[weaponType])
+    gaveWeapon = false;
+  else
+  {
+    gaveWeapon = true;
+    player->weaponowned[weaponType] = true;
+    if (weaponType > player->readyweapon)
+      player->pendingweapon = weaponType; /* switch to more powerful weapon */
+  }
+  return gaveWeapon || gaveMana;
+}
+
+static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
+{
+  player_t *player;
+  int       sound;
+  fixed_t   delta = special->z - toucher->z;
+
+  if (delta > toucher->height || delta < -8 * FRACUNIT)
+    return;            /* out of reach */
+  if (toucher->health <= 0)
+    return;            /* toucher is dead */
+
+  sound  = hexen_sfx_pickup_weapon;
+  player = toucher->player;
+
+  switch (special->sprite)
+  {
+    case HEXEN_SPR_MAN1:           /* blue mana */
+      if (!P_GiveMana(player, MANA_1, 15))
+        return;
+      player->message = "BLUE MANA";
+      sound = hexen_sfx_pickup_item;
+      break;
+    case HEXEN_SPR_MAN2:           /* green mana */
+      if (!P_GiveMana(player, MANA_2, 15))
+        return;
+      player->message = "GREEN MANA";
+      sound = hexen_sfx_pickup_item;
+      break;
+    case HEXEN_SPR_MAN3:           /* combined mana */
+    {
+      dbool got = P_GiveMana(player, MANA_1, 20);
+      got = P_GiveMana(player, MANA_2, 20) || got;
+      if (!got)
+        return;
+      player->message = "COMBINED MANA";
+      sound = hexen_sfx_pickup_item;
+      break;
+    }
+    case HEXEN_SPR_WFAX:           /* Timon's Axe (Fighter 2nd) */
+      if (player->class != PCLASS_FIGHTER || !Hexen_GiveWeapon(player, WP_SECOND))
+        return;
+      player->message = "TIMON'S AXE";
+      break;
+    case HEXEN_SPR_WFHM:           /* Hammer of Retribution (Fighter 3rd) */
+      if (player->class != PCLASS_FIGHTER || !Hexen_GiveWeapon(player, WP_THIRD))
+        return;
+      player->message = "HAMMER OF RETRIBUTION";
+      break;
+    default:
+      /* Unhandled Hexen pickup (other classes' weapons, weapon pieces,
+       * artifacts, keys): leave it in the world rather than removing it. */
+      return;
+  }
+
+  if (special->flags & MF_COUNTITEM)
+    player->itemcount++;
+  P_RemoveMobj(special);
+  player->bonuscount += BONUSADD;
+  if (!comp[comp_sound] || player == &players[displayplayer])
+    S_StartSound(player->mo, sound | PICKUP_SOUND);
+}
+// killough 11/98: make static
 //
 // KillMobj
 //
-// killough 11/98: make static
 static void P_KillMobj(mobj_t *source, mobj_t *target)
 {
   target->flags &= ~(MF_SHOOTABLE|MF_FLOAT|MF_SKULLFLY);

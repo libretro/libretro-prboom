@@ -1101,7 +1101,7 @@ int Hexen_EV_BuildStairs(line_t *line, byte *args, int direction,
  * Spawn a projectile (134/136) or a thing (135/137) at every mapspot sharing
  * the given thing id.  The spawn-type argument indexes the Hexen thing-type
  * table below. */
-static const mobjtype_t TranslateThingType[] = {
+const mobjtype_t TranslateThingType[] = {
     HEXEN_MT_MAPSPOT,                 /* T_NONE */
     HEXEN_MT_CENTAUR,                 /* T_CENTAUR */
     HEXEN_MT_CENTAURLEADER,           /* T_CENTAURLEADER */

@@ -62,6 +62,9 @@ int   Hexen_EV_DoFloorAndCeiling(line_t *line, byte *args, int raise);
 int   Hexen_EV_SectorSoundChange(byte *args);
 void  T_FloorWaggle(planeWaggle_t *waggle);
 int   EV_StartFloorWaggle(int tag, int height, int speed, int offset, int timer);
+
+#define TRANSLATE_THING_TYPE_COUNT 108
+extern const mobjtype_t TranslateThingType[TRANSLATE_THING_TYPE_COUNT];
 int   EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount);
 void  Hexen_EV_StopPlat(line_t *line, byte *args);
 

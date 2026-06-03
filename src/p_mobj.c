@@ -1832,9 +1832,26 @@ mobj_t *P_SPMAngle(mobj_t *source, mobjtype_t type, angle_t angle)
   return th;
 }
 
-/* Hexen: like P_SPMAngle, but the missile is spawned at a caller-supplied
- * position (x,y,z) rather than at the source origin.  Used by the Fighter's
- * Quietus sword, which fans several flame missiles from offset heights. */
+/* Hexen: spawn a missile travelling at an explicit angle/speed/vertical
+ * velocity (rather than aimed at a target).  Used by the Mage's Cone of
+ * Shards, whose shards reproduce outward in fixed directions. */
+mobj_t *P_SpawnMissileAngleSpeed(mobj_t *source, mobjtype_t type,
+                                 angle_t angle, fixed_t momz, fixed_t speed)
+{
+  fixed_t z;
+  mobj_t *mo;
+
+  z = source->z - source->floorclip;
+  mo = P_SpawnMobj(source->x, source->y, z, type);
+  P_SetTarget(&mo->target, source);
+  mo->angle = angle;
+  angle >>= ANGLETOFINESHIFT;
+  mo->momx = FixedMul(speed, finecosine[angle]);
+  mo->momy = FixedMul(speed, finesine[angle]);
+  mo->momz = momz;
+  P_CheckMissileSpawn(mo);
+  return mo;
+}
 mobj_t *P_SPMAngleXYZ(mobj_t *source, fixed_t x, fixed_t y, fixed_t z,
                       mobjtype_t type, angle_t angle)
 {

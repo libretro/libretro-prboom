@@ -119,6 +119,8 @@ void A_CHolyAttack(player_t *player, pspdef_t *psp);
 void A_CHolyPalette(player_t *player, pspdef_t *psp);
 /* Mage weapons. */
 void A_MWandAttack(player_t *player, pspdef_t *psp);
+void A_FireConePL1(player_t *player, pspdef_t *psp);
+void A_ShedShard(struct mobj_s *actor);
 void A_CHolySeek(struct mobj_s *actor);
 void A_CHolyTail(struct mobj_s *actor);
 void A_CHolyCheckScream(struct mobj_s *actor);

@@ -1737,6 +1737,133 @@ void A_MWandAttack(player_t *player, pspdef_t *psp)
   S_StartSound(player->mo, hexen_sfx_mage_wand_fire);
 }
 
+/* The Cone of Shards (Mage WP_SECOND): a frost burst.  At point-blank it
+ * deals heavy ice damage to the first creature in a 45-degree arc; with no
+ * target in range it instead fires a self-reproducing spray of ice shards
+ * that fan out in fixed directions (A_ShedShard). */
+#define SHARDSPAWN_LEFT  1
+#define SHARDSPAWN_RIGHT 2
+#define SHARDSPAWN_UP    4
+#define SHARDSPAWN_DOWN  8
+
+void A_FireConePL1(player_t *player, pspdef_t *psp)
+{
+  angle_t angle;
+  int     damage;
+  int     i;
+  mobj_t *pmo, *mo;
+  int     conedone = false;
+
+  (void)psp;
+  pmo = player->mo;
+  player->mana[MANA_1] -= WeaponManaUse[player->class][player->readyweapon];
+  S_StartSound(pmo, hexen_sfx_mage_shards_fire);
+
+  damage = 90 + (P_Random(pr_punch) & 15);
+  for (i = 0; i < 16; i++)
+  {
+    angle = pmo->angle + i * (ANG45 / 16);
+    P_AimLineAttack(pmo, angle, MELEERANGE, 0);
+    if (linetarget)
+    {
+      pmo->flags2 |= MF2_ICEDAMAGE;
+      P_DamageMobj(linetarget, pmo, pmo, damage);
+      pmo->flags2 &= ~MF2_ICEDAMAGE;
+      conedone = true;
+      break;
+    }
+  }
+
+  /* no creatures in range: fire the reproducing shard spray */
+  if (!conedone)
+  {
+    mo = P_SpawnPlayerMissile(pmo, HEXEN_MT_SHARDFX1);
+    if (mo)
+    {
+      mo->special1.i = SHARDSPAWN_LEFT | SHARDSPAWN_DOWN | SHARDSPAWN_UP
+                     | SHARDSPAWN_RIGHT;
+      mo->special2.i = 3;          /* reproduction levels */
+      P_SetTarget(&mo->target, pmo);
+      mo->special_args[0] = 3;     /* initial shard does super damage */
+    }
+  }
+}
+
+void A_ShedShard(mobj_t *actor)
+{
+  mobj_t *mo;
+  int     spawndir = actor->special1.i;
+  int     spermcount = actor->special2.i;
+
+  if (spermcount <= 0)
+    return;                        /* exhausted */
+  actor->special2.i = 0;
+  spermcount--;
+
+  if (spawndir & SHARDSPAWN_LEFT)
+  {
+    mo = P_SpawnMissileAngleSpeed(actor, HEXEN_MT_SHARDFX1,
+                                  actor->angle + (ANG45 / 9), 0,
+                                  (20 + 2 * spermcount) << FRACBITS);
+    if (mo)
+    {
+      mo->special1.i = SHARDSPAWN_LEFT;
+      mo->special2.i = spermcount;
+      mo->momz = actor->momz;
+      P_SetTarget(&mo->target, actor->target);
+      mo->special_args[0] = (spermcount == 3) ? 2 : 0;
+    }
+  }
+  if (spawndir & SHARDSPAWN_RIGHT)
+  {
+    mo = P_SpawnMissileAngleSpeed(actor, HEXEN_MT_SHARDFX1,
+                                  actor->angle - (ANG45 / 9), 0,
+                                  (20 + 2 * spermcount) << FRACBITS);
+    if (mo)
+    {
+      mo->special1.i = SHARDSPAWN_RIGHT;
+      mo->special2.i = spermcount;
+      mo->momz = actor->momz;
+      P_SetTarget(&mo->target, actor->target);
+      mo->special_args[0] = (spermcount == 3) ? 2 : 0;
+    }
+  }
+  if (spawndir & SHARDSPAWN_UP)
+  {
+    mo = P_SpawnMissileAngleSpeed(actor, HEXEN_MT_SHARDFX1, actor->angle,
+                                  0, (15 + 2 * spermcount) << FRACBITS);
+    if (mo)
+    {
+      mo->momz = actor->momz;
+      mo->z += 8 * FRACUNIT;
+      if (spermcount & 1)
+        mo->special1.i = SHARDSPAWN_UP | SHARDSPAWN_LEFT | SHARDSPAWN_RIGHT;
+      else
+        mo->special1.i = SHARDSPAWN_UP;
+      mo->special2.i = spermcount;
+      P_SetTarget(&mo->target, actor->target);
+      mo->special_args[0] = (spermcount == 3) ? 2 : 0;
+    }
+  }
+  if (spawndir & SHARDSPAWN_DOWN)
+  {
+    mo = P_SpawnMissileAngleSpeed(actor, HEXEN_MT_SHARDFX1, actor->angle,
+                                  0, (15 + 2 * spermcount) << FRACBITS);
+    if (mo)
+    {
+      mo->momz = actor->momz;
+      mo->z -= 4 * FRACUNIT;
+      if (spermcount & 1)
+        mo->special1.i = SHARDSPAWN_DOWN | SHARDSPAWN_LEFT | SHARDSPAWN_RIGHT;
+      else
+        mo->special1.i = SHARDSPAWN_DOWN;
+      mo->special2.i = spermcount;
+      P_SetTarget(&mo->target, actor->target);
+      mo->special_args[0] = (spermcount == 3) ? 2 : 0;
+    }
+  }
+}
+
 #ifdef HEXEN
 //****************************************************************************
 //

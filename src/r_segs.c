@@ -387,6 +387,22 @@ static void R_RenderSegLoop (void)
    R_DrawColumn_f colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, drawvars.filterwall, drawvars.filterz);
    fixed_t  texturecolumn = 0;   // shut up compiler warning
 
+   /* These are all invariant across the column loop, yet the original code
+    * re-evaluated them on every column.  Hoist them once:
+    *  - linear_filter: drawvars.filterwall is a global the compiler cannot
+    *    prove unchanged across the colfunc() calls, so the LINEAR test (up
+    *    to five times per column) never got hoisted on its own.
+    *  - the three tier composite-texture patches: midtexture/toptexture/
+    *    bottomtexture are seg-constant (set in R_StoreWallRange before this
+    *    runs), but each tier was Cache-locked and Unlocked once *per column*.
+    *    Lock each once around the whole loop and reuse the cached pointer, so
+    *    the per-column lock churn and &texture_composites[id] lookup are gone
+    *    from the renderer's hottest loop. */
+   const int linear_filter = (drawvars.filterwall == RDRAW_FILTER_LINEAR);
+   const rpatch_t *midpatch = midtexture    ? R_CacheTextureCompositePatchNum(midtexture)    : NULL;
+   const rpatch_t *toppatch = toptexture    ? R_CacheTextureCompositePatchNum(toptexture)    : NULL;
+   const rpatch_t *botpatch = bottomtexture ? R_CacheTextureCompositePatchNum(bottomtexture) : NULL;
+
    R_SetDefaultDrawColumnVars(&dcvars);
 
    for ( ; rw_x < rw_stopx ; rw_x++)
@@ -454,7 +470,7 @@ static void R_RenderSegLoop (void)
          angle_t angle =(rw_centerangle+xtoviewangle[rw_x])>>ANGLETOFINESHIFT;
 
          texturecolumn = rw_offset-FixedMul(finetangent[angle],rw_distance);
-         if (drawvars.filterwall == RDRAW_FILTER_LINEAR)
+         if (linear_filter)
             texturecolumn -= (FRACUNIT>>1);
          dcvars.texu = texturecolumn; // for filtering -- POPE
          texturecolumn >>= FRACBITS;
@@ -463,7 +479,7 @@ static void R_RenderSegLoop (void)
          /* nextcolormap is only read by the LINEAR-filter wall drawers; the
           * default POINT path ignores it, so skip the extra colormap lookup
           * when not filtering. */
-         if (drawvars.filterwall == RDRAW_FILTER_LINEAR)
+         if (linear_filter)
             dcvars.nextcolormap = R_ColourMap(rw_lightlevel+1,rw_scale); // for filtering -- POPE
          dcvars.z = rw_scale; // for filtering -- POPE
 
@@ -478,16 +494,15 @@ static void R_RenderSegLoop (void)
          dcvars.yl = yl;     // single sided line
          dcvars.yh = yh;
          dcvars.texturemid = rw_midtexturemid;
-         tex_patch = R_CacheTextureCompositePatchNum(midtexture);
+         tex_patch = midpatch;
          dcvars.source = R_GetTextureColumn(tex_patch, texturecolumn);
-         if (drawvars.filterwall == RDRAW_FILTER_LINEAR)
+         if (linear_filter)
          {
             dcvars.prevsource = R_GetTextureColumn(tex_patch, texturecolumn-1);
             dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
          }
          dcvars.texheight = midtexheight;
          colfunc (&dcvars);
-         R_UnlockTextureCompositePatchNum(midtexture);
          tex_patch = NULL;
          cc_rwx = viewheight;
          fc_rwx = -1;
@@ -510,16 +525,15 @@ static void R_RenderSegLoop (void)
                dcvars.yl = yl;
                dcvars.yh = mid;
                dcvars.texturemid = rw_toptexturemid;
-               tex_patch = R_CacheTextureCompositePatchNum(toptexture);
+               tex_patch = toppatch;
                dcvars.source = R_GetTextureColumn(tex_patch,texturecolumn);
-               if (drawvars.filterwall == RDRAW_FILTER_LINEAR)
+               if (linear_filter)
                {
                   dcvars.prevsource = R_GetTextureColumn(tex_patch,texturecolumn-1);
                   dcvars.nextsource = R_GetTextureColumn(tex_patch,texturecolumn+1);
                }
                dcvars.texheight = toptexheight;
                colfunc (&dcvars);
-               R_UnlockTextureCompositePatchNum(toptexture);
                tex_patch = NULL;
                cc_rwx = mid;
             }
@@ -547,16 +561,15 @@ static void R_RenderSegLoop (void)
                dcvars.yl = mid;
                dcvars.yh = yh;
                dcvars.texturemid = rw_bottomtexturemid;
-               tex_patch = R_CacheTextureCompositePatchNum(bottomtexture);
+               tex_patch = botpatch;
                dcvars.source = R_GetTextureColumn(tex_patch, texturecolumn);
-               if (drawvars.filterwall == RDRAW_FILTER_LINEAR)
+               if (linear_filter)
                {
                   dcvars.prevsource = R_GetTextureColumn(tex_patch, texturecolumn-1);
                   dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
                }
                dcvars.texheight = bottomtexheight;
                colfunc (&dcvars);
-               R_UnlockTextureCompositePatchNum(bottomtexture);
                tex_patch = NULL;
                fc_rwx = mid;
             }
@@ -589,6 +602,11 @@ static void R_RenderSegLoop (void)
       topfrac += topstep;
       bottomfrac += bottomstep;
    }
+
+   /* release the per-tier composite patches locked once before the loop */
+   if (midpatch) R_UnlockTextureCompositePatchNum(midtexture);
+   if (toppatch) R_UnlockTextureCompositePatchNum(toptexture);
+   if (botpatch) R_UnlockTextureCompositePatchNum(bottomtexture);
 }
 
 // killough 5/2/98: move from r_main.c, made static, simplified

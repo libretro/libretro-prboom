@@ -199,7 +199,7 @@ hexen_weaponinfo_t WeaponInfo[NUMWEAPONS][NUMCLASSES] =
   {
     { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,        HEXEN_S_NULL        }, /* PCLASS_NULL */
     { MANA_NONE, HEXEN_S_PUNCHUP,  HEXEN_S_PUNCHDOWN,  HEXEN_S_PUNCHREADY,  HEXEN_S_PUNCHATK1_1, HEXEN_S_PUNCHATK2_1 }, /* PCLASS_FIGHTER */
-    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,        HEXEN_S_NULL        }, /* PCLASS_CLERIC  (placeholder) */
+    { MANA_NONE, HEXEN_S_CMACEUP,  HEXEN_S_CMACEDOWN,  HEXEN_S_CMACEREADY,  HEXEN_S_CMACEATK_1,  HEXEN_S_CMACEATK_1  }, /* PCLASS_CLERIC: mace */
     { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,        HEXEN_S_NULL        }, /* PCLASS_MAGE    (placeholder) */
     { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,        HEXEN_S_NULL        }  /* PCLASS_PIG */
   },
@@ -207,7 +207,7 @@ hexen_weaponinfo_t WeaponInfo[NUMWEAPONS][NUMCLASSES] =
   {
     { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,      HEXEN_S_NULL      },
     { MANA_1,    HEXEN_S_FAXEUP,   HEXEN_S_FAXEDOWN,   HEXEN_S_FAXEREADY,   HEXEN_S_FAXEATK_1, HEXEN_S_FAXEATK_1 }, /* PCLASS_FIGHTER: axe */
-    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,      HEXEN_S_NULL      },
+    { MANA_1,    HEXEN_S_CSTAFFUP, HEXEN_S_CSTAFFDOWN, HEXEN_S_CSTAFFREADY, HEXEN_S_CSTAFFATK_1, HEXEN_S_CSTAFFATK_1 }, /* PCLASS_CLERIC: serpent staff */
     { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,      HEXEN_S_NULL      },
     { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,      HEXEN_S_NULL      }
   },
@@ -215,7 +215,7 @@ hexen_weaponinfo_t WeaponInfo[NUMWEAPONS][NUMCLASSES] =
   {
     { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
     { MANA_2,    HEXEN_S_FHAMMERUP,   HEXEN_S_FHAMMERDOWN,  HEXEN_S_FHAMMERREADY,  HEXEN_S_FHAMMERATK_1, HEXEN_S_FHAMMERATK_1 }, /* PCLASS_FIGHTER: hammer */
-    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
+    { MANA_2,    HEXEN_S_CFLAMEUP,    HEXEN_S_CFLAMEDOWN,   HEXEN_S_CFLAMEREADY1,  HEXEN_S_CFLAMEATK_1,  HEXEN_S_CFLAMEATK_1  }, /* PCLASS_CLERIC: flame strike */
     { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
     { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         }
   },
@@ -223,7 +223,7 @@ hexen_weaponinfo_t WeaponInfo[NUMWEAPONS][NUMCLASSES] =
   {
     { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
     { MANA_BOTH, HEXEN_S_FSWORDUP,    HEXEN_S_FSWORDDOWN,   HEXEN_S_FSWORDREADY,   HEXEN_S_FSWORDATK_1,  HEXEN_S_FSWORDATK_1  }, /* PCLASS_FIGHTER: sword */
-    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
+    { MANA_BOTH, HEXEN_S_CHOLYUP,     HEXEN_S_CHOLYDOWN,    HEXEN_S_CHOLYREADY,    HEXEN_S_CHOLYATK_1,   HEXEN_S_CHOLYATK_1   }, /* PCLASS_CLERIC: wraithverge */
     { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
     { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         }
   }
@@ -236,7 +236,7 @@ int WeaponManaUse[NUMCLASSES][NUMWEAPONS] =
 {
   {  0,  0,  0,  0 }, /* PCLASS_NULL */
   {  0,  2,  3, 14 }, /* PCLASS_FIGHTER */
-  {  0,  0,  0,  0 }, /* PCLASS_CLERIC  (placeholder) */
+  {  0,  1,  4, 18 }, /* PCLASS_CLERIC: mace free, staff 1, flame 4, wraithverge 18 */
   {  0,  0,  0,  0 }, /* PCLASS_MAGE    (placeholder) */
   {  0,  0,  0,  0 }  /* PCLASS_PIG */
 };

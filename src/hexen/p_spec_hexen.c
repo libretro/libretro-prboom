@@ -240,6 +240,113 @@ static dbool CheckedLockedDoor(mobj_t *mo, byte lock)
   return true;
 }
 
+/* --- Floors ---------------------------------------------------------------
+ *
+ * Value-driven floor movers.  These reuse the engine's T_MoveFloor thinker,
+ * which moves the sector floor to floordestheight and then removes itself;
+ * the Hexen movement types fall through its texture/special switch unchanged.
+ * Until the sound-sequence subsystem lands the movement sound is the engine's
+ * default (sfx_stnmov inside T_MoveFloor). */
+int Hexen_EV_DoFloor(line_t *line, byte *args, floor_e floortype)
+{
+  int          secnum;
+  int          rtn = 0;
+  sector_t    *sec;
+  floormove_t *floor;
+  fixed_t      speed = args[1] * (FRACUNIT / 8);
+
+  (void) line;
+
+  HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+  {
+    sec = &sectors[secnum];
+    if (sec->floordata || sec->ceilingdata)
+      continue;
+
+    rtn = 1;
+    floor = Z_Malloc(sizeof(*floor), PU_LEVEL, 0);
+    memset(floor, 0, sizeof(*floor));
+    P_AddThinker(&floor->thinker);
+    sec->floordata = floor;
+    floor->thinker.function.arg1 = (void (*)(void *))T_MoveFloor;
+    floor->type   = floortype;
+    floor->crush  = FALSE;
+    floor->sector = sec;
+    floor->speed  = speed;
+    if (floortype == FLEV_LOWERTIMES8INSTANT ||
+        floortype == FLEV_RAISETIMES8INSTANT)
+      floor->speed = 2000 << FRACBITS;
+
+    switch (floortype)
+    {
+      case FLEV_LOWERFLOOR:
+        floor->direction = -1;
+        floor->floordestheight = P_FindHighestFloorSurrounding(sec);
+        break;
+      case FLEV_LOWERFLOORTOLOWEST:
+        floor->direction = -1;
+        floor->floordestheight = P_FindLowestFloorSurrounding(sec);
+        break;
+      case FLEV_LOWERFLOORBYVALUE:
+        floor->direction = -1;
+        floor->floordestheight = sec->floorheight - args[2] * FRACUNIT;
+        break;
+      case FLEV_LOWERTIMES8INSTANT:
+      case FLEV_LOWERBYVALUETIMES8:
+        floor->direction = -1;
+        floor->floordestheight = sec->floorheight - args[2] * FRACUNIT * 8;
+        break;
+      case FLEV_RAISEFLOORCRUSH:
+        floor->crush = TRUE;
+        floor->direction = 1;
+        floor->floordestheight = sec->ceilingheight - 8 * FRACUNIT;
+        break;
+      case FLEV_RAISEFLOOR:
+        floor->direction = 1;
+        floor->floordestheight = P_FindLowestCeilingSurrounding(sec);
+        if (floor->floordestheight > sec->ceilingheight)
+          floor->floordestheight = sec->ceilingheight;
+        break;
+      case FLEV_RAISEFLOORTONEAREST:
+        floor->direction = 1;
+        floor->floordestheight =
+          P_FindNextHighestFloor(sec, sec->floorheight);
+        break;
+      case FLEV_RAISEFLOORBYVALUE:
+        floor->direction = 1;
+        floor->floordestheight = sec->floorheight + args[2] * FRACUNIT;
+        break;
+      case FLEV_RAISETIMES8INSTANT:
+      case FLEV_RAISEBYVALUETIMES8:
+        floor->direction = 1;
+        floor->floordestheight = sec->floorheight + args[2] * FRACUNIT * 8;
+        break;
+      case FLEV_MOVETOVALUETIMES8:
+        floor->floordestheight = args[2] * FRACUNIT * 8;
+        if (args[3])
+          floor->floordestheight = -floor->floordestheight;
+        if (floor->floordestheight > sec->floorheight)
+          floor->direction = 1;
+        else if (floor->floordestheight < sec->floorheight)
+          floor->direction = -1;
+        else
+        {
+          /* already at the target: undo this thinker */
+          sec->floordata = NULL;
+          P_RemoveThinker(&floor->thinker);
+          rtn = 0;
+        }
+        break;
+      default:
+        sec->floordata = NULL;
+        P_RemoveThinker(&floor->thinker);
+        rtn = 0;
+        break;
+    }
+  }
+  return rtn;
+}
+
 /* --- Dispatcher ----------------------------------------------------------- */
 
 dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
@@ -264,6 +371,42 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       if (CheckedLockedDoor(mo, args[3]))
         ok = args[0] ? Hexen_EV_DoDoor(line, args, DREV_NORMAL)
                      : Hexen_EV_VerticalDoor(line, mo);
+      break;
+    case 20:                    /* Floor_LowerByValue */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_LOWERFLOORBYVALUE);
+      break;
+    case 21:                    /* Floor_LowerToLowest */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_LOWERFLOORTOLOWEST);
+      break;
+    case 22:                    /* Floor_LowerToNearest */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_LOWERFLOOR);
+      break;
+    case 23:                    /* Floor_RaiseByValue */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEFLOORBYVALUE);
+      break;
+    case 24:                    /* Floor_RaiseToHighest */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEFLOOR);
+      break;
+    case 25:                    /* Floor_RaiseToNearest */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEFLOORTONEAREST);
+      break;
+    case 28:                    /* Floor_RaiseAndCrush */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEFLOORCRUSH);
+      break;
+    case 35:                    /* Floor_RaiseByValueTimes8 */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEBYVALUETIMES8);
+      break;
+    case 36:                    /* Floor_LowerByValueTimes8 */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_LOWERBYVALUETIMES8);
+      break;
+    case 66:                    /* Floor_LowerInstant */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_LOWERTIMES8INSTANT);
+      break;
+    case 67:                    /* Floor_RaiseInstant */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_RAISETIMES8INSTANT);
+      break;
+    case 68:                    /* Floor_MoveToValueTimes8 */
+      ok = Hexen_EV_DoFloor(line, args, FLEV_MOVETOVALUETIMES8);
       break;
     default:
       /* The remaining special groups (floors, platforms, lights, teleports,

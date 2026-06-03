@@ -37,6 +37,7 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
 void  T_HexenVerticalDoor(vldoor_t *door);
 int   Hexen_EV_DoDoor(line_t *line, byte *args, vldoor_e type);
 dbool Hexen_EV_VerticalDoor(line_t *line, mobj_t *thing);
+int   Hexen_EV_DoFloor(line_t *line, byte *args, floor_e floortype);
 
 /* Line activation entry points (wired through map_format). */
 void  P_CrossHexenSpecialLine(line_t *line, int side, mobj_t *thing);

@@ -1167,6 +1167,30 @@ static int Hexen_GiveWeaponPiece(player_t *player, pclass_t matchClass,
   return hexen_sfx_pickup_weapon;
 }
 
+/* Hexen key names, indexed 0-10 (lock argument minus one). */
+const char *TextKeyMessages[11] = {
+  "STEEL KEY",
+  "CAVE KEY",
+  "AXE KEY",
+  "FIRE KEY",
+  "EMERALD KEY",
+  "DUNGEON KEY",
+  "SILVER KEY",
+  "RUSTED KEY",
+  "HORN KEY",
+  "SWAMP KEY",
+  "CASTLE KEY"
+};
+
+static dbool P_GiveKey(player_t *player, card_t key)
+{
+  if (player->cards[key])
+    return false;
+  player->bonuscount += BONUSADD;
+  player->cards[key] = true;
+  return true;
+}
+
 static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
 {
   player_t *player;
@@ -1205,6 +1229,22 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       sound = hexen_sfx_pickup_item;
       break;
     }
+    case HEXEN_SPR_KEY1:           /* Hexen keys: STEEL .. CASTLE */
+    case HEXEN_SPR_KEY2:
+    case HEXEN_SPR_KEY3:
+    case HEXEN_SPR_KEY4:
+    case HEXEN_SPR_KEY5:
+    case HEXEN_SPR_KEY6:
+    case HEXEN_SPR_KEY7:
+    case HEXEN_SPR_KEY8:
+    case HEXEN_SPR_KEY9:
+    case HEXEN_SPR_KEYA:
+    case HEXEN_SPR_KEYB:
+      if (!P_GiveKey(player, special->sprite - HEXEN_SPR_KEY1))
+        return;
+      player->message = TextKeyMessages[special->sprite - HEXEN_SPR_KEY1];
+      sound = hexen_sfx_pickup_key;
+      break;
     case HEXEN_SPR_ARM1:           /* Mesh Armor */
       if (!Hexen_P_GiveArmor(player, ARMOR_ARMOR, -1))
         return;

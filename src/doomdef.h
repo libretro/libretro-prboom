@@ -191,6 +191,21 @@ typedef enum {
   it_blueskull,
   it_yellowskull,
   it_redskull,
+  DOOM_NUMCARDS,
+
+  /* Hexen keys (0-based; STEEL .. CASTLE).  Line specials reference them as
+   * lock 1-11, i.e. cards[lock - 1]. */
+  key_1 = 0,
+  key_2,
+  key_3,
+  key_4,
+  key_5,
+  key_6,
+  key_7,
+  key_8,
+  key_9,
+  key_a,
+  key_b,
   NUMCARDS
 } card_t;
 

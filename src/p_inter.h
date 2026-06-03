@@ -68,6 +68,7 @@ extern int bfgcells;
 extern int monsters_infight; // e6y: Dehacked support - monsters infight
 extern int maxammo[], clipammo[];
 extern int heretic_maxammo[], heretic_clipammo[];
+extern const char *TextKeyMessages[11];  /* Hexen key names (lock - 1) */
 
 dbool P_GiveBody(player_t *player, int num);
 dbool P_GiveMana(player_t *player, manatype_t mana, int count);

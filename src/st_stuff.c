@@ -294,7 +294,7 @@ static patchnum_t shortnum[10];
 
 // 3 key-cards, 3 skulls, 3 card/skull combos
 // jff 2/24/98 extend number of patches by three skull/card combos
-static patchnum_t keys[NUMCARDS+3];
+static patchnum_t keys[DOOM_NUMCARDS+3];
 
 // face status patches
 static patchnum_t faces[ST_NUMFACES];
@@ -1474,7 +1474,7 @@ static void ST_loadGraphics(dbool doload)
   R_SetPatchNum(&tallpercent,"STTPRCNT");
 
   // key cards
-  for (i=0;i<NUMCARDS;i++)
+  for (i=0;i<DOOM_NUMCARDS;i++)
     {
       sprintf(namebuf, "STKEYS%d", i);
       R_SetPatchNum(&keys[i], namebuf);
@@ -1483,11 +1483,11 @@ static void ST_loadGraphics(dbool doload)
   // otherwise fallback to skullkeys like in vanilla Doom.
   for (i=0;i<3;i++)
   {
-    sprintf(namebuf, "STKEYS%d", NUMCARDS+i);
+    sprintf(namebuf, "STKEYS%d", DOOM_NUMCARDS+i);
     if (W_CheckNumForName(namebuf) != -1)
-      R_SetPatchNum(&keys[NUMCARDS+i], namebuf);
+      R_SetPatchNum(&keys[DOOM_NUMCARDS+i], namebuf);
     else
-      keys[NUMCARDS+i] = keys[3+i];
+      keys[DOOM_NUMCARDS+i] = keys[3+i];
   }
 
   //e6y: status bar background

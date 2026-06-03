@@ -44,6 +44,8 @@
 #include "hexen/p_spec_hexen.h"
 #include "hexen/p_lightning.h"
 #include "hexen/sn_sonix.h"
+#include <stdio.h>
+#include "p_inter.h"
 #include "hexen/p_acs.h"
 #include "heretic/p_action.h"
 
@@ -251,11 +253,22 @@ dbool Hexen_EV_VerticalDoor(line_t *line, mobj_t *thing)
  * inventory/key layer; for now an unlocked check passes through. */
 static dbool CheckedLockedDoor(mobj_t *mo, byte lock)
 {
+  static char lockedBuffer[80];
+
   if (!mo || !mo->player)
     return false;
   if (!lock)
     return true;
-  /* TODO: verify the player holds key `lock` once Hexen keys are wired. */
+  if (lock > 11)
+    return false;
+  if (!mo->player->cards[lock - 1])
+  {
+    snprintf(lockedBuffer, sizeof(lockedBuffer),
+             "YOU NEED THE %s", TextKeyMessages[lock - 1]);
+    mo->player->message = lockedBuffer;
+    S_StartSound(mo, hexen_sfx_door_locked);
+    return false;
+  }
   return true;
 }
 

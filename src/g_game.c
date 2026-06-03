@@ -1797,6 +1797,18 @@ static int G_DoLoadGameFromSaveBuffer(int length)
 
   save_p += VERSIONSIZE;
 
+  /* Raven layout tag (see G_DoSaveGameToSaveBuffer).  Reject saves written by
+   * an older build whose Heretic/Hexen struct layout differs, rather than
+   * deserialising them misaligned and crashing.  Not forced-loadable: a
+   * layout mismatch is unrecoverable, unlike a wad/checksum mismatch. */
+  if (raven)
+  {
+    static const char raven_magic[4] = { 'R','V','N','1' };
+    if (memcmp(save_p, raven_magic, sizeof raven_magic))
+      return -2;
+    save_p += sizeof raven_magic;
+  }
+
   // CPhipps - always check savegames even when forced,
   //  only print a warning if forced
   {  // killough 3/16/98: check lump name checksum (independent of order)
@@ -2003,6 +2015,24 @@ static int G_DoSaveGameToSaveBuffer() {
     }
 
   save_p += VERSIONSIZE;
+
+  /* Raven (Heretic/Hexen) layout tag.  The shared PrBoom version header only
+   * identifies the file format, not the in-memory struct layout, and this
+   * fork has grown mobj_t / player_t with Heretic/Hexen fields.  A savegame
+   * written by an older build of this core therefore passes the version
+   * check but deserialises with the wrong field offsets, desynchronising the
+   * thinker/special stream and crashing in P_UnArchiveSpecials.  Stamp a
+   * layout magic for raven games so an incompatible old save is rejected
+   * cleanly instead.  Bump RAVEN_SAVE_MAGIC whenever a raven-affecting struct
+   * layout changes.  Doom saves are untouched (the shared format is shared
+   * with upstream). */
+  if (raven)
+  {
+    static const char raven_magic[4] = { 'R','V','N','1' };
+    CheckSaveGame(sizeof raven_magic);
+    memcpy(save_p, raven_magic, sizeof raven_magic);
+    save_p += sizeof raven_magic;
+  }
 
   { /* killough 3/16/98, 12/98: store lump name checksum */
     uint64_t checksum = G_Signature();

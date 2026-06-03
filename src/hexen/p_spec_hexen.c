@@ -1323,7 +1323,63 @@ static dbool ActivateThing(mobj_t *mobj)
     }
     return false;
   }
-  return false;
+  switch (mobj->type)           /* decorations: light up / animate */
+  {
+    case HEXEN_MT_ZTWINEDTORCH:
+    case HEXEN_MT_ZTWINEDTORCH_UNLIT:
+      P_SetMobjState(mobj, HEXEN_S_ZTWINEDTORCH_1);
+      S_StartSound(mobj, hexen_sfx_ignite);
+      break;
+    case HEXEN_MT_ZWALLTORCH:
+    case HEXEN_MT_ZWALLTORCH_UNLIT:
+      P_SetMobjState(mobj, HEXEN_S_ZWALLTORCH1);
+      S_StartSound(mobj, hexen_sfx_ignite);
+      break;
+    case HEXEN_MT_ZGEMPEDESTAL:
+      P_SetMobjState(mobj, HEXEN_S_ZGEMPEDESTAL2);
+      break;
+    case HEXEN_MT_ZWINGEDSTATUENOSKULL:
+      P_SetMobjState(mobj, HEXEN_S_ZWINGEDSTATUENOSKULL2);
+      break;
+    case HEXEN_MT_THRUSTFLOOR_UP:
+    case HEXEN_MT_THRUSTFLOOR_DOWN:
+      if (mobj->special_args[0] == 0)
+      {
+        S_StartSound(mobj, hexen_sfx_thrustspike_lower);
+        mobj->flags2 &= ~MF2_DONTDRAW;
+        P_SetMobjState(mobj, mobj->special_args[1] ? HEXEN_S_BTHRUSTRAISE1
+                                                   : HEXEN_S_THRUSTRAISE1);
+      }
+      break;
+    case HEXEN_MT_ZFIREBULL:
+    case HEXEN_MT_ZFIREBULL_UNLIT:
+      P_SetMobjState(mobj, HEXEN_S_ZFIREBULL_BIRTH);
+      S_StartSound(mobj, hexen_sfx_ignite);
+      break;
+    case HEXEN_MT_ZBELL:
+      if (mobj->health > 0)
+        P_DamageMobj(mobj, NULL, NULL, 10);     /* 'ring' the bell */
+      break;
+    case HEXEN_MT_ZCAULDRON:
+    case HEXEN_MT_ZCAULDRON_UNLIT:
+      P_SetMobjState(mobj, HEXEN_S_ZCAULDRON1);
+      S_StartSound(mobj, hexen_sfx_ignite);
+      break;
+    case HEXEN_MT_FLAME_SMALL:
+      S_StartSound(mobj, hexen_sfx_ignite);
+      P_SetMobjState(mobj, HEXEN_S_FLAME_SMALL1);
+      break;
+    case HEXEN_MT_FLAME_LARGE:
+      S_StartSound(mobj, hexen_sfx_ignite);
+      P_SetMobjState(mobj, HEXEN_S_FLAME_LARGE1);
+      break;
+    case HEXEN_MT_BAT_SPAWNER:
+      P_SetMobjState(mobj, HEXEN_S_SPAWNBATS1);
+      break;
+    default:
+      return false;
+  }
+  return true;
 }
 
 static dbool DeactivateThing(mobj_t *mobj)
@@ -1338,7 +1394,46 @@ static dbool DeactivateThing(mobj_t *mobj)
     }
     return false;
   }
-  return false;
+  switch (mobj->type)           /* decorations: extinguish / go dormant */
+  {
+    case HEXEN_MT_ZTWINEDTORCH:
+    case HEXEN_MT_ZTWINEDTORCH_UNLIT:
+      P_SetMobjState(mobj, HEXEN_S_ZTWINEDTORCH_UNLIT);
+      break;
+    case HEXEN_MT_ZWALLTORCH:
+    case HEXEN_MT_ZWALLTORCH_UNLIT:
+      P_SetMobjState(mobj, HEXEN_S_ZWALLTORCH_U);
+      break;
+    case HEXEN_MT_THRUSTFLOOR_UP:
+    case HEXEN_MT_THRUSTFLOOR_DOWN:
+      if (mobj->special_args[0] == 1)
+      {
+        S_StartSound(mobj, hexen_sfx_thrustspike_raise);
+        P_SetMobjState(mobj, mobj->special_args[1] ? HEXEN_S_BTHRUSTLOWER
+                                                   : HEXEN_S_THRUSTLOWER);
+      }
+      break;
+    case HEXEN_MT_ZFIREBULL:
+    case HEXEN_MT_ZFIREBULL_UNLIT:
+      P_SetMobjState(mobj, HEXEN_S_ZFIREBULL_DEATH);
+      break;
+    case HEXEN_MT_ZCAULDRON:
+    case HEXEN_MT_ZCAULDRON_UNLIT:
+      P_SetMobjState(mobj, HEXEN_S_ZCAULDRON_U);
+      break;
+    case HEXEN_MT_FLAME_SMALL:
+      P_SetMobjState(mobj, HEXEN_S_FLAME_SDORM1);
+      break;
+    case HEXEN_MT_FLAME_LARGE:
+      P_SetMobjState(mobj, HEXEN_S_FLAME_LDORM1);
+      break;
+    case HEXEN_MT_BAT_SPAWNER:
+      P_SetMobjState(mobj, HEXEN_S_SPAWNBATS_OFF);
+      break;
+    default:
+      return false;
+  }
+  return true;
 }
 
 int EV_ThingActivate(int tid)

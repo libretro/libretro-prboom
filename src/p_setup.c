@@ -1994,6 +1994,17 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
     * commit; until then, skip Doom special spawning on Hexen maps. */
    if (!hexen)
       P_SpawnSpecials();
+   else
+      /* P_SpawnSpecials interprets line->special as Doom special numbers, so
+       * it must not run over a Hexen map - but P_InitTagLists lives inside
+       * it, and skipping that too leaves every firsttag/nexttag hash slot at
+       * its zeroed state.  Zero is a valid line index, so the first runtime
+       * tag search (MBF's P_IsOnLift heuristic, via P_FindLineFromLineTag)
+       * chases nexttag from line 0 back to line 0 forever and the game locks
+       * up.  Build the chains; Hexen linedefs all carry tag 0, so lookups
+       * for any sector tag simply terminate at the -1 list ends. */
+      P_InitTagLists();
+
 
    /* The map's sectors are loaded now, so the lightning storm can scan for
     * its sky/lightning-special sectors. */

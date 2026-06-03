@@ -1164,6 +1164,12 @@ void P_InitSwitchList
 void P_SpawnSpecials
 ( void );
 
+/* killough 1/30/98: tag-search hash chains; needed by P_Find*FromLineTag */
+void P_InitTagLists
+(
+  void
+);
+
 // every tic
 void P_UpdateSpecials
 ( void );

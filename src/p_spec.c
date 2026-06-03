@@ -859,7 +859,7 @@ int P_FindLineFromLineTag(const line_t *line, int start)
 }
 
 // Hash the sector tags across the sectors and linedefs.
-static void P_InitTagLists(void)
+void P_InitTagLists(void)
 {
   register int i;
 

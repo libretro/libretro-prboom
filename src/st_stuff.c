@@ -1447,10 +1447,10 @@ static void ST_loadGraphics(dbool doload)
   // cph - macro that either acquires a pointer and lock for a lump, or
   // unlocks it. var is referenced exactly once in either case, so ++ in arg works
 
-  /* Heretic has no Doom status bar lumps (STBAR, STARMS, STF* faces,
-   * STTNUM, ...). Requesting them would abort on the missing lump. The
-   * Heretic status bar is handled separately; skip the Doom graphics. */
-  if (heretic)
+  /* Heretic and Hexen have no Doom status bar lumps (STBAR, STARMS, STF*
+   * faces, STTNUM, ...). Requesting them would abort on the missing lump.
+   * Both games draw their own status bar separately; skip the Doom graphics. */
+  if (raven)
     return;
 
   // Load the numbers, tall and short

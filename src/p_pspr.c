@@ -1167,6 +1167,74 @@ axedone:
   }
 }
 
+#define HX_HAMMER_RANGE (MELEERANGE+MELEERANGE/2)
+
+void A_FHammerAttack(player_t *player, pspdef_t *psp)
+{
+  angle_t angle;
+  mobj_t *pmo = player->mo;
+  int     damage;
+  fixed_t power;
+  fixed_t slope;
+  int     i;
+
+  (void)psp;
+  damage = 60 + (P_Random(pr_saw) & 63);
+  power = 10 * FRACUNIT;
+  for (i = 0; i < 16; i++)
+  {
+    angle = pmo->angle + i * (ANG45 / 32);
+    slope = P_AimLineAttack(pmo, angle, HX_HAMMER_RANGE, 0);
+    if (linetarget)
+    {
+      P_LineAttack(pmo, angle, HX_HAMMER_RANGE, slope, damage);
+      AdjustPlayerAngle(pmo);
+      if (linetarget->flags & MF_COUNTKILL || linetarget->player)
+        P_ThrustMobj(linetarget, angle, power);
+      pmo->special1.i = false; /* don't throw a hammer */
+      goto hammerdone;
+    }
+    angle = pmo->angle - i * (ANG45 / 32);
+    slope = P_AimLineAttack(pmo, angle, HX_HAMMER_RANGE, 0);
+    if (linetarget)
+    {
+      P_LineAttack(pmo, angle, HX_HAMMER_RANGE, slope, damage);
+      AdjustPlayerAngle(pmo);
+      if (linetarget->flags & MF_COUNTKILL || linetarget->player)
+        P_ThrustMobj(linetarget, angle, power);
+      pmo->special1.i = false; /* don't throw a hammer */
+      goto hammerdone;
+    }
+  }
+  /* didn't find any targets in melee range: still swing, then throw a hammer.
+   * (Vanilla suppressed the throw when the swing struck a nearby wall, using
+   * the spawned puff as the signal; this core's P_LineAttack does not expose
+   * that, so we always throw when no creature was hit -- a minor difference
+   * only in the point-blank-against-a-wall case.) */
+  angle = pmo->angle;
+  slope = P_AimLineAttack(pmo, angle, HX_HAMMER_RANGE, 0);
+  P_LineAttack(pmo, angle, HX_HAMMER_RANGE, slope, damage);
+  pmo->special1.i = true;
+
+hammerdone:
+  /* don't spawn a hammer if the player can't afford the mana */
+  if (player->mana[MANA_2] < WeaponManaUse[player->class][player->readyweapon])
+    pmo->special1.i = false;
+}
+
+void A_FHammerThrow(player_t *player, pspdef_t *psp)
+{
+  mobj_t *mo;
+
+  (void)psp;
+  if (!player->mo->special1.i)
+    return;
+  player->mana[MANA_2] -= WeaponManaUse[player->class][player->readyweapon];
+  mo = P_SpawnPlayerMissile(player->mo, HEXEN_MT_HAMMER_MISSILE);
+  if (mo)
+    mo->special1.i = 0;
+}
+
 #ifdef HEXEN
 //****************************************************************************
 //

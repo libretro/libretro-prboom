@@ -189,7 +189,75 @@ weaponinfo_t    heretic_weaponinfo[NUMWEAPONS] =
  * code indexes through this pointer. */
 weaponinfo_t   *weaponinfo = doom_weaponinfo;
 
+/* Hexen weapons.  Only the Fighter column is populated; the Cleric and Mage
+ * columns are inert placeholders (all HEXEN_S_NULL / MANA_NONE) to be filled
+ * when those classes are wired.  Indexed [slot][class]; PCLASS_NULL is the
+ * unused Doom/Heretic slot. */
+hexen_weaponinfo_t WeaponInfo[NUMWEAPONS][NUMCLASSES] =
+{
+  /* WP_FIRST */
+  {
+    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,        HEXEN_S_NULL        }, /* PCLASS_NULL */
+    { MANA_NONE, HEXEN_S_PUNCHUP,  HEXEN_S_PUNCHDOWN,  HEXEN_S_PUNCHREADY,  HEXEN_S_PUNCHATK1_1, HEXEN_S_PUNCHATK2_1 }, /* PCLASS_FIGHTER */
+    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,        HEXEN_S_NULL        }, /* PCLASS_CLERIC  (placeholder) */
+    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,        HEXEN_S_NULL        }, /* PCLASS_MAGE    (placeholder) */
+    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,        HEXEN_S_NULL        }  /* PCLASS_PIG */
+  },
+  /* WP_SECOND */
+  {
+    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,      HEXEN_S_NULL      },
+    { MANA_1,    HEXEN_S_FAXEUP,   HEXEN_S_FAXEDOWN,   HEXEN_S_FAXEREADY,   HEXEN_S_FAXEATK_1, HEXEN_S_FAXEATK_1 }, /* PCLASS_FIGHTER: axe */
+    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,      HEXEN_S_NULL      },
+    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,      HEXEN_S_NULL      },
+    { MANA_NONE, HEXEN_S_NULL,     HEXEN_S_NULL,       HEXEN_S_NULL,        HEXEN_S_NULL,      HEXEN_S_NULL      }
+  },
+  /* WP_THIRD */
+  {
+    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
+    { MANA_2,    HEXEN_S_FHAMMERUP,   HEXEN_S_FHAMMERDOWN,  HEXEN_S_FHAMMERREADY,  HEXEN_S_FHAMMERATK_1, HEXEN_S_FHAMMERATK_1 }, /* PCLASS_FIGHTER: hammer */
+    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
+    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
+    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         }
+  },
+  /* WP_FOURTH */
+  {
+    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
+    { MANA_BOTH, HEXEN_S_FSWORDUP,    HEXEN_S_FSWORDDOWN,   HEXEN_S_FSWORDREADY,   HEXEN_S_FSWORDATK_1,  HEXEN_S_FSWORDATK_1  }, /* PCLASS_FIGHTER: sword */
+    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
+    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         },
+    { MANA_NONE, HEXEN_S_NULL,        HEXEN_S_NULL,         HEXEN_S_NULL,          HEXEN_S_NULL,         HEXEN_S_NULL         }
+  }
+  /* slots 4..NUMWEAPONS-1 are zero-initialised (unused by Hexen) */
+};
+
+/* Per-class mana cost per weapon slot.  Fighter: fists free, axe 2 MANA_1,
+ * hammer 3 MANA_2, sword (Quietus) 14 of both.  Other classes filled later. */
+int WeaponManaUse[NUMCLASSES][NUMWEAPONS] =
+{
+  {  0,  0,  0,  0 }, /* PCLASS_NULL */
+  {  0,  2,  3, 14 }, /* PCLASS_FIGHTER */
+  {  0,  0,  0,  0 }, /* PCLASS_CLERIC  (placeholder) */
+  {  0,  0,  0,  0 }, /* PCLASS_MAGE    (placeholder) */
+  {  0,  0,  0,  0 }  /* PCLASS_PIG */
+};
+
+/* Doom-shaped weapon table for the shared raise/lower path (P_BringUpWeapon
+ * reads weaponinfo[pendingweapon].upstate).  Only the upstate is meaningful
+ * for Hexen; the rest of the per-class behaviour comes from WeaponInfo[][].
+ * Seeded for the Fighter; selected at runtime once class support is fully
+ * wired. */
+weaponinfo_t   hexen_weaponinfo[NUMWEAPONS] =
+{
+  { AM_NOAMMO, HEXEN_S_PUNCHUP,   HEXEN_S_PUNCHDOWN,   HEXEN_S_PUNCHREADY,   HEXEN_S_PUNCHATK1_1,  S_NULL, 0, -1 },
+  { AM_NOAMMO, HEXEN_S_FAXEUP,    HEXEN_S_FAXEDOWN,    HEXEN_S_FAXEREADY,    HEXEN_S_FAXEATK_1,    S_NULL, 0, -1 },
+  { AM_NOAMMO, HEXEN_S_FHAMMERUP, HEXEN_S_FHAMMERDOWN, HEXEN_S_FHAMMERREADY, HEXEN_S_FHAMMERATK_1, S_NULL, 0, -1 },
+  { AM_NOAMMO, HEXEN_S_FSWORDUP,  HEXEN_S_FSWORDDOWN,  HEXEN_S_FSWORDREADY,  HEXEN_S_FSWORDATK_1,  S_NULL, 0, -1 }
+};
+
 void D_InitWeaponInfo(void)
 {
-  weaponinfo = heretic ? heretic_weaponinfo : doom_weaponinfo;
+  if (hexen)
+    weaponinfo = hexen_weaponinfo;
+  else
+    weaponinfo = heretic ? heretic_weaponinfo : doom_weaponinfo;
 }

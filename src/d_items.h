@@ -65,6 +65,26 @@ extern  weaponinfo_t   *weaponinfo;
 extern  weaponinfo_t    doom_weaponinfo[NUMWEAPONS];
 extern  weaponinfo_t    heretic_weaponinfo[NUMWEAPONS];
 
+/* Hexen weapon info.  Hexen weapons are class-specific (the same slot is a
+ * different weapon per class) and consume mana rather than Doom ammo, and
+ * they have an extra "hold attack" state, so they need their own table type
+ * distinct from weaponinfo_t.  WeaponInfo is indexed [slot][class]; the
+ * upstate is also mirrored into the Doom-shaped hexen_weaponinfo[] used by
+ * the shared weapon-raise path (P_BringUpWeapon). */
+typedef struct
+{
+  int  mana;          /* manatype_t: MANA_1/2/BOTH/NONE */
+  int  upstate;
+  int  downstate;
+  int  readystate;
+  int  atkstate;
+  int  holdatkstate;
+} hexen_weaponinfo_t;
+
+extern  hexen_weaponinfo_t WeaponInfo[NUMWEAPONS][NUMCLASSES];
+extern  int                WeaponManaUse[NUMCLASSES][NUMWEAPONS];
+extern  weaponinfo_t       hexen_weaponinfo[NUMWEAPONS];
+
 /* Select the weapon table for the current game (Doom or Heretic). Call once
  * the game type is known. */
 void D_InitWeaponInfo(void);

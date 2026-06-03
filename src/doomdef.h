@@ -210,6 +210,29 @@ typedef enum
   NUMCLASSES
 } pclass_t;
 
+/* Hexen weapon slots.  Hexen has four weapons per class, selected by slot
+ * rather than by the Doom weapon identity, so these alias the low
+ * weapontype_t ordinals (0-3) that a Hexen game uses.  The 2D Hexen weapon
+ * tables are indexed [WP_*][class]. */
+enum
+{
+  WP_FIRST  = 0,
+  WP_SECOND = 1,
+  WP_THIRD  = 2,
+  WP_FOURTH = 3
+};
+
+/* Hexen mana (the two-mana ammo model).  MANA_NONE/MANA_BOTH are sentinels
+ * used by the weapon tables; MANA_1/MANA_2 index player->mana[]. */
+typedef enum
+{
+  MANA_1,
+  MANA_2,
+  NUMMANA,
+  MANA_BOTH,
+  MANA_NONE
+} manatype_t;
+
 // Ammunition types defined.
 typedef enum {
   AM_CLIP,    // Pistol / chaingun ammo.

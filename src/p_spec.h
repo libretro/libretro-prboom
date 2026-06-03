@@ -362,6 +362,12 @@ typedef enum
   genPerpetual,
   toggleUpDn,   //jff 3/14/98 added to support instant toggle type
 
+  /* Hexen plat movement types */
+  PLAT_PERPETUALRAISE,
+  PLAT_DOWNWAITUPSTAY,
+  PLAT_DOWNBYVALUEWAITUPSTAY,
+  PLAT_UPWAITDOWNSTAY,
+  PLAT_UPBYVALUEWAITDOWNSTAY,
 } plattype_e;
 
 // p_doors

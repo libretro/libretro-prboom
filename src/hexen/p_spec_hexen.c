@@ -347,6 +347,107 @@ int Hexen_EV_DoFloor(line_t *line, byte *args, floor_e floortype)
   return rtn;
 }
 
+/* --- Platforms ------------------------------------------------------------
+ *
+ * Lifts.  These reuse the engine's T_PlatRaise thinker and active-plat list;
+ * the Hexen movement types set low/high/wait/status and otherwise fall
+ * through the thinker's Doom change-type handling.  Movement sound is the
+ * engine default until the sound-sequence subsystem lands. */
+int EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount)
+{
+  int       secnum;
+  int       rtn = 0;
+  sector_t *sec;
+  plat_t   *plat;
+
+  (void) line;
+  (void) amount;
+
+  HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+  {
+    sec = &sectors[secnum];
+    if (sec->floordata || sec->ceilingdata)
+      continue;
+
+    rtn = 1;
+    plat = Z_Malloc(sizeof(*plat), PU_LEVEL, 0);
+    memset(plat, 0, sizeof(*plat));
+    P_AddThinker(&plat->thinker);
+    plat->type = type;
+    plat->sector = sec;
+    plat->sector->floordata = plat;
+    plat->thinker.function.arg1 = (void (*)(void *))T_PlatRaise;
+    plat->crush = FALSE;
+    plat->tag   = args[0];
+    plat->speed = args[1] * (FRACUNIT / 8);
+
+    switch (type)
+    {
+      case PLAT_DOWNWAITUPSTAY:
+        plat->low = P_FindLowestFloorSurrounding(sec) + 8 * FRACUNIT;
+        if (plat->low > sec->floorheight)
+          plat->low = sec->floorheight;
+        plat->high   = sec->floorheight;
+        plat->wait   = args[2];
+        plat->status = PLAT_DOWN;
+        break;
+      case PLAT_DOWNBYVALUEWAITUPSTAY:
+        plat->low = sec->floorheight - args[3] * 8 * FRACUNIT;
+        if (plat->low > sec->floorheight)
+          plat->low = sec->floorheight;
+        plat->high   = sec->floorheight;
+        plat->wait   = args[2];
+        plat->status = PLAT_DOWN;
+        break;
+      case PLAT_UPWAITDOWNSTAY:
+        plat->high = P_FindHighestFloorSurrounding(sec);
+        if (plat->high < sec->floorheight)
+          plat->high = sec->floorheight;
+        plat->low    = sec->floorheight;
+        plat->wait   = args[2];
+        plat->status = PLAT_UP;
+        break;
+      case PLAT_UPBYVALUEWAITDOWNSTAY:
+        plat->high = sec->floorheight + args[3] * 8 * FRACUNIT;
+        if (plat->high < sec->floorheight)
+          plat->high = sec->floorheight;
+        plat->low    = sec->floorheight;
+        plat->wait   = args[2];
+        plat->status = PLAT_UP;
+        break;
+      case PLAT_PERPETUALRAISE:
+        plat->low = P_FindLowestFloorSurrounding(sec) + 8 * FRACUNIT;
+        if (plat->low > sec->floorheight)
+          plat->low = sec->floorheight;
+        plat->high = P_FindHighestFloorSurrounding(sec);
+        if (plat->high < sec->floorheight)
+          plat->high = sec->floorheight;
+        plat->wait   = args[2];
+        plat->status = (P_Random(pr_heretic) & 1) ? PLAT_UP : PLAT_DOWN;
+        break;
+      default:
+        break;
+    }
+    P_AddActivePlat(plat);
+  }
+  return rtn;
+}
+
+void Hexen_EV_StopPlat(line_t *line, byte *args)
+{
+  platlist_t *pl;
+  platlist_t *next;
+
+  (void) line;
+
+  for (pl = activeplats; pl; pl = next)
+  {
+    next = pl->next;
+    if (pl->plat->tag == args[0])
+      P_RemoveActivePlat(pl->plat);
+  }
+}
+
 /* --- Dispatcher ----------------------------------------------------------- */
 
 dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
@@ -407,6 +508,25 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 68:                    /* Floor_MoveToValueTimes8 */
       ok = Hexen_EV_DoFloor(line, args, FLEV_MOVETOVALUETIMES8);
+      break;
+    case 60:                    /* Plat_PerpetualRaise */
+      ok = EV_DoHexenPlat(line, args, PLAT_PERPETUALRAISE, 0);
+      break;
+    case 61:                    /* Plat_Stop */
+      Hexen_EV_StopPlat(line, args);
+      ok = true;
+      break;
+    case 62:                    /* Plat_DownWaitUpStay */
+      ok = EV_DoHexenPlat(line, args, PLAT_DOWNWAITUPSTAY, 0);
+      break;
+    case 63:                    /* Plat_DownByValueWaitUpStay */
+      ok = EV_DoHexenPlat(line, args, PLAT_DOWNBYVALUEWAITUPSTAY, 0);
+      break;
+    case 64:                    /* Plat_UpWaitDownStay */
+      ok = EV_DoHexenPlat(line, args, PLAT_UPWAITDOWNSTAY, 0);
+      break;
+    case 65:                    /* Plat_UpByValueWaitDownStay */
+      ok = EV_DoHexenPlat(line, args, PLAT_UPBYVALUEWAITDOWNSTAY, 0);
       break;
     default:
       /* The remaining special groups (floors, platforms, lights, teleports,

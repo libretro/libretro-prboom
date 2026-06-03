@@ -106,6 +106,26 @@ const switchlist_t heretic_alphSwitchList[] =
   {"",		"",		0}
 };
 
+/* Hexen's switches.  Unlike Doom/Heretic, Hexen reuses the episode field as
+ * the sound effect to play when the switch is thrown, so the episode-range
+ * filter in P_InitSwitchList must be skipped for Hexen (otherwise every entry,
+ * whose "episode" is a large sfx index, would be rejected and no switch --
+ * and therefore no switch-triggered door or script -- would work). */
+const switchlist_t hexen_alphSwitchList[] =
+{
+  {"SW_1_UP",  "SW_1_DN",   hexen_sfx_switch1},
+  {"SW_2_UP",  "SW_2_DN",   hexen_sfx_switch1},
+  {"VALVE1",   "VALVE2",    hexen_sfx_valve_turn},
+  {"SW51_OFF", "SW51_ON",   hexen_sfx_switch2},
+  {"SW52_OFF", "SW52_ON",   hexen_sfx_switch2},
+  {"SW53_UP",  "SW53_DN",   hexen_sfx_rope_pull},
+  {"PUZZLE5",  "PUZZLE9",   hexen_sfx_switch1},
+  {"PUZZLE6",  "PUZZLE10",  hexen_sfx_switch1},
+  {"PUZZLE7",  "PUZZLE11",  hexen_sfx_switch1},
+  {"PUZZLE8",  "PUZZLE12",  hexen_sfx_switch1},
+  {"",         "",          0}
+};
+
 //
 // P_InitSwitchList()
 //
@@ -139,6 +159,8 @@ void P_InitSwitchList(void)
   int lump = -1;
   if (heretic)
     alphSwitchList = heretic_alphSwitchList;
+  else if (hexen)
+    alphSwitchList = hexen_alphSwitchList;
   else if ((lump = W_CheckNumForName("SWITCHES")) != -1)
     alphSwitchList = (const switchlist_t *)W_CacheLumpNum(lump);
   else
@@ -150,7 +172,7 @@ void P_InitSwitchList(void)
       switchlist = realloc(switchlist, sizeof *switchlist *
         (max_numswitches = max_numswitches ? max_numswitches*2 : 8));
 
-    if (SHORT(alphSwitchList[i].episode) <= episode)
+    if (hexen || SHORT(alphSwitchList[i].episode) <= episode)
     {
       int texture1, texture2;
 

@@ -16,10 +16,16 @@
 #include "s_sound.h"
 #include "sounds.h"
 #include "i_system.h"
+#include "lprintf.h"
+#include "w_wad.h"
+#include "u_scanner.h"
+#include "dsda_hacked.h"
 #include "hexen/sn_sonix.h"
 
 #define SS_MAX_SCRIPTS          64
 #define SS_SEQUENCE_NAME_LENGTH 32
+#define SS_TEMPBUFFER_SIZE      1024
+#define SS_SCRIPT_NAME          "SNDSEQ"
 
 /* Compiled sequence opcodes. */
 enum
@@ -76,14 +82,143 @@ int  *SequenceData[SS_MAX_SCRIPTS];
 int        ActiveSequences;
 seqnode_t *SequenceListHead;
 
-void SN_InitSequenceScript(void)
+/* Resolve a sound name (as written in the SNDSEQ lump) to its sfx index. */
+static int GetSoundOffset(const char *name)
 {
   int i;
+
+  for (i = 1; i < num_sfx; i++)
+    if (S_sfx[i].name && !strcasecmp(name, S_sfx[i].name))
+      return i;
+  return 0;
+}
+
+void SN_InitSequenceScript(void)
+{
+  int           i;
+  int           lump;
+  int           length;
+  const char   *data;
+  u_scanner_t   s;
+  int           inSequence = -1;
+  int          *tempDataStart = NULL;
+  int          *tempDataPtr = NULL;
+  int           slot = 0;
 
   ActiveSequences = 0;
   for (i = 0; i < SS_MAX_SCRIPTS; i++)
     SequenceData[i] = NULL;
-  /* The SNDSEQ lump parser is added in a following commit. */
+
+  lump = W_CheckNumForName(SS_SCRIPT_NAME);
+  if (lump < 0)
+    return;
+  length = W_LumpLength(lump);
+  data   = (const char *) W_CacheLumpNum(lump);
+
+  s = U_ScanOpen(data, length, SS_SCRIPT_NAME);
+
+  while (U_GetNextToken(&s, true))
+  {
+    if (s.token == ':')
+    {
+      /* Begin a new named sequence. */
+      if (inSequence != -1)
+        U_Error(&s, "SN_InitSequenceScript: nested sequence");
+      if (!U_GetNextToken(&s, true))
+        break;
+
+      tempDataStart = (int *) Z_Malloc(SS_TEMPBUFFER_SIZE * sizeof(int),
+                                       PU_STATIC, 0);
+      memset(tempDataStart, 0, SS_TEMPBUFFER_SIZE * sizeof(int));
+      tempDataPtr = tempDataStart;
+
+      for (slot = 0; slot < SS_MAX_SCRIPTS; slot++)
+        if (SequenceData[slot] == NULL)
+          break;
+      if (slot == SS_MAX_SCRIPTS)
+        I_Error("SN_InitSequenceScript: too many sequences");
+
+      for (i = 0; i < SEQ_NUMSEQ; i++)
+        if (!strcasecmp(SequenceTranslate[i].name, s.string))
+        {
+          SequenceTranslate[i].scriptNum = slot;
+          inSequence = i;
+          break;
+        }
+      /* A sequence not named in SequenceTranslate is parsed and discarded. */
+      continue;
+    }
+
+    if (inSequence == -1)
+      continue;
+
+    if (!strcasecmp(s.string, "playuntildone"))
+    {
+      U_GetNextToken(&s, true);
+      *tempDataPtr++ = SS_CMD_PLAY;
+      *tempDataPtr++ = GetSoundOffset(s.string);
+      *tempDataPtr++ = SS_CMD_WAITUNTILDONE;
+    }
+    else if (!strcasecmp(s.string, "play"))
+    {
+      U_GetNextToken(&s, true);
+      *tempDataPtr++ = SS_CMD_PLAY;
+      *tempDataPtr++ = GetSoundOffset(s.string);
+    }
+    else if (!strcasecmp(s.string, "playtime"))
+    {
+      U_GetNextToken(&s, true);
+      *tempDataPtr++ = SS_CMD_PLAY;
+      *tempDataPtr++ = GetSoundOffset(s.string);
+      *tempDataPtr++ = SS_CMD_DELAY;
+      *tempDataPtr++ = U_MustGetInteger(&s);
+    }
+    else if (!strcasecmp(s.string, "playrepeat"))
+    {
+      U_GetNextToken(&s, true);
+      *tempDataPtr++ = SS_CMD_PLAYREPEAT;
+      *tempDataPtr++ = GetSoundOffset(s.string);
+    }
+    else if (!strcasecmp(s.string, "delay"))
+    {
+      *tempDataPtr++ = SS_CMD_DELAY;
+      *tempDataPtr++ = U_MustGetInteger(&s);
+    }
+    else if (!strcasecmp(s.string, "delayrand"))
+    {
+      *tempDataPtr++ = SS_CMD_DELAYRAND;
+      *tempDataPtr++ = U_MustGetInteger(&s);
+      *tempDataPtr++ = U_MustGetInteger(&s);
+    }
+    else if (!strcasecmp(s.string, "volume"))
+    {
+      *tempDataPtr++ = SS_CMD_VOLUME;
+      *tempDataPtr++ = U_MustGetInteger(&s);
+    }
+    else if (!strcasecmp(s.string, "stopsound"))
+    {
+      U_GetNextToken(&s, true);
+      SequenceTranslate[inSequence].stopSound = GetSoundOffset(s.string);
+      *tempDataPtr++ = SS_CMD_STOPSOUND;
+    }
+    else if (!strcasecmp(s.string, "end"))
+    {
+      int   dataSize;
+      *tempDataPtr++ = SS_CMD_END;
+      dataSize = (int)((tempDataPtr - tempDataStart) * sizeof(int));
+      SequenceData[slot] = (int *) Z_Malloc(dataSize, PU_STATIC, 0);
+      memcpy(SequenceData[slot], tempDataStart, dataSize);
+      Z_Free(tempDataStart);
+      tempDataStart = NULL;
+      inSequence = -1;
+    }
+    else
+      U_Error(&s, "SN_InitSequenceScript: unknown command");
+  }
+
+  if (tempDataStart)
+    Z_Free(tempDataStart);
+  U_ScanClose(&s);
 }
 
 void SN_StartSequence(mobj_t *mobj, int sequence)

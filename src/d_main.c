@@ -56,6 +56,7 @@
 #include "doomdef.h"
 #include "doomtype.h"
 #include "doomstat.h"
+#include "hexen/sn_sonix.h"
 #include "d_net.h"
 #include "dstrings.h"
 #include "sounds.h"
@@ -1638,6 +1639,7 @@ bool D_DoomMainSetup(void)
   {
     lprintf(LO_INFO,"\nP_LoadMapInfo: Parsing Hexen MAPINFO.\n");
     P_LoadMapInfo();
+    SN_InitSequenceScript();
   }
 
   //jff 9/3/98 use logical output routine

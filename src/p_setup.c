@@ -36,6 +36,7 @@
 
 #include "config.h"
 #include "doomstat.h"
+#include "hexen/sn_sonix.h"
 #include "m_bbox.h"
 #include "m_argv.h"
 #include "g_game.h"
@@ -1834,6 +1835,8 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    players[consoleplayer].viewz = 1;
 
    // Make sure all sounds are stopped before Z_FreeTags.
+   if (hexen)
+      SN_StopAllSequences();
    S_Start();
 
    Z_FreeTags(PU_LEVEL, PU_PURGELEVEL-1);

@@ -32,6 +32,7 @@
  *-----------------------------------------------------------------------------*/
 
 #include "doomstat.h"
+#include "hexen/sn_sonix.h"
 #include "p_user.h"
 #include "p_spec.h"
 #include "p_tick.h"
@@ -304,6 +305,8 @@ void P_Ticker (void)
   P_RunThinkers();
   P_UpdateSpecials();
   P_RespawnSpecials();
+  if (hexen)
+    SN_UpdateActiveSequences();
   P_MapEnd();
   leveltime++;                       // for par times
 }

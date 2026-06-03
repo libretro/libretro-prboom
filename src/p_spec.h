@@ -386,6 +386,12 @@ typedef enum
   genBlazeClose,
   genCdO,
   genBlazeCdO,
+
+  /* Hexen door movement types (args-driven, used by T_HexenVerticalDoor) */
+  DREV_NORMAL,
+  DREV_CLOSE30THENOPEN,
+  DREV_CLOSE,
+  DREV_OPEN,
 } vldoor_e;
 
 // p_ceilng

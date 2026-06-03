@@ -85,6 +85,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/hexen/info.c \
 				 $(CORE_DIR)/hexen/p_mapinfo.c \
 				 $(CORE_DIR)/hexen/p_lightning.c \
+				 $(CORE_DIR)/hexen/p_spec_hexen.c \
 				 $(CORE_DIR)/p_sight.c \
 				 $(CORE_DIR)/p_spec.c \
 				 $(CORE_DIR)/p_switch.c \

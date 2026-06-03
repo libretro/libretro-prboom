@@ -41,6 +41,7 @@
 #include "p_tick.h"
 #include "p_spec.h"
 #include "map_format.h"
+#include "hexen/p_spec_hexen.h"
 #include "s_sound.h"
 #include "sounds.h"
 #include "p_inter.h"
@@ -1771,11 +1772,11 @@ dbool PTR_UseTraverse (intercept_t* in)
 
   //  return FALSE;   // don't use back side
 
-  /* Hexen line specials use a byte special + args encoding that the Doom
-   * P_UseSpecialLine cannot interpret; dispatching it here has crashed in
-   * the Doom special handlers.  Skip use-activation on Hexen maps until the
-   * Hexen line specials layer is implemented. */
-  if (!hexen)
+  /* Hexen line specials use a byte special + args encoding handled by the
+   * Hexen specials layer; Doom maps use the classic P_UseSpecialLine. */
+  if (hexen)
+    P_UseHexenSpecialLine (usething, in->d.line, side);
+  else
     P_UseSpecialLine (usething, in->d.line, side);
 
   //WAS can't use for than one special line in a row

@@ -36,6 +36,7 @@
 #include "r_defs.h"
 #include "r_state.h"
 #include "p_spec.h"
+#include "hexen/p_spec_hexen.h"
 #include "r_demo.h"
 #include "r_fps.h"
 
@@ -383,6 +384,12 @@ static void R_InterpolationGetData(thinker_t *th,
   }
   else
   if (th->function.arg1 == (void (*)(void *))T_VerticalDoor)
+  {
+    *type1 = INTERP_SectorCeiling;
+    *posptr1 = ((vldoor_t *)th)->sector;
+  }
+  else
+  if (th->function.arg1 == (void (*)(void *))T_HexenVerticalDoor)
   {
     *type1 = INTERP_SectorCeiling;
     *posptr1 = ((vldoor_t *)th)->sector;

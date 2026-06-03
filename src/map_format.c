@@ -13,6 +13,7 @@
 #include "doomstat.h"
 #include "p_spec.h"
 #include "map_format.h"
+#include "hexen/p_spec_hexen.h"
 
 map_format_t map_format;
 
@@ -28,6 +29,7 @@ static const map_format_t doom_map_format =
   P_CrossSpecialLine,
   P_ShootSpecialLine,
   P_PlayerInSpecialSector,
+  NULL,                       /* execute_line_special (Doom: none) */
   VF_DOOM
 };
 
@@ -46,9 +48,10 @@ static const map_format_t hexen_map_format =
   true,                       /* sndseq   */
   true,                       /* animdefs */
   false,                      /* doublesky*/
-  P_CrossSpecialLine,
-  P_ShootSpecialLine,
+  P_CrossHexenSpecialLine,
+  P_ShootHexenSpecialLine,
   P_PlayerInSpecialSector,
+  P_ExecuteHexenLineSpecial,
   VF_HEXEN
 };
 

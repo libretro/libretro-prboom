@@ -159,6 +159,23 @@ typedef struct {
 #define ML_BLOCKLANDMONSTERS 0x1000 /* bit 12: blocks non-floating monsters */
 #define ML_BLOCKPLAYERS      0x2000 /* bit 13: blocks players */
 
+/* Hexen line activation.  Hexen reuses the linedef flags word: bit 9 marks a
+ * repeatable special and bits 10-12 hold the activation class (how the line is
+ * triggered).  These overlap the Doom/MBF21 bit assignments above, but only
+ * apply on Hexen-format maps where those Doom flags are not used. */
+#define ML_REPEATSPECIAL 0x0200      /* bit 9: special may retrigger */
+#define HML_SPAC_SHIFT   10
+#define HML_SPAC_MASK    0x1c00
+#define GET_SPAC(flags)  (((flags) & HML_SPAC_MASK) >> HML_SPAC_SHIFT)
+
+/* Activation classes (the value GET_SPAC returns). */
+#define SPAC_CROSS   0           /* player crosses the line                */
+#define SPAC_USE     1           /* player presses use on the line         */
+#define SPAC_MCROSS  2           /* monster crosses the line               */
+#define SPAC_IMPACT  3           /* projectile hits the line               */
+#define SPAC_PUSH    4           /* player bumps the line                  */
+#define SPAC_PCROSS  5           /* projectile crosses the line            */
+
 // Sector definition, from editing.
 typedef struct {
   short floorheight;

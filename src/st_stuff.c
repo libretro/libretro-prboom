@@ -750,9 +750,13 @@ void ST_Ticker(void)
   st_oldhealth = plyr->health;
   st_oldarmour = plyr->armorpoints;
 
-  /* Heretic: glide the health gem toward the real health and wiggle the
-   * chain while it moves. Mirrors the Raven SB_Ticker behaviour. */
-  if (heretic)
+  /* Raven: glide the smoothed health marker toward the real health, close
+   * the inventory bar when its display timer runs out, and (Heretic only)
+   * wiggle the chain while the gem moves.  Mirrors SB_Ticker in both Raven
+   * games; the Hexen status bar reads HealthMarker too, so gating this on
+   * heretic alone left Hexen's health display frozen at its level-start
+   * value. */
+  if (raven)
   {
     extern int inventory, inventoryTics, inv_ptr;
     int curhealth = plyr->health;
@@ -769,7 +773,7 @@ void ST_Ticker(void)
     if (curhealth < 0)
       curhealth = 0;
 
-    if (leveltime & 1)
+    if (heretic && (leveltime & 1))
       ChainWiggle = P_Random(pr_heretic) & 1;
 
     if (curhealth < HealthMarker)

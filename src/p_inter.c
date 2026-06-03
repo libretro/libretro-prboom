@@ -1229,6 +1229,12 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       player->message = gaveWeapon ? "BLOODSCOURGE" : "SEGMENT OF BLOODSCOURGE";
       break;
     }
+    case HEXEN_SPR_SUMN:           /* Dark Servant (summon Minotaur) */
+      if (!P_GiveArtifact(player, hexen_arti_summon, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "DARK SERVANT";
+      break;
     default:
       /* Unhandled Hexen pickup (other classes' weapons, weapon pieces,
        * artifacts, keys): leave it in the world rather than removing it. */

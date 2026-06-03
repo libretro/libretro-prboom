@@ -960,6 +960,32 @@ dbool P_UseArtifact(player_t *player, int arti)
   mobj_t *mo;
   angle_t angle;
 
+  /* Hexen and Heretic number their artifacts differently and the two enums
+   * overlap (e.g. hexen_arti_summon == arti_tomeofpower == 5), so the Hexen
+   * artifacts are dispatched in their own switch.  Only the items implemented
+   * so far are handled; the rest fall through to "couldn't use".  Heretic and
+   * Doom keep using the arti_* switch below. */
+  if (hexen)
+  {
+    switch (arti)
+    {
+      case hexen_arti_summon:
+        /* Dark Servant: fire the summoning missile; A_Summon spawns the
+         * Minotaur (bound to this player as master) where it lands. */
+        mo = P_SpawnPlayerMissile(player->mo, HEXEN_MT_SUMMON_FX);
+        if (mo)
+        {
+          P_SetTarget(&mo->target, player->mo);
+          P_SetTarget(&mo->special1.m, player->mo);
+          mo->momz = 5 * FRACUNIT;
+        }
+        break;
+      default:
+        return FALSE;
+    }
+    return TRUE;
+  }
+
   switch (arti)
   {
     case arti_invulnerability:
@@ -1135,9 +1161,10 @@ void P_PlayerThink (player_t* player)
       P_MovePlayer (player);
 
    /* Heretic: use the staged artifact (from G_BuildTiccmd) this tic. */
-   /* Heretic: use the artifact staged by the local player's input. Only the
-    * console player drives the single-player pending-artifact global. */
-   if (heretic && player == &players[consoleplayer] &&
+   /* Raven (Heretic/Hexen): use the artifact staged by the local player's
+    * input. Only the console player drives the single-player pending-artifact
+    * global. */
+   if (raven && player == &players[consoleplayer] &&
        pending_artifact > 0 && pending_artifact < NUMARTIFACTS)
    {
       P_PlayerUseArtifact(player, pending_artifact);

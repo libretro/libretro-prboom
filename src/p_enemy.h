@@ -107,6 +107,7 @@ void A_MinotaurLook(mobj_t *);
 void A_MinotaurRoam(mobj_t *);
 void A_MinotaurChase(mobj_t *);
 void A_SmokePuffExit(mobj_t *);
+void A_Summon(mobj_t *);
 void A_PosAttack(mobj_t *);
 void A_Scream(mobj_t *);
 void A_SPosAttack(mobj_t *);

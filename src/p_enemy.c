@@ -3983,6 +3983,8 @@ void A_BishopMissileWeave(mobj_t *actor)
 #define MINOTAUR_LOOK_DIST (16 * 54 * FRACUNIT)
 
 dbool P_SetMobjStateNF(mobj_t *mobj, statenum_t state);  /* heretic/p_action.c */
+dbool P_TestMobjLocation(mobj_t *mobj);                  /* heretic/p_action.c */
+dbool P_GivePower(player_t *player, int power);          /* p_inter.c */
 void  A_MinotaurLook(mobj_t *actor);
 
 void A_MinotaurFade0(mobj_t *actor)
@@ -4159,4 +4161,46 @@ void A_MinotaurChase(mobj_t *actor)
 void A_SmokePuffExit(mobj_t *actor)
 {
   P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_MNTRSMOKEEXIT);
+}
+
+/* A_Summon -- the Dark Servant's HEXEN_MT_SUMMON_FX missile runs this on
+ * impact: spawn a Minotaur bound to the summoning player as its master, with
+ * the spawn time recorded so CheckMinotaurAge can stomp it after its life
+ * expires.  If the minotaur doesn't fit, drop the artifact back instead. */
+void A_Summon(mobj_t *actor)
+{
+  mobj_t *mo;
+  mobj_t *master;
+
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_MINOTAUR);
+  if (!mo)
+    return;
+
+  if (P_TestMobjLocation(mo) == false || !actor->special1.m)
+  {                             /* didn't fit - revert to the artifact */
+    P_SetMobjState(mo, HEXEN_S_NULL);
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_SUMMONMAULATOR);
+    if (mo)
+      mo->flags |= MF_DROPPED;
+    return;
+  }
+
+  /* special_args is int[] in this fork, so the spawn time goes straight into
+   * slot 0 (dsda byte-packs it across four slots); CheckMinotaurAge reads
+   * special_args[0] the same way. */
+  mo->special_args[0] = leveltime;
+  master = actor->special1.m;
+  if (master->flags & MF_CORPSE)
+  {                             /* master already dead - no master */
+    P_SetTarget(&mo->special1.m, NULL);
+  }
+  else
+  {
+    P_SetTarget(&mo->special1.m, actor->special1.m);
+    if (master->player)
+      P_GivePower(master->player, pw_minotaur);
+  }
+
+  P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_MNTRSMOKE);
+  S_StartSound(actor, hexen_sfx_maulator_active);
 }

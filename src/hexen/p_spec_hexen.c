@@ -32,6 +32,7 @@
 #include "doomstat.h"
 #include "doomdef.h"
 #include "r_state.h"
+#include "r_main.h"
 #include "p_spec.h"
 #include "p_tick.h"
 #include "p_map.h"
@@ -920,6 +921,155 @@ void Hexen_EV_StopPlat(line_t *line, byte *args)
   }
 }
 
+/* --- Stairs ---------------------------------------------------------------
+ *
+ * Build a flight of steps starting from the tagged sector(s) and propagating
+ * across two-sided lines into neighbouring sectors that carry the matching
+ * stair build-marker special and share the start floor texture.  Each step is
+ * a plain one-shot FLEV_RAISEBUILDSTEP floor mover (T_MoveFloor removes it on
+ * arrival).  NORMAL builds every step at the same speed; SYNC scales each
+ * step's speed so the whole flight finishes together.  The per-step start
+ * delay and auto-reset (PHASED stairs, and the NORMAL delay/reset args) are
+ * not modelled; the stairs still build to their final shape. */
+
+#define STAIR_SECTOR_TYPE  26
+#define STAIR_QUEUE_SIZE   32
+
+typedef enum
+{
+  STAIRS_NORMAL,
+  STAIRS_SYNC,
+  STAIRS_PHASED
+} stairs_e;
+
+static struct
+{
+  sector_t *sector;
+  int       type;
+  int       height;
+} StairQueue[STAIR_QUEUE_SIZE];
+
+static int StairQueueHead;
+static int StairQueueTail;
+
+static int s_StepDelta;
+static int s_Direction;
+static int s_Speed;
+static int s_Texture;
+static int s_StartHeight;
+
+static void QueueStairSector(sector_t *sec, int type, int height)
+{
+  if ((StairQueueTail + 1) % STAIR_QUEUE_SIZE == StairQueueHead)
+    return;                     /* too many branches; drop quietly */
+  StairQueue[StairQueueTail].sector = sec;
+  StairQueue[StairQueueTail].type = type;
+  StairQueue[StairQueueTail].height = height;
+  StairQueueTail = (StairQueueTail + 1) % STAIR_QUEUE_SIZE;
+}
+
+static sector_t *DequeueStairSector(int *type, int *height)
+{
+  sector_t *sec;
+
+  if (StairQueueHead == StairQueueTail)
+    return NULL;
+  *type   = StairQueue[StairQueueHead].type;
+  *height = StairQueue[StairQueueHead].height;
+  sec     = StairQueue[StairQueueHead].sector;
+  StairQueueHead = (StairQueueHead + 1) % STAIR_QUEUE_SIZE;
+  return sec;
+}
+
+static void ProcessStairSector(sector_t *sec, int type, int height,
+                               stairs_e stairsType)
+{
+  int          i;
+  sector_t    *tsec;
+  floormove_t *floor;
+
+  height += s_StepDelta;
+
+  floor = Z_Malloc(sizeof(*floor), PU_LEVEL, 0);
+  memset(floor, 0, sizeof(*floor));
+  P_AddThinker(&floor->thinker);
+  sec->floordata = floor;
+  floor->thinker.function.arg1 = (void (*)(void *))T_MoveFloor;
+  floor->type = FLEV_RAISEBUILDSTEP;
+  floor->direction = s_Direction;
+  floor->sector = sec;
+  floor->floordestheight = height;
+  floor->crush = FALSE;
+
+  if (stairsType == STAIRS_SYNC)
+    floor->speed = FixedMul(s_Speed, FixedDiv(height - s_StartHeight,
+                                              s_StepDelta));
+  else
+    floor->speed = s_Speed;
+
+  /* Propagate to adjacent stair sectors. */
+  for (i = 0; i < sec->linecount; i++)
+  {
+    line_t *ln = sec->lines[i];
+    if (!(ln->flags & ML_TWOSIDED))
+      continue;
+
+    tsec = ln->frontsector;
+    if (tsec && tsec->special == type + STAIR_SECTOR_TYPE &&
+        !tsec->floordata && !tsec->ceilingdata &&
+        tsec->floorpic == s_Texture && tsec->validcount != validcount)
+    {
+      QueueStairSector(tsec, type ^ 1, height);
+      tsec->validcount = validcount;
+    }
+    tsec = ln->backsector;
+    if (tsec && tsec->special == type + STAIR_SECTOR_TYPE &&
+        !tsec->floordata && !tsec->ceilingdata &&
+        tsec->floorpic == s_Texture && tsec->validcount != validcount)
+    {
+      QueueStairSector(tsec, type ^ 1, height);
+      tsec->validcount = validcount;
+    }
+  }
+}
+
+int Hexen_EV_BuildStairs(line_t *line, byte *args, int direction,
+                         int stairsType)
+{
+  int       secnum;
+  int       type;
+  int       height;
+  sector_t *sec;
+  sector_t *qSec;
+
+  (void) line;
+
+  s_Direction  = direction;
+  s_StepDelta  = s_Direction * (args[2] * FRACUNIT);
+  s_Speed      = args[1] * (FRACUNIT / 8);
+
+  StairQueueHead = StairQueueTail = 0;
+  validcount++;
+
+  HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+  {
+    sec = &sectors[secnum];
+    s_Texture     = sec->floorpic;
+    s_StartHeight = sec->floorheight;
+
+    if (sec->floordata || sec->ceilingdata)
+      continue;                 /* already moving */
+
+    QueueStairSector(sec, 0, sec->floorheight);
+    sec->special = 0;           /* consume the build marker */
+  }
+
+  while ((qSec = DequeueStairSector(&type, &height)) != NULL)
+    ProcessStairSector(qSec, type, height, (stairs_e) stairsType);
+
+  return 1;
+}
+
 /* --- Thing specials -------------------------------------------------------
  *
  * Operate on the mobjs sharing a thing id.  Activate/Deactivate wake or sleep
@@ -1181,6 +1331,18 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 29:                    /* Pillar_Build (no crush) */
       ok = EV_BuildPillar(line, args, 0);
+      break;
+    case 26:                    /* Stairs_BuildDownNormal */
+      ok = Hexen_EV_BuildStairs(line, args, -1, STAIRS_NORMAL);
+      break;
+    case 27:                    /* Stairs_BuildUpNormal */
+      ok = Hexen_EV_BuildStairs(line, args, 1, STAIRS_NORMAL);
+      break;
+    case 31:                    /* Stairs_BuildDownSync */
+      ok = Hexen_EV_BuildStairs(line, args, -1, STAIRS_SYNC);
+      break;
+    case 32:                    /* Stairs_BuildUpSync */
+      ok = Hexen_EV_BuildStairs(line, args, 1, STAIRS_SYNC);
       break;
     case 30:                    /* Pillar_Open */
       ok = EV_OpenPillar(line, args);

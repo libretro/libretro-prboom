@@ -556,15 +556,20 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    if (tz < MINZ)
       return;
 
-   xscale = FixedDiv(projectionx, tz);
-
    gxt = -FixedMul(tr_x,viewsin);
    gyt = FixedMul(tr_y,viewcos);
    tx = -(gyt+gxt);
 
    // too far off the side?
+   // (cull before the FixedDiv below: tx/tz are already known here, so a
+   // side-culled sprite -- common on wide-open maps with many things off
+   // to the sides -- skips the 64-bit projection divide it would never
+   // use.  The cull condition is unchanged, so the set of rendered sprites
+   // and the output are identical.)
    if (D_abs(tx)>(tz<<2))
       return;
+
+   xscale = FixedDiv(projectionx, tz);
 
    // Do not attempt to render special TNT1 invisible sprite
    if (thing->sprite == SPR_TNT1) return;

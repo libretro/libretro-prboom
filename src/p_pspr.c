@@ -58,6 +58,7 @@ void A_UnHideThing(mobj_t *thing);
 #define BFGCELLS bfgcells        /* Ty 03/09/98 externalized in p_inter.c */
 
 extern void P_Thrust(player_t *, angle_t, fixed_t);
+extern mobjtype_t PuffType;   /* puff actor the next hitscan/melee spawns */
 
 extern void retro_set_rumble_damage(int damage, float duration);
 
@@ -1068,6 +1069,7 @@ void A_FPunchAttack(player_t *player, pspdef_t *psp)
   (void)psp;
   damage = 40 + (P_Random(pr_punch) & 15);
   power  = 2 * FRACUNIT;
+  PuffType = HEXEN_MT_PUNCHPUFF;
   for (i = 0; i < 16; i++)
   {
     angle = pmo->angle + i * (ANG45 / 16);
@@ -1079,6 +1081,7 @@ void A_FPunchAttack(player_t *player, pspdef_t *psp)
       {
         damage <<= 1;
         power = 6 * FRACUNIT;
+        PuffType = HEXEN_MT_HAMMERPUFF;
       }
       P_LineAttack(pmo, angle, 2 * MELEERANGE, slope, damage);
       if (linetarget->flags & MF_COUNTKILL || linetarget->player)
@@ -1095,6 +1098,7 @@ void A_FPunchAttack(player_t *player, pspdef_t *psp)
       {
         damage <<= 1;
         power = 6 * FRACUNIT;
+        PuffType = HEXEN_MT_HAMMERPUFF;
       }
       P_LineAttack(pmo, angle, 2 * MELEERANGE, slope, damage);
       if (linetarget->flags & MF_COUNTKILL || linetarget->player)
@@ -1139,10 +1143,12 @@ void A_FAxeAttack(player_t *player, pspdef_t *psp)
     /* powered (glowing) axe: double damage, knockback, spends mana */
     damage <<= 1;
     power = 6 * FRACUNIT;
+    PuffType = HEXEN_MT_AXEPUFF_GLOW;
     useMana = 1;
   }
   else
   {
+    PuffType = HEXEN_MT_AXEPUFF;
     useMana = 0;
   }
 
@@ -1201,6 +1207,7 @@ void A_FHammerAttack(player_t *player, pspdef_t *psp)
   (void)psp;
   damage = 60 + (P_Random(pr_saw) & 63);
   power = 10 * FRACUNIT;
+  PuffType = HEXEN_MT_HAMMERPUFF;
   for (i = 0; i < 16; i++)
   {
     angle = pmo->angle + i * (ANG45 / 32);
@@ -1305,6 +1312,7 @@ void A_CMaceAttack(player_t *player, pspdef_t *psp)
 
   (void)psp;
   damage = 25 + (P_Random(pr_punch) & 15);
+  PuffType = HEXEN_MT_HAMMERPUFF;
   for (i = 0; i < 16; i++)
   {
     angle = pmo->angle + i * (ANG45 / 16);
@@ -1347,6 +1355,7 @@ void A_CStaffCheck(player_t *player, pspdef_t *psp)
   (void)psp;
   pmo = player->mo;
   damage = 20 + (P_Random(pr_punch) & 15);
+  PuffType = HEXEN_MT_CSTAFFPUFF;
   for (i = 0; i < 3; i++)
   {
     angle = pmo->angle + i * (ANG45 / 16);

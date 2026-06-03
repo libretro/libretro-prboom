@@ -1527,24 +1527,30 @@ void P_SpawnPuff(fixed_t x,fixed_t y,fixed_t z)
   mobj_t* th;
   int t;
 
-  /* Heretic uses its own puff actor (PuffType, set by the firing weapon)
-   * rather than the Doom MT_PUFF, and plays the puff's own sound. Without
-   * this, a Heretic hitscan (e.g. the gold wand) spawned the Doom puff,
-   * which has no valid Heretic sprite/states, so nothing was drawn at the
-   * impact point. */
-  if (heretic)
+  /* Heretic and Hexen use their own puff actor (PuffType, set by the firing
+   * weapon) rather than the Doom MT_PUFF, and play the puff's own sound.
+   * Without this, a Raven hitscan/melee spawned the Doom puff -- which has no
+   * valid Raven sprite/states -- so nothing drew at the impact (or, worse, a
+   * stray Doom puff actor lingered).  Hexen additionally plays the puff's
+   * seesound when a thing was hit, and gives the punch/hammer puffs a small
+   * upward drift. */
+  if (raven)
   {
     th = P_SpawnMobj(x, y, z + (P_SubRandom() << 10), PuffType);
-    if (th->info->attacksound)
+    if (hexen && linetarget && th->info->seesound)
+      S_StartMobjSound(th, th->info->seesound);
+    else if (th->info->attacksound)
       S_StartMobjSound(th, th->info->attacksound);
     switch (PuffType)
     {
       case HERETIC_MT_BEAKPUFF:
       case HERETIC_MT_STAFFPUFF:
+      case HEXEN_MT_PUNCHPUFF:
         th->momz = FRACUNIT;
         break;
       case HERETIC_MT_GAUNTLETPUFF1:
       case HERETIC_MT_GAUNTLETPUFF2:
+      case HEXEN_MT_HAMMERPUFF:
         th->momz = (fixed_t)(FRACUNIT * 4 / 5); /* .8 */
         break;
       default:
@@ -1770,7 +1776,37 @@ void P_BlasterMobjThinker(mobj_t * mobj)
             }
             if (changexy)
             {
-                if (P_Random(pr_heretic) < 64)
+                if (hexen)
+                {
+                    /* Hexen reuses this fast-mover thinker for two Mage
+                     * missiles.  The Sapphire Wand bolt lays a light smoke
+                     * trail; the Cleric flame missile (Frost?  no -- the
+                     * Mage's MT_CFLAME) periodically drops a floor flame.
+                     * Spawning Heretic's blaster smoke here instead left a
+                     * permanent Heretic trail actor behind every wand shot. */
+                    if (mobj->type == HEXEN_MT_MWAND_MISSILE &&
+                        (P_Random(pr_heretic) < 128))
+                    {
+                        z = mobj->z - 8 * FRACUNIT;
+                        if (z < mobj->floorz)
+                            z = mobj->floorz;
+                        P_SpawnMobj(mobj->x, mobj->y, z, HEXEN_MT_MWANDSMOKE);
+                    }
+                    else if (mobj->type != HEXEN_MT_MWAND_MISSILE &&
+                             !--mobj->special1.i)
+                    {
+                        mobj_t *fl;
+                        mobj->special1.i = 4;
+                        z = mobj->z - 12 * FRACUNIT;
+                        if (z < mobj->floorz)
+                            z = mobj->floorz;
+                        fl = P_SpawnMobj(mobj->x, mobj->y, z,
+                                         HEXEN_MT_CFLAMEFLOOR);
+                        if (fl)
+                            fl->angle = mobj->angle;
+                    }
+                }
+                else if (P_Random(pr_heretic) < 64)
                 {
                     z = mobj->z - 8 * FRACUNIT;
                     if (z < mobj->floorz)

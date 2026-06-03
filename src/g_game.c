@@ -158,6 +158,8 @@ int     inventory = 0;         /* Heretic: inventory bar currently displayed */
 int     inventoryTics = 0;     /* Heretic: tics until the bar auto-closes */
 int     key_inv_left;
 int     key_inv_right;
+int     key_fly_up;
+int     key_fly_down;
 int     key_strafe;
 int     key_speed;
 int     key_escape = KEYD_ESCAPE;                           // phares 4/13/98
@@ -354,15 +356,16 @@ void G_BuildTiccmd(ticcmd_t* cmd)
   if (gamekeydown[key_fire] || mousebuttons[mousebfire])
     cmd->buttons |= BT_ATTACK;
 
-  if (gamekeydown[key_use] || mousebuttons[mousebforward])
+  if (gamekeydown[key_use] || mousebuttons[mousebforward] ||
+      (raven && gamekeydown['e']))
     {
       cmd->buttons |= BT_USE;
     }
 
-  /* Heretic inventory input: cycle the ready artifact with the inv keys and
-   * use it with the use-artifact key. inv_ptr/curpos and readyArtifact live
-   * in p_user.c; we just nudge the cursor and stage the artifact to use. */
-  if (heretic)
+  /* Heretic/Hexen inventory input: cycle the ready artifact with the inv keys
+   * and use it with the use-artifact key. inv_ptr/curpos and readyArtifact
+   * live in p_user.c; we just nudge the cursor and stage the artifact to use. */
+  if (raven)
   {
     extern int inv_ptr, curpos;
 
@@ -576,6 +579,19 @@ void G_BuildTiccmd(ticcmd_t* cmd)
         look = -7;
      cmd->lookfly = (uint8_t)((cmd->lookfly & 0xF0) | (look & 0x0F));
      gamepad_lookdelta = 0;
+  }
+
+  /* Heretic/Hexen flight: the fly up/down keys stage a vertical step into the
+   * high nibble of cmd->lookfly (signed -8..+7), which P_MovePlayer applies to
+   * player->flyheight while the flight power is active. */
+  if (raven && (gamekeydown[key_fly_up] || gamekeydown[key_fly_down]))
+  {
+     int fly = 0;
+     if (gamekeydown[key_fly_up])
+        fly = 7;
+     else if (gamekeydown[key_fly_down])
+        fly = -7;
+     cmd->lookfly = (uint8_t)((cmd->lookfly & 0x0F) | ((fly & 0x0F) << 4));
   }
 
   mousex = mousey = 0;

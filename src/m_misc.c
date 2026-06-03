@@ -402,12 +402,16 @@ default_t defaults[] =
    0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // duh
   {"key_use",         {&key_use, NULL},            {' ', NULL}           ,
    0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // key to open a door, use a switch
-  {"key_use_artifact", {&key_use_artifact, NULL},  {KEYD_ENTER, NULL}    ,
-   0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic: use the ready artifact
-  {"key_inv_left",    {&key_inv_left, NULL},       {'[', NULL}           ,
-   0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic: previous inventory item
-  {"key_inv_right",   {&key_inv_right, NULL},      {']', NULL}           ,
-   0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic: next inventory item
+  {"key_use_artifact", {&key_use_artifact, NULL},  {'q', NULL}           ,
+   0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic/Hexen: use the ready artifact
+  {"key_inv_left",    {&key_inv_left, NULL},       {'c', NULL}           ,
+   0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic/Hexen: previous inventory item
+  {"key_inv_right",   {&key_inv_right, NULL},      {'v', NULL}           ,
+   0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic/Hexen: next inventory item
+  {"key_fly_up",      {&key_fly_up, NULL},         {'x', NULL}           ,
+   0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic/Hexen: fly up
+  {"key_fly_down",    {&key_fly_down, NULL},       {'z', NULL}           ,
+   0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic/Hexen: fly down
   {"key_strafe",      {&key_strafe, NULL},         {KEYD_RALT, NULL}      ,
    0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // key to use with arrows to strafe
   {"key_speed",       {&key_speed, NULL},          {KEYD_RSHIFT, NULL}    ,

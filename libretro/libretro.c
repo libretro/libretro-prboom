@@ -386,6 +386,45 @@ static gamepad_layout_t gp_heretic_classic = {
 	16,
 };
 
+/* Keyboard / mouse descriptors.  Unlike the gamepad layouts these document
+ * the keyboard keys the Raven games bind: movement / fire / use plus the
+ * inventory and flight keys.  Heretic uses spacebar for Use; Hexen reserves
+ * spacebar for Jump (added separately) and uses E for Use. */
+static const struct retro_input_descriptor kbd_heretic_desc[] = {
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_UP,       "Move Forward" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_DOWN,     "Move Backward" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LEFT,     "Turn Left" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_RIGHT,    "Turn Right" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LCTRL,    "Fire" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_SPACE,    "Use / Open Door" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_e,        "Use / Open Door" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LSHIFT,   "Run" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LALT,     "Strafe" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_q,        "Use Inventory Item" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_c,        "Previous Inventory Item" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_v,        "Next Inventory Item" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_x,        "Fly Up" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_z,        "Fly Down" },
+	{ 0 },
+};
+
+static const struct retro_input_descriptor kbd_hexen_desc[] = {
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_UP,       "Move Forward" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_DOWN,     "Move Backward" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LEFT,     "Turn Left" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_RIGHT,    "Turn Right" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LCTRL,    "Fire" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_e,        "Use / Open Door" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LSHIFT,   "Run" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LALT,     "Strafe" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_q,        "Use Inventory Item" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_c,        "Previous Inventory Item" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_v,        "Next Inventory Item" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_x,        "Fly Up" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_z,        "Fly Down" },
+	{ 0 },
+};
+
 static struct retro_rumble_interface rumble = {0};
 static bool rumble_enabled                  = false;
 static uint16_t rumble_damage_strength      = 0;
@@ -932,12 +971,17 @@ void retro_set_controller_port_device(unsigned port, unsigned device)
 			break;
 		case RETRO_DEVICE_KEYBOARD:
 			doom_devices[port] = RETRO_DEVICE_KEYBOARD;
-			// Input descriptors are irrelevant in this case, but don't want
-			// to leave undefined...
 			{
-				extern dbool heretic;
-				environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
-				           heretic ? gp_heretic_classic.desc : gp_classic.desc);
+				extern dbool heretic, hexen;
+				if (hexen)
+					environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+					           (void *)kbd_hexen_desc);
+				else if (heretic)
+					environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+					           (void *)kbd_heretic_desc);
+				else
+					environ_cb(RETRO_ENVIRONMENT_SET_INPUT_DESCRIPTORS,
+					           gp_classic.desc);
 			}
 			break;
 		default:

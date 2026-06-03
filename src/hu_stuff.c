@@ -310,13 +310,16 @@ void HU_Init(void)
   memset(hu_font,  0, sizeof(hu_font));
   memset(hu_msgbg, 0, sizeof(hu_msgbg));
 
-  /* Heretic uses its own font (the FONTA set, between the FONTA_S and
-   * FONTA_E markers) rather than Doom's STCFN glyphs. FONTA01 is the
-   * first printable character ('!', ASCII 33), which is exactly
-   * HU_FONTSTART, so lump (FONTA_S + 1 + i) maps to hu_font[i]. Heretic's
-   * font is uppercase-only, so fold lowercase letters onto their
-   * uppercase glyph. */
-  if (heretic && W_CheckNumForName("FONTA_S") != -1)
+  /* Heretic and Hexen use their own font (the FONTA set, between the
+   * FONTA_S and FONTA_E markers) rather than Doom's STCFN glyphs. FONTA01 is
+   * the first printable character ('!', ASCII 33), which is exactly
+   * HU_FONTSTART, so lump (FONTA_S + 1 + i) maps to hu_font[i]. The font is
+   * uppercase-only, so fold lowercase letters onto their uppercase glyph.
+   * Without this, Hexen left hu_font zeroed (the Doom STCFN lumps are
+   * absent), so any menu drawn through hu_font -- e.g. the General setup
+   * screen -- fed lump 0 to the patch cache and tried to allocate a bogus
+   * (size_t)-1024 patch. */
+  if (raven && W_CheckNumForName("FONTA_S") != -1)
   {
     int base = W_GetNumForName("FONTA_S") + 1;
     int last = W_CheckNumForName("FONTA_E");

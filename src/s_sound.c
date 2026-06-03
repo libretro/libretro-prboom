@@ -144,7 +144,7 @@ const char *S_HexenMapSong(int map)
  * I_GetSfxLumpNum lookup resolves it.  Lines are "<tag> <lump>"; the "$MAP n
  * song" directive records per-map music; other '$' lines and ';' comments
  * are skipped. */
-static void S_HexenLoadSndInfo(void)
+void S_HexenLoadSndInfo(void)
 {
   int         lump, len, i;
   const char *buf;
@@ -271,10 +271,6 @@ void S_Init(int sfxVolume, int musicVolume)
     // DSDHacked: cover the runtime-grown table, not just the static seed.
     for (i=1 ; i<num_sfx ; i++)
       S_sfx[i].lumpnum = S_sfx[i].usefulness = -1;
-
-    /* Hexen: resolve SNDINFO logical names to real lump names. */
-    if (hexen)
-      S_HexenLoadSndInfo();
   }
 
   // CPhipps - music init reformatted

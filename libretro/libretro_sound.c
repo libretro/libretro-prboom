@@ -611,6 +611,18 @@ void I_InitSound(void)
 {
   int i;
 
+  /* Hexen indirects sfx through SNDINFO: the precache below loads each
+   * sample by S_sfx[].name, so the logical names must already have been
+   * rewritten to real lumps.  This runs before S_Init (which used to do it,
+   * too late -- after the precache had already failed to NULL).  Also
+   * records the per-map music. */
+  {
+    extern dbool hexen;          /* doomstat.h */
+    extern void  S_HexenLoadSndInfo(void); /* s_sound.h */
+    if (hexen)
+      S_HexenLoadSndInfo();
+  }
+
   /* lengths[] tracks the (growable) sfx count; reallocate to cover any
    * dsdhacked-added sounds. */
   if (lengths_size < num_sfx)

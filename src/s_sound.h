@@ -76,6 +76,13 @@ void S_StartMusic(int music_id);
 void S_ChangeMusic(int music_id, int looping);
 void S_ChangeMusicByName(char* lumpname, int looping);
 
+/* Hexen: parse the SNDINFO lump, rewriting each S_sfx[].name from its
+ * logical tag to the real lump and recording per-map music.  Must run
+ * before the sound precache (I_InitSound) so samples load by the correct
+ * lump name. */
+void S_HexenLoadSndInfo(void);
+const char *S_HexenMapSong(int map);
+
 // Stops the music fer sure.
 void S_StopMusic(void);
 

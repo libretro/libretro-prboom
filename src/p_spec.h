@@ -1062,6 +1062,7 @@ void P_InitPicAnims
 
 void P_InitTerrainTypes(void);
 int  P_GetThingFloorType(mobj_t *thing);
+int  P_HitFloor(mobj_t *thing);
 extern int *TerrainTypes;
 
 void P_InitSwitchList

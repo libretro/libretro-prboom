@@ -3312,3 +3312,335 @@ void A_DemonAttack2(mobj_t *actor)
     S_StartSound(actor, hexen_sfx_demon_missile_fire);
   }
 }
+
+/* ------------------------------------------------------------------------
+ * Serpent (HEXEN_MT_SERPENT / HEXEN_MT_SERPENTLEADER)
+ *
+ * The burrowing snake: it swims hidden beneath a liquid floor, humps up to
+ * the surface to strike, melees with its head, and (the "leader" variant)
+ * spits a missile.  It is constrained to its starting floor terrain -- a
+ * move that would change the floor flat is reverted -- so it never leaves
+ * the water/lava/sludge it spawned in.  On death the head detaches.
+ *
+ * Adapted to this core: pr_hexen -> pr_heretic, S_StartMobjSound ->
+ * S_StartSound, HITDICE -> HX_HITDICE, the 4-arg P_TryMove, and the
+ * fork's fast-monster test (nightmare skill or -fast).
+ * --------------------------------------------------------------------- */
+
+#define SERPENT_FAST (gameskill == sk_nightmare || fastparm)
+
+static dbool P_CheckMeleeRange2(mobj_t *actor)
+{
+  mobj_t *mo;
+  fixed_t dist;
+
+  if (!actor->target)
+    return false;
+  mo = actor->target;
+  dist = P_AproxDistance(mo->x - actor->x, mo->y - actor->y);
+  if (dist >= MELEERANGE * 2 || dist < MELEERANGE)
+    return false;
+  if (!P_CheckSight(actor, mo))
+    return false;
+  if (mo->z > actor->z + actor->height)
+    return false;               /* target is higher */
+  if (actor->z > mo->z + mo->height)
+    return false;               /* attacker is higher */
+  return true;
+}
+
+void A_SerpentChase(mobj_t *actor)
+{
+  int delta;
+  int oldX, oldY, oldFloor;
+
+  if (actor->reactiontime)
+    actor->reactiontime--;
+  if (actor->threshold)
+    actor->threshold--;
+
+  if (SERPENT_FAST)
+  {
+    actor->tics -= actor->tics / 2;
+    if (actor->tics < 3)
+      actor->tics = 3;
+  }
+
+  /* turn towards movement direction if not there yet */
+  if (actor->movedir < 8)
+  {
+    actor->angle &= (7 << 29);
+    delta = actor->angle - (actor->movedir << 29);
+    if (delta > 0)
+      actor->angle -= ANG90 / 2;
+    else if (delta < 0)
+      actor->angle += ANG90 / 2;
+  }
+
+  if (!actor->target || !(actor->target->flags & MF_SHOOTABLE))
+  {
+    if (P_LookForPlayers(actor, true))
+      return;
+    P_SetMobjState(actor, actor->info->spawnstate);
+    return;
+  }
+
+  /* don't attack twice in a row */
+  if (actor->flags & MF_JUSTATTACKED)
+  {
+    actor->flags &= ~MF_JUSTATTACKED;
+    if (!SERPENT_FAST)
+      P_NewChaseDir(actor);
+    return;
+  }
+
+  /* check for melee attack */
+  if (actor->info->meleestate && P_CheckMeleeRange(actor))
+  {
+    if (actor->info->attacksound)
+      S_StartSound(actor, actor->info->attacksound);
+    P_SetMobjState(actor, actor->info->meleestate);
+    return;
+  }
+
+  if (netgame && !actor->threshold && !P_CheckSight(actor, actor->target))
+  {
+    if (P_LookForPlayers(actor, true))
+      return;
+  }
+
+  /* chase towards player, but stay on the same floor terrain */
+  oldX = actor->x;
+  oldY = actor->y;
+  oldFloor = actor->subsector->sector->floorpic;
+  if (--actor->movecount < 0 || !P_Move(actor, false))
+    P_NewChaseDir(actor);
+  if (actor->subsector->sector->floorpic != oldFloor)
+  {
+    P_TryMove(actor, oldX, oldY, 0);
+    P_NewChaseDir(actor);
+  }
+
+  if (actor->info->activesound && P_Random(pr_heretic) < 3)
+    S_StartSound(actor, actor->info->activesound);
+}
+
+void A_SerpentWalk(mobj_t *actor)
+{
+  int delta;
+
+  if (actor->reactiontime)
+    actor->reactiontime--;
+  if (actor->threshold)
+    actor->threshold--;
+
+  if (SERPENT_FAST)
+  {
+    actor->tics -= actor->tics / 2;
+    if (actor->tics < 3)
+      actor->tics = 3;
+  }
+
+  if (actor->movedir < 8)
+  {
+    actor->angle &= (7 << 29);
+    delta = actor->angle - (actor->movedir << 29);
+    if (delta > 0)
+      actor->angle -= ANG90 / 2;
+    else if (delta < 0)
+      actor->angle += ANG90 / 2;
+  }
+
+  if (!actor->target || !(actor->target->flags & MF_SHOOTABLE))
+  {
+    if (P_LookForPlayers(actor, true))
+      return;
+    P_SetMobjState(actor, actor->info->spawnstate);
+    return;
+  }
+
+  if (actor->flags & MF_JUSTATTACKED)
+  {
+    actor->flags &= ~MF_JUSTATTACKED;
+    if (!SERPENT_FAST)
+      P_NewChaseDir(actor);
+    return;
+  }
+
+  if (actor->info->meleestate && P_CheckMeleeRange(actor))
+  {
+    if (actor->info->attacksound)
+      S_StartSound(actor, actor->info->attacksound);
+    P_SetMobjState(actor, HEXEN_S_SERPENT_ATK1);
+    return;
+  }
+
+  if (netgame && !actor->threshold && !P_CheckSight(actor, actor->target))
+  {
+    if (P_LookForPlayers(actor, true))
+      return;
+  }
+
+  if (--actor->movecount < 0 || !P_Move(actor, false))
+    P_NewChaseDir(actor);
+}
+
+void A_SerpentHumpDecide(mobj_t *actor)
+{
+  if (actor->type == HEXEN_MT_SERPENTLEADER)
+  {
+    if (P_Random(pr_heretic) > 30)
+      return;
+    else if (P_Random(pr_heretic) < 40)
+    {
+      P_SetMobjState(actor, HEXEN_S_SERPENT_SURFACE1);
+      return;
+    }
+  }
+  else if (P_Random(pr_heretic) > 3)
+    return;
+
+  if (!P_CheckMeleeRange(actor))
+  {
+    if (actor->type == HEXEN_MT_SERPENTLEADER && P_Random(pr_heretic) < 128)
+    {
+      P_SetMobjState(actor, HEXEN_S_SERPENT_SURFACE1);
+    }
+    else
+    {
+      P_SetMobjState(actor, HEXEN_S_SERPENT_HUMP1);
+      S_StartSound(actor, hexen_sfx_serpent_active);
+    }
+  }
+}
+
+void A_SerpentCheckForAttack(mobj_t *actor)
+{
+  if (!actor->target)
+    return;
+  if (actor->type == HEXEN_MT_SERPENTLEADER)
+  {
+    if (!P_CheckMeleeRange(actor))
+    {
+      P_SetMobjState(actor, HEXEN_S_SERPENT_ATK1);
+      return;
+    }
+  }
+  if (P_CheckMeleeRange2(actor))
+  {
+    P_SetMobjState(actor, HEXEN_S_SERPENT_WALK1);
+  }
+  else if (P_CheckMeleeRange(actor))
+  {
+    if (P_Random(pr_heretic) < 32)
+      P_SetMobjState(actor, HEXEN_S_SERPENT_WALK1);
+    else
+      P_SetMobjState(actor, HEXEN_S_SERPENT_ATK1);
+  }
+}
+
+void A_SerpentChooseAttack(mobj_t *actor)
+{
+  if (!actor->target || P_CheckMeleeRange(actor))
+    return;
+  if (actor->type == HEXEN_MT_SERPENTLEADER)
+    P_SetMobjState(actor, HEXEN_S_SERPENT_MISSILE1);
+}
+
+void A_SerpentMeleeAttack(mobj_t *actor)
+{
+  if (!actor->target)
+    return;
+  if (P_CheckMeleeRange(actor))
+  {
+    P_DamageMobj(actor->target, actor, actor, HX_HITDICE(5));
+    S_StartSound(actor, hexen_sfx_serpent_meleehit);
+  }
+  if (P_Random(pr_heretic) < 96)
+    A_SerpentCheckForAttack(actor);
+}
+
+void A_SerpentMissileAttack(mobj_t *actor)
+{
+  if (!actor->target)
+    return;
+  P_SpawnMissile(actor, actor->target, HEXEN_MT_SERPENTFX);
+}
+
+void A_SerpentHide(mobj_t *actor)
+{
+  actor->flags2 |= MF2_DONTDRAW;
+  actor->floorclip = 0;
+}
+
+void A_SerpentUnHide(mobj_t *actor)
+{
+  actor->flags2 &= ~MF2_DONTDRAW;
+  actor->floorclip = 24 * FRACUNIT;
+}
+
+void A_SerpentRaiseHump(mobj_t *actor)
+{
+  actor->floorclip -= 4 * FRACUNIT;
+}
+
+void A_SerpentLowerHump(mobj_t *actor)
+{
+  actor->floorclip += 4 * FRACUNIT;
+}
+
+void A_SerpentBirthScream(mobj_t *actor)
+{
+  S_StartSound(actor, hexen_sfx_serpent_birth);
+}
+
+void A_SerpentDiveSound(mobj_t *actor)
+{
+  S_StartSound(actor, hexen_sfx_serpent_active);
+}
+
+void A_SerpentHeadPop(mobj_t *actor)
+{
+  P_SpawnMobj(actor->x, actor->y, actor->z + 45 * FRACUNIT,
+              HEXEN_MT_SERPENT_HEAD);
+}
+
+void A_SerpentHeadCheck(mobj_t *actor)
+{
+  if (actor->z <= actor->floorz)
+  {
+    if (P_GetThingFloorType(actor) >= FLOOR_LIQUID)
+    {
+      P_HitFloor(actor);
+      P_SetMobjState(actor, HEXEN_S_NULL);
+    }
+    else
+    {
+      P_SetMobjState(actor, HEXEN_S_SERPENT_HEAD_X1);
+    }
+  }
+}
+
+void A_SerpentSpawnGibs(mobj_t *actor)
+{
+  mobj_t *mo;
+  int     r1, r2;
+  int     i;
+  static const int gib[3] =
+    { HEXEN_MT_SERPENT_GIB1, HEXEN_MT_SERPENT_GIB2, HEXEN_MT_SERPENT_GIB3 };
+
+  for (i = 0; i < 3; i++)
+  {
+    r1 = P_Random(pr_heretic);
+    r2 = P_Random(pr_heretic);
+    mo = P_SpawnMobj(actor->x + ((r2 - 128) << 12),
+                     actor->y + ((r1 - 128) << 12),
+                     actor->floorz + FRACUNIT, gib[i]);
+    if (mo)
+    {
+      mo->momx = (P_Random(pr_heretic) - 128) << 6;
+      mo->momy = (P_Random(pr_heretic) - 128) << 6;
+      mo->floorclip = 6 * FRACUNIT;
+    }
+  }
+}

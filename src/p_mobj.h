@@ -482,6 +482,13 @@ typedef struct mobj_s
     int                 special_args[5];
     int                 damage;     /* Heretic: per-missile damage override */
 
+    /* Raven (Hexen/Heretic): how far the sprite is sunk into the floor, used
+     * by liquid terrain and the burrowing Serpent.  Appended at the end of
+     * the struct so it does not shift any existing field offsets.  Stored
+     * here so the actor logic works; sprite-render floorclipping is not
+     * applied yet. */
+    fixed_t             floorclip;
+
     // SEE WARNING ABOVE ABOUT POINTER FIELDS!!!
 } mobj_t;
 

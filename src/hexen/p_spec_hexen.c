@@ -34,6 +34,8 @@
 #include "r_state.h"
 #include "p_spec.h"
 #include "p_tick.h"
+#include "p_map.h"
+#include "r_demo.h"
 #include "s_sound.h"
 #include "sounds.h"
 #include "z_zone.h"
@@ -918,6 +920,121 @@ void Hexen_EV_StopPlat(line_t *line, byte *args)
   }
 }
 
+/* --- Teleport -------------------------------------------------------------
+ *
+ * Hexen teleports send the activating mobj to a teleport-destination mapspot
+ * found by thing id (TID), optionally with the teleport fog/sound. */
+dbool P_HexenTeleport(mobj_t *thing, fixed_t x, fixed_t y, angle_t angle,
+                      dbool useFog)
+{
+  fixed_t   oldx = thing->x;
+  fixed_t   oldy = thing->y;
+  fixed_t   oldz = thing->z;
+  fixed_t   aboveFloor = thing->z - thing->floorz;
+  fixed_t   fogDelta;
+  unsigned  an;
+  mobj_t   *fog;
+  player_t *player;
+
+  if (!P_TeleportMove(thing, x, y, false))
+    return false;
+
+  if (thing->player)
+  {
+    player = thing->player;
+    if (player->powers[pw_flight] && aboveFloor)
+    {
+      thing->z = thing->floorz + aboveFloor;
+      if (thing->z + thing->height > thing->ceilingz)
+        thing->z = thing->ceilingz - thing->height;
+      player->viewz = thing->z + player->viewheight;
+    }
+    else
+    {
+      thing->z = thing->floorz;
+      player->viewz = thing->z + player->viewheight;
+      if (useFog)
+        player->lookdir = 0;
+    }
+  }
+  else if (thing->flags & MF_MISSILE)
+  {
+    thing->z = thing->floorz + aboveFloor;
+    if (thing->z + thing->height > thing->ceilingz)
+      thing->z = thing->ceilingz - thing->height;
+  }
+  else
+    thing->z = thing->floorz;
+
+  if (useFog)
+  {
+    fogDelta = (thing->flags & MF_MISSILE) ? 0 : TELEFOGHEIGHT;
+    fog = P_SpawnMobj(oldx, oldy, oldz + fogDelta, HEXEN_MT_TFOG);
+    S_StartSound(fog, hexen_sfx_teleport);
+    an = angle >> ANGLETOFINESHIFT;
+    fog = P_SpawnMobj(x + 20 * finecosine[an], y + 20 * finesine[an],
+                      thing->z + fogDelta, HEXEN_MT_TFOG);
+    S_StartSound(fog, hexen_sfx_teleport);
+    if (thing->player &&
+        !thing->player->powers[pw_weaponlevel2] &&
+        !thing->player->powers[pw_speed])
+      thing->reactiontime = 18;     /* freeze player ~0.5s */
+    thing->angle = angle;
+  }
+
+  if (thing->flags2 & MF2_FOOTCLIP)
+  {
+    if (thing->z == thing->subsector->sector->floorheight &&
+        P_GetThingFloorType(thing) > FLOOR_SOLID)
+      thing->floorclip = 10 * FRACUNIT;
+    else
+      thing->floorclip = 0;
+  }
+
+  if (thing->flags & MF_MISSILE)
+  {
+    an = angle >> ANGLETOFINESHIFT;
+    thing->momx = FixedMul(thing->info->speed, finecosine[an]);
+    thing->momy = FixedMul(thing->info->speed, finesine[an]);
+  }
+  else if (useFog)
+    thing->momx = thing->momy = thing->momz = 0;
+
+  if (thing->player)
+    R_ResetAfterTeleport(thing->player);
+
+  return true;
+}
+
+dbool EV_HexenTeleport(int tid, mobj_t *thing, dbool fog)
+{
+  int     count;
+  int     searcher;
+  int     i;
+  mobj_t *mo;
+
+  if (!thing || (thing->flags2 & MF2_NOTELEPORT))
+    return false;
+
+  count = 0;
+  searcher = -1;
+  while (P_FindMobjFromTID((short) tid, &searcher) != NULL)
+    count++;
+  if (count == 0)
+    return false;
+
+  count = 1 + (P_Random(pr_heretic) % count);
+  searcher = -1;
+  mo = NULL;
+  for (i = 0; i < count; i++)
+    mo = P_FindMobjFromTID((short) tid, &searcher);
+
+  if (mo == NULL)
+    return false;
+
+  return P_HexenTeleport(thing, mo->x, mo->y, mo->angle, fog);
+}
+
 /* --- Dispatcher ----------------------------------------------------------- */
 
 dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
@@ -942,6 +1059,14 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       if (CheckedLockedDoor(mo, args[3]))
         ok = args[0] ? Hexen_EV_DoDoor(line, args, DREV_NORMAL)
                      : Hexen_EV_VerticalDoor(line, mo);
+      break;
+    case 70:                    /* Teleport */
+      if (side == 0)
+        ok = EV_HexenTeleport(args[0], mo, true);
+      break;
+    case 71:                    /* Teleport_NoFog */
+      if (side == 0)
+        ok = EV_HexenTeleport(args[0], mo, false);
       break;
     case 20:                    /* Floor_LowerByValue */
       ok = Hexen_EV_DoFloor(line, args, FLEV_LOWERFLOORBYVALUE);

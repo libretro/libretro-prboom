@@ -46,6 +46,9 @@ int   EV_BuildPillar(line_t *line, byte *args, int crush);
 int   EV_OpenPillar(line_t *line, byte *args);
 void  T_HexenLight(light_t *light);
 int   EV_SpawnLight(line_t *line, byte *args, lighttype_t type);
+dbool P_HexenTeleport(mobj_t *thing, fixed_t x, fixed_t y, angle_t angle,
+                      dbool useFog);
+dbool EV_HexenTeleport(int tid, mobj_t *thing, dbool fog);
 int   EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount);
 void  Hexen_EV_StopPlat(line_t *line, byte *args);
 

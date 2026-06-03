@@ -1099,6 +1099,74 @@ punchdone:
   }
 }
 
+#define HX_AXERANGE (9*MELEERANGE/4)   /* 2.25 * MELEERANGE */
+
+void A_FAxeAttack(player_t *player, pspdef_t *psp)
+{
+  angle_t angle;
+  mobj_t *pmo = player->mo;
+  fixed_t power;
+  int     damage;
+  fixed_t slope;
+  int     i;
+  int     useMana;
+
+  (void)psp;
+  damage = 40 + (P_Random(pr_saw) & 15) + (P_Random(pr_saw) & 7);
+  power = 0;
+  if (player->mana[MANA_1] > 0)
+  {
+    /* powered (glowing) axe: double damage, knockback, spends mana */
+    damage <<= 1;
+    power = 6 * FRACUNIT;
+    useMana = 1;
+  }
+  else
+  {
+    useMana = 0;
+  }
+
+  for (i = 0; i < 16; i++)
+  {
+    angle = pmo->angle + i * (ANG45 / 16);
+    slope = P_AimLineAttack(pmo, angle, HX_AXERANGE, 0);
+    if (linetarget)
+    {
+      P_LineAttack(pmo, angle, HX_AXERANGE, slope, damage);
+      if (linetarget->flags & MF_COUNTKILL || linetarget->player)
+        P_ThrustMobj(linetarget, angle, power);
+      AdjustPlayerAngle(pmo);
+      useMana++;
+      goto axedone;
+    }
+    angle = pmo->angle - i * (ANG45 / 16);
+    slope = P_AimLineAttack(pmo, angle, HX_AXERANGE, 0);
+    if (linetarget)
+    {
+      P_LineAttack(pmo, angle, HX_AXERANGE, slope, damage);
+      if (linetarget->flags & MF_COUNTKILL)
+        P_ThrustMobj(linetarget, angle, power);
+      AdjustPlayerAngle(pmo);
+      useMana++;
+      goto axedone;
+    }
+  }
+  /* didn't find any creatures, so try to strike any walls */
+  pmo->special1.i = 0;
+
+  angle = pmo->angle;
+  slope = P_AimLineAttack(pmo, angle, MELEERANGE, 0);
+  P_LineAttack(pmo, angle, MELEERANGE, slope, damage);
+
+axedone:
+  if (useMana == 2)
+  {
+    player->mana[MANA_1] -= WeaponManaUse[player->class][player->readyweapon];
+    if (player->mana[MANA_1] <= 0)
+      P_SetPsprite(player, ps_weapon, HEXEN_S_FAXEATK_5);
+  }
+}
+
 #ifdef HEXEN
 //****************************************************************************
 //

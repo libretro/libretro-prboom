@@ -81,6 +81,7 @@ static void cheat_tntweap();
 static void cheat_tntweapx(char buf[3]);
 static void cheat_tntammo();
 static void cheat_tntammox(char buf[1]);
+static void cheat_hexweap();
 static void cheat_smart();
 static void cheat_pitch();
 static void cheat_megaarmour();
@@ -129,6 +130,9 @@ struct cheat_s cheat[] = {
 
   {"idfa",       "Ammo",              not_net | not_demo,
       {cheat_fa}, 0, 0, 0  },
+
+  {"hexweap",    "Hexen Weapons",     not_net | not_demo,
+      {cheat_hexweap}, 0, 0, 0 },
 
   {"idspispopd", "No Clipping 1",     not_net | not_demo,
       {cheat_noclip}, 0, 0, 0 },
@@ -372,6 +376,23 @@ static void cheat_fa()
       plyr->ammo[i] = plyr->maxammo[i];
 
   plyr->message = s_STSTR_FAADDED;
+}
+
+/* Hexen debug aid: grant the current class its four weapons and full mana.
+ * Temporary -- exists so the Hexen weapons can be exercised before weapon
+ * and mana pickups are implemented; remove once those land.  No-op outside
+ * Hexen. */
+static void cheat_hexweap()
+{
+  if (!hexen)
+    return;
+  plyr->weaponowned[WP_FIRST]  = TRUE;
+  plyr->weaponowned[WP_SECOND] = TRUE;
+  plyr->weaponowned[WP_THIRD]  = TRUE;
+  plyr->weaponowned[WP_FOURTH] = TRUE;
+  plyr->mana[MANA_1] = plyr->maxmana;
+  plyr->mana[MANA_2] = plyr->maxmana;
+  plyr->message = "Weapons & Mana Added";
 }
 
 static void cheat_k()

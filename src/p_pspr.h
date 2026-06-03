@@ -95,6 +95,7 @@ void A_Light0(player_t *player, pspdef_t *psp);
 void A_WeaponReady(player_t *player, pspdef_t *psp);
 /* Hexen Fighter fists (active). */
 void A_FPunchAttack(player_t *player, pspdef_t *psp);
+void A_FAxeAttack(player_t *player, pspdef_t *psp);
 /* MBF21 weapon codepointers */
 void A_WeaponProjectile(player_t *player, pspdef_t *psp);
 void A_WeaponBulletAttack(player_t *player, pspdef_t *psp);

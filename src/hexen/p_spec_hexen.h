@@ -57,6 +57,9 @@ int   Hexen_EV_BuildStairs(line_t *line, byte *args, int direction,
                            int stairsType);
 int   EV_ThingProjectile(byte *args, int gravity);
 int   EV_ThingSpawn(byte *args, int fog);
+int   Hexen_EV_FloorCrushStop(line_t *line, byte *args);
+int   Hexen_EV_DoFloorAndCeiling(line_t *line, byte *args, int raise);
+int   Hexen_EV_SectorSoundChange(byte *args);
 int   EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount);
 void  Hexen_EV_StopPlat(line_t *line, byte *args);
 

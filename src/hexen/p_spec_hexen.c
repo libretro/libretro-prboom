@@ -1512,6 +1512,79 @@ dbool EV_HexenTeleport(int tid, mobj_t *thing, dbool fog)
 
 /* --- Dispatcher ----------------------------------------------------------- */
 
+int Hexen_EV_FloorCrushStop(line_t *line, byte *args)
+{
+  thinker_t *think;
+  int        rtn = 0;
+
+  (void) line;
+  (void) args;
+
+  for (think = thinkercap.next; think != &thinkercap; think = think->next)
+  {
+    floormove_t *floor;
+    if (think->function.arg1 != (void (*)(void *))T_MoveFloor)
+      continue;
+    floor = (floormove_t *) think;
+    if (floor->type != FLEV_RAISEFLOORCRUSH)
+      continue;
+    SN_StopSequence((mobj_t *) &floor->sector->soundorg);
+    floor->sector->floordata = NULL;
+    P_RemoveThinker(&floor->thinker);
+    rtn = 1;
+  }
+  return rtn;
+}
+
+int Hexen_EV_DoFloorAndCeiling(line_t *line, byte *args, int raise)
+{
+  int       secnum;
+  int       floorOk;
+  int       ceilingOk;
+  sector_t *sec;
+
+  if (raise)
+  {
+    floorOk = Hexen_EV_DoFloor(line, args, FLEV_RAISEFLOORBYVALUE);
+    HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+    {
+      sec = &sectors[secnum];
+      sec->floordata = NULL;
+      sec->ceilingdata = NULL;
+    }
+    ceilingOk = Hexen_EV_DoCeiling(line, args, CLEV_RAISEBYVALUE);
+  }
+  else
+  {
+    floorOk = Hexen_EV_DoFloor(line, args, FLEV_LOWERFLOORBYVALUE);
+    HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+    {
+      sec = &sectors[secnum];
+      sec->floordata = NULL;
+      sec->ceilingdata = NULL;
+    }
+    ceilingOk = Hexen_EV_DoCeiling(line, args, CLEV_LOWERBYVALUE);
+  }
+  return floorOk | ceilingOk;
+}
+
+int Hexen_EV_SectorSoundChange(byte *args)
+{
+  int secnum;
+  int rtn = 0;
+
+  if (!args[0])
+    return 0;
+
+  HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+  {
+    sectors[secnum].seqType = args[1];
+    rtn = 1;
+  }
+  return rtn;
+}
+
+
 dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
                                 int side, mobj_t *mo)
 {
@@ -1671,6 +1744,18 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 44:                    /* Ceiling_CrushStop */
       ok = Hexen_EV_CeilingCrushStop(line, args);
+      break;
+    case 46:                    /* Floor_CrushStop */
+      ok = Hexen_EV_FloorCrushStop(line, args);
+      break;
+    case 95:                    /* FloorAndCeiling_LowerByValue */
+      ok = Hexen_EV_DoFloorAndCeiling(line, args, 0);
+      break;
+    case 96:                    /* FloorAndCeiling_RaiseByValue */
+      ok = Hexen_EV_DoFloorAndCeiling(line, args, 1);
+      break;
+    case 140:                   /* Sector_SoundChange */
+      ok = Hexen_EV_SectorSoundChange(args);
       break;
     case 45:                    /* Ceiling_CrushRaiseAndStay */
       ok = Hexen_EV_DoCeiling(line, args, CLEV_CRUSHRAISEANDSTAY);

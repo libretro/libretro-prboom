@@ -496,8 +496,8 @@ void M_FinishHelp(int choice)        // killough 10/98
 void M_DrawReadThis1(void)
 {
   inhelpscreens = TRUE;
-  if (heretic)
-    /* Heretic's HELP1/HELP2 are raw 320x200 bitmaps, not patch_t graphics;
+  if (raven)
+    /* Heretic and Hexen HELP1/HELP2 are raw 320x200 bitmaps, not patch_t graphics;
      * drawing them through the patch decoder reads a bogus width/height and
      * tries to allocate ~4 GB.  Use the raw-screen blit (same path used for
      * Heretic's TITLE/CREDIT pages). */
@@ -516,7 +516,7 @@ void M_DrawReadThis1(void)
 void M_DrawReadThis2(void)
 {
   inhelpscreens = TRUE;
-  if (heretic)
+  if (raven)
     V_DrawRawScreen("HELP2");
   else if (gamemode == shareware)
     M_DrawCredits();
@@ -821,7 +821,7 @@ void M_DrawLoad(void)
   // CPhipps - patch drawing updated
   /* M_LOADG is a Doom-only title graphic; draw the Heretic title in its
    * big font instead. */
-  if (heretic)
+  if (raven)
     M_DrawTextB(70, LOADGRAPHIC_Y, "LOAD GAME");
   else
     V_DrawNamePatch(72 ,LOADGRAPHIC_Y, 0, "M_LOADG", CR_DEFAULT, VPT_STRETCH);
@@ -842,8 +842,8 @@ void M_DrawSaveLoadBorder(int x,int y)
   /* Heretic has none of Doom's M_LSLEFT/M_LSCNTR/M_LSRGHT border graphics.
    * The Doom path tiles the centre patch 24 times per slot, which at a high
    * internal resolution is a huge number of stretched blits per frame for a
-   * border that does not even exist here -- so skip it for Heretic. */
-  if (heretic)
+   * border that does not even exist here -- so skip it for Heretic and Hexen. */
+  if (raven)
     return;
 
   V_DrawNamePatch(x-8, y+7, 0, "M_LSLEFT", CR_DEFAULT, VPT_STRETCH);
@@ -970,7 +970,7 @@ void M_DrawSave(void)
 
   //jff 3/15/98 use symbolic load position
   // CPhipps - patch drawing updated
-  if (heretic)
+  if (raven)
     M_DrawTextB(70, LOADGRAPHIC_Y, "SAVE GAME");
   else
     V_DrawNamePatch(72, LOADGRAPHIC_Y, 0, "M_SAVEG", CR_DEFAULT, VPT_STRETCH);

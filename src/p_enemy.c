@@ -3258,6 +3258,44 @@ void A_EttinAttack(mobj_t *actor)
     P_DamageMobj(actor->target, actor, actor, HX_HITDICE(2));
 }
 
+/* Hexen: the Centaur raises its shield when hurt, becoming briefly
+ * invulnerable and reflecting missiles, then either lowers it or lunges
+ * into melee.  A_SetReflective also makes the Centaur invulnerable; the
+ * generic forms are shared with other reflective Hexen actors. */
+void A_SetInvulnerable(mobj_t *actor)
+{
+  actor->flags2 |= MF2_INVULNERABLE;
+}
+
+void A_UnSetInvulnerable(mobj_t *actor)
+{
+  actor->flags2 &= ~MF2_INVULNERABLE;
+}
+
+void A_SetReflective(mobj_t *actor)
+{
+  actor->flags2 |= MF2_REFLECTIVE;
+  if (actor->type == HEXEN_MT_CENTAUR || actor->type == HEXEN_MT_CENTAURLEADER)
+    A_SetInvulnerable(actor);
+}
+
+void A_UnSetReflective(mobj_t *actor)
+{
+  actor->flags2 &= ~MF2_REFLECTIVE;
+  if (actor->type == HEXEN_MT_CENTAUR || actor->type == HEXEN_MT_CENTAURLEADER)
+    A_UnSetInvulnerable(actor);
+}
+
+void A_CentaurDefend(mobj_t *actor)
+{
+  A_FaceTarget(actor);
+  if (P_CheckMeleeRange(actor) && P_Random(pr_heretic) < 32)
+  {
+    A_UnSetInvulnerable(actor);
+    P_SetMobjState(actor, actor->info->meleestate);
+  }
+}
+
 void A_CentaurAttack(mobj_t *actor)
 {
   if (!actor->target)

@@ -1537,6 +1537,21 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
   if (target->health <= 0)
     return;
 
+  /* Hexen: a thing flagged MF2_INVULNERABLE shrugs off all ordinary damage
+   * (used by the Centaur while it raises its shield).  A telefrag-scale
+   * 10000+ hit still goes through.  For a player it is absolute. */
+  if (hexen && (target->flags2 & MF2_INVULNERABLE) && damage < 10000)
+  {
+    if (target->player)
+      return;
+    if (!(target->flags & MF_SHOOTABLE))
+      return;
+    if (!source)
+      return;
+    /* non-player invulnerable monster: ignore the hit */
+    return;
+  }
+
   if (target->flags & MF_SKULLFLY)
     target->momx = target->momy = target->momz = 0;
 

@@ -38,6 +38,7 @@
 #include "p_maputl.h"
 #include "p_map.h"
 #include "p_setup.h"
+#include "p_tick.h"
 #include "p_spec.h"
 #include "map_format.h"
 #include "s_sound.h"
@@ -636,6 +637,27 @@ static dbool PIT_CheckThing(mobj_t *thing) // killough 3/26/98: make static
 
       if (!(thing->flags & MF_SHOOTABLE))
   return !(thing->flags & MF_SOLID); // didn't do any damage
+
+      /* Hexen: a missile striking a reflective thing (the Centaur's raised
+       * shield) is turned back the way it came and re-aimed at whoever it
+       * was, rather than dealing damage.  RIP missiles are not reflected. */
+      if (hexen && (thing->flags2 & MF2_REFLECTIVE) &&
+          !(tmthing->flags2 & MF2_RIP))
+      {
+        angle_t ang = R_PointToAngle2(thing->x, thing->y,
+                                      tmthing->x, tmthing->y);
+        ang += ANG1 * ((P_Random(pr_heretic) % 16) - 8);
+        tmthing->angle = ang;
+        ang >>= ANGLETOFINESHIFT;
+        {
+          fixed_t spd = P_AproxDistance(tmthing->momx, tmthing->momy);
+          tmthing->momx = FixedMul(spd, finecosine[ang]);
+          tmthing->momy = FixedMul(spd, finesine[ang]);
+        }
+        if (tmthing->target)
+          P_SetTarget(&tmthing->target, thing);
+        return TRUE; /* pass through, now travelling back */
+      }
 
       // damage / explode
 

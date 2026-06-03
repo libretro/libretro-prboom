@@ -65,6 +65,11 @@ void A_FaceTarget(mobj_t *);
 /* Hexen monster codepointers. */
 void A_EttinAttack(mobj_t *);
 void A_CentaurAttack(mobj_t *);
+void A_CentaurDefend(mobj_t *);
+void A_SetInvulnerable(mobj_t *);
+void A_UnSetInvulnerable(mobj_t *);
+void A_SetReflective(mobj_t *);
+void A_UnSetReflective(mobj_t *);
 void A_WraithMelee(mobj_t *);
 void A_WraithMissile(mobj_t *);
 void A_DemonAttack1(mobj_t *);

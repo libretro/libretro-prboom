@@ -5296,8 +5296,8 @@ void M_Drawer (void)
       const char *alttext = currentMenu->menuitems[i].alttext;
       if (alttext)
       {
-        if (heretic)
-          M_DrawTextB(x, y, alttext);     /* Heretic's big FONTB font */
+        if (raven)
+          M_DrawTextB(x, y, alttext);     /* Heretic/Hexen big FONTB font */
         else
           M_WriteText(x, y+8-(M_StringHeight(alttext)/2), alttext, CR_DEFAULT);
       }
@@ -5307,10 +5307,11 @@ void M_Drawer (void)
   // DRAW SKULL
 
   // CPhipps - patch drawing updated
-  /* The Doom skull cursor lumps (M_SKULL1/2) do not exist in Heretic, which
-   * uses the blinking arrow selector M_SLCTR1/2 instead.  Pick the right
-   * cursor for the game; whichSkull already provides the blink phase. */
-  if (heretic)
+  /* The Doom skull cursor lumps (M_SKULL1/2) do not exist in Heretic or
+   * Hexen, which use the blinking arrow selector M_SLCTR1/2 instead.  Pick
+   * the right cursor for the game; whichSkull already provides the blink
+   * phase. */
+  if (raven)
     {
       const char *selName = whichSkull ? "M_SLCTR1" : "M_SLCTR2";
       if (W_CheckNumForName(selName) >= 0)

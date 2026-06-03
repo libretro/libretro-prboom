@@ -420,6 +420,12 @@ static void P_FireWeapon(player_t *player)
   newstate = weaponinfo[player->readyweapon].atkstate;
 #endif
 
+  /* Hexen: the Fighter's axe (WP_SECOND) has a powered, glowing attack
+   * animation that plays whenever blue mana is available to spend. */
+  if (hexen && player->class == PCLASS_FIGHTER
+      && player->readyweapon == WP_SECOND && player->mana[MANA_1] > 0)
+    newstate = HEXEN_S_FAXEATK_G1;
+
   P_SetPsprite(player, ps_weapon, newstate);
   /* MBF21: a SILENT weapon does not alert monsters when fired. */
   if (!(mbf21_features &&

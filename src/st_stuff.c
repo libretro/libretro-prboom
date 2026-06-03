@@ -1222,6 +1222,167 @@ static void ST_HereticFullscreenDrawer(void)
   }
 }
 
+/* Hexen artifact icon per hexen_arti_* type.  These graphics live in the
+ * sprite namespace (they double as in-world pickup sprites), so
+ * ST_HereticDrawArtiIcon resolves them via ns_sprites. */
+static const char *const hexen_arti_icon[HEXEN_NUMARTIFACTS] = {
+  "ARTIBOX",  "ARTIINVU", "ARTIPTN2", "ARTISPHL", "ARTIHRAD", "ARTISUMN",
+  "ARTITRCH", "ARTIPORK", "ARTISOAR", "ARTIBLST", "ARTIPSBG", "ARTITELO",
+  "ARTISPED", "ARTIBMAN", "ARTIBRAC", "ARTIATLP", "ARTISKLL", "ARTIBGEM",
+  "ARTIGEMR", "ARTIGEMG", "ARTIGMG2", "ARTIGEMB", "ARTIGMB2", "ARTIBOK1",
+  "ARTIBOK2", "ARTISKL2", "ARTIFWEP", "ARTICWEP", "ARTIMWEP", "ARTIGEAR",
+  "ARTIGER2", "ARTIGER3", "ARTIGER4"
+};
+
+/* The full inventory bar for Hexen (shown while cycling artifacts).  Mirrors
+ * ST_HereticDrawInvBar but uses the larger Hexen artifact set/bound and the
+ * Hexen SELECTBOX lump name (SELECTBO). */
+static void ST_HexenDrawInvBar(player_t *plyr)
+{
+  extern int inv_ptr, curpos;
+  int i, base;
+
+  if (W_CheckNumForName("INVBAR") >= 0)
+    V_DrawNamePatch(38, 162, FG, "INVBAR", CR_DEFAULT, VPT_STRETCH);
+
+  base = inv_ptr - curpos;
+  if (base < 0)
+    base = 0;
+
+  for (i = 0; i < 7; i++)
+  {
+    int slot = base + i;
+    if (slot < plyr->inventorySlotNum &&
+        plyr->inventory[slot].type != arti_none)
+    {
+      int t = plyr->inventory[slot].type;
+      if (t > 0 && t < HEXEN_NUMARTIFACTS)
+        ST_HereticDrawArtiIcon(hexen_arti_icon[t], 50 + i * 31, 162);
+      ST_HereticDrawSmallNumber(plyr->inventory[slot].count,
+                                69 + i * 31, 185);
+    }
+  }
+
+  if (W_CheckNumForName("SELECTBO") >= 0)
+    V_DrawNamePatch(50 + curpos * 31, 189, FG, "SELECTBO",
+                    CR_DEFAULT, VPT_STRETCH);
+}
+
+/* Hexen status bar.  Layout follows the Raven HUD (320x200 coords scaled by
+ * VPT_STRETCH): the H2BAR frame, then either the inventory bar or the stat
+ * panel with health, the two mana pools (count + bright/dim icon by ready
+ * weapon), armor, the ready-artifact box, and the fourth-weapon piece
+ * indicators.  The fork's player_t carries a single armorpoints value and a
+ * single mana pair, so the per-armor-type sum and the vial fill-levels from
+ * the original are simplified to those fields. */
+static void ST_HexenDrawer(void)
+{
+  extern int inventory, inv_ptr, ArtifactFlash;
+  player_t  *plyr = &players[displayplayer];
+  int        m1, m2;
+
+  /* H2BAR frame (320x65 at y=134).  Drawn directly each frame with
+   * VPT_STRETCH; the status-bar BG cache buffer (screens[BG]) is sized for
+   * the Doom/Heretic bar, so stretching the taller Hexen frame through it
+   * would overrun it. */
+  if (W_CheckNumForName("H2BAR") >= 0)
+    V_DrawNamePatch(0, 134, FG, "H2BAR", CR_DEFAULT, VPT_STRETCH);
+
+  if (inventory)
+  {
+    ST_HexenDrawInvBar(plyr);
+  }
+  else
+  {
+    /* Stat panel. */
+    if (W_CheckNumForName("STATBAR") >= 0)
+      V_DrawNamePatch(38, 162, FG, "STATBAR", CR_DEFAULT, VPT_STRETCH);
+
+    /* Health (use the smoothed HealthMarker, clamped 0..100 like the bar). */
+    {
+      int h = HealthMarker;
+      if (h < 0) h = 0; else if (h > 100) h = 100;
+      ST_HereticDrawINumber(h, 40, 176);
+    }
+
+    /* Mana pools: count + bright/dim icon depending on whether the ready
+     * weapon draws on that mana type. */
+    m1 = plyr->mana[0];
+    m2 = plyr->mana[1];
+    ST_HereticDrawSmallNumber(m1, 79, 181);
+    ST_HereticDrawSmallNumber(m2, 111, 181);
+    if (W_CheckNumForName(m1 ? "MANABRT1" : "MANADIM1") >= 0)
+      V_DrawNamePatch(77, 164, FG, m1 ? "MANABRT1" : "MANADIM1",
+                      CR_DEFAULT, VPT_STRETCH);
+    if (W_CheckNumForName(m2 ? "MANABRT2" : "MANADIM2") >= 0)
+      V_DrawNamePatch(110, 164, FG, m2 ? "MANABRT2" : "MANADIM2",
+                      CR_DEFAULT, VPT_STRETCH);
+    if (W_CheckNumForName("MANAVL1") >= 0)
+      V_DrawNamePatch(94, 164, FG, "MANAVL1", CR_DEFAULT, VPT_STRETCH);
+    if (W_CheckNumForName("MANAVL2") >= 0)
+      V_DrawNamePatch(102, 164, FG, "MANAVL2", CR_DEFAULT, VPT_STRETCH);
+
+    /* Armor. */
+    ST_HereticDrawINumber(plyr->armorpoints, 250, 176);
+
+    /* Ready-artifact box, count, and the use-flash animation. */
+    if (ArtifactFlash)
+    {
+      char fname[9];
+      if (W_CheckNumForName("ARTICLS") >= 0)
+        V_DrawNamePatch(144, 160, FG, "ARTICLS", CR_DEFAULT, VPT_STRETCH);
+      sprintf(fname, "USEARTI%c", 'A' + (ArtifactFlash - 1));
+      if (W_CheckNumForName(fname) >= 0)
+        V_DrawNamePatch(148, 164, FG, fname, CR_DEFAULT, VPT_STRETCH);
+      ArtifactFlash--;
+    }
+    else if (plyr->readyArtifact > 0 &&
+             plyr->readyArtifact < HEXEN_NUMARTIFACTS)
+    {
+      if (W_CheckNumForName("ARTIBOX") >= 0)
+        V_DrawNamePatch(143, 163, FG, "ARTIBOX", CR_DEFAULT, VPT_STRETCH);
+      ST_HereticDrawArtiIcon(hexen_arti_icon[plyr->readyArtifact], 143, 163);
+      if (plyr->inventorySlotNum > 0)
+        ST_HereticDrawSmallNumber(plyr->inventory[inv_ptr].count, 162, 184);
+    }
+
+    /* Fourth-weapon piece indicators (class-specific lumps). */
+    {
+      const char *cls = (plyr->class == PCLASS_CLERIC) ? "C"
+                      : (plyr->class == PCLASS_MAGE)   ? "M" : "F";
+      char nm[9];
+      if (plyr->pieces == (WPIECE1 | WPIECE2 | WPIECE3))
+      {
+        sprintf(nm, "WPFULL%c", (plyr->class == PCLASS_CLERIC) ? '1'
+                              : (plyr->class == PCLASS_MAGE)   ? '2' : '0');
+        if (W_CheckNumForName(nm) >= 0)
+          V_DrawNamePatch(190, 162, FG, nm, CR_DEFAULT, VPT_STRETCH);
+      }
+      else
+      {
+        if (plyr->pieces & WPIECE1)
+        {
+          sprintf(nm, "WPIECE%c1", cls[0]);
+          if (W_CheckNumForName(nm) >= 0)
+            V_DrawNamePatch(190, 162, FG, nm, CR_DEFAULT, VPT_STRETCH);
+        }
+        if (plyr->pieces & WPIECE2)
+        {
+          sprintf(nm, "WPIECE%c2", cls[0]);
+          if (W_CheckNumForName(nm) >= 0)
+            V_DrawNamePatch(225, 162, FG, nm, CR_DEFAULT, VPT_STRETCH);
+        }
+        if (plyr->pieces & WPIECE3)
+        {
+          sprintf(nm, "WPIECE%c3", cls[0]);
+          if (W_CheckNumForName(nm) >= 0)
+            V_DrawNamePatch(234, 162, FG, nm, CR_DEFAULT, VPT_STRETCH);
+        }
+      }
+    }
+  }
+}
+
 void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)
 {
   /* cph - let status bar on be controlled
@@ -1232,12 +1393,14 @@ void ST_Drawer(dbool statusbaron, dbool refresh, dbool fullmenu)
 
   ST_doPaletteStuff();  // Do red-/gold-shifts from damage/items
 
-  /* Hexen has its own status bar and does not carry the Doom bar graphics;
-   * drawing the Doom bar over a Hexen game looks for missing patches and has
-   * produced bad patch-size allocations.  The Hexen status bar is a later
-   * commit, so draw nothing here for now (the 3D view still renders). */
+  /* Hexen has its own status bar (its own lumps); draw it and return before
+   * the Doom bar code, which has no Hexen graphics. */
   if (hexen)
+  {
+    if (statusbaron)
+      ST_HexenDrawer();
     return;
+  }
 
   /* The Doom status bar widgets/background are not loaded for Heretic
    * (see ST_loadGraphics). Draw the Heretic bar instead (its own lumps),

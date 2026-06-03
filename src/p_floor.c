@@ -33,6 +33,7 @@
  *-----------------------------------------------------------------------------*/
 
 #include "doomstat.h"
+#include "hexen/sn_sonix.h"
 #include "r_main.h"
 #include "p_map.h"
 #include "p_spec.h"
@@ -246,7 +247,7 @@ void T_MoveFloor(floormove_t* floor)
     floor->direction
   );
 
-  if (!(leveltime&7))     /* make the floormove sound */
+  if (!hexen && !(leveltime&7))     /* make the floormove sound */
     S_StartSound((mobj_t *)&floor->sector->soundorg, sfx_stnmov);
 
   if (res == RES_PASTDEST)    /* if destination height is reached */
@@ -297,6 +298,8 @@ void T_MoveFloor(floormove_t* floor)
      }
 
      floor->sector->floordata = NULL; //jff 2/22/98
+     if (hexen)
+        SN_StopSequence((mobj_t *)&floor->sector->soundorg);
      P_RemoveThinker(&floor->thinker);//remove this floor from list of movers
 
      //jff 2/26/98 implement stair retrigger lockout while still building
@@ -327,7 +330,8 @@ void T_MoveFloor(floormove_t* floor)
      }
 
      // make floor stop sound
-     S_StartSound((mobj_t *)&floor->sector->soundorg, sfx_pstop);
+     if (!hexen)
+        S_StartSound((mobj_t *)&floor->sector->soundorg, sfx_pstop);
   }
 }
 

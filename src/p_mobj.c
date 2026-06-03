@@ -1575,7 +1575,18 @@ void P_SpawnMapThing (const mapthing_t* mthing)
     return;
   }
   if (raven && thingtype >= 1400 && thingtype < 1410)
+  {
+    /* Sound-sequence marker: tag the sector it stands in with the sequence
+     * type (0-9) so its movers pick the matching door/platform sequence. */
+    if (hexen)
+    {
+      subsector_t *ss = R_PointInSubsector(mthing->x << FRACBITS,
+                                           mthing->y << FRACBITS);
+      if (ss && ss->sector)
+        ss->sector->seqType = thingtype - 1400;
+    }
     return;
+  }
 
   // Thing types from 14100 to 14164 are used for MUSINFO entities
   // this means they are actually the same MusicChanger thingtype but

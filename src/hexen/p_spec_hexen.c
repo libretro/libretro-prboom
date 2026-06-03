@@ -43,6 +43,7 @@
 #include "m_random.h"
 #include "hexen/p_spec_hexen.h"
 #include "hexen/p_lightning.h"
+#include "hexen/sn_sonix.h"
 #include "heretic/p_action.h"
 
 /* These have no shared prototype header in this fork. */
@@ -91,7 +92,8 @@ void T_HexenVerticalDoor(vldoor_t *door)
         if (door->type == DREV_NORMAL)
         {
           door->direction = -1;
-          S_StartSound((mobj_t *) &door->sector->soundorg, hexen_sfx_door_heavy_close);
+          SN_StartSequence((mobj_t *) &door->sector->soundorg,
+                           SEQ_DOOR_STONE + door->sector->seqType);
         }
         else if (door->type == DREV_CLOSE30THENOPEN)
         {
@@ -118,6 +120,7 @@ void T_HexenVerticalDoor(vldoor_t *door)
           case DREV_NORMAL:
           case DREV_CLOSE:
             door->sector->ceilingdata = NULL;
+            SN_StopSequence((mobj_t *) &door->sector->soundorg);
             P_RemoveThinker(&door->thinker);
             break;
           case DREV_CLOSE30THENOPEN:
@@ -149,6 +152,7 @@ void T_HexenVerticalDoor(vldoor_t *door)
           case DREV_CLOSE30THENOPEN:
           case DREV_OPEN:
             door->sector->ceilingdata = NULL;
+            SN_StopSequence((mobj_t *) &door->sector->soundorg);
             P_RemoveThinker(&door->thinker);
             break;
           default:
@@ -190,7 +194,8 @@ int Hexen_EV_DoDoor(line_t *line, byte *args, vldoor_e type)
       case DREV_CLOSE:
         door->topheight = P_FindLowestCeilingSurrounding(sec) - 4 * FRACUNIT;
         door->direction = -1;
-        S_StartSound((mobj_t *) &sec->soundorg, hexen_sfx_door_heavy_close);
+        SN_StartSequence((mobj_t *) &sec->soundorg,
+                         SEQ_DOOR_STONE + sec->seqType);
         break;
       case DREV_CLOSE30THENOPEN:
         door->topheight = sec->ceilingheight;
@@ -200,7 +205,8 @@ int Hexen_EV_DoDoor(line_t *line, byte *args, vldoor_e type)
       case DREV_OPEN:
         door->direction = 1;
         door->topheight = P_FindLowestCeilingSurrounding(sec) - 4 * FRACUNIT;
-        S_StartSound((mobj_t *) &sec->soundorg, hexen_sfx_door_open);
+        SN_StartSequence((mobj_t *) &sec->soundorg,
+                         SEQ_DOOR_STONE + sec->seqType);
         break;
       default:
         break;
@@ -233,7 +239,7 @@ dbool Hexen_EV_VerticalDoor(line_t *line, mobj_t *thing)
   door->speed    = line->args[1] * (FRACUNIT / 8);
   door->topwait  = line->args[2];
   door->topheight = P_FindLowestCeilingSurrounding(sec) - 4 * FRACUNIT;
-  S_StartSound((mobj_t *) &sec->soundorg, hexen_sfx_door_open);
+  SN_StartSequence((mobj_t *) &sec->soundorg, SEQ_DOOR_STONE + sec->seqType);
   return true;
 }
 
@@ -353,6 +359,9 @@ int Hexen_EV_DoFloor(line_t *line, byte *args, floor_e floortype)
         rtn = 0;
         break;
     }
+    if (sec->floordata == floor)
+      SN_StartSequence((mobj_t *) &sec->soundorg,
+                       SEQ_PLATFORM + sec->seqType);
   }
   return rtn;
 }
@@ -380,7 +389,10 @@ void T_HexenMoveCeiling(ceiling_t *ceiling)
           ceiling->speed = ceiling->speed * 2;
         }
         else
+        {
+          SN_StopSequence((mobj_t *) &ceiling->sector->soundorg);
           P_RemoveActiveCeiling(ceiling);
+        }
       }
       break;
 
@@ -397,7 +409,10 @@ void T_HexenMoveCeiling(ceiling_t *ceiling)
           ceiling->speed = ceiling->speed / 2;
         }
         else
+        {
+          SN_StopSequence((mobj_t *) &ceiling->sector->soundorg);
           P_RemoveActiveCeiling(ceiling);
+        }
       }
       /* crushed: the crusher types simply keep pushing */
       break;
@@ -492,7 +507,11 @@ int Hexen_EV_DoCeiling(line_t *line, byte *args, ceiling_e type)
     ceiling->type = type;
 
     if (rtn)
+    {
       P_AddActiveCeiling(ceiling);
+      SN_StartSequence((mobj_t *) &sec->soundorg,
+                       SEQ_PLATFORM + sec->seqType);
+    }
     else
     {
       sec->ceilingdata = NULL;
@@ -704,6 +723,7 @@ void T_HexenBuildPillar(pillar_t *pillar)
   if (res1 == RES_PASTDEST && res2 == RES_PASTDEST)
   {
     pillar->sector->floordata = NULL;
+    SN_StopSequence((mobj_t *) &pillar->sector->soundorg);
     P_RemoveThinker(&pillar->thinker);
   }
 }
@@ -759,6 +779,7 @@ int EV_BuildPillar(line_t *line, byte *args, int crush)
     pillar->floordest   = newHeight;
     pillar->ceilingdest = newHeight;
     pillar->direction   = 1;
+    SN_StartSequence((mobj_t *) &sec->soundorg, SEQ_PLATFORM + sec->seqType);
     pillar->crush       = (crush && args[3]) ? TRUE : FALSE;
   }
   return rtn;
@@ -817,6 +838,7 @@ int EV_OpenPillar(line_t *line, byte *args)
                                              pillar->ceilingdest));
     }
     pillar->direction = -1;     /* open */
+    SN_StartSequence((mobj_t *) &sec->soundorg, SEQ_PLATFORM + sec->seqType);
   }
   return rtn;
 }
@@ -903,6 +925,7 @@ int EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount)
         break;
     }
     P_AddActivePlat(plat);
+    SN_StartSequence((mobj_t *) &sec->soundorg, SEQ_PLATFORM + sec->seqType);
   }
   return rtn;
 }
@@ -1007,6 +1030,8 @@ static void ProcessStairSector(sector_t *sec, int type, int height,
                                               s_StepDelta));
   else
     floor->speed = s_Speed;
+
+  SN_StartSequence((mobj_t *) &sec->soundorg, SEQ_PLATFORM + sec->seqType);
 
   /* Propagate to adjacent stair sectors. */
   for (i = 0; i < sec->linecount; i++)

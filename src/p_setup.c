@@ -37,6 +37,7 @@
 #include "config.h"
 #include "doomstat.h"
 #include "hexen/sn_sonix.h"
+#include "hexen/p_acs.h"
 #include "m_bbox.h"
 #include "m_argv.h"
 #include "g_game.h"
@@ -1988,8 +1989,15 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
     * its sky/lightning-special sectors. */
    if (hexen)
    {
+      int behaviorLump = lumpnum + ML_BLOCKMAP + 1;
+      if (behaviorLump < numlumps &&
+          !strncasecmp(lumpinfo[behaviorLump].name, "BEHAVIOR", 8))
+         P_LoadACScripts(behaviorLump);
+      else
+         P_LoadACScripts(-1);
       P_InitLightning();
       P_CreateTIDList();
+      P_CheckACSStore();
    }
 
    P_MapEnd();

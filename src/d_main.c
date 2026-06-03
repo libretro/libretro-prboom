@@ -502,11 +502,11 @@ void D_AdvanceDemo (void)
 
 static void D_SetPageName(const char *name)
 {
-  /* Heretic's full-screen title lump is named TITLE, not Doom's TITLEPIC;
-   * the rest of the demo-sequence page names (HELP1/HELP2/CREDIT) match.
-   * Map the one that differs so the boot title does not abort on a
+  /* Heretic and Hexen's full-screen title lump is named TITLE, not Doom's
+   * TITLEPIC; the rest of the demo-sequence page names (HELP1/HELP2/CREDIT)
+   * match.  Map the one that differs so the boot title does not abort on a
    * missing lump. */
-  if (heretic && name && !strcmp(name, "TITLEPIC"))
+  if (raven && name && !strcmp(name, "TITLEPIC"))
     name = "TITLE";
   pagename = name;
 }

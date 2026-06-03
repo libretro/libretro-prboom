@@ -700,6 +700,22 @@ void S_ChangeMusic(int musicnum, int looping)
         hname = "cptd";                 /* finale/ending  -> MUS_CPTD */
       snprintf(namebuf, sizeof(namebuf), "MUS_%s", hname);
     }
+    else if (hexen)
+    {
+      /* Hexen's level music is set by lump name through SNDINFO (see
+       * S_Start); only the non-level slots reach S_ChangeMusic by number.
+       * Those Doom-shaped slot names map to Hexen's bare music lumps. */
+      const char *hname = music->name;
+      if (!strcmp(hname, "intro") || !strcmp(hname, "dm2ttl"))
+        hname = "HEXEN";                /* title screen */
+      else if (!strcmp(hname, "inter") || !strcmp(hname, "dm2int"))
+        hname = "HUB";                  /* hub / intermission */
+      else if (!strcmp(hname, "victor"))
+        hname = "ORB";                  /* victory */
+      else if (!strcmp(hname, "read_m"))
+        hname = "HALL";                 /* finale */
+      snprintf(namebuf, sizeof(namebuf), "%s", hname);
+    }
     else
       snprintf(namebuf, sizeof(namebuf), "d_%s", music->name);
     music->lumpnum = W_CheckNumForName(namebuf);

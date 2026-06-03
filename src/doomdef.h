@@ -233,6 +233,8 @@ typedef enum
   MANA_NONE
 } manatype_t;
 
+#define MAX_MANA 200   /* Hexen per-mana cap */
+
 // Ammunition types defined.
 typedef enum {
   AM_CLIP,    // Pistol / chaingun ammo.

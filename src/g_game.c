@@ -1128,6 +1128,23 @@ void G_PlayerReborn (int player)
   p->usedown = p->attackdown = true;  // don't do anything immediately
   p->playerstate = PST_LIVE;
   p->health = initial_health;  // Ty 03/12/98 - use dehacked values
+
+  if (hexen)
+  {
+    /* Hexen player: class comes from the chosen PlayerClass[]; the player
+     * starts with the first weapon (fists/equivalent) of that class and an
+     * empty mana pool (mana is picked up in the level).  The per-class
+     * weapon identity is resolved through WeaponInfo[slot][class]. */
+    int j;
+    p->class = PlayerClass[player];
+    p->readyweapon = p->pendingweapon = (weapontype_t) WP_FIRST;
+    p->weaponowned[WP_FIRST] = true;
+    p->maxmana = MAX_MANA;
+    for (j = 0; j < NUMMANA; j++)
+      p->mana[j] = 0;
+    return;
+  }
+
   p->readyweapon = p->pendingweapon = WP_PISTOL;
   p->weaponowned[WP_FIST] = true;
   p->weaponowned[WP_PISTOL] = true;

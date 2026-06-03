@@ -274,6 +274,9 @@ typedef struct player_s
   int         class;          /* Hexen player class (pclass_t); PCLASS_NULL
                                * for Doom/Heretic.  Used by the Hexen player
                                * and weapon code. */
+  int         mana[NUMMANA];  /* Hexen two-mana ammo (MANA_1, MANA_2) */
+  int         maxmana;        /* Hexen mana cap */
+  int         morphTics;      /* Hexen: >0 while morphed (pig) */
 
 } player_t;
 

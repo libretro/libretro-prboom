@@ -326,8 +326,9 @@ void IN_Start(wbstartstruct_t *wbstartstruct)
   intertime = 0;
   oldintertime = 0;
   AM_Stop();
-  /* Heretic intermission music (mus_intr) is only defined in HEXEN builds;
-   * leave the current music playing rather than reference a missing enum. */
+  /* Heretic intermission music: mus_inter is remapped to the Heretic
+   * intermission lump (MUS_INTR) by S_ChangeMusic when running Heretic. */
+  S_ChangeMusic(mus_inter, true);
 }
 
 void IN_Ticker(void)

@@ -135,8 +135,9 @@ void Heretic_F_StartFinale(void)
   }
   /* Clear any lingering E2 finale palette tint from a previous episode. */
   V_RestorePalette();
-  /* Heretic ending music (mus_cptd) is only defined in HEXEN builds; leave
-   * the current music rather than reference a missing enum. */
+  /* Heretic ending music: mus_victor is remapped to the Heretic finale lump
+   * (MUS_CPTD) by S_ChangeMusic when running Heretic. */
+  S_ChangeMusic(mus_victor, true);
 }
 
 dbool Heretic_F_Responder(event_t *event)

@@ -513,10 +513,9 @@ static void D_SetPageName(const char *name)
 
 static void D_DrawTitle1(const char *name)
 {
-  /* mus_intro is a Doom music index; the Heretic music table is not wired
-   * up yet, so do not start Doom title music under Heretic. */
-  if (!heretic)
-    S_StartMusic(mus_intro);
+  /* mus_intro maps to the Heretic title lump (MUS_TITL) under Heretic and to
+   * Doom's title music otherwise; see the Heretic remap in S_ChangeMusic. */
+  S_StartMusic(mus_intro);
   pagetic = (TICRATE*170)/35;
   if (W_CheckNumForName("SIGILINT") != -1) // Sigil: Longer wait before playing a demo to give the title theme time to end.
     pagetic = (TICRATE*404)/35;

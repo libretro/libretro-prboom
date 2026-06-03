@@ -555,7 +555,20 @@ void S_ChangeMusic(int musicnum, int looping)
     /* Doom music lumps are D_<name> (e.g. D_E1M1); Heretic uses MUS_<name>
      * (e.g. MUS_E1M1). */
     if (heretic)
-      snprintf(namebuf, sizeof(namebuf), "MUS_%s", music->name);
+    {
+      /* The music table is Doom-shaped, so the non-level slots carry Doom
+       * names (intro/inter/...).  Heretic's title, intermission and finale
+       * tracks live under different lump names, so remap those few slots to
+       * the Heretic lumps; ordinary level music (e1m1...) passes through. */
+      const char *hname = music->name;
+      if (!strcmp(hname, "intro") || !strcmp(hname, "dm2ttl"))
+        hname = "titl";                 /* title screen   -> MUS_TITL */
+      else if (!strcmp(hname, "inter") || !strcmp(hname, "dm2int"))
+        hname = "intr";                 /* intermission   -> MUS_INTR */
+      else if (!strcmp(hname, "victor") || !strcmp(hname, "read_m"))
+        hname = "cptd";                 /* finale/ending  -> MUS_CPTD */
+      snprintf(namebuf, sizeof(namebuf), "MUS_%s", hname);
+    }
     else
       snprintf(namebuf, sizeof(namebuf), "d_%s", music->name);
     music->lumpnum = W_CheckNumForName(namebuf);

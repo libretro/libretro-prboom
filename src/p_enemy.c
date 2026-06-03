@@ -3252,6 +3252,54 @@ void A_RemoveFlags(mobj_t *actor)
 
 int P_SubRandom(void);  /* heretic/p_action.c */
 
+/* Hexen breakable pottery.  ZPottery decorations are shootable; on death
+ * they run A_PotteryExplode, flinging a handful of pottery-bit gibs.  Each
+ * bit picks a random resting sprite (A_PotteryChooseBit) and lingers until
+ * a player looks at it, then crumbles (A_PotteryCheck). */
+void A_PotteryExplode(mobj_t *actor)
+{
+  mobj_t *mo = NULL;
+  int     i;
+
+  for (i = (P_Random(pr_heretic) & 3) + 3; i; i--)
+  {
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_POTTERYBIT1);
+    if (!mo)
+      continue;
+    P_SetMobjState(mo, mo->info->spawnstate + (P_Random(pr_heretic) % 5));
+    mo->momz = ((P_Random(pr_heretic) & 7) + 5) * (3 * FRACUNIT / 4);
+    mo->momx = P_SubRandom() << (FRACBITS - 6);
+    mo->momy = P_SubRandom() << (FRACBITS - 6);
+  }
+  if (mo)
+    S_StartSound(mo, hexen_sfx_pottery_explode);
+  /* (Pots scripted to drop an item on break need the ACS thing-spawn args,
+   * which aren't wired up here; the plain shatter is unaffected.) */
+  P_RemoveMobj(actor);
+}
+
+void A_PotteryChooseBit(mobj_t *actor)
+{
+  P_SetMobjState(actor, actor->info->deathstate + (P_Random(pr_heretic) % 5) + 1);
+  actor->tics = 256 + (P_Random(pr_heretic) << 1);
+}
+
+void A_PotteryCheck(mobj_t *actor)
+{
+  mobj_t *pmo;
+
+  if (netgame)
+    return;
+  pmo = players[consoleplayer].mo;
+  if (pmo && P_CheckSight(actor, pmo) &&
+      (abs((int)R_PointToAngle2(pmo->x, pmo->y, actor->x, actor->y)
+           - (int)pmo->angle) <= ANG45))
+  {
+    /* a player is looking at the bit: back up one state (the waiting frame) */
+    P_SetMobjState(actor, (statenum_t)(actor->state - &states[0] - 1));
+  }
+}
+
 /* Hexen tree leaf-spawner.  ZLeafSpawner things (the trees) periodically
  * fling a few leaf sprites out on the wind; each leaf drifts, occasionally
  * gets another upward gust (A_LeafThrust), and fades out (A_LeafCheck). */

@@ -759,8 +759,14 @@ void M_DrawClass(void)
    * the menu items' alttext is left blank so the generic (red) item loop in
    * M_Drawer does not draw over them. */
   static const char *const boxlump[3]  = { "M_FBOX",  "M_CBOX",  "M_MBOX"  };
-  static const char *const walklump[3] = { "M_FWALK1","M_CWALK1","M_MWALK1"};
+  static const char *const walkfmt[3]  = { "M_FWALK%d", "M_CWALK%d", "M_MWALK%d" };
   int sel = (itemOn >= 0 && itemOn < class_end) ? itemOn : 0;
+  char walkname[9];
+
+  /* Cycle the four walk frames so the model turns in place as in the
+   * original.  gametic advances while the class screen sits over the demo
+   * walk, giving roughly seven frames a second. */
+  snprintf(walkname, sizeof(walkname), walkfmt[sel], 1 + ((gametic >> 2) & 3));
 
   /* The class list and heading are drawn in the small translatable font
    * (FONTA via hu_font) in green.  The big FONTB glyphs are baked red and do
@@ -776,9 +782,9 @@ void M_DrawClass(void)
    * it inside that window rather than below the frame. */
   if (W_CheckNumForName(boxlump[sel]) >= 0)
     V_DrawNamePatch(174, 8, 0, boxlump[sel], CR_DEFAULT, VPT_STRETCH);
-  if (W_CheckNumForName(walklump[sel]) >= 0)
+  if (W_CheckNumForName(walkname) >= 0)
   {
-    int lump = W_GetNumForName(walklump[sel]);
+    int lump = W_GetNumForName(walkname);
     int bx = 174, bw = 112;
     int mw = R_NumPatchWidth(lump);
     /* Centre the visible figure horizontally in the 112-wide box and seat it

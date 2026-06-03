@@ -401,6 +401,13 @@ static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
   // table, not the static NUMSFX seed.  I_Error is non-fatal in this build
   // (it logs and returns), so we must also bail out explicitly -- otherwise
   // execution falls through into the out-of-bounds S_sfx[sfx_id] below.
+  //
+  // In Raven games (Heretic/Hexen) sfx id 0 is the "None" sentinel: a number
+  // of sound-origin and sequence code paths legitimately ask to play "no
+  // sound".  Treat that as a quiet no-op rather than an error, which is what
+  // those games expect; only genuinely out-of-range ids are reported.
+  if (raven && sfx_id == 0)
+    return;
   if (sfx_id < 1 || sfx_id >= num_sfx)
   {
     I_Error("S_StartSoundAtVolume: Bad sfx #: %d", sfx_id);

@@ -19,6 +19,7 @@
 #include "d_think.h"
 #include "doomstat.h"
 #include "heretic/heretic.h"
+#include "hexen/hexen.h"
 #include "dsda_hacked.h"
 
 /* The five editable tables live in info.c / sounds.c. */
@@ -310,6 +311,71 @@ void dsda_InitTables(void)
    * sounds.c).  States, sprites and sounds use Heretic's own 0-based index
    * spaces; mobjinfo is special (see below) because Heretic mobjtypes are
    * high-valued in the shared mobjtype_t enum. */
+  if (hexen)
+  {
+    const state_t   *seed_states   = hexen_states;
+    const char     **seed_sprnames = hexen_sprnames;
+    const sfxinfo_t *seed_sfx      = hexen_S_sfx;
+    int s;
+
+    /* Raven game parameters needed at boot.  Hexen's player is class-based
+     * (fighter/cleric/mage); the per-class mobjtype and play states are
+     * selected at spawn time when the class layer lands (step 4).  Until
+     * then the Fighter is used as the foundation default so the boot/spawn
+     * path has valid g_* values. */
+    g_mt_player = HEXEN_MT_PLAYER_FIGHTER;
+    g_s_play = HEXEN_S_FPLAY;
+    g_s_play_run1 = HEXEN_S_FPLAY_RUN1;
+    g_s_play_atk1 = HEXEN_S_FPLAY_ATK1;
+    g_s_play_atk2 = HEXEN_S_FPLAY_ATK2;
+    g_mt_tfog = HEXEN_MT_TFOG;
+    g_mt_teleportman = HEXEN_MT_TELEPORTMAN;
+    g_telefog_height = TELEFOGHEIGHT;
+    g_sfx_telept = hexen_sfx_teleport;
+    g_menu_flat = "F_032";
+
+    num_states     = HEXEN_NUMSTATES;
+    num_mobj_types = HEXEN_NUMMOBJTYPES; /* full span: lower slots unused, Hexen at offset */
+    num_sprites    = HEXEN_NUMSPRITES;
+    num_sfx        = HEXEN_NUMSFX;
+    num_music      = NUMMUSIC; /* music table shared/Doom for now */
+
+    states = malloc(num_states * sizeof(*states));
+    memcpy(states, seed_states, num_states * sizeof(*states));
+
+    /* mobjinfo: allocate the full unified span and copy the Hexen slice to
+     * [s + HEXEN_MT_ZERO], matching the enum numbering so runtime
+     * mobjinfo[HEXEN_MT_*] indexes work directly.  The Hexen tables do not
+     * reference any HERETIC_MT_* slot, so only the Hexen slice is loaded. */
+    mobjinfo = malloc(num_mobj_types * sizeof(*mobjinfo));
+    memset(mobjinfo, 0, num_mobj_types * sizeof(*mobjinfo));
+    for (s = 0; s < HEXEN_NUMMOBJTYPES - HEXEN_MT_ZERO; s++)
+      mobjinfo[s + HEXEN_MT_ZERO] = hexen_mobjinfo[s];
+
+    /* sprnames: 0-based, terminator slot after the names. */
+    sprnames = malloc((num_sprites + 1) * sizeof(*sprnames));
+    memcpy(sprnames, seed_sprnames, num_sprites * sizeof(*sprnames));
+    sprnames[num_sprites] = NULL;
+
+    S_sfx = malloc(num_sfx * sizeof(*S_sfx));
+    memcpy(S_sfx, seed_sfx, num_sfx * sizeof(*S_sfx));
+    /* Re-point any sound-alias links into the heap copy. */
+    for (i = 0; i < num_sfx; i++)
+      if (S_sfx[i].link)
+        S_sfx[i].link = S_sfx + (S_sfx[i].link - seed_sfx);
+
+    S_music = malloc((num_music + MUSIC_EXTRA) * sizeof(*S_music));
+    memcpy(S_music, S_music_seed, num_music * sizeof(*S_music));
+    memset(S_music + num_music, 0, MUSIC_EXTRA * sizeof(*S_music));
+
+    deh_codeptr = malloc(num_states * sizeof(*deh_codeptr));
+    for (i = 0; i < num_states; i++)
+      deh_codeptr[i] = states[i].action;
+
+    /* Hexen does not use the DEHEXTRA reserved sprite/sound ranges. */
+    return;
+  }
+
   if (heretic)
   {
     const state_t   *seed_states   = heretic_states;

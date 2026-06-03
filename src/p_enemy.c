@@ -3251,3 +3251,26 @@ void A_EttinAttack(mobj_t *actor)
   if (P_CheckMeleeRange(actor))
     P_DamageMobj(actor->target, actor, actor, HX_HITDICE(2));
 }
+
+void A_CentaurAttack(mobj_t *actor)
+{
+  if (!actor->target)
+    return;
+  if (P_CheckMeleeRange(actor))
+    P_DamageMobj(actor->target, actor, actor, P_Random(pr_heretic) % 7 + 3);
+}
+
+void A_WraithMelee(mobj_t *actor)
+{
+  int amount;
+
+  if (!actor->target)
+    return;
+  /* steal health from the target */
+  if (P_CheckMeleeRange(actor) && (P_Random(pr_heretic) < 220))
+  {
+    amount = HX_HITDICE(2);
+    P_DamageMobj(actor->target, actor, actor, amount);
+    actor->health += amount;
+  }
+}

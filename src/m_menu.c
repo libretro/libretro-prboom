@@ -298,6 +298,7 @@ void M_DrawKeybnd(void);
 void M_DrawWeapons(void);
 static void M_DrawMenuString(int,int,int);
 static void M_DrawTextB(int x, int y, const char *text);
+static void M_DrawTextBColor(int x, int y, const char *text, int color);
 static void M_DrawStringCentered(int,int,int,const char*);
 void M_DrawStatusHUD(void);
 void M_DrawExtHelp(void);
@@ -734,9 +735,9 @@ enum
 
 menuitem_t ClassMenu[] =
 {
-  {1, "", M_ChooseClass, 'f', "FIGHTER"},
-  {1, "", M_ChooseClass, 'c', "CLERIC"},
-  {1, "", M_ChooseClass, 'm', "MAGE"}
+  {1, "", M_ChooseClass, 'f', NULL},
+  {1, "", M_ChooseClass, 'c', NULL},
+  {1, "", M_ChooseClass, 'm', NULL}
 };
 
 menu_t ClassDef =
@@ -751,9 +752,35 @@ menu_t ClassDef =
 
 void M_DrawClass(void)
 {
-  /* Hexen has no "select class" title graphic lump, so label the screen
-   * in the same big font used for the items. */
-  M_DrawTextB(34, 24, "CHOOSE CLASS:");
+  /* The authentic Hexen class screen: a green "CHOOSE CLASS" heading with
+   * the three classes listed in green, and a framed, rotating player model
+   * of the highlighted class on the right with its name boxed.  This core
+   * draws the heading and class list in the big FONTB font (Hexen has no
+   * dedicated title graphic) and the still model frame for the class the
+   * cursor is on; the alttext is left blank so the generic (red) menu-item
+   * loop in M_Drawer does not also draw over it. */
+  static const char *const boxlump[3]  = { "M_FBOX",  "M_CBOX",  "M_MBOX"  };
+  static const char *const walklump[3] = { "M_FWALK1","M_CWALK1","M_MWALK1"};
+  int sel = (itemOn >= 0 && itemOn < class_end) ? itemOn : 0;
+
+  M_DrawTextBColor(34, 24, "CHOOSE CLASS:", CR_GREEN);
+  M_DrawTextBColor(ClassDef.x, ClassDef.y + 0 * LINEHEIGHT, "FIGHTER", CR_GREEN);
+  M_DrawTextBColor(ClassDef.x, ClassDef.y + 1 * LINEHEIGHT, "CLERIC",  CR_GREEN);
+  M_DrawTextBColor(ClassDef.x, ClassDef.y + 2 * LINEHEIGHT, "MAGE",    CR_GREEN);
+
+  /* Framed model of the highlighted class (box behind, walking model on
+   * top), positioned on the right as in the original.  The box is 112x136;
+   * centre the ~44x66 walking model horizontally within it and seat it in
+   * the framed window near the top. */
+  if (W_CheckNumForName(boxlump[sel]) >= 0)
+    V_DrawNamePatch(174, 8, 0, boxlump[sel], CR_DEFAULT, VPT_STRETCH);
+  if (W_CheckNumForName(walklump[sel]) >= 0)
+  {
+    int bx = 174, bw = 112;
+    int mw = R_NamePatchWidth(walklump[sel]);
+    V_DrawNamePatch(bx + (bw - mw) / 2, 48, 0, walklump[sel],
+                    CR_DEFAULT, VPT_STRETCH);
+  }
 }
 
 void M_ChooseClass(int choice)
@@ -5253,7 +5280,7 @@ void M_StartControlPanel (void)
 /* Draw a string in Heretic's big FONTB menu font. FONTB_S+1 is glyph '!'
  * (ASCII 33); characters below 33 (space) advance a fixed width. Used for
  * Heretic menu items, which have no per-item graphic lumps. */
-static void M_DrawTextB(int x, int y, const char *text)
+static void M_DrawTextBColor(int x, int y, const char *text, int color)
 {
   static int fontb_base = -2;   /* -2 = not looked up, -1 = absent */
   char c;
@@ -5265,7 +5292,7 @@ static void M_DrawTextB(int x, int y, const char *text)
   }
   if (fontb_base < 0)
   {
-    M_WriteText(x, y, text, CR_DEFAULT);   /* fall back to the small font */
+    M_WriteText(x, y, text, color);   /* fall back to the small font */
     return;
   }
 
@@ -5281,10 +5308,15 @@ static void M_DrawTextB(int x, int y, const char *text)
     else
     {
       int lump = fontb_base + c - 33;
-      V_DrawNumPatch(x, y, 0, lump, CR_DEFAULT, VPT_STRETCH);
+      V_DrawNumPatch(x, y, 0, lump, color, VPT_STRETCH | VPT_TRANS);
       x += R_NumPatchWidth(lump) - 1;
     }
   }
+}
+
+static void M_DrawTextB(int x, int y, const char *text)
+{
+  M_DrawTextBColor(x, y, text, CR_DEFAULT);
 }
 
 void M_Drawer (void)

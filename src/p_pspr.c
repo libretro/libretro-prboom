@@ -1018,6 +1018,11 @@ void A_FireCGun(player_t *player, pspdef_t *psp)
 
 #define HX_MAX_ANGLE_ADJUST (5*ANG1)
 
+/* P_ThrustMobj is defined in p_mobj.c; its only header prototype lives in
+ * heretic/p_action.h, which p_pspr.c includes far below this point.  Declare
+ * it locally so the fists code above that include sees the correct type. */
+void P_ThrustMobj(mobj_t *mo, angle_t angle, fixed_t move);
+
 static void AdjustPlayerAngle(mobj_t *pmo)
 {
   angle_t angle;

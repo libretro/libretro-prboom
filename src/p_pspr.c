@@ -1004,6 +1004,96 @@ void A_FireCGun(player_t *player, pspdef_t *psp)
   retro_set_rumble_damage(10, 120.0f);
 }
 
+/* ------------------------------------------------------------------------
+ * Hexen Fighter fists (active port).
+ *
+ * Ported from the dormant vanilla-Hexen weapon block below and adapted to
+ * this core's API: P_Random takes a pr_class, P_AimLineAttack takes a mask
+ * argument, mobj special1 is the specialval_t union (.i), and the custom
+ * MT_PUNCHPUFF/MT_HAMMERPUFF puff types are dropped (P_LineAttack here spawns
+ * the engine's fixed puff -- cosmetic only; the hit/damage is unaffected).
+ * This is the fists-first slice of the Fighter weapon set; the axe/hammer/
+ * sword come later.
+ * --------------------------------------------------------------------- */
+
+#define HX_MAX_ANGLE_ADJUST (5*ANG1)
+
+static void AdjustPlayerAngle(mobj_t *pmo)
+{
+  angle_t angle;
+  int     difference;
+
+  angle = R_PointToAngle2(pmo->x, pmo->y, linetarget->x, linetarget->y);
+  difference = (int)angle - (int)pmo->angle;
+  if (abs(difference) > HX_MAX_ANGLE_ADJUST)
+    pmo->angle += difference > 0 ? HX_MAX_ANGLE_ADJUST : -HX_MAX_ANGLE_ADJUST;
+  else
+    pmo->angle = angle;
+}
+
+void A_FPunchAttack(player_t *player, pspdef_t *psp)
+{
+  angle_t angle;
+  int     damage;
+  fixed_t slope;
+  mobj_t *pmo = player->mo;
+  fixed_t power;
+  int     i;
+
+  (void)psp;
+  damage = 40 + (P_Random(pr_punch) & 15);
+  power  = 2 * FRACUNIT;
+  for (i = 0; i < 16; i++)
+  {
+    angle = pmo->angle + i * (ANG45 / 16);
+    slope = P_AimLineAttack(pmo, angle, 2 * MELEERANGE, 0);
+    if (linetarget)
+    {
+      pmo->special1.i++;
+      if (pmo->special1.i == 3)
+      {
+        damage <<= 1;
+        power = 6 * FRACUNIT;
+      }
+      P_LineAttack(pmo, angle, 2 * MELEERANGE, slope, damage);
+      if (linetarget->flags & MF_COUNTKILL || linetarget->player)
+        P_ThrustMobj(linetarget, angle, power);
+      AdjustPlayerAngle(pmo);
+      goto punchdone;
+    }
+    angle = pmo->angle - i * (ANG45 / 16);
+    slope = P_AimLineAttack(pmo, angle, 2 * MELEERANGE, 0);
+    if (linetarget)
+    {
+      pmo->special1.i++;
+      if (pmo->special1.i == 3)
+      {
+        damage <<= 1;
+        power = 6 * FRACUNIT;
+      }
+      P_LineAttack(pmo, angle, 2 * MELEERANGE, slope, damage);
+      if (linetarget->flags & MF_COUNTKILL || linetarget->player)
+        P_ThrustMobj(linetarget, angle, power);
+      AdjustPlayerAngle(pmo);
+      goto punchdone;
+    }
+  }
+  /* didn't find any creatures, so try to strike any walls */
+  pmo->special1.i = 0;
+
+  angle = pmo->angle;
+  slope = P_AimLineAttack(pmo, angle, MELEERANGE, 0);
+  P_LineAttack(pmo, angle, MELEERANGE, slope, damage);
+
+punchdone:
+  if (pmo->special1.i == 3)
+  {
+    pmo->special1.i = 0;
+    P_SetPsprite(player, ps_weapon, HEXEN_S_PUNCHATK2_1);
+    S_StartSound(pmo, hexen_sfx_fighter_grunt);
+  }
+}
+
 #ifdef HEXEN
 //****************************************************************************
 //

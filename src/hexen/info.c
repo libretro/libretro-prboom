@@ -21,6 +21,7 @@
 #include "d_think.h"
 #include "p_mobj.h"
 #include "p_enemy.h"
+#include "p_pspr.h"
 #include "heretic/p_action.h"
 #include "hexen/hexen.h"
 
@@ -1062,7 +1063,7 @@ state_t hexen_states[HEXEN_NUMSTATES] = {
     {HEXEN_SPR_FPCH, 0, 1, {(arg0_t)A_Raise}, HEXEN_S_PUNCHUP, 0, 0}, // HEXEN_S_PUNCHUP
     {HEXEN_SPR_FPCH, 1, 5, {(arg0_t)NULL}, HEXEN_S_PUNCHATK1_2, 5, 40},       // HEXEN_S_PUNCHATK1_1
     {HEXEN_SPR_FPCH, 2, 4, {(arg0_t)NULL}, HEXEN_S_PUNCHATK1_3, 5, 40},       // HEXEN_S_PUNCHATK1_2
-    {HEXEN_SPR_FPCH, 3, 4, {(arg0_t)NULL}, HEXEN_S_PUNCHATK1_4, 5, 40},     // HEXEN_S_PUNCHATK1_3
+    {HEXEN_SPR_FPCH, 3, 4, {(arg0_t)A_FPunchAttack}, HEXEN_S_PUNCHATK1_4, 5, 40},     // HEXEN_S_PUNCHATK1_3
     {HEXEN_SPR_FPCH, 2, 4, {(arg0_t)NULL}, HEXEN_S_PUNCHATK1_5, 5, 40},       // HEXEN_S_PUNCHATK1_4
     {HEXEN_SPR_FPCH, 1, 5, {(arg0_t)A_ReFire}, HEXEN_S_PUNCHREADY, 5, 40},    // HEXEN_S_PUNCHATK1_5
     {HEXEN_SPR_FPCH, 3, 4, {(arg0_t)NULL}, HEXEN_S_PUNCHATK2_2, 5, 40},       // HEXEN_S_PUNCHATK2_1

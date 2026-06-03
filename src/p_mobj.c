@@ -1336,6 +1336,13 @@ void P_SpawnMapThing (const mapthing_t* mthing)
       return;
   }
 
+  /* Hexen places player starts 5-8 at editor numbers 9100-9103 (players 1-4
+   * use 1-4 as in Doom).  This core is single-player, so the extra starts are
+   * recorded as inactive and otherwise ignored -- without this they fall
+   * through to the doomednum lookup and spam "Unknown Thing type". */
+  if (hexen && thingtype >= 9100 && thingtype <= 9103)
+    return;
+
   // killough 11/98: clear flags unused by Doom
   //
   // We clear the flags unused in Doom if we see flag mask 256 set, since

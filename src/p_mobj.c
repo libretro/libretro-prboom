@@ -1325,6 +1325,7 @@ static mobj_t *TIDMobj[MAX_TID_COUNT];
 
 short hexen_thing_tid = 0;
 int   hexen_thing_args[5] = {0, 0, 0, 0, 0};
+int   hexen_thing_special = 0;
 
 void P_CreateTIDList(void)
 {
@@ -1646,6 +1647,7 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   {
     int a;
     mobj->tid = hexen_thing_tid;
+    mobj->special = hexen_thing_special;
     for (a = 0; a < 5; a++)
       mobj->special_args[a] = hexen_thing_args[a];
   }

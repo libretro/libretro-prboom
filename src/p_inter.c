@@ -43,6 +43,8 @@
 #include "lprintf.h"
 
 #include "p_inter.h"
+#include "hexen/p_acs.h"
+#include "hexen/p_spec_hexen.h"
 #include "p_enemy.h"
 
 #include "p_inter.h"
@@ -1418,6 +1420,17 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
 
   if (special->flags & MF_COUNTITEM)
     player->itemcount++;
+  /* A picked-up thing fires its action special with the toucher as the
+   * activator (vanilla Hexen, e.g. picking up the key that seals a door). */
+  if (special->special)
+  {
+    byte b[5];
+    int  a;
+    for (a = 0; a < 5; a++)
+      b[a] = (byte) special->special_args[a];
+    P_ExecuteHexenLineSpecial(special->special, b, NULL, 0, toucher);
+    special->special = 0;
+  }
   P_RemoveMobj(special);
   player->bonuscount += BONUSADD;
   if (!comp[comp_sound] || player == &players[displayplayer])
@@ -1445,6 +1458,27 @@ static void P_KillMobj(mobj_t *source, mobj_t *target)
 
   if (!((target->flags ^ MF_COUNTKILL) & (MF_FRIEND | MF_COUNTKILL)))
     totallive--;
+
+  /* Hexen: a dying monster (or the bell) fires its action special, with the
+   * dying thing as the activator (vanilla behaviour).  The boss sorcerer's
+   * special is an ACS script number instead. */
+  if (hexen && target->special &&
+      (target->flags & MF_COUNTKILL || target->type == HEXEN_MT_ZBELL))
+  {
+    if (target->type == HEXEN_MT_SORCBOSS)
+    {
+      byte dummyArgs[3] = {0, 0, 0};
+      P_StartACS(target->special, 0, dummyArgs, target, NULL, 0);
+    }
+    else
+    {
+      byte b[5];
+      int  a;
+      for (a = 0; a < 5; a++)
+        b[a] = (byte) target->special_args[a];
+      P_ExecuteHexenLineSpecial(target->special, b, NULL, 0, target);
+    }
+  }
 
   if (source && source->player)
     {

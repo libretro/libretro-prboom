@@ -480,6 +480,7 @@ typedef struct mobj_s
     specialval_t        special1;
     specialval_t        special2;
     int                 special_args[5];
+    short               special;    /* Hexen: action special fired on death/use */
     short               tid;        /* Hexen: thing id for TID lookups */
     int                 damage;     /* Heretic: per-missile damage override */
 
@@ -533,6 +534,7 @@ void    P_RemoveMobjFromTIDList(mobj_t *mobj);
 mobj_t *P_FindMobjFromTID(short tid, int *searchPosition);
 extern short hexen_thing_tid;
 extern int   hexen_thing_args[5];
+extern int   hexen_thing_special;
 dbool   P_SetMobjState(mobj_t *mobj, statenum_t state);
 void    P_MobjThinker(mobj_t *mobj);
 void    P_SpawnPuff(fixed_t x, fixed_t y, fixed_t z);

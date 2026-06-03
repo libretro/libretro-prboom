@@ -37,6 +37,7 @@
 #include "p_map.h"
 #include "p_inter.h"
 #include "p_pspr.h"
+extern fixed_t FloatBobOffsets[64];
 #include "dsda_hacked.h"
 #include "p_enemy.h"
 #include "p_tick.h"
@@ -1325,6 +1326,113 @@ void A_CMaceAttack(player_t *player, pspdef_t *psp)
   angle = pmo->angle;
   slope = P_AimLineAttack(pmo, angle, MELEERANGE, 0);
   P_LineAttack(pmo, angle, MELEERANGE, slope, damage);
+}
+
+/* The Serpent Staff (Cleric WP_SECOND): a life-draining melee check.  On a
+ * hit it heals the Cleric a little and switches to the drain animation;
+ * A_CStaffAttack then fires the twin slithering missiles.  The ready state
+ * periodically blinks the staff's eyes (Init/CheckBlink). */
+void A_CStaffCheck(player_t *player, pspdef_t *psp)
+{
+  mobj_t *pmo;
+  int     damage;
+  int     newLife;
+  angle_t angle;
+  fixed_t slope;
+  int     i;
+
+  (void)psp;
+  pmo = player->mo;
+  damage = 20 + (P_Random(pr_punch) & 15);
+  for (i = 0; i < 3; i++)
+  {
+    angle = pmo->angle + i * (ANG45 / 16);
+    slope = P_AimLineAttack(pmo, angle, (3 * MELEERANGE) / 2, 0);
+    if (linetarget)
+    {
+      P_LineAttack(pmo, angle, (3 * MELEERANGE) / 2, slope, damage);
+      pmo->angle = R_PointToAngle2(pmo->x, pmo->y,
+                                   linetarget->x, linetarget->y);
+      if ((linetarget->player || (linetarget->flags & MF_COUNTKILL))
+          && !(linetarget->flags2 & (MF2_DORMANT | MF2_INVULNERABLE)))
+      {
+        newLife = player->health + (damage >> 3);
+        newLife = newLife > 100 ? 100 : newLife;
+        pmo->health = player->health = newLife;
+        P_SetPsprite(player, ps_weapon, HEXEN_S_CSTAFFATK2_1);
+      }
+      player->mana[MANA_1] -= WeaponManaUse[player->class][player->readyweapon];
+      break;
+    }
+    angle = pmo->angle - i * (ANG45 / 16);
+    slope = P_AimLineAttack(pmo, angle, (3 * MELEERANGE) / 2, 0);
+    if (linetarget)
+    {
+      P_LineAttack(pmo, angle, (3 * MELEERANGE) / 2, slope, damage);
+      pmo->angle = R_PointToAngle2(pmo->x, pmo->y,
+                                   linetarget->x, linetarget->y);
+      if (linetarget->player || (linetarget->flags & MF_COUNTKILL))
+      {
+        newLife = player->health + (damage >> 4);
+        newLife = newLife > 100 ? 100 : newLife;
+        pmo->health = player->health = newLife;
+        P_SetPsprite(player, ps_weapon, HEXEN_S_CSTAFFATK2_1);
+      }
+      player->mana[MANA_1] -= WeaponManaUse[player->class][player->readyweapon];
+      break;
+    }
+  }
+  R_SmoothPlaying_Reset(player);
+}
+
+void A_CStaffAttack(player_t *player, pspdef_t *psp)
+{
+  mobj_t *mo;
+  mobj_t *pmo;
+
+  (void)psp;
+  player->mana[MANA_1] -= WeaponManaUse[player->class][player->readyweapon];
+  pmo = player->mo;
+  mo = P_SPMAngle(pmo, HEXEN_MT_CSTAFF_MISSILE, pmo->angle - (ANG45 / 15));
+  if (mo)
+    mo->special2.i = 32;
+  mo = P_SPMAngle(pmo, HEXEN_MT_CSTAFF_MISSILE, pmo->angle + (ANG45 / 15));
+  if (mo)
+    mo->special2.i = 0;
+  S_StartSound(player->mo, hexen_sfx_cleric_cstaff_fire);
+}
+
+void A_CStaffMissileSlither(mobj_t *actor)
+{
+  fixed_t newX, newY;
+  int     weaveXY;
+  int     angle;
+
+  weaveXY = actor->special2.i;
+  angle = (actor->angle + ANG90) >> ANGLETOFINESHIFT;
+  newX = actor->x - FixedMul(finecosine[angle], FloatBobOffsets[weaveXY]);
+  newY = actor->y - FixedMul(finesine[angle], FloatBobOffsets[weaveXY]);
+  weaveXY = (weaveXY + 3) & 63;
+  newX += FixedMul(finecosine[angle], FloatBobOffsets[weaveXY]);
+  newY += FixedMul(finesine[angle], FloatBobOffsets[weaveXY]);
+  P_TryMove(actor, newX, newY, 0);
+  actor->special2.i = weaveXY;
+}
+
+void A_CStaffInitBlink(player_t *player, pspdef_t *psp)
+{
+  (void)psp;
+  player->mo->special1.i = (P_Random(pr_punch) >> 1) + 20;
+}
+
+void A_CStaffCheckBlink(player_t *player, pspdef_t *psp)
+{
+  (void)psp;
+  if (!--player->mo->special1.i)
+  {
+    P_SetPsprite(player, ps_weapon, HEXEN_S_CSTAFFBLINK1);
+    player->mo->special1.i = (P_Random(pr_punch) + 50) >> 2;
+  }
 }
 
 #ifdef HEXEN

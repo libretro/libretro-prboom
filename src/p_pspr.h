@@ -106,6 +106,11 @@ void A_FHammerThrow(player_t *player, pspdef_t *psp);
 void A_FSwordAttack(player_t *player, pspdef_t *psp);
 /* Cleric weapons. */
 void A_CMaceAttack(player_t *player, pspdef_t *psp);
+void A_CStaffCheck(player_t *player, pspdef_t *psp);
+void A_CStaffAttack(player_t *player, pspdef_t *psp);
+void A_CStaffMissileSlither(struct mobj_s *actor);
+void A_CStaffInitBlink(player_t *player, pspdef_t *psp);
+void A_CStaffCheckBlink(player_t *player, pspdef_t *psp);
 void A_FSwordFlames(struct mobj_s *actor);
 /* MBF21 weapon codepointers */
 void A_WeaponProjectile(player_t *player, pspdef_t *psp);

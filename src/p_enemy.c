@@ -3644,3 +3644,188 @@ void A_SerpentSpawnGibs(mobj_t *actor)
     }
   }
 }
+
+/* ------------------------------------------------------------------------
+ * Fire Demon / Afrit (HEXEN_MT_FIREDEMON)
+ *
+ * A floating monster that bobs up and down, strafes around its target,
+ * sheds a shower of bouncing fire rocks, and lobs a fireball.  Uses a
+ * custom float/strafe chase rather than the standard ground AI.
+ *
+ * Adapted to this core: pr_hexen -> pr_heretic, S_StartMobjSound ->
+ * S_StartSound.  FaceMovementDirection and FIREDEMON_ATTACK_RANGE are
+ * provided locally; FloatBobOffsets, P_SetTarget, P_CheckMissileRange and
+ * the chase helpers already exist.
+ * --------------------------------------------------------------------- */
+
+extern fixed_t FloatBobOffsets[64];
+#define FIREDEMON_ATTACK_RANGE (64 * 8 * FRACUNIT)
+
+static void FaceMovementDirection(mobj_t *actor)
+{
+  switch (actor->movedir)
+  {
+    case DI_EAST:      actor->angle = 0   << 24; break;
+    case DI_NORTHEAST: actor->angle = 32  << 24; break;
+    case DI_NORTH:     actor->angle = 64  << 24; break;
+    case DI_NORTHWEST: actor->angle = 96  << 24; break;
+    case DI_WEST:      actor->angle = 128 << 24; break;
+    case DI_SOUTHWEST: actor->angle = 160 << 24; break;
+    case DI_SOUTH:     actor->angle = 192 << 24; break;
+    case DI_SOUTHEAST: actor->angle = 224 << 24; break;
+    default: break;
+  }
+}
+
+void A_FiredSpawnRock(mobj_t *actor)
+{
+  mobj_t *mo;
+  int     x, y, z;
+  int     rtype = 0;
+
+  switch (P_Random(pr_heretic) % 5)
+  {
+    case 0: rtype = HEXEN_MT_FIREDEMON_FX1; break;
+    case 1: rtype = HEXEN_MT_FIREDEMON_FX2; break;
+    case 2: rtype = HEXEN_MT_FIREDEMON_FX3; break;
+    case 3: rtype = HEXEN_MT_FIREDEMON_FX4; break;
+    case 4: rtype = HEXEN_MT_FIREDEMON_FX5; break;
+  }
+
+  x = actor->x + ((P_Random(pr_heretic) - 128) << 12);
+  y = actor->y + ((P_Random(pr_heretic) - 128) << 12);
+  z = actor->z + ((P_Random(pr_heretic)) << 11);
+  mo = P_SpawnMobj(x, y, z, rtype);
+  if (mo)
+  {
+    P_SetTarget(&mo->target, actor);
+    mo->momx = (P_Random(pr_heretic) - 128) << 10;
+    mo->momy = (P_Random(pr_heretic) - 128) << 10;
+    mo->momz = (P_Random(pr_heretic) << 10);
+    mo->special1.i = 2;        /* number of bounces */
+  }
+
+  actor->special2.i = 0;
+  actor->flags &= ~MF_JUSTATTACKED;
+}
+
+void A_FiredRocks(mobj_t *actor)
+{
+  A_FiredSpawnRock(actor);
+  A_FiredSpawnRock(actor);
+  A_FiredSpawnRock(actor);
+  A_FiredSpawnRock(actor);
+  A_FiredSpawnRock(actor);
+}
+
+void A_FiredChase(mobj_t *actor)
+{
+  int      weaveindex = actor->special1.i;
+  mobj_t  *target = actor->target;
+  angle_t  ang;
+  fixed_t  dist;
+
+  if (actor->reactiontime)
+    actor->reactiontime--;
+  if (actor->threshold)
+    actor->threshold--;
+
+  /* float up and down */
+  actor->z += FloatBobOffsets[weaveindex];
+  actor->special1.i = (weaveindex + 2) & 63;
+
+  /* keep above a minimum height */
+  if (actor->z < actor->floorz + (64 * FRACUNIT))
+    actor->z += 2 * FRACUNIT;
+
+  if (!actor->target || !(actor->target->flags & MF_SHOOTABLE))
+  {
+    P_LookForPlayers(actor, true);
+    return;
+  }
+
+  /* strafe */
+  if (actor->special2.i > 0)
+  {
+    actor->special2.i--;
+  }
+  else
+  {
+    actor->special2.i = 0;
+    actor->momx = actor->momy = 0;
+    dist = P_AproxDistance(actor->x - target->x, actor->y - target->y);
+    if (dist < FIREDEMON_ATTACK_RANGE)
+    {
+      if (P_Random(pr_heretic) < 30)
+      {
+        ang = R_PointToAngle2(actor->x, actor->y, target->x, target->y);
+        if (P_Random(pr_heretic) < 128)
+          ang += ANG90;
+        else
+          ang -= ANG90;
+        ang >>= ANGLETOFINESHIFT;
+        actor->momx = FixedMul(8 * FRACUNIT, finecosine[ang]);
+        actor->momy = FixedMul(8 * FRACUNIT, finesine[ang]);
+        actor->special2.i = 3;  /* strafe time */
+      }
+    }
+  }
+
+  FaceMovementDirection(actor);
+
+  /* normal movement */
+  if (!actor->special2.i)
+  {
+    if (--actor->movecount < 0 || !P_Move(actor, false))
+      P_NewChaseDir(actor);
+  }
+
+  /* missile attack */
+  if (!(actor->flags & MF_JUSTATTACKED))
+  {
+    if (P_CheckMissileRange(actor) && (P_Random(pr_heretic) < 20))
+    {
+      P_SetMobjState(actor, actor->info->missilestate);
+      actor->flags |= MF_JUSTATTACKED;
+      return;
+    }
+  }
+  else
+  {
+    actor->flags &= ~MF_JUSTATTACKED;
+  }
+
+  if (actor->info->activesound && P_Random(pr_heretic) < 3)
+    S_StartSound(actor, actor->info->activesound);
+}
+
+void A_FiredAttack(mobj_t *actor)
+{
+  mobj_t *mo;
+
+  if (!actor->target)
+    return;
+  mo = P_SpawnMissile(actor, actor->target, HEXEN_MT_FIREDEMON_FX6);
+  if (mo)
+    S_StartSound(actor, hexen_sfx_fired_attack);
+}
+
+void A_FiredSplotch(mobj_t *actor)
+{
+  mobj_t *mo;
+
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_FIREDEMON_SPLOTCH1);
+  if (mo)
+  {
+    mo->momx = (P_Random(pr_heretic) - 128) << 11;
+    mo->momy = (P_Random(pr_heretic) - 128) << 11;
+    mo->momz = FRACUNIT * 3 + (P_Random(pr_heretic) << 10);
+  }
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_FIREDEMON_SPLOTCH2);
+  if (mo)
+  {
+    mo->momx = (P_Random(pr_heretic) - 128) << 11;
+    mo->momy = (P_Random(pr_heretic) - 128) << 11;
+    mo->momz = FRACUNIT * 3 + (P_Random(pr_heretic) << 10);
+  }
+}

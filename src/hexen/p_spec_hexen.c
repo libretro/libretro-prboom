@@ -44,6 +44,7 @@
 #include "hexen/p_spec_hexen.h"
 #include "hexen/p_lightning.h"
 #include "hexen/sn_sonix.h"
+#include "hexen/p_acs.h"
 #include "heretic/p_action.h"
 
 /* These have no shared prototype header in this fork. */
@@ -121,6 +122,7 @@ void T_HexenVerticalDoor(vldoor_t *door)
           case DREV_CLOSE:
             door->sector->ceilingdata = NULL;
             SN_StopSequence((mobj_t *) &door->sector->soundorg);
+            P_TagFinished(door->sector->tag);
             P_RemoveThinker(&door->thinker);
             break;
           case DREV_CLOSE30THENOPEN:
@@ -153,6 +155,7 @@ void T_HexenVerticalDoor(vldoor_t *door)
           case DREV_OPEN:
             door->sector->ceilingdata = NULL;
             SN_StopSequence((mobj_t *) &door->sector->soundorg);
+            P_TagFinished(door->sector->tag);
             P_RemoveThinker(&door->thinker);
             break;
           default:
@@ -391,6 +394,7 @@ void T_HexenMoveCeiling(ceiling_t *ceiling)
         else
         {
           SN_StopSequence((mobj_t *) &ceiling->sector->soundorg);
+          P_TagFinished(ceiling->sector->tag);
           P_RemoveActiveCeiling(ceiling);
         }
       }
@@ -411,6 +415,7 @@ void T_HexenMoveCeiling(ceiling_t *ceiling)
         else
         {
           SN_StopSequence((mobj_t *) &ceiling->sector->soundorg);
+          P_TagFinished(ceiling->sector->tag);
           P_RemoveActiveCeiling(ceiling);
         }
       }
@@ -724,6 +729,7 @@ void T_HexenBuildPillar(pillar_t *pillar)
   {
     pillar->sector->floordata = NULL;
     SN_StopSequence((mobj_t *) &pillar->sector->soundorg);
+    P_TagFinished(pillar->sector->tag);
     P_RemoveThinker(&pillar->thinker);
   }
 }
@@ -1628,6 +1634,7 @@ void T_FloorWaggle(planeWaggle_t *waggle)
         waggle->sector->floorheight = waggle->originalHeight;
         P_ChangeSector(waggle->sector, true);
         waggle->sector->floordata = NULL;
+        P_TagFinished(waggle->sector->tag);
         P_RemoveThinker(&waggle->thinker);
         return;
       }
@@ -1698,6 +1705,7 @@ int Hexen_EV_FloorCrushStop(line_t *line, byte *args)
       continue;
     SN_StopSequence((mobj_t *) &floor->sector->soundorg);
     floor->sector->floordata = NULL;
+    P_TagFinished(floor->sector->tag);
     P_RemoveThinker(&floor->thinker);
     rtn = 1;
   }
@@ -1783,6 +1791,27 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
     case 71:                    /* Teleport_NoFog */
       if (side == 0)
         ok = EV_HexenTeleport(args[0], mo, false);
+      break;
+    case 80:                    /* ACS_Execute */
+      ok = P_StartACS(args[0], args[1], &args[2], mo, line, side);
+      break;
+    case 81:                    /* ACS_Suspend */
+      ok = P_SuspendACS(args[0], args[1]);
+      break;
+    case 82:                    /* ACS_Terminate */
+      ok = P_TerminateACS(args[0], args[1]);
+      break;
+    case 83:                    /* ACS_LockedExecute */
+      if (CheckedLockedDoor(mo, args[4]))
+      {
+        byte newArgs[5];
+        newArgs[0] = args[0];
+        newArgs[1] = args[1];
+        newArgs[2] = args[2];
+        newArgs[3] = args[3];
+        newArgs[4] = 0;
+        ok = P_StartACS(newArgs[0], newArgs[1], &newArgs[2], mo, line, side);
+      }
       break;
     case 20:                    /* Floor_LowerByValue */
       ok = Hexen_EV_DoFloor(line, args, FLEV_LOWERFLOORBYVALUE);

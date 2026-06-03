@@ -34,6 +34,7 @@
 
 #include "doomstat.h"
 #include "hexen/sn_sonix.h"
+#include "hexen/p_acs.h"
 #include "r_main.h"
 #include "p_map.h"
 #include "p_spec.h"
@@ -299,7 +300,10 @@ void T_MoveFloor(floormove_t* floor)
 
      floor->sector->floordata = NULL; //jff 2/22/98
      if (hexen)
+     {
         SN_StopSequence((mobj_t *)&floor->sector->soundorg);
+        P_TagFinished(floor->sector->tag);
+     }
      P_RemoveThinker(&floor->thinker);//remove this floor from list of movers
 
      //jff 2/26/98 implement stair retrigger lockout while still building

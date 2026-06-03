@@ -33,6 +33,7 @@
 
 #include "doomstat.h"
 #include "hexen/sn_sonix.h"
+#include "hexen/p_acs.h"
 #include "m_random.h"
 #include "r_main.h"
 #include "p_spec.h"
@@ -415,7 +416,10 @@ void P_RemoveActivePlat(plat_t* plat)
 {
    platlist_t *list = plat->list;
    if (hexen)
+   {
       SN_StopSequence((mobj_t *)&plat->sector->soundorg);
+      P_TagFinished(plat->sector->tag);
+   }
    plat->sector->floordata = NULL; //jff 2/23/98 multiple thinkers
    P_RemoveThinker(&plat->thinker);
    if ((*list->prev = list->next))

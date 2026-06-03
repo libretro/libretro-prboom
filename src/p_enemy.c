@@ -3251,6 +3251,8 @@ void A_RemoveFlags(mobj_t *actor)
 #define HX_HITDICE(a) ((1 + (P_Random(pr_heretic) & 7)) * (a))
 
 int P_SubRandom(void);  /* heretic/p_action.c */
+dbool P_SetMobjStateNF(mobj_t *mobj, statenum_t state);  /* heretic/p_action.c */
+extern fixed_t FloatBobOffsets[64];
 
 /* Hexen corpse queue: monster corpses register here as they settle, and
  * once the queue is full the oldest corpse is removed so a long fight does
@@ -3311,6 +3313,139 @@ void A_DemonDeath(mobj_t *actor)
 void A_Demon2Death(mobj_t *actor)
 {
   Hexen_DemonChunks(actor, HEXEN_MT_DEMON2CHUNK1);
+}
+
+/* Hexen drifting fog.  A FogSpawner map thing (editor number 10000) emits
+ * fog patches that weave and drift along its angle for a scripted lifetime,
+ * then fade.  Speed/spread/lifetime come from the spawner's mapthing args. */
+void A_FogSpawn(mobj_t *actor)
+{
+  mobj_t *mo = NULL;
+  angle_t delta;
+
+  if (actor->special1.i-- > 0)
+    return;
+  actor->special1.i = actor->special_args[2];   /* reset frequency count */
+
+  switch (P_Random(pr_heretic) % 3)
+  {
+    case 0: mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_FOGPATCHS); break;
+    case 1: mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_FOGPATCHM); break;
+    case 2: mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_FOGPATCHL); break;
+  }
+  if (mo)
+  {
+    delta = actor->special_args[1];
+    if (delta == 0)
+      delta = 1;
+    mo->angle = actor->angle +
+      (((P_Random(pr_heretic) % delta) - (delta >> 1)) << 24);
+    P_SetTarget(&mo->target, actor);
+    if (actor->special_args[0] < 1)
+      actor->special_args[0] = 1;
+    mo->special_args[0] = (P_Random(pr_heretic) % (actor->special_args[0])) + 1;
+    mo->special_args[3] = actor->special_args[3];   /* lifetime */
+    mo->special_args[4] = 1;                         /* moving */
+    mo->special2.i = P_Random(pr_heretic) & 63;
+  }
+}
+
+void A_FogMove(mobj_t *actor)
+{
+  int     speed = actor->special_args[0] << FRACBITS;
+  angle_t angle;
+  int     weaveindex;
+
+  if (!(actor->special_args[4]))
+    return;
+  if (actor->special_args[3]-- <= 0)
+  {
+    P_SetMobjStateNF(actor, actor->info->deathstate);
+    return;
+  }
+  if ((actor->special_args[3] % 4) == 0)
+  {
+    weaveindex = actor->special2.i;
+    actor->z += FloatBobOffsets[weaveindex] >> 1;
+    actor->special2.i = (weaveindex + 1) & 63;
+  }
+  angle = actor->angle >> ANGLETOFINESHIFT;
+  actor->momx = FixedMul(speed, finecosine[angle]);
+  actor->momy = FixedMul(speed, finesine[angle]);
+}
+
+/* Hexen breakable shrubs/trees.  On first damage the bush becomes a taller
+ * shootable target (A_TreeDeath); a second, fire-damage hit sends it to its
+ * burning melee state. */
+void A_TreeDeath(mobj_t *actor)
+{
+  if (!(actor->flags2 & MF2_FIREDAMAGE))
+  {
+    actor->height <<= 2;
+    actor->flags |= MF_SHOOTABLE;
+    actor->flags &= ~(MF_CORPSE | MF_DROPOFF);
+    actor->health = 35;
+    return;
+  }
+  P_SetMobjState(actor, actor->info->meleestate);
+}
+
+void A_PoisonShroom(mobj_t *actor)
+{
+  actor->tics = 128 + (P_Random(pr_heretic) << 1);
+}
+
+/* Hexen corpse/gib decoration: gibs float up then sink back, lynched
+ * corpses drip blood, and a sitting corpse can be exploded into bits. */
+void A_FloatGib(mobj_t *actor)
+{
+  actor->floorclip -= FRACUNIT;
+}
+
+void A_SinkGib(mobj_t *actor)
+{
+  actor->floorclip += FRACUNIT;
+}
+
+void A_DelayGib(mobj_t *actor)
+{
+  actor->tics -= P_Random(pr_heretic) >> 2;
+}
+
+void A_CorpseBloodDrip(mobj_t *actor)
+{
+  if (P_Random(pr_heretic) > 128)
+    return;
+  P_SpawnMobj(actor->x, actor->y, actor->z + actor->height / 2,
+              HEXEN_MT_CORPSEBLOODDRIP);
+}
+
+void A_CorpseExplode(mobj_t *actor)
+{
+  mobj_t *mo;
+  int     i;
+
+  for (i = (P_Random(pr_heretic) & 3) + 3; i; i--)
+  {
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_CORPSEBIT);
+    if (!mo)
+      continue;
+    P_SetMobjState(mo, mo->info->spawnstate + (P_Random(pr_heretic) % 3));
+    mo->momz = ((P_Random(pr_heretic) & 7) + 5) * (3 * FRACUNIT / 4);
+    mo->momx = P_SubRandom() << (FRACBITS - 6);
+    mo->momy = P_SubRandom() << (FRACBITS - 6);
+  }
+  /* spawn a skull */
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_CORPSEBIT);
+  if (mo)
+  {
+    P_SetMobjState(mo, HEXEN_S_CORPSEBIT_4);
+    mo->momz = ((P_Random(pr_heretic) & 7) + 5) * (3 * FRACUNIT / 4);
+    mo->momx = P_SubRandom() << (FRACBITS - 6);
+    mo->momy = P_SubRandom() << (FRACBITS - 6);
+    S_StartSound(mo, hexen_sfx_fired_death);
+  }
+  P_RemoveMobj(actor);
 }
 
 /* Hexen breakable pottery.  ZPottery decorations are shootable; on death

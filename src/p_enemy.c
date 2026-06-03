@@ -3970,3 +3970,193 @@ void A_BishopMissileWeave(mobj_t *actor)
   actor->z += FloatBobOffsets[weaveZ];
   actor->special2.i = weaveZ + (weaveXY << 16);
 }
+
+/* --------------------------------------------------------------------------
+ * Hexen Minotaur (Dark Servant) lifetime behaviour.  The combat codepointers
+ * (A_MinotaurAtk1/2/3, A_MinotaurDecide, A_MinotaurCharge, A_MntrFloorFire)
+ * are shared with the Heretic Maulotaur and live in heretic/p_action.c, now
+ * game-aware.  The functions below are Hexen-only: the summoned minotaur
+ * fades in on spawn, hunts the nearest valid target (attacking monsters when
+ * it has a player master), roams when idle, and stomps itself after
+ * MAULATORTICS of life.  Ported from dsda-doom p_enemy.c.
+ * ------------------------------------------------------------------------ */
+#define MINOTAUR_LOOK_DIST (16 * 54 * FRACUNIT)
+
+dbool P_SetMobjStateNF(mobj_t *mobj, statenum_t state);  /* heretic/p_action.c */
+void  A_MinotaurLook(mobj_t *actor);
+
+void A_MinotaurFade0(mobj_t *actor)
+{
+  actor->flags &= ~MF_ALTSHADOW;
+  actor->flags |= MF_SHADOW;
+}
+
+void A_MinotaurFade1(mobj_t *actor)
+{
+  actor->flags &= ~MF_SHADOW;
+  actor->flags |= MF_ALTSHADOW;
+}
+
+void A_MinotaurFade2(mobj_t *actor)
+{
+  actor->flags &= ~MF_SHADOW;
+  actor->flags &= ~MF_ALTSHADOW;
+}
+
+/* The summoned Minotaur self-destructs after MAULATORTICS.  special_args[0]
+ * holds the leveltime at which it was spawned (set by the Dark Servant
+ * summon when that artifact lands); a map-placed minotaur with a zero start
+ * simply ages from level start.  Returns false if the actor was killed. */
+static dbool CheckMinotaurAge(mobj_t *mo)
+{
+  if ((unsigned)(leveltime - mo->special_args[0]) >= (unsigned)MAULATORTICS)
+  {
+    P_DamageMobj(mo, NULL, NULL, 10000);
+    return FALSE;
+  }
+  return TRUE;
+}
+
+void A_MinotaurRoam(mobj_t *actor)
+{
+  actor->flags &= ~MF_SHADOW;     /* in case pain skipped his fade-in */
+  actor->flags &= ~MF_ALTSHADOW;
+
+  if (!CheckMinotaurAge(actor))
+    return;
+
+  if (P_Random(pr_heretic) < 30)
+    A_MinotaurLook(actor);        /* adjust to closest target */
+
+  if (P_Random(pr_heretic) < 6)
+  {
+    actor->movedir = P_Random(pr_heretic) % 8;
+    FaceMovementDirection(actor);
+  }
+  if (!P_Move(actor, false))
+  {
+    if (P_Random(pr_heretic) & 1)
+      actor->movedir = (actor->movedir + 1) % 8;
+    else
+      actor->movedir = (actor->movedir + 7) % 8;
+    FaceMovementDirection(actor);
+  }
+}
+
+void A_MinotaurLook(mobj_t *actor)
+{
+  mobj_t    *mo = NULL;
+  player_t  *player;
+  thinker_t *think;
+  fixed_t    dist;
+  int        i;
+  mobj_t    *master = actor->special1.m;
+
+  P_SetTarget(&actor->target, NULL);
+  if (deathmatch)                 /* quick search for players */
+  {
+    for (i = 0; i < MAXPLAYERS; i++)
+    {
+      if (!playeringame[i])
+        continue;
+      player = &players[i];
+      mo = player->mo;
+      if (mo == master)
+        continue;
+      if (mo->health <= 0)
+        continue;
+      dist = P_AproxDistance(actor->x - mo->x, actor->y - mo->y);
+      if (dist > MINOTAUR_LOOK_DIST)
+        continue;
+      P_SetTarget(&actor->target, mo);
+      break;
+    }
+  }
+
+  if (!actor->target)             /* near-player monster search */
+  {
+    if (master && (master->health > 0) && (master->player))
+      mo = P_RoughTargetSearch(master, 0, 20);
+    else
+      mo = P_RoughTargetSearch(actor, 0, 20);
+    P_SetTarget(&actor->target, mo);
+  }
+
+  if (!actor->target)             /* normal monster search */
+  {
+    for (think = thinkercap.next; think != &thinkercap; think = think->next)
+    {
+      if (think->function.arg1 != (void (*)(void *))P_MobjThinker)
+        continue;
+      mo = (mobj_t *) think;
+      if (!(mo->flags & MF_COUNTKILL))
+        continue;
+      if (mo->health <= 0)
+        continue;
+      if (!(mo->flags & MF_SHOOTABLE))
+        continue;
+      dist = P_AproxDistance(actor->x - mo->x, actor->y - mo->y);
+      if (dist > MINOTAUR_LOOK_DIST)
+        continue;
+      if ((mo == master) || (mo == actor))
+        continue;
+      if ((mo->type == HEXEN_MT_MINOTAUR)
+          && (mo->special1.m == actor->special1.m))
+        continue;
+      P_SetTarget(&actor->target, mo);
+      break;                      /* found mobj to attack */
+    }
+  }
+
+  if (actor->target)
+    P_SetMobjStateNF(actor, HEXEN_S_MNTR_WALK1);
+  else
+    P_SetMobjStateNF(actor, HEXEN_S_MNTR_ROAM1);
+}
+
+void A_MinotaurChase(mobj_t *actor)
+{
+  actor->flags &= ~MF_SHADOW;     /* in case pain skipped his fade-in */
+  actor->flags &= ~MF_ALTSHADOW;
+
+  if (!CheckMinotaurAge(actor))
+    return;
+
+  if (P_Random(pr_heretic) < 30)
+    A_MinotaurLook(actor);        /* adjust to closest target */
+
+  if (!actor->target || (actor->target->health <= 0)
+      || !(actor->target->flags & MF_SHOOTABLE))
+  {                               /* look for a new target */
+    P_SetMobjState(actor, HEXEN_S_MNTR_LOOK1);
+    return;
+  }
+
+  FaceMovementDirection(actor);
+  actor->reactiontime = 0;
+
+  if (actor->info->meleestate && P_CheckMeleeRange(actor))
+  {
+    if (actor->info->attacksound)
+      S_StartSound(actor, actor->info->attacksound);
+    P_SetMobjState(actor, actor->info->meleestate);
+    return;
+  }
+
+  if (actor->info->missilestate && P_CheckMissileRange(actor))
+  {
+    P_SetMobjState(actor, actor->info->missilestate);
+    return;
+  }
+
+  if (!P_Move(actor, false))
+    P_NewChaseDir(actor);
+
+  if (actor->info->activesound && P_Random(pr_heretic) < 6)
+    S_StartSound(actor, actor->info->activesound);
+}
+
+void A_SmokePuffExit(mobj_t *actor)
+{
+  P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_MNTRSMOKEEXIT);
+}

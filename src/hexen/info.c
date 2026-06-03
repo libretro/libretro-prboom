@@ -2070,18 +2070,18 @@ state_t hexen_states[HEXEN_NUMSTATES] = {
     {HEXEN_SPR_WRBL, 25, 7, {(arg0_t)NULL}, HEXEN_S_WRTHFX_BDROP1, 0, 0},     // HEXEN_S_WRTHFX_BDROP3
     {HEXEN_SPR_WRBL, 25, 35, {(arg0_t)NULL}, HEXEN_S_NULL, 0, 0},     // HEXEN_S_WRTHFX_BDEAD1
     {HEXEN_SPR_MNTR, 0, 15, {(arg0_t)NULL}, HEXEN_S_MNTR_SPAWN2, 0, 0},       // HEXEN_S_MNTR_SPAWN1
-    {HEXEN_SPR_MNTR, 0, 15, {(arg0_t)NULL}, HEXEN_S_MNTR_SPAWN3, 0, 0},    // HEXEN_S_MNTR_SPAWN2
-    {HEXEN_SPR_MNTR, 0, 3, {(arg0_t)NULL}, HEXEN_S_MNTR_LOOK1, 0, 0},      // HEXEN_S_MNTR_SPAWN3
-    {HEXEN_SPR_MNTR, 0, 10, {(arg0_t)NULL}, HEXEN_S_MNTR_LOOK2, 0, 0},      // HEXEN_S_MNTR_LOOK1
-    {HEXEN_SPR_MNTR, 1, 10, {(arg0_t)NULL}, HEXEN_S_MNTR_LOOK1, 0, 0},      // HEXEN_S_MNTR_LOOK2
-    {HEXEN_SPR_MNTR, 0, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_WALK2, 0, 0},      // HEXEN_S_MNTR_WALK1
-    {HEXEN_SPR_MNTR, 1, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_WALK3, 0, 0},      // HEXEN_S_MNTR_WALK2
-    {HEXEN_SPR_MNTR, 2, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_WALK4, 0, 0},      // HEXEN_S_MNTR_WALK3
-    {HEXEN_SPR_MNTR, 3, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_WALK1, 0, 0},      // HEXEN_S_MNTR_WALK4
-    {HEXEN_SPR_MNTR, 0, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_ROAM2, 0, 0},       // HEXEN_S_MNTR_ROAM1
-    {HEXEN_SPR_MNTR, 1, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_ROAM3, 0, 0},       // HEXEN_S_MNTR_ROAM2
-    {HEXEN_SPR_MNTR, 2, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_ROAM4, 0, 0},       // HEXEN_S_MNTR_ROAM3
-    {HEXEN_SPR_MNTR, 3, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_ROAM1, 0, 0},       // HEXEN_S_MNTR_ROAM4
+    {HEXEN_SPR_MNTR, 0, 15, {(arg0_t)A_MinotaurFade1}, HEXEN_S_MNTR_SPAWN3, 0, 0},    // HEXEN_S_MNTR_SPAWN2
+    {HEXEN_SPR_MNTR, 0, 3, {(arg0_t)A_MinotaurFade2}, HEXEN_S_MNTR_LOOK1, 0, 0},      // HEXEN_S_MNTR_SPAWN3
+    {HEXEN_SPR_MNTR, 0, 10, {(arg0_t)A_MinotaurLook}, HEXEN_S_MNTR_LOOK2, 0, 0},      // HEXEN_S_MNTR_LOOK1
+    {HEXEN_SPR_MNTR, 1, 10, {(arg0_t)A_MinotaurLook}, HEXEN_S_MNTR_LOOK1, 0, 0},      // HEXEN_S_MNTR_LOOK2
+    {HEXEN_SPR_MNTR, 0, 5, {(arg0_t)A_MinotaurChase}, HEXEN_S_MNTR_WALK2, 0, 0},      // HEXEN_S_MNTR_WALK1
+    {HEXEN_SPR_MNTR, 1, 5, {(arg0_t)A_MinotaurChase}, HEXEN_S_MNTR_WALK3, 0, 0},      // HEXEN_S_MNTR_WALK2
+    {HEXEN_SPR_MNTR, 2, 5, {(arg0_t)A_MinotaurChase}, HEXEN_S_MNTR_WALK4, 0, 0},      // HEXEN_S_MNTR_WALK3
+    {HEXEN_SPR_MNTR, 3, 5, {(arg0_t)A_MinotaurChase}, HEXEN_S_MNTR_WALK1, 0, 0},      // HEXEN_S_MNTR_WALK4
+    {HEXEN_SPR_MNTR, 0, 5, {(arg0_t)A_MinotaurRoam}, HEXEN_S_MNTR_ROAM2, 0, 0},       // HEXEN_S_MNTR_ROAM1
+    {HEXEN_SPR_MNTR, 1, 5, {(arg0_t)A_MinotaurRoam}, HEXEN_S_MNTR_ROAM3, 0, 0},       // HEXEN_S_MNTR_ROAM2
+    {HEXEN_SPR_MNTR, 2, 5, {(arg0_t)A_MinotaurRoam}, HEXEN_S_MNTR_ROAM4, 0, 0},       // HEXEN_S_MNTR_ROAM3
+    {HEXEN_SPR_MNTR, 3, 5, {(arg0_t)A_MinotaurRoam}, HEXEN_S_MNTR_ROAM1, 0, 0},       // HEXEN_S_MNTR_ROAM4
     {HEXEN_SPR_MNTR, 6, 10, {(arg0_t)A_FaceTarget}, HEXEN_S_MNTR_ATK1_2, 0, 0},       // HEXEN_S_MNTR_ATK1_1
     {HEXEN_SPR_MNTR, 7, 7, {(arg0_t)A_FaceTarget}, HEXEN_S_MNTR_ATK1_3, 0, 0},        // HEXEN_S_MNTR_ATK1_2
     {HEXEN_SPR_MNTR, 8, 12, {(arg0_t)A_MinotaurAtk1}, HEXEN_S_MNTR_WALK1, 0, 0},      // HEXEN_S_MNTR_ATK1_3
@@ -2097,12 +2097,12 @@ state_t hexen_states[HEXEN_NUMSTATES] = {
     {HEXEN_SPR_MNTR, 4, 6, {(arg0_t)A_Pain}, HEXEN_S_MNTR_WALK1, 0, 0},       // HEXEN_S_MNTR_PAIN2
     {HEXEN_SPR_MNTR, 4, 6, {(arg0_t)NULL}, HEXEN_S_MNTR_DIE2, 0, 0},  // HEXEN_S_MNTR_DIE1
     {HEXEN_SPR_MNTR, 4, 2, {(arg0_t)A_Scream}, HEXEN_S_MNTR_DIE3, 0, 0},      // HEXEN_S_MNTR_DIE2
-    {HEXEN_SPR_MNTR, 4, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_DIE4, 0, 0},       // HEXEN_S_MNTR_DIE3
+    {HEXEN_SPR_MNTR, 4, 5, {(arg0_t)A_SmokePuffExit}, HEXEN_S_MNTR_DIE4, 0, 0},       // HEXEN_S_MNTR_DIE3
     {HEXEN_SPR_MNTR, 4, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_DIE5, 0, 0},  // HEXEN_S_MNTR_DIE4
     {HEXEN_SPR_MNTR, 4, 5, {(arg0_t)A_NoBlocking}, HEXEN_S_MNTR_DIE6, 0, 0},  // HEXEN_S_MNTR_DIE5
     {HEXEN_SPR_MNTR, 4, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_DIE7, 0, 0},  // HEXEN_S_MNTR_DIE6
-    {HEXEN_SPR_MNTR, 4, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_DIE8, 0, 0},       // HEXEN_S_MNTR_DIE7
-    {HEXEN_SPR_MNTR, 4, 5, {(arg0_t)NULL}, HEXEN_S_MNTR_DIE9, 0, 0},       // HEXEN_S_MNTR_DIE8
+    {HEXEN_SPR_MNTR, 4, 5, {(arg0_t)A_MinotaurFade1}, HEXEN_S_MNTR_DIE8, 0, 0},       // HEXEN_S_MNTR_DIE7
+    {HEXEN_SPR_MNTR, 4, 5, {(arg0_t)A_MinotaurFade0}, HEXEN_S_MNTR_DIE9, 0, 0},       // HEXEN_S_MNTR_DIE8
     {HEXEN_SPR_MNTR, 4, 10, {(arg0_t)NULL}, HEXEN_S_NULL, 0, 0},      // HEXEN_S_MNTR_DIE9
     {HEXEN_SPR_FX12, 32768, 6, {(arg0_t)NULL}, HEXEN_S_MNTRFX1_2, 0, 0},      // HEXEN_S_MNTRFX1_1
     {HEXEN_SPR_FX12, 32769, 6, {(arg0_t)NULL}, HEXEN_S_MNTRFX1_1, 0, 0},      // HEXEN_S_MNTRFX1_2

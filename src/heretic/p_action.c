@@ -53,22 +53,28 @@ extern mobj_t **bodyque;
  * only, the Heretic values are inlined here as constants. */
 #define g_skullpop_mt        HERETIC_MT_BLOODYSKULL
 #define g_sfx_respawn        heretic_sfx_respawn
-#define g_mntr_charge_puff   HERETIC_MT_PHOENIXPUFF
-#define g_mntr_charge_rng    150
-#define g_mntr_charge_speed  (13 * FRACUNIT)
-#define g_mntr_charge_state  HERETIC_S_MNTR_ATK4_1
-#define g_mntr_decide_range  8
-#define g_mntr_fire          HERETIC_MT_MNTRFX3
-#define g_mntr_fire_rng      220
-#define g_mntr_fire_state    HERETIC_S_MNTR_ATK3_1
-#define g_mntr_atk1_sfx      heretic_sfx_stfpow
-#define g_mntr_atk2_sfx      heretic_sfx_minat2
-#define g_mntr_atk2_dice     5
-#define g_mntr_atk2_missile  HERETIC_MT_MNTRFX1
-#define g_mntr_atk3_sfx      heretic_sfx_minat1
-#define g_mntr_atk3_dice     5
-#define g_mntr_atk3_missile  HERETIC_MT_MNTRFX2
-#define g_mntr_atk3_state    HERETIC_S_MNTR_ATK3_4
+/* The Minotaur codepointers below are shared between the Heretic Maulotaur
+ * and the Hexen Dark Servant minotaur, so unlike the rest of this file they
+ * must honour the real 'hexen' flag (the file-wide "#define hexen 0" is
+ * #undef'd around the Minotaur block and restored after it).  Each selector
+ * resolves to the Hexen value when running Hexen and the Heretic value
+ * otherwise, matching dsda-doom's per-game g_mntr_* globals. */
+#define g_mntr_charge_puff   (hexen ? HEXEN_MT_PUNCHPUFF : HERETIC_MT_PHOENIXPUFF)
+#define g_mntr_charge_rng    (hexen ? 230 : 150)
+#define g_mntr_charge_speed  (hexen ? (23 * FRACUNIT) : (13 * FRACUNIT))
+#define g_mntr_charge_state  (hexen ? HEXEN_S_MNTR_ATK4_1 : HERETIC_S_MNTR_ATK4_1)
+#define g_mntr_decide_range  (hexen ? 16 : 8)
+#define g_mntr_fire          (hexen ? HEXEN_MT_MNTRFX3 : HERETIC_MT_MNTRFX3)
+#define g_mntr_fire_rng      (hexen ? 100 : 220)
+#define g_mntr_fire_state    (hexen ? HEXEN_S_MNTR_ATK3_1 : HERETIC_S_MNTR_ATK3_1)
+#define g_mntr_atk1_sfx      (hexen ? hexen_sfx_maulator_hammer_swing : heretic_sfx_stfpow)
+#define g_mntr_atk2_sfx      (hexen ? hexen_sfx_maulator_hammer_swing : heretic_sfx_minat2)
+#define g_mntr_atk2_dice     (hexen ? 3 : 5)
+#define g_mntr_atk2_missile  (hexen ? HEXEN_MT_MNTRFX1 : HERETIC_MT_MNTRFX1)
+#define g_mntr_atk3_sfx      (hexen ? hexen_sfx_maulator_hammer_hit : heretic_sfx_minat1)
+#define g_mntr_atk3_dice     (hexen ? 3 : 5)
+#define g_mntr_atk3_missile  (hexen ? HEXEN_MT_MNTRFX2 : HERETIC_MT_MNTRFX2)
+#define g_mntr_atk3_state    (hexen ? HEXEN_S_MNTR_ATK3_4 : HERETIC_S_MNTR_ATK3_4)
 
 /* Heretic state aliases (game-agnostic in dsda; constant here). */
 #define g_s_bloodyskullx1    HERETIC_S_BLOODYSKULLX1
@@ -990,6 +996,9 @@ void A_MakePod(mobj_t * actor)
 }
 
 
+/* --- Minotaur block: honour the real 'hexen' flag (see g_mntr_* above) --- */
+#undef hexen
+
 void A_MinotaurAtk1(mobj_t * actor)
 {
     player_t *player;
@@ -1161,6 +1170,9 @@ void A_MntrFloorFire(mobj_t * actor)
     mo->momx = 1;               // Force block checking
     P_CheckMissileSpawn(mo);
 }
+
+/* --- end Minotaur block: restore the file-wide hexen fold-out --- */
+#define hexen 0
 
 
 void A_MummyAttack(mobj_t * actor)

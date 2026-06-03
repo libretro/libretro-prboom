@@ -35,6 +35,7 @@
 #include "doomstat.h"
 #include "r_main.h"
 #include "p_map.h"
+#include "p_maputl.h"
 #include "p_inter.h"
 #include "p_pspr.h"
 extern fixed_t FloatBobOffsets[64];
@@ -1516,6 +1517,208 @@ void A_CFlameRotate(mobj_t *actor)
   actor->momx = actor->special1.i + FixedMul(FLAMEROTSPEED, finecosine[an]);
   actor->momy = actor->special2.i + FixedMul(FLAMEROTSPEED, finesine[an]);
   actor->angle += ANG90 / 15;
+}
+
+/* --------------------------------------------------------------------------
+ * Wraithverge (Cleric WP_FOURTH): fires Holy spirits that seek out enemies,
+ * weave through the air trailing a tail of ghost segments, and home in.
+ * ------------------------------------------------------------------------ */
+
+static void CHolyFindTarget(mobj_t *actor)
+{
+  mobj_t *target = P_RoughTargetSearch(actor, 0, 6);
+  if (target)
+  {
+    P_SetTarget(&actor->special1.m, target);
+    actor->flags |= MF_NOCLIP | MF_SKULLFLY;
+    actor->flags &= ~MF_MISSILE;
+  }
+}
+
+static void CHolySeekerMissile(mobj_t *actor, angle_t thresh, angle_t turnMax)
+{
+  int     dir;
+  int     dist;
+  angle_t delta;
+  angle_t angle;
+  mobj_t *target;
+  fixed_t newZ;
+  fixed_t deltaZ;
+
+  target = actor->special1.m;
+  if (!target)
+    return;
+  if (!(target->flags & MF_SHOOTABLE)
+      || (!(target->flags & MF_COUNTKILL) && !target->player))
+  {                       /* target died / isn't a creature */
+    P_SetTarget(&actor->special1.m, NULL);
+    actor->flags &= ~(MF_NOCLIP | MF_SKULLFLY);
+    actor->flags |= MF_MISSILE;
+    CHolyFindTarget(actor);
+    return;
+  }
+  dir = P_FaceMobj(actor, target, &delta);
+  if (delta > thresh)
+  {
+    delta >>= 1;
+    if (delta > turnMax)
+      delta = turnMax;
+  }
+  if (dir)
+    actor->angle += delta;     /* clockwise */
+  else
+    actor->angle -= delta;     /* counter-clockwise */
+  angle = actor->angle >> ANGLETOFINESHIFT;
+  actor->momx = FixedMul(actor->info->speed, finecosine[angle]);
+  actor->momy = FixedMul(actor->info->speed, finesine[angle]);
+  if (!(leveltime & 15)
+      || actor->z > target->z + target->height
+      || actor->z + actor->height < target->z)
+  {
+    newZ = target->z + ((P_Random(pr_heretic) * target->height) >> 8);
+    deltaZ = newZ - actor->z;
+    if (abs(deltaZ) > 15 * FRACUNIT)
+      deltaZ = (deltaZ > 0) ? 15 * FRACUNIT : -15 * FRACUNIT;
+    dist = P_AproxDistance(target->x - actor->x, target->y - actor->y);
+    dist = dist / actor->info->speed;
+    if (dist < 1)
+      dist = 1;
+    actor->momz = deltaZ / dist;
+  }
+}
+
+static void CHolyWeave(mobj_t *actor)
+{
+  fixed_t newX, newY;
+  int     weaveXY, weaveZ;
+  int     angle;
+
+  weaveXY = actor->special2.i >> 16;
+  weaveZ = actor->special2.i & 0xFFFF;
+  angle = (actor->angle + ANG90) >> ANGLETOFINESHIFT;
+  newX = actor->x - FixedMul(finecosine[angle], FloatBobOffsets[weaveXY] << 2);
+  newY = actor->y - FixedMul(finesine[angle], FloatBobOffsets[weaveXY] << 2);
+  weaveXY = (weaveXY + (P_Random(pr_heretic) % 5)) & 63;
+  newX += FixedMul(finecosine[angle], FloatBobOffsets[weaveXY] << 2);
+  newY += FixedMul(finesine[angle], FloatBobOffsets[weaveXY] << 2);
+  P_TryMove(actor, newX, newY, 0);
+  actor->z -= FloatBobOffsets[weaveZ] << 1;
+  weaveZ = (weaveZ + (P_Random(pr_heretic) % 5)) & 63;
+  actor->z += FloatBobOffsets[weaveZ] << 1;
+  actor->special2.i = weaveZ + (weaveXY << 16);
+}
+
+void A_CHolySeek(mobj_t *actor)
+{
+  actor->health--;
+  if (actor->health <= 0)
+  {
+    actor->momx >>= 2;
+    actor->momy >>= 2;
+    actor->momz = 0;
+    P_SetMobjState(actor, actor->info->deathstate);
+    actor->tics -= P_Random(pr_heretic) & 3;
+    return;
+  }
+  if (actor->special1.m)
+  {
+    CHolySeekerMissile(actor, actor->special_args[0] * ANG1,
+                       actor->special_args[0] * ANG1 * 2);
+    if (!((leveltime + 7) & 15))
+      actor->special_args[0] = 5 + (P_Random(pr_heretic) / 20);
+  }
+  CHolyWeave(actor);
+}
+
+static void CHolyTailFollow(mobj_t *actor, fixed_t dist)
+{
+  mobj_t *child;
+  int     an;
+  fixed_t oldDistance, newDistance;
+
+  child = actor->special1.m;
+  if (child)
+  {
+    an = R_PointToAngle2(actor->x, actor->y, child->x, child->y)
+         >> ANGLETOFINESHIFT;
+    oldDistance = P_AproxDistance(child->x - actor->x, child->y - actor->y);
+    if (P_TryMove(child,
+                  actor->x + FixedMul(dist, finecosine[an]),
+                  actor->y + FixedMul(dist, finesine[an]), 0))
+    {
+      newDistance = P_AproxDistance(child->x - actor->x,
+                                    child->y - actor->y) - FRACUNIT;
+      if (oldDistance < FRACUNIT)
+        child->z = (child->z < actor->z) ? actor->z - dist : actor->z + dist;
+      else
+        child->z = actor->z + FixedMul(FixedDiv(newDistance, oldDistance),
+                                       child->z - actor->z);
+    }
+    CHolyTailFollow(child, dist - FRACUNIT);
+  }
+}
+
+static void CHolyTailRemove(mobj_t *actor)
+{
+  mobj_t *child = actor->special1.m;
+  if (child)
+    CHolyTailRemove(child);
+  P_RemoveMobj(actor);
+}
+
+void A_CHolyTail(mobj_t *actor)
+{
+  mobj_t *parent = actor->special2.m;
+
+  if (parent)
+  {
+    if (parent->state >= &states[parent->info->deathstate])
+    {                   /* ghost gone: remove all tail parts */
+      CHolyTailRemove(actor);
+      return;
+    }
+    else if (P_TryMove(actor,
+               parent->x - FixedMul(14 * FRACUNIT,
+                 finecosine[parent->angle >> ANGLETOFINESHIFT]),
+               parent->y - FixedMul(14 * FRACUNIT,
+                 finesine[parent->angle >> ANGLETOFINESHIFT]), 0))
+    {
+      actor->z = parent->z - 5 * FRACUNIT;
+    }
+    CHolyTailFollow(actor, 10 * FRACUNIT);
+  }
+}
+
+void A_CHolyCheckScream(mobj_t *actor)
+{
+  A_CHolySeek(actor);
+  if (P_Random(pr_heretic) < 20)
+    S_StartSound(actor, hexen_sfx_spirit_active);
+  if (!actor->special1.m)
+    CHolyFindTarget(actor);
+}
+
+void A_CHolySpawnPuff(mobj_t *actor)
+{
+  P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_HOLY_MISSILE_PUFF);
+}
+
+void A_CHolyAttack(player_t *player, pspdef_t *psp)
+{
+  (void)psp;
+  player->mana[MANA_1] -= WeaponManaUse[player->class][player->readyweapon];
+  player->mana[MANA_2] -= WeaponManaUse[player->class][player->readyweapon];
+  P_SpawnPlayerMissile(player->mo, HEXEN_MT_HOLY_MISSILE);
+  S_StartSound(player->mo, hexen_sfx_choly_fire);
+}
+
+/* The screen-flash palette stages of the Wraithverge fire animation are
+ * cosmetic and depend on status-bar refresh hooks this core does not have;
+ * the state advances normally without them. */
+void A_CHolyPalette(player_t *player, pspdef_t *psp)
+{
+  (void)player;
+  (void)psp;
 }
 
 #ifdef HEXEN

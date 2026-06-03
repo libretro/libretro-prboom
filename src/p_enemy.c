@@ -2910,7 +2910,7 @@ static dbool P_SeekerMissile(mobj_t *actor, mobj_t **seekTarget,
 
 /* Search surrounding blockmap for a valid auto-target within fov/distance.
  * Adapted from Hexen's rough monster search (as used by dsda). */
-static mobj_t *P_RoughTargetSearch(mobj_t *mo, angle_t fov, int distance)
+mobj_t *P_RoughTargetSearch(mobj_t *mo, angle_t fov, int distance)
 {
   int startX, startY, count, bx, by;
   mobj_t *link;

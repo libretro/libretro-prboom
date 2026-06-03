@@ -1832,6 +1832,9 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    P_InitThinkers();
 
+   if (hexen)
+      P_InitCreatureCorpseQueue();
+
    // if working with a devlopment map, reload it
    //    W_Reload ();     killough 1/31/98: W_Reload obsolete
 

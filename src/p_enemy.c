@@ -3252,6 +3252,67 @@ void A_RemoveFlags(mobj_t *actor)
 
 int P_SubRandom(void);  /* heretic/p_action.c */
 
+/* Hexen corpse queue: monster corpses register here as they settle, and
+ * once the queue is full the oldest corpse is removed so a long fight does
+ * not leave an unbounded pile.  Reset by P_InitCreatureCorpseQueue at level
+ * load. */
+#define CORPSEQUEUESIZE 64
+static mobj_t *corpseQueue[CORPSEQUEUESIZE];
+static int     corpseQueueSlot;
+
+void A_QueueCorpse(mobj_t *actor)
+{
+  mobj_t *corpse;
+
+  if (corpseQueueSlot >= CORPSEQUEUESIZE)
+  {                             /* too many corpses: drop the oldest */
+    corpse = corpseQueue[corpseQueueSlot % CORPSEQUEUESIZE];
+    if (corpse)
+      P_RemoveMobj(corpse);
+  }
+  corpseQueue[corpseQueueSlot % CORPSEQUEUESIZE] = actor;
+  corpseQueueSlot++;
+}
+
+void P_InitCreatureCorpseQueue(void)
+{
+  corpseQueueSlot = 0;
+  memset(corpseQueue, 0, sizeof(corpseQueue));
+}
+
+/* Demon (and Demon-2) gib death: fling five chunk actors outward. */
+static void Hexen_DemonChunks(mobj_t *actor, mobjtype_t first)
+{
+  mobj_t *mo;
+  angle_t angle;
+  int     i;
+
+  for (i = 0; i < 5; i++)
+  {
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z + 45 * FRACUNIT,
+                     (mobjtype_t)(first + i));
+    if (!mo)
+      continue;
+    angle = (i == 0) ? actor->angle + ANG90 : actor->angle - ANG90;
+    mo->momz = 8 * FRACUNIT;
+    mo->momx = FixedMul((P_Random(pr_heretic) << 10) + FRACUNIT,
+                        finecosine[angle >> ANGLETOFINESHIFT]);
+    mo->momy = FixedMul((P_Random(pr_heretic) << 10) + FRACUNIT,
+                        finesine[angle >> ANGLETOFINESHIFT]);
+    P_SetTarget(&mo->target, actor);
+  }
+}
+
+void A_DemonDeath(mobj_t *actor)
+{
+  Hexen_DemonChunks(actor, HEXEN_MT_DEMONCHUNK1);
+}
+
+void A_Demon2Death(mobj_t *actor)
+{
+  Hexen_DemonChunks(actor, HEXEN_MT_DEMON2CHUNK1);
+}
+
 /* Hexen breakable pottery.  ZPottery decorations are shootable; on death
  * they run A_PotteryExplode, flinging a handful of pottery-bit gibs.  Each
  * bit picks a random resting sprite (A_PotteryChooseBit) and lingers until

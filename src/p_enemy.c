@@ -3448,6 +3448,107 @@ void A_CorpseExplode(mobj_t *actor)
   P_RemoveMobj(actor);
 }
 
+/* Hexen frozen death.  An ice/frost kill freezes the victim solid
+ * (A_FreezeDeath): it becomes a brittle, shootable, pushable statue.  When
+ * that statue is hit or its timer runs out it shatters (A_FreezeDeathChunks)
+ * into a shower of ice chunks; if the victim was a player, the view is
+ * attached to a head-sized chunk so you watch yourself fall apart.
+ * A_IceSetTics gives each chunk a random lifetime (shorter on lava, longer
+ * on ice); A_IceCheckHeadDone retires the view chunk once it has landed. */
+void A_IceSetTics(mobj_t *actor)
+{
+  int floor;
+
+  actor->tics = 70 + (P_Random(pr_heretic) & 63);
+  floor = P_GetThingFloorType(actor);
+  if (floor == FLOOR_LAVA)
+    actor->tics >>= 2;
+  else if (floor == FLOOR_ICE)
+    actor->tics <<= 1;
+}
+
+void A_IceCheckHeadDone(mobj_t *actor)
+{
+  if (actor->special2.i == 666)
+    P_SetMobjState(actor, HEXEN_S_ICECHUNK_HEAD2);
+}
+
+void A_FreezeDeath(mobj_t *actor)
+{
+  int r = P_Random(pr_heretic);
+
+  actor->tics = 75 + r + P_Random(pr_heretic);
+  actor->flags  |= MF_SOLID | MF_SHOOTABLE | MF_NOBLOOD;
+  actor->flags2 |= MF2_PUSHABLE | MF2_TELESTOMP | MF2_PASSMOBJ | MF2_SLIDE;
+  actor->height <<= 2;
+  S_StartSound(actor, hexen_sfx_freeze_death);
+
+  if (actor->player)
+  {
+    actor->player->damagecount = 0;
+    actor->player->bonuscount  = 0;
+    /* the damage/bonus palette tints clear themselves on the next status-bar
+     * tic now that the counts are zeroed */
+  }
+  /* Monsters with an ACS death-action special would fire it here; the core
+   * has no ACS, so there is nothing to execute. */
+}
+
+void A_FreezeDeathChunks(mobj_t *actor)
+{
+  int     i;
+  int     r1, r2, r3;
+  mobj_t *mo;
+
+  if (actor->momx || actor->momy || actor->momz)
+  {
+    actor->tics = 105;            /* still sliding: wait until it settles */
+    return;
+  }
+  S_StartSound(actor, hexen_sfx_freeze_shatter);
+
+  for (i = 12 + (P_Random(pr_heretic) & 15); i >= 0; i--)
+  {
+    r1 = P_Random(pr_heretic);
+    r2 = P_Random(pr_heretic);
+    r3 = P_Random(pr_heretic);
+    mo = P_SpawnMobj(actor->x + (((r3 - 128) * actor->radius) >> 7),
+                     actor->y + (((r2 - 128) * actor->radius) >> 7),
+                     actor->z + (r1 * actor->height / 255),
+                     HEXEN_MT_ICECHUNK);
+    if (!mo)
+      continue;
+    P_SetMobjState(mo, mo->info->spawnstate + (P_Random(pr_heretic) % 3));
+    mo->momz = FixedDiv(mo->z - actor->z, actor->height) << 2;
+    mo->momx = P_SubRandom() << (FRACBITS - 7);
+    mo->momy = P_SubRandom() << (FRACBITS - 7);
+    A_IceSetTics(mo);
+  }
+
+  if (actor->player)
+  {                               /* attach the view to a head chunk */
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z + VIEWHEIGHT,
+                     HEXEN_MT_ICECHUNK);
+    if (mo)
+    {
+      P_SetMobjState(mo, HEXEN_S_ICECHUNK_HEAD);
+      mo->momz = FixedDiv(mo->z - actor->z, actor->height) << 2;
+      mo->momx = P_SubRandom() << (FRACBITS - 7);
+      mo->momy = P_SubRandom() << (FRACBITS - 7);
+      mo->flags2 |= MF2_ICEDAMAGE;  /* forces the blue palette */
+      mo->flags2 &= ~MF2_FOOTCLIP;
+      mo->player  = actor->player;
+      actor->player = NULL;
+      mo->health  = actor->health;
+      mo->angle   = actor->angle;
+      mo->player->mo = mo;
+      mo->player->lookdir = 0;
+    }
+  }
+  P_SetMobjState(actor, HEXEN_S_FREETARGMOBJ);
+  actor->flags2 |= MF2_DONTDRAW;
+}
+
 /* Hexen breakable pottery.  ZPottery decorations are shootable; on death
  * they run A_PotteryExplode, flinging a handful of pottery-bit gibs.  Each
  * bit picks a random resting sprite (A_PotteryChooseBit) and lingers until

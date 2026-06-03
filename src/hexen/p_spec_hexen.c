@@ -43,6 +43,7 @@
 #include "m_random.h"
 #include "hexen/p_spec_hexen.h"
 #include "hexen/p_lightning.h"
+#include "heretic/p_action.h"
 
 /* These have no shared prototype header in this fork. */
 void P_ThrustMobj(mobj_t *mo, angle_t angle, fixed_t move);
@@ -1367,6 +1368,9 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
     case 109:                   /* ForceLightning */
       P_ForceLightning();
       ok = true;
+      break;
+    case 120:                   /* Quake */
+      ok = A_LocalQuake(args, mo);
       break;
     case 110:                   /* Light_RaiseByValue */
       ok = EV_SpawnLight(line, args, LITE_RAISEBYVALUE);

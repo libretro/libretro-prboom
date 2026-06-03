@@ -142,4 +142,9 @@ dbool P_SeekerMissile(mobj_t *actor, mobj_t **seekTarget, angle_t thresh, angle_
 mobj_t *P_SPMAngle(mobj_t *source, mobjtype_t type, angle_t angle);
 mobj_t *P_SpawnMissileAngle(mobj_t *source, mobjtype_t type, angle_t angle, fixed_t momz);
 
+/* Hexen earthquake. */
+void  A_Quake(mobj_t *actor);
+dbool A_LocalQuake(byte *args, mobj_t *actor);
+extern int localQuakeHappening[MAXPLAYERS];
+
 #endif

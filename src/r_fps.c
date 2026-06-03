@@ -33,6 +33,8 @@
  */
 
 #include "doomstat.h"
+#include "m_random.h"
+#include "heretic/p_action.h"
 #include "r_defs.h"
 #include "r_state.h"
 #include "p_spec.h"
@@ -112,6 +114,14 @@ void R_InterpolateView (player_t *player)
 
     viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset;
     viewpitch = R_SmoothPlaying_Get(player->mo->pitch) + viewpitchoffset;
+  }
+
+  /* Hexen earthquake: jitter the camera while a local quake is happening. */
+  if (hexen && localQuakeHappening[displayplayer])
+  {
+    int intensity = localQuakeHappening[displayplayer];
+    viewx += (((M_Random() % (intensity << 2)) - (intensity << 1)) << FRACBITS);
+    viewy += (((M_Random() % (intensity << 2)) - (intensity << 1)) << FRACBITS);
   }
 }
 

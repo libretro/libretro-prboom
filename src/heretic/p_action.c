@@ -1869,3 +1869,83 @@ void A_ContMobjSound(mobj_t * actor)
             break;
     }
 }
+
+/* Hexen earthquake.  A_LocalQuake spawns a quake focus at every mapspot that
+ * shares the given thing id; each focus runs A_Quake while it lives, shaking
+ * the view of nearby players and (closer in) damaging and shoving them.  The
+ * view shake itself is applied in r_fps.c from localQuakeHappening[]. */
+
+int localQuakeHappening[MAXPLAYERS];
+
+#ifndef HITDICE
+#define HITDICE(a) ((1 + (P_Random(pr_heretic) & 7)) * (a))
+#endif
+
+void A_Quake(mobj_t * actor)
+{
+    int richters = actor->special_args[0];
+    int playnum;
+
+    if (actor->special_args[1]-- > 0)
+    {
+        for (playnum = 0; playnum < MAXPLAYERS; playnum++)
+        {
+            player_t *player;
+            mobj_t   *victim;
+            fixed_t   dist;
+
+            if (!playeringame[playnum])
+                continue;
+            player = &players[playnum];
+            victim = player->mo;
+            if (!victim)
+                continue;
+
+            dist = P_AproxDistance(actor->x - victim->x,
+                                   actor->y - victim->y) >> (FRACBITS + 6);
+            if (dist < actor->special_args[3])      /* tremor radius */
+                localQuakeHappening[playnum] = richters;
+
+            if (dist < actor->special_args[2] &&    /* damage radius */
+                victim->z <= victim->floorz)
+            {
+                angle_t an;
+                if (P_Random(pr_heretic) < 50)
+                    P_DamageMobj(victim, NULL, NULL, HITDICE(1));
+                an = victim->angle + ANG1 * P_Random(pr_heretic);
+                P_ThrustMobj(victim, an, richters << (FRACBITS - 1));
+            }
+        }
+    }
+    else
+    {
+        for (playnum = 0; playnum < MAXPLAYERS; playnum++)
+            localQuakeHappening[playnum] = false;
+        P_SetMobjState(actor, HEXEN_S_NULL);
+    }
+}
+
+dbool A_LocalQuake(byte * args, mobj_t * actor)
+{
+    mobj_t *focus, *target;
+    int     lastfound = -1;
+    dbool   success = false;
+
+    (void) actor;
+
+    while ((target = P_FindMobjFromTID((short) args[4], &lastfound)) != NULL)
+    {
+        focus = P_SpawnMobj(target->x, target->y, target->z,
+                            HEXEN_MT_QUAKE_FOCUS);
+        if (focus)
+        {
+            focus->special_args[0] = args[0];
+            focus->special_args[1] = args[1] >> 1;  /* decremented every 2 tics */
+            focus->special_args[2] = args[2];
+            focus->special_args[3] = args[3];
+            focus->special_args[4] = args[4];
+            success = true;
+        }
+    }
+    return success;
+}

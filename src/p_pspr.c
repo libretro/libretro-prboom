@@ -420,11 +420,21 @@ static void P_FireWeapon(player_t *player)
   newstate = weaponinfo[player->readyweapon].atkstate;
 #endif
 
-  /* Hexen: the Fighter's axe (WP_SECOND) has a powered, glowing attack
-   * animation that plays whenever blue mana is available to spend. */
-  if (hexen && player->class == PCLASS_FIGHTER
-      && player->readyweapon == WP_SECOND && player->mana[MANA_1] > 0)
-    newstate = HEXEN_S_FAXEATK_G1;
+  /* Hexen: pick the attack state from the per-class weapon table rather
+   * than the Doom-shaped weaponinfo[], and put the player model into its
+   * class attack pose.  The Fighter's axe (WP_SECOND) additionally has a
+   * powered, glowing attack animation when blue mana is available. */
+  if (hexen)
+  {
+    P_SetMobjState(player->mo, PStateAttack[player->class]);
+    if (player->class == PCLASS_FIGHTER && player->readyweapon == WP_SECOND
+        && player->mana[MANA_1] > 0)
+      newstate = HEXEN_S_FAXEATK_G1;
+    else
+      newstate = player->refire
+        ? WeaponInfo[player->readyweapon][player->class].holdatkstate
+        : WeaponInfo[player->readyweapon][player->class].atkstate;
+  }
 
   P_SetPsprite(player, ps_weapon, newstate);
   /* MBF21: a SILENT weapon does not alert monsters when fired. */
@@ -1272,6 +1282,49 @@ void A_FSwordFlames(mobj_t *actor)
                 actor->y + ((P_Random(pr_saw) - 128) << 12),
                 actor->z + ((P_Random(pr_saw) - 128) << 11),
                 HEXEN_MT_FSWORD_FLAME);
+}
+
+/* --------------------------------------------------------------------------
+ * Cleric weapons
+ * ------------------------------------------------------------------------ */
+
+/* The Mace (Cleric WP_FIRST): a wide melee sweep.  Fans out +/- across a
+ * 45-degree arc looking for a target, striking the first found; otherwise
+ * a straight melee swing at any wall. */
+void A_CMaceAttack(player_t *player, pspdef_t *psp)
+{
+  angle_t angle;
+  int     damage;
+  fixed_t slope;
+  mobj_t *pmo = player->mo;
+  int     i;
+
+  (void)psp;
+  damage = 25 + (P_Random(pr_punch) & 15);
+  for (i = 0; i < 16; i++)
+  {
+    angle = pmo->angle + i * (ANG45 / 16);
+    slope = P_AimLineAttack(pmo, angle, 2 * MELEERANGE, 0);
+    if (linetarget)
+    {
+      P_LineAttack(pmo, angle, 2 * MELEERANGE, slope, damage);
+      AdjustPlayerAngle(pmo);
+      return;
+    }
+    angle = pmo->angle - i * (ANG45 / 16);
+    slope = P_AimLineAttack(pmo, angle, 2 * MELEERANGE, 0);
+    if (linetarget)
+    {
+      P_LineAttack(pmo, angle, 2 * MELEERANGE, slope, damage);
+      AdjustPlayerAngle(pmo);
+      return;
+    }
+  }
+  /* no creatures found; strike whatever wall is ahead */
+  pmo->special1.i = 0;
+  angle = pmo->angle;
+  slope = P_AimLineAttack(pmo, angle, MELEERANGE, 0);
+  P_LineAttack(pmo, angle, MELEERANGE, slope, damage);
 }
 
 #ifdef HEXEN

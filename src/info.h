@@ -5789,6 +5789,12 @@ typedef struct
 extern state_t *states;
 extern const char **sprnames;
 
+/* Hexen per-class player-model state selectors (defined in hexen/info.c). */
+extern const int PStateNormal[];
+extern const int PStateRun[];
+extern const int PStateAttack[];
+extern const int PStateAttackEnd[];
+
 /********************************************************************
  * Thing enumeration -- must match info.c                           *
  ********************************************************************

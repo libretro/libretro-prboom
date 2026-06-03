@@ -196,6 +196,20 @@ typedef enum {
   WP_NOCHANGE              // No pending weapon change.
 } weapontype_t;
 
+/* Hexen player classes.  Numbering matches the original Hexen / dsda-doom
+ * pclass_t so the (currently dormant) Hexen player and weapon code resolves
+ * against it.  Inert for Doom/Heretic, which leave player->class at
+ * PCLASS_NULL. */
+typedef enum
+{
+  PCLASS_NULL,
+  PCLASS_FIGHTER,
+  PCLASS_CLERIC,
+  PCLASS_MAGE,
+  PCLASS_PIG,
+  NUMCLASSES
+} pclass_t;
+
 // Ammunition types defined.
 typedef enum {
   AM_CLIP,    // Pistol / chaingun ammo.

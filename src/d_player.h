@@ -271,6 +271,9 @@ typedef struct player_s
   struct mobj_s *rain1;       /* active rainmaker 1 */
   struct mobj_s *rain2;       /* active rainmaker 2 */
   int         pclass;         /* player class (Heretic: single class) */
+  int         class;          /* Hexen player class (pclass_t); PCLASS_NULL
+                               * for Doom/Heretic.  Used by the Hexen player
+                               * and weapon code. */
 
 } player_t;
 

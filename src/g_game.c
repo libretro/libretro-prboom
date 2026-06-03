@@ -115,6 +115,9 @@ dbool           deathmatch;    // only if started as net death
 dbool           netgame;       // only TRUE if packets are broadcast
 dbool           playeringame[MAXPLAYERS];
 player_t        players[MAXPLAYERS];
+/* Hexen: per-player chosen class (PCLASS_*); PCLASS_NULL for Doom/Heretic.
+ * Copied into players[].class at spawn. */
+pclass_t        PlayerClass[MAXPLAYERS];
 int             consoleplayer; // player taking events and displaying
 int             displayplayer; // view being displayed
 int             gametic;

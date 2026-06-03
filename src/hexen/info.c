@@ -3330,3 +3330,44 @@ mobjinfo_t hexen_mobjinfo[HEXEN_NUMMOBJTYPES - HEXEN_MT_ZERO] = {
   { NULL, 10225, HEXEN_S_SPAWNBATS1, 1000, HEXEN_S_NULL, hexen_sfx_None, 8, hexen_sfx_None, HEXEN_S_NULL, 0, hexen_sfx_None, HEXEN_S_NULL, HEXEN_S_NULL, HEXEN_S_NULL, HEXEN_S_NULL, hexen_sfx_None, 0, 0, 20 * FRACUNIT, 16 * FRACUNIT, 100, 0, hexen_sfx_None, MF_NOBLOCKMAP | MF_NOSECTOR | MF_NOGRAVITY, 0, 0, 0, 0, MF2_DONTDRAW, 0, 0, 0, 0, 0, 0, HEXEN_S_NULL },  // HEXEN_MT_BAT_SPAWNER
   { NULL, -1, HEXEN_S_BAT1, 1000, HEXEN_S_NULL, hexen_sfx_None, 8, hexen_sfx_None, HEXEN_S_NULL, 0, hexen_sfx_None, HEXEN_S_NULL, HEXEN_S_NULL, HEXEN_S_BAT_DEATH, HEXEN_S_NULL, hexen_sfx_None, 0, 5 * FRACUNIT, 3 * FRACUNIT, 3 * FRACUNIT, 100, 0, hexen_sfx_None, MF_NOBLOCKMAP | MF_NOGRAVITY | MF_MISSILE, 0, 0, 0, 0, MF2_PASSMOBJ | MF2_NOTELEPORT, 0, 0, 0, 0, 0, 0, HEXEN_S_NULL },  // HEXEN_MT_BAT
 };
+
+/* Per-class player state selectors (vanilla Hexen PState* arrays), indexed
+ * by pclass_t.  Used by the Hexen player/weapon code to map a class to its
+ * idle / running / attack / attack-end player states.  PCLASS_NULL is the
+ * Doom/Heretic "no Hexen class" slot and points at HEXEN_S_NULL.  The Pig
+ * has a single attack frame, so its attack-end reuses the attack state. */
+const int PStateNormal[NUMCLASSES] =
+{
+  HEXEN_S_NULL,       /* PCLASS_NULL    */
+  HEXEN_S_FPLAY,      /* PCLASS_FIGHTER */
+  HEXEN_S_CPLAY,      /* PCLASS_CLERIC  */
+  HEXEN_S_MPLAY,      /* PCLASS_MAGE    */
+  HEXEN_S_PIGPLAY     /* PCLASS_PIG     */
+};
+
+const int PStateRun[NUMCLASSES] =
+{
+  HEXEN_S_NULL,
+  HEXEN_S_FPLAY_RUN1,
+  HEXEN_S_CPLAY_RUN1,
+  HEXEN_S_MPLAY_RUN1,
+  HEXEN_S_PIGPLAY_RUN1
+};
+
+const int PStateAttack[NUMCLASSES] =
+{
+  HEXEN_S_NULL,
+  HEXEN_S_FPLAY_ATK1,
+  HEXEN_S_CPLAY_ATK1,
+  HEXEN_S_MPLAY_ATK1,
+  HEXEN_S_PIGPLAY_ATK1
+};
+
+const int PStateAttackEnd[NUMCLASSES] =
+{
+  HEXEN_S_NULL,
+  HEXEN_S_FPLAY_ATK2,
+  HEXEN_S_CPLAY_ATK2,
+  HEXEN_S_MPLAY_ATK2,
+  HEXEN_S_PIGPLAY_ATK1
+};

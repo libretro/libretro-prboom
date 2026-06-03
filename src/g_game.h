@@ -180,6 +180,8 @@ extern int  mousebforward;
 extern int  mousebbackward;
 extern int  mouse_double_click_use;
 extern int  mlooky;
+extern pclass_t PlayerClass[MAXPLAYERS]; /* Hexen per-player class */
+
 extern int FinaleStage; // cph -
 extern int FinaleCount; // made static
 

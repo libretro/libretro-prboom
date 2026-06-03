@@ -938,11 +938,14 @@ static bool IdentifyVersion (void)
     /* jff 8/23/98 set gamemission global appropriately in all cases
      * cphipps 12/1999 - no version output here, leave that to the caller
      */
-    if (heretic)
+    if (raven)
     {
-      /* CheckIWAD already recognised a Heretic IWAD and set
-       * gamemission = heretic_mission; do not overwrite it with a Doom
-       * mission below. */
+      /* CheckIWAD already recognised a Heretic or Hexen IWAD and set
+       * gamemission = heretic_mission / hexen_mission; do not overwrite it
+       * with a Doom mission below.  (Hexen and commercial Doom both use
+       * MAP## levels, so without this the commercial branch would reset
+       * gamemission to doom2 and the game would identify and behave as
+       * Doom 2 -- loading the Doom status bar, switch list and so on.) */
     }
     else
     switch(gamemode)
@@ -1322,7 +1325,11 @@ bool D_DoomMainSetup(void)
     // cph - code cleaned and made smaller
     const char* doomverstr;
 
-    if (heretic)
+    if (hexen)
+    {
+      doomverstr = "Hexen: Beyond Heretic";
+    }
+    else if (heretic)
     {
       /* The Doom gamemode slots are reused for Heretic (see IdentifyVersion):
        * shareware = E1 only, registered = the full game. Distinguish the

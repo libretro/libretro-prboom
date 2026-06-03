@@ -3285,3 +3285,30 @@ void A_WraithMissile(mobj_t *actor)
   if (mo)
     S_StartSound(actor, hexen_sfx_wraith_missile_fire);
 }
+
+void A_DemonAttack1(mobj_t *actor)
+{
+  if (!actor->target)
+    return;
+  if (P_CheckMeleeRange(actor))
+    P_DamageMobj(actor->target, actor, actor, HX_HITDICE(2));
+}
+
+void A_DemonAttack2(mobj_t *actor)
+{
+  mobj_t *mo;
+  int     fireBall;
+
+  if (!actor->target)
+    return;
+  if (actor->type == HEXEN_MT_DEMON)
+    fireBall = HEXEN_MT_DEMONFX1;
+  else
+    fireBall = HEXEN_MT_DEMON2FX1;
+  mo = P_SpawnMissile(actor, actor->target, fireBall);
+  if (mo)
+  {
+    mo->z += 30 * FRACUNIT;
+    S_StartSound(actor, hexen_sfx_demon_missile_fire);
+  }
+}

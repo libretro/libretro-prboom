@@ -67,6 +67,8 @@ void A_EttinAttack(mobj_t *);
 void A_CentaurAttack(mobj_t *);
 void A_WraithMelee(mobj_t *);
 void A_WraithMissile(mobj_t *);
+void A_DemonAttack1(mobj_t *);
+void A_DemonAttack2(mobj_t *);
 void A_PosAttack(mobj_t *);
 void A_Scream(mobj_t *);
 void A_SPosAttack(mobj_t *);

@@ -1881,10 +1881,10 @@ state_t hexen_states[HEXEN_NUMSTATES] = {
     {HEXEN_SPR_DEMN, 3, 4, {(arg0_t)A_Chase}, HEXEN_S_DEMN_CHASE1, 0, 0},     // HEXEN_S_DEMN_CHASE4
     {HEXEN_SPR_DEMN, 4, 6, {(arg0_t)A_FaceTarget}, HEXEN_S_DEMN_ATK1_2, 0, 0},        // HEXEN_S_DEMN_ATK1_1
     {HEXEN_SPR_DEMN, 5, 8, {(arg0_t)A_FaceTarget}, HEXEN_S_DEMN_ATK1_3, 0, 0},        // HEXEN_S_DEMN_ATK1_2
-    {HEXEN_SPR_DEMN, 6, 6, {(arg0_t)NULL}, HEXEN_S_DEMN_CHASE1, 0, 0},      // HEXEN_S_DEMN_ATK1_3
+    {HEXEN_SPR_DEMN, 6, 6, {(arg0_t)A_DemonAttack1}, HEXEN_S_DEMN_CHASE1, 0, 0},      // HEXEN_S_DEMN_ATK1_3
     {HEXEN_SPR_DEMN, 4, 5, {(arg0_t)A_FaceTarget}, HEXEN_S_DEMN_ATK2_2, 0, 0},        // HEXEN_S_DEMN_ATK2_1
     {HEXEN_SPR_DEMN, 5, 6, {(arg0_t)A_FaceTarget}, HEXEN_S_DEMN_ATK2_3, 0, 0},        // HEXEN_S_DEMN_ATK2_2
-    {HEXEN_SPR_DEMN, 6, 5, {(arg0_t)NULL}, HEXEN_S_DEMN_CHASE1, 0, 0},      // HEXEN_S_DEMN_ATK2_3
+    {HEXEN_SPR_DEMN, 6, 5, {(arg0_t)A_DemonAttack2}, HEXEN_S_DEMN_CHASE1, 0, 0},      // HEXEN_S_DEMN_ATK2_3
     {HEXEN_SPR_DEMN, 4, 4, {(arg0_t)NULL}, HEXEN_S_DEMN_PAIN2, 0, 0}, // HEXEN_S_DEMN_PAIN1
     {HEXEN_SPR_DEMN, 4, 4, {(arg0_t)A_Pain}, HEXEN_S_DEMN_CHASE1, 0, 0},      // HEXEN_S_DEMN_PAIN2
     {HEXEN_SPR_DEMN, 7, 6, {(arg0_t)NULL}, HEXEN_S_DEMN_DEATH2, 0, 0},        // HEXEN_S_DEMN_DEATH1
@@ -1943,10 +1943,10 @@ state_t hexen_states[HEXEN_NUMSTATES] = {
     {HEXEN_SPR_DEM2, 3, 4, {(arg0_t)A_Chase}, HEXEN_S_DEMN2_CHASE1, 0, 0},    // HEXEN_S_DEMN2_CHASE4
     {HEXEN_SPR_DEM2, 4, 6, {(arg0_t)A_FaceTarget}, HEXEN_S_DEMN2_ATK1_2, 0, 0},       // HEXEN_S_DEMN2_ATK1_1
     {HEXEN_SPR_DEM2, 5, 8, {(arg0_t)A_FaceTarget}, HEXEN_S_DEMN2_ATK1_3, 0, 0},       // HEXEN_S_DEMN2_ATK1_2
-    {HEXEN_SPR_DEM2, 6, 6, {(arg0_t)NULL}, HEXEN_S_DEMN2_CHASE1, 0, 0},     // HEXEN_S_DEMN2_ATK1_3
+    {HEXEN_SPR_DEM2, 6, 6, {(arg0_t)A_DemonAttack1}, HEXEN_S_DEMN2_CHASE1, 0, 0},     // HEXEN_S_DEMN2_ATK1_3
     {HEXEN_SPR_DEM2, 4, 5, {(arg0_t)A_FaceTarget}, HEXEN_S_DEMN2_ATK2_2, 0, 0},       // HEXEN_S_DEMN2_ATK2_1
     {HEXEN_SPR_DEM2, 5, 6, {(arg0_t)A_FaceTarget}, HEXEN_S_DEMN2_ATK2_3, 0, 0},       // HEXEN_S_DEMN2_ATK2_2
-    {HEXEN_SPR_DEM2, 6, 5, {(arg0_t)NULL}, HEXEN_S_DEMN2_CHASE1, 0, 0},     // HEXEN_S_DEMN2_ATK2_3
+    {HEXEN_SPR_DEM2, 6, 5, {(arg0_t)A_DemonAttack2}, HEXEN_S_DEMN2_CHASE1, 0, 0},     // HEXEN_S_DEMN2_ATK2_3
     {HEXEN_SPR_DEM2, 4, 4, {(arg0_t)NULL}, HEXEN_S_DEMN2_PAIN2, 0, 0},        // HEXEN_S_DEMN2_PAIN1
     {HEXEN_SPR_DEM2, 4, 4, {(arg0_t)A_Pain}, HEXEN_S_DEMN2_CHASE1, 0, 0},     // HEXEN_S_DEMN2_PAIN2
     {HEXEN_SPR_DEM2, 7, 6, {(arg0_t)NULL}, HEXEN_S_DEMN2_DEATH2, 0, 0},       // HEXEN_S_DEMN2_DEATH1

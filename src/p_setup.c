@@ -49,6 +49,7 @@
 #include "map_format.h"
 #include "p_tick.h"
 #include "p_enemy.h"
+#include "hexen/p_lightning.h"
 #include "s_sound.h"
 #include "lprintf.h" //jff 10/6/98 for debug outputs
 #include "v_video.h"
@@ -1833,7 +1834,10 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    P_InitThinkers();
 
    if (hexen)
+   {
       P_InitCreatureCorpseQueue();
+      P_InitLightning();
+   }
 
    // if working with a devlopment map, reload it
    //    W_Reload ();     killough 1/31/98: W_Reload obsolete

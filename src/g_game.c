@@ -74,6 +74,7 @@
 #include "sounds.h"
 #include "r_data.h"
 #include "r_sky.h"
+#include "hexen/p_mapinfo.h"
 #include "d_deh.h"              // Ty 3/27/98 deh declarations
 #include "p_inter.h"
 #include "g_game.h"
@@ -660,15 +661,20 @@ static void G_DoLoadLevel (void)
   {
     skytexture = R_TextureNumForName(gamemapinfo->skytexture);
   }
-  /* Hexen picks the sky per map through its MAPINFO (sky1/sky2), which this
-   * core does not parse yet.  Until it does, fall back to the SKY1 texture so
-   * sky sectors at least render a real sky rather than a missing-texture
-   * pattern. */
+  /* Hexen picks the sky per map through its MAPINFO: a primary sky (Sky1),
+   * an alternate sky (Sky2) used for the lightning flash and as the scrolling
+   * backdrop when DoubleSky is set, and a horizontal scroll speed for each.
+   * skytexture tracks Sky1 (the lightning code swaps it to Sky2 mid-flash). */
   else if (hexen)
   {
-    skytexture = R_CheckTextureNumForName("SKY1");
-    if (skytexture == -1)
-      skytexture = R_TextureNumForName("SKY2");
+    Sky1Texture      = P_GetMapSky1Texture(gamemap);
+    Sky2Texture      = P_GetMapSky2Texture(gamemap);
+    Sky1ScrollDelta  = P_GetMapSky1ScrollDelta(gamemap);
+    Sky2ScrollDelta  = P_GetMapSky2ScrollDelta(gamemap);
+    Sky1ColumnOffset = 0;
+    Sky2ColumnOffset = 0;
+    DoubleSky        = P_GetMapDoubleSky(gamemap);
+    skytexture       = Sky1Texture;
   }
   /* DOOM determines the sky texture to be used
    * depending on the current episode, and the game version.

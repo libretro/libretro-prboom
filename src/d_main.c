@@ -80,6 +80,7 @@
 #include "p_setup.h"
 #include "r_draw.h"
 #include "r_main.h"
+#include "hexen/p_mapinfo.h"
 #include "r_fps.h"
 #include "d_main.h"
 #include "d_deh.h"  // Ty 04/08/98 - Externalizations
@@ -1632,6 +1633,12 @@ bool D_DoomMainSetup(void)
   //jff 9/3/98 use logical output routine
   lprintf(LO_INFO,"R_Init: Init DOOM refresh daemon - ");
   R_Init();
+
+  if (hexen)
+  {
+    lprintf(LO_INFO,"\nP_LoadMapInfo: Parsing Hexen MAPINFO.\n");
+    P_LoadMapInfo();
+  }
 
   //jff 9/3/98 use logical output routine
   lprintf(LO_INFO,"\nP_Init: Init Playloop state.\n");

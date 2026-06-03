@@ -46,6 +46,18 @@ int skyflatnum;
 int skytexture;
 int skytexturemid;
 
+/* Hexen dual-sky support.  Sky1 is the regular sky; during a lightning flash
+ * the renderer swaps Sky1 to the brighter Sky2.  With DoubleSky a second sky
+ * (Sky2) scrolls behind a foreground sky (Sky1) that has transparent areas.
+ * Each sky has its own horizontal scroll speed. */
+int     Sky1Texture;
+int     Sky2Texture;
+fixed_t Sky1ColumnOffset;
+fixed_t Sky2ColumnOffset;
+fixed_t Sky1ScrollDelta;
+fixed_t Sky2ScrollDelta;
+dbool   DoubleSky;
+
 dbool   r_stretchsky; // user option, named after ZDoom's
 dbool   skystretch;
 

@@ -490,6 +490,12 @@ static void R_DoDrawPlane(visplane_t *pl)
             dcvars.texturemid = skytexturemid;    // Default y-offset
             texture = skytexture;             // Default texture
             flip = 0;                         // Doom flips it
+
+            /* Hexen scrolls the sky horizontally.  Sky1ColumnOffset
+             * accumulates Sky1ScrollDelta each tic (see P_UpdateSpecials);
+             * fold it into the view angle so the sky drifts. */
+            if (hexen)
+               an += Sky1ColumnOffset;
          }
 
          /* Sky is always drawn full bright, i.e. colormaps[0] is used.

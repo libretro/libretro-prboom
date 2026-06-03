@@ -48,6 +48,8 @@
 #include "m_argv.h"
 #include "w_wad.h"
 #include "r_main.h"
+#include "r_sky.h"
+#include "hexen/p_lightning.h"
 #include "p_maputl.h"
 #include "p_map.h"
 #include "p_user.h"
@@ -2674,6 +2676,14 @@ void P_UpdateSpecials (void)
   /* Heretic: advance the ambient-sound sequencer once per tic. */
   if (heretic)
     P_AmbientSound();
+
+  /* Hexen: advance the lightning storm and scroll the sky. */
+  if (hexen)
+  {
+    P_UpdateLightning();
+    Sky1ColumnOffset += Sky1ScrollDelta;
+    Sky2ColumnOffset += Sky2ScrollDelta;
+  }
 
   // Downcount level timer, exit level if elapsed
   if (levelTimer == TRUE)

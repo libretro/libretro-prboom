@@ -45,6 +45,15 @@
 extern int skytexture;
 extern int skytexturemid;
 
+/* Hexen dual-sky / lightning support. */
+extern int     Sky1Texture;
+extern int     Sky2Texture;
+extern fixed_t Sky1ColumnOffset;
+extern fixed_t Sky2ColumnOffset;
+extern fixed_t Sky1ScrollDelta;
+extern fixed_t Sky2ScrollDelta;
+extern dbool   DoubleSky;
+
 // Sky stretching (see https://zdoom.org/wiki/Sky_stretching )
 #define SKYSTRETCH_HEIGHT 228
 extern dbool   r_stretchsky; // user option

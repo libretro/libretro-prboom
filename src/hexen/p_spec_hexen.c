@@ -510,6 +510,140 @@ int Hexen_EV_CeilingCrushStop(line_t *line, byte *args)
   return 0;
 }
 
+/* --- Pillars --------------------------------------------------------------
+ *
+ * A pillar drives a sector's floor and ceiling together: build closes them to
+ * a meeting height, open separates a closed sector.  The two planes move at
+ * independently scaled speeds so they arrive together. */
+void T_HexenBuildPillar(pillar_t *pillar)
+{
+  result_e res1;
+  result_e res2;
+
+  res1 = T_MovePlane(pillar->sector, pillar->floorSpeed, pillar->floordest,
+                     pillar->crush, 0, pillar->direction);
+  res2 = T_MovePlane(pillar->sector, pillar->ceilingSpeed, pillar->ceilingdest,
+                     pillar->crush, 1, -pillar->direction);
+  if (res1 == RES_PASTDEST && res2 == RES_PASTDEST)
+  {
+    pillar->sector->floordata = NULL;
+    P_RemoveThinker(&pillar->thinker);
+  }
+}
+
+int EV_BuildPillar(line_t *line, byte *args, int crush)
+{
+  int       secnum;
+  int       rtn = 0;
+  sector_t *sec;
+  pillar_t *pillar;
+  int       newHeight;
+
+  (void) line;
+
+  HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+  {
+    sec = &sectors[secnum];
+    if (sec->floordata || sec->ceilingdata)
+      continue;
+    if (sec->floorheight == sec->ceilingheight)
+      continue;                 /* already closed */
+
+    rtn = 1;
+    if (!args[2])
+      newHeight = sec->floorheight +
+        ((sec->ceilingheight - sec->floorheight) / 2);
+    else
+      newHeight = sec->floorheight + (args[2] << FRACBITS);
+
+    pillar = Z_Malloc(sizeof(*pillar), PU_LEVEL, 0);
+    memset(pillar, 0, sizeof(*pillar));
+    sec->floordata = pillar;
+    P_AddThinker(&pillar->thinker);
+    pillar->thinker.function.arg1 = (void (*)(void *))T_HexenBuildPillar;
+    pillar->sector = sec;
+
+    if (!args[2])
+      pillar->ceilingSpeed = pillar->floorSpeed = args[1] * (FRACUNIT / 8);
+    else if (newHeight - sec->floorheight > sec->ceilingheight - newHeight)
+    {
+      pillar->floorSpeed = args[1] * (FRACUNIT / 8);
+      pillar->ceilingSpeed = FixedMul(sec->ceilingheight - newHeight,
+                                      FixedDiv(pillar->floorSpeed,
+                                               newHeight - sec->floorheight));
+    }
+    else
+    {
+      pillar->ceilingSpeed = args[1] * (FRACUNIT / 8);
+      pillar->floorSpeed = FixedMul(newHeight - sec->floorheight,
+                                    FixedDiv(pillar->ceilingSpeed,
+                                             sec->ceilingheight - newHeight));
+    }
+    pillar->floordest   = newHeight;
+    pillar->ceilingdest = newHeight;
+    pillar->direction   = 1;
+    pillar->crush       = (crush && args[3]) ? TRUE : FALSE;
+  }
+  return rtn;
+}
+
+int EV_OpenPillar(line_t *line, byte *args)
+{
+  int       secnum;
+  int       rtn = 0;
+  sector_t *sec;
+  pillar_t *pillar;
+
+  (void) line;
+
+  HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+  {
+    sec = &sectors[secnum];
+    if (sec->floordata || sec->ceilingdata)
+      continue;
+    if (sec->floorheight != sec->ceilingheight)
+      continue;                 /* not closed */
+
+    rtn = 1;
+    pillar = Z_Malloc(sizeof(*pillar), PU_LEVEL, 0);
+    memset(pillar, 0, sizeof(*pillar));
+    sec->floordata = pillar;
+    P_AddThinker(&pillar->thinker);
+    pillar->thinker.function.arg1 = (void (*)(void *))T_HexenBuildPillar;
+    pillar->sector = sec;
+    pillar->crush  = FALSE;
+
+    if (!args[2])
+      pillar->floordest = P_FindLowestFloorSurrounding(sec);
+    else
+      pillar->floordest = sec->floorheight - (args[2] << FRACBITS);
+    if (!args[3])
+      pillar->ceilingdest = P_FindHighestCeilingSurrounding(sec);
+    else
+      pillar->ceilingdest = sec->ceilingheight + (args[3] << FRACBITS);
+
+    if (sec->floorheight - pillar->floordest >=
+        pillar->ceilingdest - sec->ceilingheight)
+    {
+      pillar->floorSpeed = args[1] * (FRACUNIT / 8);
+      pillar->ceilingSpeed = FixedMul(sec->ceilingheight - pillar->ceilingdest,
+                                      FixedDiv(pillar->floorSpeed,
+                                               pillar->floordest -
+                                               sec->floorheight));
+    }
+    else
+    {
+      pillar->ceilingSpeed = args[1] * (FRACUNIT / 8);
+      pillar->floorSpeed = FixedMul(pillar->floordest - sec->floorheight,
+                                    FixedDiv(pillar->ceilingSpeed,
+                                             sec->ceilingheight -
+                                             pillar->ceilingdest));
+    }
+    pillar->direction = -1;     /* open */
+  }
+  return rtn;
+}
+
 /* --- Platforms ------------------------------------------------------------
  *
  * Lifts.  These reuse the engine's T_PlatRaise thinker and active-plat list;
@@ -656,6 +790,15 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 28:                    /* Floor_RaiseAndCrush */
       ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEFLOORCRUSH);
+      break;
+    case 29:                    /* Pillar_Build (no crush) */
+      ok = EV_BuildPillar(line, args, 0);
+      break;
+    case 30:                    /* Pillar_Open */
+      ok = EV_OpenPillar(line, args);
+      break;
+    case 94:                    /* Pillar_BuildAndCrush */
+      ok = EV_BuildPillar(line, args, 1);
       break;
     case 35:                    /* Floor_RaiseByValueTimes8 */
       ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEBYVALUETIMES8);

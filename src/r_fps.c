@@ -409,6 +409,14 @@ static void R_InterpolationGetData(thinker_t *th,
     *posptr2 = ((elevator_t *)th)->sector;
   }
   else
+  if (th->function.arg1 == (void (*)(void *))T_HexenBuildPillar)
+  {
+    *type1 = INTERP_SectorFloor;
+    *posptr1 = ((pillar_t *)th)->sector;
+    *type2 = INTERP_SectorCeiling;
+    *posptr2 = ((pillar_t *)th)->sector;
+  }
+  else
   if (th->function.arg1 == (void (*)(void *))T_Scroll)
   {
     switch (((scroll_t *)th)->type)

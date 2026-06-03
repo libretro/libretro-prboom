@@ -673,6 +673,20 @@ typedef struct
   int lighttag;
 } vldoor_t;
 
+/* Hexen pillar: moves a sector's floor and ceiling toward each other (build)
+ * or apart (open) at the same time. */
+typedef struct
+{
+  thinker_t thinker;
+  sector_t *sector;
+  int       ceilingSpeed;
+  int       floorSpeed;
+  int       floordest;
+  int       ceilingdest;
+  int       direction;
+  dbool     crush;
+} pillar_t;
+
 // p_doors
 
 typedef struct

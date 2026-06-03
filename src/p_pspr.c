@@ -1235,6 +1235,39 @@ void A_FHammerThrow(player_t *player, pspdef_t *psp)
     mo->special1.i = 0;
 }
 
+void A_FSwordAttack(player_t *player, pspdef_t *psp)
+{
+  mobj_t *pmo;
+
+  (void)psp;
+  player->mana[MANA_1] -= WeaponManaUse[player->class][player->readyweapon];
+  player->mana[MANA_2] -= WeaponManaUse[player->class][player->readyweapon];
+  pmo = player->mo;
+  P_SPMAngleXYZ(pmo, pmo->x, pmo->y, pmo->z - 10*FRACUNIT,
+                HEXEN_MT_FSWORD_MISSILE, pmo->angle + ANG45/4);
+  P_SPMAngleXYZ(pmo, pmo->x, pmo->y, pmo->z - 5*FRACUNIT,
+                HEXEN_MT_FSWORD_MISSILE, pmo->angle + ANG45/8);
+  P_SPMAngleXYZ(pmo, pmo->x, pmo->y, pmo->z,
+                HEXEN_MT_FSWORD_MISSILE, pmo->angle);
+  P_SPMAngleXYZ(pmo, pmo->x, pmo->y, pmo->z + 5*FRACUNIT,
+                HEXEN_MT_FSWORD_MISSILE, pmo->angle - ANG45/8);
+  P_SPMAngleXYZ(pmo, pmo->x, pmo->y, pmo->z + 10*FRACUNIT,
+                HEXEN_MT_FSWORD_MISSILE, pmo->angle - ANG45/4);
+  S_StartSound(pmo, hexen_sfx_fighter_sword_fire);
+}
+
+/* Actor codepointer (runs on the FSwordFlame missile, not a psprite). */
+void A_FSwordFlames(mobj_t *actor)
+{
+  int i;
+
+  for (i = 1 + (P_Random(pr_saw) & 3); i; i--)
+    P_SpawnMobj(actor->x + ((P_Random(pr_saw) - 128) << 12),
+                actor->y + ((P_Random(pr_saw) - 128) << 12),
+                actor->z + ((P_Random(pr_saw) - 128) << 11),
+                HEXEN_MT_FSWORD_FLAME);
+}
+
 #ifdef HEXEN
 //****************************************************************************
 //

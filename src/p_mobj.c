@@ -1809,6 +1809,48 @@ mobj_t *P_SPMAngle(mobj_t *source, mobjtype_t type, angle_t angle)
   return th;
 }
 
+/* Hexen: like P_SPMAngle, but the missile is spawned at a caller-supplied
+ * position (x,y,z) rather than at the source origin.  Used by the Fighter's
+ * Quietus sword, which fans several flame missiles from offset heights. */
+mobj_t *P_SPMAngleXYZ(mobj_t *source, fixed_t x, fixed_t y, fixed_t z,
+                      mobjtype_t type, angle_t angle)
+{
+  mobj_t *th;
+  fixed_t slope = 0;
+  angle_t an = angle;
+  uint64_t mask = 0;
+
+  slope = P_AimLineAttack(source, an, 16 * 64 * FRACUNIT, mask);
+  if (!linetarget)
+  {
+    slope = P_AimLineAttack(source, an += 1 << 26, 16 * 64 * FRACUNIT, mask);
+    if (!linetarget)
+    {
+      slope = P_AimLineAttack(source, an -= 2 << 26, 16 * 64 * FRACUNIT, mask);
+      if (!linetarget)
+      {
+        an = angle;
+        slope = 0;
+      }
+    }
+  }
+
+  z += 4 * 8 * FRACUNIT;
+  if (source->flags2 & MF2_FEETARECLIPPED)
+    z -= FOOTCLIPSIZE;
+
+  th = P_SpawnMobj(x, y, z, type);
+  if (th->info->seesound)
+    S_StartSound(th, th->info->seesound);
+  P_SetTarget(&th->target, source);
+  th->angle = an;
+  th->momx = FixedMul(th->info->speed, finecosine[an >> ANGLETOFINESHIFT]);
+  th->momy = FixedMul(th->info->speed, finesine[an >> ANGLETOFINESHIFT]);
+  th->momz = FixedMul(th->info->speed, slope);
+  P_CheckMissileSpawn(th);
+  return th;
+}
+
 /* Heretic: spawn a missile travelling at a fixed angle with explicit momz. */
 mobj_t *P_SpawnMissileAngle(mobj_t *source, mobjtype_t type, angle_t angle, fixed_t momz)
 {

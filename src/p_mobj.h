@@ -523,6 +523,9 @@ void    P_SpawnPuff(fixed_t x, fixed_t y, fixed_t z);
 void    P_SpawnBlood(fixed_t x, fixed_t y, fixed_t z, int damage);
 mobj_t  *P_SpawnMissile(mobj_t *source, mobj_t *dest, mobjtype_t type);
 mobj_t  *P_SpawnPlayerMissile(mobj_t *source, mobjtype_t type);
+/* Hexen: P_SPMAngle variant spawning at a caller-supplied position. */
+mobj_t  *P_SPMAngleXYZ(mobj_t *source, fixed_t x, fixed_t y, fixed_t z,
+                       mobjtype_t type, angle_t angle);
 dbool   P_IsDoomnumAllowed(int doomnum);
 void    P_SpawnMapThing (const mapthing_t*  mthing);
 void    P_SpawnPlayer(int n, const mapthing_t *mthing);

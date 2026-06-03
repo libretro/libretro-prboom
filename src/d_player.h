@@ -277,6 +277,7 @@ typedef struct player_s
   int         mana[NUMMANA];  /* Hexen two-mana ammo (MANA_1, MANA_2) */
   int         maxmana;        /* Hexen mana cap */
   int         morphTics;      /* Hexen: >0 while morphed (pig) */
+  int         pieces;         /* Hexen: collected fourth-weapon pieces (WPIECE*) */
 
 } player_t;
 

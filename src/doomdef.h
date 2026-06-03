@@ -235,6 +235,11 @@ typedef enum
 
 #define MAX_MANA 200   /* Hexen per-mana cap */
 
+/* Hexen fourth-weapon assembly pieces (bitmask in player->pieces). */
+#define WPIECE1 1
+#define WPIECE2 2
+#define WPIECE3 4
+
 // Ammunition types defined.
 typedef enum {
   AM_CLIP,    // Pistol / chaingun ammo.

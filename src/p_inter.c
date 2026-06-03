@@ -1084,6 +1084,38 @@ static dbool Hexen_GiveWeapon(player_t *player, weapontype_t weaponType)
   return gaveWeapon || gaveMana;
 }
 
+/* Collect a fourth-weapon piece (single-player).  Always grants 20+20 mana;
+ * tracks the piece bit, and when all three are held grants and switches to
+ * the fourth weapon (Fighter: Quietus).  Returns the sound to play. */
+static int Hexen_GiveWeaponPiece(player_t *player, pclass_t matchClass,
+                                 int pieceValue, dbool *gaveWeapon)
+{
+  *gaveWeapon = false;
+
+  if (player->class != matchClass)
+  {
+    /* wrong class: pick up only for the mana */
+    int gaveMana = (int)P_GiveMana(player, MANA_1, 20)
+                 + (int)P_GiveMana(player, MANA_2, 20);
+    if (!gaveMana)
+      return -1;                  /* didn't need it; leave in world */
+    return hexen_sfx_pickup_weapon;
+  }
+
+  P_GiveMana(player, MANA_1, 20);
+  P_GiveMana(player, MANA_2, 20);
+  player->pieces |= pieceValue;
+  if (player->pieces == (WPIECE1 | WPIECE2 | WPIECE3))
+  {
+    *gaveWeapon = true;
+    player->weaponowned[WP_FOURTH] = true;
+    if (WP_FOURTH > player->readyweapon)
+      player->pendingweapon = (weapontype_t)WP_FOURTH;
+    return hexen_sfx_weapon_build;
+  }
+  return hexen_sfx_pickup_weapon;
+}
+
 static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
 {
   player_t *player;
@@ -1132,6 +1164,21 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
         return;
       player->message = "HAMMER OF RETRIBUTION";
       break;
+    case HEXEN_SPR_WFR1:           /* Quietus piece 1 (Fighter 4th) */
+    case HEXEN_SPR_WFR2:           /* Quietus piece 2 */
+    case HEXEN_SPR_WFR3:           /* Quietus piece 3 */
+    {
+      dbool gaveWeapon;
+      int   pieceValue = (special->sprite == HEXEN_SPR_WFR1) ? WPIECE1
+                       : (special->sprite == HEXEN_SPR_WFR2) ? WPIECE2 : WPIECE3;
+      int   s = Hexen_GiveWeaponPiece(player, PCLASS_FIGHTER, pieceValue,
+                                      &gaveWeapon);
+      if (s < 0)
+        return;
+      sound = s;
+      player->message = gaveWeapon ? "QUIETUS" : "SEGMENT OF QUIETUS";
+      break;
+    }
     default:
       /* Unhandled Hexen pickup (other classes' weapons, weapon pieces,
        * artifacts, keys): leave it in the world rather than removing it. */

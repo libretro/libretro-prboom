@@ -39,6 +39,7 @@
 #include "p_inter.h"
 #include "p_pspr.h"
 extern fixed_t FloatBobOffsets[64];
+dbool P_SeekerMissile(mobj_t *actor, mobj_t **seekTarget, angle_t thresh, angle_t turnMax, dbool seekcenter);
 void A_UnHideThing(mobj_t *thing);
 #include "dsda_hacked.h"
 #include "p_enemy.h"
@@ -2035,6 +2036,77 @@ void A_LightningReady(player_t *player, pspdef_t *psp)
   A_WeaponReady(player, psp);
   if (P_Random(pr_punch) < 160)
     S_StartSound(player->mo, hexen_sfx_mage_lightning_ready);
+}
+
+/* --------------------------------------------------------------------------
+ * Bloodscourge (Mage WP_FOURTH): fires three homing staff missiles that
+ * acquire targets, weave through the air and seek their prey.
+ * ------------------------------------------------------------------------ */
+static void MStaffSpawn(mobj_t *pmo, angle_t angle)
+{
+  mobj_t *mo;
+
+  mo = P_SPMAngle(pmo, HEXEN_MT_MSTAFF_FX2, angle);
+  if (mo)
+  {
+    P_SetTarget(&mo->target, pmo);
+    P_SetTarget(&mo->special1.m, P_RoughTargetSearch(mo, 0, 10));
+  }
+}
+
+void A_MStaffAttack(player_t *player, pspdef_t *psp)
+{
+  angle_t angle;
+  mobj_t *pmo;
+
+  (void)psp;
+  player->mana[MANA_1] -= WeaponManaUse[player->class][player->readyweapon];
+  player->mana[MANA_2] -= WeaponManaUse[player->class][player->readyweapon];
+  pmo = player->mo;
+  angle = pmo->angle;
+
+  MStaffSpawn(pmo, angle);
+  MStaffSpawn(pmo, angle - ANG1 * 5);
+  MStaffSpawn(pmo, angle + ANG1 * 5);
+  S_StartSound(player->mo, hexen_sfx_mage_staff_fire);
+}
+
+/* The fire-animation screen flash is cosmetic and needs status-bar palette
+ * hooks this core lacks; the state advances normally without it. */
+void A_MStaffPalette(player_t *player, pspdef_t *psp)
+{
+  (void)player;
+  (void)psp;
+}
+
+void A_MStaffWeave(mobj_t *actor)
+{
+  fixed_t newX, newY;
+  int     weaveXY, weaveZ;
+  int     angle;
+
+  weaveXY = actor->special2.i >> 16;
+  weaveZ = actor->special2.i & 0xFFFF;
+  angle = (actor->angle + ANG90) >> ANGLETOFINESHIFT;
+  newX = actor->x - FixedMul(finecosine[angle], FloatBobOffsets[weaveXY] << 2);
+  newY = actor->y - FixedMul(finesine[angle], FloatBobOffsets[weaveXY] << 2);
+  weaveXY = (weaveXY + 6) & 63;
+  newX += FixedMul(finecosine[angle], FloatBobOffsets[weaveXY] << 2);
+  newY += FixedMul(finesine[angle], FloatBobOffsets[weaveXY] << 2);
+  P_TryMove(actor, newX, newY, 0);
+  actor->z -= FloatBobOffsets[weaveZ] << 1;
+  weaveZ = (weaveZ + 3) & 63;
+  actor->z += FloatBobOffsets[weaveZ] << 1;
+  if (actor->z <= actor->floorz)
+    actor->z = actor->floorz + FRACUNIT;
+  actor->special2.i = weaveZ + (weaveXY << 16);
+}
+
+void A_MStaffTrack(mobj_t *actor)
+{
+  if (actor->special1.m == NULL && P_Random(pr_heretic) < 50)
+    P_SetTarget(&actor->special1.m, P_RoughTargetSearch(actor, 0, 10));
+  P_SeekerMissile(actor, &actor->special1.m, ANG1 * 2, ANG1 * 10, false);
 }
 
 #ifdef HEXEN

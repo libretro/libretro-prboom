@@ -1665,8 +1665,22 @@ bool D_DoomMainSetup(void)
   if (hexen)
   {
     int pc;
+    pclass_t startclass = PCLASS_FIGHTER;
+    int p = M_CheckParm("-class");
+
+    if (p && p + 1 < myargc)
+    {
+      const char *c = myargv[p + 1];
+      if (!strcasecmp(c, "cleric") || !strcasecmp(c, "c"))
+        startclass = PCLASS_CLERIC;
+      else if (!strcasecmp(c, "mage") || !strcasecmp(c, "m"))
+        startclass = PCLASS_MAGE;
+      else /* "fighter"/"f"/anything else */
+        startclass = PCLASS_FIGHTER;
+    }
+
     for (pc = 0; pc < MAXPLAYERS; pc++)
-      PlayerClass[pc] = PCLASS_FIGHTER;
+      PlayerClass[pc] = startclass;
   }
 
   if (gameaction != ga_playdemo)

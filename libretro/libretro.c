@@ -415,6 +415,7 @@ static const struct retro_input_descriptor kbd_hexen_desc[] = {
 	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_RIGHT,    "Turn Right" },
 	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LCTRL,    "Fire" },
 	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_e,        "Use / Open Door" },
+	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_SPACE,    "Jump" },
 	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LSHIFT,   "Run" },
 	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_LALT,     "Strafe" },
 	{ 0, RETRO_DEVICE_KEYBOARD, 0, RETROK_q,        "Use Inventory Item" },

@@ -541,6 +541,23 @@ void P_MovePlayer (player_t* player)
           player->flyheight /= 2;
       }
     }
+
+    /* Hexen jump: a grounded player given upward momentum, with a short
+     * cooldown so holding the key cannot pogo.  Morphed (pig) players get a
+     * weaker hop.  Mirrors dsda-doom's Hexen jump. */
+    if (hexen)
+    {
+      if (player->jumpTics)
+        player->jumpTics--;
+
+      if ((cmd->arti & AFLAG_JUMP) && onground && !player->jumpTics &&
+          !(mo->flags2 & MF2_FLY))
+      {
+        mo->momz = (player->morphTics ? 6 : 9) * FRACUNIT;
+        mo->flags2 &= ~MF2_ONMOBJ;
+        player->jumpTics = 18;
+      }
+    }
   }
 #endif
 }

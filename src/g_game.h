@@ -118,6 +118,7 @@ extern int  key_inv_left;
 extern int  key_inv_right;
 extern int  key_fly_up;
 extern int  key_fly_down;
+extern int  key_jump;
 extern int  key_strafe;
 extern int  key_speed;
 extern int  key_escape;                                             // phares

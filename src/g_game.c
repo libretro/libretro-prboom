@@ -160,6 +160,7 @@ int     key_inv_left;
 int     key_inv_right;
 int     key_fly_up;
 int     key_fly_down;
+int     key_jump;
 int     key_strafe;
 int     key_speed;
 int     key_escape = KEYD_ESCAPE;                           // phares 4/13/98
@@ -356,11 +357,20 @@ void G_BuildTiccmd(ticcmd_t* cmd)
   if (gamekeydown[key_fire] || mousebuttons[mousebfire])
     cmd->buttons |= BT_ATTACK;
 
-  if (gamekeydown[key_use] || mousebuttons[mousebforward] ||
-      (raven && gamekeydown['e']))
+  /* Use / open door.  In Hexen the spacebar is the jump key, so the use
+   * action there comes from E (and the mouse); Heretic and Doom keep the
+   * configured use key (spacebar by default). */
+  if (mousebuttons[mousebforward] ||
+      (raven && gamekeydown['e']) ||
+      (!hexen && gamekeydown[key_use]))
     {
       cmd->buttons |= BT_USE;
     }
+
+  /* Hexen jump: stage the request in the arti byte's top bit; P_MovePlayer
+   * turns it into upward momentum when the player is on the ground. */
+  if (hexen && gamekeydown[key_jump])
+    cmd->arti |= AFLAG_JUMP;
 
   /* Heretic/Hexen inventory input: cycle the ready artifact with the inv keys
    * and use it with the use-artifact key. inv_ptr/curpos and readyArtifact

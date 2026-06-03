@@ -142,6 +142,11 @@ typedef enum
   HEXEN_NUMARTIFACTS
 } artitype_t;
 
+/* The ticcmd `arti` byte normally carries an artitype_t (<= HEXEN_NUMARTIFACTS,
+ * well under 0x80).  Hexen reuses its top bit to request a jump this tic. */
+#define AFLAG_JUMP 0x80
+#define AFLAG_MASK 0x7f
+
 #define NUMINVENTORYSLOTS HEXEN_NUMARTIFACTS
 
 typedef struct
@@ -281,6 +286,7 @@ typedef struct player_s
   int         mana[NUMMANA];  /* Hexen two-mana ammo (MANA_1, MANA_2) */
   int         maxmana;        /* Hexen mana cap */
   int         morphTics;      /* Hexen: >0 while morphed (pig) */
+  int         jumpTics;       /* Hexen: cooldown before the next jump */
   int         pieces;         /* Hexen: collected fourth-weapon pieces (WPIECE*) */
 
 } player_t;

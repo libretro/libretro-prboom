@@ -412,6 +412,8 @@ default_t defaults[] =
    0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic/Hexen: fly up
   {"key_fly_down",    {&key_fly_down, NULL},       {'z', NULL}           ,
    0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Heretic/Hexen: fly down
+  {"key_jump",        {&key_jump, NULL},           {' ', NULL}           ,
+   0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // Hexen: jump
   {"key_strafe",      {&key_strafe, NULL},         {KEYD_RALT, NULL}      ,
    0,MAX_KEY,def_key,ss_keys, NULL, NULL}, // key to use with arrows to strafe
   {"key_speed",       {&key_speed, NULL},          {KEYD_RSHIFT, NULL}    ,

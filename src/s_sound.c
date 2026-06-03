@@ -125,6 +125,126 @@ static int S_getChannel(void *origin, sfxinfo_t *sfxinfo, int is_pickup);
 //  allocates channel buffer, sets S_sfx lookup.
 //
 
+/* Per-map music lump names from the Hexen SNDINFO "$MAP n song" lines,
+ * indexed by map number (1..98). */
+static char hexen_map_song[99][16];
+
+const char *S_HexenMapSong(int map)
+{
+  if (map < 1 || map > 98 || !hexen_map_song[map][0])
+    return NULL;
+  return hexen_map_song[map];
+}
+
+/* Hexen sounds are indirected through the SNDINFO lump: the S_sfx table
+ * ships with each entry's *logical* name (e.g. "PlayerFighterGrunt"), and
+ * SNDINFO maps that to the actual lump ("fgtgrunt").  Doom and Heretic name
+ * their sfx lumps directly, so this step is Hexen-only.  Rewrite each
+ * S_sfx[i].name from its logical tag to the mapped lump so the normal
+ * I_GetSfxLumpNum lookup resolves it.  Lines are "<tag> <lump>"; the "$MAP n
+ * song" directive records per-map music; other '$' lines and ';' comments
+ * are skipped. */
+static void S_HexenLoadSndInfo(void)
+{
+  int         lump, len, i;
+  const char *buf;
+  char        tag[64], lmp[64];
+
+  memset(hexen_map_song, 0, sizeof(hexen_map_song));
+
+  lump = (W_CheckNumForName)("SNDINFO", ns_global);
+  if (lump < 0)
+    return;
+  len = W_LumpLength(lump);
+  buf = (const char *)W_CacheLumpNum(lump);
+  if (!buf || len <= 0)
+    return;
+
+  i = 0;
+  while (i < len)
+  {
+    int t = 0, l = 0;
+
+    /* skip whitespace */
+    while (i < len && (buf[i] == ' ' || buf[i] == '\t' ||
+                       buf[i] == '\r' || buf[i] == '\n'))
+      i++;
+    if (i >= len)
+      break;
+
+    /* comment line */
+    if (buf[i] == ';')
+    {
+      while (i < len && buf[i] != '\n')
+        i++;
+      continue;
+    }
+
+    /* first token */
+    while (i < len && buf[i] != ' ' && buf[i] != '\t' &&
+           buf[i] != '\r' && buf[i] != '\n' && t < (int)sizeof(tag) - 1)
+      tag[t++] = buf[i++];
+    tag[t] = '\0';
+
+    /* '$' directive.  "$MAP n song" carries the per-map music lump; other
+     * directives ($ARCHIVEPATH, ...) are ignored. */
+    if (tag[0] == '$')
+    {
+      if (!strcasecmp(tag, "$MAP"))
+      {
+        char nbuf[16], sbuf[16];
+        int  nn = 0, ss = 0, mapnum;
+        while (i < len && (buf[i] == ' ' || buf[i] == '\t')) i++;
+        while (i < len && buf[i] != ' ' && buf[i] != '\t' &&
+               buf[i] != '\r' && buf[i] != '\n' && nn < (int)sizeof(nbuf)-1)
+          nbuf[nn++] = buf[i++];
+        nbuf[nn] = '\0';
+        while (i < len && (buf[i] == ' ' || buf[i] == '\t')) i++;
+        while (i < len && buf[i] != ' ' && buf[i] != '\t' &&
+               buf[i] != '\r' && buf[i] != '\n' && ss < (int)sizeof(sbuf)-1)
+          sbuf[ss++] = buf[i++];
+        sbuf[ss] = '\0';
+        mapnum = atoi(nbuf);
+        if (mapnum >= 1 && mapnum <= 98 && sbuf[0])
+          strncpy(hexen_map_song[mapnum], sbuf,
+                  sizeof(hexen_map_song[0]) - 1);
+      }
+      while (i < len && buf[i] != '\n')
+        i++;
+      continue;
+    }
+
+    /* skip the gap to the second token */
+    while (i < len && (buf[i] == ' ' || buf[i] == '\t'))
+      i++;
+    /* second token (the lump name) */
+    while (i < len && buf[i] != ' ' && buf[i] != '\t' &&
+           buf[i] != '\r' && buf[i] != '\n' && l < (int)sizeof(lmp) - 1)
+      lmp[l++] = buf[i++];
+    lmp[l] = '\0';
+
+    if (!t || !l)
+      continue;
+
+    /* '?' means "use the default sound"; leave the entry as-is. */
+    if (lmp[0] == '?')
+      continue;
+
+    /* match the tag against a sfx entry's logical name and repoint it. */
+    {
+      int s;
+      for (s = 1; s < num_sfx; s++)
+        if (S_sfx[s].name && !strcasecmp(S_sfx[s].name, tag))
+        {
+          S_sfx[s].name = strdup(lmp);
+          break;
+        }
+    }
+  }
+
+  W_UnlockLumpNum(lump);
+}
+
 void S_Init(int sfxVolume, int musicVolume)
 {
   //jff 1/22/98 skip sound init if sound not enabled
@@ -151,6 +271,10 @@ void S_Init(int sfxVolume, int musicVolume)
     // DSDHacked: cover the runtime-grown table, not just the static seed.
     for (i=1 ; i<num_sfx ; i++)
       S_sfx[i].lumpnum = S_sfx[i].usefulness = -1;
+
+    /* Hexen: resolve SNDINFO logical names to real lump names. */
+    if (hexen)
+      S_HexenLoadSndInfo();
   }
 
   // CPhipps - music init reformatted
@@ -239,6 +363,17 @@ void S_Start(void)
   if (gamemapinfo && gamemapinfo->music[0])
   {
     S_ChangeMusicByName(gamemapinfo->music, TRUE);
+    return;
+  }
+
+  /* Hexen sets the per-map music by lump name through SNDINFO ("$MAP n
+   * song"), which S_HexenLoadSndInfo recorded; the Doom episode/commercial
+   * music numbering below does not apply. */
+  if (hexen)
+  {
+    const char *song = S_HexenMapSong(gamemap);
+    if (song)
+      S_ChangeMusicByName((char *)song, TRUE);
     return;
   }
 

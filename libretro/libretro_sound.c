@@ -131,8 +131,8 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
      * (GLDHIT, IMPAT1, ...). Build the right one. W_CheckNumForName
      * uppercases internally. */
     {
-        extern dbool heretic;   /* doomstat.h */
-        if (heretic)
+        extern dbool raven;   /* doomstat.h: heretic||hexen */
+        if (raven)
             snprintf(sfxlump_name, sizeof(sfxlump_name), "%s", sfxname);
         else
             snprintf(sfxlump_name, sizeof(sfxlump_name), "DS%s", sfxname);
@@ -271,13 +271,14 @@ void I_SetMusicVolume(int volume)
  * for a given SFX name. */
 int I_GetSfxLumpNum(sfxinfo_t* sfx)
 {
-    extern dbool heretic;   /* doomstat.h */
+    extern dbool raven;   /* doomstat.h: heretic||hexen */
     char namebuf[9];
 
-    /* Doom names its sfx lumps DS<name> (e.g. DSPISTOL); Heretic uses the
-     * bare name (e.g. GLDHIT, IMPAT1) with no prefix. W_GetNumForName
-     * uppercases internally, so just pass the name through for Heretic. */
-    if (heretic)
+    /* Doom names its sfx lumps DS<name> (e.g. DSPISTOL); Heretic and Hexen
+     * use the bare lump name with no prefix (for Hexen the SNDINFO step has
+     * already rewritten sfx->name to the real lump). W_GetNumForName
+     * uppercases internally. */
+    if (raven)
         snprintf(namebuf, sizeof(namebuf), "%s", sfx->name);
     else
         snprintf(namebuf, sizeof(namebuf), "ds%s", sfx->name);

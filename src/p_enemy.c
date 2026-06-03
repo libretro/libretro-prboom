@@ -3274,3 +3274,14 @@ void A_WraithMelee(mobj_t *actor)
     actor->health += amount;
   }
 }
+
+void A_WraithMissile(mobj_t *actor)
+{
+  mobj_t *mo;
+
+  if (!actor->target)
+    return;
+  mo = P_SpawnMissile(actor, actor->target, HEXEN_MT_WRAITHFX1);
+  if (mo)
+    S_StartSound(actor, hexen_sfx_wraith_missile_fire);
+}

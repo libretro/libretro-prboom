@@ -55,6 +55,8 @@ int   EV_ThingRemove(int tid);
 int   EV_ThingDestroy(int tid);
 int   Hexen_EV_BuildStairs(line_t *line, byte *args, int direction,
                            int stairsType);
+int   EV_ThingProjectile(byte *args, int gravity);
+int   EV_ThingSpawn(byte *args, int fog);
 int   EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount);
 void  Hexen_EV_StopPlat(line_t *line, byte *args);
 

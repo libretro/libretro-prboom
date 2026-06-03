@@ -49,6 +49,10 @@ int   EV_SpawnLight(line_t *line, byte *args, lighttype_t type);
 dbool P_HexenTeleport(mobj_t *thing, fixed_t x, fixed_t y, angle_t angle,
                       dbool useFog);
 dbool EV_HexenTeleport(int tid, mobj_t *thing, dbool fog);
+int   EV_ThingActivate(int tid);
+int   EV_ThingDeactivate(int tid);
+int   EV_ThingRemove(int tid);
+int   EV_ThingDestroy(int tid);
 int   EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount);
 void  Hexen_EV_StopPlat(line_t *line, byte *args);
 

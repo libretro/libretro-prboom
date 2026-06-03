@@ -920,6 +920,96 @@ void Hexen_EV_StopPlat(line_t *line, byte *args)
   }
 }
 
+/* --- Thing specials -------------------------------------------------------
+ *
+ * Operate on the mobjs sharing a thing id.  Activate/Deactivate wake or sleep
+ * dormant monsters (the common, gameplay-meaningful case); the decoration
+ * light/animation toggles are a later refinement.  Remove deletes the thing;
+ * Destroy kills a shootable thing outright. */
+static dbool ActivateThing(mobj_t *mobj)
+{
+  if (mobj->flags & MF_COUNTKILL)
+  {                             /* monster: clear dormancy */
+    if (mobj->flags2 & MF2_DORMANT)
+    {
+      mobj->flags2 &= ~MF2_DORMANT;
+      mobj->tics = 1;
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+static dbool DeactivateThing(mobj_t *mobj)
+{
+  if (mobj->flags & MF_COUNTKILL)
+  {                             /* monster: go dormant */
+    if (!(mobj->flags2 & MF2_DORMANT))
+    {
+      mobj->flags2 |= MF2_DORMANT;
+      mobj->tics = -1;
+      return true;
+    }
+    return false;
+  }
+  return false;
+}
+
+int EV_ThingActivate(int tid)
+{
+  mobj_t *mobj;
+  int     searcher = -1;
+  int     success = 0;
+
+  while ((mobj = P_FindMobjFromTID((short) tid, &searcher)) != NULL)
+    if (ActivateThing(mobj))
+      success = 1;
+  return success;
+}
+
+int EV_ThingDeactivate(int tid)
+{
+  mobj_t *mobj;
+  int     searcher = -1;
+  int     success = 0;
+
+  while ((mobj = P_FindMobjFromTID((short) tid, &searcher)) != NULL)
+    if (DeactivateThing(mobj))
+      success = 1;
+  return success;
+}
+
+int EV_ThingRemove(int tid)
+{
+  mobj_t *mobj;
+  int     searcher = -1;
+  int     success = 0;
+
+  while ((mobj = P_FindMobjFromTID((short) tid, &searcher)) != NULL)
+  {
+    P_RemoveMobj(mobj);
+    success = 1;
+    searcher = -1;              /* the list shifted; restart the scan */
+  }
+  return success;
+}
+
+int EV_ThingDestroy(int tid)
+{
+  mobj_t *mobj;
+  int     searcher = -1;
+  int     success = 0;
+
+  while ((mobj = P_FindMobjFromTID((short) tid, &searcher)) != NULL)
+    if (mobj->flags & MF_SHOOTABLE)
+    {
+      P_DamageMobj(mobj, NULL, NULL, 10000);
+      success = 1;
+    }
+  return success;
+}
+
 /* --- Teleport -------------------------------------------------------------
  *
  * Hexen teleports send the activating mobj to a teleport-destination mapspot
@@ -1136,6 +1226,18 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 116:                   /* Light_Strobe */
       ok = EV_SpawnLight(line, args, LITE_STROBE);
+      break;
+    case 130:                   /* Thing_Activate */
+      ok = EV_ThingActivate(args[0]);
+      break;
+    case 131:                   /* Thing_Deactivate */
+      ok = EV_ThingDeactivate(args[0]);
+      break;
+    case 132:                   /* Thing_Remove */
+      ok = EV_ThingRemove(args[0]);
+      break;
+    case 133:                   /* Thing_Destroy */
+      ok = EV_ThingDestroy(args[0]);
       break;
     case 35:                    /* Floor_RaiseByValueTimes8 */
       ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEBYVALUETIMES8);

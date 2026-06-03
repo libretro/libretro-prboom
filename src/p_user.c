@@ -582,109 +582,68 @@ void P_DeathThink (player_t* player)
 
    P_MovePsprites (player);
 
-#ifdef HEXEN
+   /* Fall to the ground.  Raven games (Heretic/Hexen) additionally tilt the
+    * view: a popped-off bloody skull / ice chunk looks upward, an ordinary
+    * corpse settles its lookdir back to level.  This used to live only in
+    * the compiled-out HEXEN branch, so a dying Heretic/Hexen player's view
+    * never tilted.  Mirrors dsda-doom's P_DeathThink. */
    onground = (player->mo->z <= player->mo->floorz);
-   if(player->mo->type == MT_BLOODYSKULL || player->mo->type == MT_ICECHUNK)
-   { // Flying bloody skull or flying ice chunk
-      player->viewheight = 6*FRACUNIT;
+
+   if (raven &&
+       (player->mo->type == HEXEN_MT_BLOODYSKULL || player->mo->type == HEXEN_MT_ICECHUNK))
+   {  /* flying bloody skull / ice chunk: look upward */
+      player->viewheight = 6 * FRACUNIT;
       player->deltaviewheight = 0;
-      //player->damagecount = 20;
-      if(onground)
+      if (onground && player->lookdir < 60)
       {
-         if(player->lookdir < 60)
-         {
-            lookDelta = (60-player->lookdir)/8;
-            if(lookDelta < 1 && (leveltime&1))
-            {
-               lookDelta = 1;
-            }
-            else if(lookDelta > 6)
-            {
-               lookDelta = 6;
-            }
-            player->lookdir += lookDelta;
-         }
+         int lookDelta = (60 - player->lookdir) / 8;
+         if (lookDelta < 1 && (leveltime & 1))
+            lookDelta = 1;
+         else if (lookDelta > 6)
+            lookDelta = 6;
+         player->lookdir += lookDelta;
       }
    }
-   else if(!(player->mo->flags2&MF2_ICEDAMAGE))
-   { // Fall to ground (if not frozen)
-      player->deltaviewheight = 0;
-      if(player->viewheight > 6*FRACUNIT)
-      {
+   else if (!(raven && (player->mo->flags2 & MF2_ICEDAMAGE)))
+   {  /* settle to the ground (unless frozen solid) */
+      if (player->viewheight > 6*FRACUNIT)
          player->viewheight -= FRACUNIT;
-      }
-      if(player->viewheight < 6*FRACUNIT)
-      {
+      if (player->viewheight < 6*FRACUNIT)
          player->viewheight = 6*FRACUNIT;
-      }
-      if(player->lookdir > 0)
-      {
-         player->lookdir -= 6;
-      }
-      else if(player->lookdir < 0)
-      {
-         player->lookdir += 6;
-      }
-      if(abs(player->lookdir) < 6)
-      {
-         player->lookdir = 0;
+      player->deltaviewheight = 0;
+      if (raven)
+      {  /* return the death view-tilt to level */
+         if (player->lookdir > 0)
+            player->lookdir -= 6;
+         else if (player->lookdir < 0)
+            player->lookdir += 6;
+         if (abs(player->lookdir) < 6)
+            player->lookdir = 0;
       }
    }
-#else
-   /* fall to the ground */
-   if (player->viewheight > 6*FRACUNIT)
-      player->viewheight -= FRACUNIT;
-   if (player->viewheight < 6*FRACUNIT)
-      player->viewheight = 6*FRACUNIT;
-   player->deltaviewheight = 0;
-   onground = (player->mo->z <= player->mo->floorz);
-#endif
    P_CalcHeight (player);
 
-#ifdef HEXEN
-   if(player->attacker && player->attacker != player->mo)
-   { // Watch killer
-      dir = P_FaceMobj(player->mo, player->attacker, &delta);
-      if(delta < ANGLE_1*10)
-      { // Looking at killer, so fade damage and poison counters
-         if(player->damagecount)
-         {
+   if (hexen && player->attacker && player->attacker != player->mo)
+   {  /* Hexen watches the killer with a smooth face-turn, fading the damage
+       * flash while looking at them.  (Vanilla also faded a poison counter
+       * here; this build has no poison system, so only damagecount.) */
+      int dir = P_FaceMobj(player->mo, player->attacker, &delta);
+      if (delta < ANG1 * 10)
+      {
+         if (player->damagecount)
             player->damagecount--;
-         }
-         if(player->poisoncount)
-         {
-            player->poisoncount--;
-         }
       }
-      delta = delta/8;
-      if(delta > ANGLE_1*5)
-      {
-         delta = ANGLE_1*5;
-      }
-      if(dir)
-      { // Turn clockwise
-         player->mo->angle += delta;
-      }
+      delta = delta / 8;
+      if (delta > ANG1 * 5)
+         delta = ANG1 * 5;
+      if (dir)
+         player->mo->angle += delta;   /* turn clockwise */
       else
-      { // Turn counter clockwise
-         player->mo->angle -= delta;
-      }
+         player->mo->angle -= delta;    /* turn counter-clockwise */
    }
-   else if(player->damagecount || player->poisoncount)
+   else if (player->attacker && player->attacker != player->mo)
    {
-      if(player->damagecount)
-      {
-         player->damagecount--;
-      }
-      else
-      {
-         player->poisoncount--;
-      }
-   }
-#else
-   if (player->attacker && player->attacker != player->mo)
-   {
-      /* watch killer */
+      /* watch killer (Doom/Heretic) */
       angle = R_PointToAngle2 (player->mo->x,
             player->mo->y, player->attacker->x,
             player->attacker->y);
@@ -703,31 +662,14 @@ void P_DeathThink (player_t* player)
    }
    else if (player->damagecount)
       player->damagecount--;
-#endif
 
    if (player->cmd.buttons & BT_USE)
    {
-#ifdef HEXEN
-      if(player == &players[consoleplayer])
-		{
-			I_SetPalette((byte *)W_CacheLumpName("PLAYPAL", PU_CACHE));
-			inv_ptr = 0;
-			curpos = 0;
-			newtorch = 0;
-			newtorchdelta = 0;
-		}
-#endif
-
+      /* Hexen's vanilla code stamped the corpse mobj with special1=class /
+       * special2=666 here and reset the inventory cursor; this build derives
+       * the reborn class from PlayerClass[] and resets the inventory cursor
+       * in G_PlayerReborn, so neither is needed. */
       player->playerstate = PST_REBORN;
-
-#ifdef HEXEN
-      player->mo->special1 = player->class;
-		if(player->mo->special1 > 2)
-			player->mo->special1 = 0;
-		// Let the mobj know the player has entered the reborn state.  Some
-		// mobjs need to know when it's ok to remove themselves.
-      player->mo->special2 = 666;
-#endif
    }
 
    R_SmoothPlaying_Reset(player); // e6y
@@ -1403,21 +1345,6 @@ void P_PlayerThink (player_t* player)
       player->mo->flags &= ~MF_JUSTATTACKED;
    }
 
-#ifdef HEXEN
-   // messageTics is above the rest of the counters so that messages will
-   // 		go away, even in death.
-   player->messageTics--; // Can go negative
-   if(!player->messageTics || player->messageTics == -1)
-   { // Refresh the screen when a message goes away
-      player->ultimateMessage = false; // clear out any chat messages.
-      player->yellowMessage = false;
-      if(player == &players[consoleplayer])
-      {
-         BorderTopRefresh = true;
-      }
-   }
-   player->worldTimer++;
-#endif
 
    if (player->playerstate == PST_DEAD)
    {
@@ -1425,12 +1352,6 @@ void P_PlayerThink (player_t* player)
       return;
    }
 
-#ifdef HEXEN
-   if(player->jumpTics)
-      player->jumpTics--;
-   if(player->morphTics)
-      P_MorphPlayerThink(player);
-#endif
 
    // Move around.
    // Reactiontime is used to prevent movement

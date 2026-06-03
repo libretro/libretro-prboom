@@ -205,7 +205,12 @@ static void IN_DrawInterpic(void)
   if (gameepisode < 1 || gameepisode > 3)
     return;
   sprintf(name, "MAPE%d", gameepisode);
-  V_DrawNamePatch(0, 0, 0, name, CR_DEFAULT, VPT_STRETCH);
+  /* The episode map is a static full-screen 320x200 art lump redrawn every
+   * intermission frame; route it through the cached full-screen blit so the
+   * VPT_STRETCH scale only happens on the first frame (and on a palette or
+   * resolution change) instead of every frame -- the same fix the finale /
+   * help art screens use.  At 4K the per-frame stretch was ~11 ms. */
+  V_DrawNamePatchFullScreenCached(0, name, CR_DEFAULT);
 }
 
 static void IN_DrawStatBack(void)

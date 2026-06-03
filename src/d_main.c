@@ -417,11 +417,12 @@ static void D_PageDrawer(void)
   // CPhipps - updated for new patch drawing
   // proff - added M_DrawCredits
 
-  /* Heretic's full-screen lumps (TITLE, CREDIT, HELP1, HELP2) are raw
-   * 320x200 bitmaps, not Doom patch_t graphics, so they render through the
-   * raw-screen blit rather than the patch decoder.  They are otherwise
-   * just as static and just as expensive to re-stretch every frame, so
-   * they share the same page cache; only the render-on-miss call differs. */
+  /* Heretic and Hexen's full-screen lumps (TITLE, CREDIT, HELP1, HELP2)
+   * are raw 320x200 bitmaps, not Doom patch_t graphics, so they render
+   * through the raw-screen blit rather than the patch decoder.  They are
+   * otherwise just as static and just as expensive to re-stretch every
+   * frame, so they share the same page cache; only the render-on-miss call
+   * differs. */
   if (pagename)
   {
     const size_t fb_bytes = (size_t)SCREENWIDTH * SCREENHEIGHT
@@ -454,7 +455,7 @@ static void D_PageDrawer(void)
         drawvars.short_topleft = page_cache;
         drawvars.int_topleft   = (unsigned int *)page_cache;
 
-        if (heretic)
+        if (raven)
           V_DrawRawScreen(pagename);
         else
           V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
@@ -472,7 +473,7 @@ static void D_PageDrawer(void)
       {
         /* Allocation failed -- fall back to drawing directly every
          * frame (correct, just not accelerated). */
-        if (heretic)
+        if (raven)
           V_DrawRawScreen(pagename);
         else
           V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);

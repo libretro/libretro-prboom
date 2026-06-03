@@ -228,6 +228,11 @@
 #define MF_ISMONSTER        LONGLONG(0x0000004000000000)
 // doesn't fall down after being killed (for the Lost Soul)
 #define MF_DONTFALL         LONGLONG(0x0000008000000000)
+/* Raven (Hexen): alternate translucent draw style.  Bit 42 is free in
+ * the MF_ flag space; the value matches dsda-doom's MF_ALTSHADOW.  Note
+ * this is an MF_ (flags) bit and is distinct from the equally-valued
+ * MF2_CANTLEAVEFLOORPIC, which lives in the separate flags2 field. */
+#define MF_ALTSHADOW        LONGLONG(0x0000040000000000)
 
 
 // The flags below are switching order, starting from the most significant bit,

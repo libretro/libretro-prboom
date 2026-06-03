@@ -11,5 +11,6 @@
 extern sfxinfo_t hexen_S_sfx[HEXEN_NUMSFX];
 extern const char *hexen_sprnames[HEXEN_NUMSPRITES + 1];
 extern state_t hexen_states[HEXEN_NUMSTATES];
+extern mobjinfo_t hexen_mobjinfo[HEXEN_NUMMOBJTYPES - HEXEN_MT_ZERO];
 
 #endif

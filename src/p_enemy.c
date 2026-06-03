@@ -343,6 +343,12 @@ static dbool   P_Move(mobj_t *actor, dbool   dropoff) /* killough 9/12/98 */
   int friction = ORIG_FRICTION;
   int speed;
 
+  /* A blasted thing (Disc of Repulsion) is being carried by the blast's
+   * momentum; don't let its own step-move override the throw until the blast
+   * wears off (ResetBlasted clears the flag once it comes to rest). */
+  if (actor->flags2 & MF2_BLASTED)
+    return TRUE;
+
   if (actor->movedir == DI_NODIR)
     return FALSE;
 

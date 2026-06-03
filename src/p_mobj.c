@@ -319,7 +319,7 @@ static void P_XYMovement (mobj_t* mo)
     mo->momx = mo->momy = 0;
       }
     else
-      if (player)   // try to slide along it
+      if (player || (mo->flags2 & MF2_SLIDE))   // try to slide along it
         P_SlideMove (mo);
       else
         if (mo->flags & MF_MISSILE)
@@ -830,6 +830,11 @@ void P_MobjThinker (mobj_t* mobj)
     P_XYMovement(mobj);
     if (mobj->thinker.function.arg1 != (void (*)(void *))P_MobjThinker) // cph - Must've been removed
       return;       // killough - mobj was removed
+  }
+  else if (mobj->flags2 & MF2_BLASTED)
+  {                   /* blast has worn off once the mobj is at rest */
+    extern void ResetBlasted(mobj_t *mo);
+    ResetBlasted(mobj);
   }
 
   if (mobj->z != mobj->floorz || mobj->momz)

@@ -955,6 +955,156 @@ static void P_ArtiTele(player_t *player)
   }
 }
 
+/* Disc of Repulsion (hexen_arti_blastradius) support. */
+fixed_t P_AproxDistance(fixed_t dx, fixed_t dy);  /* p_maputl.c */
+void    P_NoiseAlert(mobj_t *target, mobj_t *emitter); /* p_enemy.c */
+#define BLAST_RADIUS_DIST  (255 * FRACUNIT)
+#define BLAST_SPEED        (20 * FRACUNIT)
+#define BLAST_FULLSTRENGTH 255
+
+/* Clear the blasted state once a shoved mobj has come to rest (called from
+ * P_MobjThinker).  The fork has no ice-death system, so there is no
+ * ice-corpse special case to preserve here. */
+void ResetBlasted(mobj_t *mo)
+{
+  mo->flags2 &= ~MF2_BLASTED;
+  mo->flags2 &= ~MF2_SLIDE;
+}
+
+/* Shove a single victim radially away from the blast source.  The artifact
+ * always blasts at full strength: missiles are flung (and a couple of special
+ * projectiles are reflected back at the caster), monsters get a mass-scaled
+ * upward kick, and a HEXEN_MT_BLASTEFFECT puff trails the victim. */
+void P_BlastMobj(mobj_t *source, mobj_t *victim, fixed_t strength)
+{
+  angle_t angle, ang;
+  mobj_t *mo;
+  fixed_t x, y, z;
+
+  angle = R_PointToAngle2(source->x, source->y, victim->x, victim->y);
+  angle >>= ANGLETOFINESHIFT;
+
+  if (strength < BLAST_FULLSTRENGTH)
+  {
+    victim->momx = FixedMul(strength, finecosine[angle]);
+    victim->momy = FixedMul(strength, finesine[angle]);
+    if (!victim->player)
+    {
+      victim->flags2 |= MF2_SLIDE;
+      victim->flags2 |= MF2_BLASTED;
+    }
+    return;
+  }
+
+  /* full-strength blast from the artifact */
+  if (victim->flags & MF_MISSILE)
+  {
+    switch (victim->type)
+    {
+      case HEXEN_MT_SORCBALL1:   /* don't blast sorcerer balls */
+      case HEXEN_MT_SORCBALL2:
+      case HEXEN_MT_SORCBALL3:
+        return;
+      case HEXEN_MT_MSTAFF_FX2:  /* reflect to originator */
+        P_SetTarget(&victim->special1.m, victim->target);
+        P_SetTarget(&victim->target, source);
+        break;
+      default:
+        break;
+    }
+  }
+  if (victim->type == HEXEN_MT_HOLY_FX)
+  {
+    if (victim->special1.m == source)
+    {
+      P_SetTarget(&victim->special1.m, victim->target);
+      P_SetTarget(&victim->target, source);
+    }
+  }
+
+  victim->momx = FixedMul(BLAST_SPEED, finecosine[angle]);
+  victim->momy = FixedMul(BLAST_SPEED, finesine[angle]);
+
+  /* blast puff, trailing the victim back toward the source */
+  ang = R_PointToAngle2(victim->x, victim->y, source->x, source->y);
+  ang >>= ANGLETOFINESHIFT;
+  x = victim->x + FixedMul(victim->radius + FRACUNIT, finecosine[ang]);
+  y = victim->y + FixedMul(victim->radius + FRACUNIT, finesine[ang]);
+  z = victim->z - victim->floorclip + (victim->height >> 1);
+  mo = P_SpawnMobj(x, y, z, HEXEN_MT_BLASTEFFECT);
+  if (mo)
+  {
+    mo->momx = victim->momx;
+    mo->momy = victim->momy;
+  }
+
+  if (victim->flags & MF_MISSILE)
+  {
+    victim->momz = 8 * FRACUNIT;
+    if (mo)
+      mo->momz = victim->momz;
+  }
+  else
+    victim->momz = (1000 / victim->info->mass) << FRACBITS;
+
+  if (!victim->player)
+  {
+    victim->flags2 |= MF2_SLIDE;
+    victim->flags2 |= MF2_BLASTED;
+  }
+}
+
+/* Blast all nearby things away from the player (the Disc of Repulsion).
+ * Skips bosses, the player, inert effect mobjs, dead monsters, dormant and
+ * underground creatures, splashes and serpents -- everything else within
+ * BLAST_RADIUS_DIST is shoved. */
+void P_BlastRadius(player_t *player)
+{
+  mobj_t    *mo;
+  mobj_t    *pmo = player->mo;
+  thinker_t *think;
+  fixed_t    dist;
+
+  S_StartSound(pmo, hexen_sfx_artifact_blast);
+  P_NoiseAlert(player->mo, player->mo);
+
+  for (think = thinkercap.next; think != &thinkercap; think = think->next)
+  {
+    if (think->function.arg1 != (void (*)(void *))P_MobjThinker)
+      continue;   /* not a mobj thinker */
+    mo = (mobj_t *)think;
+
+    if ((mo == pmo) || (mo->flags2 & MF2_BOSS))
+      continue;   /* not a valid target */
+
+    if ((mo->type == HEXEN_MT_POISONCLOUD) ||
+        (mo->type == HEXEN_MT_HOLY_FX))
+    {
+      /* let these special cases through */
+    }
+    else if ((mo->flags & MF_COUNTKILL) && (mo->health <= 0))
+      continue;   /* dead monster */
+    else if (!(mo->flags & MF_COUNTKILL) &&
+             !(mo->player) && !(mo->flags & MF_MISSILE))
+      continue;   /* must be a monster, player, or missile */
+
+    if (mo->flags2 & MF2_DORMANT)
+      continue;
+    if ((mo->type == HEXEN_MT_WRAITHB) && (mo->flags2 & MF2_DONTDRAW))
+      continue;   /* underground wraith */
+    if ((mo->type == HEXEN_MT_SPLASHBASE) || (mo->type == HEXEN_MT_SPLASH))
+      continue;
+    if (mo->type == HEXEN_MT_SERPENT || mo->type == HEXEN_MT_SERPENTLEADER)
+      continue;
+
+    dist = P_AproxDistance(pmo->x - mo->x, pmo->y - mo->y);
+    if (dist > BLAST_RADIUS_DIST)
+      continue;   /* out of range */
+
+    P_BlastMobj(pmo, mo, BLAST_FULLSTRENGTH);
+  }
+}
+
 dbool P_UseArtifact(player_t *player, int arti)
 {
   mobj_t *mo;
@@ -1062,6 +1212,10 @@ dbool P_UseArtifact(player_t *player, int arti)
           P_SetTarget(&mo->special1.m, player->mo);
           mo->momz = 5 * FRACUNIT;
         }
+        break;
+      case hexen_arti_blastradius:
+        /* Disc of Repulsion: shove every nearby thing away. */
+        P_BlastRadius(player);
         break;
       default:
         return FALSE;

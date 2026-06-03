@@ -39,6 +39,12 @@
 #include "z_zone.h"
 #include "m_random.h"
 #include "hexen/p_spec_hexen.h"
+#include "hexen/p_lightning.h"
+
+/* These have no shared prototype header in this fork. */
+void P_ThrustMobj(mobj_t *mo, angle_t angle, fixed_t move);
+void P_DamageMobj(mobj_t *target, mobj_t *inflictor, mobj_t *source,
+                  int damage);
 
 /* Collapse the per-line arg array into a local byte[5] (mirrors dsda). */
 #define COLLAPSE_SPECIAL_ARGS(dest, source) \
@@ -966,6 +972,24 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 94:                    /* Pillar_BuildAndCrush */
       ok = EV_BuildPillar(line, args, 1);
+      break;
+    case 72:                    /* ThrustThing */
+      if (side == 0 && mo)
+      {
+        P_ThrustMobj(mo, args[0] * (ANG90 / 64), args[1] << FRACBITS);
+        ok = true;
+      }
+      break;
+    case 73:                    /* DamageThing */
+      if (mo)
+      {
+        P_DamageMobj(mo, NULL, NULL, args[0] ? args[0] : 10000);
+        ok = true;
+      }
+      break;
+    case 109:                   /* ForceLightning */
+      P_ForceLightning();
+      ok = true;
       break;
     case 110:                   /* Light_RaiseByValue */
       ok = EV_SpawnLight(line, args, LITE_RAISEBYVALUE);

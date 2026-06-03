@@ -1179,6 +1179,56 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       player->message = gaveWeapon ? "QUIETUS" : "SEGMENT OF QUIETUS";
       break;
     }
+    case HEXEN_SPR_WCSS:           /* Serpent Staff (Cleric 2nd) */
+      if (player->class != PCLASS_CLERIC || !Hexen_GiveWeapon(player, WP_SECOND))
+        return;
+      player->message = "SERPENT STAFF";
+      break;
+    case HEXEN_SPR_WCFM:           /* Firestorm / Flame Strike (Cleric 3rd) */
+      if (player->class != PCLASS_CLERIC || !Hexen_GiveWeapon(player, WP_THIRD))
+        return;
+      player->message = "FIRESTORM";
+      break;
+    case HEXEN_SPR_WCH1:           /* Wraithverge piece 1 (Cleric 4th) */
+    case HEXEN_SPR_WCH2:           /* Wraithverge piece 2 */
+    case HEXEN_SPR_WCH3:           /* Wraithverge piece 3 */
+    {
+      dbool gaveWeapon;
+      int   pieceValue = (special->sprite == HEXEN_SPR_WCH1) ? WPIECE1
+                       : (special->sprite == HEXEN_SPR_WCH2) ? WPIECE2 : WPIECE3;
+      int   s = Hexen_GiveWeaponPiece(player, PCLASS_CLERIC, pieceValue,
+                                      &gaveWeapon);
+      if (s < 0)
+        return;
+      sound = s;
+      player->message = gaveWeapon ? "WRAITHVERGE" : "SEGMENT OF WRAITHVERGE";
+      break;
+    }
+    case HEXEN_SPR_WMCS:           /* Frost Shards / Cone of Shards (Mage 2nd) */
+      if (player->class != PCLASS_MAGE || !Hexen_GiveWeapon(player, WP_SECOND))
+        return;
+      player->message = "FROST SHARDS";
+      break;
+    case HEXEN_SPR_WMLG:           /* Arc of Death (Mage 3rd) */
+      if (player->class != PCLASS_MAGE || !Hexen_GiveWeapon(player, WP_THIRD))
+        return;
+      player->message = "ARC OF DEATH";
+      break;
+    case HEXEN_SPR_WMS1:           /* Bloodscourge piece 1 (Mage 4th) */
+    case HEXEN_SPR_WMS2:           /* Bloodscourge piece 2 */
+    case HEXEN_SPR_WMS3:           /* Bloodscourge piece 3 */
+    {
+      dbool gaveWeapon;
+      int   pieceValue = (special->sprite == HEXEN_SPR_WMS1) ? WPIECE1
+                       : (special->sprite == HEXEN_SPR_WMS2) ? WPIECE2 : WPIECE3;
+      int   s = Hexen_GiveWeaponPiece(player, PCLASS_MAGE, pieceValue,
+                                      &gaveWeapon);
+      if (s < 0)
+        return;
+      sound = s;
+      player->message = gaveWeapon ? "BLOODSCOURGE" : "SEGMENT OF BLOODSCOURGE";
+      break;
+    }
     default:
       /* Unhandled Hexen pickup (other classes' weapons, weapon pieces,
        * artifacts, keys): leave it in the world rather than removing it. */

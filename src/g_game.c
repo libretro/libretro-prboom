@@ -105,6 +105,14 @@ skill_t         gameskill;
 dbool           respawnmonsters;
 int             gameepisode;
 int             gamemap;
+
+/* Hexen hub travel: the player start position the next map is entered at
+ * (args[0] of the matching player start), and the pending Teleport_NewMap
+ * destination staged by G_Completed.  A LeaveMap of -1 means
+ * Teleport_EndGame. */
+int RebornPosition;
+static int LeaveMap;
+static int LeavePosition;
 mapentry_t*     gamemapinfo;
 dbool           paused;
 // CPhipps - moved *_loadgame vars here
@@ -1097,13 +1105,28 @@ static void G_PlayerFinishLevel(int player)
   player_t *p = &players[player];
 
   memset(p->powers, 0, sizeof p->powers);
-  memset(p->cards, 0, sizeof p->cards);
+  /* Hexen keys are hub-scoped: they survive Teleport_NewMap within a
+   * cluster and are stripped only when the destination lies in a different
+   * one (or the game is ending), matching G_PlayerExitMap. */
+  if (!hexen || LeaveMap == -1 ||
+      P_GetMapCluster(gamemap) != P_GetMapCluster(P_TranslateMapWarp(LeaveMap)))
+    memset(p->cards, 0, sizeof p->cards);
 
   p->mo = NULL;           // cph - this is allocated PU_LEVEL so it's gone
   p->extralight = 0;      /* cancel gun flashes */
   p->fixedcolormap = 0;   /* cancel ir gogles */
   p->damagecount = 0;     /* no palette changes */
   p->bonuscount = 0;
+}
+
+/* The player start to use for (re)spawning: the RebornPosition start on
+ * Hexen maps when present, position 0 otherwise. */
+static mapthing_t *G_PlayerStart(int playernum)
+{
+  if (hexen && RebornPosition > 0 && RebornPosition < MAX_PLAYER_STARTS &&
+      playerstarts[RebornPosition][playernum].options)
+    return &playerstarts[RebornPosition][playernum];
+  return &playerstarts[0][playernum];
 }
 
 // CPhipps - G_SetPlayerColour
@@ -1348,7 +1371,7 @@ void G_DeathMatchSpawnPlayer (int playernum)
    }
 
    /* no good spot, so the player will probably get stuck */
-   P_SpawnPlayer (playernum, &playerstarts[playernum]);
+   P_SpawnPlayer (playernum, G_PlayerStart(playernum));
 }
 
 /*
@@ -1381,18 +1404,18 @@ void G_DoReborn (int playernum)
       return;
    }
 
-   if (G_CheckSpot (playernum, &playerstarts[playernum]) )
+   if (G_CheckSpot (playernum, G_PlayerStart(playernum)) )
    {
-      P_SpawnPlayer (playernum, &playerstarts[playernum]);
+      P_SpawnPlayer (playernum, G_PlayerStart(playernum));
       return;
    }
 
    /* try to spawn at one of the other players spots */
    for (i=0 ; i<MAXPLAYERS ; i++)
    {
-      if (G_CheckSpot (playernum, &playerstarts[i]) )
+      if (G_CheckSpot (playernum, G_PlayerStart(i)) )
       {
-         P_SpawnPlayer (playernum, &playerstarts[i]);
+         P_SpawnPlayer (playernum, G_PlayerStart(i));
          return;
       }
    }
@@ -1438,6 +1461,16 @@ void G_ExitLevel (void)
   gameaction = ga_completed;
 }
 
+/* Hexen Teleport_NewMap: stage the destination (a MAPINFO warp number and an
+ * arrival start position) and complete the level.  map -1 ends the game. */
+void G_Completed(int map, int position)
+{
+  secretexit = false;
+  LeaveMap = map;
+  LeavePosition = position;
+  gameaction = ga_completed;
+}
+
 // Here's for the german edition.
 // IF NO WOLF3D LEVELS, NO SECRET EXIT!
 
@@ -1466,6 +1499,25 @@ void G_DoCompleted (void)
 
   if (automapmode & am_active)
     AM_Stop();
+
+  /* Hexen has no intermission between hub maps: resolve the staged
+   * Teleport_NewMap destination through the MAPINFO warp table and load it
+   * directly.  Per-map world state is not yet preserved across hub revisits
+   * (the hub save subsystem is a later step); the destination map loads
+   * fresh each time, while the players carry their state over. */
+  if (hexen)
+  {
+    if (LeaveMap == -1)
+    { /* Teleport_EndGame */
+      gameaction = ga_victory;
+      return;
+    }
+    wminfo.nextep = gameepisode - 1;
+    wminfo.next = P_TranslateMapWarp(LeaveMap) - 1;
+    RebornPosition = LeavePosition;
+    gameaction = ga_worlddone;
+    return;
+  }
 
   wminfo.lastmapinfo = gamemapinfo;
   wminfo.nextmapinfo = NULL;

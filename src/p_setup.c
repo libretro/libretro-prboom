@@ -351,7 +351,7 @@ mapthing_t *deathmatchstarts;      // killough
 size_t     num_deathmatchstarts;   // killough
 
 mapthing_t *deathmatch_p;
-mapthing_t playerstarts[MAXPLAYERS];
+mapthing_t playerstarts[MAX_PLAYER_STARTS][MAXPLAYERS];
 
 /*
 =================

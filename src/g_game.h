@@ -59,6 +59,9 @@ bool G_DoLoadGameFromBuffer(void *data, size_t length);
 bool G_DoSaveGameToBuffer(void *buf, size_t size);
 void G_SaveGame(int slot, char *description); // Called by M_Responder.
 void G_ExitLevel(void);
+/* Hexen Teleport_NewMap (map -1 = Teleport_EndGame) */
+void G_Completed(int map, int position);
+extern int RebornPosition;
 void G_SecretExitLevel(void);
 void G_WorldDone(void);
 void G_EndGame(void); /* cph - make m_menu.c call a G_* function for this */

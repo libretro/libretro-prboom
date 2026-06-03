@@ -254,7 +254,10 @@ extern  size_t     num_deathmatchstarts; // killough
 extern  mapthing_t *deathmatch_p;
 
 // Player spawn spots.
-extern  mapthing_t playerstarts[];
+/* Hexen player starts carry a position number (the start spot a
+ * Teleport_NewMap line sends the player to) in args[0]. */
+#define MAX_PLAYER_STARTS 8
+extern  mapthing_t playerstarts[MAX_PLAYER_STARTS][MAXPLAYERS];
 
 // Intermission stats.
 // Parameters for world map / intermission.

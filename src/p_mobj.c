@@ -1516,15 +1516,24 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   {
 
     // save spots for respawning in coop games
-    playerstarts[thingtype-1] = *mthing;
-    /* cph 2006/07/24 - use the otherwise-unused options field to flag that
-     * this start is present (so we know which elements of the array are filled
-     * in, in effect). Also note that the call below to P_SpawnPlayer must use
-     * the playerstarts version with this field set */
-    playerstarts[thingtype-1].options = 1;
+    /* Hexen: a map may carry several starts per player, distinguished by the
+     * position number in the thing's args[0]; a Teleport_NewMap line names
+     * which one the player arrives at (RebornPosition).  Doom and Heretic
+     * starts are always position 0. */
+    {
+      int pos = hexen ? hexen_thing_args[0] : 0;
+      if (pos < 0 || pos >= MAX_PLAYER_STARTS)
+        pos = 0;
+      playerstarts[pos][thingtype-1] = *mthing;
+      /* cph 2006/07/24 - use the otherwise-unused options field to flag that
+       * this start is present (so we know which elements of the array are
+       * filled in, in effect). Also note that the call below to P_SpawnPlayer
+       * must use the playerstarts version with this field set */
+      playerstarts[pos][thingtype-1].options = 1;
 
-    if (!deathmatch)
-      P_SpawnPlayer (thingtype-1, &playerstarts[thingtype-1]);
+      if (!deathmatch && pos == (hexen ? RebornPosition : 0))
+        P_SpawnPlayer (thingtype-1, &playerstarts[pos][thingtype-1]);
+    }
     return;
   }
 

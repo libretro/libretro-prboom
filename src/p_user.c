@@ -953,9 +953,11 @@ static void P_ArtiTele(player_t *player)
   }
   else
   {
-    destX = playerstarts[0].x << FRACBITS;
-    destY = playerstarts[0].y << FRACBITS;
-    destAngle = ANG45 * (playerstarts[0].angle / 45);
+    int pos = (hexen && RebornPosition > 0 && RebornPosition < MAX_PLAYER_STARTS &&
+               playerstarts[RebornPosition][0].options) ? RebornPosition : 0;
+    destX = playerstarts[pos][0].x << FRACBITS;
+    destY = playerstarts[pos][0].y << FRACBITS;
+    destAngle = ANG45 * (playerstarts[pos][0].angle / 45);
   }
 
   oldx = player->mo->x;

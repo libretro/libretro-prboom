@@ -35,6 +35,7 @@
 #include "r_main.h"
 #include "p_spec.h"
 #include "hexen/po_man.h"
+#include "g_game.h"
 #include "lprintf.h"
 #include "p_tick.h"
 #include "p_map.h"
@@ -1915,6 +1916,29 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       {
         P_DamageMobj(mo, NULL, NULL, args[0] ? args[0] : 10000);
         ok = true;
+      }
+      break;
+    case 74:                    /* Teleport_NewMap */
+      if (side == 0)
+      { /* only the front side teleports, and only living players */
+        if (!(mo && mo->player && mo->player->playerstate == PST_DEAD))
+        {
+          G_Completed(args[0], args[1]);
+          ok = true;
+        }
+      }
+      break;
+    case 75:                    /* Teleport_EndGame */
+      if (side == 0)
+      {
+        if (!(mo && mo->player && mo->player->playerstate == PST_DEAD))
+        {
+          ok = true;
+          if (deathmatch)
+            G_Completed(1, 0); /* deathmatch victory loops to map 1 */
+          else
+            G_Completed(-1, 0);
+        }
       }
       break;
     case 109:                   /* ForceLightning */

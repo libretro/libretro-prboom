@@ -68,6 +68,7 @@ void S_StartAmbientSound(void *origin, int sound_id, int volume);
 
 // Stop sound for thing at <origin>
 void S_StopSound(void* origin);
+dbool S_GetSoundPlayingInfo(void *origin, int sound_id);
 
 // Start music using <music_id> from sounds.h
 void S_StartMusic(int music_id);

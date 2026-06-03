@@ -516,6 +516,27 @@ void S_StartAmbientSound(void *origin, int sfx_id, int volume)
   S_StartSoundAtVolume((degenmobj_t *)origin, sfx_id, volume);
 }
 
+/* Hexen sound sequences need to know whether a particular sound is still
+ * playing on a given origin, to chain or repeat sequence steps. */
+dbool S_GetSoundPlayingInfo(void *origin, int sound_id)
+{
+  int        cnum;
+  sfxinfo_t *sfx;
+
+  if (nosfxparm)
+    return false;
+
+  sfx = &S_sfx[sound_id];
+  for (cnum = 0; cnum < numChannels; cnum++)
+  {
+    channel_t *c = &channels[cnum];
+    if (c->sfxinfo == sfx && c->origin == origin)
+      if (I_SoundIsPlaying(c->handle))
+        return true;
+  }
+  return false;
+}
+
 void S_StopSound(void *origin)
 {
   int cnum;

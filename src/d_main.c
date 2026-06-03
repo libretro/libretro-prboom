@@ -620,11 +620,14 @@ void D_DoAdvanceDemo(void)
    * format that this engine's Doom demo reader (G_ReadDemoHeader) cannot
    * parse, which hangs the attract loop. Until Heretic demo playback is
    * wired up, keep showing the title page instead of advancing into a
-   * demo. */
+   * demo.  The page-cycling D_DrawTitle* path (which would normally start
+   * the title music) is skipped here, so start it explicitly; S_StartMusic
+   * is a no-op once the title song is already playing. */
   if (heretic)
   {
     pagetic = TICRATE * 11;
     pagename = "TITLE";
+    S_StartMusic(mus_intro);
     return;
   }
 

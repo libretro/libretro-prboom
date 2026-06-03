@@ -179,6 +179,10 @@ typedef struct player_s
   // Armor type is 0-2.
   int                 armortype;
 
+  /* Hexen: four independent armor pieces (fixed-point save-percent units).
+   * Doom/Heretic use the scalar armorpoints/armortype above instead. */
+  int                 hexen_armorpoints[NUMARMOR];
+
   // Power ups. invinc and invis are tic counters.
   int                 powers[NUMPOWERS];
   dbool             cards[NUMCARDS];

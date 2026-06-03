@@ -285,6 +285,57 @@ static dbool   P_GiveArmor(player_t *player, int armortype)
   return TRUE;
 }
 
+/* Per-class Hexen armor parameters (fixed-point), indexed by pclass_t.
+ * armor_increment[] is the value each armor piece is set to by a full
+ * pickup of that type and its weight in the damage-absorption sum;
+ * auto_armor_save is the class's innate save; armor_max caps the total a
+ * Boost-Armor pickup can build to.  Values match the original Hexen. */
+static const struct
+{
+  fixed_t armor_increment[NUMARMOR];
+  fixed_t auto_armor_save;
+  fixed_t armor_max;
+} hexen_class_armor[NUMCLASSES] = {
+  /* PCLASS_NULL    */ { { 0, 0, 0, 0 }, 0, 0 },
+  /* PCLASS_FIGHTER */ { { 25*FRACUNIT, 20*FRACUNIT, 15*FRACUNIT,  5*FRACUNIT }, 15*FRACUNIT, 100*FRACUNIT },
+  /* PCLASS_CLERIC  */ { { 10*FRACUNIT, 25*FRACUNIT,  5*FRACUNIT, 20*FRACUNIT }, 10*FRACUNIT,  90*FRACUNIT },
+  /* PCLASS_MAGE    */ { {  5*FRACUNIT, 15*FRACUNIT, 10*FRACUNIT, 25*FRACUNIT },  5*FRACUNIT,  80*FRACUNIT },
+  /* PCLASS_PIG     */ { { 0, 0, 0, 0 }, 0, 5*FRACUNIT }
+};
+
+/* Hexen armor grant.  amount == -1 sets the given piece to its full
+ * class value (the in-world armor pickups); a positive amount adds
+ * amount*5 save-percent up to the class total cap (the Boost Armor /
+ * Heal Radius artifacts).  Returns FALSE if nothing could be added. */
+dbool Hexen_P_GiveArmor(player_t *player, armortype_t armortype, int amount)
+{
+  int hits;
+  int totalArmor;
+  int cls = player->class;
+
+  if (amount == -1)
+  {
+    hits = hexen_class_armor[cls].armor_increment[armortype];
+    if (player->hexen_armorpoints[armortype] >= hits)
+      return FALSE;
+    player->hexen_armorpoints[armortype] = hits;
+  }
+  else
+  {
+    hits = amount * 5 * FRACUNIT;
+    totalArmor = player->hexen_armorpoints[ARMOR_ARMOR]
+               + player->hexen_armorpoints[ARMOR_SHIELD]
+               + player->hexen_armorpoints[ARMOR_HELMET]
+               + player->hexen_armorpoints[ARMOR_AMULET]
+               + hexen_class_armor[cls].auto_armor_save;
+    if (totalArmor < hexen_class_armor[cls].armor_max)
+      player->hexen_armorpoints[armortype] += hits;
+    else
+      return FALSE;
+  }
+  return TRUE;
+}
+
 //
 // P_GiveCard
 //
@@ -1154,6 +1205,30 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       sound = hexen_sfx_pickup_item;
       break;
     }
+    case HEXEN_SPR_ARM1:           /* Mesh Armor */
+      if (!Hexen_P_GiveArmor(player, ARMOR_ARMOR, -1))
+        return;
+      player->message = "MESH ARMOR";
+      sound = hexen_sfx_pickup_item;
+      break;
+    case HEXEN_SPR_ARM2:           /* Falcon Shield */
+      if (!Hexen_P_GiveArmor(player, ARMOR_SHIELD, -1))
+        return;
+      player->message = "FALCON SHIELD";
+      sound = hexen_sfx_pickup_item;
+      break;
+    case HEXEN_SPR_ARM3:           /* Platinum Helm */
+      if (!Hexen_P_GiveArmor(player, ARMOR_HELMET, -1))
+        return;
+      player->message = "PLATINUM HELM";
+      sound = hexen_sfx_pickup_item;
+      break;
+    case HEXEN_SPR_ARM4:           /* Amulet of Warding */
+      if (!Hexen_P_GiveArmor(player, ARMOR_AMULET, -1))
+        return;
+      player->message = "AMULET OF WARDING";
+      sound = hexen_sfx_pickup_item;
+      break;
     case HEXEN_SPR_WFAX:           /* Timon's Axe (Fighter 2nd) */
       if (player->class != PCLASS_FIGHTER || !Hexen_GiveWeapon(player, WP_SECOND))
         return;
@@ -1521,7 +1596,43 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
           (player->cheats&CF_GODMODE || player->powers[pw_invulnerability]))
         return;
 
-      if (player->armortype)
+      if (hexen)
+        {
+          /* Hexen armor: the absorbed fraction is the per-class innate save
+           * plus the four armor pieces (capped at 100%); each piece is then
+           * worn down in proportion to its class weight. */
+          int     i;
+          int     saved;
+          int     cls = player->class;
+          fixed_t savedPercent = hexen_class_armor[cls].auto_armor_save
+                               + player->hexen_armorpoints[ARMOR_ARMOR]
+                               + player->hexen_armorpoints[ARMOR_SHIELD]
+                               + player->hexen_armorpoints[ARMOR_HELMET]
+                               + player->hexen_armorpoints[ARMOR_AMULET];
+          if (savedPercent)
+            {
+              if (savedPercent > 100 * FRACUNIT)
+                savedPercent = 100 * FRACUNIT;
+              for (i = 0; i < NUMARMOR; i++)
+                {
+                  if (player->hexen_armorpoints[i])
+                    {
+                      player->hexen_armorpoints[i] -= FixedDiv(
+                        FixedMul(damage << FRACBITS,
+                                 hexen_class_armor[cls].armor_increment[i]),
+                        300 * FRACUNIT);
+                      if (player->hexen_armorpoints[i] < 2 * FRACUNIT)
+                        player->hexen_armorpoints[i] = 0;
+                    }
+                }
+              saved = FixedDiv(FixedMul(damage << FRACBITS, savedPercent),
+                               100 * FRACUNIT);
+              if (saved > savedPercent * 2)
+                saved = savedPercent * 2;
+              damage -= saved >> FRACBITS;
+            }
+        }
+      else if (player->armortype)
         {
           int saved = player->armortype == 1 ? damage/3 : damage/2;
           if (player->armorpoints <= saved)

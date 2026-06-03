@@ -1322,8 +1322,16 @@ static void ST_HexenDrawer(void)
     if (W_CheckNumForName("MANAVL2") >= 0)
       V_DrawNamePatch(102, 164, FG, "MANAVL2", CR_DEFAULT, VPT_STRETCH);
 
-    /* Armor. */
-    ST_HereticDrawINumber(plyr->armorpoints, 250, 176);
+    /* Armor.  Hexen shows the total armor class: the sum of the four armor
+     * pieces (stored as fixed-point save-percent) expressed in AC points,
+     * i.e. divided by 5*FRACUNIT. */
+    {
+      fixed_t sum = plyr->hexen_armorpoints[ARMOR_ARMOR]
+                  + plyr->hexen_armorpoints[ARMOR_SHIELD]
+                  + plyr->hexen_armorpoints[ARMOR_HELMET]
+                  + plyr->hexen_armorpoints[ARMOR_AMULET];
+      ST_HereticDrawINumber(FixedDiv(sum, 5 * FRACUNIT) >> FRACBITS, 250, 176);
+    }
 
     /* Ready-artifact box, count, and the use-flash animation. */
     if (ArtifactFlash)

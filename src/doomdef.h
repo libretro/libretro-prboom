@@ -250,6 +250,19 @@ typedef enum
 
 #define MAX_MANA 200   /* Hexen per-mana cap */
 
+/* Hexen armor.  Unlike Doom/Heretic (a single armorpoints value with a
+ * 1-or-2 armortype), Hexen tracks four independent armor pieces; the
+ * absorbed fraction is the sum of all four plus a per-class innate save.
+ * armorpoints are stored as fixed-point "save percent" units. */
+typedef enum
+{
+  ARMOR_ARMOR,
+  ARMOR_SHIELD,
+  ARMOR_HELMET,
+  ARMOR_AMULET,
+  NUMARMOR
+} armortype_t;
+
 /* Hexen fourth-weapon assembly pieces (bitmask in player->pieces). */
 #define WPIECE1 1
 #define WPIECE2 2

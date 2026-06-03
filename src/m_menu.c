@@ -753,33 +753,38 @@ menu_t ClassDef =
 void M_DrawClass(void)
 {
   /* The authentic Hexen class screen: a green "CHOOSE CLASS" heading with
-   * the three classes listed in green, and a framed, rotating player model
-   * of the highlighted class on the right with its name boxed.  This core
-   * draws the heading and class list in the big FONTB font (Hexen has no
-   * dedicated title graphic) and the still model frame for the class the
-   * cursor is on; the alttext is left blank so the generic (red) menu-item
-   * loop in M_Drawer does not also draw over it. */
+   * the three classes listed in green, and a framed player model of the
+   * highlighted class on the right.  The heading and list are drawn in the
+   * small translatable font (FONTA via hu_font) so they can render green;
+   * the menu items' alttext is left blank so the generic (red) item loop in
+   * M_Drawer does not draw over them. */
   static const char *const boxlump[3]  = { "M_FBOX",  "M_CBOX",  "M_MBOX"  };
   static const char *const walklump[3] = { "M_FWALK1","M_CWALK1","M_MWALK1"};
   int sel = (itemOn >= 0 && itemOn < class_end) ? itemOn : 0;
 
-  M_DrawTextBColor(34, 24, "CHOOSE CLASS:", CR_GREEN);
-  M_DrawTextBColor(ClassDef.x, ClassDef.y + 0 * LINEHEIGHT, "FIGHTER", CR_GREEN);
-  M_DrawTextBColor(ClassDef.x, ClassDef.y + 1 * LINEHEIGHT, "CLERIC",  CR_GREEN);
-  M_DrawTextBColor(ClassDef.x, ClassDef.y + 2 * LINEHEIGHT, "MAGE",    CR_GREEN);
+  /* The class list and heading are drawn in the small translatable font
+   * (FONTA via hu_font) in green.  The big FONTB glyphs are baked red and do
+   * not translate, so they cannot render green; FONTA does. */
+  M_WriteText(34, 24, "CHOOSE CLASS:", CR_GREEN);
+  M_WriteText(ClassDef.x, ClassDef.y + 0 * LINEHEIGHT, "FIGHTER", CR_GREEN);
+  M_WriteText(ClassDef.x, ClassDef.y + 1 * LINEHEIGHT, "CLERIC",  CR_GREEN);
+  M_WriteText(ClassDef.x, ClassDef.y + 2 * LINEHEIGHT, "MAGE",    CR_GREEN);
 
   /* Framed model of the highlighted class (box behind, walking model on
-   * top), positioned on the right as in the original.  The box is 112x136;
-   * centre the ~44x66 walking model horizontally within it and seat it in
-   * the framed window near the top. */
+   * top).  The box is 112x136 at (174,8); its black model window sits in the
+   * upper portion, so centre the ~44x66 walking model horizontally and seat
+   * it inside that window rather than below the frame. */
   if (W_CheckNumForName(boxlump[sel]) >= 0)
     V_DrawNamePatch(174, 8, 0, boxlump[sel], CR_DEFAULT, VPT_STRETCH);
   if (W_CheckNumForName(walklump[sel]) >= 0)
   {
+    int lump = W_GetNumForName(walklump[sel]);
     int bx = 174, bw = 112;
-    int mw = R_NamePatchWidth(walklump[sel]);
-    V_DrawNamePatch(bx + (bw - mw) / 2, 48, 0, walklump[sel],
-                    CR_DEFAULT, VPT_STRETCH);
+    int mw = R_NumPatchWidth(lump);
+    /* Centre the visible figure horizontally in the 112-wide box and seat it
+     * inside the black model window in the upper part of the frame.
+     * V_DrawNumPatch applies the patch's own offsets. */
+    V_DrawNumPatch(bx + (bw - mw) / 2, 24, 0, lump, CR_DEFAULT, VPT_STRETCH);
   }
 }
 

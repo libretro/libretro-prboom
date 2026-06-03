@@ -908,6 +908,14 @@ static void P_LoadThings (int lump)
           mt.angle   = SHORT(hmt->angle);
           mt.type    = SHORT(hmt->type);
           mt.options = SHORT(hmt->options);
+          /* Stage the Hexen thing id and scripted-special arguments for
+           * P_SpawnMapThing (the narrow mapthing_t cannot carry them). */
+          hexen_thing_tid     = SHORT(hmt->tid);
+          hexen_thing_args[0] = hmt->args[0];
+          hexen_thing_args[1] = hmt->args[1];
+          hexen_thing_args[2] = hmt->args[2];
+          hexen_thing_args[3] = hmt->args[3];
+          hexen_thing_args[4] = hmt->args[4];
         }
       else
         {
@@ -918,6 +926,9 @@ static void P_LoadThings (int lump)
           mt.angle = SHORT(mt.angle);
           mt.type = SHORT(mt.type);
           mt.options = SHORT(mt.options);
+          hexen_thing_tid = 0;
+          hexen_thing_args[0] = hexen_thing_args[1] = hexen_thing_args[2] =
+            hexen_thing_args[3] = hexen_thing_args[4] = 0;
         }
 
       if (!P_IsDoomnumAllowed(mt.type))
@@ -1973,7 +1984,10 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    /* The map's sectors are loaded now, so the lightning storm can scan for
     * its sky/lightning-special sectors. */
    if (hexen)
+   {
       P_InitLightning();
+      P_CreateTIDList();
+   }
 
    P_MapEnd();
 

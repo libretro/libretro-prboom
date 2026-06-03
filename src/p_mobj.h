@@ -480,6 +480,7 @@ typedef struct mobj_s
     specialval_t        special1;
     specialval_t        special2;
     int                 special_args[5];
+    short               tid;        /* Hexen: thing id for TID lookups */
     int                 damage;     /* Heretic: per-missile damage override */
 
     /* Raven (Hexen/Heretic): how far the sprite is sunk into the floor, used
@@ -524,6 +525,14 @@ extern int iquetail;
 void    P_RespawnSpecials(void);
 mobj_t  *P_SpawnMobj(fixed_t x, fixed_t y, fixed_t z, mobjtype_t type);
 void    P_RemoveMobj(mobj_t *th);
+
+/* Hexen thing-id (TID) list. */
+void    P_CreateTIDList(void);
+void    P_InsertMobjIntoTIDList(mobj_t *mobj, short tid);
+void    P_RemoveMobjFromTIDList(mobj_t *mobj);
+mobj_t *P_FindMobjFromTID(short tid, int *searchPosition);
+extern short hexen_thing_tid;
+extern int   hexen_thing_args[5];
 dbool   P_SetMobjState(mobj_t *mobj, statenum_t state);
 void    P_MobjThinker(mobj_t *mobj);
 void    P_SpawnPuff(fixed_t x, fixed_t y, fixed_t z);

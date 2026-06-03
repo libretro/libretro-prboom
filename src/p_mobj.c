@@ -1035,6 +1035,9 @@ int        iquetail;
 
 void P_RemoveMobj (mobj_t* mobj)
 {
+  if (hexen && mobj->tid != 0)
+    P_RemoveMobjFromTIDList(mobj);
+
   if ((mobj->flags & MF_SPECIAL)
       && !(mobj->flags & MF_DROPPED)
       && (mobj->type != MT_INV)
@@ -1306,6 +1309,99 @@ dbool P_IsDoomnumAllowed(int doomnum)
 }
 
 //
+// Hexen thing-id (TID) list.
+//
+// Hexen things may carry a thing id; specials and scripts find a mobj by its
+// TID.  The list is rebuilt after a level loads and kept in sync as TID-
+// bearing mobjs are spawned or removed.  P_LoadThings stages each Hexen
+// thing's id and args into these carriers right before P_SpawnMapThing, since
+// the engine's narrow mapthing_t (a raw Doom WAD record) cannot hold them.
+//
+
+#define MAX_TID_COUNT 200
+
+static int     TIDList[MAX_TID_COUNT + 1];  /* +1 for the 0 terminator */
+static mobj_t *TIDMobj[MAX_TID_COUNT];
+
+short hexen_thing_tid = 0;
+int   hexen_thing_args[5] = {0, 0, 0, 0, 0};
+
+void P_CreateTIDList(void)
+{
+  int        i = 0;
+  thinker_t *t;
+
+  for (t = thinkercap.next; t != &thinkercap; t = t->next)
+  {
+    mobj_t *mobj;
+    if (t->function.arg1 != (void (*)(void *))P_MobjThinker)
+      continue;
+    mobj = (mobj_t *) t;
+    if (mobj->tid != 0)
+    {
+      if (i == MAX_TID_COUNT)
+        I_Error("P_CreateTIDList: MAX_TID_COUNT (%d) exceeded.", MAX_TID_COUNT);
+      TIDList[i] = mobj->tid;
+      TIDMobj[i++] = mobj;
+    }
+  }
+  TIDList[i] = 0;
+}
+
+void P_InsertMobjIntoTIDList(mobj_t *mobj, short tid)
+{
+  int i;
+  int index = -1;
+
+  for (i = 0; TIDList[i] != 0; i++)
+    if (TIDList[i] == -1)
+    {
+      index = i;
+      break;
+    }
+  if (index == -1)
+  {
+    if (i == MAX_TID_COUNT)
+      I_Error("P_InsertMobjIntoTIDList: MAX_TID_COUNT (%d) exceeded.",
+              MAX_TID_COUNT);
+    index = i;
+    TIDList[index + 1] = 0;
+  }
+  mobj->tid = tid;
+  TIDList[index] = tid;
+  TIDMobj[index] = mobj;
+}
+
+void P_RemoveMobjFromTIDList(mobj_t *mobj)
+{
+  int i;
+
+  for (i = 0; TIDList[i] != 0; i++)
+    if (TIDMobj[i] == mobj)
+    {
+      TIDList[i] = -1;
+      TIDMobj[i] = NULL;
+      mobj->tid = 0;
+      return;
+    }
+  mobj->tid = 0;
+}
+
+mobj_t *P_FindMobjFromTID(short tid, int *searchPosition)
+{
+  int i;
+
+  for (i = *searchPosition + 1; TIDList[i] != 0; i++)
+    if (TIDList[i] == tid)
+    {
+      *searchPosition = i;
+      return TIDMobj[i];
+    }
+  *searchPosition = -1;
+  return NULL;
+}
+
+//
 // P_SpawnMapThing
 // The fields of the mapthing should
 // already be in host byte order.
@@ -1531,6 +1627,17 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   mobj = P_SpawnMobj (x,y,z, i);
   mobj->spawnpoint = *mthing;
   mobj->iden_num = iden_num;
+
+  /* Hexen: carry the thing id and scripted-special arguments onto the mobj
+   * (staged by P_LoadThings).  P_CreateTIDList picks the tid up after the
+   * level finishes loading. */
+  if (hexen)
+  {
+    int a;
+    mobj->tid = hexen_thing_tid;
+    for (a = 0; a < 5; a++)
+      mobj->special_args[a] = hexen_thing_args[a];
+  }
 
   if (mobj->tics > 0)
     mobj->tics = 1 + (P_Random (pr_spawnthing) % mobj->tics);

@@ -1235,6 +1235,60 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       sound = hexen_sfx_pickup_artifact;
       player->message = "DARK SERVANT";
       break;
+    case HEXEN_SPR_PTN2:           /* Quartz Flask (heal 25) */
+      if (!P_GiveArtifact(player, hexen_arti_health, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "QUARTZ FLASK";
+      break;
+    case HEXEN_SPR_SPHL:           /* Mystic Urn (heal 100) */
+      if (!P_GiveArtifact(player, hexen_arti_superhealth, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "MYSTIC URN";
+      break;
+    case HEXEN_SPR_INVU:           /* Icon of the Defender (invulnerability) */
+      if (!P_GiveArtifact(player, hexen_arti_invulnerability, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "ICON OF THE DEFENDER";
+      break;
+    case HEXEN_SPR_TRCH:           /* Torch */
+      if (!P_GiveArtifact(player, hexen_arti_torch, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "TORCH";
+      break;
+    case HEXEN_SPR_PORK:           /* Porkalator (egg) */
+      if (!P_GiveArtifact(player, hexen_arti_egg, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "PORKALATOR";
+      break;
+    case HEXEN_SPR_SOAR:           /* Wings of Wrath (flight) */
+      if (!P_GiveArtifact(player, hexen_arti_fly, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "WINGS OF WRATH";
+      break;
+    case HEXEN_SPR_SPED:           /* Boots of Speed */
+      if (!P_GiveArtifact(player, hexen_arti_speed, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "BOOTS OF SPEED";
+      break;
+    case HEXEN_SPR_BMAN:           /* Krater of Might (boost mana) */
+      if (!P_GiveArtifact(player, hexen_arti_boostmana, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "KRATER OF MIGHT";
+      break;
+    case HEXEN_SPR_PSBG:           /* Flechette (poison bag) */
+      if (!P_GiveArtifact(player, hexen_arti_poisonbag, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "FLECHETTE";
+      break;
     default:
       /* Unhandled Hexen pickup (other classes' weapons, weapon pieces,
        * artifacts, keys): leave it in the world rather than removing it. */

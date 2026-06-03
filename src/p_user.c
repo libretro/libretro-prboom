@@ -969,6 +969,89 @@ dbool P_UseArtifact(player_t *player, int arti)
   {
     switch (arti)
     {
+      case hexen_arti_invulnerability:
+        if (!P_GivePower(player, pw_invulnerability))
+          return FALSE;
+        break;
+      case hexen_arti_health:
+        if (!P_GiveBody(player, 25))
+          return FALSE;
+        break;
+      case hexen_arti_superhealth:
+        if (!P_GiveBody(player, 100))
+          return FALSE;
+        break;
+      case hexen_arti_torch:
+        if (!P_GivePower(player, pw_infrared))
+          return FALSE;
+        break;
+      case hexen_arti_egg:
+        P_SpawnPlayerMissile(player->mo, HEXEN_MT_EGGFX);
+        P_SPMAngle(player->mo, HEXEN_MT_EGGFX, player->mo->angle - (ANG45 / 6));
+        P_SPMAngle(player->mo, HEXEN_MT_EGGFX, player->mo->angle + (ANG45 / 6));
+        P_SPMAngle(player->mo, HEXEN_MT_EGGFX, player->mo->angle - (ANG45 / 3));
+        P_SPMAngle(player->mo, HEXEN_MT_EGGFX, player->mo->angle + (ANG45 / 3));
+        break;
+      case hexen_arti_fly:
+        if (!P_GivePower(player, pw_flight))
+          return FALSE;
+        if (player->mo->momz <= -35 * FRACUNIT)
+          S_StopSound(player->mo);   /* cut the falling scream */
+        break;
+      case hexen_arti_speed:
+        if (!P_GivePower(player, pw_speed))
+          return FALSE;
+        break;
+      case hexen_arti_boostmana:
+        if (!P_GiveMana(player, MANA_1, MAX_MANA))
+        {
+          if (!P_GiveMana(player, MANA_2, MAX_MANA))
+            return FALSE;
+        }
+        else
+          P_GiveMana(player, MANA_2, MAX_MANA);
+        break;
+      case hexen_arti_poisonbag:
+        angle = player->mo->angle >> ANGLETOFINESHIFT;
+        if (player->class == PCLASS_CLERIC)
+        {
+          mo = P_SpawnMobj(player->mo->x + 16 * finecosine[angle],
+                           player->mo->y + 24 * finesine[angle],
+                           player->mo->z - player->mo->floorclip + 8 * FRACUNIT,
+                           HEXEN_MT_POISONBAG);
+          if (mo)
+            P_SetTarget(&mo->target, player->mo);
+        }
+        else if (player->class == PCLASS_MAGE)
+        {
+          mo = P_SpawnMobj(player->mo->x + 16 * finecosine[angle],
+                           player->mo->y + 24 * finesine[angle],
+                           player->mo->z - player->mo->floorclip + 8 * FRACUNIT,
+                           HEXEN_MT_FIREBOMB);
+          if (mo)
+            P_SetTarget(&mo->target, player->mo);
+        }
+        else   /* Fighter (and pig): a lobbed timed bomb */
+        {
+          mo = P_SpawnMobj(player->mo->x, player->mo->y,
+                           player->mo->z - player->mo->floorclip + 35 * FRACUNIT,
+                           HEXEN_MT_THROWINGBOMB);
+          if (mo)
+          {
+            mo->angle = player->mo->angle
+                      + (((P_Random(pr_heretic) & 7) - 4) << 24);
+            mo->momz = 4 * FRACUNIT
+                     + (player->lookdir << (FRACBITS - 4));
+            mo->z += player->lookdir << (FRACBITS - 4);
+            P_ThrustMobj(mo, mo->angle, mo->info->speed);
+            mo->momx += player->mo->momx >> 1;
+            mo->momy += player->mo->momy >> 1;
+            P_SetTarget(&mo->target, player->mo);
+            mo->tics -= P_Random(pr_heretic) & 3;
+            P_CheckMissileSpawn(mo);
+          }
+        }
+        break;
       case hexen_arti_summon:
         /* Dark Servant: fire the summoning missile; A_Summon spawns the
          * Minotaur (bound to this player as master) where it lands. */
@@ -1165,7 +1248,8 @@ void P_PlayerThink (player_t* player)
     * input. Only the console player drives the single-player pending-artifact
     * global. */
    if (raven && player == &players[consoleplayer] &&
-       pending_artifact > 0 && pending_artifact < NUMARTIFACTS)
+       pending_artifact > 0 &&
+       pending_artifact < (hexen ? HEXEN_NUMARTIFACTS : NUMARTIFACTS))
    {
       P_PlayerUseArtifact(player, pending_artifact);
       pending_artifact = 0;

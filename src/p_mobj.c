@@ -1233,7 +1233,25 @@ void P_SpawnPlayer (int n, const mapthing_t* mthing)
   x    = mthing->x << FRACBITS;
   y    = mthing->y << FRACBITS;
   z    = ONFLOORZ;
-  mobj = P_SpawnMobj (x,y,z, g_mt_player);
+  if (hexen)
+  {
+    /* Hexen: the player mobj type follows the chosen class - sprites and
+     * pain/death sounds differ per class. */
+    switch (PlayerClass[n])
+    {
+      case PCLASS_CLERIC:
+        mobj = P_SpawnMobj(x, y, z, HEXEN_MT_PLAYER_CLERIC);
+        break;
+      case PCLASS_MAGE:
+        mobj = P_SpawnMobj(x, y, z, HEXEN_MT_PLAYER_MAGE);
+        break;
+      default:
+        mobj = P_SpawnMobj(x, y, z, HEXEN_MT_PLAYER_FIGHTER);
+        break;
+    }
+  }
+  else
+    mobj = P_SpawnMobj (x,y,z, g_mt_player);
 
   // set color translations for player sprites
 

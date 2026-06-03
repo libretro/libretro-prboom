@@ -48,6 +48,7 @@
 #include "g_game.h"
 #include "p_inter.h"
 #include "lprintf.h"
+#include "hexen/po_man.h"
 #include "r_demo.h"
 #include "u_musinfo.h"
 
@@ -1450,6 +1451,12 @@ void P_SpawnMapThing (const mapthing_t* mthing)
     case DEN_PLAYER8:
       return;
   }
+
+  /* Hexen: polyobject anchor and start-spot things are load-time
+   * bookkeeping handled by PO_Init, not world mobjs (and the start spots
+   * are counted here so PO_Init knows how many to allocate). */
+  if (PO_Detect(thingtype))
+    return;
 
   /* Hexen places player starts 5-8 at editor numbers 9100-9103 (players 1-4
    * use 1-4 as in Doom).  This core is single-player, so the extra starts are

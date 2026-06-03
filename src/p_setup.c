@@ -38,6 +38,7 @@
 #include "doomstat.h"
 #include "hexen/sn_sonix.h"
 #include "hexen/p_acs.h"
+#include "hexen/po_man.h"
 #include "m_bbox.h"
 #include "m_argv.h"
 #include "g_game.h"
@@ -1829,6 +1830,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    P_ApplyMapFormat();
 
    totallive = totalkills = totalitems = totalsecret = wminfo.maxfrags = 0;
+  po_NumPolyobjs = 0; /* hexen */
    wminfo.partime = 180;
 
    for (i=0; i<MAXPLAYERS; i++)
@@ -1903,6 +1905,9 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    P_LoadLineDefs2 (lumpnum+ML_LINEDEFS);
    P_LoadBlockMap  (lumpnum+ML_BLOCKMAP);
 
+   if (hexen)
+      PO_ResetBlockMap(true); /* parallel polyobject collision blockmap */
+
    if (nodes_glbsp > 0)
    {
       P_LoadSubsectors(gl_lumpnum + ML_GL_SSECT);
@@ -1949,6 +1954,9 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       P_InitAmbientSound();
 
    P_LoadThings(lumpnum+ML_THINGS);
+
+   if (hexen)
+      PO_Init(lumpnum+ML_THINGS); /* spawn and place the polyobjects */
 
    // if deathmatch, randomly spawn the active players
    if (deathmatch)

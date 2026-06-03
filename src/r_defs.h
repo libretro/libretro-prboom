@@ -282,7 +282,45 @@ typedef struct subsector_s
 {
   sector_t *sector;
   int numlines, firstline;
+
+  /* Hexen: the polyobject rendered inside this subsector, if any. */
+  struct polyobj_s *poly;
 } subsector_t;
+
+/* Hexen polyobjects: a group of segs anchored at a start spot, moved and
+ * rotated at runtime by rewriting the seg vertices.  Collision goes through
+ * a parallel blockmap of polyblock_t links; rendering attaches the group to
+ * the subsector containing its centre. */
+typedef struct polyobj_s
+{
+  int numsegs;
+  seg_t **segs;
+  degenmobj_t startSpot;
+  vertex_t *originalPts;   /* the base for rotations */
+  vertex_t *prevPts;       /* restores the old points when a move is blocked */
+  angle_t angle;
+  int tag;                 /* reference tag from the editor */
+  int bbox[4];             /* blockmap coordinates */
+  int validcount;          /* dedup in the blockmap line iterator */
+  dbool crush;             /* should the polyobj attempt to crush mobjs? */
+  dbool hurt;
+  int seqType;
+  void *specialdata;       /* the mover thinker while the poly is moving */
+  subsector_t *subsector;
+} polyobj_t;
+
+typedef struct polyblock_s
+{
+  polyobj_t *polyobj;
+  struct polyblock_s *prev;
+  struct polyblock_s *next;
+} polyblock_t;
+
+#define PO_LINE_START 1     /* polyobj line start special */
+#define PO_LINE_EXPLICIT 5
+
+extern polyobj_t *polyobjs; /* list of all poly-objects on the level */
+extern int po_NumPolyobjs;
 
 
 //

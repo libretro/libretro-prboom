@@ -40,6 +40,8 @@
 #include "p_maputl.h"
 #include "p_map.h"
 #include "p_setup.h"
+#include "hexen/po_man.h"
+#include "lprintf.h"
 
 //
 // P_AproxDistance
@@ -365,6 +367,43 @@ dbool P_BlockLinesIterator(int x, int y, dbool func(line_t*))
   if (x<0 || y<0 || x>=bmapwidth || y>=bmapheight)
     return TRUE;
   offset = y*bmapwidth+x;
+
+  /* Hexen: polyobject segs live in a parallel blockmap; their linedefs'
+   * vertices move with the poly, so they must be offered to the iterator
+   * here (the static line blockmap still holds them at their original
+   * anchor position). */
+  if (hexen && PolyBlockMap)
+  {
+    int i;
+    seg_t **tempSeg;
+    polyblock_t *polyLink;
+
+    polyLink = PolyBlockMap[offset];
+    while (polyLink)
+    {
+      if (polyLink->polyobj)
+      {
+        if (polyLink->polyobj->validcount != validcount)
+        {
+          polyLink->polyobj->validcount = validcount;
+          tempSeg = polyLink->polyobj->segs;
+          for (i = 0; i < polyLink->polyobj->numsegs; i++, tempSeg++)
+          {
+            if ((*tempSeg)->linedef->validcount == validcount)
+            {
+              continue;
+            }
+            (*tempSeg)->linedef->validcount = validcount;
+            if (!func((*tempSeg)->linedef))
+            {
+              return false;
+            }
+          }
+        }
+      }
+      polyLink = polyLink->next;
+    }
+  }
   offset = *(blockmap+offset);
   list = blockmaplump+offset;     // original was reading         // phares
                                   // delmiting 0 as linedef 0     // phares

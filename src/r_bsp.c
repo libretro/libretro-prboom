@@ -468,6 +468,22 @@ static dbool   R_CheckBBox(const fixed_t *bspcoord)
 //
 // killough 1/31/98 -- made static, polished
 
+/* Hexen: render a polyobject's segs inside its current subsector, before
+ * the subsector's own segs.  The vertices were rewritten by the polyobj
+ * movement code, so R_AddLine draws them where they now stand. */
+static void R_AddPolyLines(polyobj_t *poly)
+{
+  int polyCount;
+  seg_t **polySeg;
+
+  polyCount = poly->numsegs;
+  polySeg = poly->segs;
+  while (polyCount--)
+  {
+    R_AddLine(*polySeg++);
+  }
+}
+
 static void R_Subsector(int num)
 {
   int         count;
@@ -529,6 +545,11 @@ static void R_Subsector(int num)
   // like passing it as an argument.
 
   R_AddSprites(sub, (floorlightlevel+ceilinglightlevel)/2);
+
+  /* Hexen: render the polyobj in the subsector first */
+  if (sub->poly)
+    R_AddPolyLines(sub->poly);
+
   while (count--)
   {
     if (line->miniseg == FALSE)

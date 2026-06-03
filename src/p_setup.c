@@ -1834,10 +1834,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    P_InitThinkers();
 
    if (hexen)
-   {
       P_InitCreatureCorpseQueue();
-      P_InitLightning();
-   }
 
    // if working with a devlopment map, reload it
    //    W_Reload ();     killough 1/31/98: W_Reload obsolete
@@ -1972,6 +1969,11 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
     * commit; until then, skip Doom special spawning on Hexen maps. */
    if (!hexen)
       P_SpawnSpecials();
+
+   /* The map's sectors are loaded now, so the lightning storm can scan for
+    * its sky/lightning-special sectors. */
+   if (hexen)
+      P_InitLightning();
 
    P_MapEnd();
 

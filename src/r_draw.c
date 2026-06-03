@@ -50,6 +50,7 @@
 #elif defined(__ARM_NEON)
 #include <arm_neon.h>
 #endif
+#include <string.h>
 
 //
 // All drawing to the view buffer is accomplished in this file.
@@ -375,12 +376,19 @@ static void R_FlushQuad16(void)
    uint16_t *dest   = drawvars.short_topleft + commontop * SURFACE_SHORT_PITCH + startx;
    int        count = commonbot - commontop + 1;
 
+   /* Each row copies the 4 transposed columns, which are 4 contiguous
+    * uint16_t in the source (the transpose buffer is 4-wide) to 4 adjacent
+    * pixels in the destination -- i.e. exactly 8 contiguous bytes from a
+    * contiguous source.  The original wrote them as four separate 16-bit
+    * stores.  Collapse to a single 8-byte move: memcpy(,,8) lowers to one
+    * unaligned movq/str on every target the core builds for, makes no
+    * alignment assumption (dest = topleft + startx is only 2-byte aligned),
+    * and is endian-agnostic (a byte copy, so bit-identical on LE and BE).
+    * The whole quad-column path is the common wall-fill case, so this is the
+    * pixel-write hot loop. */
    while(--count >= 0)
    {
-      dest[0] = source[0];
-      dest[1] = source[1];
-      dest[2] = source[2];
-      dest[3] = source[3];
+      memcpy(dest, source, 4 * sizeof(uint16_t));
       source += 4;
       dest += SURFACE_SHORT_PITCH;
    }

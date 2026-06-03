@@ -152,6 +152,7 @@ typedef struct
   short special;
   short oldspecial;      //jff 2/16/98 remembers if sector WAS secret (automap)
   short tag;
+  int   seqType;         /* Hexen: sound-sequence type (SEQTYPE_*) */
 } sector_t;
 
 //

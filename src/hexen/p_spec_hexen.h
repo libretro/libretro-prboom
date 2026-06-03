@@ -38,6 +38,9 @@ void  T_HexenVerticalDoor(vldoor_t *door);
 int   Hexen_EV_DoDoor(line_t *line, byte *args, vldoor_e type);
 dbool Hexen_EV_VerticalDoor(line_t *line, mobj_t *thing);
 int   Hexen_EV_DoFloor(line_t *line, byte *args, floor_e floortype);
+void  T_HexenMoveCeiling(ceiling_t *ceiling);
+int   Hexen_EV_DoCeiling(line_t *line, byte *args, ceiling_e type);
+int   Hexen_EV_CeilingCrushStop(line_t *line, byte *args);
 int   EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount);
 void  Hexen_EV_StopPlat(line_t *line, byte *args);
 

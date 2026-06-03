@@ -383,6 +383,12 @@ static void R_InterpolationGetData(thinker_t *th,
     *posptr1 = ((ceiling_t *)th)->sector;
   }
   else
+  if (th->function.arg1 == (void (*)(void *))T_HexenMoveCeiling)
+  {
+    *type1 = INTERP_SectorCeiling;
+    *posptr1 = ((ceiling_t *)th)->sector;
+  }
+  else
   if (th->function.arg1 == (void (*)(void *))T_VerticalDoor)
   {
     *type1 = INTERP_SectorCeiling;

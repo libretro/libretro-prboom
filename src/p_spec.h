@@ -423,6 +423,15 @@ typedef enum
   genCrusher,
   genSilentCrusher,
 
+  /* Hexen ceiling movement types (handled by T_HexenMoveCeiling) */
+  CLEV_LOWERTOFLOOR,
+  CLEV_RAISETOHIGHEST,
+  CLEV_LOWERANDCRUSH,
+  CLEV_CRUSHANDRAISE,
+  CLEV_LOWERBYVALUE,
+  CLEV_RAISEBYVALUE,
+  CLEV_CRUSHRAISEANDSTAY,
+  CLEV_MOVETOVALUETIMES8,
 } ceiling_e;
 
 // p_floor

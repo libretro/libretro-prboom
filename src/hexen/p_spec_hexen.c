@@ -347,6 +347,169 @@ int Hexen_EV_DoFloor(line_t *line, byte *args, floor_e floortype)
   return rtn;
 }
 
+/* --- Ceilings -------------------------------------------------------------
+ *
+ * A dedicated Hexen ceiling thinker (the Doom T_MoveCeiling does not remove
+ * plain movers at their destination, and its crusher handling differs).  One-
+ * shot movers stop on arrival; crush-and-raise reverses and keeps cycling;
+ * crush-raise-and-stay reverses up after one down stroke. */
+void T_HexenMoveCeiling(ceiling_t *ceiling)
+{
+  result_e res;
+
+  switch (ceiling->direction)
+  {
+    case 1:                     /* up */
+      res = T_MovePlane(ceiling->sector, ceiling->speed,
+                        ceiling->topheight, FALSE, 1, ceiling->direction);
+      if (res == RES_PASTDEST)
+      {
+        if (ceiling->type == CLEV_CRUSHANDRAISE)
+        {
+          ceiling->direction = -1;
+          ceiling->speed = ceiling->speed * 2;
+        }
+        else
+          P_RemoveActiveCeiling(ceiling);
+      }
+      break;
+
+    case -1:                    /* down */
+      res = T_MovePlane(ceiling->sector, ceiling->speed,
+                        ceiling->bottomheight, ceiling->crush, 1,
+                        ceiling->direction);
+      if (res == RES_PASTDEST)
+      {
+        if (ceiling->type == CLEV_CRUSHANDRAISE ||
+            ceiling->type == CLEV_CRUSHRAISEANDSTAY)
+        {
+          ceiling->direction = 1;
+          ceiling->speed = ceiling->speed / 2;
+        }
+        else
+          P_RemoveActiveCeiling(ceiling);
+      }
+      /* crushed: the crusher types simply keep pushing */
+      break;
+  }
+}
+
+int Hexen_EV_DoCeiling(line_t *line, byte *args, ceiling_e type)
+{
+  int        secnum;
+  int        rtn = 0;
+  sector_t  *sec;
+  ceiling_t *ceiling;
+
+  (void) line;
+
+  HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+  {
+    sec = &sectors[secnum];
+    if (sec->floordata || sec->ceilingdata)
+      continue;
+
+    rtn = 1;
+    ceiling = Z_Malloc(sizeof(*ceiling), PU_LEVEL, 0);
+    memset(ceiling, 0, sizeof(*ceiling));
+    P_AddThinker(&ceiling->thinker);
+    sec->ceilingdata = ceiling;
+    ceiling->thinker.function.arg1 = (void (*)(void *))T_HexenMoveCeiling;
+    ceiling->sector = sec;
+    ceiling->crush  = FALSE;
+    ceiling->speed  = args[1] * (FRACUNIT / 8);
+
+    switch (type)
+    {
+      case CLEV_CRUSHRAISEANDSTAY:
+        ceiling->crush = TRUE;
+        ceiling->topheight = sec->ceilingheight;
+        ceiling->bottomheight = sec->floorheight + 8 * FRACUNIT;
+        ceiling->direction = -1;
+        break;
+      case CLEV_CRUSHANDRAISE:
+        ceiling->topheight = sec->ceilingheight;
+        ceiling->crush = TRUE;
+        ceiling->bottomheight = sec->floorheight + 8 * FRACUNIT;
+        ceiling->direction = -1;
+        break;
+      case CLEV_LOWERANDCRUSH:
+        ceiling->crush = TRUE;
+        ceiling->bottomheight = sec->floorheight + 8 * FRACUNIT;
+        ceiling->direction = -1;
+        break;
+      case CLEV_LOWERTOFLOOR:
+        ceiling->bottomheight = sec->floorheight;
+        ceiling->direction = -1;
+        break;
+      case CLEV_RAISETOHIGHEST:
+        ceiling->topheight = P_FindHighestCeilingSurrounding(sec);
+        ceiling->direction = 1;
+        break;
+      case CLEV_LOWERBYVALUE:
+        ceiling->bottomheight = sec->ceilingheight - args[2] * FRACUNIT;
+        ceiling->direction = -1;
+        break;
+      case CLEV_RAISEBYVALUE:
+        ceiling->topheight = sec->ceilingheight + args[2] * FRACUNIT;
+        ceiling->direction = 1;
+        break;
+      case CLEV_MOVETOVALUETIMES8:
+      {
+        int destHeight = args[2] * FRACUNIT * 8;
+        if (args[3])
+          destHeight = -destHeight;
+        if (sec->ceilingheight <= destHeight)
+        {
+          ceiling->direction = 1;
+          ceiling->topheight = destHeight;
+          if (sec->ceilingheight == destHeight)
+            rtn = 0;
+        }
+        else
+        {
+          ceiling->direction = -1;
+          ceiling->bottomheight = destHeight;
+        }
+        break;
+      }
+      default:
+        rtn = 0;
+        break;
+    }
+
+    ceiling->tag  = sec->tag;
+    ceiling->type = type;
+
+    if (rtn)
+      P_AddActiveCeiling(ceiling);
+    else
+    {
+      sec->ceilingdata = NULL;
+      P_RemoveThinker(&ceiling->thinker);
+    }
+  }
+  return rtn;
+}
+
+int Hexen_EV_CeilingCrushStop(line_t *line, byte *args)
+{
+  ceilinglist_t *cl;
+
+  (void) line;
+
+  for (cl = activeceilings; cl; cl = cl->next)
+  {
+    ceiling_t *ceiling = cl->ceiling;
+    if (ceiling->tag == args[0])
+    {
+      P_RemoveActiveCeiling(ceiling);
+      return 1;
+    }
+  }
+  return 0;
+}
+
 /* --- Platforms ------------------------------------------------------------
  *
  * Lifts.  These reuse the engine's T_PlatRaise thinker and active-plat list;
@@ -499,6 +662,27 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 36:                    /* Floor_LowerByValueTimes8 */
       ok = Hexen_EV_DoFloor(line, args, FLEV_LOWERBYVALUETIMES8);
+      break;
+    case 40:                    /* Ceiling_LowerByValue */
+      ok = Hexen_EV_DoCeiling(line, args, CLEV_LOWERBYVALUE);
+      break;
+    case 41:                    /* Ceiling_RaiseByValue */
+      ok = Hexen_EV_DoCeiling(line, args, CLEV_RAISEBYVALUE);
+      break;
+    case 42:                    /* Ceiling_CrushAndRaise */
+      ok = Hexen_EV_DoCeiling(line, args, CLEV_CRUSHANDRAISE);
+      break;
+    case 43:                    /* Ceiling_LowerAndCrush */
+      ok = Hexen_EV_DoCeiling(line, args, CLEV_LOWERANDCRUSH);
+      break;
+    case 44:                    /* Ceiling_CrushStop */
+      ok = Hexen_EV_CeilingCrushStop(line, args);
+      break;
+    case 45:                    /* Ceiling_CrushRaiseAndStay */
+      ok = Hexen_EV_DoCeiling(line, args, CLEV_CRUSHRAISEANDSTAY);
+      break;
+    case 69:                    /* Ceiling_MoveToValueTimes8 */
+      ok = Hexen_EV_DoCeiling(line, args, CLEV_MOVETOVALUETIMES8);
       break;
     case 66:                    /* Floor_LowerInstant */
       ok = Hexen_EV_DoFloor(line, args, FLEV_LOWERTIMES8INSTANT);

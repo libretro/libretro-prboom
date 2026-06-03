@@ -1281,6 +1281,15 @@ bool D_DoomMainSetup(void)
   if (!IdentifyVersion())
      goto failed;
 
+  /* Hexen binds both Use and Jump, but the stock key defaults put key_use
+   * and key_jump on the spacebar (harmless in Doom/Heretic, which have no
+   * jump).  The gamepad layouts post these keycodes into the event queue,
+   * so identical values make every Use press jump and every Jump press
+   * use.  When they collide under Hexen, move Use to 'e' per the Hexen
+   * keyboard scheme (spacebar is Jump, E is Use - see kbd_hexen_desc). */
+  if (hexen && key_use == key_jump)
+    key_use = 'e';
+
   /* D_BuildBEXTables above seeded the dynamic tables before the game type
    * was known (it runs before IdentifyVersion), so they were seeded as
    * Doom. Now that IdentifyVersion has set heretic/gamemission, re-seed so

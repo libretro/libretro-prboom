@@ -156,6 +156,21 @@ typedef enum {
 #define MTF_FRIEND            128
 #define MTF_RESERVED          256
 
+/* Hexen reuses the mapthing options word with a different layout from Doom:
+ * the low skill/ambush bits match, but bit 16 is MTF_DORMANT, bits 32/64/128
+ * are the per-class spawn bits, and bits 256/512/1024 are positive "appears
+ * in this game mode" bits (single/coop/deathmatch) rather than Doom's NOT*
+ * bits.  These overlap MTF_NOTSINGLE/NOTDM/NOTCOOP/FRIEND/RESERVED
+ * numerically, so Hexen things must be filtered with these names, not the
+ * Doom ones. */
+#define MTF_HEXEN_DORMANT      16
+#define MTF_HEXEN_FIGHTER      32
+#define MTF_HEXEN_CLERIC       64
+#define MTF_HEXEN_MAGE         128
+#define MTF_HEXEN_GSINGLE      256
+#define MTF_HEXEN_GCOOP        512
+#define MTF_HEXEN_GDEATHMATCH  1024
+
 typedef enum {
   sk_none=-1, //jff 3/24/98 create unpicked skill setting
   sk_baby=0,

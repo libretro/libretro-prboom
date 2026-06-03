@@ -1344,9 +1344,10 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   // bits that weren't used in Doom (such as HellMaker wads). So we should
   // then simply ignore all upper bits.
 
-  if (demo_compatibility ||
+  if (!hexen &&
+      (demo_compatibility ||
       (compatibility_level >= lxdoom_1_compatibility  &&
-       options & MTF_RESERVED)) {
+       options & MTF_RESERVED))) {
     if (!demo_compatibility) // cph - Add warning about bad thing flags
       lprintf(LO_WARN, "P_SpawnMapThing: correcting bad flags (%u) (thing type %d)\n",
         options, thingtype);
@@ -1400,19 +1401,55 @@ void P_SpawnMapThing (const mapthing_t* mthing)
 
   // check for apropriate skill level
 
-  /* jff "not single" thing flag */
-  if (!netgame && options & MTF_NOTSINGLE)
-    return;
+  if (hexen)
+  {
+    /* Hexen filters by positive "appears in this game mode" bits and by the
+     * player's character class, rather than Doom's NOT* bits. */
+    extern pclass_t PlayerClass[];
+    int classbit;
 
-  //jff 3/30/98 implement "not deathmatch" thing flag
+    if (!netgame)
+    {
+      if (!(options & MTF_HEXEN_GSINGLE))
+        return;
+    }
+    else if (deathmatch)
+    {
+      if (!(options & MTF_HEXEN_GDEATHMATCH))
+        return;
+    }
+    else
+    {
+      if (!(options & MTF_HEXEN_GCOOP))
+        return;
+    }
 
-  if (netgame && deathmatch && options & MTF_NOTDM)
-    return;
+    switch (PlayerClass[consoleplayer])
+    {
+      case PCLASS_FIGHTER: classbit = MTF_HEXEN_FIGHTER; break;
+      case PCLASS_CLERIC:  classbit = MTF_HEXEN_CLERIC;  break;
+      case PCLASS_MAGE:    classbit = MTF_HEXEN_MAGE;    break;
+      default:             classbit = 0;                break;
+    }
+    if (!netgame && classbit && !(options & classbit))
+      return;
+  }
+  else
+  {
+    /* jff "not single" thing flag */
+    if (!netgame && options & MTF_NOTSINGLE)
+      return;
 
-  //jff 3/30/98 implement "not cooperative" thing flag
+    //jff 3/30/98 implement "not deathmatch" thing flag
 
-  if (netgame && !deathmatch && options & MTF_NOTCOOP)
-    return;
+    if (netgame && deathmatch && options & MTF_NOTDM)
+      return;
+
+    //jff 3/30/98 implement "not cooperative" thing flag
+
+    if (netgame && !deathmatch && options & MTF_NOTCOOP)
+      return;
+  }
 
   // killough 11/98: simplify
   if (gameskill == sk_baby || gameskill == sk_easy ?

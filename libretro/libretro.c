@@ -2018,14 +2018,30 @@ bool retro_load_game(const struct retro_game_info *info)
    if (!D_DoomMainSetup())
       goto failed;
 
-   /* Game type (Doom vs Heretic) is now known. The controller info was
-    * registered with Doom device names in retro_set_environment (before
-    * any game was loaded); for Heretic, re-register with Heretic names so
-    * the frontend's device list and the Gamepad Modern bindings reflect
-    * the Heretic control scheme. */
+   /* Game type (Doom vs Heretic vs Hexen) is now known. The controller
+    * info was registered with Doom device names in retro_set_environment
+    * (before any game was loaded); for the Raven games, re-register with
+    * game-appropriate names so the frontend's device list reflects the
+    * Heretic / Hexen control schemes. */
    {
-      extern dbool heretic;
-      if (heretic)
+      extern dbool heretic, hexen;
+      if (hexen)
+      {
+         static const struct retro_controller_description hexen_port[] = {
+            { "Hexen Gamepad Modern", RETROPAD_MODERN },
+            { "Hexen Gamepad Classic", RETROPAD_CLASSIC },
+            { "Hexen RetroKeyboard/Mouse", RETRO_DEVICE_KEYBOARD },
+            { 0 },
+         };
+         static const struct retro_controller_info hexen_ports[] = {
+            { hexen_port, 3 },
+            { NULL, 0 },
+         };
+         environ_cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)hexen_ports);
+         /* Refresh the active descriptors for the current device. */
+         retro_set_controller_port_device(0, doom_devices[0]);
+      }
+      else if (heretic)
       {
          static const struct retro_controller_description heretic_port[] = {
             { "Heretic Gamepad Modern", RETROPAD_MODERN },

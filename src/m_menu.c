@@ -254,6 +254,8 @@ void M_DrawMainMenu(void);
 void M_DrawReadThis1(void);
 void M_DrawReadThis2(void);
 void M_DrawNewGame(void);
+void M_ChooseClass(int choice);   /* Hexen class-selection menu */
+void M_DrawClass(void);
 void M_DrawEpisode(void);
 void M_DrawOptions(void);
 void M_DrawSound(void);
@@ -713,6 +715,64 @@ void M_DrawNewGame(void)
     V_DrawNamePatch(54, 38, 0, "M_SKILL",CR_DEFAULT, VPT_STRETCH);
 }
 
+/////////////////////////////
+//
+// HEXEN CLASS SELECT MENU
+//
+// Hexen picks a player class (Fighter/Cleric/Mage) before the skill
+// screen.  There are no per-item graphic lumps, so the items render as
+// alttext through the big FONTB font (the raven path in M_Drawer).
+//
+
+enum
+{
+  class_fighter,
+  class_cleric,
+  class_mage,
+  class_end
+} class_e;
+
+menuitem_t ClassMenu[] =
+{
+  {1, "", M_ChooseClass, 'f', "FIGHTER"},
+  {1, "", M_ChooseClass, 'c', "CLERIC"},
+  {1, "", M_ChooseClass, 'm', "MAGE"}
+};
+
+menu_t ClassDef =
+{
+  class_end,       // # of menu items
+  &MainDef,        // previous menu
+  ClassMenu,       // menuitem_t ->
+  M_DrawClass,     // drawing routine ->
+  66, 60,          // x,y
+  class_fighter    // lastOn
+};
+
+void M_DrawClass(void)
+{
+  /* Hexen has no "select class" title graphic lump, so label the screen
+   * in the same big font used for the items. */
+  M_DrawTextB(34, 24, "CHOOSE CLASS:");
+}
+
+void M_ChooseClass(int choice)
+{
+  pclass_t pc = PCLASS_FIGHTER;
+  int i;
+
+  if (choice == class_cleric)
+    pc = PCLASS_CLERIC;
+  else if (choice == class_mage)
+    pc = PCLASS_MAGE;
+
+  for (i = 0; i < MAXPLAYERS; i++)
+    PlayerClass[i] = pc;
+
+  /* Proceed to skill selection, exactly as the non-Hexen New Game path. */
+  M_SetupNextMenu(&NewDef);
+}
+
 /* cph - make `New Game' restart the level in a netgame */
 static void M_RestartLevelResponse(int ch)
 {
@@ -734,7 +794,11 @@ void M_NewGame(int choice)
     return;
   }
 
-  if ( EpiDef.numitems == 0 )
+  /* Hexen chooses a player class before skill; other games go straight to
+   * the skill (or episode) menu. */
+  if (hexen)
+    M_SetupNextMenu(&ClassDef);
+  else if ( EpiDef.numitems == 0 )
     M_SetupNextMenu(&NewDef);
   else
     M_SetupNextMenu(&EpiDef);

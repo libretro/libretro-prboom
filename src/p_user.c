@@ -500,6 +500,47 @@ void P_MovePlayer (player_t* player)
         player->centering = false;
       }
     }
+
+    /* Heretic/Hexen flight: decode the high nibble of cmd->lookfly into a
+     * vertical fly command and apply it while the Wings of Wrath
+     * (pw_flight) are active.  This too lived only in the compiled-out
+     * HEXEN branch, so flight was half-wired: the artifact set MF2_FLY but
+     * the player could never gain or lose height.  Mirror dsda-doom's
+     * Raven_P_MovePlayer. */
+    {
+      int fly = cmd->lookfly >> 4;
+      if (fly > 7)
+        fly -= 16;
+      if (fly && player->powers[pw_flight])
+      {
+        if (fly != TOCENTER_LOOK)
+        {
+          player->flyheight = fly * 2;
+          if (!(mo->flags2 & MF2_FLY))
+          {
+            mo->flags2 |= MF2_FLY;
+            mo->flags |= MF_NOGRAVITY;
+            if (hexen && mo->momz <= -39 * FRACUNIT)
+              S_StopSound(mo);   /* cut off the falling scream */
+          }
+        }
+        else
+        {
+          mo->flags2 &= ~MF2_FLY;
+          mo->flags &= ~MF_NOGRAVITY;
+        }
+      }
+      else if (fly > 0)
+      {
+        P_PlayerUseArtifact(player, arti_fly);
+      }
+      if (mo->flags2 & MF2_FLY)
+      {
+        mo->momz = player->flyheight * FRACUNIT;
+        if (player->flyheight)
+          player->flyheight /= 2;
+      }
+    }
   }
 #endif
 }

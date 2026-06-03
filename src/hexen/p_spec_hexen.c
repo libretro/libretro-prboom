@@ -34,6 +34,8 @@
 #include "r_state.h"
 #include "r_main.h"
 #include "p_spec.h"
+#include "hexen/po_man.h"
+#include "lprintf.h"
 #include "p_tick.h"
 #include "p_map.h"
 #include "r_demo.h"
@@ -1781,6 +1783,27 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
 
   switch (special)
   {
+    case 1:                     /* Polyobj_StartLine (consumed at spawn) */
+    case 5:                     /* Polyobj_ExplicitLine (consumed at spawn) */
+      break;
+    case 2:                     /* Polyobj_RotateLeft */
+      ok = EV_RotatePoly(line, args, 1, false);
+      break;
+    case 3:                     /* Polyobj_RotateRight */
+      ok = EV_RotatePoly(line, args, -1, false);
+      break;
+    case 4:                     /* Polyobj_Move */
+      ok = EV_MovePoly(line, args, false, false);
+      break;
+    case 6:                     /* Polyobj_MoveTimes8 */
+      ok = EV_MovePoly(line, args, true, false);
+      break;
+    case 7:                     /* Polyobj_DoorSwing */
+      ok = EV_OpenPolyDoor(line, args, PODOOR_SWING);
+      break;
+    case 8:                     /* Polyobj_DoorSlide */
+      ok = EV_OpenPolyDoor(line, args, PODOOR_SLIDE);
+      break;
     case 10:                    /* Door_Close */
       ok = Hexen_EV_DoDoor(line, args, DREV_CLOSE);
       break;
@@ -1864,6 +1887,18 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 30:                    /* Pillar_Open */
       ok = EV_OpenPillar(line, args);
+      break;
+    case 90:                    /* Polyobj_OR_RotateLeft */
+      ok = EV_RotatePoly(line, args, 1, true);
+      break;
+    case 91:                    /* Polyobj_OR_RotateRight */
+      ok = EV_RotatePoly(line, args, -1, true);
+      break;
+    case 92:                    /* Polyobj_OR_Move */
+      ok = EV_MovePoly(line, args, false, true);
+      break;
+    case 93:                    /* Polyobj_OR_MoveTimes8 */
+      ok = EV_MovePoly(line, args, true, true);
       break;
     case 94:                    /* Pillar_BuildAndCrush */
       ok = EV_BuildPillar(line, args, 1);

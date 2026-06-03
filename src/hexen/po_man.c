@@ -29,9 +29,15 @@
 #include "z_zone.h"
 #include "i_system.h"
 #include "doomdata.h"
+#include "sn_sonix.h"
+#include "p_acs.h"
 #include "po_man.h"
 
 #define PO_MAXPOLYSEGS 64
+
+#ifndef ANGLE_MAX
+#define ANGLE_MAX 0xffffffff
+#endif
 
 polyobj_t *polyobjs;     /* list of all poly-objects on the level */
 int po_NumPolyobjs;
@@ -97,6 +103,8 @@ static void ThrustMobj(mobj_t *mobj, seg_t *seg, polyobj_t *po)
   int thrustAngle;
   int thrustX;
   int thrustY;
+  polyevent_t *pe;
+  int force;
 
   if (!(mobj->flags & MF_SHOOTABLE) && !mobj->player)
   {
@@ -104,8 +112,35 @@ static void ThrustMobj(mobj_t *mobj, seg_t *seg, polyobj_t *po)
   }
   thrustAngle = (seg->angle - ANG90) >> ANGLETOFINESHIFT;
 
-  thrustX = FixedMul(FRACUNIT, finecosine[thrustAngle]);
-  thrustY = FixedMul(FRACUNIT, finesine[thrustAngle]);
+  /* The push scales with the mover's speed: rotations carry their speed as
+   * an angle delta, slides as a fixed-point distance. */
+  pe = po->specialdata;
+  if (pe)
+  {
+    if (pe->thinker.function.arg1 == (void (*)(void *))T_RotatePoly)
+    {
+      force = pe->speed >> 8;
+    }
+    else
+    {
+      force = pe->speed >> 3;
+    }
+    if (force < FRACUNIT)
+    {
+      force = FRACUNIT;
+    }
+    else if (force > 4 * FRACUNIT)
+    {
+      force = 4 * FRACUNIT;
+    }
+  }
+  else
+  {
+    force = FRACUNIT;
+  }
+
+  thrustX = FixedMul(force, finecosine[thrustAngle]);
+  thrustY = FixedMul(force, finesine[thrustAngle]);
   mobj->momx += thrustX;
   mobj->momy += thrustY;
   if (po->crush)
@@ -893,6 +928,461 @@ dbool PO_Busy(int polyobj)
   if (!poly || !poly->specialdata)
   {
     return false;
+  }
+  return true;
+}
+
+static int GetPolyobjMirror(int poly)
+{
+  int i;
+
+  for (i = 0; i < po_NumPolyobjs; i++)
+  {
+    if (polyobjs[i].tag == poly)
+    {
+      return ((*polyobjs[i].segs)->linedef->args[1]);
+    }
+  }
+  return 0;
+}
+
+/* A mover finished or was interrupted: detach it from the poly, stop the
+ * sound sequence and wake any ACS scripts waiting on this polyobject. */
+static void StopPolyEvent(polyevent_t *pe)
+{
+  polyobj_t *poly;
+
+  poly = GetPolyobj(pe->polyobj);
+  if (poly->specialdata == pe)
+  {
+    poly->specialdata = NULL;
+  }
+  SN_StopSequence((mobj_t *) &poly->startSpot);
+  P_PolyobjFinished(poly->tag);
+  P_RemoveThinker(&pe->thinker);
+}
+
+void T_RotatePoly(polyevent_t *pe)
+{
+  int absSpeed;
+
+  if (PO_RotatePolyobj(pe->polyobj, pe->speed))
+  {
+    absSpeed = abs(pe->speed);
+
+    if (pe->dist == (unsigned int) -1)
+    { /* perpetual polyobj */
+      return;
+    }
+    pe->dist -= absSpeed;
+    if ((int) pe->dist <= 0)
+    {
+      StopPolyEvent(pe);
+    }
+    if (pe->dist < (unsigned int) absSpeed)
+    {
+      pe->speed = pe->dist * (pe->speed < 0 ? -1 : 1);
+    }
+  }
+}
+
+dbool EV_RotatePoly(line_t *line, byte *args, int direction, dbool overRide)
+{
+  int polyNum;
+  int mirror;
+  polyevent_t *pe;
+  polyobj_t *poly;
+
+  (void)line;
+  polyNum = args[0];
+  poly = GetPolyobj(polyNum);
+  if (poly != NULL)
+  {
+    if (poly->specialdata && !overRide)
+    { /* poly is already moving */
+      return false;
+    }
+  }
+  else
+  {
+    I_Error("EV_RotatePoly:  Invalid polyobj num: %d\n", polyNum);
+  }
+  pe = Z_Malloc(sizeof(polyevent_t), PU_LEVEL, 0);
+  P_AddThinker(&pe->thinker);
+  pe->thinker.function.arg1 = (void (*)(void *))T_RotatePoly;
+  pe->polyobj = polyNum;
+  if (args[2])
+  {
+    if (args[2] == 255)
+    {
+      pe->dist = (unsigned int) -1;
+    }
+    else
+    {
+      pe->dist = args[2] * (ANG90 / 64); /* Angle */
+    }
+  }
+  else
+  {
+    pe->dist = ANGLE_MAX - 1;
+  }
+  pe->speed = (args[1] * direction * (ANG90 / 64)) >> 3;
+  poly->specialdata = pe;
+  SN_StartSequence((mobj_t *) &poly->startSpot, SEQ_DOOR_STONE + poly->seqType);
+
+  while ((mirror = GetPolyobjMirror(polyNum)) != 0)
+  {
+    poly = GetPolyobj(mirror);
+    if (poly && poly->specialdata && !overRide)
+    { /* mirroring poly is already in motion */
+      break;
+    }
+    pe = Z_Malloc(sizeof(polyevent_t), PU_LEVEL, 0);
+    P_AddThinker(&pe->thinker);
+    pe->thinker.function.arg1 = (void (*)(void *))T_RotatePoly;
+    poly->specialdata = pe;
+    pe->polyobj = mirror;
+    if (args[2])
+    {
+      if (args[2] == 255)
+      {
+        pe->dist = (unsigned int) -1;
+      }
+      else
+      {
+        pe->dist = args[2] * (ANG90 / 64); /* Angle */
+      }
+    }
+    else
+    {
+      pe->dist = ANGLE_MAX - 1;
+    }
+    poly = GetPolyobj(polyNum);
+    if (poly != NULL)
+    {
+      poly->specialdata = pe;
+    }
+    else
+    {
+      I_Error("EV_RotatePoly:  Invalid polyobj num: %d\n", polyNum);
+    }
+    direction = -direction;
+    pe->speed = (args[1] * direction * (ANG90 / 64)) >> 3;
+    polyNum = mirror;
+    SN_StartSequence((mobj_t *) &poly->startSpot, SEQ_DOOR_STONE + poly->seqType);
+  }
+  return true;
+}
+
+void T_MovePoly(polyevent_t *pe)
+{
+  int absSpeed;
+
+  if (PO_MovePolyobj(pe->polyobj, pe->xSpeed, pe->ySpeed))
+  {
+    absSpeed = abs(pe->speed);
+    pe->dist -= absSpeed;
+    if ((int) pe->dist <= 0)
+    {
+      StopPolyEvent(pe);
+    }
+    if (pe->dist < (unsigned int) absSpeed)
+    {
+      pe->speed = pe->dist * (pe->speed < 0 ? -1 : 1);
+      pe->xSpeed = FixedMul(pe->speed, finecosine[pe->angle]);
+      pe->ySpeed = FixedMul(pe->speed, finesine[pe->angle]);
+    }
+  }
+}
+
+static void EV_SpawnMovePolyEvent(int polyNum, polyobj_t *poly, fixed_t speed,
+                                  fixed_t dist, angle_t an, dbool overRide)
+{
+  int mirror;
+  polyevent_t *pe;
+
+  pe = Z_Malloc(sizeof(polyevent_t), PU_LEVEL, 0);
+  P_AddThinker(&pe->thinker);
+  pe->thinker.function.arg1 = (void (*)(void *))T_MovePoly;
+  pe->polyobj = polyNum;
+  pe->dist = dist;
+  pe->speed = speed;
+  poly->specialdata = pe;
+  pe->angle = an >> ANGLETOFINESHIFT;
+  pe->xSpeed = FixedMul(pe->speed, finecosine[pe->angle]);
+  pe->ySpeed = FixedMul(pe->speed, finesine[pe->angle]);
+  SN_StartSequence((mobj_t *) &poly->startSpot, SEQ_DOOR_STONE + poly->seqType);
+
+  while ((mirror = GetPolyobjMirror(polyNum)) != 0)
+  {
+    poly = GetPolyobj(mirror);
+    if (poly && poly->specialdata && !overRide)
+    { /* mirroring poly is already in motion */
+      break;
+    }
+    pe = Z_Malloc(sizeof(polyevent_t), PU_LEVEL, 0);
+    P_AddThinker(&pe->thinker);
+    pe->thinker.function.arg1 = (void (*)(void *))T_MovePoly;
+    pe->polyobj = mirror;
+    poly->specialdata = pe;
+    pe->dist = dist;
+    pe->speed = speed;
+    an = an + ANG180; /* reverse the angle */
+    pe->angle = an >> ANGLETOFINESHIFT;
+    pe->xSpeed = FixedMul(pe->speed, finecosine[pe->angle]);
+    pe->ySpeed = FixedMul(pe->speed, finesine[pe->angle]);
+    polyNum = mirror;
+    SN_StartSequence((mobj_t *) &poly->startSpot, SEQ_DOOR_STONE + poly->seqType);
+  }
+}
+
+dbool EV_MovePoly(line_t *line, byte *args, dbool timesEight, dbool overRide)
+{
+  int polyNum;
+  polyobj_t *poly;
+  int distance;
+  fixed_t speed;
+  angle_t an;
+
+  (void)line;
+  polyNum = args[0];
+  poly = GetPolyobj(polyNum);
+  if (poly != NULL)
+  {
+    if (poly->specialdata && !overRide)
+    { /* poly is already moving */
+      return false;
+    }
+  }
+  else
+  {
+    I_Error("EV_MovePoly:  Invalid polyobj num: %d\n", polyNum);
+  }
+
+  distance = args[3];
+  if (timesEight)
+  {
+    distance *= 8 * FRACUNIT;
+  }
+  else
+  {
+    distance *= FRACUNIT;
+  }
+
+  speed = args[1] * (FRACUNIT / 8);
+  an = args[2] * (ANG90 / 64);
+
+  EV_SpawnMovePolyEvent(polyNum, poly, speed, distance, an, overRide);
+
+  return true;
+}
+
+void T_PolyDoor(polydoor_t *pd)
+{
+  int absSpeed;
+  polyobj_t *poly;
+
+  if (pd->tics)
+  {
+    if (!--pd->tics)
+    {
+      poly = GetPolyobj(pd->polyobj);
+      SN_StartSequence((mobj_t *) &poly->startSpot,
+                       SEQ_DOOR_STONE + poly->seqType);
+    }
+    return;
+  }
+  switch (pd->type)
+  {
+    case PODOOR_SLIDE:
+      if (PO_MovePolyobj(pd->polyobj, pd->xSpeed, pd->ySpeed))
+      {
+        absSpeed = abs(pd->speed);
+        pd->dist -= absSpeed;
+        if (pd->dist <= 0)
+        {
+          poly = GetPolyobj(pd->polyobj);
+          SN_StopSequence((mobj_t *) &poly->startSpot);
+          if (!pd->close)
+          {
+            pd->dist = pd->totalDist;
+            pd->close = true;
+            pd->tics = pd->waitTics;
+            pd->direction = (ANGLE_MAX >> ANGLETOFINESHIFT) - pd->direction;
+            pd->xSpeed = -pd->xSpeed;
+            pd->ySpeed = -pd->ySpeed;
+          }
+          else
+          {
+            if (poly->specialdata == pd)
+            {
+              poly->specialdata = NULL;
+            }
+            P_PolyobjFinished(poly->tag);
+            P_RemoveThinker(&pd->thinker);
+          }
+        }
+      }
+      else
+      {
+        poly = GetPolyobj(pd->polyobj);
+        if (poly->crush || !pd->close)
+        { /* continue moving if the poly is a crusher, or is opening */
+          return;
+        }
+        else
+        { /* open back up */
+          pd->dist = pd->totalDist - pd->dist;
+          pd->direction = (ANGLE_MAX >> ANGLETOFINESHIFT) - pd->direction;
+          pd->xSpeed = -pd->xSpeed;
+          pd->ySpeed = -pd->ySpeed;
+          pd->close = false;
+          SN_StartSequence((mobj_t *) &poly->startSpot,
+                           SEQ_DOOR_STONE + poly->seqType);
+        }
+      }
+      break;
+    case PODOOR_SWING:
+      if (PO_RotatePolyobj(pd->polyobj, pd->speed))
+      {
+        absSpeed = abs(pd->speed);
+        if (pd->dist == -1)
+        { /* perpetual polyobj */
+          return;
+        }
+        pd->dist -= absSpeed;
+        if (pd->dist <= 0)
+        {
+          poly = GetPolyobj(pd->polyobj);
+          SN_StopSequence((mobj_t *) &poly->startSpot);
+          if (!pd->close)
+          {
+            pd->dist = pd->totalDist;
+            pd->close = true;
+            pd->tics = pd->waitTics;
+            pd->speed = -pd->speed;
+          }
+          else
+          {
+            if (poly->specialdata == pd)
+            {
+              poly->specialdata = NULL;
+            }
+            P_PolyobjFinished(poly->tag);
+            P_RemoveThinker(&pd->thinker);
+          }
+        }
+      }
+      else
+      {
+        poly = GetPolyobj(pd->polyobj);
+        if (poly->crush || !pd->close)
+        { /* continue moving if the poly is a crusher, or is opening */
+          return;
+        }
+        else
+        { /* open back up and rewait */
+          pd->dist = pd->totalDist - pd->dist;
+          pd->speed = -pd->speed;
+          pd->close = false;
+          SN_StartSequence((mobj_t *) &poly->startSpot,
+                           SEQ_DOOR_STONE + poly->seqType);
+        }
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+dbool EV_OpenPolyDoor(line_t *line, byte *args, podoortype_t type)
+{
+  int polyNum;
+  int mirror;
+  polydoor_t *pd;
+  polyobj_t *poly;
+  angle_t an = 0;
+
+  (void)line;
+  polyNum = args[0];
+  poly = GetPolyobj(polyNum);
+  if (poly != NULL)
+  {
+    if (poly->specialdata)
+    { /* poly is already moving */
+      return false;
+    }
+  }
+  else
+  {
+    I_Error("EV_OpenPolyDoor:  Invalid polyobj num: %d\n", polyNum);
+  }
+  pd = Z_Malloc(sizeof(polydoor_t), PU_LEVEL, 0);
+  memset(pd, 0, sizeof(polydoor_t));
+  P_AddThinker(&pd->thinker);
+  pd->thinker.function.arg1 = (void (*)(void *))T_PolyDoor;
+  pd->type = type;
+  pd->polyobj = polyNum;
+  if (type == PODOOR_SLIDE)
+  {
+    pd->waitTics = args[4];
+    pd->speed = args[1] * (FRACUNIT / 8);
+    pd->totalDist = args[3] * FRACUNIT; /* Distance */
+    pd->dist = pd->totalDist;
+    an = args[2] * (ANG90 / 64);
+    pd->direction = an >> ANGLETOFINESHIFT;
+    pd->xSpeed = FixedMul(pd->speed, finecosine[pd->direction]);
+    pd->ySpeed = FixedMul(pd->speed, finesine[pd->direction]);
+    SN_StartSequence((mobj_t *) &poly->startSpot, SEQ_DOOR_STONE + poly->seqType);
+  }
+  else if (type == PODOOR_SWING)
+  {
+    pd->waitTics = args[3];
+    pd->direction = 1;
+    pd->speed = (args[1] * pd->direction * (ANG90 / 64)) >> 3;
+    pd->totalDist = args[2] * (ANG90 / 64);
+    pd->dist = pd->totalDist;
+    SN_StartSequence((mobj_t *) &poly->startSpot, SEQ_DOOR_STONE + poly->seqType);
+  }
+
+  poly->specialdata = pd;
+
+  while ((mirror = GetPolyobjMirror(polyNum)) != 0)
+  {
+    poly = GetPolyobj(mirror);
+    if (poly && poly->specialdata)
+    { /* mirroring poly is already in motion */
+      break;
+    }
+    pd = Z_Malloc(sizeof(polydoor_t), PU_LEVEL, 0);
+    memset(pd, 0, sizeof(polydoor_t));
+    P_AddThinker(&pd->thinker);
+    pd->thinker.function.arg1 = (void (*)(void *))T_PolyDoor;
+    pd->polyobj = mirror;
+    pd->type = type;
+    poly->specialdata = pd;
+    if (type == PODOOR_SLIDE)
+    {
+      pd->waitTics = args[4];
+      pd->speed = args[1] * (FRACUNIT / 8);
+      pd->totalDist = args[3] * FRACUNIT; /* Distance */
+      pd->dist = pd->totalDist;
+      an = an + ANG180; /* reverse the angle */
+      pd->direction = an >> ANGLETOFINESHIFT;
+      pd->xSpeed = FixedMul(pd->speed, finecosine[pd->direction]);
+      pd->ySpeed = FixedMul(pd->speed, finesine[pd->direction]);
+      SN_StartSequence((mobj_t *) &poly->startSpot, SEQ_DOOR_STONE + poly->seqType);
+    }
+    else if (type == PODOOR_SWING)
+    {
+      pd->waitTics = args[3];
+      pd->direction = -1;
+      pd->speed = (args[1] * pd->direction * (ANG90 / 64)) >> 3;
+      pd->totalDist = args[2] * (ANG90 / 64);
+      pd->dist = pd->totalDist;
+      SN_StartSequence((mobj_t *) &poly->startSpot, SEQ_DOOR_STONE + poly->seqType);
+    }
+    polyNum = mirror;
   }
   return true;
 }

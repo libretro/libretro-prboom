@@ -70,6 +70,7 @@ dbool P_TerminateACS(int number, int map);
 dbool P_SuspendACS(int number, int map);
 void  T_InterpretACS(acs_t *script);
 void  P_TagFinished(int tag);
+void  P_PolyobjFinished(int po);
 void  P_ACSInitNewGame(void);
 void  P_CheckACSStore(void);
 

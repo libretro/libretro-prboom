@@ -12,6 +12,7 @@
 
 #include "doomtype.h"
 #include "doomstat.h"
+#include "hexen/po_man.h"
 #include "z_zone.h"
 #include "m_swap.h"
 #include "w_wad.h"
@@ -974,6 +975,25 @@ void P_TagFinished(int tag)
     if (ACSInfo[i].state == ASTE_WAITINGFORTAG &&
         ACSInfo[i].waitValue == tag)
       ACSInfo[i].state = ASTE_RUNNING;
+}
+
+/* Wake any scripts waiting on a polyobject once it has stopped moving. */
+void P_PolyobjFinished(int po)
+{
+  int i;
+
+  if (PO_Busy(po) == true)
+  {
+    return;
+  }
+  for (i = 0; i < ACScriptCount; i++)
+  {
+    if (ACSInfo[i].state == ASTE_WAITINGFORPOLY
+        && ACSInfo[i].waitValue == po)
+    {
+      ACSInfo[i].state = ASTE_RUNNING;
+    }
+  }
 }
 
 void T_InterpretACS(acs_t *script)

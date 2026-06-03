@@ -53,6 +53,13 @@ typedef struct
 #define PO_SPAWN_TYPE       3001
 #define PO_SPAWNCRUSH_TYPE  3002
 
+void T_PolyDoor(polydoor_t *pd);
+void T_RotatePoly(polyevent_t *pe);
+void T_MovePoly(polyevent_t *pe);
+dbool EV_RotatePoly(line_t *line, byte *args, int direction, dbool overRide);
+dbool EV_MovePoly(line_t *line, byte *args, dbool timesEight, dbool overRide);
+dbool EV_OpenPolyDoor(line_t *line, byte *args, podoortype_t type);
+
 dbool PO_MovePolyobj(int num, int x, int y);
 dbool PO_RotatePolyobj(int num, angle_t angle);
 dbool PO_Detect(int doomednum);

@@ -201,112 +201,121 @@ void P_LoadMapInfo(void)
     free(scratch);
   }
 
-  /* Peek the leading token of each block; a "map" keyword starts a new map
-   * definition.  We consume with expandState once we have committed to it. */
-  while (U_GetNextToken(&s, false))
+  /* Parse with straight consuming reads.  The optional-keyword loop also
+   * detects the next "map" keyword; when it does, that token has already been
+   * consumed, so carry a flag to reuse it as the start of the next block
+   * instead of reading again. */
   {
-    int map;
+    dbool haveMap = U_GetNextToken(&s, true);
 
-    /* Each block must open with the MAP keyword. */
-    if (s.nextState.token != TK_Identifier || strcasecmp(s.nextState.string, "MAP"))
+    while (haveMap)
     {
-      U_Error(&s, "Expected 'map' at start of definition");
-      break;
-    }
-    U_GetNextToken(&s, true);          /* consume "map" */
+      int   map;
+      dbool sawNextMap = false;
 
-    if (!U_MustGetInteger(&s))
-      break;
-    map = s.number;
-    if (map < 1 || map > MAPINFO_MAX_MAPS)
-    {
-      U_Error(&s, "Bad map number %d", map);
-      break;
-    }
-
-    info = &MapInfo[map];
-
-    /* Start from the defaults. */
-    memcpy(info, &MapInfo[0], sizeof(*info));
-    info->warpTrans = map;            /* warp defaults to the map number */
-
-    /* The map name follows the number. */
-    if (!U_GetNextToken(&s, true))
-      break;
-    strncpy(info->name, s.string, sizeof(info->name) - 1);
-    info->name[sizeof(info->name) - 1] = '\0';
-
-    /* Optional keywords until the next MAP block or EOF. */
-    while (U_GetNextToken(&s, false))
-    {
-      int cmd;
-
-      if (s.nextState.token == TK_Identifier &&
-          !strcasecmp(s.nextState.string, "MAP"))
-        break;                        /* leave "map" for the outer loop */
-
-      if (s.nextState.token != TK_Identifier)
+      if (s.token != TK_Identifier || strcasecmp(s.string, "MAP"))
       {
-        U_GetNextToken(&s, true);
-        U_Error(&s, "Expected map keyword");
+        U_Error(&s, "Expected 'map' at start of definition");
         break;
       }
 
-      U_GetNextToken(&s, true);        /* consume the keyword */
-      cmd = FindMapCmd(s.string);
-      switch (cmd)
+      if (!U_MustGetInteger(&s))
+        break;
+      map = s.number;
+      if (map < 1 || map > MAPINFO_MAX_MAPS)
       {
-        case MCMD_CLUSTER:
-          U_MustGetInteger(&s);
-          info->cluster = (short) s.number;
-          break;
-        case MCMD_WARPTRANS:
-          U_MustGetInteger(&s);
-          info->warpTrans = (short) s.number;
-          break;
-        case MCMD_NEXT:
-          U_MustGetInteger(&s);
-          info->nextMap = (short) s.number;
-          break;
-        case MCMD_SKY1:
-          U_GetNextToken(&s, true);
-          info->sky1Texture = (short) SafeTextureNumForName(s.string);
-          U_MustGetInteger(&s);
-          info->sky1ScrollDelta = s.number << 8;
-          break;
-        case MCMD_SKY2:
-          U_GetNextToken(&s, true);
-          info->sky2Texture = (short) SafeTextureNumForName(s.string);
-          U_MustGetInteger(&s);
-          info->sky2ScrollDelta = s.number << 8;
-          break;
-        case MCMD_DOUBLESKY:
-          info->doubleSky = true;
-          break;
-        case MCMD_LIGHTNING:
-          info->lightning = true;
-          break;
-        case MCMD_FADETABLE:
-          U_GetNextToken(&s, true);
-          info->fadetable = W_CheckNumForName(s.string);
-          break;
-        case MCMD_CDTRACK:
-        case MCMD_CD_STARTTRACK:
-        case MCMD_CD_END1TRACK:
-        case MCMD_CD_END2TRACK:
-        case MCMD_CD_END3TRACK:
-        case MCMD_CD_INTERTRACK:
-        case MCMD_CD_TITLETRACK:
-          U_MustGetInteger(&s);       /* CD audio: parsed, not used */
-          break;
-        default:
-          U_Error(&s, "Unknown map keyword '%s'", s.string);
-          break;
+        U_Error(&s, "Bad map number %d", map);
+        break;
       }
-    }
 
-    if (map > mapMax)
-      mapMax = map;
+      info = &MapInfo[map];
+
+      /* Start from the defaults. */
+      memcpy(info, &MapInfo[0], sizeof(*info));
+      info->warpTrans = map;          /* warp defaults to the map number */
+
+      /* The map name follows the number. */
+      if (!U_GetNextToken(&s, true))
+        break;
+      strncpy(info->name, s.string, sizeof(info->name) - 1);
+      info->name[sizeof(info->name) - 1] = '\0';
+
+      /* Optional keywords until the next MAP block or EOF. */
+      while (U_GetNextToken(&s, true))
+      {
+        int cmd;
+
+        if (s.token != TK_Identifier)
+        {
+          U_Error(&s, "Expected map keyword");
+          break;
+        }
+
+        if (!strcasecmp(s.string, "MAP"))
+        {
+          sawNextMap = true;          /* reuse this token as the next block */
+          break;
+        }
+
+        cmd = FindMapCmd(s.string);
+        switch (cmd)
+        {
+          case MCMD_CLUSTER:
+            U_MustGetInteger(&s);
+            info->cluster = (short) s.number;
+            break;
+          case MCMD_WARPTRANS:
+            U_MustGetInteger(&s);
+            info->warpTrans = (short) s.number;
+            break;
+          case MCMD_NEXT:
+            U_MustGetInteger(&s);
+            info->nextMap = (short) s.number;
+            break;
+          case MCMD_SKY1:
+            U_GetNextToken(&s, true);
+            info->sky1Texture = (short) SafeTextureNumForName(s.string);
+            U_MustGetInteger(&s);
+            info->sky1ScrollDelta = s.number << 8;
+            break;
+          case MCMD_SKY2:
+            U_GetNextToken(&s, true);
+            info->sky2Texture = (short) SafeTextureNumForName(s.string);
+            U_MustGetInteger(&s);
+            info->sky2ScrollDelta = s.number << 8;
+            break;
+          case MCMD_DOUBLESKY:
+            info->doubleSky = true;
+            break;
+          case MCMD_LIGHTNING:
+            info->lightning = true;
+            break;
+          case MCMD_FADETABLE:
+            U_GetNextToken(&s, true);
+            info->fadetable = W_CheckNumForName(s.string);
+            break;
+          case MCMD_CDTRACK:
+          case MCMD_CD_STARTTRACK:
+          case MCMD_CD_END1TRACK:
+          case MCMD_CD_END2TRACK:
+          case MCMD_CD_END3TRACK:
+          case MCMD_CD_INTERTRACK:
+          case MCMD_CD_TITLETRACK:
+            U_MustGetInteger(&s);     /* CD audio: parsed, not used */
+            break;
+          default:
+            U_Error(&s, "Unknown map keyword '%s'", s.string);
+            break;
+        }
+      }
+
+      if (map > mapMax)
+        mapMax = map;
+
+      /* If the keyword loop stopped on a "map" token, it is already in hand;
+       * otherwise the lump is exhausted. */
+      haveMap = sawNextMap;
+    }
   }
 
   U_ScanClose(&s);

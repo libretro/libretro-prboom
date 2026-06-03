@@ -510,6 +510,173 @@ int Hexen_EV_CeilingCrushStop(line_t *line, byte *args)
   return 0;
 }
 
+/* --- Lights ---------------------------------------------------------------
+ *
+ * Per-sector light-level effects: instant raise/lower/change, plus animated
+ * fade / glow / flicker / strobe driven by a small thinker.  No geometry
+ * moves, so these need no interpolation. */
+void T_HexenLight(light_t *light)
+{
+  if (light->count)
+  {
+    light->count--;
+    return;
+  }
+  switch (light->type)
+  {
+    case LITE_FADE:
+      light->sector->lightlevel =
+        ((light->sector->lightlevel << FRACBITS) + light->value2) >> FRACBITS;
+      if (light->tics2 == 1)
+      {
+        if (light->sector->lightlevel >= light->value1)
+        {
+          light->sector->lightlevel = light->value1;
+          P_RemoveThinker(&light->thinker);
+        }
+      }
+      else if (light->sector->lightlevel <= light->value1)
+      {
+        light->sector->lightlevel = light->value1;
+        P_RemoveThinker(&light->thinker);
+      }
+      break;
+    case LITE_GLOW:
+      light->sector->lightlevel =
+        ((light->sector->lightlevel << FRACBITS) + light->tics1) >> FRACBITS;
+      if (light->tics2 == 1)
+      {
+        if (light->sector->lightlevel >= light->value1)
+        {
+          light->sector->lightlevel = light->value1;
+          light->tics1 = -light->tics1;
+          light->tics2 = -1;
+        }
+      }
+      else if (light->sector->lightlevel <= light->value2)
+      {
+        light->sector->lightlevel = light->value2;
+        light->tics1 = -light->tics1;
+        light->tics2 = 1;
+      }
+      break;
+    case LITE_FLICKER:
+      if (light->sector->lightlevel == light->value1)
+      {
+        light->sector->lightlevel = light->value2;
+        light->count = (P_Random(pr_heretic) & 7) + 1;
+      }
+      else
+      {
+        light->sector->lightlevel = light->value1;
+        light->count = (P_Random(pr_heretic) & 31) + 1;
+      }
+      break;
+    case LITE_STROBE:
+      if (light->sector->lightlevel == light->value1)
+      {
+        light->sector->lightlevel = light->value2;
+        light->count = light->tics2;
+      }
+      else
+      {
+        light->sector->lightlevel = light->value1;
+        light->count = light->tics1;
+      }
+      break;
+    default:
+      break;
+  }
+}
+
+int EV_SpawnLight(line_t *line, byte *args, lighttype_t type)
+{
+  int       secnum;
+  int       rtn = 0;
+  sector_t *sec;
+  light_t  *light;
+  dbool     think;
+  int       arg1 = args[1];
+  int       arg2 = args[2];
+  int       arg3 = args[3];
+  int       arg4 = args[4];
+
+  (void) line;
+
+  HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+  {
+    think = false;
+    sec = &sectors[secnum];
+
+    light = Z_Malloc(sizeof(*light), PU_LEVEL, 0);
+    memset(light, 0, sizeof(*light));
+    light->type = type;
+    light->sector = sec;
+    light->count = 0;
+    rtn = 1;
+
+    switch (type)
+    {
+      case LITE_RAISEBYVALUE:
+        sec->lightlevel += arg1;
+        if (sec->lightlevel > 255) sec->lightlevel = 255;
+        break;
+      case LITE_LOWERBYVALUE:
+        sec->lightlevel -= arg1;
+        if (sec->lightlevel < 0) sec->lightlevel = 0;
+        break;
+      case LITE_CHANGETOVALUE:
+        sec->lightlevel = arg1;
+        if (sec->lightlevel < 0) sec->lightlevel = 0;
+        else if (sec->lightlevel > 255) sec->lightlevel = 255;
+        break;
+      case LITE_FADE:
+        think = true;
+        light->value1 = arg1;       /* destination lightlevel */
+        light->value2 = FixedDiv((arg1 - sec->lightlevel) << FRACBITS,
+                                 arg2 << FRACBITS);  /* delta */
+        light->tics2 = (sec->lightlevel <= arg1) ? 1 : -1;
+        break;
+      case LITE_GLOW:
+        think = true;
+        light->value1 = arg1;       /* upper */
+        light->value2 = arg2;       /* lower */
+        light->tics1 = FixedDiv((arg1 - sec->lightlevel) << FRACBITS,
+                                arg3 << FRACBITS);   /* delta */
+        light->tics2 = (sec->lightlevel <= arg1) ? 1 : -1;
+        break;
+      case LITE_FLICKER:
+        think = true;
+        light->value1 = arg1;
+        light->value2 = arg2;
+        sec->lightlevel = light->value1;
+        light->count = (P_Random(pr_heretic) & 64) + 1;
+        break;
+      case LITE_STROBE:
+        think = true;
+        light->value1 = arg1;
+        light->value2 = arg2;
+        light->tics1 = arg3;
+        light->tics2 = arg4;
+        light->count = arg3;
+        sec->lightlevel = light->value1;
+        break;
+      default:
+        rtn = 0;
+        break;
+    }
+
+    if (think)
+    {
+      P_AddThinker(&light->thinker);
+      light->thinker.function.arg1 = (void (*)(void *))T_HexenLight;
+    }
+    else
+      Z_Free(light);
+  }
+  return rtn;
+}
+
 /* --- Pillars --------------------------------------------------------------
  *
  * A pillar drives a sector's floor and ceiling together: build closes them to
@@ -799,6 +966,27 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 94:                    /* Pillar_BuildAndCrush */
       ok = EV_BuildPillar(line, args, 1);
+      break;
+    case 110:                   /* Light_RaiseByValue */
+      ok = EV_SpawnLight(line, args, LITE_RAISEBYVALUE);
+      break;
+    case 111:                   /* Light_LowerByValue */
+      ok = EV_SpawnLight(line, args, LITE_LOWERBYVALUE);
+      break;
+    case 112:                   /* Light_ChangeToValue */
+      ok = EV_SpawnLight(line, args, LITE_CHANGETOVALUE);
+      break;
+    case 113:                   /* Light_Fade */
+      ok = EV_SpawnLight(line, args, LITE_FADE);
+      break;
+    case 114:                   /* Light_Glow */
+      ok = EV_SpawnLight(line, args, LITE_GLOW);
+      break;
+    case 115:                   /* Light_Flicker */
+      ok = EV_SpawnLight(line, args, LITE_FLICKER);
+      break;
+    case 116:                   /* Light_Strobe */
+      ok = EV_SpawnLight(line, args, LITE_STROBE);
       break;
     case 35:                    /* Floor_RaiseByValueTimes8 */
       ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEBYVALUETIMES8);

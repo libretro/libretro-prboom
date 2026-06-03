@@ -687,6 +687,30 @@ typedef struct
   dbool     crush;
 } pillar_t;
 
+/* Hexen sector light effects (driven by T_Light). */
+typedef enum
+{
+  LITE_RAISEBYVALUE,
+  LITE_LOWERBYVALUE,
+  LITE_CHANGETOVALUE,
+  LITE_FADE,
+  LITE_GLOW,
+  LITE_FLICKER,
+  LITE_STROBE
+} lighttype_t;
+
+typedef struct
+{
+  thinker_t   thinker;
+  sector_t   *sector;
+  lighttype_t type;
+  int         value1;
+  int         value2;
+  int         tics1;
+  int         tics2;
+  int         count;
+} light_t;
+
 // p_doors
 
 typedef struct

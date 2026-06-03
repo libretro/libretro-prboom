@@ -44,6 +44,8 @@ int   Hexen_EV_CeilingCrushStop(line_t *line, byte *args);
 void  T_HexenBuildPillar(pillar_t *pillar);
 int   EV_BuildPillar(line_t *line, byte *args, int crush);
 int   EV_OpenPillar(line_t *line, byte *args);
+void  T_HexenLight(light_t *light);
+int   EV_SpawnLight(line_t *line, byte *args, lighttype_t type);
 int   EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount);
 void  Hexen_EV_StopPlat(line_t *line, byte *args);
 

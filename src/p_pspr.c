@@ -1721,6 +1721,22 @@ void A_CHolyPalette(player_t *player, pspdef_t *psp)
   (void)psp;
 }
 
+/* --------------------------------------------------------------------------
+ * Mage weapons
+ * ------------------------------------------------------------------------ */
+
+/* The Sapphire Wand (Mage WP_FIRST): a free, fast blaster bolt. */
+void A_MWandAttack(player_t *player, pspdef_t *psp)
+{
+  mobj_t *mo;
+
+  (void)psp;
+  mo = P_SpawnPlayerMissile(player->mo, HEXEN_MT_MWAND_MISSILE);
+  if (mo)
+    mo->thinker.function.arg1 = (arg1_t)P_BlasterMobjThinker;
+  S_StartSound(player->mo, hexen_sfx_mage_wand_fire);
+}
+
 #ifdef HEXEN
 //****************************************************************************
 //

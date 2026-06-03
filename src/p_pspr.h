@@ -117,6 +117,8 @@ void A_CFlamePuff(struct mobj_s *actor);
 void A_CFlameRotate(struct mobj_s *actor);
 void A_CHolyAttack(player_t *player, pspdef_t *psp);
 void A_CHolyPalette(player_t *player, pspdef_t *psp);
+/* Mage weapons. */
+void A_MWandAttack(player_t *player, pspdef_t *psp);
 void A_CHolySeek(struct mobj_s *actor);
 void A_CHolyTail(struct mobj_s *actor);
 void A_CHolyCheckScream(struct mobj_s *actor);

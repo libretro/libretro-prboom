@@ -111,6 +111,10 @@ void A_CStaffAttack(player_t *player, pspdef_t *psp);
 void A_CStaffMissileSlither(struct mobj_s *actor);
 void A_CStaffInitBlink(player_t *player, pspdef_t *psp);
 void A_CStaffCheckBlink(player_t *player, pspdef_t *psp);
+void A_CFlameAttack(player_t *player, pspdef_t *psp);
+void A_CFlameMissile(struct mobj_s *actor);
+void A_CFlamePuff(struct mobj_s *actor);
+void A_CFlameRotate(struct mobj_s *actor);
 void A_FSwordFlames(struct mobj_s *actor);
 /* MBF21 weapon codepointers */
 void A_WeaponProjectile(player_t *player, pspdef_t *psp);

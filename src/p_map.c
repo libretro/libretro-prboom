@@ -52,6 +52,11 @@
 #endif
 
 static mobj_t    *tmthing;
+
+/* Raven (Hexen/Heretic): the most recent thing that blocked a move -- read
+ * by missile-impact codepointers (e.g. the Cleric Flame Strike) to know what
+ * was hit.  Only maintained for Raven games. */
+mobj_t *BlockingMobj;
 static fixed_t   tmx;
 static fixed_t   tmy;
 static int pe_x; // Pain Elemental position for Lost Soul checks // phares
@@ -534,6 +539,9 @@ static dbool PIT_CheckThing(mobj_t *thing) // killough 3/26/98: make static
   if (thing == tmthing)
     return TRUE;
 
+  if (raven)
+    BlockingMobj = thing;
+
   /* killough 11/98:
    *
    * TOUCHY flag, for mines or other objects which die on contact with solids.
@@ -798,6 +806,8 @@ dbool P_CheckPosition (mobj_t* thing,fixed_t x,fixed_t y)
   yl = (tmbbox[BOXBOTTOM] - bmaporgy - MAXRADIUS)>>MAPBLOCKSHIFT;
   yh = (tmbbox[BOXTOP] - bmaporgy + MAXRADIUS)>>MAPBLOCKSHIFT;
 
+
+  BlockingMobj = NULL;
 
   for (bx=xl ; bx<=xh ; bx++)
     for (by=yl ; by<=yh ; by++)

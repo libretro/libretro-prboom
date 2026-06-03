@@ -534,6 +534,7 @@ mobj_t  *P_SpawnPlayerMissile(mobj_t *source, mobjtype_t type);
 mobj_t  *P_SPMAngleXYZ(mobj_t *source, fixed_t x, fixed_t y, fixed_t z,
                        mobjtype_t type, angle_t angle);
 mobj_t  *P_SPMAngle(mobj_t *source, mobjtype_t type, angle_t angle);
+void     P_BlasterMobjThinker(mobj_t *mobj);
 dbool   P_IsDoomnumAllowed(int doomnum);
 void    P_SpawnMapThing (const mapthing_t*  mthing);
 void    P_SpawnPlayer(int n, const mapthing_t *mthing);

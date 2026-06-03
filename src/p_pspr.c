@@ -38,6 +38,7 @@
 #include "p_inter.h"
 #include "p_pspr.h"
 extern fixed_t FloatBobOffsets[64];
+void A_UnHideThing(mobj_t *thing);
 #include "dsda_hacked.h"
 #include "p_enemy.h"
 #include "p_tick.h"
@@ -1433,6 +1434,88 @@ void A_CStaffCheckBlink(player_t *player, pspdef_t *psp)
     P_SetPsprite(player, ps_weapon, HEXEN_S_CSTAFFBLINK1);
     player->mo->special1.i = (P_Random(pr_punch) + 50) >> 2;
   }
+}
+
+/* Flame Strike (Cleric WP_THIRD): launches a flame missile that, on hitting
+ * a creature, rings it with a circle of rotating flames. */
+#define FLAMESPEED    29491        /* 0.45 * FRACUNIT */
+#define FLAMEROTSPEED (2 * FRACUNIT)
+
+void A_CFlameAttack(player_t *player, pspdef_t *psp)
+{
+  mobj_t *mo;
+
+  (void)psp;
+  mo = P_SpawnPlayerMissile(player->mo, HEXEN_MT_CFLAME_MISSILE);
+  if (mo)
+  {
+    mo->thinker.function.arg1 = (arg1_t)P_BlasterMobjThinker;
+    mo->special1.i = 2;
+  }
+  player->mana[MANA_2] -= WeaponManaUse[player->class][player->readyweapon];
+  S_StartSound(player->mo, hexen_sfx_cleric_flame_fire);
+}
+
+void A_CFlameMissile(mobj_t *actor)
+{
+  int     i;
+  int     an;
+  fixed_t dist;
+  mobj_t *mo;
+
+  A_UnHideThing(actor);
+  S_StartSound(actor, hexen_sfx_cleric_flame_explode);
+  if (BlockingMobj && (BlockingMobj->flags & MF_SHOOTABLE))
+  {
+    /* hit a creature: ring it with rotating flames */
+    dist = BlockingMobj->radius + 18 * FRACUNIT;
+    for (i = 0; i < 4; i++)
+    {
+      an = (i * ANG45) >> ANGLETOFINESHIFT;
+      mo = P_SpawnMobj(BlockingMobj->x + FixedMul(dist, finecosine[an]),
+                       BlockingMobj->y + FixedMul(dist, finesine[an]),
+                       BlockingMobj->z + 5 * FRACUNIT, HEXEN_MT_CIRCLEFLAME);
+      if (mo)
+      {
+        mo->angle = an << ANGLETOFINESHIFT;
+        P_SetTarget(&mo->target, actor->target);
+        mo->momx = mo->special1.i = FixedMul(FLAMESPEED, finecosine[an]);
+        mo->momy = mo->special2.i = FixedMul(FLAMESPEED, finesine[an]);
+        mo->tics -= P_Random(pr_heretic) & 3;
+      }
+      mo = P_SpawnMobj(BlockingMobj->x - FixedMul(dist, finecosine[an]),
+                       BlockingMobj->y - FixedMul(dist, finesine[an]),
+                       BlockingMobj->z + 5 * FRACUNIT, HEXEN_MT_CIRCLEFLAME);
+      if (mo)
+      {
+        mo->angle = ANG180 + (an << ANGLETOFINESHIFT);
+        P_SetTarget(&mo->target, actor->target);
+        mo->momx = mo->special1.i = FixedMul(-FLAMESPEED, finecosine[an]);
+        mo->momy = mo->special2.i = FixedMul(-FLAMESPEED, finesine[an]);
+        mo->tics -= P_Random(pr_heretic) & 3;
+      }
+    }
+    P_SetMobjState(actor, HEXEN_S_FLAMEPUFF2_1);
+  }
+}
+
+void A_CFlamePuff(mobj_t *actor)
+{
+  A_UnHideThing(actor);
+  actor->momx = 0;
+  actor->momy = 0;
+  actor->momz = 0;
+  S_StartSound(actor, hexen_sfx_cleric_flame_explode);
+}
+
+void A_CFlameRotate(mobj_t *actor)
+{
+  int an;
+
+  an = (actor->angle + ANG90) >> ANGLETOFINESHIFT;
+  actor->momx = actor->special1.i + FixedMul(FLAMEROTSPEED, finecosine[an]);
+  actor->momy = actor->special2.i + FixedMul(FLAMEROTSPEED, finesine[an]);
+  actor->angle += ANG90 / 15;
 }
 
 #ifdef HEXEN

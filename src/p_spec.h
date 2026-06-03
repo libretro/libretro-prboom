@@ -687,6 +687,29 @@ typedef struct
   dbool     crush;
 } pillar_t;
 
+/* Hexen floor waggle: oscillates a sector floor up and down (FloatBob table)
+ * for a duration, easing the amplitude in at the start and out at the end. */
+enum
+{
+  WGLSTATE_EXPAND,
+  WGLSTATE_STABLE,
+  WGLSTATE_REDUCE
+};
+
+typedef struct
+{
+  thinker_t thinker;
+  sector_t *sector;
+  fixed_t   originalHeight;
+  fixed_t   accumulator;
+  fixed_t   accDelta;
+  fixed_t   targetScale;
+  fixed_t   scale;
+  fixed_t   scaleDelta;
+  int       ticker;
+  int       state;
+} planeWaggle_t;
+
 /* Hexen sector light effects (driven by T_Light). */
 typedef enum
 {

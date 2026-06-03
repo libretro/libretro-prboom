@@ -60,6 +60,8 @@ int   EV_ThingSpawn(byte *args, int fog);
 int   Hexen_EV_FloorCrushStop(line_t *line, byte *args);
 int   Hexen_EV_DoFloorAndCeiling(line_t *line, byte *args, int raise);
 int   Hexen_EV_SectorSoundChange(byte *args);
+void  T_FloorWaggle(planeWaggle_t *waggle);
+int   EV_StartFloorWaggle(int tag, int height, int speed, int offset, int timer);
 int   EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount);
 void  Hexen_EV_StopPlat(line_t *line, byte *args);
 

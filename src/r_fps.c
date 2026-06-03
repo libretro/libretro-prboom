@@ -427,6 +427,12 @@ static void R_InterpolationGetData(thinker_t *th,
     *posptr2 = ((pillar_t *)th)->sector;
   }
   else
+  if (th->function.arg1 == (void (*)(void *))T_FloorWaggle)
+  {
+    *type1 = INTERP_SectorFloor;
+    *posptr1 = ((planeWaggle_t *)th)->sector;
+  }
+  else
   if (th->function.arg1 == (void (*)(void *))T_Scroll)
   {
     switch (((scroll_t *)th)->type)

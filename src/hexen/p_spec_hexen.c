@@ -1510,6 +1510,79 @@ dbool EV_HexenTeleport(int tid, mobj_t *thing, dbool fog)
   return P_HexenTeleport(thing, mo->x, mo->y, mo->angle, fog);
 }
 
+/* --- Floor waggle ---------------------------------------------------------
+ *
+ * Oscillates a sector floor with the FloatBob offset table for a timed
+ * duration, easing the amplitude in (expand) and out (reduce). */
+extern fixed_t FloatBobOffsets[64];
+
+void T_FloorWaggle(planeWaggle_t *waggle)
+{
+  switch (waggle->state)
+  {
+    case WGLSTATE_EXPAND:
+      if ((waggle->scale += waggle->scaleDelta) >= waggle->targetScale)
+      {
+        waggle->scale = waggle->targetScale;
+        waggle->state = WGLSTATE_STABLE;
+      }
+      break;
+    case WGLSTATE_REDUCE:
+      if ((waggle->scale -= waggle->scaleDelta) <= 0)
+      {
+        waggle->sector->floorheight = waggle->originalHeight;
+        P_ChangeSector(waggle->sector, true);
+        waggle->sector->floordata = NULL;
+        P_RemoveThinker(&waggle->thinker);
+        return;
+      }
+      break;
+    case WGLSTATE_STABLE:
+      if (waggle->ticker != -1)
+        if (!--waggle->ticker)
+          waggle->state = WGLSTATE_REDUCE;
+      break;
+  }
+  waggle->accumulator += waggle->accDelta;
+  waggle->sector->floorheight = waggle->originalHeight +
+    FixedMul(FloatBobOffsets[(waggle->accumulator >> FRACBITS) & 63],
+             waggle->scale);
+  P_ChangeSector(waggle->sector, true);
+}
+
+int EV_StartFloorWaggle(int tag, int height, int speed, int offset, int timer)
+{
+  int            secnum;
+  int            rtn = 0;
+  sector_t      *sector;
+  planeWaggle_t *waggle;
+
+  HEXEN_FOR_TAGGED_SECTORS(secnum, tag)
+  {
+    sector = &sectors[secnum];
+    if (sector->floordata || sector->ceilingdata)
+      continue;                 /* already busy */
+
+    rtn = 1;
+    waggle = Z_Malloc(sizeof(*waggle), PU_LEVEL, 0);
+    memset(waggle, 0, sizeof(*waggle));
+    sector->floordata = waggle;
+    waggle->thinker.function.arg1 = (void (*)(void *))T_FloorWaggle;
+    waggle->sector = sector;
+    waggle->originalHeight = sector->floorheight;
+    waggle->accumulator = offset * FRACUNIT;
+    waggle->accDelta = speed << 10;
+    waggle->scale = 0;
+    waggle->targetScale = height << 10;
+    waggle->scaleDelta = waggle->targetScale /
+                         (35 + ((3 * 35) * height) / 255);
+    waggle->ticker = timer ? timer * 35 : -1;
+    waggle->state = WGLSTATE_EXPAND;
+    P_AddThinker(&waggle->thinker);
+  }
+  return rtn;
+}
+
 /* --- Dispatcher ----------------------------------------------------------- */
 
 int Hexen_EV_FloorCrushStop(line_t *line, byte *args)
@@ -1756,6 +1829,9 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       break;
     case 140:                   /* Sector_SoundChange */
       ok = Hexen_EV_SectorSoundChange(args);
+      break;
+    case 138:                   /* Floor_Waggle */
+      ok = EV_StartFloorWaggle(args[0], args[1], args[2], args[3], args[4]);
       break;
     case 45:                    /* Ceiling_CrushRaiseAndStay */
       ok = Hexen_EV_DoCeiling(line, args, CLEV_CRUSHRAISEANDSTAY);

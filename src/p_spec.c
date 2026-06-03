@@ -2453,6 +2453,15 @@ void P_PlayerInSpecialSector (player_t* player)
     return;
   }
 
+  /* Hexen uses an entirely different sector-special model (the byte is not
+   * a Doom-style damage/scroll selector), so running the Doom handler on it
+   * misreads benign Hexen specials as Doom damage -- e.g. the player taking
+   * continuous pain (red palette flash) just standing in Winnowing Hall.
+   * Skip it until the Hexen sector-special layer lands, matching the other
+   * hexen-gated safe boundaries in p_setup/p_map. */
+  if (hexen)
+    return;
+
   // Has hit ground.
   //jff add if to handle old vs generalized types
   if (sector->special<32) // regular sector specials

@@ -535,6 +535,7 @@ mobj_t  *P_SPMAngleXYZ(mobj_t *source, fixed_t x, fixed_t y, fixed_t z,
                        mobjtype_t type, angle_t angle);
 mobj_t  *P_SPMAngle(mobj_t *source, mobjtype_t type, angle_t angle);
 mobj_t  *P_SpawnMissileAngleSpeed(mobj_t *source, mobjtype_t type, angle_t angle, fixed_t momz, fixed_t speed);
+void     P_ThrustMobj(mobj_t *mo, angle_t angle, fixed_t move);
 void     P_BlasterMobjThinker(mobj_t *mobj);
 int      P_FaceMobj(mobj_t *source, mobj_t *target, angle_t *delta);
 mobj_t  *P_RoughTargetSearch(mobj_t *mo, angle_t fov, int distance);

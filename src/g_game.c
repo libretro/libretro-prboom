@@ -650,12 +650,25 @@ static void G_DoLoadLevel (void)
    *  we look for an actual index, instead of simply
    *  setting one.
    */
-  skyflatnum = R_FlatNumForName ( SKYFLATNAME );
+  /* Hexen's sky-flat lump is "F_SKY" (Doom and Heretic use "F_SKY1"); a
+   * ceiling painted with the sky flat is what the renderer treats as open
+   * sky, so getting this wrong leaves sky sectors drawing garbage. */
+  skyflatnum = R_FlatNumForName ( hexen ? "F_SKY" : SKYFLATNAME );
 
   /* skytexture set through UMAPINFO */
   if (gamemapinfo && gamemapinfo->skytexture[0])
   {
     skytexture = R_TextureNumForName(gamemapinfo->skytexture);
+  }
+  /* Hexen picks the sky per map through its MAPINFO (sky1/sky2), which this
+   * core does not parse yet.  Until it does, fall back to the SKY1 texture so
+   * sky sectors at least render a real sky rather than a missing-texture
+   * pattern. */
+  else if (hexen)
+  {
+    skytexture = R_CheckTextureNumForName("SKY1");
+    if (skytexture == -1)
+      skytexture = R_TextureNumForName("SKY2");
   }
   /* DOOM determines the sky texture to be used
    * depending on the current episode, and the game version.

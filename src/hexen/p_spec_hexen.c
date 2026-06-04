@@ -34,6 +34,7 @@
 #include "r_state.h"
 #include "r_main.h"
 #include "p_spec.h"
+#include "p_enemy.h"
 #include "hexen/po_man.h"
 #include "g_game.h"
 #include "lprintf.h"
@@ -1490,6 +1491,11 @@ int EV_ThingRemove(int tid)
 
   while ((mobj = P_FindMobjFromTID((short) tid, &searcher)) != NULL)
   {
+    if (mobj->type == HEXEN_MT_BRIDGE)
+    {                           /* bridges fade out instead of vanishing */
+      A_BridgeRemove(mobj);
+      return 1;
+    }
     P_RemoveMobj(mobj);
     success = 1;
     searcher = -1;              /* the list shifted; restart the scan */

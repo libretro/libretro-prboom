@@ -141,6 +141,7 @@ void A_SpeedFade(mobj_t *);
 void A_DropMace(mobj_t *);
 void A_CheckFloor(mobj_t *);
 void A_BridgeInit(mobj_t *);
+void A_BridgeRemove(mobj_t *);
 void A_BridgeOrbit(mobj_t *);
 void A_FlameCheck(mobj_t *);
 void A_BatSpawnInit(mobj_t *);

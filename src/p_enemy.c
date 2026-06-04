@@ -4419,7 +4419,15 @@ int orbitTableY[256] = {
 void A_BridgeOrbit(mobj_t *actor)
 {
   if (actor->target->special1.i)
+  {
+    /* The bridge is going away: S_NULL removes this ball, which also
+     * releases its target reference, so touching the mobj past this
+     * point is use-after-free (vanilla falls through onto the stale
+     * pointers and survives by accident; with reference-counted
+     * targets it would crash). */
     P_SetMobjState(actor, HEXEN_S_NULL);
+    return;
+  }
   actor->special_args[0] += 3;
   actor->special_args[0] &= 0xff;
   actor->x = actor->target->x + orbitTableX[actor->special_args[0]];
@@ -4455,6 +4463,15 @@ void A_BridgeInit(mobj_t *actor)
   A_BridgeOrbit(ball1);
   A_BridgeOrbit(ball2);
   A_BridgeOrbit(ball3);
+}
+
+/* Thing_Remove on a bridge: fade it out gracefully -- unsolid, the
+ * FREE_BRIDGE sequence, and the removal flag the orbiting balls watch. */
+void A_BridgeRemove(mobj_t *actor)
+{
+  actor->special1.i = true;     /* removing the bridge */
+  actor->flags &= ~MF_SOLID;
+  P_SetMobjState(actor, HEXEN_S_FREE_BRIDGE1);
 }
 
 void A_FlameCheck(mobj_t *actor)

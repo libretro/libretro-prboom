@@ -42,6 +42,7 @@
 #include "st_lib.h"
 #include "r_main.h"
 #include "am_map.h"
+#include "p_inter.h"
 #include "m_cheat.h"
 #include "s_sound.h"
 #include "sounds.h"
@@ -1238,6 +1239,79 @@ static const char *const hexen_arti_icon[HEXEN_NUMARTIFACTS] = {
   "ARTIGER2", "ARTIGER3", "ARTIGER4"
 };
 
+/* Hexen red INumber (the INRED font), for the low-health readout. */
+static void ST_HexenDrawRedINumber(int val, int x, int y)
+{
+  int lump;
+  int oldval = val;
+
+  if (val < 0)
+    val = 0;
+  if (val > 99)
+  {
+    lump = W_GetNumForName("inred0") + val / 100;
+    V_DrawNumPatch(x, y, FG, lump, CR_DEFAULT, VPT_STRETCH);
+  }
+  val = val % 100;
+  if (val > 9 || oldval > 99)
+  {
+    lump = W_GetNumForName("inred0") + val / 10;
+    V_DrawNumPatch(x + 8, y, FG, lump, CR_DEFAULT, VPT_STRETCH);
+  }
+  val = val % 10;
+  lump = W_GetNumForName("inred0") + val;
+  V_DrawNumPatch(x + 16, y, FG, lump, CR_DEFAULT, VPT_STRETCH);
+}
+
+/* The drained portion of a mana vial: a black column from the top, in
+ * 320x200 bar coordinates scaled to the framebuffer (V_FillRect itself is
+ * unscaled). */
+static void ST_HexenDrawVialDrain(int x, int y, int mana)
+{
+  int h = 22 - (22 * mana) / MAX_MANA;
+  int fx, fy, fw, fh;
+
+  if (h <= 0)
+    return;
+  fx = x * SCREENWIDTH / 320;
+  fy = y * SCREENHEIGHT / 200;
+  fw = ((x + 3) * SCREENWIDTH / 320) - fx;
+  fh = ((y + h) * SCREENHEIGHT / 200) - fy;
+  if (fw < 1)
+    fw = 1;
+  V_FillRect(fx, fy, fw, fh, 0);
+}
+
+/* Automap panel: the KEYBAR with up to five key icons and the four armor
+ * piece slots.  Vanilla dims a slot toward transparency as the piece wears
+ * out; the fork has no translucent patch path, so owned pieces draw opaque. */
+static void ST_HexenDrawKeyBar(player_t *plyr)
+{
+  int i;
+  int xPosition;
+
+  if (W_CheckNumForName("KEYBAR") >= 0)
+    V_DrawNamePatch(38, 162, FG, "KEYBAR", CR_DEFAULT, VPT_STRETCH);
+
+  xPosition = 46;
+  for (i = 0; i < 11 && xPosition <= 126; i++)   /* the 11 hexen locks */
+  {
+    if (plyr->cards[i])
+    {
+      V_DrawNumPatch(xPosition, 164, FG,
+                     W_GetNumForName("keyslot1") + i, CR_DEFAULT, VPT_STRETCH);
+      xPosition += 20;
+    }
+  }
+  for (i = 0; i < NUMARMOR; i++)
+  {
+    if (!plyr->hexen_armorpoints[i])
+      continue;
+    V_DrawNumPatch(150 + 31 * i, 164, FG,
+                   W_GetNumForName("armslot1") + i, CR_DEFAULT, VPT_STRETCH);
+  }
+}
+
 /* The full inventory bar for Hexen (shown while cycling artifacts).  Mirrors
  * ST_HereticDrawInvBar but uses the larger Hexen artifact set/bound and the
  * Hexen SELECTBOX lump name (SELECTBO). */
@@ -1296,41 +1370,89 @@ static void ST_HexenDrawer(void)
   {
     ST_HexenDrawInvBar(plyr);
   }
+  else if (automapmode & am_active)
+  {
+    /* On the automap the stat panel gives way to the key bar. */
+    ST_HexenDrawKeyBar(plyr);
+  }
   else
   {
+    const char *icon1, *icon2, *vial1, *vial2;
+
     /* Stat panel. */
     if (W_CheckNumForName("STATBAR") >= 0)
       V_DrawNamePatch(38, 162, FG, "STATBAR", CR_DEFAULT, VPT_STRETCH);
 
-    /* Health (use the smoothed HealthMarker, clamped 0..100 like the bar). */
+    /* Health (smoothed HealthMarker, clamped 0..100; vanilla switches to
+     * the red INRED font below 25), or the frag total in deathmatch. */
+    if (deathmatch)
+    {
+      int i, frags = 0;
+      for (i = 0; i < MAXPLAYERS; i++)
+        frags += plyr->frags[i];
+      if (W_CheckNumForName("KILLS") >= 0)
+        V_DrawNamePatch(38, 162, FG, "KILLS", CR_DEFAULT, VPT_STRETCH);
+      ST_HereticDrawINumber(frags, 40, 176);
+    }
+    else
     {
       int h = HealthMarker;
       if (h < 0) h = 0; else if (h > 100) h = 100;
-      ST_HereticDrawINumber(h, 40, 176);
+      if (h >= 25)
+        ST_HereticDrawINumber(h, 40, 176);
+      else
+        ST_HexenDrawRedINumber(h, 40, 176);
     }
 
-    /* Mana pools: count + bright/dim icon depending on whether the ready
-     * weapon draws on that mana type. */
+    /* Mana pools: vanilla picks the bright icon and the active vial by the
+     * ready weapon's mana draw, and dims the icon at a zero count; the vial
+     * drains with a black column proportional to the pool. */
     m1 = plyr->mana[0];
     m2 = plyr->mana[1];
     ST_HereticDrawSmallNumber(m1, 79, 181);
     ST_HereticDrawSmallNumber(m2, 111, 181);
-    if (W_CheckNumForName(m1 ? "MANABRT1" : "MANADIM1") >= 0)
-      V_DrawNamePatch(77, 164, FG, m1 ? "MANABRT1" : "MANADIM1",
-                      CR_DEFAULT, VPT_STRETCH);
-    if (W_CheckNumForName(m2 ? "MANABRT2" : "MANADIM2") >= 0)
-      V_DrawNamePatch(110, 164, FG, m2 ? "MANABRT2" : "MANADIM2",
-                      CR_DEFAULT, VPT_STRETCH);
-    if (W_CheckNumForName("MANAVL1") >= 0)
-      V_DrawNamePatch(94, 164, FG, "MANAVL1", CR_DEFAULT, VPT_STRETCH);
-    if (W_CheckNumForName("MANAVL2") >= 0)
-      V_DrawNamePatch(102, 164, FG, "MANAVL2", CR_DEFAULT, VPT_STRETCH);
 
-    /* Armor.  Hexen shows the total armor class: the sum of the four armor
-     * pieces (stored as fixed-point save-percent) expressed in AC points,
-     * i.e. divided by 5*FRACUNIT. */
+    switch (plyr->readyweapon)
     {
-      fixed_t sum = plyr->hexen_armorpoints[ARMOR_ARMOR]
+      case WP_SECOND:
+        icon1 = "MANABRT1"; vial1 = "MANAVL1";
+        icon2 = "MANADIM2"; vial2 = "MANAVL2D";
+        break;
+      case WP_THIRD:
+        icon1 = "MANADIM1"; vial1 = "MANAVL1D";
+        icon2 = "MANABRT2"; vial2 = "MANAVL2";
+        break;
+      case WP_FOURTH:
+        icon1 = "MANABRT1"; vial1 = "MANAVL1";
+        icon2 = "MANABRT2"; vial2 = "MANAVL2";
+        break;
+      default:                  /* the first weapon uses no mana */
+        icon1 = "MANADIM1"; vial1 = "MANAVL1D";
+        icon2 = "MANADIM2"; vial2 = "MANAVL2D";
+        break;
+    }
+    if (!m1)
+      icon1 = "MANADIM1";
+    if (!m2)
+      icon2 = "MANADIM2";
+
+    if (W_CheckNumForName(icon1) >= 0)
+      V_DrawNamePatch(77, 164, FG, icon1, CR_DEFAULT, VPT_STRETCH);
+    if (W_CheckNumForName(icon2) >= 0)
+      V_DrawNamePatch(110, 164, FG, icon2, CR_DEFAULT, VPT_STRETCH);
+    if (W_CheckNumForName(vial1) >= 0)
+      V_DrawNamePatch(94, 164, FG, vial1, CR_DEFAULT, VPT_STRETCH);
+    ST_HexenDrawVialDrain(95, 165, m1);
+    if (W_CheckNumForName(vial2) >= 0)
+      V_DrawNamePatch(102, 164, FG, vial2, CR_DEFAULT, VPT_STRETCH);
+    ST_HexenDrawVialDrain(103, 165, m2);
+
+    /* Armor.  Hexen shows the total armor class: the class's innate save
+     * plus the four armor pieces (fixed-point save-percent), expressed in
+     * AC points, i.e. divided by 5*FRACUNIT. */
+    {
+      fixed_t sum = P_HexenAutoArmorSave(plyr->class)
+                  + plyr->hexen_armorpoints[ARMOR_ARMOR]
                   + plyr->hexen_armorpoints[ARMOR_SHIELD]
                   + plyr->hexen_armorpoints[ARMOR_HELMET]
                   + plyr->hexen_armorpoints[ARMOR_AMULET];

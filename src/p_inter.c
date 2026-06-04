@@ -304,6 +304,15 @@ static const struct
   /* PCLASS_PIG     */ { { 0, 0, 0, 0 }, 0, 5*FRACUNIT }
 };
 
+/* The class's innate armor save, for the status bar's AC readout (the table
+ * itself stays private to the armor logic above). */
+fixed_t P_HexenAutoArmorSave(int cls)
+{
+  if (cls < 0 || cls >= NUMCLASSES)
+    return 0;
+  return hexen_class_armor[cls].auto_armor_save;
+}
+
 /* Hexen armor grant.  amount == -1 sets the given piece to its full
  * class value (the in-world armor pickups); a positive amount adds
  * amount*5 save-percent up to the class total cap (the Boost Armor /

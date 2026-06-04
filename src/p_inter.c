@@ -1845,6 +1845,30 @@ static dbool P_MorphMonster(mobj_t *actor)
   return true;
 }
 
+/* The Minotaur's charge slam (the Heretic Maulotaur and the Hexen Dark
+ * Servant): heavy knockback plus dice damage, staggering players, and the
+ * charge ends. */
+void P_MinotaurSlam(mobj_t *source, mobj_t *target)
+{
+  angle_t angle;
+  fixed_t thrust;
+
+  angle = R_PointToAngle2(source->x, source->y, target->x, target->y);
+  angle >>= ANGLETOFINESHIFT;
+  thrust = 16 * FRACUNIT + (P_Random(pr_heretic) << 10);
+  target->momx += FixedMul(thrust, finecosine[angle]);
+  target->momy += FixedMul(thrust, finesine[angle]);
+  if (hexen)
+    P_DamageMobj(target, NULL, source,
+                 (1 + (P_Random(pr_heretic) & 7)) * 4);
+  else
+    P_DamageMobj(target, NULL, NULL,
+                 (1 + (P_Random(pr_heretic) & 7)) * 6);
+  if (target->player)
+    target->reactiontime = 14 + (P_Random(pr_heretic) & 7);
+  source->special_args[0] = 0;  /* stop charging */
+}
+
 void P_PoisonPlayer(player_t *player, mobj_t *poisoner, int poison)
 {
   if ((player->cheats & CF_GODMODE) || player->powers[pw_invulnerability])
@@ -1964,6 +1988,42 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
           return;
         }
         break;
+      case HEXEN_MT_MINOTAUR:
+        if (inflictor->flags & MF_SKULLFLY)
+        {                       /* slam only when in charge mode */
+          P_MinotaurSlam(inflictor, target);
+          return;
+        }
+        break;
+      case HEXEN_MT_BISH_FX:
+        damage >>= 1;           /* bishops are just too nasty */
+        break;
+      case HEXEN_MT_SHARDFX1:
+        switch (inflictor->special2.i)
+        {                       /* Wendigo shards scale with their size */
+          case 3:
+            damage <<= 3;
+            break;
+          case 2:
+            damage <<= 2;
+            break;
+          case 1:
+            damage <<= 1;
+            break;
+          default:
+            break;
+        }
+        break;
+      case HEXEN_MT_CSTAFF_MISSILE:
+        if (target->player)
+        {                       /* the Serpent Staff poisons */
+          P_PoisonPlayer(target->player, source, 20);
+          damage >>= 1;
+        }
+        break;
+      case HEXEN_MT_ICEGUY_FX2:
+        damage >>= 1;
+        break;
       case HEXEN_MT_EGGFX:
         if (target->player)
           P_MorphPlayer(target->player);
@@ -2018,7 +2078,21 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
   }
 
   if (target->flags & MF_SKULLFLY)
+  {
+    /* A charging Maulotaur shrugs damage off entirely. */
+    if (heretic && target->type == HERETIC_MT_MINOTAUR)
+      return;
     target->momx = target->momy = target->momz = 0;
+  }
+
+  /* Heretic: the charging Maulotaur slams (the hexen Dark Servant's slam
+   * lives in the hexen inflictor switch above, per each game's ordering). */
+  if (heretic && inflictor && inflictor->type == HERETIC_MT_MINOTAUR &&
+      (inflictor->flags & MF_SKULLFLY))
+  {
+    P_MinotaurSlam(inflictor, target);
+    return;
+  }
 
   player = target->player;
   if (player && gameskill == sk_baby)

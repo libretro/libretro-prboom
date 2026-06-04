@@ -49,6 +49,7 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor,mobj_t *source,int damage);
 void P_FallingDamage(player_t *player);
 dbool P_MorphPlayer(player_t *player);
 fixed_t P_HexenAutoArmorSave(int cls);
+void P_MinotaurSlam(mobj_t *source, mobj_t *target);
 #define MAXMORPHHEALTH 30
 
 /* killough 5/2/98: moved from d_deh.c, g_game.c, m_misc.c, others: */

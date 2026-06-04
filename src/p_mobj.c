@@ -962,8 +962,11 @@ mobj_t* P_SpawnMobj(fixed_t x,fixed_t y,fixed_t z,mobjtype_t type)
   /* MBF21 thing flags must not affect sub-21 demos even if a deh patch set
    * them, so strip flags2 entirely below complevel 21.  This is the single
    * choke point that keeps every MF2_* behaviour inert outside MBF21,
-   * mirroring the friends/bouncers strip below. */
-  if (!mbf21_features)
+   * mirroring the friends/bouncers strip below.  Raven games are exempt:
+   * for Heretic and Hexen, flags2 carries core thing behaviour (FOOTCLIP,
+   * PASSMOBJ, INVULNERABLE, DONTDRAW, ...) that must survive at every
+   * complevel -- Doom demo compatibility does not apply to them. */
+  if (!mbf21_features && !raven)
     mobj->flags2 = 0;
 
   /* killough 8/23/98: no friends, bouncers, or touchy things in old demos */

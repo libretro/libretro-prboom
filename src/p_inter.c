@@ -1892,6 +1892,7 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
    * chainsaw exception; below complevel 21 the hardcoded chainsaw check is
    * used unchanged. */
   if (inflictor && !(target->flags & MF_NOCLIP) &&
+      !(inflictor->flags2 & MF2_NODMGTHRUST) &&
       (!source || !source->player ||
        (mbf21_features
         ? !(weaponinfo[source->player->readyweapon].flags & WPF_NOTHRUST)

@@ -1690,7 +1690,14 @@ dbool PTR_ShootTraverse (intercept_t* in)
          if (P_Random(pr_heretic) < 192)
             P_BloodSplatter(x, y, z, in->d.thing);
       }
-      P_DamageMobj (th, shootthing, shootthing, la_damage);
+      if (hexen && PuffType == HEXEN_MT_FLAMEPUFF2)
+      {                         /* Cleric flame strike does fire damage */
+         P_DamageMobj (th, &LavaInflictor, shootthing, la_damage);
+      }
+      else
+      {
+         P_DamageMobj (th, shootthing, shootthing, la_damage);
+      }
    }
 
    // don't go any farther

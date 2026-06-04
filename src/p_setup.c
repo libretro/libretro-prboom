@@ -2787,6 +2787,7 @@ void P_Init (void)
    P_InitSwitchList();
    P_InitPicAnims();
    P_InitFTAnims();  /* hexen ANIMDEFS (no-op otherwise) */
+   P_InitLava();     /* raven fire inflictor (no-op otherwise) */
    P_InitTerrainTypes();
    R_InitSprites(sprnames);
 }

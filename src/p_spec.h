@@ -1187,6 +1187,11 @@ void P_ShootSpecialLine
 
 void P_CrossSpecialLine(line_t *line, int side, mobj_t *thing);
 
+/* Raven fire-typed damage inflictor (lava, Cleric flame strike). */
+extern mobj_t LavaInflictor;
+void P_InitLava(void);
+void P_PlayerOnSpecialFlat(player_t *player, int floorType);
+
 void P_PlayerInSpecialSector
 ( player_t* player );
 

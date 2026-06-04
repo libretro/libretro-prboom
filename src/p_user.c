@@ -1553,45 +1553,51 @@ void P_PlayerThink (player_t* player)
    if (player->mo->subsector->sector->special)
       map_format.player_in_special_sector(player);
 
-#ifdef HEXEN
-   if((floorType = P_GetThingFloorType(player->mo)) != FLOOR_SOLID)
-      P_PlayerOnSpecialFlat(player, floorType);
-
-   switch(player->class)
+   if (hexen)
    {
-      case PCLASS_FIGHTER:
-         if(player->mo->momz <= -35*FRACUNIT
-               && player->mo->momz >= -40*FRACUNIT && !player->morphTics
-               && !S_GetSoundPlayingInfo(player->mo,
-                  SFX_PLAYER_FIGHTER_FALLING_SCREAM))
-         {
-            S_StartSound(player->mo,
-                  SFX_PLAYER_FIGHTER_FALLING_SCREAM);
-         }
-         break;
-      case PCLASS_CLERIC:
-         if(player->mo->momz <= -35*FRACUNIT
-               && player->mo->momz >= -40*FRACUNIT && !player->morphTics
-               && !S_GetSoundPlayingInfo(player->mo,
-                  SFX_PLAYER_CLERIC_FALLING_SCREAM))
-         {
-            S_StartSound(player->mo,
-                  SFX_PLAYER_CLERIC_FALLING_SCREAM);
-         }
-         break;
-      case PCLASS_MAGE:
-         if(player->mo->momz <= -35*FRACUNIT
-               && player->mo->momz >= -40*FRACUNIT && !player->morphTics
-               && !S_GetSoundPlayingInfo(player->mo,
-                  SFX_PLAYER_MAGE_FALLING_SCREAM))
-         {
-            S_StartSound(player->mo,
-                  SFX_PLAYER_MAGE_FALLING_SCREAM);
-         }
-         break;
-      default:
-         break;
+      int floorType;
+
+      if((floorType = P_GetThingFloorType(player->mo)) != FLOOR_SOLID)
+         P_PlayerOnSpecialFlat(player, floorType);
+
+      switch(player->class)
+      {
+         case PCLASS_FIGHTER:
+            if(player->mo->momz <= -35*FRACUNIT
+                  && player->mo->momz >= -40*FRACUNIT && !player->morphTics
+                  && !S_GetSoundPlayingInfo(player->mo,
+                     hexen_sfx_player_fighter_falling_scream))
+            {
+               S_StartSound(player->mo,
+                     hexen_sfx_player_fighter_falling_scream);
+            }
+            break;
+         case PCLASS_CLERIC:
+            if(player->mo->momz <= -35*FRACUNIT
+                  && player->mo->momz >= -40*FRACUNIT && !player->morphTics
+                  && !S_GetSoundPlayingInfo(player->mo,
+                     hexen_sfx_player_cleric_falling_scream))
+            {
+               S_StartSound(player->mo,
+                     hexen_sfx_player_cleric_falling_scream);
+            }
+            break;
+         case PCLASS_MAGE:
+            if(player->mo->momz <= -35*FRACUNIT
+                  && player->mo->momz >= -40*FRACUNIT && !player->morphTics
+                  && !S_GetSoundPlayingInfo(player->mo,
+                     hexen_sfx_player_mage_falling_scream))
+            {
+               S_StartSound(player->mo,
+                     hexen_sfx_player_mage_falling_scream);
+            }
+            break;
+         default:
+            break;
+      }
    }
+
+#ifdef HEXEN
    if(cmd->arti)
    { // Use an artifact
       if((cmd->arti&AFLAG_JUMP) && onground && !player->jumpTics)

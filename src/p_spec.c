@@ -2398,15 +2398,52 @@ void P_ShootSpecialLine
  * core's heretic/p_action.c); declared locally as p_mobj.c does. */
 int P_HitFloor(mobj_t *thing);
 
+/* Raven: lava and other fire attacks damage through a static fire-typed
+ * inflictor, so P_DamageMobj can route burn deaths (and skip the thrust a
+ * positioned inflictor would otherwise apply: the inflictor sits at the map
+ * origin, so without MF2_NODMGTHRUST it would shove the victim toward 0,0
+ * every hit). */
+
+mobj_t LavaInflictor;
+
+void P_InitLava(void)
+{
+  if (!raven)
+    return;
+  memset(&LavaInflictor, 0, sizeof(mobj_t));
+  LavaInflictor.type = hexen ? HEXEN_MT_CIRCLEFLAME : HERETIC_MT_PHOENIXFX2;
+  LavaInflictor.flags2 = MF2_FIREDAMAGE | MF2_NODMGTHRUST;
+}
+
+/* Hexen: terrain-driven floor damage; the only special flat is lava. */
+void P_PlayerOnSpecialFlat(player_t *player, int floorType)
+{
+  if (player->mo->z != player->mo->floorz)
+    return;                     /* not touching the floor */
+
+  switch (floorType)
+  {
+    case FLOOR_LAVA:
+      if (!(leveltime & 31))
+      {
+        P_DamageMobj(player->mo, &LavaInflictor, NULL, 10);
+        S_StartSound(player->mo, hexen_sfx_lava_sizzle);
+      }
+      break;
+    default:
+      break;
+  }
+}
+
 /* Raven: Heretic uses its own sector-special numbering.  Several values
  * that mean "damage" under Doom mean "scroll/current", "wind" or "low
  * friction" in Heretic (and vice-versa), so running the Doom handler on a
  * Heretic map makes harmless current sectors -- e.g. the water past the
  * E1M1 teleporter -- injure the player.  This mirrors the Doom-lineage
  * P_HitFloor terrain stub (a no-op here) and dsda-doom's Heretic table.
- * NULL is passed as the damage inflictor on purpose: this core's
- * P_DamageMobj has no MF2_NODMGTHRUST handling, so a positioned lava
- * inflictor would shove the player toward the map origin every tic. */
+ * Lava damage goes through the fire-typed LavaInflictor (see P_InitLava)
+ * so burn deaths route correctly; MF2_NODMGTHRUST keeps the origin-placed
+ * inflictor from shoving the player. */
 static void P_PlayerInHereticSector(player_t *player, sector_t *sector)
 {
   /* Heretic wind/scroll push magnitudes (sector special - base index). */
@@ -2429,7 +2466,7 @@ static void P_PlayerInHereticSector(player_t *player, sector_t *sector)
     case 5:                            /* Damage_LavaWimpy */
       if (!(leveltime & 15))
       {
-        P_DamageMobj(player->mo, NULL, NULL, 5);
+        P_DamageMobj(player->mo, &LavaInflictor, NULL, 5);
         P_HitFloor(player->mo);
       }
       break;
@@ -2437,7 +2474,7 @@ static void P_PlayerInHereticSector(player_t *player, sector_t *sector)
     case 16:                           /* Damage_LavaHefty */
       if (!(leveltime & 15))
       {
-        P_DamageMobj(player->mo, NULL, NULL, 8);
+        P_DamageMobj(player->mo, &LavaInflictor, NULL, 8);
         P_HitFloor(player->mo);
       }
       break;
@@ -2446,7 +2483,7 @@ static void P_PlayerInHereticSector(player_t *player, sector_t *sector)
       P_Thrust(player, 0, 2048 * 28);
       if (!(leveltime & 15))
       {
-        P_DamageMobj(player->mo, NULL, NULL, 5);
+        P_DamageMobj(player->mo, &LavaInflictor, NULL, 5);
         P_HitFloor(player->mo);
       }
       break;

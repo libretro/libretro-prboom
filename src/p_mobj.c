@@ -553,6 +553,44 @@ static void P_FloorBounceMissile(mobj_t *mo)
   }
 }
 
+/* Hexen: landing on top of another mobj (squat, falling damage, class
+ * landing grunt) -- the on-mobj counterpart of the floor landing in
+ * P_ZMovement. */
+static void PlayerLandedOnThing(mobj_t *mo, mobj_t *onmobj)
+{
+  (void) onmobj;
+
+  mo->player->deltaviewheight = mo->momz >> 3;
+  if (mo->momz < -23 * FRACUNIT)
+  {
+    P_FallingDamage(mo->player);
+    P_NoiseAlert(mo, mo);
+  }
+  else if (mo->momz < -GRAVITY * 12 && !mo->player->morphTics)
+  {
+    S_StartSound(mo, hexen_sfx_player_land);
+    switch (mo->player->class)
+    {
+      case PCLASS_FIGHTER:
+        S_StartSound(mo, hexen_sfx_player_fighter_grunt);
+        break;
+      case PCLASS_CLERIC:
+        S_StartSound(mo, hexen_sfx_player_cleric_grunt);
+        break;
+      case PCLASS_MAGE:
+        S_StartSound(mo, hexen_sfx_player_mage_grunt);
+        break;
+      default:
+        break;
+    }
+  }
+  else if (!mo->player->morphTics)
+  {
+    S_StartSound(mo, hexen_sfx_player_land);
+  }
+  mo->player->centering = true;   /* vanilla auto-corrects the look pitch */
+}
+
 #define SMALLSPLASHCLIP (12 << FRACBITS)
 
 /* Hexen splashes: small drips for light things, the full splash (with a
@@ -1125,7 +1163,75 @@ void P_MobjThinker (mobj_t* mobj)
     ResetBlasted(mobj);
   }
 
-  if (mobj->z != mobj->floorz || mobj->momz)
+  if (raven && (mobj->flags2 & MF2_FLOATBOB))
+  {                             /* floating item bobbing motion */
+    mobj->z = mobj->floorz + (hexen ? mobj->special1.i : 0)
+            + FloatBobOffsets[(mobj->health++) & 63];
+  }
+  else if (raven && (mobj->flags2 & MF2_PASSMOBJ) &&
+           (mobj->z != mobj->floorz || mobj->momz || BlockingMobj))
+  {
+    /* Raven z movement is mobj-aware: things can land on, stand on, and
+     * pass over or under each other. */
+    mobj_t *onmo = P_CheckOnmobj(mobj);
+
+    if (!onmo)
+    {
+      P_ZMovement(mobj);
+      if (mobj->thinker.function.arg1 != (void (*)(void *))P_MobjThinker)
+        return;     /* mobj was removed */
+      /* This bug is part of the original source: it tests 'flags', not
+       * 'flags2', so the clear below effectively never runs. */
+      if (hexen && mobj->player && mobj->flags & MF2_ONMOBJ)
+        mobj->flags2 &= ~MF2_ONMOBJ;
+    }
+    else if (mobj->player)
+    {
+      if (hexen)
+      {
+        if (mobj->momz < -GRAVITY * 8 && !(mobj->flags2 & MF2_FLY))
+          PlayerLandedOnThing(mobj, onmo);
+        if (onmo->z + onmo->height - mobj->z <= 24 * FRACUNIT)
+        {
+          mobj->player->viewheight -= onmo->z + onmo->height - mobj->z;
+          mobj->player->deltaviewheight =
+            (VIEWHEIGHT - mobj->player->viewheight) >> 3;
+          mobj->z = onmo->z + onmo->height;
+          mobj->flags2 |= MF2_ONMOBJ;
+          mobj->momz = 0;
+        }
+        else
+        {                       /* hit the bottom of the blocking mobj */
+          mobj->momz = 0;
+        }
+      }
+      else
+      {                         /* heretic */
+        if (mobj->momz < 0)
+        {
+          mobj->flags2 |= MF2_ONMOBJ;
+          mobj->momz = 0;
+        }
+        if (onmo->player || onmo->type == HERETIC_MT_POD)
+        {
+          mobj->momx = onmo->momx;
+          mobj->momy = onmo->momy;
+          if (onmo->z < onmo->floorz)
+          {
+            mobj->z += onmo->floorz - onmo->z;
+            if (onmo->player)
+            {
+              onmo->player->viewheight -= onmo->floorz - onmo->z;
+              onmo->player->deltaviewheight =
+                (VIEWHEIGHT - onmo->player->viewheight) >> 3;
+            }
+            onmo->z = onmo->floorz;
+          }
+        }
+      }
+    }
+  }
+  else if (mobj->z != mobj->floorz || mobj->momz)
   {
     P_ZMovement(mobj);
     if (mobj->thinker.function.arg1 != (void (*)(void *))P_MobjThinker) // cph - Must've been removed
@@ -1633,6 +1739,7 @@ static int     TIDList[MAX_TID_COUNT + 1];  /* +1 for the 0 terminator */
 static mobj_t *TIDMobj[MAX_TID_COUNT];
 
 short hexen_thing_tid = 0;
+short hexen_thing_height = 0;
 int   hexen_thing_args[5] = {0, 0, 0, 0, 0};
 int   hexen_thing_special = 0;
 
@@ -2004,6 +2111,21 @@ void P_SpawnMapThing (const mapthing_t* mthing)
     mobj->special = hexen_thing_special;
     for (a = 0; a < 5; a++)
       mobj->special_args[a] = hexen_thing_args[a];
+
+    /* The hexen thing height is floor-relative (or ceiling-relative for
+     * ceiling spawners): apply it like vanilla so mid-air placements --
+     * hanging decorations, floating items -- land where the map says. */
+    if (z == ONFLOORZ)
+      mobj->z += hexen_thing_height << FRACBITS;
+    else if (z == ONCEILINGZ)
+      mobj->z -= hexen_thing_height << FRACBITS;
+  }
+
+  if (raven && (mobj->flags2 & MF2_FLOATBOB))
+  {                             /* seed a random starting bob phase */
+    mobj->health = P_Random(pr_heretic);
+    if (hexen)
+      mobj->special1.i = hexen_thing_height << FRACBITS;
   }
 
   if (mobj->tics > 0)

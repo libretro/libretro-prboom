@@ -778,6 +778,169 @@ dbool Check_Sides(mobj_t* actor, int x, int y)
 //   (monsters won't move to a dropoff)
 //  speciallines[]
 //  numspeciallines
+/* --- Raven on-mobj z checking (P_CheckOnmobj) ------------------------- */
+
+static mobj_t *onmobj;          /* generic global onmobj...used for landing on pods/players */
+
+/* Fake the zmovement so the thing's z can be tested against other mobjs
+ * before the real P_ZMovement commits anything. */
+static void P_FakeZMovement(mobj_t *mo)
+{
+  int dist;
+  int delta;
+
+  /* adjust height */
+  mo->z += mo->momz;
+  if (mo->flags & MF_FLOAT && mo->target)
+  {                             /* float down towards target if too close */
+    if (!(mo->flags & MF_SKULLFLY) && !(mo->flags & MF_INFLOAT))
+    {
+      dist = P_AproxDistance(mo->x - mo->target->x, mo->y - mo->target->y);
+      delta = (mo->target->z + (mo->height >> 1)) - mo->z;
+      if (delta < 0 && dist < -(delta * 3))
+        mo->z -= FLOATSPEED;
+      else if (delta > 0 && dist < (delta * 3))
+        mo->z += FLOATSPEED;
+    }
+  }
+  if (mo->player && mo->flags2 & MF2_FLY && !(mo->z <= mo->floorz)
+      && leveltime & 2)
+  {
+    mo->z += finesine[(FINEANGLES / 20 * leveltime >> 2) & FINEMASK];
+  }
+
+  /* clip movement */
+  if (mo->z <= mo->floorz)
+  {                             /* hit the floor */
+    mo->z = mo->floorz;
+    if (mo->momz < 0)
+      mo->momz = 0;
+    if (mo->flags & MF_SKULLFLY)
+    {                           /* the skull slammed into something */
+      mo->momz = -mo->momz;
+    }
+    if (mo->info->crashstate && (mo->flags & MF_CORPSE))
+      return;
+  }
+  else if (mo->flags2 & MF2_LOGRAV)
+  {
+    if (mo->momz == 0)
+      mo->momz = -(GRAVITY >> 3) * 2;
+    else
+      mo->momz -= GRAVITY >> 3;
+  }
+  else if (!(mo->flags & MF_NOGRAVITY))
+  {
+    if (mo->momz == 0)
+      mo->momz = -GRAVITY * 2;
+    else
+      mo->momz -= GRAVITY;
+  }
+
+  if (mo->z + mo->height > mo->ceilingz)
+  {                             /* hit the ceiling */
+    if (mo->momz > 0)
+      mo->momz = 0;
+    mo->z = mo->ceilingz - mo->height;
+    if (mo->flags & MF_SKULLFLY)
+    {                           /* the skull slammed into something */
+      mo->momz = -mo->momz;
+    }
+  }
+}
+
+static dbool PIT_CheckOnmobjZ(mobj_t *thing)
+{
+  fixed_t blockdist;
+
+  if (!(thing->flags & (MF_SOLID | MF_SPECIAL | MF_SHOOTABLE)))
+  {                             /* can't hit thing */
+    return true;
+  }
+  blockdist = thing->radius + tmthing->radius;
+  if (D_abs(thing->x - tmx) >= blockdist || D_abs(thing->y - tmy) >= blockdist)
+  {                             /* didn't hit thing */
+    return true;
+  }
+  if (thing == tmthing)
+  {                             /* don't clip against self */
+    return true;
+  }
+  if (tmthing->z > thing->z + thing->height)
+  {
+    return true;
+  }
+  else if (tmthing->z + tmthing->height < thing->z)
+  {                             /* under thing */
+    return true;
+  }
+  if (thing->flags & MF_SOLID)
+    onmobj = thing;
+  return !(thing->flags & MF_SOLID);
+}
+
+/* Checks if the thing's faked new z position rests on another mobj;
+ * returns that mobj, or NULL when the z movement is clear. */
+mobj_t *P_CheckOnmobj(mobj_t *thing)
+{
+  int xl, xh, yl, yh, bx, by;
+  sector_t *newsec;
+  fixed_t x;
+  fixed_t y;
+  mobj_t oldmo;
+
+  x = thing->x;
+  y = thing->y;
+  tmthing = thing;
+  oldmo = *thing;               /* save the old mobj before the fake zmovement */
+  P_FakeZMovement(tmthing);
+
+  tmx = x;
+  tmy = y;
+
+  tmbbox[BOXTOP] = y + tmthing->radius;
+  tmbbox[BOXBOTTOM] = y - tmthing->radius;
+  tmbbox[BOXRIGHT] = x + tmthing->radius;
+  tmbbox[BOXLEFT] = x - tmthing->radius;
+
+  newsec = R_PointInSubsector(x, y)->sector;
+  ceilingline = NULL;
+
+  /* The base floor / ceiling is from the subsector that contains the
+   * point.  Any contacted lines the step closer together will adjust
+   * them. */
+  tmfloorz = tmdropoffz = newsec->floorheight;
+  tmceilingz = newsec->ceilingheight;
+
+  validcount++;
+  numspechit = 0;
+
+  if (thing->flags & MF_NOCLIP)
+  {
+    *tmthing = oldmo;
+    return NULL;
+  }
+
+  /* Check things first, possibly picking things up.  The bounding box is
+   * extended by MAXRADIUS because mobj_ts are grouped into mapblocks
+   * based on their origin point, and can overlap into adjacent blocks by
+   * up to MAXRADIUS units. */
+  xl = (tmbbox[BOXLEFT] - bmaporgx - MAXRADIUS) >> MAPBLOCKSHIFT;
+  xh = (tmbbox[BOXRIGHT] - bmaporgx + MAXRADIUS) >> MAPBLOCKSHIFT;
+  yl = (tmbbox[BOXBOTTOM] - bmaporgy - MAXRADIUS) >> MAPBLOCKSHIFT;
+  yh = (tmbbox[BOXTOP] - bmaporgy + MAXRADIUS) >> MAPBLOCKSHIFT;
+
+  for (bx = xl; bx <= xh; bx++)
+    for (by = yl; by <= yh; by++)
+      if (!P_BlockThingsIterator(bx, by, PIT_CheckOnmobjZ))
+      {
+        *tmthing = oldmo;
+        return onmobj;
+      }
+  *tmthing = oldmo;
+  return NULL;
+}
+
 //
 
 dbool P_CheckPosition (mobj_t* thing,fixed_t x,fixed_t y)

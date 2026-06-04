@@ -539,6 +539,7 @@ void    P_BloodSplatter(fixed_t x, fixed_t y, fixed_t z, mobj_t *originator);
 void    P_BloodSplatter2(fixed_t x, fixed_t y, fixed_t z, mobj_t *originator);
 mobj_t *P_FindMobjFromTID(short tid, int *searchPosition);
 extern short hexen_thing_tid;
+extern short hexen_thing_height;
 extern int   hexen_thing_args[5];
 extern int   hexen_thing_special;
 dbool   P_SetMobjState(mobj_t *mobj, statenum_t state);

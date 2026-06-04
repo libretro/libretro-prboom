@@ -3549,6 +3549,54 @@ void A_FreezeDeathChunks(mobj_t *actor)
   actor->flags2 |= MF2_DONTDRAW;
 }
 
+/* Banishment Device projectile trail.  The lead missile sheds three ring
+ * effects as it flies; each carries a short lifetime counted down by
+ * A_CheckTeleRing before collapsing into its death state.  Any of them
+ * teleports what it touches (see P_DamageMobj). */
+#define TELEPORT_LIFE 1
+
+static void TeloSpawn(mobj_t *actor, mobjtype_t type)
+{
+  mobj_t *mo;
+
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z, type);
+  if (mo)
+  {
+    mo->special1.i = TELEPORT_LIFE;     /* lifetime countdown */
+    mo->angle = actor->angle;
+    P_SetTarget(&mo->target, actor->target);
+    mo->momx = actor->momx >> 1;
+    mo->momy = actor->momy >> 1;
+    mo->momz = actor->momz >> 1;
+  }
+}
+
+void A_TeloSpawnA(mobj_t *actor)
+{
+  TeloSpawn(actor, HEXEN_MT_TELOTHER_FX2);
+}
+
+void A_TeloSpawnB(mobj_t *actor)
+{
+  TeloSpawn(actor, HEXEN_MT_TELOTHER_FX3);
+}
+
+void A_TeloSpawnC(mobj_t *actor)
+{
+  TeloSpawn(actor, HEXEN_MT_TELOTHER_FX4);
+}
+
+void A_TeloSpawnD(mobj_t *actor)
+{
+  TeloSpawn(actor, HEXEN_MT_TELOTHER_FX5);
+}
+
+void A_CheckTeleRing(mobj_t *actor)
+{
+  if (actor->special1.i-- <= 0)
+    P_SetMobjState(actor, actor->info->deathstate);
+}
+
 /* Hexen bell (Winnowing Hall's clocktower).  The bell is a hanging
  * MF_SPAWNCEILING|MF_NOGRAVITY decoration whose "death" is its ring: when
  * shot, P_KillMobj corpse-ifies it like any other shootable - it strips

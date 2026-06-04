@@ -907,13 +907,157 @@ static void P_ArtiTele(player_t *player)
   oldz = player->mo->z;
   if (P_TeleportMove(player->mo, destX, destY, FALSE))
   {
-    S_StartSound(P_SpawnMobj(oldx, oldy, oldz, HERETIC_MT_TFOG),
-                 heretic_sfx_telept);
+    S_StartSound(P_SpawnMobj(oldx, oldy, oldz, g_mt_tfog), g_sfx_telept);
     player->mo->angle = destAngle;
     player->mo->z = player->mo->floorz;
     player->mo->momx = player->mo->momy = player->mo->momz = 0;
-    S_StartSound(NULL, heretic_sfx_wpnup); /* full-volume laugh */
+    if (!hexen)
+      S_StartSound(NULL, heretic_sfx_wpnup); /* full-volume laugh */
   }
+}
+
+/* Hexen: teleport a mobj to a destination with fog at both ends - the
+ * victim half of the Banishment Device and the monster-eviction rules. */
+static void TeleportMobj(mobj_t *victim, fixed_t x, fixed_t y, angle_t angle)
+{
+  fixed_t oldx = victim->x, oldy = victim->y, oldz = victim->z;
+
+  if (P_TeleportMove(victim, x, y, FALSE))
+  {
+    S_StartSound(P_SpawnMobj(oldx, oldy, oldz, g_mt_tfog), g_sfx_telept);
+    S_StartSound(P_SpawnMobj(x, y, victim->z, g_mt_tfog), g_sfx_telept);
+    victim->angle = angle;
+    victim->z = victim->floorz;
+    victim->momx = victim->momy = victim->momz = 0;
+    if (!victim->player)
+      victim->reactiontime = 18;
+  }
+}
+
+static void P_TeleportToPlayerStarts(mobj_t *victim)
+{
+  int i, selections = 0;
+  const mapthing_t *start;
+
+  for (i = 0; i < MAXPLAYERS; i++)
+    if (playeringame[i])
+      selections++;
+  if (!selections)
+    return;
+  i = P_Random(pr_heretic) % selections;
+  start = &playerstarts[0][i];
+  TeleportMobj(victim, start->x << FRACBITS, start->y << FRACBITS,
+               ANG45 * (start->angle / 45));
+}
+
+static void P_TeleportToDeathmatchStarts(mobj_t *victim)
+{
+  int selections = deathmatch_p - deathmatchstarts;
+
+  if (selections)
+  {
+    int i = P_Random(pr_heretic) % selections;
+    TeleportMobj(victim, deathmatchstarts[i].x << FRACBITS,
+                 deathmatchstarts[i].y << FRACBITS,
+                 ANG45 * (deathmatchstarts[i].angle / 45));
+  }
+  else
+    P_TeleportToPlayerStarts(victim);
+}
+
+void P_TeleportOther(mobj_t *victim)
+{
+  if (victim->player)
+  {
+    if (deathmatch)
+      P_TeleportToDeathmatchStarts(victim);
+    else
+      P_TeleportToPlayerStarts(victim);
+  }
+  else
+  {
+    /* a monster's death action runs when it is banished */
+    if (victim->flags & MF_COUNTKILL && victim->special)
+    {
+      P_RemoveMobjFromTIDList(victim);
+      P_ExecuteHexenLineSpecial(victim->special, victim->special_args,
+                                NULL, 0, victim);
+      victim->special = 0;
+    }
+    /* all monsters go to the deathmatch spots */
+    P_TeleportToDeathmatchStarts(victim);
+  }
+}
+
+static void P_ArtiTeleportOther(player_t *player)
+{
+  mobj_t *mo;
+
+  mo = P_SpawnPlayerMissile(player->mo, HEXEN_MT_TELOTHER_FX1);
+  if (mo)
+    P_SetTarget(&mo->target, player->mo);
+}
+
+#define HEAL_RADIUS_DIST (255 * FRACUNIT)
+
+/* Mystic Ambit Incant: a class-specific boon for every living player in
+ * range (the user included). */
+static dbool P_HealRadius(player_t *player)
+{
+  mobj_t    *mo;
+  mobj_t    *pmo = player->mo;
+  thinker_t *think;
+  fixed_t    dist;
+  int        effective = false;
+  int        amount;
+
+  for (think = thinkercap.next; think != &thinkercap; think = think->next)
+  {
+    if (think->function.arg1 != (void (*)(void *)) P_MobjThinker)
+      continue;
+    mo = (mobj_t *) think;
+    if (!mo->player)
+      continue;
+    if (mo->health <= 0)
+      continue;
+    dist = P_AproxDistance(pmo->x - mo->x, pmo->y - mo->y);
+    if (dist > HEAL_RADIUS_DIST)
+      continue;
+
+    switch (player->class)
+    {
+      case PCLASS_FIGHTER:      /* radius armor boost */
+        if (Hexen_P_GiveArmor(mo->player, ARMOR_ARMOR, 1) ||
+            Hexen_P_GiveArmor(mo->player, ARMOR_SHIELD, 1) ||
+            Hexen_P_GiveArmor(mo->player, ARMOR_HELMET, 1) ||
+            Hexen_P_GiveArmor(mo->player, ARMOR_AMULET, 1))
+        {
+          effective = true;
+          S_StartSound(mo, hexen_sfx_mysticincant);
+        }
+        break;
+      case PCLASS_CLERIC:       /* radius heal */
+        amount = 50 + (P_Random(pr_heretic) % 50);
+        if (P_GiveBody(mo->player, amount))
+        {
+          effective = true;
+          S_StartSound(mo, hexen_sfx_mysticincant);
+        }
+        break;
+      case PCLASS_MAGE:         /* radius mana boost */
+        amount = 50 + (P_Random(pr_heretic) % 50);
+        if (P_GiveMana(mo->player, MANA_1, amount) ||
+            P_GiveMana(mo->player, MANA_2, amount))
+        {
+          effective = true;
+          S_StartSound(mo, hexen_sfx_mysticincant);
+        }
+        break;
+      default:
+        break;
+    }
+  }
+  return effective;
 }
 
 /* Disc of Repulsion (hexen_arti_blastradius) support. */
@@ -1080,6 +1224,25 @@ dbool P_UseArtifact(player_t *player, int arti)
   {
     switch (arti)
     {
+      case hexen_arti_teleport:
+        P_ArtiTele(player);
+        break;
+      case hexen_arti_teleportother:
+        P_ArtiTeleportOther(player);
+        break;
+      case hexen_arti_boostarmor:
+      {
+        int i, count = 0;
+        for (i = 0; i < NUMARMOR; i++)
+          count += Hexen_P_GiveArmor(player, i, 1); /* 1 point per type */
+        if (!count)
+          return FALSE;
+        break;
+      }
+      case hexen_arti_healingradius:
+        if (!P_HealRadius(player))
+          return FALSE;
+        break;
       /* Puzzle artifacts: try the use-line/thing in front of the player. */
       case hexen_arti_puzzskull:
       case hexen_arti_puzzgembig:

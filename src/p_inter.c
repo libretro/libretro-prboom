@@ -1352,6 +1352,30 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       sound = hexen_sfx_pickup_artifact;
       player->message = "DARK SERVANT";
       break;
+    case HEXEN_SPR_ATLP:           /* Chaos Device (self teleport) */
+      if (!P_GiveArtifact(player, hexen_arti_teleport, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "CHAOS DEVICE";
+      break;
+    case HEXEN_SPR_TELO:           /* Banishment Device (teleport other) */
+      if (!P_GiveArtifact(player, hexen_arti_teleportother, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "BANISHMENT DEVICE";
+      break;
+    case HEXEN_SPR_BRAC:           /* Dragonskin Bracers (armor boost) */
+      if (!P_GiveArtifact(player, hexen_arti_boostarmor, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "DRAGONSKIN BRACERS";
+      break;
+    case HEXEN_SPR_HRAD:           /* Mystic Ambit Incant (radius boon) */
+      if (!P_GiveArtifact(player, hexen_arti_healingradius, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "MYSTIC AMBIT INCANT";
+      break;
     case HEXEN_SPR_PTN1:           /* Crystal Vial (instant 10 health) */
       if (!P_GiveBody(player, 10))
         return;
@@ -1720,6 +1744,32 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
 
   if (target->health <= 0)
     return;
+
+  /* Hexen: the Banishment Device's projectiles teleport their victim away
+   * instead of damaging it - players always, monsters unless they are
+   * serpents, bosses, or not counted kills. */
+  if (hexen && inflictor)
+  {
+    switch (inflictor->type)
+    {
+      case HEXEN_MT_TELOTHER_FX1:
+      case HEXEN_MT_TELOTHER_FX2:
+      case HEXEN_MT_TELOTHER_FX3:
+      case HEXEN_MT_TELOTHER_FX4:
+      case HEXEN_MT_TELOTHER_FX5:
+        if (target->player ||
+            ((target->flags & MF_COUNTKILL) &&
+             target->type != HEXEN_MT_SERPENT &&
+             target->type != HEXEN_MT_SERPENTLEADER &&
+             !(target->flags2 & MF2_BOSS)))
+        {
+          P_TeleportOther(target);
+        }
+        return;
+      default:
+        break;
+    }
+  }
 
   /* Hexen: a thing flagged MF2_INVULNERABLE shrugs off all ordinary damage
    * (used by the Centaur while it raises its shield).  A telefrag-scale

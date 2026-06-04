@@ -44,5 +44,7 @@ void P_DeathThink(player_t *player);
 void P_MovePlayer(player_t *player);
 void P_Thrust(player_t *player, angle_t angle, fixed_t move);
 void P_PlayerUseArtifact(player_t *player, int arti);
+/* Hexen Banishment Device victim teleport (also used by P_DamageMobj) */
+void P_TeleportOther(mobj_t *victim);
 
 #endif  /* __P_USER__ */

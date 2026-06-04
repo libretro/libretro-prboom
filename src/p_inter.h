@@ -72,4 +72,5 @@ extern const char *TextKeyMessages[11];  /* Hexen key names (lock - 1) */
 
 dbool P_GiveBody(player_t *player, int num);
 dbool P_GiveMana(player_t *player, manatype_t mana, int count);
+dbool Hexen_P_GiveArmor(player_t *player, armortype_t armortype, int amount);
 #endif

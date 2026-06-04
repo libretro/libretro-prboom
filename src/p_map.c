@@ -1121,9 +1121,15 @@ dbool P_ThingHeightClip (mobj_t* thing)
   if (onfloor)
     {
 
-    // walking monsters rise and fall with the floor
+    /* walking monsters rise and fall with the floor.  Hexen: a fast
+     * floor drop must not teleport things downward -- they only snap if
+     * still within 9 units of the new floor (or weightless); otherwise
+     * gravity brings them down naturally. */
 
-    thing->z = thing->floorz;
+    if (!hexen ||
+        (thing->z - thing->floorz < 9 * FRACUNIT) ||
+        (thing->flags & MF_NOGRAVITY))
+      thing->z = thing->floorz;
 
     /* killough 11/98: Possibly upset balance of objects hanging off ledges */
       if (thing->intflags & MIF_FALLING && thing->gear >= MAXGEAR)

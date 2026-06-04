@@ -1786,6 +1786,33 @@ void P_PoisonDamage(player_t *player, mobj_t *source, int damage,
     P_SetMobjState(target, target->info->painstate);
 }
 
+/* Hexen: landing damage scaled by impact speed; lethal past 63 units/tic,
+ * survivable above the -39 threshold (clamped to leave 1 health unless the
+ * player was already at 1). */
+void P_FallingDamage(player_t *player)
+{
+  int damage;
+  int mom;
+  int dist;
+
+  mom = abs(player->mo->momz);
+  dist = FixedMul(mom, 16 * FRACUNIT / 23);
+
+  if (mom >= 63 * FRACUNIT)
+  {                             /* automatic death */
+    P_DamageMobj(player->mo, NULL, NULL, 10000);
+    return;
+  }
+  damage = ((FixedMul(dist, dist) / 10) >> FRACBITS) - 24;
+  if (player->mo->momz > -39 * FRACUNIT && damage > player->mo->health
+      && player->mo->health != 1)
+  {                             /* no-death threshold */
+    damage = player->mo->health - 1;
+  }
+  S_StartSound(player->mo, hexen_sfx_player_land);
+  P_DamageMobj(player->mo, NULL, NULL, damage);
+}
+
 void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
 {
   player_t *player;

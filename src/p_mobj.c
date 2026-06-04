@@ -47,6 +47,7 @@
 #include "info.h"
 #include "g_game.h"
 #include "p_inter.h"
+#include "p_enemy.h"
 #include "lprintf.h"
 #include "hexen/po_man.h"
 #include "r_demo.h"
@@ -633,8 +634,36 @@ floater:
         // and utter appropriate sound.
 
         mo->player->deltaviewheight = mo->momz>>3;
+        if (hexen)
+        {
+          if (mo->momz < -23 * FRACUNIT)
+          {
+            P_FallingDamage(mo->player);
+            P_NoiseAlert(mo, mo);
+          }
+          else if (mo->momz < -GRAVITY * 12 && !mo->player->morphTics)
+          {
+            S_StartSound(mo, hexen_sfx_player_land);
+            switch (mo->player->class)
+            {
+              case PCLASS_FIGHTER:
+                S_StartSound(mo, hexen_sfx_player_fighter_grunt);
+                break;
+              case PCLASS_CLERIC:
+                S_StartSound(mo, hexen_sfx_player_cleric_grunt);
+                break;
+              case PCLASS_MAGE:
+                S_StartSound(mo, hexen_sfx_player_mage_grunt);
+                break;
+              default:
+                break;
+            }
+          }
+        }
+        else if (heretic)
+          S_StartSound(mo, heretic_sfx_plroof);
         /* cph - prevent "oof" when dead */
-        if (comp[comp_sound] || mo->health > 0)
+        else if (comp[comp_sound] || mo->health > 0)
           S_StartSound (mo, sfx_oof);
       }
   mo->momz = 0;

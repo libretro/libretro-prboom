@@ -478,6 +478,81 @@ static void P_XYMovement (mobj_t* mo)
 
 int P_SubRandom(void);  /* heretic/p_action.c */
 
+/* Floor-bouncing missiles (the stained-glass shards, the Heresiarch's
+ * balls and SORCFX1, the Heretic Firemace balls): bounce with per-type
+ * energy decay, lose the shards once they slow, and sink into liquids
+ * (P_HitFloor splashes) except for the Heresiarch set.  Vanilla plays the
+ * seesound once; dsda-doom carries an extra unconditional replay after the
+ * type switch, which doubles the sound, so it is not reproduced. */
+static void P_FloorBounceMissile(mobj_t *mo)
+{
+  if (hexen)
+  {
+    if (P_HitFloor(mo) >= FLOOR_LIQUID)
+    {
+      switch (mo->type)
+      {
+        case HEXEN_MT_SORCFX1:
+        case HEXEN_MT_SORCBALL1:
+        case HEXEN_MT_SORCBALL2:
+        case HEXEN_MT_SORCBALL3:
+          break;
+        default:
+          P_RemoveMobj(mo);
+          return;
+      }
+    }
+    switch (mo->type)
+    {
+      case HEXEN_MT_SORCFX1:
+        mo->momz = -mo->momz;   /* no energy absorbed */
+        break;
+      case HEXEN_MT_SGSHARD1:
+      case HEXEN_MT_SGSHARD2:
+      case HEXEN_MT_SGSHARD3:
+      case HEXEN_MT_SGSHARD4:
+      case HEXEN_MT_SGSHARD5:
+      case HEXEN_MT_SGSHARD6:
+      case HEXEN_MT_SGSHARD7:
+      case HEXEN_MT_SGSHARD8:
+      case HEXEN_MT_SGSHARD9:
+      case HEXEN_MT_SGSHARD0:
+        mo->momz = FixedMul(mo->momz, (fixed_t)(-0.3 * FRACUNIT));
+        if (D_abs(mo->momz) < (FRACUNIT / 2))
+        {
+          P_SetMobjState(mo, HEXEN_S_NULL);
+          return;
+        }
+        break;
+      default:
+        mo->momz = FixedMul(mo->momz, (fixed_t)(-0.7 * FRACUNIT));
+        break;
+    }
+    mo->momx = 2 * mo->momx / 3;
+    mo->momy = 2 * mo->momy / 3;
+    if (mo->info->seesound)
+    {
+      switch (mo->type)
+      {
+        case HEXEN_MT_SORCBALL1:
+        case HEXEN_MT_SORCBALL2:
+        case HEXEN_MT_SORCBALL3:
+          if (!mo->special_args[0])
+            S_StartSound(mo, mo->info->seesound);
+          break;
+        default:
+          S_StartSound(mo, mo->info->seesound);
+          break;
+      }
+    }
+  }
+  else
+  {
+    mo->momz = -mo->momz;
+    P_SetMobjState(mo, mobjinfo[mo->type].deathstate);
+  }
+}
+
 #define SMALLSPLASHCLIP (12 << FRACBITS)
 
 /* Hexen splashes: small drips for light things, the full splash (with a
@@ -735,6 +810,40 @@ floater:
     {
     // hit the floor
 
+    /* Raven missiles resolve floor contact vanilla-style, ahead of the doom
+     * landing code: floor-bouncers bounce, the Minotaur floor fire and the
+     * floor lightning pass through (so they can climb steps), the Wraithverge
+     * spirit strikes the ground, and the rest splash and explode.  Heretic
+     * missiles other than floor-bouncers keep the doom flow below. */
+    if (raven && (mo->flags & MF_MISSILE) && !(mo->flags & MF_NOCLIP))
+      {
+      mo->z = mo->floorz;
+      if (mo->flags2 & MF2_FLOORBOUNCE)
+        {
+        P_FloorBounceMissile (mo);
+        return;
+        }
+      if (hexen)
+        {
+        if (mo->type == HEXEN_MT_MNTRFX2 ||
+            mo->type == HEXEN_MT_LIGHTNING_FLOOR)
+          return;               /* Minotaur floor fire can go up steps */
+        if (mo->type == HEXEN_MT_HOLY_FX)
+          {                     /* the spirit struck the ground */
+          mo->momz = 0;
+          P_HitFloor (mo);
+          return;
+          }
+        P_HitFloor (mo);
+        P_ExplodeMissile (mo);
+        return;
+        }
+      }
+
+    /* Blasted (Disc of Repulsion) monsters falling hard are destroyed. */
+    if (hexen && (mo->flags & MF_COUNTKILL) && mo->momz < -(23 * FRACUNIT))
+      P_DamageMobj (mo, NULL, NULL, 10000);
+
     /* Note (id):
      *  somebody left this after the setting momz to 0,
      *  kinda useless there.
@@ -840,8 +949,6 @@ floater:
 
     if ( (mo->flags & MF_MISSILE) && !(mo->flags & MF_NOCLIP) )
       {
-      if (hexen)
-        P_HitFloor (mo);        /* projectiles splash into liquids */
       P_ExplodeMissile (mo);
       return;
       }

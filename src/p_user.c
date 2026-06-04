@@ -71,6 +71,9 @@
 
 dbool   onground; // whether player is on ground or in air
 
+static int newtorch;      /* hexen torch flicker */
+static int newtorchdelta;
+
 // max/min values for pitch angle
 angle_t viewpitch_min;
 angle_t viewpitch_max;
@@ -89,19 +92,18 @@ angle_t viewpitch_max;
 void P_Thrust(player_t* player,angle_t angle,fixed_t move)
 {
    angle >>= ANGLETOFINESHIFT;
-#ifdef HEXEN
-   if(player->powers[pw_flight] && !(player->mo->z <= player->mo->floorz))
+   /* Hexen: full air control while flying, half thrust on ice. */
+   if(hexen && player->powers[pw_flight] && !(player->mo->z <= player->mo->floorz))
    {
       player->mo->momx += FixedMul(move, finecosine[angle]);
       player->mo->momy += FixedMul(move, finesine[angle]);
    }
-   else if(P_GetThingFloorType(player->mo) == FLOOR_ICE) // Friction_Low
+   else if(hexen && P_GetThingFloorType(player->mo) == FLOOR_ICE) // Friction_Low
    {
       player->mo->momx += FixedMul(move>>1, finecosine[angle]);
       player->mo->momy += FixedMul(move>>1, finesine[angle]);
    }
    else
-#endif
    {
       player->mo->momx += FixedMul(move,finecosine[angle]);
       player->mo->momy += FixedMul(move,finesine[angle]);
@@ -1501,11 +1503,14 @@ void P_PlayerThink (player_t* player)
       // and SSG weapons switches here, rather than in G_BuildTiccmd(). For
       // other games which rely on user preferences, we must use the latter.
 
-#ifdef HEXEN
-      if(player->weaponowned[newweapon]
-            && newweapon != player->readyweapon)
-         player->pendingweapon = newweapon;
-#else
+      if (hexen)
+      {
+         if(player->weaponowned[newweapon]
+               && newweapon != player->readyweapon)
+            player->pendingweapon = newweapon;
+      }
+      else
+      {
       if (demo_compatibility)
       { // compatibility mode -- required for old demos -- killough
          if (newweapon == WP_FIST && player->weaponowned[WP_CHAINSAW] &&
@@ -1529,7 +1534,7 @@ void P_PlayerThink (player_t* player)
          if ((newweapon != WP_PLASMA && newweapon != WP_BFG)
                || (gamemode != shareware) )
             player->pendingweapon = newweapon;
-#endif
+      }
    }
 
    /* check for use */
@@ -1568,8 +1573,9 @@ void P_PlayerThink (player_t* player)
    /* Other Counters */
    if (player->powers[pw_invulnerability])
    {
-#ifdef HEXEN
-      if(player->class == PCLASS_CLERIC)
+      /* Hexen: the Cleric's Icon of the Defender also phases the player
+       * in and out of visibility while it runs. */
+      if(hexen && player->class == PCLASS_CLERIC)
       {
          if(!(leveltime&7) && player->mo->flags&MF_SHADOW
                && !(player->mo->flags2&MF2_DONTDRAW))
@@ -1600,32 +1606,28 @@ void P_PlayerThink (player_t* player)
             }
          }
       }
-      if(!(--player->powers[pw_invulnerability]))
+      if(!(--player->powers[pw_invulnerability]) && raven)
       {
          player->mo->flags2 &= ~(MF2_INVULNERABLE|MF2_REFLECTIVE);
-         if(player->class == PCLASS_CLERIC)
+         if(hexen && player->class == PCLASS_CLERIC)
          {
             player->mo->flags2 &= ~(MF2_DONTDRAW|MF2_NONSHOOTABLE);
             player->mo->flags &= ~(MF_SHADOW|MF_ALTSHADOW);
          }
       }
-#else
-      player->powers[pw_invulnerability]--;
-#endif
    }
 
-#ifdef HEXEN
    if(player->powers[pw_minotaur])
-		player->powers[pw_minotaur]--;
-#endif
+      player->powers[pw_minotaur]--;
 
    if (player->powers[pw_invisibility])
       if (! --player->powers[pw_invisibility] )
          player->mo->flags &= ~MF_SHADOW;
 
 
-#ifdef HEXEN
-   if(player->powers[pw_flight] && netgame)
+   /* Raven flight: Heretic wings always count down; Hexen only spends the
+    * power in netgames (in single player it lasts until the map ends). */
+   if (player->powers[pw_flight] && (!hexen || netgame))
    {
       if(!--player->powers[pw_flight])
       {
@@ -1635,16 +1637,14 @@ void P_PlayerThink (player_t* player)
          }
          player->mo->flags2 &= ~MF2_FLY;
          player->mo->flags &= ~MF_NOGRAVITY;
-         BorderTopRefresh = true; //make sure the sprite's cleared out
       }
    }
+
    if(player->powers[pw_speed])
       player->powers[pw_speed]--;
-#else
 
    if (player->powers[pw_ironfeet])
       player->powers[pw_ironfeet]--;
-#endif
 
    if (player->damagecount)
       player->damagecount--;
@@ -1661,51 +1661,54 @@ void P_PlayerThink (player_t* player)
    }
 
    if (player->powers[pw_infrared])
-   {
-#ifdef HEXEN
-      if (player->powers[pw_infrared] <= BLINKTHRESHOLD)
-      {
-         if(player->powers[pw_infrared]&8)
-         {
-            player->fixedcolormap = 0;
-         }
-         else
-         {
-            player->fixedcolormap = 1;
-         }
-      }
-      else if(!(leveltime&16) && player == &players[consoleplayer])
-      {
-         if(newtorch)
-         {
-            if(player->fixedcolormap+newtorchdelta > 7
-                  || player->fixedcolormap+newtorchdelta < 1
-                  || newtorch == player->fixedcolormap)
-               newtorch = 0;
-            else
-               player->fixedcolormap += newtorchdelta;
-         }
-         else
-         {
-            newtorch = (M_Random()&7)+1;
-            newtorchdelta = (newtorch == player->fixedcolormap) ?
-               0 : ((newtorch > player->fixedcolormap) ? 1 : -1);
-         }
-      }
-#else
       player->powers[pw_infrared]--;
-#endif
-   }
-#ifdef HEXEN
+   /* Handling colormaps. */
+   if (!raven)
+      player->fixedcolormap = player->powers[pw_invulnerability] > 4*32 ||
+         player->powers[pw_invulnerability] & 8 ? INVERSECOLORMAP :
+         player->powers[pw_infrared] > 4*32 || player->powers[pw_infrared] & 8;
    else
    {
-      player->fixedcolormap = 0;
+      /* Raven: invulnerability whites out (heretic only; hexen invulnerability
+       * has no colormap), and the torch flickers instead of holding steady. */
+      if (!hexen && player->powers[pw_invulnerability])
+      {
+         if (player->powers[pw_invulnerability] > BLINKTHRESHOLD
+               || (player->powers[pw_invulnerability] & 8))
+            player->fixedcolormap = INVERSECOLORMAP;
+         else
+            player->fixedcolormap = 0;
+      }
+      else if (player->powers[pw_infrared])
+      {
+         if (player->powers[pw_infrared] <= BLINKTHRESHOLD)
+         {
+            if (player->powers[pw_infrared] & 8)
+               player->fixedcolormap = 0;
+            else
+               player->fixedcolormap = 1;
+         }
+         else if (!(leveltime & 16) && player == &players[consoleplayer])
+         {
+            if (newtorch)
+            {
+               if (player->fixedcolormap + newtorchdelta > 7
+                     || player->fixedcolormap + newtorchdelta < 1
+                     || newtorch == player->fixedcolormap)
+                  newtorch = 0;
+               else
+                  player->fixedcolormap += newtorchdelta;
+            }
+            else
+            {
+               newtorch = (M_Random() & 7) + 1;
+               newtorchdelta = (newtorch == player->fixedcolormap) ?
+                  0 : ((newtorch > player->fixedcolormap) ? 1 : -1);
+            }
+         }
+      }
+      else
+         player->fixedcolormap = 0;
    }
-#else
-   /* Handling colormaps. */
-   player->fixedcolormap = player->powers[pw_invulnerability] > 4*32 ||
-      player->powers[pw_invulnerability] & 8 ? INVERSECOLORMAP :
-      player->powers[pw_infrared] > 4*32 || player->powers[pw_infrared] & 8;
-#endif
 
 }

@@ -773,12 +773,15 @@ static uint8_t *P_DecompressZNodes(const uint8_t *in, int inlen, int *outlen)
 {
   mz_stream zs;
   uint8_t *out;
-  int cap, err;
+  size_t cap;
+  int err;
 
   if (inlen <= 0)
     return NULL;
 
-  cap = inlen * 4;          /* first guess at the inflated size */
+  /* First guess at the inflated size; grown on demand below.  size_t math
+   * avoids the int overflow a very large lump could otherwise hit. */
+  cap = (size_t)inlen * 4;
   if (cap < 4096)
     cap = 4096;
   out = (uint8_t *)malloc(cap);
@@ -797,14 +800,16 @@ static uint8_t *P_DecompressZNodes(const uint8_t *in, int inlen, int *outlen)
     return NULL;
   }
 
-  /* Grow the output buffer whenever it fills before the stream ends. */
+  /* Inflate, doubling the output buffer each time it fills before the
+   * stream ends. */
   while ((err = mz_inflate(&zs, MZ_SYNC_FLUSH)) == MZ_OK)
   {
-    int used = cap;
+    size_t used = (size_t)zs.total_out;
     uint8_t *grown;
 
-    if (zs.avail_out != 0)     /* progress but not yet at stream end */
+    if (zs.avail_out != 0)        /* not full yet -- keep going */
       continue;
+
     grown = (uint8_t *)realloc(out, cap * 2);
     if (!grown)
     {
@@ -813,9 +818,9 @@ static uint8_t *P_DecompressZNodes(const uint8_t *in, int inlen, int *outlen)
       return NULL;
     }
     out = grown;
-    zs.next_out  = out + used;
-    zs.avail_out = (unsigned int)(cap);   /* the new second half */
     cap *= 2;
+    zs.next_out  = out + used;
+    zs.avail_out = (unsigned int)(cap - used);
   }
 
   if (err != MZ_STREAM_END)
@@ -872,34 +877,23 @@ static dbool P_LoadUDMFNodes(int lump)
   if (compressed)
   {
     /* The 4-byte signature is not part of the zlib stream; inflate the
-     * remainder, then prepend a synthetic header the parsers expect by
-     * pointing them at a buffer whose first 4 bytes they skip. */
+     * remainder.  The parsers now expect data already past the signature,
+     * so the inflated body is handed straight to them -- no extra copy. */
     int dlen = 0;
-    uint8_t *body = P_DecompressZNodes(lumpdata + 4, lumplen - 4, &dlen);
-    if (!body)
-    {
-      W_UnlockLumpNum(lump);
-      return FALSE;
-    }
-    /* The parsers expect a 4-byte header they discard, so allocate a
-     * buffer of dlen+4 with a dummy header in front of the inflated body. */
-    decomp = (uint8_t *)malloc(dlen + 4);
+    decomp = P_DecompressZNodes(lumpdata + 4, lumplen - 4, &dlen);
     if (!decomp)
     {
-      free(body);
       W_UnlockLumpNum(lump);
       return FALSE;
     }
-    memcpy(decomp, id, 4);
-    memcpy(decomp + 4, body, dlen);
-    free(body);
     data = decomp;
-    len  = dlen + 4;
+    len  = dlen;
   }
   else
   {
-    data = lumpdata;
-    len  = lumplen;
+    /* Skip the signature; parsers expect post-header data. */
+    data = lumpdata + 4;
+    len  = lumplen - 4;
   }
 
   if (glver < 0)
@@ -921,7 +915,8 @@ static void P_LoadXNOD(const uint8_t *data, int len)
   int i, numorgvert, numnewvert, first_seg = 0;
   vertex_t *newvert;
 
-  data += 4; len -= 4; // skip the header
+  /* data points just past the 4-byte signature (the dispatcher advanced it,
+   * or it is the inflated body which has no signature). */
   numorgvert = LONG(*(const int *)data); data += 4; len -= 4;
   numnewvert = LONG(*(const int *)data); data += 4; len -= 4;
 
@@ -1051,7 +1046,7 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
   int node_is_32 = (glver >= 3);
   unsigned int miniseg_sentinel = line_is_32 ? 0xffffffffu : 0xffffu;
 
-  data += 4; len -= 4; /* skip the 4-byte signature */
+  /* data points just past the 4-byte signature (see P_LoadXNOD note). */
 
   /* --- vertices: original count + builder-added vertices --- */
   numorgvert = LONG(*(const int *)data); data += 4; len -= 4;

@@ -46,8 +46,7 @@
 #include "hexen/p_acs.h"
 #include "hexen/p_spec_hexen.h"
 #include "p_enemy.h"
-
-#include "p_inter.h"
+#include "p_user.h"
 
 #define BONUSADD        6
 

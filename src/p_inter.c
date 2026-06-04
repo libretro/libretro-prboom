@@ -1352,6 +1352,12 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       sound = hexen_sfx_pickup_artifact;
       player->message = "DARK SERVANT";
       break;
+    case HEXEN_SPR_PTN1:           /* Crystal Vial (instant 10 health) */
+      if (!P_GiveBody(player, 10))
+        return;
+      player->message = "CRYSTAL VIAL";
+      sound = hexen_sfx_pickup_item;
+      break;
     /* Puzzle artifacts (hub-quest items; used on matching special-129
      * lines or things via P_UsePuzzleItem). */
     case HEXEN_SPR_ASKU:

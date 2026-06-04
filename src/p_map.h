@@ -38,6 +38,9 @@
 #include "d_player.h"
 
 #define USERANGE        (64*FRACUNIT)
+
+/* Hexen: use the readied puzzle artifact against a special-129 line/thing */
+dbool P_UsePuzzleItem(player_t *player, int itemType);
 #define MELEERANGE      (64*FRACUNIT)
 #define MISSILERANGE    (32*64*FRACUNIT)
 

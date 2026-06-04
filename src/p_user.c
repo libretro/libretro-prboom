@@ -1138,6 +1138,29 @@ dbool P_UseArtifact(player_t *player, int arti)
   {
     switch (arti)
     {
+      /* Puzzle artifacts: try the use-line/thing in front of the player. */
+      case hexen_arti_puzzskull:
+      case hexen_arti_puzzgembig:
+      case hexen_arti_puzzgemred:
+      case hexen_arti_puzzgemgreen1:
+      case hexen_arti_puzzgemgreen2:
+      case hexen_arti_puzzgemblue1:
+      case hexen_arti_puzzgemblue2:
+      case hexen_arti_puzzbook1:
+      case hexen_arti_puzzbook2:
+      case hexen_arti_puzzskull2:
+      case hexen_arti_puzzfweapon:
+      case hexen_arti_puzzcweapon:
+      case hexen_arti_puzzmweapon:
+      case hexen_arti_puzzgear1:
+      case hexen_arti_puzzgear2:
+      case hexen_arti_puzzgear3:
+      case hexen_arti_puzzgear4:
+        if (P_UsePuzzleItem(player, arti - hexen_arti_firstpuzzitem))
+          return TRUE;
+        player->message = "YOU CANNOT USE THIS HERE";
+        return FALSE;
+
       case hexen_arti_invulnerability:
         if (!P_GivePower(player, pw_invulnerability))
           return FALSE;
@@ -1328,8 +1351,10 @@ void P_PlayerUseArtifact(player_t *player, int arti)
           ArtifactFlash = 4;
         }
       }
-      else
-      {                         /* couldn't use it - advance the cursor */
+      else if (!(hexen && arti >= hexen_arti_firstpuzzitem))
+      {                         /* couldn't use it - advance the cursor.
+                                 * Hexen puzzle items stay selected on
+                                 * failure, as in Raven's handler. */
         P_PlayerNextArtifact(player);
       }
       break;

@@ -1352,6 +1352,110 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       sound = hexen_sfx_pickup_artifact;
       player->message = "DARK SERVANT";
       break;
+    /* Puzzle artifacts (hub-quest items; used on matching special-129
+     * lines or things via P_UsePuzzleItem). */
+    case HEXEN_SPR_ASKU:
+      if (!P_GiveArtifact(player, hexen_arti_puzzskull, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "YORICK'S SKULL";
+      break;
+    case HEXEN_SPR_ABGM:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgembig, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "HEART OF D'SPARIL";
+      break;
+    case HEXEN_SPR_AGMR:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgemred, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "RUBY PLANET";
+      break;
+    case HEXEN_SPR_AGMG:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgemgreen1, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "EMERALD PLANET";
+      break;
+    case HEXEN_SPR_AGG2:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgemgreen2, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "EMERALD PLANET";
+      break;
+    case HEXEN_SPR_AGMB:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgemblue1, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "SAPPHIRE PLANET";
+      break;
+    case HEXEN_SPR_AGB2:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgemblue2, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "SAPPHIRE PLANET";
+      break;
+    case HEXEN_SPR_ABK1:
+      if (!P_GiveArtifact(player, hexen_arti_puzzbook1, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "DAEMON CODEX";
+      break;
+    case HEXEN_SPR_ABK2:
+      if (!P_GiveArtifact(player, hexen_arti_puzzbook2, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "LIBER OSCURA";
+      break;
+    case HEXEN_SPR_ASK2:
+      if (!P_GiveArtifact(player, hexen_arti_puzzskull2, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "FLAME MASK";
+      break;
+    case HEXEN_SPR_AFWP:
+      if (!P_GiveArtifact(player, hexen_arti_puzzfweapon, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "GLAIVE SEAL";
+      break;
+    case HEXEN_SPR_ACWP:
+      if (!P_GiveArtifact(player, hexen_arti_puzzcweapon, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "HOLY RELIC";
+      break;
+    case HEXEN_SPR_AMWP:
+      if (!P_GiveArtifact(player, hexen_arti_puzzmweapon, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "SIGIL OF THE MAGUS";
+      break;
+    case HEXEN_SPR_AGER:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgear1, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "CLOCK GEAR";
+      break;
+    case HEXEN_SPR_AGR2:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgear2, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "CLOCK GEAR";
+      break;
+    case HEXEN_SPR_AGR3:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgear3, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "CLOCK GEAR";
+      break;
+    case HEXEN_SPR_AGR4:
+      if (!P_GiveArtifact(player, hexen_arti_puzzgear4, special))
+        return;
+      sound = hexen_sfx_pickup_artifact;
+      player->message = "CLOCK GEAR";
+      break;
     case HEXEN_SPR_PTN2:           /* Quartz Flask (heal 25) */
       if (!P_GiveArtifact(player, hexen_arti_health, special))
         return;

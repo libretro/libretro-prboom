@@ -42,6 +42,7 @@
 #include "p_spec.h"
 #include "map_format.h"
 #include "hexen/p_spec_hexen.h"
+#include "hexen/p_acs.h"
 #include "s_sound.h"
 #include "sounds.h"
 #include "p_inter.h"
@@ -1840,6 +1841,108 @@ void P_UseLines (player_t*  player)
   if (P_PathTraverse ( x1, y1, x2, y2, PT_ADDLINES, PTR_UseTraverse ))
     if (!comp[comp_sound] && !P_PathTraverse ( x1, y1, x2, y2, PT_ADDLINES, PTR_NoWayTraverse ))
       S_StartSound (usething, sfx_noway);
+}
+
+/* Hexen puzzle items.  Using a puzzle artifact traces the use range for a
+ * line or thing carrying special 129 (UsePuzzleItem) whose args[0] names the
+ * same item; on a match the special's ACS script runs with the remaining
+ * args and the special is consumed.  Failing against a wall plays the
+ * class's "can't use" grunt. */
+#define USE_PUZZLE_ITEM_SPECIAL 129
+
+static mobj_t *PuzzleItemUser;
+static int     PuzzleItemType;
+static dbool   PuzzleActivated;
+
+static dbool PTR_PuzzleItemTraverse(intercept_t *in)
+{
+  mobj_t *mobj;
+  byte args[3];
+  int sound;
+
+  if (in->isaline)
+  { /* Check line */
+    if (in->d.line->special != USE_PUZZLE_ITEM_SPECIAL)
+    {
+      P_LineOpening(in->d.line);
+      if (openrange <= 0)
+      {
+        sound = hexen_sfx_None;
+        if (PuzzleItemUser->player)
+        {
+          switch (PuzzleItemUser->player->class)
+          {
+            case PCLASS_FIGHTER:
+              sound = hexen_sfx_puzzle_fail_fighter;
+              break;
+            case PCLASS_CLERIC:
+              sound = hexen_sfx_puzzle_fail_cleric;
+              break;
+            case PCLASS_MAGE:
+              sound = hexen_sfx_puzzle_fail_mage;
+              break;
+            default:
+              sound = hexen_sfx_None;
+              break;
+          }
+        }
+        S_StartSound(PuzzleItemUser, sound);
+        return false;           /* can't use through a wall */
+      }
+      return true;              /* continue searching */
+    }
+    if (P_PointOnLineSide(PuzzleItemUser->x, PuzzleItemUser->y,
+                          in->d.line) == 1)
+    { /* don't use back sides */
+      return false;
+    }
+    if (PuzzleItemType != in->d.line->args[0])
+    { /* item type doesn't match */
+      return false;
+    }
+    args[0] = in->d.line->args[2];
+    args[1] = in->d.line->args[3];
+    args[2] = in->d.line->args[4];
+    P_StartACS(in->d.line->args[1], 0, args, PuzzleItemUser, in->d.line, 0);
+    in->d.line->special = 0;
+    PuzzleActivated = true;
+    return false;               /* stop searching */
+  }
+  /* Check thing */
+  mobj = in->d.thing;
+  if (mobj->special != USE_PUZZLE_ITEM_SPECIAL)
+  { /* wrong special */
+    return true;
+  }
+  if (PuzzleItemType != mobj->special_args[0])
+  { /* item type doesn't match */
+    return true;
+  }
+  args[0] = mobj->special_args[2];
+  args[1] = mobj->special_args[3];
+  args[2] = mobj->special_args[4];
+  P_StartACS(mobj->special_args[1], 0, args, PuzzleItemUser, NULL, 0);
+  mobj->special = 0;
+  PuzzleActivated = true;
+  return false;                 /* stop searching */
+}
+
+dbool P_UsePuzzleItem(player_t *player, int itemType)
+{
+  int angle;
+  fixed_t x1, y1, x2, y2;
+
+  PuzzleItemType = itemType;
+  PuzzleItemUser = player->mo;
+  PuzzleActivated = false;
+  angle = player->mo->angle >> ANGLETOFINESHIFT;
+  x1 = player->mo->x;
+  y1 = player->mo->y;
+  x2 = x1 + (USERANGE >> FRACBITS) * finecosine[angle];
+  y2 = y1 + (USERANGE >> FRACBITS) * finesine[angle];
+  P_PathTraverse(x1, y1, x2, y2, PT_ADDLINES | PT_ADDTHINGS,
+                 PTR_PuzzleItemTraverse);
+  return PuzzleActivated;
 }
 
 

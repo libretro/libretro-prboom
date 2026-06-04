@@ -446,6 +446,12 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
   dcvars.colormap = vis->colormap;
   dcvars.nextcolormap = dcvars.colormap; // for filtering -- POPE
 
+  /* Raven translucent sprites: Hexen MF_SHADOW draws at half intensity and
+   * MF_ALTSHADOW fainter still; Heretic ghosts use the same path.  The
+   * sprite keeps its lit colormap and the column flushers blend. */
+  if (raven && (vis->mobjflags & (MF_SHADOW | MF_ALTSHADOW)) && vis->colormap)
+    R_SetSpriteTranslucency((vis->mobjflags & MF_ALTSHADOW) ? 2 : 1);
+
   // killough 4/11/98: rearrange and handle translucent sprites
   // mixed with translucent/non-translucenct 2s normals
 
@@ -492,6 +498,8 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
     );
   }
   R_UnlockPatchNum(vis->patch+firstspritelump); // cph - release lump
+
+  R_SetSpriteTranslucency(0);
 }
 
 //
@@ -501,6 +509,11 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 
 static void R_ProjectSprite (mobj_t* thing, int lightlevel)
 {
+   /* Hexen: buried thrust spikes, dormant wraiths etc. are flagged
+    * MF2_DONTDRAW and must not be rendered. */
+   if (raven && (thing->flags2 & MF2_DONTDRAW))
+      return;
+
    fixed_t   gzt;               // killough 3/27/98
    fixed_t   tx;
    fixed_t   xscale;
@@ -706,8 +719,10 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    vis->patch = lump;
 
    // get light level
-   if (thing->flags & MF_SHADOW)
-      vis->colormap = NULL;             // shadow draw
+   if (!raven && (thing->flags & MF_SHADOW))
+      vis->colormap = NULL;             // shadow draw (Doom spectre fuzz);
+                                        // Raven shadow things draw lit but
+                                        // translucent (see R_DrawVisSprite)
    else if (fixedcolormap)
       vis->colormap = fixedcolormap;      // fixed map
    else if (thing->frame & FF_FULLBRIGHT)
@@ -863,7 +878,23 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
 
    vis->patch = lump;
 
-   if (viewplayer->powers[pw_invisibility] > 4*32
+   if (raven && (viewplayer->mo->flags & MF_SHADOW ||
+                 viewplayer->mo->flags2 & MF2_DONTDRAW ||
+                 viewplayer->powers[pw_invisibility]))
+   {
+      /* Raven: an invisible player's weapon draws translucent, fainter when
+       * the player is fully cloaked (after dsda-doom). */
+      if (viewplayer->mo->flags2 & MF2_DONTDRAW)
+         vis->mobjflags |= MF_SHADOW;
+      else
+         vis->mobjflags |= MF_ALTSHADOW;
+      if (fixedcolormap)
+         vis->colormap = fixedcolormap;
+      else
+         vis->colormap = R_ColourMap(lightlevel,
+               FixedMul(pspritescale, 0x2b000));
+   }
+   else if (viewplayer->powers[pw_invisibility] > 4*32
          || viewplayer->powers[pw_invisibility] & 8)
       vis->colormap = NULL;                    // shadow draw
    else if (fixedcolormap)

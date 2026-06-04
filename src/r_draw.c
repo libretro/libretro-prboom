@@ -149,6 +149,7 @@ typedef enum
    COL_NONE,
    COL_OPAQUE,
    COL_TRANS,
+   COL_ALTTRANS,
    COL_FLEXTRANS,
    COL_FUZZ,
    COL_FLEXADD
@@ -158,6 +159,47 @@ static int    temp_x = 0;
 static int    tempyl[4], tempyh[4];
 static uint16_t short_tempbuf[MAX_SCREENHEIGHT * 4];
 static int    startx = 0;
+
+/* Raven translucent sprites (Hexen MF_SHADOW/MF_ALTSHADOW, Heretic ghosts).
+ * The batching column drawers consult these instead of hardcoding the opaque
+ * type/flushers, so a translucent sprite gets its own batch type (breaking
+ * any run shared with neighbouring opaque columns) and blending flushers.
+ * R_SetSpriteTranslucency selects the mode around a sprite's draw; the
+ * default is the opaque set.  The blend works directly on the RGB565
+ * framebuffer: 50/50 for SHADOW, 25/75 for ALTSHADOW. */
+static void R_FlushWhole16(void);
+static void R_FlushHT16(void);
+static void R_FlushQuad16(void);
+static void R_FlushWholeTL16(void);
+static void R_FlushHTTL16(void);
+static void R_FlushQuadTL16(void);
+
+static int  tl_temptype = COL_OPAQUE;
+static void (*tl_flush_whole)(void) = R_FlushWhole16;
+static void (*tl_flush_ht)(void)    = R_FlushHT16;
+static void (*tl_flush_quad)(void)  = R_FlushQuad16;
+
+void R_SetSpriteTranslucency(int mode)
+{
+  if (mode)
+  {
+    tl_temptype    = (mode == 2) ? COL_ALTTRANS : COL_TRANS;
+    tl_flush_whole = R_FlushWholeTL16;
+    tl_flush_ht    = R_FlushHTTL16;
+    tl_flush_quad  = R_FlushQuadTL16;
+  }
+  else
+  {
+    tl_temptype    = COL_OPAQUE;
+    tl_flush_whole = R_FlushWhole16;
+    tl_flush_ht    = R_FlushHT16;
+    tl_flush_quad  = R_FlushQuad16;
+  }
+}
+
+/* 50/50 RGB565 blend: mask off each channel's low bit, halve, add. */
+#define TL_BLEND565(s, d) \
+  ((uint16_t)((((s) & 0xF7DEu) >> 1) + (((d) & 0xF7DEu) >> 1)))
 static int    temptype = COL_NONE;
 static int    commontop, commonbot;
 // SoM 7-28-04: Fix the fuzz problem.
@@ -394,6 +436,104 @@ static void R_FlushQuad16(void)
    }
 }
 
+/* Translucent flushers: as the opaque trio, but each pixel store blends the
+ * column sample against the destination.  COL_ALTTRANS blends twice toward
+ * the destination (~25%% sprite), matching Hexen's fainter alt-shadow. */
+static void R_FlushWholeTL16(void)
+{
+   int alt = (temptype == COL_ALTTRANS);
+
+   while(--temp_x >= 0)
+   {
+      int yl           = tempyl[temp_x];
+      uint16_t *source = &short_tempbuf[temp_x + (yl << 2)];
+      uint16_t *dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + temp_x;
+      int   count      = tempyh[temp_x] - yl + 1;
+
+      while(--count >= 0)
+      {
+         uint16_t px = TL_BLEND565(*source, *dest);
+         if (alt)
+            px = TL_BLEND565(px, *dest);
+         *dest   = px;
+         source += 4;
+         dest   += SURFACE_SHORT_PITCH;
+      }
+   }
+}
+
+static void R_FlushHTTL16(void)
+{
+   uint16_t *source;
+   uint16_t *dest;
+   int count, colnum = 0;
+   int yl, yh;
+   int alt = (temptype == COL_ALTTRANS);
+
+   while(colnum < 4)
+   {
+      yl = tempyl[colnum];
+      yh = tempyh[colnum];
+
+      if(yl < commontop)
+      {
+         source = &short_tempbuf[colnum + (yl << 2)];
+         dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = commontop - yl;
+
+         while(--count >= 0)
+         {
+            uint16_t px = TL_BLEND565(*source, *dest);
+            if (alt)
+               px = TL_BLEND565(px, *dest);
+            *dest   = px;
+            source += 4;
+            dest   += SURFACE_SHORT_PITCH;
+         }
+      }
+
+      if(yh > commonbot)
+      {
+         source = &short_tempbuf[colnum + ((commonbot + 1) << 2)];
+         dest   = drawvars.short_topleft + (commonbot + 1) * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = yh - commonbot;
+
+         while(--count >= 0)
+         {
+            uint16_t px = TL_BLEND565(*source, *dest);
+            if (alt)
+               px = TL_BLEND565(px, *dest);
+            *dest   = px;
+            source += 4;
+            dest   += SURFACE_SHORT_PITCH;
+         }
+      }
+      ++colnum;
+   }
+}
+
+static void R_FlushQuadTL16(void)
+{
+   uint16_t *source = &short_tempbuf[commontop << 2];
+   uint16_t *dest   = drawvars.short_topleft + commontop * SURFACE_SHORT_PITCH + startx;
+   int        count = commonbot - commontop + 1;
+   int        alt   = (temptype == COL_ALTTRANS);
+
+   while(--count >= 0)
+   {
+      int i;
+      for (i = 0; i < 4; i++)
+      {
+         uint16_t px = TL_BLEND565(source[i], dest[i]);
+         if (alt)
+            px = TL_BLEND565(px, dest[i]);
+         dest[i] = px;
+      }
+      source += 4;
+      dest += SURFACE_SHORT_PITCH;
+   }
+}
+
 /*
  * R_FlushWholeFuzz16
  *
@@ -585,7 +725,7 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
    }
 
    if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
       R_FlushColumns();
 
    if(!temp_x)
@@ -593,15 +733,15 @@ static void R_DrawColumn16_PointUV(draw_column_vars_t *dcvars)
       startx = dcvars->x;
       tempyl[0] = commontop = dcvars->yl;
       tempyh[0] = commonbot = dcvars->yh;
-      temptype = (COL_OPAQUE);
+      temptype = tl_temptype;
 
 
 
 
 
-      R_FlushWholeColumns = R_FlushWhole16;
-      R_FlushHTColumns = R_FlushHT16;
-      R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = tl_flush_whole;
+      R_FlushHTColumns = tl_flush_ht;
+      R_FlushQuadColumn = tl_flush_quad;
 
       dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -753,7 +893,7 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
    }
 
    if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
       R_FlushColumns();
 
    if(!temp_x)
@@ -761,15 +901,15 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
       startx = dcvars->x;
       tempyl[0] = commontop = dcvars->yl;
       tempyh[0] = commonbot = dcvars->yh;
-      temptype = (COL_OPAQUE);
+      temptype = tl_temptype;
 
 
 
 
 
-      R_FlushWholeColumns = R_FlushWhole16;
-      R_FlushHTColumns = R_FlushHT16;
-      R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = tl_flush_whole;
+      R_FlushHTColumns = tl_flush_ht;
+      R_FlushQuadColumn = tl_flush_quad;
 
       dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -926,7 +1066,7 @@ static void R_DrawColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
    }
 
       if(temp_x == 4 ||
-            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+            (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -934,15 +1074,15 @@ static void R_DrawColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -1118,7 +1258,7 @@ static void R_DrawColumn16_LinearUV(draw_column_vars_t *dcvars)
 
 
    if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
       R_FlushColumns();
 
    if(!temp_x)
@@ -1126,15 +1266,15 @@ static void R_DrawColumn16_LinearUV(draw_column_vars_t *dcvars)
       startx = dcvars->x;
       tempyl[0] = commontop = dcvars->yl;
       tempyh[0] = commonbot = dcvars->yh;
-      temptype = (COL_OPAQUE);
+      temptype = tl_temptype;
 
 
 
 
 
-      R_FlushWholeColumns = R_FlushWhole16;
-      R_FlushHTColumns = R_FlushHT16;
-      R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = tl_flush_whole;
+      R_FlushHTColumns = tl_flush_ht;
+      R_FlushQuadColumn = tl_flush_quad;
 
       dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -1327,7 +1467,7 @@ static void R_DrawColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
    }
 
    if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
       R_FlushColumns();
 
    if(!temp_x)
@@ -1335,15 +1475,15 @@ static void R_DrawColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
       startx = dcvars->x;
       tempyl[0] = commontop = dcvars->yl;
       tempyh[0] = commonbot = dcvars->yh;
-      temptype = (COL_OPAQUE);
+      temptype = tl_temptype;
 
 
 
 
 
-      R_FlushWholeColumns = R_FlushWhole16;
-      R_FlushHTColumns = R_FlushHT16;
-      R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = tl_flush_whole;
+      R_FlushHTColumns = tl_flush_ht;
+      R_FlushQuadColumn = tl_flush_quad;
 
       dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -1516,7 +1656,7 @@ static void R_DrawColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars)
    }
 
    if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
       R_FlushColumns();
 
    if(!temp_x)
@@ -1524,15 +1664,15 @@ static void R_DrawColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars)
       startx = dcvars->x;
       tempyl[0] = commontop = dcvars->yl;
       tempyh[0] = commonbot = dcvars->yh;
-      temptype = (COL_OPAQUE);
+      temptype = tl_temptype;
 
 
 
 
 
-      R_FlushWholeColumns = R_FlushWhole16;
-      R_FlushHTColumns = R_FlushHT16;
-      R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = tl_flush_whole;
+      R_FlushHTColumns = tl_flush_ht;
+      R_FlushQuadColumn = tl_flush_quad;
 
       dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -1721,7 +1861,7 @@ static void R_DrawColumn16_RoundedUV(draw_column_vars_t *dcvars)
    {
 
       if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -1729,15 +1869,15 @@ static void R_DrawColumn16_RoundedUV(draw_column_vars_t *dcvars)
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -1931,7 +2071,7 @@ static void R_DrawColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars)
    {
 
       if(temp_x == 4 ||
-            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+            (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -1939,15 +2079,15 @@ static void R_DrawColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars)
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -2143,7 +2283,7 @@ static void R_DrawColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvars)
    {
 
       if(temp_x == 4 ||
-            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+            (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -2151,15 +2291,15 @@ static void R_DrawColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvars)
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -2357,7 +2497,7 @@ static void R_DrawTranslatedColumn16_PointUV(draw_column_vars_t *dcvars)
    }
 
    if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
       R_FlushColumns();
 
    if(!temp_x)
@@ -2365,15 +2505,15 @@ static void R_DrawTranslatedColumn16_PointUV(draw_column_vars_t *dcvars)
       startx = dcvars->x;
       tempyl[0] = commontop = dcvars->yl;
       tempyh[0] = commonbot = dcvars->yh;
-      temptype = (COL_OPAQUE);
+      temptype = tl_temptype;
 
 
 
 
 
-      R_FlushWholeColumns = R_FlushWhole16;
-      R_FlushHTColumns = R_FlushHT16;
-      R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = tl_flush_whole;
+      R_FlushHTColumns = tl_flush_ht;
+      R_FlushQuadColumn = tl_flush_quad;
 
       dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -2533,7 +2673,7 @@ static void R_DrawTranslatedColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
    }
 
    if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
       R_FlushColumns();
 
    if(!temp_x)
@@ -2541,15 +2681,15 @@ static void R_DrawTranslatedColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
       startx = dcvars->x;
       tempyl[0] = commontop = dcvars->yl;
       tempyh[0] = commonbot = dcvars->yh;
-      temptype = (COL_OPAQUE);
+      temptype = tl_temptype;
 
 
 
 
 
-      R_FlushWholeColumns = R_FlushWhole16;
-      R_FlushHTColumns = R_FlushHT16;
-      R_FlushQuadColumn = R_FlushQuad16;
+      R_FlushWholeColumns = tl_flush_whole;
+      R_FlushHTColumns = tl_flush_ht;
+      R_FlushQuadColumn = tl_flush_quad;
 
       dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -2707,7 +2847,7 @@ static void R_DrawTranslatedColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
    {
 
       if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -2715,15 +2855,15 @@ static void R_DrawTranslatedColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -2916,7 +3056,7 @@ static void R_DrawTranslatedColumn16_LinearUV(draw_column_vars_t *dcvars)
    {
 
       if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -2924,15 +3064,15 @@ static void R_DrawTranslatedColumn16_LinearUV(draw_column_vars_t *dcvars)
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -3128,7 +3268,7 @@ static void R_DrawTranslatedColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
    {
 
       if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -3136,15 +3276,15 @@ static void R_DrawTranslatedColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -3345,7 +3485,7 @@ static void R_DrawTranslatedColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars
    {
 
       if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -3353,15 +3493,15 @@ static void R_DrawTranslatedColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -3559,7 +3699,7 @@ static void R_DrawTranslatedColumn16_RoundedUV(draw_column_vars_t *dcvars)
    {
 
       if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -3567,15 +3707,15 @@ static void R_DrawTranslatedColumn16_RoundedUV(draw_column_vars_t *dcvars)
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -3771,7 +3911,7 @@ static void R_DrawTranslatedColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars
    {
 
       if(temp_x == 4 ||
-         (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+         (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -3779,15 +3919,15 @@ static void R_DrawTranslatedColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 
@@ -3981,7 +4121,7 @@ static void R_DrawTranslatedColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvar
    {
 
       if(temp_x == 4 ||
-            (temp_x && (temptype != (COL_OPAQUE) || temp_x + startx != dcvars->x)))
+            (temp_x && (temptype != tl_temptype || temp_x + startx != dcvars->x)))
          R_FlushColumns();
 
       if(!temp_x)
@@ -3989,15 +4129,15 @@ static void R_DrawTranslatedColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvar
          startx = dcvars->x;
          tempyl[0] = commontop = dcvars->yl;
          tempyh[0] = commonbot = dcvars->yh;
-         temptype = (COL_OPAQUE);
+         temptype = tl_temptype;
 
 
 
 
 
-         R_FlushWholeColumns = R_FlushWhole16;
-         R_FlushHTColumns = R_FlushHT16;
-         R_FlushQuadColumn = R_FlushQuad16;
+         R_FlushWholeColumns = tl_flush_whole;
+         R_FlushHTColumns = tl_flush_ht;
+         R_FlushQuadColumn = tl_flush_quad;
 
          dest = &short_tempbuf[dcvars->yl << 2];
 

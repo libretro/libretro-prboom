@@ -145,4 +145,7 @@ void R_InitTranslationTables(void);
 // column drawing.
 void R_ResetColumnBuffer(void);
 
+/* Raven translucent sprite mode: 0 opaque, 1 MF_SHADOW (50%), 2 MF_ALTSHADOW (25%) */
+void R_SetSpriteTranslucency(int mode);
+
 #endif

@@ -28,6 +28,7 @@
 #include "s_sound.h"
 #include "dsda_hacked.h"
 #include "lprintf.h"
+#include "i_system.h"
 #include "hexen/p_acs.h"
 #include "hexen/sn_sonix.h"
 #include "hexen/p_spec_hexen.h"
@@ -181,6 +182,14 @@ static int GetACSIndex(int number)
     if (ACSInfo[i].number == number)
       return i;
   return -1;
+}
+
+void CheckACSPresent(int number)
+{
+  if (GetACSIndex(number) == -1)
+  {
+    I_Error("Required ACS script %d not initialized", number);
+  }
 }
 
 dbool P_StartACS(int number, int map, byte *args, mobj_t *activator,

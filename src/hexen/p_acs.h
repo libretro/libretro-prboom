@@ -66,6 +66,7 @@ typedef struct
 void  P_LoadACScripts(int lump);
 dbool P_StartACS(int number, int map, byte *args, mobj_t *activator,
                  line_t *line, int side);
+void CheckACSPresent(int number);
 dbool P_TerminateACS(int number, int map);
 dbool P_SuspendACS(int number, int map);
 void  T_InterpretACS(acs_t *script);

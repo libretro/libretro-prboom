@@ -1410,6 +1410,36 @@ void P_RemoveMobjFromTIDList(mobj_t *mobj)
   mobj->tid = 0;
 }
 
+mobj_t *P_SpawnKoraxMissile(fixed_t x, fixed_t y, fixed_t z,
+                            mobj_t *source, mobj_t *dest, mobjtype_t type)
+{
+  mobj_t *th;
+  angle_t an;
+  int dist;
+
+  z -= source->floorclip;
+  th = P_SpawnMobj(x, y, z, type);
+  if (th->info->seesound)
+    S_StartSound(th, th->info->seesound);
+  P_SetTarget(&th->target, source);    /* originator */
+  an = R_PointToAngle2(x, y, dest->x, dest->y);
+  if (dest->flags & MF_SHADOW)
+  {                                    /* invisible target */
+    an += P_SubRandom() << 21;
+  }
+  th->angle = an;
+  an >>= ANGLETOFINESHIFT;
+  th->momx = FixedMul(th->info->speed, finecosine[an]);
+  th->momy = FixedMul(th->info->speed, finesine[an]);
+  dist = P_AproxDistance(dest->x - x, dest->y - y);
+  dist = dist / th->info->speed;
+  if (dist < 1)
+    dist = 1;
+  th->momz = (dest->z - z + (30 * FRACUNIT)) / dist;
+  P_CheckMissileSpawn(th);
+  return th;
+}
+
 mobj_t *P_FindMobjFromTID(short tid, int *searchPosition)
 {
   int i;

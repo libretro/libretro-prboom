@@ -554,6 +554,7 @@ mobj_t  *P_SPMAngle(mobj_t *source, mobjtype_t type, angle_t angle);
 mobj_t  *P_SpawnMissileAngle(mobj_t *source, mobjtype_t type, angle_t angle, fixed_t momz);
 mobj_t  *P_SpawnMissileAngleSpeed(mobj_t *source, mobjtype_t type, angle_t angle, fixed_t momz, fixed_t speed);
 mobj_t  *P_SpawnMissileXYZ(fixed_t x, fixed_t y, fixed_t z, mobj_t *source, mobj_t *dest, mobjtype_t type);
+mobj_t  *P_SpawnKoraxMissile(fixed_t x, fixed_t y, fixed_t z, mobj_t *source, mobj_t *dest, mobjtype_t type);
 void     P_ThrustMobj(mobj_t *mo, angle_t angle, fixed_t move);
 void     P_BlasterMobjThinker(mobj_t *mobj);
 int      P_FaceMobj(mobj_t *source, mobj_t *target, angle_t *delta);

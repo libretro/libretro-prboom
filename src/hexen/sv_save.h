@@ -20,6 +20,10 @@
  * restoring the destination from its archive when one exists. */
 void SV_MapTeleport(int map, int position);
 
+/* True while SV_MapTeleport is loading a map: hub travel must not run the
+ * new-game ACS reset. */
+dbool SV_IsHubTravel(void);
+
 /* Forget all per-map archives (new game / new cluster). */
 void SV_HubInit(void);
 

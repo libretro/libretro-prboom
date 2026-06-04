@@ -752,8 +752,19 @@ static void SV_LoadMap(void)
 
   AssertSegment(ASEG_END);
 
+  /* the TID cache built during P_SetupLevel points at the fresh mobjs that
+   * RemoveAllThinkers just destroyed; rebuild it from the restored set */
+  P_CreateTIDList();
+
   free(MobjList);
   MobjList = NULL;
+}
+
+static dbool hub_travel;
+
+dbool SV_IsHubTravel(void)
+{
+  return hub_travel;
 }
 
 void SV_MapTeleport(int map, int position)
@@ -764,6 +775,8 @@ void SV_MapTeleport(int map, int position)
   int      inventoryPtr;
   int      currentInvPos;
   dbool    playerWasReborn;
+
+  hub_travel = TRUE;
 
   if (!deathmatch)
   {
@@ -862,4 +875,6 @@ void SV_MapTeleport(int map, int position)
     P_CheckACSStore();
 
   P_MapEnd();
+
+  hub_travel = FALSE;
 }

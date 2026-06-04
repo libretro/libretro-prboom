@@ -2422,7 +2422,10 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
          P_LoadACScripts(-1);
       P_InitLightning();
       P_CreateTIDList();
-      P_CheckACSStore();
+      /* Deferred cross-map ACS scripts are replayed by SV_MapTeleport after
+       * hub travel completes -- consuming them here would start them on the
+       * freshly set-up level only for the hub restore to destroy their
+       * thinkers and overwrite their effects (sv_save.c). */
    }
 
    P_MapEnd();

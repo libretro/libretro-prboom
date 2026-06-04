@@ -2645,8 +2645,11 @@ void G_InitNew(skill_t skill, int episode, int map)
   int i;
 
   /* Hexen: a fresh game must not inherit ACS world variables or deferred
-   * cross-map scripts from the previous one. */
-  if (hexen)
+   * cross-map scripts from the previous one.  Hub travel re-enters here for
+   * every map transition (sv_save.c), and that must NOT reset ACS world
+   * state: world variables and the deferred-script store are exactly the
+   * state that persists across maps within a hub. */
+  if (hexen && !SV_IsHubTravel())
     P_ACSInitNewGame();
 
   if (paused)

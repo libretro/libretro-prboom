@@ -134,6 +134,8 @@ void A_MStaffPalette(player_t *player, pspdef_t *psp);
 void A_MStaffWeave(struct mobj_s *actor);
 void A_MStaffTrack(struct mobj_s *actor);
 void A_CHolySeek(struct mobj_s *actor);
+void A_CHolyAttack2(struct mobj_s *actor);
+void A_ShedShard(struct mobj_s *actor);
 void A_CHolyTail(struct mobj_s *actor);
 void A_CHolyCheckScream(struct mobj_s *actor);
 void A_CHolySpawnPuff(struct mobj_s *actor);

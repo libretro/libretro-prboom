@@ -2160,6 +2160,36 @@ mobj_t *P_SPMAngleXYZ(mobj_t *source, fixed_t x, fixed_t y, fixed_t z,
 }
 
 /* Heretic: spawn a missile travelling at a fixed angle with explicit momz. */
+mobj_t *P_SpawnMissileXYZ(fixed_t x, fixed_t y, fixed_t z,
+                          mobj_t *source, mobj_t *dest, mobjtype_t type)
+{
+  mobj_t *th;
+  angle_t an;
+  int dist;
+
+  z -= source->floorclip;
+  th = P_SpawnMobj(x, y, z, type);
+  if (th->info->seesound)
+    S_StartSound(th, th->info->seesound);
+  P_SetTarget(&th->target, source);   /* originator */
+  an = R_PointToAngle2(source->x, source->y, dest->x, dest->y);
+  if (dest->flags & MF_SHADOW)
+  {                                   /* invisible target */
+    an += P_SubRandom() << 21;
+  }
+  th->angle = an;
+  an >>= ANGLETOFINESHIFT;
+  th->momx = FixedMul(th->info->speed, finecosine[an]);
+  th->momy = FixedMul(th->info->speed, finesine[an]);
+  dist = P_AproxDistance(dest->x - source->x, dest->y - source->y);
+  dist = dist / th->info->speed;
+  if (dist < 1)
+    dist = 1;
+  th->momz = (dest->z - source->z) / dist;
+  P_CheckMissileSpawn(th);
+  return th;
+}
+
 mobj_t *P_SpawnMissileAngle(mobj_t *source, mobjtype_t type, angle_t angle, fixed_t momz)
 {
   fixed_t z;

@@ -4370,6 +4370,275 @@ void A_CheckFloor(mobj_t *actor)
   }
 }
 
+/* Hexen magic bridge: three balls orbit the (invisible) bridge thing. */
+int orbitTableX[256] = {
+    983025, 982725, 981825, 980340, 978255, 975600, 972330, 968490,
+    964065, 959070, 953475, 947325, 940590, 933300, 925440, 917025,
+    908055, 898545, 888495, 877905, 866775, 855135, 842985, 830310,
+    817155, 803490, 789360, 774735, 759660, 744120, 728130, 711690,
+    694845, 677565, 659880, 641805, 623340, 604500, 585285, 565725,
+    545820, 525600, 505050, 484200, 463065, 441645, 419955, 398010,
+    375840, 353430, 330810, 307995, 285000, 261825, 238485, 215010,
+    191400, 167685, 143865, 119955, 95970, 71940, 47850, 23745,
+    -375, -24495, -48600, -72690, -96720, -120705, -144600, -168420,
+    -192150, -215745, -239220, -262545, -285720, -308715, -331530, -354135,
+    -376530, -398700, -420630, -442320, -463725, -484860, -505695, -526230,
+    -546450, -566340, -585885, -605085, -623925, -642375, -660435, -678105,
+    -695370, -712215, -728625, -744600, -760125, -775200, -789795, -803925,
+    -817575, -830715, -843375, -855510, -867135, -878235, -888810, -898845,
+    -908340, -917295, -925695, -933540, -940815, -947520, -953670, -959235,
+    -964215, -968625, -972450, -975690, -978330, -980400, -981870, -982740,
+    -983025, -982725, -981825, -980340, -978255, -975600, -972330, -968490,
+    -964065, -959070, -953475, -947325, -940590, -933300, -925440, -917025,
+    -908055, -898545, -888495, -877905, -866775, -855135, -842985, -830310,
+    -817155, -803490, -789360, -774735, -759660, -744120, -728130, -711690,
+    -694845, -677565, -659880, -641805, -623340, -604485, -585285, -565725,
+    -545820, -525600, -505050, -484200, -463065, -441645, -419955, -398010,
+    -375840, -353430, -330810, -307995, -285000, -261825, -238485, -215010,
+    -191400, -167685, -143865, -119955, -95970, -71940, -47850, -23745,
+    375, 24495, 48600, 72690, 96720, 120705, 144600, 168420,
+    192150, 215745, 239220, 262545, 285720, 308715, 331530, 354135,
+    376530, 398700, 420630, 442320, 463725, 484860, 505695, 526230,
+    546450, 566340, 585885, 605085, 623925, 642375, 660435, 678105,
+    695370, 712215, 728625, 744600, 760125, 775200, 789795, 803925,
+    817575, 830715, 843375, 855510, 867135, 878235, 888810, 898845,
+    908340, 917295, 925695, 933540, 940815, 947520, 953670, 959235,
+    964215, 968625, 972450, 975690, 978330, 980400, 981870, 982740
+};
+
+int orbitTableY[256] = {
+    375, 24495, 48600, 72690, 96720, 120705, 144600, 168420,
+    192150, 215745, 239220, 262545, 285720, 308715, 331530, 354135,
+    376530, 398700, 420630, 442320, 463725, 484860, 505695, 526230,
+    546450, 566340, 585885, 605085, 623925, 642375, 660435, 678105,
+    695370, 712215, 728625, 744600, 760125, 775200, 789795, 803925,
+    817575, 830715, 843375, 855510, 867135, 878235, 888810, 898845,
+    908340, 917295, 925695, 933540, 940815, 947520, 953670, 959235,
+    964215, 968625, 972450, 975690, 978330, 980400, 981870, 982740,
+    983025, 982725, 981825, 980340, 978255, 975600, 972330, 968490,
+    964065, 959070, 953475, 947325, 940590, 933300, 925440, 917025,
+    908055, 898545, 888495, 877905, 866775, 855135, 842985, 830310,
+    817155, 803490, 789360, 774735, 759660, 744120, 728130, 711690,
+    694845, 677565, 659880, 641805, 623340, 604500, 585285, 565725,
+    545820, 525600, 505050, 484200, 463065, 441645, 419955, 398010,
+    375840, 353430, 330810, 307995, 285000, 261825, 238485, 215010,
+    191400, 167685, 143865, 119955, 95970, 71940, 47850, 23745,
+    -375, -24495, -48600, -72690, -96720, -120705, -144600, -168420,
+    -192150, -215745, -239220, -262545, -285720, -308715, -331530, -354135,
+    -376530, -398700, -420630, -442320, -463725, -484860, -505695, -526230,
+    -546450, -566340, -585885, -605085, -623925, -642375, -660435, -678105,
+    -695370, -712215, -728625, -744600, -760125, -775200, -789795, -803925,
+    -817575, -830715, -843375, -855510, -867135, -878235, -888810, -898845,
+    -908340, -917295, -925695, -933540, -940815, -947520, -953670, -959235,
+    -964215, -968625, -972450, -975690, -978330, -980400, -981870, -982740,
+    -983025, -982725, -981825, -980340, -978255, -975600, -972330, -968490,
+    -964065, -959070, -953475, -947325, -940590, -933300, -925440, -917025,
+    -908055, -898545, -888495, -877905, -866775, -855135, -842985, -830310,
+    -817155, -803490, -789360, -774735, -759660, -744120, -728130, -711690,
+    -694845, -677565, -659880, -641805, -623340, -604485, -585285, -565725,
+    -545820, -525600, -505050, -484200, -463065, -441645, -419955, -398010,
+    -375840, -353430, -330810, -307995, -285000, -261825, -238485, -215010,
+    -191400, -167685, -143865, -119955, -95970, -71940, -47850, -23745
+};
+
+void A_BridgeOrbit(mobj_t *actor)
+{
+  if (actor->target->special1.i)
+    P_SetMobjState(actor, HEXEN_S_NULL);
+  actor->special_args[0] += 3;
+  actor->special_args[0] &= 0xff;
+  actor->x = actor->target->x + orbitTableX[actor->special_args[0]];
+  actor->y = actor->target->y + orbitTableY[actor->special_args[0]];
+  actor->z = actor->target->z;
+}
+
+void A_BridgeInit(mobj_t *actor)
+{
+  byte startangle;
+  mobj_t *ball1, *ball2, *ball3;
+  fixed_t cx, cy, cz;
+
+  cx = actor->x;
+  cy = actor->y;
+  cz = actor->z;
+  startangle = P_Random(pr_heretic);
+  actor->special1.i = 0;
+
+  /* spawn the orbit triad */
+  ball1 = P_SpawnMobj(cx, cy, cz, HEXEN_MT_BRIDGEBALL);
+  ball1->special_args[0] = startangle;
+  P_SetTarget(&ball1->target, actor);
+
+  ball2 = P_SpawnMobj(cx, cy, cz, HEXEN_MT_BRIDGEBALL);
+  ball2->special_args[0] = (startangle + 85) & 255;
+  P_SetTarget(&ball2->target, actor);
+
+  ball3 = P_SpawnMobj(cx, cy, cz, HEXEN_MT_BRIDGEBALL);
+  ball3->special_args[0] = (startangle + 170) & 255;
+  P_SetTarget(&ball3->target, actor);
+
+  A_BridgeOrbit(ball1);
+  A_BridgeOrbit(ball2);
+  A_BridgeOrbit(ball3);
+}
+
+void A_FlameCheck(mobj_t *actor)
+{
+  if (!actor->special_args[0]--)      /* called every 8 tics */
+    P_SetMobjState(actor, HEXEN_S_NULL);
+}
+
+void A_BatSpawnInit(mobj_t *actor)
+{
+  actor->special1.i = 0;              /* frequency count */
+}
+
+void A_BatSpawn(mobj_t *actor)
+{
+  mobj_t *mo;
+  int delta;
+  angle_t angle;
+
+  /* countdown until next spawn */
+  if (actor->special1.i-- > 0)
+    return;
+  actor->special1.i = actor->special_args[0];   /* reset frequency count */
+
+  delta = actor->special_args[1];
+  if (delta == 0)
+    delta = 1;
+  angle = actor->angle +
+          (((P_Random(pr_heretic) % delta) - (delta >> 1)) << 24);
+  mo = P_SpawnMissileAngle(actor, HEXEN_MT_BAT, angle, 0);
+  if (mo)
+  {
+    mo->special_args[0] = P_Random(pr_heretic) & 63;  /* floatbob index */
+    mo->special_args[4] = actor->special_args[4];     /* turn degrees */
+    mo->special2.i = actor->special_args[3] << 3;     /* lifetime */
+    P_SetTarget(&mo->target, actor);
+  }
+}
+
+void A_BatMove(mobj_t *actor)
+{
+  angle_t newangle;
+  fixed_t speed;
+
+  if (actor->special2.i < 0)
+    P_SetMobjState(actor, actor->info->deathstate);
+  actor->special2.i -= 2;             /* called every 2 tics */
+
+  if (P_Random(pr_heretic) < 128)
+    newangle = actor->angle + ANG1 * actor->special_args[4];
+  else
+    newangle = actor->angle - ANG1 * actor->special_args[4];
+
+  /* adjust momentum vector to new direction */
+  newangle >>= ANGLETOFINESHIFT;
+  speed = FixedMul(actor->info->speed, P_Random(pr_heretic) << 10);
+  actor->momx = FixedMul(speed, finecosine[newangle]);
+  actor->momy = FixedMul(speed, finesine[newangle]);
+
+  if (P_Random(pr_heretic) < 15)
+    S_StartSound(actor, hexen_sfx_bat_scream);
+
+  /* handle Z movement */
+  actor->z = actor->target->z + 2 * FloatBobOffsets[actor->special_args[0]];
+  actor->special_args[0] = (actor->special_args[0] + 3) & 63;
+}
+
+void A_IceGuyLook(mobj_t *actor)
+{
+  fixed_t dist;
+  fixed_t an;
+
+  A_Look(actor);
+  if (P_Random(pr_heretic) < 64)
+  {
+    dist = ((P_Random(pr_heretic) - 128) * actor->radius) >> 7;
+    an = (actor->angle + ANG90) >> ANGLETOFINESHIFT;
+
+    P_SpawnMobj(actor->x + FixedMul(dist, finecosine[an]),
+                actor->y + FixedMul(dist, finesine[an]),
+                actor->z + 60 * FRACUNIT,
+                HEXEN_MT_ICEGUY_WISP1 + (P_Random(pr_heretic) & 1));
+  }
+}
+
+void A_IceGuyChase(mobj_t *actor)
+{
+  fixed_t dist;
+  fixed_t an;
+  mobj_t *mo;
+
+  A_Chase(actor);
+  if (P_Random(pr_heretic) < 128)
+  {
+    dist = ((P_Random(pr_heretic) - 128) * actor->radius) >> 7;
+    an = (actor->angle + ANG90) >> ANGLETOFINESHIFT;
+
+    mo = P_SpawnMobj(actor->x + FixedMul(dist, finecosine[an]),
+                     actor->y + FixedMul(dist, finesine[an]),
+                     actor->z + 60 * FRACUNIT,
+                     HEXEN_MT_ICEGUY_WISP1 + (P_Random(pr_heretic) & 1));
+    if (mo)
+    {
+      mo->momx = actor->momx;
+      mo->momy = actor->momy;
+      mo->momz = actor->momz;
+      P_SetTarget(&mo->target, actor);
+    }
+  }
+}
+
+void A_IceGuyAttack(mobj_t *actor)
+{
+  fixed_t an;
+
+  if (!actor->target)
+    return;
+  an = (actor->angle + ANG90) >> ANGLETOFINESHIFT;
+  P_SpawnMissileXYZ(actor->x + FixedMul(actor->radius >> 1, finecosine[an]),
+                    actor->y + FixedMul(actor->radius >> 1, finesine[an]),
+                    actor->z + 40 * FRACUNIT, actor, actor->target,
+                    HEXEN_MT_ICEGUY_FX);
+  an = (actor->angle - ANG90) >> ANGLETOFINESHIFT;
+  P_SpawnMissileXYZ(actor->x + FixedMul(actor->radius >> 1, finecosine[an]),
+                    actor->y + FixedMul(actor->radius >> 1, finesine[an]),
+                    actor->z + 40 * FRACUNIT, actor, actor->target,
+                    HEXEN_MT_ICEGUY_FX);
+  S_StartSound(actor, actor->info->attacksound);
+}
+
+void A_IceGuyMissilePuff(mobj_t *actor)
+{
+  P_SpawnMobj(actor->x, actor->y, actor->z + 2 * FRACUNIT,
+              HEXEN_MT_ICEFX_PUFF);
+}
+
+void A_IceGuyDie(mobj_t *actor)
+{
+  actor->momx = 0;
+  actor->momy = 0;
+  actor->momz = 0;
+  actor->height <<= 2;
+  A_FreezeDeathChunks(actor);
+}
+
+void A_IceGuyMissileExplode(mobj_t *actor)
+{
+  mobj_t *mo;
+  unsigned int i;
+
+  for (i = 0; i < 8; i++)
+  {
+    mo = P_SpawnMissileAngle(actor, HEXEN_MT_ICEGUY_FX2, i * ANG45,
+                             -(3 * FRACUNIT) / 10);
+    if (mo)
+      P_SetTarget(&mo->target, actor->target);
+  }
+}
+
 void A_DemonAttack1(mobj_t *actor)
 {
   if (!actor->target)

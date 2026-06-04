@@ -1713,6 +1713,65 @@ void A_CHolySpawnPuff(mobj_t *actor)
   P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_HOLY_MISSILE_PUFF);
 }
 
+void A_CHolyAttack2(mobj_t *actor)
+{
+  int j;
+  int i;
+  int r;
+  mobj_t *mo;
+  mobj_t *tail, *next;
+
+  for (j = 0; j < 4; j++)
+  {
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_HOLY_FX);
+    if (!mo)
+      continue;
+    switch (j)
+    {                           /* float bob index */
+      case 0:
+        mo->special2.i = P_Random(pr_heretic) & 7;              /* upper-left */
+        break;
+      case 1:
+        mo->special2.i = 32 + (P_Random(pr_heretic) & 7);       /* upper-right */
+        break;
+      case 2:
+        mo->special2.i = (32 + (P_Random(pr_heretic) & 7)) << 16;  /* lower-left */
+        break;
+      default:
+        r = P_Random(pr_heretic);
+        mo->special2.i = ((32 + (r & 7)) << 16) + 32 +
+                         (P_Random(pr_heretic) & 7);
+        break;
+    }
+    mo->z = actor->z;
+    mo->angle = actor->angle + (ANG45 + ANG45 / 2) - ANG45 * j;
+    P_ThrustMobj(mo, mo->angle, mo->info->speed);
+    P_SetTarget(&mo->target, actor->target);
+    mo->special_args[0] = 10;   /* initial turn value */
+    mo->special_args[1] = 0;    /* initial look angle */
+    if (deathmatch)
+    {                           /* ghosts last slightly shorter in deathmatch */
+      mo->health = 85;
+    }
+    if (linetarget)
+    {
+      P_SetTarget(&mo->special1.m, linetarget);
+      mo->flags |= MF_NOCLIP | MF_SKULLFLY;
+      mo->flags &= ~MF_MISSILE;
+    }
+    tail = P_SpawnMobj(mo->x, mo->y, mo->z, HEXEN_MT_HOLY_TAIL);
+    P_SetTarget(&tail->special2.m, mo);   /* parent */
+    for (i = 1; i < 3; i++)
+    {
+      next = P_SpawnMobj(mo->x, mo->y, mo->z, HEXEN_MT_HOLY_TAIL);
+      P_SetMobjState(next, next->info->spawnstate + 1);
+      P_SetTarget(&tail->special1.m, next);
+      tail = next;
+    }
+    P_SetTarget(&tail->special1.m, NULL); /* last tail bit */
+  }
+}
+
 void A_CHolyAttack(player_t *player, pspdef_t *psp)
 {
   (void)psp;

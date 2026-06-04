@@ -12,6 +12,7 @@
 
 #include "doomtype.h"
 #include "doomstat.h"
+#include "hexen/p_mapinfo.h"
 #include "hexen/po_man.h"
 #include "z_zone.h"
 #include "m_swap.h"
@@ -190,7 +191,10 @@ dbool P_StartACS(int number, int map, byte *args, mobj_t *activator,
   aste_t *statePtr;
 
   NewScript = NULL;
-  if (map && map != gamemap)
+  /* ACS map numbers are MAPINFO warp numbers, so the current map must be
+   * compared in warp space (they differ from lump numbers in PWADs like
+   * Deathkings). */
+  if (map && map != P_GetMapWarpTrans(gamemap))
     return AddToACSStore(map, number, args);
 
   infoIndex = GetACSIndex(number);
@@ -290,13 +294,13 @@ void P_ACSInitNewGame(void)
 
 void P_CheckACSStore(void)
 {
-  /* Replay any scripts deferred for this map.  Wired up with the cross-map
-   * hub travel; for now the store simply drains. */
+  /* Replay any scripts other maps deferred for this one (ACS_Execute with a
+   * map argument): the cross-map half of Hexen's hub scripting. */
   acsstore_t *store;
 
   for (store = ACSStore; store->map != 0; store++)
   {
-    if (store->map == gamemap)
+    if (store->map == P_GetMapWarpTrans(gamemap))
     {
       P_StartACS(store->script, 0, store->args, NULL, NULL, 0);
       store->map = -1;

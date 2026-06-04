@@ -75,6 +75,7 @@
 #include "r_data.h"
 #include "r_sky.h"
 #include "hexen/p_mapinfo.h"
+#include "hexen/p_acs.h"
 #include "d_deh.h"              // Ty 3/27/98 deh declarations
 #include "p_inter.h"
 #include "g_game.h"
@@ -2612,6 +2613,11 @@ int G_ValidateMapName(const char *mapname, int *pEpi, int *pMap)
 void G_InitNew(skill_t skill, int episode, int map)
 {
   int i;
+
+  /* Hexen: a fresh game must not inherit ACS world variables or deferred
+   * cross-map scripts from the previous one. */
+  if (hexen)
+    P_ACSInitNewGame();
 
   if (paused)
     {

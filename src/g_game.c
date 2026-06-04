@@ -1928,7 +1928,10 @@ static int G_DoLoadGameFromSaveBuffer(int length)
    * layout mismatch is unrecoverable, unlike a wad/checksum mismatch. */
   if (raven)
   {
-    static const char raven_magic[4] = { 'R','V','N','1' };
+    /* 'RVN2': the raven mobj record became the full struct (the legacy
+     * truncated layout lost tid/special/damage/floorclip) and hexen saves
+     * gained the world state (ACS, polyobjs, sound sequences) */
+    static const char raven_magic[4] = { 'R','V','N','2' };
     if (memcmp(save_p, raven_magic, sizeof raven_magic))
       return -2;
     save_p += sizeof raven_magic;
@@ -1995,10 +1998,16 @@ static int G_DoLoadGameFromSaveBuffer(int length)
 
   // dearchive all the modifications
   P_MapStart();
+  P_UnArchiveACS ();   /* hexen world vars + deferred scripts (no-op otherwise) */
   P_UnArchivePlayers ();
   P_UnArchiveWorld ();
+  P_UnArchivePolyobjs (); /* hexen (no-op otherwise) */
   P_UnArchiveThinkers ();
+  if (hexen)
+    P_CreateTIDList (); /* thing IDs hang off the freshly loaded mobjs */
   P_UnArchiveSpecials ();
+  P_UnArchiveScripts (); /* hexen ACS script states + map vars (no-op otherwise) */
+  P_UnArchiveSounds ();  /* hexen active sound sequences (no-op otherwise) */
   P_UnArchiveRNG ();    // killough 1/18/98: load RNG information
   P_UnArchiveMap ();    // killough 1/22/98: load automap information
   P_MapEnd();
@@ -2153,7 +2162,7 @@ static int G_DoSaveGameToSaveBuffer() {
    * with upstream). */
   if (raven)
   {
-    static const char raven_magic[4] = { 'R','V','N','1' };
+    static const char raven_magic[4] = { 'R','V','N','2' };
     CheckSaveGame(sizeof raven_magic);
     memcpy(save_p, raven_magic, sizeof raven_magic);
     save_p += sizeof raven_magic;
@@ -2213,6 +2222,8 @@ static int G_DoSaveGameToSaveBuffer() {
   // killough 11/98: save revenant tracer state
   *save_p++ = (gametic-basetic) & 255;
 
+  P_ArchiveACS();      /* hexen world vars + deferred scripts (no-op otherwise) */
+
   P_ArchivePlayers();
 
   // phares 9/13/98: Move mobj_t->index out of P_ArchiveThinkers so the
@@ -2222,6 +2233,7 @@ static int G_DoSaveGameToSaveBuffer() {
   P_ThinkerToIndex();
 
   P_ArchiveWorld();
+  P_ArchivePolyobjs(); /* hexen (no-op otherwise) */
   P_ArchiveThinkers();
 
   // phares 9/13/98: Move index->mobj_t out of P_ArchiveThinkers, simply
@@ -2230,6 +2242,8 @@ static int G_DoSaveGameToSaveBuffer() {
   P_IndexToThinker();
 
   P_ArchiveSpecials();
+  P_ArchiveScripts();  /* hexen ACS script states + map vars (no-op otherwise) */
+  P_ArchiveSounds();   /* hexen active sound sequences (no-op otherwise) */
   P_ArchiveRNG();    // killough 1/18/98: save RNG information
   P_ArchiveMap();    // killough 1/22/98: save automap information
 

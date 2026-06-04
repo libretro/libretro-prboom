@@ -40,6 +40,8 @@
 #include "m_random.h"
 #include "am_map.h"
 #include "p_enemy.h"
+#include "hexen/p_acs.h"
+#include "hexen/sn_sonix.h"
 #include "lprintf.h"
 
 uint8_t *save_p;
@@ -292,6 +294,63 @@ void P_IndexToThinker(void)
 //
 // 2/14/98 killough: substantially modified to fix savegame bugs
 
+/* Hexen and Heretic overload mobj special1/special2 as either an int or a
+ * mobj pointer depending on the thing type.  Pointer-valued specials must be
+ * converted to thinker indices on save and back on load, exactly like
+ * target/tracer; integer-valued ones must be left alone (vanilla solves the
+ * same union with per-type knowledge in RestoreMobj).  These are all the
+ * types whose specials hold pointers across tics. */
+
+#define PSF_SPECIAL1 1
+#define PSF_SPECIAL2 2
+
+static int P_PointerSpecialFields(int type)
+{
+  if (hexen)
+    switch (type)
+    {
+      case HEXEN_MT_HOLY_TAIL:                  /* next segment + parent  */
+      case HEXEN_MT_LIGHTNING_FLOOR:            /* partner + zap links    */
+      case HEXEN_MT_LIGHTNING_CEILING:
+        return PSF_SPECIAL1 | PSF_SPECIAL2;
+      case HEXEN_MT_HOLY_FX:                    /* seek target            */
+      case HEXEN_MT_SORCFX1:                    /* seek target            */
+      case HEXEN_MT_BISH_FX:                    /* seek target            */
+      case HEXEN_MT_MSTAFF_FX2:                 /* seek target            */
+      case HEXEN_MT_KORAX_SPIRIT1:              /* seek target            */
+      case HEXEN_MT_KORAX_SPIRIT2:
+      case HEXEN_MT_KORAX_SPIRIT3:
+      case HEXEN_MT_KORAX_SPIRIT4:
+      case HEXEN_MT_KORAX_SPIRIT5:
+      case HEXEN_MT_KORAX_SPIRIT6:
+      case HEXEN_MT_DRAGON:                     /* destination map spot   */
+      case HEXEN_MT_MINOTAUR:                   /* summoning master       */
+      case HEXEN_MT_SUMMON_FX:                  /* thrower                */
+      case HEXEN_MT_THRUSTFLOOR_UP:             /* impaled dirt clump     */
+      case HEXEN_MT_THRUSTFLOOR_DOWN:
+        return PSF_SPECIAL1;
+      case HEXEN_MT_LIGHTNING_ZAP:              /* parent bolt            */
+        return PSF_SPECIAL2;
+      default:
+        return 0;
+    }
+  if (heretic)
+    switch (type)
+    {
+      case HERETIC_MT_MACEFX4:                  /* seek target            */
+      case HERETIC_MT_HORNRODFX2:
+      case HERETIC_MT_MUMMYFX1:
+      case HERETIC_MT_PHOENIXFX1:
+      case HERETIC_MT_WHIRLWIND:
+        return PSF_SPECIAL1;
+      case HERETIC_MT_POD:                      /* pod generator          */
+        return PSF_SPECIAL2;
+      default:
+        return 0;
+    }
+  return 0;
+}
+
 void P_ArchiveThinkers (void)
 {
   thinker_t *th;
@@ -319,6 +378,27 @@ void P_ArchiveThinkers (void)
         *save_p++ = tc_mobj;
         PADSAVEP();
         mobj = (mobj_t *)save_p;
+
+        if (raven)
+        {
+          /* The legacy stream layout below predates the Heretic/Hexen
+           * fields, which were appended after the old end of mobj_t; its
+           * fixed "all but the last words" arithmetic would truncate them
+           * (losing tid, the death action special, the damage override and
+           * floorclip).  Raven saves are not format-compatible with anything
+           * else anyway (see the RVN tag), so store the full struct. */
+          memcpy (mobj, th, sizeof(*mobj));
+          save_p += sizeof(*mobj);
+          mobj->state = (state_t *)(mobj->state - states);
+          mobj->touching_sectorlist = NULL;
+
+          if (mobj->lastenemy)
+            mobj->lastenemy = mobj->lastenemy->thinker.function.arg1 ==
+              (void (*)(void *))P_MobjThinker ?
+              (mobj_t *) mobj->lastenemy->thinker.prev : NULL;
+        }
+        else
+        {
 	/* cph 2006/07/30 - 
 	 * The end of mobj_t changed from
 	 *  dbool   invisible;
@@ -340,6 +420,7 @@ void P_ArchiveThinkers (void)
         save_p += sizeof(*mobj) - 2*sizeof(void*) - 4*sizeof(fixed_t);
         memset (save_p, 0, 5*sizeof(void*));
         mobj->state = (state_t *)(mobj->state - states);
+        }
 
         // killough 2/14/98: convert pointers into indices.
         // Fixes many savegame problems, by properly saving
@@ -357,10 +438,29 @@ void P_ArchiveThinkers (void)
             (void (*)(void *))P_MobjThinker ?
             (mobj_t *) mobj->tracer->thinker.prev : NULL;
 
+        /* pointer-valued raven specials get the same index treatment;
+         * integer-valued ones are saved verbatim by the memcpy above */
+        if (raven)
+        {
+          int psf = P_PointerSpecialFields(mobj->type);
+
+          if ((psf & PSF_SPECIAL1) && mobj->special1.m)
+            mobj->special1.m = mobj->special1.m->thinker.function.arg1 ==
+              (void (*)(void *))P_MobjThinker ?
+              (mobj_t *) mobj->special1.m->thinker.prev : NULL;
+
+          if ((psf & PSF_SPECIAL2) && mobj->special2.m)
+            mobj->special2.m = mobj->special2.m->thinker.function.arg1 ==
+              (void (*)(void *))P_MobjThinker ?
+              (mobj_t *) mobj->special2.m->thinker.prev : NULL;
+        }
+
         // killough 2/14/98: new field: save last known enemy. Prevents
         // monsters from going to sleep after killing monsters and not
         // seeing player anymore.
 
+        if (!raven)
+        {
         if (((mobj_t*)th)->lastenemy && ((mobj_t*)th)->lastenemy->thinker.function.arg1 == (void (*)(void *))P_MobjThinker) {
           memcpy (save_p + sizeof(void*), &(((mobj_t*)th)->lastenemy->thinker.prev), sizeof(void*));
 	}
@@ -368,6 +468,7 @@ void P_ArchiveThinkers (void)
         // killough 2/14/98: end changes
 
         save_p += 5*sizeof(void*);
+        }
 
         if (mobj->player)
           mobj->player = (player_t *)((mobj->player-players) + 1);
@@ -398,6 +499,43 @@ void P_ArchiveThinkers (void)
 
       save_p += sizeof target;
     }
+  }
+
+  /* Running ACS scripts are thinkers too; they are archived here, rather
+   * than with the specials, because the activator fixup needs the thinker
+   * indices that P_ThinkerToIndex stored in the prev fields (and the load
+   * side needs the mobj translation table). */
+  if (hexen)
+  {
+    int acs_count = 0;
+
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+      if (th->function.arg1 == (void (*)(void *)) T_InterpretACS)
+        acs_count++;
+
+    CheckSaveGame(sizeof(acs_count) + acs_count * (sizeof(acs_t) + 4));
+    memcpy(save_p, &acs_count, sizeof(acs_count));
+    save_p += sizeof(acs_count);
+
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+      if (th->function.arg1 == (void (*)(void *)) T_InterpretACS)
+      {
+        acs_t *acs;
+
+        PADSAVEP();
+        acs = (acs_t *) save_p;
+        memcpy(acs, th, sizeof(*acs));
+        save_p += sizeof(*acs);
+
+        if (acs->activator)
+          acs->activator = acs->activator->thinker.function.arg1 ==
+            (void (*)(void *))P_MobjThinker ?
+            (mobj_t *) acs->activator->thinker.prev : NULL;
+
+        /* 0 = no line, otherwise index + 1 */
+        acs->line = acs->line ?
+          (line_t *) (uintptr_t) ((acs->line - lines) + 1) : NULL;
+      }
   }
 }
 
@@ -463,7 +601,8 @@ void P_UnArchiveThinkers (void)
       {                     // skip all entries, adding up count
         PADSAVEP();
 	/* cph 2006/07/30 - see comment below for change in layout of mobj_t */
-        save_p += sizeof(mobj_t)+3*sizeof(void*)-4*sizeof(fixed_t);
+        save_p += raven ? sizeof(mobj_t)
+                        : sizeof(mobj_t)+3*sizeof(void*)-4*sizeof(fixed_t);
       }
 
     if (*--save_p != tc_end)
@@ -501,10 +640,20 @@ void P_UnArchiveThinkers (void)
        * fields of our current mobj_t. We then pull lastenemy from the 2nd of
        * the 5 leftover words, and skip the others.
        */
+      if (raven)
+      {
+        /* full-struct layout; see the matching branch in P_ArchiveThinkers */
+        memcpy (mobj, save_p, sizeof(mobj_t));
+        save_p += sizeof(mobj_t);
+        mobj->touching_sectorlist = NULL;
+      }
+      else
+      {
       memcpy (mobj, save_p, sizeof(mobj_t)-2*sizeof(void*)-4*sizeof(fixed_t));
       save_p += sizeof(mobj_t)-sizeof(void*)-4*sizeof(fixed_t);
       memcpy (&(mobj->lastenemy), save_p, sizeof(void*));
       save_p += 4*sizeof(void*);
+      }
       mobj->state = states + (uintptr_t) mobj->state;
 
       if (mobj->player)
@@ -546,6 +695,20 @@ void P_UnArchiveThinkers (void)
 
       P_SetNewTarget(&((mobj_t *) th)->lastenemy,
         mobj_p[P_GetMobj(((mobj_t *)th)->lastenemy,size)]);
+
+      /* pointer-valued raven specials (see P_ArchiveThinkers) */
+      if (raven)
+      {
+        int psf = P_PointerSpecialFields(((mobj_t *) th)->type);
+
+        if (psf & PSF_SPECIAL1)
+          P_SetNewTarget(&((mobj_t *) th)->special1.m,
+            mobj_p[P_GetMobj(((mobj_t *) th)->special1.m, size)]);
+
+        if (psf & PSF_SPECIAL2)
+          P_SetNewTarget(&((mobj_t *) th)->special2.m,
+            mobj_p[P_GetMobj(((mobj_t *) th)->special2.m, size)]);
+      }
     }
 
   {  // killough 9/14/98: restore soundtargets
@@ -572,6 +735,33 @@ void P_UnArchiveThinkers (void)
         else
           P_SetNewTarget(&sectors[i].soundtarget, mobj_p[idx]);
       }
+    }
+  }
+
+  /* restore running ACS scripts (see the matching block in
+   * P_ArchiveThinkers); needs the mobj table for the activator */
+  if (hexen)
+  {
+    int acs_count;
+    int i;
+
+    memcpy(&acs_count, save_p, sizeof(acs_count));
+    save_p += sizeof(acs_count);
+
+    for (i = 0; i < acs_count; i++)
+    {
+      acs_t *acs = Z_Malloc(sizeof(acs_t), PU_LEVEL, NULL);
+
+      PADSAVEP();
+      memcpy(acs, save_p, sizeof(*acs));
+      save_p += sizeof(*acs);
+
+      P_SetNewTarget(&acs->activator,
+        mobj_p[P_GetMobj(acs->activator, size)]);
+      acs->line = acs->line ?
+        &lines[(uintptr_t) acs->line - 1] : NULL;
+      acs->thinker.function.arg1 = (void (*)(void *)) T_InterpretACS;
+      P_AddThinker(&acs->thinker);
     }
   }
 
@@ -1056,3 +1246,287 @@ void P_UnArchiveMap(void)
     }
 }
 
+
+
+/* ======================================================================
+ * Hexen world state: ACS variables and the deferred-script store, the
+ * per-map script table, polyobjects, and active sound sequences.  All of
+ * this matches the vanilla save layout in spirit; every block is gated on
+ * hexen so doom and heretic savegames are byte-identical to before.
+ * ====================================================================== */
+
+static void P_SaveInt(int v)
+{
+  memcpy(save_p, &v, sizeof(v));
+  save_p += sizeof(v);
+}
+
+static int P_LoadInt(void)
+{
+  int v;
+
+  memcpy(&v, save_p, sizeof(v));
+  save_p += sizeof(v);
+  return v;
+}
+
+/* world variables + scripts deferred for other hub maps */
+
+void P_ArchiveACS(void)
+{
+  size_t size;
+
+  if (!hexen)
+    return;
+
+  size = sizeof(WorldVars) + sizeof(ACSStore);
+  CheckSaveGame(size);
+
+  memcpy(save_p, WorldVars, sizeof(WorldVars));
+  save_p += sizeof(WorldVars);
+  memcpy(save_p, ACSStore, sizeof(ACSStore));
+  save_p += sizeof(ACSStore);
+}
+
+void P_UnArchiveACS(void)
+{
+  if (!hexen)
+    return;
+
+  memcpy(WorldVars, save_p, sizeof(WorldVars));
+  save_p += sizeof(WorldVars);
+  memcpy(ACSStore, save_p, sizeof(ACSStore));
+  save_p += sizeof(ACSStore);
+}
+
+/* per-script state (suspended/terminating, wait values) + map variables */
+
+void P_ArchiveScripts(void)
+{
+  size_t size;
+
+  if (!hexen)
+    return;
+
+  size = sizeof(*ACSInfo) * ACScriptCount + sizeof(MapVars);
+  CheckSaveGame(size);
+
+  memcpy(save_p, ACSInfo, sizeof(*ACSInfo) * ACScriptCount);
+  save_p += sizeof(*ACSInfo) * ACScriptCount;
+  memcpy(save_p, MapVars, sizeof(MapVars));
+  save_p += sizeof(MapVars);
+}
+
+void P_UnArchiveScripts(void)
+{
+  if (!hexen)
+    return;
+
+  memcpy(ACSInfo, save_p, sizeof(*ACSInfo) * ACScriptCount);
+  save_p += sizeof(*ACSInfo) * ACScriptCount;
+  memcpy(MapVars, save_p, sizeof(MapVars));
+  save_p += sizeof(MapVars);
+}
+
+/* polyobjects: per-seg geometry plus the rotation/translation state */
+
+static void P_ArchiveVertex(vertex_t *v)
+{
+  P_SaveInt(v->x);
+  P_SaveInt(v->y);
+}
+
+static void P_UnArchiveVertex(vertex_t *v)
+{
+  v->x = P_LoadInt();
+  v->y = P_LoadInt();
+}
+
+void P_ArchivePolyobjs(void)
+{
+  int i;
+
+  if (!hexen)
+    return;
+
+  for (i = 0; i < po_NumPolyobjs; i++)
+  {
+    int seg_i;
+    polyobj_t *po;
+
+    po = &polyobjs[i];
+
+    CheckSaveGame(po->numsegs * 13 * sizeof(int) + 3 * sizeof(int));
+
+    for (seg_i = 0; seg_i < po->numsegs; ++seg_i)
+    {
+      seg_t *seg;
+      line_t *line;
+
+      seg = po->segs[seg_i];
+      line = seg->linedef;
+
+      P_ArchiveVertex(seg->v1);
+      P_ArchiveVertex(seg->v2);
+
+      P_SaveInt(seg->angle);
+      P_SaveInt(line->slopetype);
+      P_SaveInt(line->bbox[0]);
+      P_SaveInt(line->bbox[1]);
+      P_SaveInt(line->bbox[2]);
+      P_SaveInt(line->bbox[3]);
+      P_SaveInt(line->dx);
+      P_SaveInt(line->dy);
+
+      P_ArchiveVertex(&po->originalPts[seg_i]);
+      P_ArchiveVertex(&po->prevPts[seg_i]);
+    }
+
+    P_SaveInt(po->angle);
+    P_SaveInt(po->startSpot.x);
+    P_SaveInt(po->startSpot.y);
+  }
+}
+
+void P_UnArchivePolyobjs(void)
+{
+  void UnLinkPolyobj(polyobj_t *po);
+  void LinkPolyobj(polyobj_t *po);
+  void ResetPolySubSector(polyobj_t *po);
+
+  int i;
+
+  if (!hexen)
+    return;
+
+  for (i = 0; i < po_NumPolyobjs; i++)
+  {
+    int seg_i;
+    polyobj_t *po;
+
+    po = &polyobjs[i];
+
+    UnLinkPolyobj(po);
+
+    for (seg_i = 0; seg_i < po->numsegs; ++seg_i)
+    {
+      seg_t *seg;
+      line_t *line;
+
+      seg = po->segs[seg_i];
+      line = seg->linedef;
+
+      P_UnArchiveVertex(seg->v1);
+      P_UnArchiveVertex(seg->v2);
+
+      seg->angle = P_LoadInt();
+      line->slopetype = P_LoadInt();
+      line->bbox[0] = P_LoadInt();
+      line->bbox[1] = P_LoadInt();
+      line->bbox[2] = P_LoadInt();
+      line->bbox[3] = P_LoadInt();
+      line->dx = P_LoadInt();
+      line->dy = P_LoadInt();
+
+      P_UnArchiveVertex(&po->originalPts[seg_i]);
+      P_UnArchiveVertex(&po->prevPts[seg_i]);
+    }
+
+    po->angle = P_LoadInt();
+    po->startSpot.x = P_LoadInt();
+    po->startSpot.y = P_LoadInt();
+
+    LinkPolyobj(po);
+    ResetPolySubSector(po);
+  }
+}
+
+/* active sound sequences: which script, where in it, and what it's
+ * attached to (a sector's sound origin or a polyobj's start spot) */
+
+void P_ArchiveSounds(void)
+{
+  seqnode_t *node;
+  sector_t *sec;
+  int difference;
+  int i;
+
+  if (!hexen)
+    return;
+
+  CheckSaveGame(sizeof(int) + ActiveSequences * (6 * sizeof(int) + 1));
+  P_SaveInt(ActiveSequences);
+
+  for (node = SequenceListHead; node; node = node->next)
+  {
+    P_SaveInt(node->sequence);
+    P_SaveInt(node->delayTics);
+    P_SaveInt(node->volume);
+
+    difference = SN_GetSequenceOffset(node->sequence, node->sequencePtr);
+    P_SaveInt(difference);
+    P_SaveInt(node->currentSoundID);
+
+    for (i = 0; i < po_NumPolyobjs; i++)
+    {
+      if (node->mobj == (mobj_t *) &polyobjs[i].startSpot)
+        break;
+    }
+
+    if (i == po_NumPolyobjs)
+    {                  /* sound is attached to a sector, not a polyobj */
+      sec = R_PointInSubsector(node->mobj->x, node->mobj->y)->sector;
+      difference = (int) (sec - sectors);
+      *save_p++ = 0;   /* 0 -- sector sound origin */
+    }
+    else
+    {
+      difference = i;
+      *save_p++ = 1;   /* 1 -- polyobj sound origin */
+    }
+
+    P_SaveInt(difference);
+  }
+}
+
+void P_UnArchiveSounds(void)
+{
+  int i;
+  int numSequences;
+  int sequence;
+  int delayTics;
+  int volume;
+  int seqOffset;
+  int soundID;
+  byte polySnd;
+  int secNum;
+  mobj_t *sndMobj;
+
+  if (!hexen)
+    return;
+
+  SN_StopAllSequences();
+
+  numSequences = P_LoadInt();
+
+  i = 0;
+  while (i < numSequences)
+  {
+    sequence = P_LoadInt();
+    delayTics = P_LoadInt();
+    volume = P_LoadInt();
+    seqOffset = P_LoadInt();
+    soundID = P_LoadInt();
+    polySnd = *save_p++;
+    secNum = P_LoadInt();
+
+    if (!polySnd)
+      sndMobj = (mobj_t *) &sectors[secNum].soundorg;
+    else
+      sndMobj = (mobj_t *) &polyobjs[secNum].startSpot;
+
+    SN_StartSequence(sndMobj, sequence);
+    SN_ChangeNodeData(i, seqOffset, delayTics, volume, soundID);
+    i++;
+  }
+}

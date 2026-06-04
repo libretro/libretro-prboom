@@ -368,6 +368,37 @@ void SN_UpdateActiveSequences(void)
   }
 }
 
+/* Savegame support: where in its script a running sequence is, and pushing
+ * that position back into a node restarted on load. */
+
+int SN_GetSequenceOffset(int sequence, int *sequencePtr)
+{
+  return (sequencePtr - SequenceData[SequenceTranslate[sequence].scriptNum]);
+}
+
+void SN_ChangeNodeData(int nodeNum, int seqOffset, int delayTics, int volume,
+                       int currentSoundID)
+{
+  int i;
+  seqnode_t *node;
+
+  i = 0;
+  node = SequenceListHead;
+  while (node && i < nodeNum)
+  {
+    node = node->next;
+    i++;
+  }
+  if (!node)
+  {              /* reached the end of the list before the nodeNum-th node */
+    return;
+  }
+  node->delayTics = delayTics;
+  node->volume = volume;
+  node->sequencePtr += seqOffset;
+  node->currentSoundID = currentSoundID;
+}
+
 void SN_StopAllSequences(void)
 {
   seqnode_t *node;

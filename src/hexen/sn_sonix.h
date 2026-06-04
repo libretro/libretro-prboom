@@ -35,5 +35,8 @@ void SN_StartSequenceName(mobj_t *mobj, const char *name);
 void SN_StopSequence(mobj_t *mobj);
 void SN_UpdateActiveSequences(void);
 void SN_StopAllSequences(void);
+int  SN_GetSequenceOffset(int sequence, int *sequencePtr);
+void SN_ChangeNodeData(int nodeNum, int seqOffset, int delayTics, int volume,
+                       int currentSoundID);
 
 #endif

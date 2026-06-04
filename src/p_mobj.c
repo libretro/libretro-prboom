@@ -476,6 +476,149 @@ static void P_XYMovement (mobj_t* mo)
 }
 
 
+int P_SubRandom(void);  /* heretic/p_action.c */
+
+#define SMALLSPLASHCLIP (12 << FRACBITS)
+
+/* Hexen splashes: small drips for light things, the full splash (with a
+ * monster-waking noise for players) otherwise, and the splash-time lava
+ * contact damage through the fire-typed inflictor. */
+static int Hexen_P_HitFloor(mobj_t *thing)
+{
+  mobj_t *mo;
+  dbool smallsplash = FALSE;
+
+  /* Things that don't splash go here */
+  switch (thing->type)
+  {
+    case HEXEN_MT_LEAF1:
+    case HEXEN_MT_LEAF2:
+    case HEXEN_MT_SPLASH:
+    case HEXEN_MT_SLUDGECHUNK:
+      return FLOOR_SOLID;
+    default:
+      break;
+  }
+
+  /* Small splash for small masses */
+  if (thing->info->mass < 10)
+    smallsplash = TRUE;
+
+  switch (P_GetThingFloorType(thing))
+  {
+    case FLOOR_WATER:
+      if (smallsplash)
+      {
+        mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HEXEN_MT_SPLASHBASE);
+        if (mo)
+          mo->floorclip += SMALLSPLASHCLIP;
+        S_StartSound(mo, hexen_sfx_ambient10);  /* small drip */
+      }
+      else
+      {
+        mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HEXEN_MT_SPLASH);
+        P_SetTarget(&mo->target, thing);
+        mo->momx = P_SubRandom() << 8;
+        mo->momy = P_SubRandom() << 8;
+        mo->momz = 2 * FRACUNIT + (P_Random(pr_heretic) << 8);
+        mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HEXEN_MT_SPLASHBASE);
+        if (thing->player)
+          P_NoiseAlert(thing, thing);
+        S_StartSound(mo, hexen_sfx_water_splash);
+      }
+      return FLOOR_WATER;
+    case FLOOR_LAVA:
+      if (smallsplash)
+      {
+        mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HEXEN_MT_LAVASPLASH);
+        if (mo)
+          mo->floorclip += SMALLSPLASHCLIP;
+      }
+      else
+      {
+        mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HEXEN_MT_LAVASMOKE);
+        mo->momz = FRACUNIT + (P_Random(pr_heretic) << 7);
+        mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HEXEN_MT_LAVASPLASH);
+        if (thing->player)
+          P_NoiseAlert(thing, thing);
+      }
+      S_StartSound(mo, hexen_sfx_lava_sizzle);
+      if (thing->player && leveltime & 31)
+        P_DamageMobj(thing, &LavaInflictor, NULL, 5);
+      return FLOOR_LAVA;
+    case FLOOR_SLUDGE:
+      if (smallsplash)
+      {
+        mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HEXEN_MT_SLUDGESPLASH);
+        if (mo)
+          mo->floorclip += SMALLSPLASHCLIP;
+      }
+      else
+      {
+        mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HEXEN_MT_SLUDGECHUNK);
+        P_SetTarget(&mo->target, thing);
+        mo->momx = P_SubRandom() << 8;
+        mo->momy = P_SubRandom() << 8;
+        mo->momz = FRACUNIT + (P_Random(pr_heretic) << 8);
+        mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HEXEN_MT_SLUDGESPLASH);
+        if (thing->player)
+          P_NoiseAlert(thing, thing);
+      }
+      S_StartSound(mo, hexen_sfx_sludge_gloop);
+      return FLOOR_SLUDGE;
+    default:
+      break;
+  }
+  return FLOOR_SOLID;
+}
+
+/* Terrain splashes on landing in a liquid (heretic and hexen tables).  Note
+ * this lives here rather than in heretic/p_action.c: that file folds the
+ * 'hexen' flag to a constant 0 for its heretic-only codepointers, which
+ * would dead-strip the hexen dispatch below. */
+int P_HitFloor(mobj_t *thing)
+{
+  mobj_t *mo;
+
+  if (thing->floorz != thing->subsector->sector->floorheight)
+  {                             /* landed on the edge above the liquid */
+    return FLOOR_SOLID;
+  }
+
+  if (hexen)
+    return Hexen_P_HitFloor(thing);
+
+  switch (P_GetThingFloorType(thing))
+  {
+    case FLOOR_WATER:
+      P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HERETIC_MT_SPLASHBASE);
+      mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HERETIC_MT_SPLASH);
+      P_SetTarget(&mo->target, thing);
+      mo->momx = P_SubRandom() << 8;
+      mo->momy = P_SubRandom() << 8;
+      mo->momz = 2 * FRACUNIT + (P_Random(pr_heretic) << 8);
+      S_StartSound(mo, heretic_sfx_gloop);
+      return FLOOR_WATER;
+    case FLOOR_LAVA:
+      P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HERETIC_MT_LAVASPLASH);
+      mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HERETIC_MT_LAVASMOKE);
+      mo->momz = FRACUNIT + (P_Random(pr_heretic) << 7);
+      S_StartSound(mo, heretic_sfx_burn);
+      return FLOOR_LAVA;
+    case FLOOR_SLUDGE:
+      P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HERETIC_MT_SLUDGESPLASH);
+      mo = P_SpawnMobj(thing->x, thing->y, ONFLOORZ, HERETIC_MT_SLUDGECHUNK);
+      P_SetTarget(&mo->target, thing);
+      mo->momx = P_SubRandom() << 8;
+      mo->momy = P_SubRandom() << 8;
+      mo->momz = FRACUNIT + (P_Random(pr_heretic) << 8);
+      return FLOOR_SLUDGE;
+    default:
+      break;
+  }
+  return FLOOR_SOLID;
+}
+
 //
 // P_ZMovement
 //
@@ -666,6 +809,12 @@ floater:
         else if (comp[comp_sound] || mo->health > 0)
           S_StartSound (mo, sfx_oof);
       }
+  /* Raven: spawn terrain splashes when the thing was airborne above the
+   * floor last tic (the check needs the pre-zeroed momz).  Missiles are
+   * excluded here; they splash once through the explode branch below. */
+  if (raven && !(mo->flags & MF_MISSILE) && mo->z - mo->momz > mo->floorz)
+    P_HitFloor(mo);
+
   mo->momz = 0;
       }
     mo->z = mo->floorz;
@@ -691,6 +840,8 @@ floater:
 
     if ( (mo->flags & MF_MISSILE) && !(mo->flags & MF_NOCLIP) )
       {
+      if (hexen)
+        P_HitFloor (mo);        /* projectiles splash into liquids */
       P_ExplodeMissile (mo);
       return;
       }
@@ -948,7 +1099,6 @@ void P_MobjThinker (mobj_t* mobj)
 // P_SpawnMobj
 //
 /* Heretic helpers defined across translation units / later in this file. */
-int  P_HitFloor(mobj_t *thing);
 int  P_FaceMobj(mobj_t *source, mobj_t *target, angle_t *delta);
 
 /* Heretic attack globals: current attack puff type and the last missile
@@ -959,7 +1109,7 @@ int  P_FaceMobj(mobj_t *source, mobj_t *target, angle_t *delta);
 mobjtype_t PuffType;
 mobj_t *PuffSpawned;  /* last puff actor spawned by P_SpawnPuff (Hexen melee feedback) */
 mobj_t *PuffSpawned;   /* last puff P_SpawnPuff created (Raven games) */
-int P_SubRandom(void);  /* heretic/p_action.c */
+
 void S_StartMobjSound(mobj_t *mobj, int sfx_id);  /* heretic/p_action.c */
 mobj_t *MissileMobj;
 

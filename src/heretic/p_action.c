@@ -6,6 +6,7 @@
 
 #include <stdlib.h>
 #include "doomtype.h"
+#include "lprintf.h"
 #include "doomdef.h"
 #include "doomstat.h"
 #include "m_fixed.h"
@@ -27,8 +28,6 @@
 extern int bodyqueslot, bodyquesize;
 extern mobj_t **bodyque;
 
-/* Floor-type return values used by P_HitFloor (terrain splashes are not
- * implemented here, so it always reports a solid floor). */
 /* Heretic ammo types (separate space from this core's Doom AM_* enum). */
 
 /* Heretic per-shot ammo costs. */
@@ -161,13 +160,6 @@ void P_DropItem(mobj_t *source, mobjtype_t type, int special, int chance)
   mo->health = special;
 }
 
-int P_HitFloor(mobj_t *thing)
-{
-  /* Report the floor terrain type so callers can take liquid-specific
-   * behaviour (the Serpent's surface/dive logic, fire/ice monsters, sprite
-   * floorclipping).  Terrain splash effect mobjs are not spawned yet. */
-  return P_GetThingFloorType(thing);
-}
 
 void P_Massacre(void)
 {

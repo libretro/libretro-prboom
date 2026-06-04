@@ -564,4 +564,5 @@ void    P_SpawnMapThing (const mapthing_t*  mthing);
 void    P_SpawnPlayer(int n, const mapthing_t *mthing);
 void    P_CheckMissileSpawn(mobj_t*);  // killough 8/2/98
 void    P_ExplodeMissile(mobj_t*);    // killough
+int P_HitFloor(mobj_t *thing); /* terrain splash; returns the floortype_t */
 #endif

@@ -1931,10 +1931,12 @@ static int G_DoLoadGameFromSaveBuffer(int length)
     /* RVN2: the raven mobj record became the full struct (the legacy
      * truncated layout lost tid/special/damage/floorclip) and hexen saves
      * gained the world state (ACS, polyobjs, sound sequences).
-     * RVN3 (hexen only): the hub map archives ride in the savegame. */
+     * RVN3 (hexen only): the hub map archives ride in the savegame.
+     * RVN4 (hexen only): the map archives gained the vanilla sound-
+     * sequence segment. */
     char raven_magic[4] = { 'R','V','N','2' };
     if (hexen)
-      raven_magic[3] = '3';
+      raven_magic[3] = '4';
     if (memcmp(save_p, raven_magic, sizeof raven_magic))
       return -2;
     save_p += sizeof raven_magic;
@@ -2168,7 +2170,7 @@ static int G_DoSaveGameToSaveBuffer() {
   {
     char raven_magic[4] = { 'R','V','N','2' };
     if (hexen)
-      raven_magic[3] = '3';
+      raven_magic[3] = '4';
     CheckSaveGame(sizeof raven_magic);
     memcpy(save_p, raven_magic, sizeof raven_magic);
     save_p += sizeof raven_magic;

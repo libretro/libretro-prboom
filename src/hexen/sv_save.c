@@ -44,8 +44,10 @@
 #include "hexen/po_man.h"
 #include "hexen/p_mapinfo.h"
 #include "hexen/p_spec_hexen.h"
+#include "hexen/sn_sonix.h"
 #include "hexen/sv_save.h"
 #include "p_saveg.h"
+#include "r_main.h"
 #include "g_game.h"
 
 #define SV_MAX_MAPS         99
@@ -174,6 +176,7 @@ static void AssertSegment(int segType)
 #define ASEG_THINKERS   106
 #define ASEG_SCRIPTS    107
 #define ASEG_MISC       108
+#define ASEG_SOUNDS     110   /* appended; 109 is ASEG_END below */
 #define ASEG_END        109
 
 /* ------------------------------------------------------------------------ */
@@ -689,6 +692,79 @@ static void UnarchiveScripts(void)
   SV_Read(MapVars, sizeof(MapVars[0]) * MAX_ACS_MAP_VARS);
 }
 
+/* Active sound sequences, so a looping mover keeps its place in its script
+ * when the player comes back to the map (vanilla ASEG_SOUNDS). */
+static void ArchiveSounds(void)
+{
+  seqnode_t *node;
+  sector_t  *sec;
+  int        i;
+
+  SV_WriteLong(ASEG_SOUNDS);
+  SV_WriteLong(ActiveSequences);
+
+  for (node = SequenceListHead; node; node = node->next)
+  {
+    SV_WriteLong(node->sequence);
+    SV_WriteLong(node->delayTics);
+    SV_WriteLong(node->volume);
+    SV_WriteLong(SN_GetSequenceOffset(node->sequence, node->sequencePtr));
+    SV_WriteLong(node->currentSoundID);
+
+    for (i = 0; i < po_NumPolyobjs; i++)
+      if (node->mobj == (mobj_t *) &polyobjs[i].startSpot)
+        break;
+
+    if (i == po_NumPolyobjs)
+    {                       /* attached to a sector, not a polyobj */
+      sec = R_PointInSubsector(node->mobj->x, node->mobj->y)->sector;
+      SV_WriteLong(0);
+      SV_WriteLong((int) (sec - sectors));
+    }
+    else
+    {
+      SV_WriteLong(1);
+      SV_WriteLong(i);
+    }
+  }
+}
+
+static void UnarchiveSounds(void)
+{
+  int     i;
+  int     numSequences;
+  int     sequence;
+  int     delayTics;
+  int     volume;
+  int     seqOffset;
+  int     soundID;
+  int     polySnd;
+  int     secNum;
+  mobj_t *sndMobj;
+
+  AssertSegment(ASEG_SOUNDS);
+  numSequences = SV_ReadLong();
+
+  for (i = 0; i < numSequences; i++)
+  {
+    sequence  = SV_ReadLong();
+    delayTics = SV_ReadLong();
+    volume    = SV_ReadLong();
+    seqOffset = SV_ReadLong();
+    soundID   = SV_ReadLong();
+    polySnd   = SV_ReadLong();
+    secNum    = SV_ReadLong();
+
+    if (!polySnd)
+      sndMobj = (mobj_t *) &sectors[secNum].soundorg;
+    else
+      sndMobj = (mobj_t *) &polyobjs[secNum].startSpot;
+
+    SN_StartSequence(sndMobj, sequence);
+    SN_ChangeNodeData(i, seqOffset, delayTics, volume, soundID);
+  }
+}
+
 static void ArchiveMisc(void)
 {
   int i;
@@ -732,6 +808,7 @@ static void SV_SaveMap(void)
   ArchiveMobjs();
   ArchiveThinkers();
   ArchiveScripts();
+  ArchiveSounds();
   ArchiveMisc();
 
   SV_WriteLong(ASEG_END);
@@ -774,6 +851,7 @@ static void SV_LoadMap(void)
   UnarchiveMobjs();
   UnarchiveThinkers();
   UnarchiveScripts();
+  UnarchiveSounds();
   UnarchiveMisc();
 
   AssertSegment(ASEG_END);

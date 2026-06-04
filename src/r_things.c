@@ -756,8 +756,19 @@ void R_AddSprites(subsector_t* subsec, int lightlevel)
 
    // Handle all things in sector.
 
+#ifdef PRBOOM_RENDER_PROFILE
+   {
+      extern double prof_sprproj_usec;
+      extern double I_RenderProfileUsec(void);
+      double _t0 = I_RenderProfileUsec();
+      for (thing = sec->thinglist; thing; thing = thing->snext)
+         R_ProjectSprite(thing, lightlevel);
+      prof_sprproj_usec += (I_RenderProfileUsec() - _t0);
+   }
+#else
    for (thing = sec->thinglist; thing; thing = thing->snext)
       R_ProjectSprite(thing, lightlevel);
+#endif
 }
 
 //

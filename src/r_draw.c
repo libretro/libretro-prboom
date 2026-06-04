@@ -65,6 +65,7 @@
 double prof_wallfill_usec = 0.0;  /* us spent writing wall/sprite columns to the framebuffer (R_FlushColumns) */
 double prof_storewall_usec = 0.0; /* us spent in R_StoreWallRange (wall seg setup + RenderSegLoop) */
 double prof_findplane_usec = 0.0; /* us spent in R_FindPlane (visplane hash + alloc) */
+double prof_sprproj_usec = 0.0;   /* us spent in R_ProjectSprite (sprite projection/selection, inside bsp+walls) */
 #endif
 
 uint8_t *viewimage;

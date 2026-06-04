@@ -51,6 +51,7 @@
 #include "p_setup.h"
 #include "p_spec.h"
 #include "map_format.h"
+#include "udmf.h"
 #include "p_tick.h"
 #include "p_enemy.h"
 #include "hexen/p_lightning.h"
@@ -1826,6 +1827,289 @@ static void P_RemoveSlimeTrails(void)         // killough 10/98
 =================
 */
 
+
+/* UDMF level detection and named-lump resolution.
+ *
+ * A UDMF map's directory is  MAPxx, TEXTMAP, [ZNODES|BLOCKMAP|REJECT|
+ * BEHAVIOR|DIALOGUE ...], ENDMAP -- the geometry lives in the single
+ * TEXTMAP lump and the BSP in a named ZNODES lump, so the fixed
+ * lumpnum+ML_* offsets used for binary maps do not apply.  These helpers
+ * detect TEXTMAP at label+1 and scan label+1..ENDMAP for a named lump. */
+static dbool P_LevelIsUDMF(int lumpnum)
+{
+  int t = lumpnum + 1;
+  return (t < numlumps && !strncasecmp(lumpinfo[t].name, "TEXTMAP", 8));
+}
+
+static int P_FindUDMFLump(int lumpnum, const char *name)
+{
+  int i;
+  for (i = lumpnum + 1; i < numlumps; i++)
+  {
+    if (!strncasecmp(lumpinfo[i].name, "ENDMAP", 8))
+      break;
+    if (!strncasecmp(lumpinfo[i].name, name, 8))
+      return i;
+  }
+  return -1;
+}
+
+/* ====================================================================
+ * UDMF runtime consumers (text map format).  Mirror the binary P_Load*
+ * loaders against the udmf parser output; only engine-carried fields are
+ * consumed (the DSDA tier -- no slopes/3D-floors/portals/ZScript).
+ * ==================================================================== */
+/* ------------------------------------------------------------------ */
+/* dsda_StringToFixed: parse a UDMF coordinate/value string ("128",    */
+/* "-64.5", "0.375") to fixed_t.  C89, no sscanf -- a hand cursor      */
+/* parser matching the semantics of DSDA's helper (integer part shifted */
+/* by FRACBITS, up to 8 fractional digits scaled by their power of 10).*/
+/* ------------------------------------------------------------------ */
+static fixed_t udmf_string_to_fixed(const char *x)
+{
+  dbool negative;
+  fixed_t ipart;
+  const char *p;
+  long frac_num;
+  long frac_div;
+  int  frac_digits;
+
+  if (!x || !*x)
+    return 0;
+
+  p = x;
+  negative = FALSE;
+  if (*p == '-') { negative = TRUE; p++; }
+  else if (*p == '+') { p++; }
+
+  /* integer part */
+  ipart = 0;
+  while (*p >= '0' && *p <= '9')
+  {
+    ipart = ipart * 10 + (*p - '0');
+    p++;
+  }
+  ipart <<= FRACBITS;
+
+  /* fractional part: accumulate up to 8 digits, tracking the divisor */
+  frac_num = 0;
+  frac_div = 1;
+  frac_digits = 0;
+  if (*p == '.')
+  {
+    p++;
+    while (*p >= '0' && *p <= '9' && frac_digits < 8)
+    {
+      frac_num = frac_num * 10 + (*p - '0');
+      frac_div *= 10;
+      frac_digits++;
+      p++;
+    }
+  }
+
+  if (frac_num)
+    ipart += (fixed_t)(((long long)frac_num * FRACUNIT) / frac_div);
+
+  return negative ? -ipart : ipart;
+}
+
+/* ------------------------------------------------------------------ */
+/* Vertexes                                                            */
+/* ------------------------------------------------------------------ */
+static void P_LoadUDMFVertexes(void)
+{
+  int i;
+
+  numvertexes = (int)udmf.num_vertices;
+  vertexes = Z_Calloc(numvertexes, sizeof(vertex_t), PU_LEVEL, 0);
+
+  for (i = 0; i < numvertexes; i++)
+  {
+    vertexes[i].x = udmf_string_to_fixed(udmf.vertices[i].x);
+    vertexes[i].y = udmf_string_to_fixed(udmf.vertices[i].y);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Sectors -- mirrors P_LoadSectors; only engine-carried fields set.   */
+/* ------------------------------------------------------------------ */
+static void P_LoadUDMFSectors(void)
+{
+  int i;
+
+  numsectors = (int)udmf.num_sectors;
+  sectors = Z_Calloc(numsectors, sizeof(sector_t), PU_LEVEL, 0);
+
+  for (i = 0; i < numsectors; i++)
+  {
+    sector_t *ss = sectors + i;
+    const udmf_sector_t *ms = &udmf.sectors[i];
+
+    ss->cachedheight  = 0;
+    ss->floorheight   = ms->heightfloor << FRACBITS;
+    ss->ceilingheight = ms->heightceiling << FRACBITS;
+    ss->floorpic      = R_FlatNumForName(ms->texturefloor);
+    ss->ceilingpic    = R_FlatNumForName(ms->textureceiling);
+    ss->lightlevel    = (short)ms->lightlevel;
+    ss->special       = (short)ms->special;
+    ss->oldspecial    = (short)ms->special;
+    ss->tag           = (short)ms->id;
+    ss->thinglist     = NULL;
+    ss->touching_thinglist = NULL;
+    ss->nextsec       = -1;
+    ss->prevsec       = -1;
+    ss->floor_xoffs   = 0;
+    ss->floor_yoffs   = 0;
+    ss->ceiling_xoffs = 0;
+    ss->ceiling_yoffs = 0;
+    ss->heightsec     = -1;
+    ss->floorlightsec = -1;
+    ss->ceilinglightsec = -1;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* SideDefs -- mirrors P_LoadSideDefs2.                                */
+/* ------------------------------------------------------------------ */
+static void P_LoadUDMFSideDefs(void)
+{
+  int i;
+
+  numsides = (int)udmf.num_sides;
+  sides = Z_Calloc(numsides, sizeof(side_t), PU_LEVEL, 0);
+
+  for (i = 0; i < numsides; i++)
+  {
+    const udmf_side_t *ms = &udmf.sides[i];
+    side_t *sd = sides + i;
+    unsigned int sector_num;
+
+    sd->textureoffset = ms->offsetx << FRACBITS;
+    sd->rowoffset     = ms->offsety << FRACBITS;
+
+    sector_num = (unsigned int)ms->sector;
+    if (sector_num >= (unsigned int)numsectors)
+    {
+      lprintf(LO_WARN, "P_LoadUDMFSideDefs: sidedef %i has out-of-range sector num %u\n",
+              i, sector_num);
+      sector_num = 0;
+    }
+    sd->sector = &sectors[sector_num];
+
+    /* UDMF stores texture names directly; no 242-colormap overload here
+     * (that is a Boom binary-sidedef trick driven by the linedef special,
+     * not part of the UDMF text fields). */
+    sd->midtexture    = R_SafeTextureNumForName(ms->texturemiddle, i);
+    sd->toptexture    = R_SafeTextureNumForName(ms->texturetop, i);
+    sd->bottomtexture = R_SafeTextureNumForName(ms->texturebottom, i);
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* LineDefs -- fills source fields then calls the shared finalizer.    */
+/* ------------------------------------------------------------------ */
+
+/* UDMF line flags share the low Boom bit layout (BLOCKING=1 .. PASSUSE
+ * =0x200).  Copy only the bits the engine's 16-bit line flags understand. */
+#define UDMF_LINE_ENGINE_FLAGS \
+  (UDMF_ML_BLOCKING | UDMF_ML_BLOCKMONSTERS | UDMF_ML_TWOSIDED | \
+   UDMF_ML_DONTPEGTOP | UDMF_ML_DONTPEGBOTTOM | UDMF_ML_SECRET | \
+   UDMF_ML_SOUNDBLOCK | UDMF_ML_DONTDRAW | UDMF_ML_MAPPED | UDMF_ML_PASSUSE)
+
+static void P_LoadUDMFLineDefs(void)
+{
+  int i;
+
+  numlines = (int)udmf.num_lines;
+  lines = Z_Calloc(numlines, sizeof(line_t), PU_LEVEL, 0);
+
+  for (i = 0; i < numlines; i++)
+  {
+    line_t *ld = lines + i;
+    const udmf_line_t *mld = &udmf.lines[i];
+    unsigned short mv1, mv2;
+
+    ld->flags   = (unsigned short)(mld->flags & UDMF_LINE_ENGINE_FLAGS);
+    ld->special = (short)mld->special;
+    /* In the Hexen/UDMF model the editor "id" is the line tag. */
+    ld->tag     = (mld->id >= 0) ? mld->id : 0;
+    ld->args[0] = (unsigned char)mld->arg0;
+    ld->args[1] = (unsigned char)mld->arg1;
+    ld->args[2] = (unsigned char)mld->arg2;
+    ld->args[3] = (unsigned char)mld->arg3;
+    ld->args[4] = (unsigned char)mld->arg4;
+
+    mv1 = (unsigned short)mld->v1;
+    mv2 = (unsigned short)mld->v2;
+    ld->sidenum[0] = (unsigned short)mld->sidefront;
+    ld->sidenum[1] = (mld->sideback >= 0) ? (unsigned short)mld->sideback
+                                          : (unsigned short)NO_INDEX;
+
+    P_FinalizeLineDef(ld, mv1, mv2, i);
+
+    /* Derive front/back sectors from the sidedefs, as P_LoadLineDefs2 does
+     * for binary maps.  Sidedefs are already loaded at this point.  After
+     * P_FinalizeLineDef, sidenum[0] is guaranteed valid (it substitutes the
+     * dummy sidedef 0 for a missing right side). */
+    ld->frontsector = sides[ld->sidenum[0]].sector;
+    ld->backsector  = (ld->sidenum[1] != NO_INDEX)
+                      ? sides[ld->sidenum[1]].sector : NULL;
+  }
+}
+
+/* ------------------------------------------------------------------ */
+/* Things -- mirrors the Hexen branch of P_LoadThings, spawning through */
+/* the narrow mapthing_t plus the hexen_thing_* staging globals.        */
+/* ------------------------------------------------------------------ */
+static void P_LoadUDMFThings(void)
+{
+  int i, numthings;
+
+  numthings = (int)udmf.num_things;
+
+  for (i = 0; i < numthings; i++)
+  {
+    const udmf_thing_t *dmt = &udmf.things[i];
+    mapthing_t mt;
+
+    /* coordinates are stored as text in UDMF; convert to map units (the
+     * narrow mapthing_t carries short x/y, matching the binary path). */
+    mt.x       = (short)(udmf_string_to_fixed(dmt->x) >> FRACBITS);
+    mt.y       = (short)(udmf_string_to_fixed(dmt->y) >> FRACBITS);
+    mt.angle   = (short)dmt->angle;
+    mt.type    = (short)dmt->type;
+    mt.options = 0;
+
+    /* skill / multiplayer / ambush flags -> engine MTF_* options */
+    if (dmt->flags & UDMF_TF_SKILL1) mt.options |= MTF_EASY;
+    if (dmt->flags & UDMF_TF_SKILL2) mt.options |= MTF_EASY;
+    if (dmt->flags & UDMF_TF_SKILL3) mt.options |= MTF_NORMAL;
+    if (dmt->flags & UDMF_TF_SKILL4) mt.options |= MTF_HARD;
+    if (dmt->flags & UDMF_TF_SKILL5) mt.options |= MTF_HARD;
+    if (dmt->flags & UDMF_TF_AMBUSH) mt.options |= MTF_AMBUSH;
+    /* UDMF uses positive single/coop/dm presence flags; the engine uses
+     * the inverted MTF_NOTSINGLE/NOTCOOP/NOTDM.  Absent => "not". */
+    if (!(dmt->flags & UDMF_TF_SINGLE)) mt.options |= MTF_NOTSINGLE;
+    if (!(dmt->flags & UDMF_TF_COOP))   mt.options |= MTF_NOTCOOP;
+    if (!(dmt->flags & UDMF_TF_DM))     mt.options |= MTF_NOTDM;
+    if (dmt->flags & UDMF_TF_FRIEND)    mt.options |= MTF_FRIEND;
+
+    /* stage the Hexen scripted-special args for P_SpawnMapThing */
+    hexen_thing_tid     = (short)dmt->id;
+    hexen_thing_special = dmt->special;
+    hexen_thing_args[0] = dmt->arg0;
+    hexen_thing_args[1] = dmt->arg1;
+    hexen_thing_args[2] = dmt->arg2;
+    hexen_thing_args[3] = dmt->arg3;
+    hexen_thing_args[4] = dmt->arg4;
+
+    if (!P_IsDoomnumAllowed(mt.type))
+      continue;
+
+    P_SpawnMapThing(&mt);
+  }
+}
+
 void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 {
    int   i;
@@ -1834,6 +2118,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    char  gl_lumpname[9];
    int   gl_lumpnum;
+   dbool udmf_level;
 
    R_StopAllInterpolations();
 
@@ -1905,6 +2190,67 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       I_Error("P_SetupLevel: %s: Hexen format not supported", lumpname);
 
    // figgi 10/19/00 -- check for gl lumps and load them
+   udmf_level = P_LevelIsUDMF(lumpnum);
+
+   if (udmf_level)
+   {
+      int textmap = lumpnum + 1;
+      int znodes;
+
+      /* Parse the TEXTMAP lump into the udmf record set, then build the
+       * runtime geometry from it.  Namespace must resolve or the parser
+       * I_Errors via the callback. */
+      udmf_namespace = UDMF_NONE;
+      dsda_ParseUDMF(W_CacheLumpNum(textmap), W_LumpLength(textmap),
+                     (udmf_errorfunc)I_Error);
+      if (udmf_namespace == UDMF_NONE)
+         I_Error("P_SetupLevel: %s: unsupported or missing UDMF namespace", lumpname);
+
+      P_LoadUDMFVertexes();
+      P_LoadUDMFSectors();
+      P_LoadUDMFSideDefs();
+      P_LoadUDMFLineDefs();
+
+      /* BSP: UDMF stores nodes in a named ZNODES lump.  Only the
+       * uncompressed extended formats (XNOD/XGLN) are supported here; a
+       * compressed ZNODES needs zlib inflate, which this loader does not do
+       * -- fail clearly rather than misread it. */
+      znodes = P_FindUDMFLump(lumpnum, "ZNODES");
+      if (znodes < 0)
+         I_Error("P_SetupLevel: %s: UDMF map has no ZNODES lump", lumpname);
+      {
+         char id[4];
+         if (!ReadIdentifier(znodes, id) ||
+             (memcmp(id, "XNOD", 4) && memcmp(id, "XGLN", 4)))
+            I_Error("P_SetupLevel: %s: ZNODES must be uncompressed XNOD/XGLN "
+                    "(rebuild nodes with zdbsp -X)", lumpname);
+      }
+      P_LoadXNOD(znodes);
+
+      {
+         int bm = P_FindUDMFLump(lumpnum, "BLOCKMAP");
+         if (bm >= 0 && W_LumpLength(bm) >= 8)
+         {
+            P_LoadBlockMap(bm);
+         }
+         else
+         {
+            /* UDMF maps usually omit BLOCKMAP.  P_CreateBlockMap builds the
+             * lump and sets bmapwidth/height/org, but (unlike P_LoadBlockMap)
+             * does not allocate the per-block thing-chain table, so do that
+             * here -- P_SetThingPosition dereferences blocklinks. */
+            P_CreateBlockMap();
+            blockmap = blockmaplump + 4;
+            blocklinks = Z_Calloc((size_t)bmapwidth * bmapheight,
+                                  sizeof(*blocklinks), PU_LEVEL, 0);
+         }
+      }
+
+      if (hexen)
+         PO_ResetBlockMap(true);
+   }
+   else
+   {
    P_GetNodesVersion(lumpnum,gl_lumpnum);
 
    if (nodes_glbsp > 0)
@@ -1937,6 +2283,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       P_LoadNodes(lumpnum + ML_NODES);
       P_LoadSegs(lumpnum + ML_SEGS);
    }
+   }
 
    // reject loading and underflow padding separated out into new function
    // P_GroupLines modified to return a number the underflow padding needs
@@ -1966,9 +2313,12 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    if (heretic)
       P_InitAmbientSound();
 
-   P_LoadThings(lumpnum+ML_THINGS);
+   if (udmf_level)
+      P_LoadUDMFThings();
+   else
+      P_LoadThings(lumpnum+ML_THINGS);
 
-   if (hexen)
+   if (hexen && !udmf_level)
       PO_Init(lumpnum+ML_THINGS); /* spawn and place the polyobjects */
 
    // if deathmatch, randomly spawn the active players

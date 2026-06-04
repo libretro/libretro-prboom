@@ -14,12 +14,18 @@
 
 #include "scanner.h"
 #include "udmf.h"
+#include "z_zone.h"
+
+/* The parser allocates level-lifetime storage for the strings it hands back
+ * (vertex/thing coordinate text, texture-overflow names, etc.).  Map these
+ * onto the engine zone allocator with the PU_LEVEL tag so they are released
+ * automatically when the level is unloaded. */
+void *Z_MallocLevel(size_t size)      { return Z_Malloc(size, PU_LEVEL, 0); }
+char *Z_StrdupLevel(const char *s)    { return Z_Strdup(s, PU_LEVEL, 0); }
 
 /* These are provided by the engine at integration time (level zone alloc,
  * auto-freed on level unload) and by the game-mode globals.  For the
  * standalone parser test, local definitions are supplied in udmf_test.c. */
-extern void *Z_MallocLevel(size_t size);
-extern char *Z_StrdupLevel(const char *s);
 extern int raven;    /* nonzero for Heretic/Hexen builds */
 extern int heretic;  /* nonzero when running Heretic     */
 extern int hexen;    /* nonzero when running Hexen        */

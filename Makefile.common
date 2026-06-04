@@ -75,6 +75,8 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/p_pspr.c \
 				 $(CORE_DIR)/p_saveg.c \
 				 $(CORE_DIR)/p_setup.c \
+				 $(CORE_DIR)/scanner.c \
+				 $(CORE_DIR)/udmf.c \
 				 $(CORE_DIR)/map_format.c \
 				 $(CORE_DIR)/heretic/info.c \
 				 $(CORE_DIR)/heretic/sounds.c \

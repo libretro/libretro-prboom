@@ -520,13 +520,14 @@ void P_DeathThink (player_t* player)
 
    if (hexen && player->attacker && player->attacker != player->mo)
    {  /* Hexen watches the killer with a smooth face-turn, fading the damage
-       * flash while looking at them.  (Vanilla also faded a poison counter
-       * here; this build has no poison system, so only damagecount.) */
+       * flash and the poison sting while looking at them. */
       int dir = P_FaceMobj(player->mo, player->attacker, &delta);
       if (delta < ANG1 * 10)
       {
          if (player->damagecount)
             player->damagecount--;
+         if (player->poisoncount)
+            player->poisoncount--;
       }
       delta = delta / 8;
       if (delta > ANG1 * 5)
@@ -1493,6 +1494,11 @@ void P_PlayerThink (player_t* player)
    }
 
    /* Check for weapon change. */
+
+   /* Raven: special button codes share bits with the action buttons, so a
+    * pause/save tic must not be misread as an attack or weapon change. */
+   if (raven && (cmd->buttons & BT_SPECIAL))
+      cmd->buttons = 0;
 
    /* Hexen: a morphed (pig) player cannot change weapons. */
    if(cmd->buttons&BT_CHANGE && !player->morphTics)

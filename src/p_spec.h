@@ -984,6 +984,8 @@ void T_Glow
 void T_PlatRaise
 ( plat_t* plat );
 
+void T_HexenPlatRaise(plat_t *plat); /* hexen plat thinker */
+
 // p_doors
 
 void T_VerticalDoor

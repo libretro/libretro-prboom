@@ -525,7 +525,7 @@ static const thinkInfo_t ThinkerInfo[] =
   TINFO(TC_MOVE_CEILING,  T_HexenMoveCeiling, ceiling_t,     offsetof(ceiling_t, sector)),
   TINFO(TC_VERTICAL_DOOR, T_HexenVerticalDoor, vldoor_t,     offsetof(vldoor_t, sector)),
   TINFO(TC_MOVE_FLOOR,    T_MoveFloor,        floormove_t,   offsetof(floormove_t, sector)),
-  TINFO(TC_PLAT_RAISE,    T_PlatRaise,        plat_t,        offsetof(plat_t, sector)),
+  TINFO(TC_PLAT_RAISE,    T_HexenPlatRaise,   plat_t,        offsetof(plat_t, sector)),
   TINFO(TC_INTERPRET_ACS, T_InterpretACS,     acs_t,         -1),
   TINFO(TC_FLOOR_WAGGLE,  T_FloorWaggle,      planeWaggle_t, offsetof(planeWaggle_t, sector)),
   TINFO(TC_LIGHT,         T_HexenLight,       light_t,       offsetof(light_t, sector)),

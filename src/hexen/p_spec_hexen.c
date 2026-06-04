@@ -122,12 +122,12 @@ void T_HexenVerticalDoor(vldoor_t *door)
                         door->sector->floorheight, FALSE, 1, door->direction);
       if (res == RES_PASTDEST)
       {
+        SN_StopSequence((mobj_t *) &door->sector->soundorg);
         switch (door->type)
         {
           case DREV_NORMAL:
           case DREV_CLOSE:
             door->sector->ceilingdata = NULL;
-            SN_StopSequence((mobj_t *) &door->sector->soundorg);
             P_TagFinished(door->sector->tag);
             P_RemoveThinker(&door->thinker);
             break;
@@ -151,6 +151,7 @@ void T_HexenVerticalDoor(vldoor_t *door)
                         door->topheight, FALSE, 1, door->direction);
       if (res == RES_PASTDEST)
       {
+        SN_StopSequence((mobj_t *) &door->sector->soundorg);
         switch (door->type)
         {
           case DREV_NORMAL:
@@ -160,7 +161,6 @@ void T_HexenVerticalDoor(vldoor_t *door)
           case DREV_CLOSE30THENOPEN:
           case DREV_OPEN:
             door->sector->ceilingdata = NULL;
-            SN_StopSequence((mobj_t *) &door->sector->soundorg);
             P_TagFinished(door->sector->tag);
             P_RemoveThinker(&door->thinker);
             break;
@@ -554,6 +554,7 @@ int Hexen_EV_CeilingCrushStop(line_t *line, byte *args)
     ceiling_t *ceiling = cl->ceiling;
     if (ceiling->tag == args[0])
     {
+      SN_StopSequence((mobj_t *) &ceiling->sector->soundorg);
       P_RemoveActiveCeiling(ceiling);
       return 1;
     }
@@ -895,7 +896,7 @@ int EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount)
     plat->type = type;
     plat->sector = sec;
     plat->sector->floordata = plat;
-    plat->thinker.function.arg1 = (void (*)(void *))T_PlatRaise;
+    plat->thinker.function.arg1 = (void (*)(void *))T_HexenPlatRaise;
     plat->crush = FALSE;
     plat->tag   = args[0];
     plat->speed = args[1] * (FRACUNIT / 8);

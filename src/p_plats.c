@@ -168,6 +168,80 @@ void T_PlatRaise(plat_t* plat)
    }
 }
 
+/* Hexen plats run their own thinker: the type set differs (the doom removal
+ * switches above don't know the hexen types, which would leave a hexen
+ * Plat_DownWaitUpStay cycling forever), and the sound-sequence layer starts
+ * and stops with the strokes instead of doom's point sounds. */
+void T_HexenPlatRaise(plat_t *plat)
+{
+   result_e res;
+
+   switch (plat->status)
+   {
+      case PLAT_UP:
+         res = T_MovePlane(plat->sector, plat->speed, plat->high,
+                           plat->crush, 0, 1);
+         if (res == RES_CRUSHED && !plat->crush)
+         {
+            plat->count  = plat->wait;
+            plat->status = PLAT_DOWN;
+            SN_StartSequence((mobj_t *) &plat->sector->soundorg,
+                             SEQ_PLATFORM + plat->sector->seqType);
+         }
+         else if (res == RES_PASTDEST)
+         {
+            plat->count  = plat->wait;
+            plat->status = PLAT_WAITING;
+            SN_StopSequence((mobj_t *) &plat->sector->soundorg);
+            switch (plat->type)
+            {
+               case PLAT_DOWNWAITUPSTAY:
+               case PLAT_DOWNBYVALUEWAITUPSTAY:
+                  P_RemoveActivePlat(plat);
+                  break;
+               default:
+                  break;
+            }
+         }
+         break;
+
+      case PLAT_DOWN:
+         res = T_MovePlane(plat->sector, plat->speed, plat->low,
+                           FALSE, 0, -1);
+         if (res == RES_PASTDEST)
+         {
+            plat->count  = plat->wait;
+            plat->status = PLAT_WAITING;
+            switch (plat->type)
+            {
+               case PLAT_UPWAITDOWNSTAY:
+               case PLAT_UPBYVALUEWAITDOWNSTAY:
+                  P_RemoveActivePlat(plat);
+                  break;
+               default:
+                  break;
+            }
+            SN_StopSequence((mobj_t *) &plat->sector->soundorg);
+         }
+         break;
+
+      case PLAT_WAITING:
+         if (!--plat->count)
+         {
+            if (plat->sector->floorheight == plat->low)
+               plat->status = PLAT_UP;
+            else
+               plat->status = PLAT_DOWN;
+            SN_StartSequence((mobj_t *) &plat->sector->soundorg,
+                             SEQ_PLATFORM + plat->sector->seqType);
+         }
+         break;
+
+      default:
+         break;
+   }
+}
+
 
 //
 // EV_DoPlat

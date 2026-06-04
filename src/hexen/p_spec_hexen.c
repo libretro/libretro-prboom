@@ -332,7 +332,7 @@ int Hexen_EV_DoFloor(line_t *line, byte *args, floor_e floortype)
         floor->floordestheight = sec->floorheight - args[2] * FRACUNIT * 8;
         break;
       case FLEV_RAISEFLOORCRUSH:
-        floor->crush = TRUE;
+        floor->crush = args[2];       /* crush damage */
         floor->direction = 1;
         floor->floordestheight = sec->ceilingheight - 8 * FRACUNIT;
         break;
@@ -468,19 +468,19 @@ int Hexen_EV_DoCeiling(line_t *line, byte *args, ceiling_e type)
     switch (type)
     {
       case CLEV_CRUSHRAISEANDSTAY:
-        ceiling->crush = TRUE;
+        ceiling->crush = args[2];     /* crush damage */
         ceiling->topheight = sec->ceilingheight;
         ceiling->bottomheight = sec->floorheight + 8 * FRACUNIT;
         ceiling->direction = -1;
         break;
       case CLEV_CRUSHANDRAISE:
         ceiling->topheight = sec->ceilingheight;
-        ceiling->crush = TRUE;
+        ceiling->crush = args[2];     /* crush damage */
         ceiling->bottomheight = sec->floorheight + 8 * FRACUNIT;
         ceiling->direction = -1;
         break;
       case CLEV_LOWERANDCRUSH:
-        ceiling->crush = TRUE;
+        ceiling->crush = args[2];     /* crush damage */
         ceiling->bottomheight = sec->floorheight + 8 * FRACUNIT;
         ceiling->direction = -1;
         break;
@@ -802,7 +802,7 @@ int EV_BuildPillar(line_t *line, byte *args, int crush)
     pillar->ceilingdest = newHeight;
     pillar->direction   = 1;
     SN_StartSequence((mobj_t *) &sec->soundorg, SEQ_PLATFORM + sec->seqType);
-    pillar->crush       = (crush && args[3]) ? TRUE : FALSE;
+    pillar->crush       = crush ? args[3] : 0;  /* crush damage */
   }
   return rtn;
 }

@@ -2214,12 +2214,19 @@ dbool PIT_ChangeSector (mobj_t* thing)
 
   if (crushchange && !(leveltime&3)) {
     int t;
-    P_DamageMobj(thing,NULL,NULL,10);
+    /* Hexen movers carry their crush damage (e.g. Pillar_BuildAndCrush's
+     * fourth arg) in the crush field; Doom and Heretic pass TRUE and keep
+     * the classic 10. */
+    P_DamageMobj(thing, NULL, NULL,
+                 (hexen && crushchange > 1) ? crushchange : 10);
 
-    // spray blood in a random direction
+    // spray blood in a random direction (each game's own blood actor; the
+    // Doom MT_BLOOD slot has no valid states under the Raven tables)
     mo = P_SpawnMobj (thing->x,
                       thing->y,
-                      thing->z + thing->height/2, MT_BLOOD);
+                      thing->z + thing->height/2,
+                      hexen ? HEXEN_MT_BLOOD :
+                      heretic ? HERETIC_MT_BLOOD : MT_BLOOD);
 
     /* killough 8/10/98: remove dependence on order of evaluation */
     t = P_Random(pr_crush);

@@ -2,7 +2,7 @@ DEPS_DIR           = $(ROOT_DIR)/deps
 LIBRETRO_DIR       = $(ROOT_DIR)/libretro
 LIBRETRO_COMM_DIR  = $(ROOT_DIR)/libretro/libretro-common
 
-INCFLAGS    = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(DEPS_DIR)/libmad -I$(LIBRETRO_COMM_DIR)/include
+INCFLAGS    = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(DEPS_DIR)/libmad -I$(DEPS_DIR)/miniz -I$(LIBRETRO_COMM_DIR)/include
 
 ifneq (,$(findstring msvc2003,$(platform)))
 INCFLAGS += -I$(LIBRETRO_COMM_DIR)/include/compat/msvc
@@ -32,7 +32,8 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/file/file_path_io.c \
 				 $(LIBRETRO_COMM_DIR)/time/rtime.c
 
-SOURCES_C += $(DEPS_DIR)/libmad/bit.c \
+SOURCES_C += $(DEPS_DIR)/miniz/miniz.c \
+				 $(DEPS_DIR)/libmad/bit.c \
 				 $(DEPS_DIR)/libmad/decoder.c \
 				 $(DEPS_DIR)/libmad/fixed.c \
 				 $(DEPS_DIR)/libmad/frame.c \

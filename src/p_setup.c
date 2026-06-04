@@ -53,6 +53,7 @@
 #include "p_spec.h"
 #include "map_format.h"
 #include "udmf.h"
+#include "miniz.h"
 #include "p_tick.h"
 #include "p_enemy.h"
 #include "hexen/p_lightning.h"
@@ -758,14 +759,165 @@ static void P_LoadNodes (int lump)
   W_UnlockLumpNum(lump); // cph - release the data
 }
 
+static void P_LoadXNOD(const uint8_t *data, int len);
+static void P_LoadXGLNodes(const uint8_t *data, int len, int glver);
+
+/* P_DecompressZNodes -- inflate a zlib-compressed (Z*) extended-node lump
+ * into a freshly allocated buffer.  The compressed ZDBSP node formats are
+ * the uncompressed payload wrapped in standard zlib (RFC 1950); decompress
+ * here, then the same X* parser runs over the result.  The decompressed
+ * size is not stored, so grow the output buffer as inflate fills it.
+ * Returns a malloc'd buffer (caller frees) and writes its length to *outlen,
+ * or NULL on failure. */
+static uint8_t *P_DecompressZNodes(const uint8_t *in, int inlen, int *outlen)
+{
+  mz_stream zs;
+  uint8_t *out;
+  int cap, err;
+
+  if (inlen <= 0)
+    return NULL;
+
+  cap = inlen * 4;          /* first guess at the inflated size */
+  if (cap < 4096)
+    cap = 4096;
+  out = (uint8_t *)malloc(cap);
+  if (!out)
+    return NULL;
+
+  memset(&zs, 0, sizeof(zs));
+  zs.next_in   = (const unsigned char *)in;
+  zs.avail_in  = (unsigned int)inlen;
+  zs.next_out  = out;
+  zs.avail_out = (unsigned int)cap;
+
+  if (mz_inflateInit(&zs) != MZ_OK)
+  {
+    free(out);
+    return NULL;
+  }
+
+  /* Grow the output buffer whenever it fills before the stream ends. */
+  while ((err = mz_inflate(&zs, MZ_SYNC_FLUSH)) == MZ_OK)
+  {
+    int used = cap;
+    uint8_t *grown;
+
+    if (zs.avail_out != 0)     /* progress but not yet at stream end */
+      continue;
+    grown = (uint8_t *)realloc(out, cap * 2);
+    if (!grown)
+    {
+      mz_inflateEnd(&zs);
+      free(out);
+      return NULL;
+    }
+    out = grown;
+    zs.next_out  = out + used;
+    zs.avail_out = (unsigned int)(cap);   /* the new second half */
+    cap *= 2;
+  }
+
+  if (err != MZ_STREAM_END)
+  {
+    mz_inflateEnd(&zs);
+    free(out);
+    return NULL;
+  }
+
+  *outlen = (int)zs.total_out;
+  mz_inflateEnd(&zs);
+  return out;
+}
+
+/* P_LoadUDMFNodes -- dispatch a ZDBSP extended-node lump by signature.
+ *
+ * Recognises all eight ZDBSP formats: the non-GL XNOD/ZNOD and the GL
+ * XGLN/XGL2/XGL3 (and their Z-compressed counterparts).  Uncompressed
+ * lumps are parsed in place; compressed ones are inflated first.  Returns
+ * TRUE on success, FALSE if the signature is unknown or decompression
+ * fails (the caller then declines the level). */
+static dbool P_LoadUDMFNodes(int lump)
+{
+  const uint8_t *lumpdata = W_CacheLumpNum(lump);
+  int lumplen = W_LumpLength(lump);
+  char id[4];
+  dbool compressed = FALSE;
+  int glver = -1;            /* -1 == non-GL (XNOD), else GL version 1..3 */
+  uint8_t *decomp = NULL;
+  const uint8_t *data;
+  int len;
+
+  if (lumplen < 4 || !lumpdata)
+  {
+    W_UnlockLumpNum(lump);
+    return FALSE;
+  }
+  memcpy(id, lumpdata, 4);
+
+  if      (!memcmp(id, "XNOD", 4)) { glver = -1; compressed = FALSE; }
+  else if (!memcmp(id, "ZNOD", 4)) { glver = -1; compressed = TRUE;  }
+  else if (!memcmp(id, "XGLN", 4)) { glver =  1; compressed = FALSE; }
+  else if (!memcmp(id, "ZGLN", 4)) { glver =  1; compressed = TRUE;  }
+  else if (!memcmp(id, "XGL2", 4)) { glver =  2; compressed = FALSE; }
+  else if (!memcmp(id, "ZGL2", 4)) { glver =  2; compressed = TRUE;  }
+  else if (!memcmp(id, "XGL3", 4)) { glver =  3; compressed = FALSE; }
+  else if (!memcmp(id, "ZGL3", 4)) { glver =  3; compressed = TRUE;  }
+  else
+  {
+    W_UnlockLumpNum(lump);
+    return FALSE;            /* unknown node format */
+  }
+
+  if (compressed)
+  {
+    /* The 4-byte signature is not part of the zlib stream; inflate the
+     * remainder, then prepend a synthetic header the parsers expect by
+     * pointing them at a buffer whose first 4 bytes they skip. */
+    int dlen = 0;
+    uint8_t *body = P_DecompressZNodes(lumpdata + 4, lumplen - 4, &dlen);
+    if (!body)
+    {
+      W_UnlockLumpNum(lump);
+      return FALSE;
+    }
+    /* The parsers expect a 4-byte header they discard, so allocate a
+     * buffer of dlen+4 with a dummy header in front of the inflated body. */
+    decomp = (uint8_t *)malloc(dlen + 4);
+    if (!decomp)
+    {
+      free(body);
+      W_UnlockLumpNum(lump);
+      return FALSE;
+    }
+    memcpy(decomp, id, 4);
+    memcpy(decomp + 4, body, dlen);
+    free(body);
+    data = decomp;
+    len  = dlen + 4;
+  }
+  else
+  {
+    data = lumpdata;
+    len  = lumplen;
+  }
+
+  if (glver < 0)
+    P_LoadXNOD(data, len);
+  else
+    P_LoadXGLNodes(data, len, glver);
+
+  if (decomp)
+    free(decomp);
+  W_UnlockLumpNum(lump);
+  return TRUE;
+}
+
 //
 // P_LoadXNOD - load uncompressed ZDBSP nodes
 //
-
-static void P_LoadXNOD(int lump)
+static void P_LoadXNOD(const uint8_t *data, int len)
 {
-  int len = W_LumpLength(lump);
-  const uint8_t *data = W_CacheLumpNum(lump);
   int i, numorgvert, numnewvert, first_seg = 0;
   vertex_t *newvert;
 
@@ -871,8 +1023,203 @@ static void P_LoadXNOD(int lump)
       node->children[j] = LONG(*(const unsigned int *)data); data += 4; len -= 4;
     }
   }
+}
 
-  W_UnlockLumpNum(lump);
+/* P_LoadXGLNodes -- load uncompressed ZDoom GL extended nodes.
+ *
+ * Handles the three uncompressed GL node formats by version:
+ *   glver 1 -> XGLN : seg linedef is 16-bit, node is 16-bit
+ *   glver 2 -> XGL2 : seg linedef is 32-bit, node is 16-bit
+ *   glver 3 -> XGL3 : seg linedef is 32-bit, node is 32-bit fixed
+ *
+ * GL segs differ from plain XNOD segs in two ways that matter here:
+ *  - only the seg's first vertex (v1) is stored; v2 is the *next* seg's v1
+ *    within the same subsector, wrapping the last seg back to the first
+ *    (subsectors are closed convex polygons);
+ *  - a linedef index of all-ones marks a miniseg (a partition-line fragment
+ *    with no real linedef), which the renderer skips.
+ *
+ * Byte-stepped rather than cast through packed structs, to stay portable
+ * under MSVC C89 (matching P_LoadXNOD).
+ */
+static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
+{
+  int i, j;
+  int numorgvert, numnewvert, first_seg = 0;
+  vertex_t *newvert;
+  int line_is_32 = (glver >= 2);
+  int node_is_32 = (glver >= 3);
+  unsigned int miniseg_sentinel = line_is_32 ? 0xffffffffu : 0xffffu;
+
+  data += 4; len -= 4; /* skip the 4-byte signature */
+
+  /* --- vertices: original count + builder-added vertices --- */
+  numorgvert = LONG(*(const int *)data); data += 4; len -= 4;
+  numnewvert = LONG(*(const int *)data); data += 4; len -= 4;
+
+  newvert = Z_Realloc(vertexes,
+                      (numorgvert + numnewvert) * sizeof(*newvert),
+                      PU_LEVEL, NULL);
+
+  for (i = 0; i < numnewvert; i++)
+  {
+    vertex_t *v = newvert + numorgvert + i;
+    v->x = LONG(*(const fixed_t *)data); data += 4; len -= 4;
+    v->y = LONG(*(const fixed_t *)data); data += 4; len -= 4;
+  }
+
+  if (newvert != vertexes)
+  {
+    for (i = 0; i < numlines; i++)
+    {
+      lines[i].v1 = newvert + (lines[i].v1 - vertexes);
+      lines[i].v2 = newvert + (lines[i].v2 - vertexes);
+    }
+    vertexes = newvert;
+  }
+  numvertexes = numorgvert + numnewvert;
+
+  /* --- subsectors: only the per-subsector seg count is stored; the first
+   * seg index is accumulated (first subsector starts at seg 0) --- */
+  numsubsectors = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  subsectors = Z_Calloc(numsubsectors, sizeof(*subsectors), PU_LEVEL, NULL);
+
+  for (i = 0; i < numsubsectors; i++)
+  {
+    subsectors[i].firstline = first_seg;
+    subsectors[i].numlines = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+    first_seg += subsectors[i].numlines;
+  }
+
+  /* --- segs --- */
+  numsegs = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  if (numsegs != first_seg)
+    I_Error("P_LoadXGLNodes: %d segs but subsectors total %d", numsegs, first_seg);
+  segs = Z_Calloc(numsegs, sizeof(*segs), PU_LEVEL, NULL);
+
+  /* First pass: read v1 (and linedef/side), wiring each subsector's segs
+   * into a closed loop by deriving v2 from the next seg's v1. */
+  for (i = 0; i < numsubsectors; i++)
+  {
+    int firstseg = subsectors[i].firstline;
+    int count    = subsectors[i].numlines;
+
+    for (j = 0; j < count; j++)
+    {
+      unsigned int v1;
+      unsigned int line;
+      unsigned char side;
+      seg_t *seg = segs + firstseg + j;
+
+      v1 = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+      /* partner seg (the record's v2) is unused by this renderer */
+      data += 4; len -= 4;
+      if (line_is_32)
+      {
+        line = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+      }
+      else
+      {
+        line = (unsigned short)SHORT(*(const unsigned short *)data);
+        data += 2; len -= 2;
+      }
+      side = *(const unsigned char *)data; data += 1; len -= 1;
+
+      seg->v1 = vertexes + v1;
+      /* close the polygon: this seg's v2 is the next seg's v1 (wrap last) */
+      if (j == 0)
+        seg[count - 1].v2 = seg->v1;
+      else
+        seg[-1].v2 = seg->v1;
+
+      if (line != miniseg_sentinel)
+      {
+        line_t *ldef;
+
+        if (line >= (unsigned int)numlines)
+          I_Error("P_LoadXGLNodes: seg references bad linedef %u", line);
+        ldef = lines + line;
+
+        if (side != 0 && side != 1)
+          I_Error("P_LoadXGLNodes: seg references bad side %u", (unsigned int)side);
+
+        seg->miniseg = FALSE;
+        seg->linedef = ldef;
+        seg->sidedef = &sides[ldef->sidenum[side]];
+        seg->frontsector = (ldef->sidenum[side] != NO_INDEX)
+                           ? sides[ldef->sidenum[side]].sector : NULL;
+        seg->backsector = ((ldef->flags & ML_TWOSIDED)
+                           && ldef->sidenum[side ^ 1] != NO_INDEX)
+                          ? sides[ldef->sidenum[side ^ 1]].sector : NULL;
+        seg->offset = side ? GetOffset(seg->v1, ldef->v2)
+                           : GetOffset(seg->v1, ldef->v1);
+      }
+      else
+      {
+        seg->miniseg = TRUE;
+        seg->linedef = NULL;
+        seg->sidedef = NULL;
+        seg->offset = 0;
+        seg->length = 0;
+        seg->frontsector = NULL;
+        seg->backsector = NULL;
+      }
+    }
+
+    /* Second pass over this subsector: every v2 is now known, so angles and
+     * lengths can be computed for the real (non-mini) segs. */
+    for (j = 0; j < count; j++)
+    {
+      seg_t *seg = segs + firstseg + j;
+      if (!seg->miniseg)
+      {
+        seg->angle = R_PointToAngle2(seg->v1->x, seg->v1->y,
+                                     seg->v2->x, seg->v2->y);
+        seg->length = GetDistance(seg->v2->x - seg->v1->x,
+                                  seg->v2->y - seg->v1->y);
+      }
+    }
+  }
+
+  /* --- nodes --- */
+  numnodes = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  nodes = Z_Calloc(numnodes, sizeof(*nodes), PU_LEVEL, NULL);
+
+  for (i = 0; i < numnodes; i++)
+  {
+    node_t *node = nodes + i;
+    int k;
+
+    if (node_is_32)
+    {
+      /* XGL3: partition x/y/dx/dy are 32-bit fixed_t */
+      node->x  = LONG(*(const fixed_t *)data); data += 4; len -= 4;
+      node->y  = LONG(*(const fixed_t *)data); data += 4; len -= 4;
+      node->dx = LONG(*(const fixed_t *)data); data += 4; len -= 4;
+      node->dy = LONG(*(const fixed_t *)data); data += 4; len -= 4;
+    }
+    else
+    {
+      /* XGLN/XGL2: 16-bit partition, shifted up to fixed_t */
+      node->x  = SHORT(*(const short *)data) << FRACBITS; data += 2; len -= 2;
+      node->y  = SHORT(*(const short *)data) << FRACBITS; data += 2; len -= 2;
+      node->dx = SHORT(*(const short *)data) << FRACBITS; data += 2; len -= 2;
+      node->dy = SHORT(*(const short *)data) << FRACBITS; data += 2; len -= 2;
+    }
+
+    /* bounding boxes are 16-bit in all three formats */
+    for (j = 0; j < 2; j++)
+      for (k = 0; k < 4; k++)
+      {
+        node->bbox[j][k] = SHORT(*(const short *)data) << FRACBITS;
+        data += 2; len -= 2;
+      }
+
+    for (j = 0; j < 2; j++)
+    {
+      node->children[j] = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+    }
+  }
 }
 
 /*
@@ -2233,12 +2580,11 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
          return;
       }
 
-      /* BSP: UDMF stores nodes in a named ZNODES lump.  Only the
-       * uncompressed extended formats (XNOD/XGLN) are supported; compressed
-       * ZNODES (ZNOD/ZGLN) and the newer GL formats (XGL2/XGL3 and their
-       * compressed variants) need inflate / a different decoder this loader
-       * does not have.  Reject up-front so we never build a level we cannot
-       * give a working BSP. */
+      /* BSP: UDMF stores nodes in a named ZNODES lump.  All eight ZDBSP
+       * extended-node formats are now handled -- non-GL XNOD/ZNOD and GL
+       * XGLN/XGL2/XGL3, each uncompressed or zlib-compressed.  Confirm the
+       * lump exists here; the actual parse (and signature dispatch) happens
+       * in P_LoadUDMFNodes after the geometry is built. */
       znodes = P_FindUDMFLump(lumpnum, "ZNODES");
       if (znodes < 0)
       {
@@ -2246,24 +2592,18 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
          level_setup_failed = TRUE;
          return;
       }
-      {
-         char id[4];
-         if (!ReadIdentifier(znodes, id) ||
-             (memcmp(id, "XNOD", 4) && memcmp(id, "XGLN", 4)))
-         {
-            I_Error("P_SetupLevel: %s: ZNODES are '%.4s'; only uncompressed "
-                    "XNOD/XGLN are supported (rebuild nodes with zdbsp -X)",
-                    lumpname, id);
-            level_setup_failed = TRUE;
-            return;
-         }
-      }
 
       P_LoadUDMFVertexes();
       P_LoadUDMFSectors();
       P_LoadUDMFSideDefs();
       P_LoadUDMFLineDefs();
-      P_LoadXNOD(znodes);
+      if (!P_LoadUDMFNodes(znodes))
+      {
+         I_Error("P_SetupLevel: %s: ZNODES format unsupported or corrupt",
+                 lumpname);
+         level_setup_failed = TRUE;
+         return;
+      }
 
       {
          int bm = P_FindUDMFLump(lumpnum, "BLOCKMAP");
@@ -2313,7 +2653,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    }
    else if (nodes_zdbsp == 1)
    {
-      P_LoadXNOD(lumpnum + ML_NODES);
+      P_LoadUDMFNodes(lumpnum + ML_NODES);
    }
    else
    {

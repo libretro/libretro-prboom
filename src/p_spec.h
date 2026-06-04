@@ -1192,6 +1192,7 @@ extern mobj_t LavaInflictor;
 void P_InitLava(void);
 void P_PlayerOnSpecialFlat(player_t *player, int floorType);
 
+
 void P_PlayerInSpecialSector
 ( player_t* player );
 

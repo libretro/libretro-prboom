@@ -52,6 +52,9 @@ void P_UnArchiveScripts(void);
 void P_ArchivePolyobjs(void);
 void P_UnArchivePolyobjs(void);
 void P_ArchiveSounds(void);
+/* heretic ambient sequence cursor (lives in p_spec.c with the walker) */
+void P_ArchiveAmbientSound(void);
+void P_UnArchiveAmbientSound(void);
 void P_UnArchiveSounds(void);
 void P_UnArchiveSpecials(void);
 void P_ThinkerToIndex(void); /* phares 9/13/98: save soundtarget in savegame */

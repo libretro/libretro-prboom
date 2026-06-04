@@ -1933,8 +1933,9 @@ static int G_DoLoadGameFromSaveBuffer(int length)
      * gained the world state (ACS, polyobjs, sound sequences).
      * RVN3 (hexen only): the hub map archives ride in the savegame.
      * RVN4 (hexen only): the map archives gained the vanilla sound-
-     * sequence segment. */
-    char raven_magic[4] = { 'R','V','N','2' };
+     * sequence segment.
+     * RVN5 (heretic only): the ambient sound cursor rides in the save. */
+    char raven_magic[4] = { 'R','V','N','5' };
     if (hexen)
       raven_magic[3] = '4';
     if (memcmp(save_p, raven_magic, sizeof raven_magic))
@@ -2013,6 +2014,7 @@ static int G_DoLoadGameFromSaveBuffer(int length)
   P_UnArchiveSpecials ();
   P_UnArchiveScripts (); /* hexen ACS script states + map vars (no-op otherwise) */
   P_UnArchiveSounds ();  /* hexen active sound sequences (no-op otherwise) */
+  P_UnArchiveAmbientSound ();  /* heretic ambient cursor (no-op otherwise) */
   SV_UnArchiveMaps (); /* hexen hub map archives (no-op otherwise) */
   P_UnArchiveRNG ();    // killough 1/18/98: load RNG information
   P_UnArchiveMap ();    // killough 1/22/98: load automap information
@@ -2168,7 +2170,7 @@ static int G_DoSaveGameToSaveBuffer() {
    * with upstream). */
   if (raven)
   {
-    char raven_magic[4] = { 'R','V','N','2' };
+    char raven_magic[4] = { 'R','V','N','5' };
     if (hexen)
       raven_magic[3] = '4';
     CheckSaveGame(sizeof raven_magic);
@@ -2252,6 +2254,7 @@ static int G_DoSaveGameToSaveBuffer() {
   P_ArchiveSpecials();
   P_ArchiveScripts();  /* hexen ACS script states + map vars (no-op otherwise) */
   P_ArchiveSounds();   /* hexen active sound sequences (no-op otherwise) */
+  P_ArchiveAmbientSound();   /* heretic ambient cursor (no-op otherwise) */
   SV_ArchiveMaps();    /* hexen hub map archives (no-op otherwise) */
   P_ArchiveRNG();    // killough 1/18/98: save RNG information
   P_ArchiveMap();    // killough 1/22/98: save automap information

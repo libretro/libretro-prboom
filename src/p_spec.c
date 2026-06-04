@@ -41,6 +41,7 @@
 
 #include "doomstat.h"
 #include "p_spec.h"
+#include "p_saveg.h"
 #include "p_tick.h"
 #include "p_setup.h"
 #include "m_random.h"
@@ -3905,6 +3906,61 @@ void P_InitAmbientSound(void)
   AmbSfxTics     = 10 * TICRATE;
   AmbSfxPtrIndex = -1;
   AmbSfxPtr      = AmbSndSeqInit;
+}
+
+/* Heretic savegame support: the ambient walker consumes pr_heretic randoms
+ * on every command boundary, so loading must restore the exact mid-sequence
+ * position or the post-load timeline (and demo-style RNG stream) diverges
+ * from the saved one.  The registered sequence list itself is rebuilt
+ * deterministically by P_SpawnMapThing during level setup, so only the
+ * cursor needs saving: slot index (-1 = the init sequence), the offset of
+ * the command pointer within that sequence, the tic countdown and the
+ * running volume. */
+void P_ArchiveAmbientSound(void)
+{
+  const int *base;
+  int offset;
+
+  if (!heretic)
+    return;
+
+  CheckSaveGame(4 * sizeof(int));
+
+  base = (AmbSfxPtrIndex < 0) ? AmbSndSeqInit : LevelAmbientSfx[AmbSfxPtrIndex];
+  offset = (int)(AmbSfxPtr - base);
+
+  memcpy(save_p, &AmbSfxPtrIndex, sizeof(int)); save_p += sizeof(int);
+  memcpy(save_p, &offset,         sizeof(int)); save_p += sizeof(int);
+  memcpy(save_p, &AmbSfxTics,     sizeof(int)); save_p += sizeof(int);
+  memcpy(save_p, &AmbSfxVolume,   sizeof(int)); save_p += sizeof(int);
+}
+
+void P_UnArchiveAmbientSound(void)
+{
+  int *base;
+  int offset;
+
+  if (!heretic)
+    return;
+
+  memcpy(&AmbSfxPtrIndex, save_p, sizeof(int)); save_p += sizeof(int);
+  memcpy(&offset,         save_p, sizeof(int)); save_p += sizeof(int);
+  memcpy(&AmbSfxTics,     save_p, sizeof(int)); save_p += sizeof(int);
+  memcpy(&AmbSfxVolume,   save_p, sizeof(int)); save_p += sizeof(int);
+
+  /* The slot list was rebuilt by level setup before this runs; reject a
+   * cursor that no longer fits rather than dereferencing past it. */
+  if (AmbSfxPtrIndex < 0 || AmbSfxPtrIndex >= AmbSfxCount)
+  {
+    AmbSfxPtrIndex = -1;
+    base = AmbSndSeqInit;
+    offset = 0;                 /* the init sequence is a lone afxcmd_end */
+  }
+  else
+    base = LevelAmbientSfx[AmbSfxPtrIndex];
+  if (offset < 0)
+    offset = 0;
+  AmbSfxPtr = base + offset;
 }
 
 void P_AmbientSound(void)

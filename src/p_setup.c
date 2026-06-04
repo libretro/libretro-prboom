@@ -38,6 +38,7 @@
 #include "config.h"
 #include "doomstat.h"
 #include "hexen/sn_sonix.h"
+#include "hexen/p_anim.h"
 #include "hexen/p_acs.h"
 #include "hexen/p_spec_hexen.h"
 #include "hexen/po_man.h"
@@ -2742,6 +2743,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
        * for any sector tag simply terminate at the -1 list ends. */
       P_InitTagLists();
       P_InitHexenTaggedLines();
+      P_SpawnLineSpecials();   /* collect the scrolling walls (100-103) */
    }
 
 
@@ -2784,6 +2786,7 @@ void P_Init (void)
 {
    P_InitSwitchList();
    P_InitPicAnims();
+   P_InitFTAnims();  /* hexen ANIMDEFS (no-op otherwise) */
    P_InitTerrainTypes();
    R_InitSprites(sprnames);
 }

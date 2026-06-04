@@ -50,6 +50,7 @@
 #include "r_main.h"
 #include "r_sky.h"
 #include "hexen/p_lightning.h"
+#include "hexen/p_anim.h"
 #include "p_maputl.h"
 #include "p_map.h"
 #include "p_user.h"
@@ -2677,12 +2678,14 @@ void P_UpdateSpecials (void)
   if (heretic)
     P_AmbientSound();
 
-  /* Hexen: advance the lightning storm and scroll the sky. */
+  /* Hexen: advance the lightning storm, scroll the sky, animate the
+   * ANIMDEFS flats/textures, and scroll the 100-103 walls. */
   if (hexen)
   {
     P_UpdateLightning();
     Sky1ColumnOffset += Sky1ScrollDelta;
     Sky2ColumnOffset += Sky2ScrollDelta;
+    P_AnimateHexenSurfaces();
   }
 
   // Downcount level timer, exit level if elapsed

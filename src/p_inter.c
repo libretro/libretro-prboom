@@ -47,6 +47,7 @@
 #include "hexen/p_spec_hexen.h"
 #include "p_enemy.h"
 #include "p_user.h"
+#include "r_demo.h"
 
 #define BONUSADD        6
 
@@ -2032,6 +2033,82 @@ static dbool P_MorphMonster(mobj_t *actor)
   return true;
 }
 
+int P_SubRandom(void);  /* heretic/p_action.c */
+
+#define CHICKENTICS (40 * 35)
+
+/* Heretic Morph Ovum on a monster: trade it for a chicken that remembers
+ * what it was (the chic actions tick P_UpdateChicken to turn it back).
+ * Pods, chickens, iron liches, the Maulotaur, and both D'Sparil forms
+ * shrug the egg off. */
+static dbool P_ChickenMorph(mobj_t *actor)
+{
+  mobj_t *fog;
+  mobj_t *chicken;
+  mobj_t *target;
+  mobjtype_t moType;
+  fixed_t x, y, z;
+  angle_t angle;
+  uint64_t ghost;
+
+  if (actor->player)
+    return false;
+  moType = actor->type;
+  switch (moType)
+  {
+    case HERETIC_MT_POD:
+    case HERETIC_MT_CHICKEN:
+    case HERETIC_MT_HEAD:
+    case HERETIC_MT_MINOTAUR:
+    case HERETIC_MT_SORCERER1:
+    case HERETIC_MT_SORCERER2:
+      return false;
+    default:
+      break;
+  }
+  x = actor->x;
+  y = actor->y;
+  z = actor->z;
+  angle = actor->angle;
+  ghost = actor->flags & MF_SHADOW;
+  target = actor->target;
+  P_SetMobjState(actor, HERETIC_S_FREETARGMOBJ);
+  fog = P_SpawnMobj(x, y, z + TELEFOGHEIGHT, HERETIC_MT_TFOG);
+  S_StartSound(fog, heretic_sfx_telept);
+  chicken = P_SpawnMobj(x, y, z, HERETIC_MT_CHICKEN);
+  chicken->special2.i = moType;
+  chicken->special1.i = CHICKENTICS + P_Random(pr_heretic);
+  chicken->flags |= ghost;
+  P_SetTarget(&chicken->target, target);
+  chicken->angle = angle;
+  return true;
+}
+
+/* Heretic whirlwind contact: rattle the victim around, occasionally toss
+ * non-bosses upward, and chip 3 damage every 8 tics. */
+void P_TouchWhirlwind(mobj_t *target)
+{
+  int randVal;
+
+  target->angle += P_SubRandom() << 20;
+  target->momx += P_SubRandom() << 10;
+  target->momy += P_SubRandom() << 10;
+  if (leveltime & 16 && !(target->flags2 & MF2_BOSS))
+  {
+    randVal = P_Random(pr_heretic);
+    if (randVal > 160)
+      randVal = 160;
+    target->momz += randVal << 10;
+    if (target->momz > 12 * FRACUNIT)
+      target->momz = 12 * FRACUNIT;
+  }
+  if (!(leveltime & 7))
+    P_DamageMobj(target, NULL, NULL, 3);
+
+  if (target->player)
+    R_SmoothPlaying_Reset(target->player); // e6y
+}
+
 /* The Minotaur's charge slam (the Heretic Maulotaur and the Hexen Dark
  * Servant): heavy knockback plus dice damage, staggering players, and the
  * charge ends. */
@@ -2286,14 +2363,31 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
     target->momx = target->momy = target->momz = 0;
   }
 
-  /* Heretic: the charging Maulotaur slams (the hexen Dark Servant's slam
-   * lives in the hexen inflictor switch above, per each game's ordering). */
-  if (heretic && inflictor && inflictor->type == HERETIC_MT_MINOTAUR &&
-      (inflictor->flags & MF_SKULLFLY))
-  {
-    P_MinotaurSlam(inflictor, target);
-    return;
-  }
+  /* Heretic inflictor special cases, in vanilla heretic's order (the hexen
+   * equivalents live in the hexen switch above, per each game's order). */
+  if (heretic && inflictor)
+    switch (inflictor->type)
+    {
+      case HERETIC_MT_EGGFX:
+        /* The Morph Ovum never deals damage.  Monsters become chickens;
+         * the player-side chicken morph awaits the heretic morph system,
+         * so the egg passes harmlessly through players for now. */
+        if (!target->player)
+          P_ChickenMorph(target);
+        return;
+      case HERETIC_MT_WHIRLWIND:
+        P_TouchWhirlwind(target);
+        return;
+      case HERETIC_MT_MINOTAUR:
+        if (inflictor->flags & MF_SKULLFLY)
+        {                       /* slam only when in charge mode */
+          P_MinotaurSlam(inflictor, target);
+          return;
+        }
+        break;
+      default:
+        break;
+    }
 
   player = target->player;
   if (player && gameskill == sk_baby)

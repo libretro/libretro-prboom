@@ -1973,6 +1973,8 @@ static dbool P_SplashImmune(mobj_t *target, mobj_t *spot)
     mobjinfo[target->type].splash_group == mobjinfo[spot->type].splash_group;
 }
 
+static dbool bombdamagesource = true;
+
 dbool PIT_RadiusAttack (mobj_t* thing)
 {
   fixed_t dx;
@@ -1984,6 +1986,10 @@ dbool PIT_RadiusAttack (mobj_t* thing)
    */
 
   if (!(thing->flags & (MF_SHOOTABLE | MF_BOUNCES)))
+    return TRUE;
+
+  /* Hexen: some projectiles do not splash their shooter */
+  if (!bombdamagesource && thing == bombsource)
     return TRUE;
 
   // Boss spider and cyborg
@@ -2035,7 +2041,8 @@ dbool PIT_RadiusAttack (mobj_t* thing)
 // P_RadiusAttack
 // Source is the creature that caused the explosion at spot.
 //
-void P_RadiusAttackEx(mobj_t* spot,mobj_t* source,int damage,int distance)
+void P_RadiusAttackHexen(mobj_t *spot, mobj_t *source, int damage,
+                         int distance, dbool damageSource)
 {
   int x;
   int y;
@@ -2056,10 +2063,16 @@ void P_RadiusAttackEx(mobj_t* spot,mobj_t* source,int damage,int distance)
   bombsource = source;
   bombdamage = damage;
   bombdistance = distance;
+  bombdamagesource = damageSource;
 
   for (y=yl ; y<=yh ; y++)
     for (x=xl ; x<=xh ; x++)
       P_BlockThingsIterator (x, y, PIT_RadiusAttack );
+}
+
+void P_RadiusAttackEx(mobj_t* spot,mobj_t* source,int damage,int distance)
+{
+  P_RadiusAttackHexen(spot, source, damage, distance, true);
 }
 
 void P_RadiusAttack(mobj_t* spot,mobj_t* source,int damage)

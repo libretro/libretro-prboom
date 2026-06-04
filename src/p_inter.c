@@ -1733,6 +1733,58 @@ static dbool P_InfightingImmune(mobj_t *target, mobj_t *source)
     mobjinfo[target->type].infighting_group == mobjinfo[source->type].infighting_group;
 }
 
+/* Hexen poison: P_PoisonPlayer raises the player's poison level (the tick in
+ * P_PlayerThink then drains it as P_PoisonDamage hits); P_PoisonDamage is the
+ * armor-ignoring damage path poison uses, after Raven's code. */
+void P_PoisonPlayer(player_t *player, mobj_t *poisoner, int poison)
+{
+  if ((player->cheats & CF_GODMODE) || player->powers[pw_invulnerability])
+    return;
+  player->poisoncount += poison;
+  player->poisoner = poisoner;
+  if (player->poisoncount > 100)
+    player->poisoncount = 100;
+}
+
+void P_PoisonDamage(player_t *player, mobj_t *source, int damage,
+                    dbool playPainSound)
+{
+  mobj_t *target = player->mo;
+  mobj_t *inflictor = source;
+
+  if (target->health <= 0)
+    return;
+  if (target->flags2 & MF2_INVULNERABLE && damage < 10000)
+    return;
+  if (gameskill == sk_baby)
+    damage >>= 1;               /* take half damage in trainer mode */
+  if (damage < 1000 &&
+      ((player->cheats & CF_GODMODE) || player->powers[pw_invulnerability]))
+    return;
+  player->health -= damage;
+  if (player->health < 0)
+    player->health = 0;
+  player->attacker = source;
+
+  target->health -= damage;
+  if (target->health <= 0)
+  {                             /* death */
+    target->special1.i = damage;
+    if (inflictor && !player->morphTics)
+    {                           /* flame/ice death */
+      if ((inflictor->flags2 & MF2_FIREDAMAGE) &&
+          (target->health > -50) && (damage > 25))
+        target->flags2 |= MF2_FIREDAMAGE;
+      if (inflictor->flags2 & MF2_ICEDAMAGE)
+        target->flags2 |= MF2_ICEDAMAGE;
+    }
+    P_KillMobj(source, target);
+    return;
+  }
+  if (!(leveltime & 63) && playPainSound)
+    P_SetMobjState(target, target->info->painstate);
+}
+
 void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
 {
   player_t *player;
@@ -1752,6 +1804,34 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
   {
     switch (inflictor->type)
     {
+      case HEXEN_MT_POISONDART:
+        if (target->player)
+        {
+          P_PoisonPlayer(target->player, source, 20);
+          damage >>= 1;
+        }
+        break;
+      case HEXEN_MT_POISONCLOUD:
+        if (target->player)
+        {
+          if (target->player->poisoncount < 4)
+          {
+            P_PoisonDamage(target->player, source,
+                           15 + (P_Random(pr_heretic) & 15), false);
+            P_PoisonPlayer(target->player, source, 50);
+            S_StartSound(target, hexen_sfx_player_poisoncough);
+          }
+          return;
+        }
+        else if (!(target->flags & MF_COUNTKILL))
+        {                       /* clouds only hurt players and monsters */
+          return;
+        }
+        break;
+      case HEXEN_MT_FSWORD_MISSILE:
+        if (target->player)
+          damage -= damage >> 2;
+        break;
       case HEXEN_MT_TELOTHER_FX1:
       case HEXEN_MT_TELOTHER_FX2:
       case HEXEN_MT_TELOTHER_FX3:
@@ -1777,13 +1857,22 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
   if (hexen && (target->flags2 & MF2_INVULNERABLE) && damage < 10000)
   {
     if (target->player)
+      return;                   /* for the player, no exceptions */
+    if (inflictor)
+    {
+      switch (inflictor->type)
+      {
+        /* these inflictors aren't foiled by invulnerability */
+        case HEXEN_MT_HOLY_FX:
+        case HEXEN_MT_POISONCLOUD:
+        case HEXEN_MT_FIREBOMB:
+          break;
+        default:
+          return;
+      }
+    }
+    else
       return;
-    if (!(target->flags & MF_SHOOTABLE))
-      return;
-    if (!source)
-      return;
-    /* non-player invulnerable monster: ignore the hit */
-    return;
   }
 
   if (target->flags & MF_SKULLFLY)
@@ -1945,6 +2034,16 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
     else
       target->flags |= MF_JUSTHIT;    // fight back!
 
+    /* Hexen: centaurs and ettins caught in a poison cloud whimper */
+    if (hexen && inflictor && inflictor->type == HEXEN_MT_POISONCLOUD)
+    {
+      if (target->flags & MF_COUNTKILL && P_Random(pr_heretic) < 128 &&
+          !S_GetSoundPlayingInfo(target, hexen_sfx_puppybeat) &&
+          (target->type == HEXEN_MT_CENTAUR ||
+           target->type == HEXEN_MT_CENTAURLEADER ||
+           target->type == HEXEN_MT_ETTIN))
+        S_StartSound(target, hexen_sfx_puppybeat);
+    }
     P_SetMobjState(target, target->info->painstate);
   }
 

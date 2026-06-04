@@ -1794,17 +1794,13 @@ void P_PlayerThink (player_t* player)
    if (player->bonuscount)
       player->bonuscount--;
 
-#ifdef HEXEN
-   if(player->poisoncount && !(leveltime&15))
+   if (hexen && player->poisoncount && !(leveltime & 15))
    {
       player->poisoncount -= 5;
-      if(player->poisoncount < 0)
-      {
+      if (player->poisoncount < 0)
          player->poisoncount = 0;
-      }
       P_PoisonDamage(player, player->poisoner, 1, true);
    }
-#endif
 
    if (player->powers[pw_infrared])
    {

@@ -2153,15 +2153,18 @@ void A_Explode(mobj_t *thingy)
 {
   int damage   = 128;
   int distance = 128;
+  dbool damagesource = true;
 
-  /* Heretic gives several actors their own blast damage/radius, and the
-   * firebomb raises itself before bursting. Without this they all used the
-   * Doom 128/128 default. */
-  if (heretic)
+  /* Raven gives many actors their own blast damage/radius, and the
+   * firebombs raise themselves before bursting; several Hexen player
+   * projectiles also spare their shooter from the splash.  Without this
+   * they all used the Doom 128/128 default. */
+  if (raven)
   {
     switch (thingy->type)
     {
       case HERETIC_MT_FIREBOMB:        /* time bomb of the ancients */
+      case HEXEN_MT_FIREBOMB:
         thingy->z += 32 * FRACUNIT;
         thingy->flags &= ~MF_SHADOW;
         break;
@@ -2173,12 +2176,72 @@ void A_Explode(mobj_t *thingy)
         damage = 80 + (P_Random(pr_heretic) & 31);
         distance = damage;
         break;
+      case HEXEN_MT_MNTRFX2:           /* minotaur floor fire */
+        damage = 24;
+        break;
+      case HEXEN_MT_BISHOP:            /* bishop radius death */
+        damage = 25 + (P_Random(pr_heretic) & 15);
+        break;
+      case HEXEN_MT_HAMMER_MISSILE:    /* fighter hammer */
+        damage = 128;
+        damagesource = false;
+        break;
+      case HEXEN_MT_FSWORD_MISSILE:    /* fighter runesword */
+        damage = 64;
+        damagesource = false;
+        break;
+      case HEXEN_MT_CIRCLEFLAME:       /* cleric flame secondary */
+        damage = 20;
+        damagesource = false;
+        break;
+      case HEXEN_MT_SORCBALL1:         /* sorcerer balls */
+      case HEXEN_MT_SORCBALL2:
+      case HEXEN_MT_SORCBALL3:
+        distance = 255;
+        damage = 255;
+        thingy->special_args[0] = 1;   /* don't play bounce */
+        break;
+      case HEXEN_MT_SORCFX1:           /* sorcerer spell 1 */
+        damage = 30;
+        break;
+      case HEXEN_MT_SORCFX4:           /* sorcerer spell 4 */
+        damage = 20;
+        break;
+      case HEXEN_MT_TREEDESTRUCTIBLE:
+        damage = 10;
+        break;
+      case HEXEN_MT_DRAGON_FX2:
+        damage = 80;
+        damagesource = false;
+        break;
+      case HEXEN_MT_MSTAFF_FX:         /* mage bloodscourge */
+        damage = 64;
+        distance = 192;
+        damagesource = false;
+        break;
+      case HEXEN_MT_MSTAFF_FX2:
+        damage = 80;
+        distance = 192;
+        damagesource = false;
+        break;
+      case HEXEN_MT_POISONCLOUD:       /* flechette gas */
+        damage = 4;
+        distance = 40;
+        break;
+      case HEXEN_MT_ZXMAS_TREE:
+      case HEXEN_MT_ZSHRUB2:
+        damage = 30;
+        distance = 64;
+        break;
       default:
         break;
     }
   }
 
-  P_RadiusAttackEx(thingy, thingy->target, damage, distance);
+  P_RadiusAttackHexen(thingy, thingy->target, damage, distance, damagesource);
+  if (hexen && thingy->z <= thingy->floorz + (distance << FRACBITS) &&
+      thingy->type != HEXEN_MT_POISONCLOUD)
+    P_HitFloor(thingy);
   retro_set_rumble_damage(60, 500.f);
 }
 
@@ -3595,6 +3658,103 @@ void A_CheckTeleRing(mobj_t *actor)
 {
   if (actor->special1.i-- <= 0)
     P_SetMobjState(actor, actor->info->deathstate);
+}
+
+/* Flechette.  The Cleric's bag becomes a drifting poison cloud
+ * (A_PoisonBagInit) that lives a randomized two dozen tics
+ * (A_PoisonBagCheck) while bobbing and splashing 4/40 gas damage
+ * (A_PoisonBagDamage via A_Explode); the Fighter's grenade and the
+ * Mage's firebomb count down with A_CheckThrowBomb, settling with
+ * A_SmBounce and expiring through A_BounceCheck. */
+void A_PoisonBagInit(mobj_t *actor)
+{
+  mobj_t *mo;
+
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z + 28 * FRACUNIT,
+                   HEXEN_MT_POISONCLOUD);
+  if (!mo)
+    return;
+  mo->momx = 1;                 /* missiles must move to touch things */
+  mo->special1.i = 24 + (P_Random(pr_heretic) & 7);
+  mo->special2.i = 0;
+  P_SetTarget(&mo->target, actor->target);
+  mo->radius = 20 * FRACUNIT;
+  mo->height = 30 * FRACUNIT;
+  mo->flags &= ~MF_NOCLIP;
+}
+
+void A_PoisonBagCheck(mobj_t *actor)
+{
+  if (!--actor->special1.i)
+    P_SetMobjState(actor, HEXEN_S_POISONCLOUD_X1);
+}
+
+void A_PoisonBagDamage(mobj_t *actor)
+{
+  int bobIndex;
+
+  A_Explode(actor);
+
+  bobIndex = actor->special2.i;
+  actor->z += FloatBobOffsets[bobIndex] >> 4;
+  actor->special2.i = (bobIndex + 1) & 63;
+}
+
+void A_CheckThrowBomb(mobj_t *actor)
+{
+  if (D_abs(actor->momx) < 3 * FRACUNIT / 2 &&
+      D_abs(actor->momy) < 3 * FRACUNIT / 2 &&
+      actor->momz < 2 * FRACUNIT &&
+      actor->state == &states[HEXEN_S_THROWINGBOMB6])
+  {
+    P_SetMobjState(actor, HEXEN_S_THROWINGBOMB7);
+    actor->z = actor->floorz;
+    actor->momz = 0;
+    actor->flags2 &= ~MF2_FLOORBOUNCE;
+    actor->flags &= ~MF_MISSILE;
+  }
+  if (!--actor->health)
+    P_SetMobjState(actor, actor->info->deathstate);
+}
+
+void A_SmBounce(mobj_t *actor)
+{
+  /* give some more momentum (x, y and z) */
+  actor->z = actor->floorz + FRACUNIT;
+  actor->momz = (2 * FRACUNIT) + (P_Random(pr_heretic) << 10);
+  actor->momx = (P_Random(pr_heretic) % 3) << FRACBITS;
+  actor->momy = (P_Random(pr_heretic) % 3) << FRACBITS;
+}
+
+void A_BounceCheck(mobj_t *actor)
+{
+  if (actor->special_args[4]-- <= 0)
+  {
+    if (actor->special_args[3]-- <= 0)
+    {
+      P_SetMobjState(actor, actor->info->deathstate);
+      switch (actor->type)
+      {
+        case HEXEN_MT_SORCBALL1:
+        case HEXEN_MT_SORCBALL2:
+        case HEXEN_MT_SORCBALL3:
+          S_StartSound(NULL, hexen_sfx_sorcerer_bigballexplode);
+          break;
+        case HEXEN_MT_SORCFX1:
+          S_StartSound(NULL, hexen_sfx_sorcerer_headscream);
+          break;
+        default:
+          break;
+      }
+    }
+    else
+      A_SmBounce(actor);
+  }
+}
+
+void A_NoGravity(mobj_t *actor)
+{
+  actor->flags |= MF_NOGRAVITY;
 }
 
 /* Hexen bell (Winnowing Hall's clocktower).  The bell is a hanging

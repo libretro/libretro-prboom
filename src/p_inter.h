@@ -73,4 +73,6 @@ extern const char *TextKeyMessages[11];  /* Hexen key names (lock - 1) */
 dbool P_GiveBody(player_t *player, int num);
 dbool P_GiveMana(player_t *player, manatype_t mana, int count);
 dbool Hexen_P_GiveArmor(player_t *player, armortype_t armortype, int amount);
+void P_PoisonPlayer(player_t *player, mobj_t *poisoner, int poison);
+void P_PoisonDamage(player_t *player, mobj_t *source, int damage, dbool playPainSound);
 #endif

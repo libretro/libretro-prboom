@@ -286,6 +286,8 @@ typedef struct player_s
   int         mana[NUMMANA];  /* Hexen two-mana ammo (MANA_1, MANA_2) */
   int         maxmana;        /* Hexen mana cap */
   int         morphTics;      /* Hexen: >0 while morphed (pig) */
+  int         poisoncount;    /* Hexen: poison severity; ticks damage */
+  struct mobj_s *poisoner;    /* Hexen: who poisoned the player */
   int         jumpTics;       /* Hexen: cooldown before the next jump */
   int         pieces;         /* Hexen: collected fourth-weapon pieces (WPIECE*) */
 

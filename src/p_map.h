@@ -67,6 +67,7 @@ void    P_LineAttack(mobj_t *t1, angle_t angle, fixed_t distance,
                      fixed_t slope, int damage );
 void    P_RadiusAttack(mobj_t *spot, mobj_t *source, int damage);
 void    P_RadiusAttackEx(mobj_t *spot, mobj_t *source, int damage, int distance);
+void    P_RadiusAttackHexen(mobj_t *spot, mobj_t *source, int damage, int distance, dbool damageSource);
 dbool P_CheckPosition(mobj_t *thing, fixed_t x, fixed_t y);
 
 //jff 3/19/98 P_CheckSector(): new routine to replace P_ChangeSector()

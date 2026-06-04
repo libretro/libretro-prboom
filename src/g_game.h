@@ -64,6 +64,7 @@ void G_Completed(int map, int position);
 extern int RebornPosition;
 void G_SecretExitLevel(void);
 void G_WorldDone(void);
+int G_GetLeaveMap(void); /* hexen: staged Teleport_NewMap warp number */
 void G_EndGame(void); /* cph - make m_menu.c call a G_* function for this */
 void G_Ticker(void);
 void G_ReloadDefaults(void);     // killough 3/1/98: loads game defaults

@@ -1517,11 +1517,10 @@ void G_DoCompleted (void)
   if (automapmode & am_active)
     AM_Stop();
 
-  /* Hexen has no intermission between hub maps: resolve the staged
-   * Teleport_NewMap destination through the MAPINFO warp table and load it
-   * directly.  Per-map world state is not yet preserved across hub revisits
-   * (the hub save subsystem is a later step); the destination map loads
-   * fresh each time, while the players carry their state over. */
+  /* Hexen: hub travel within a cluster loads the next map directly; a
+   * cluster change (or any deathmatch exit) goes through the interlude
+   * first -- the CLUSxMSG text screen or the frag tally -- and the staged
+   * destination is consumed by G_DoWorldDone when it ends. */
   if (hexen)
   {
     if (LeaveMap == -1)
@@ -1532,7 +1531,16 @@ void G_DoCompleted (void)
     wminfo.nextep = gameepisode - 1;
     wminfo.next = P_TranslateMapWarp(LeaveMap) - 1;
     RebornPosition = LeavePosition;
-    gameaction = ga_worlddone;
+    if (!deathmatch &&
+        P_GetMapCluster(gamemap) ==
+        P_GetMapCluster(P_TranslateMapWarp(LeaveMap)))
+    {
+      gameaction = ga_worlddone;
+      return;
+    }
+    gamestate = GS_INTERMISSION;
+    automapmode &= ~am_active;
+    WI_Start(&wminfo);
     return;
   }
 
@@ -1673,6 +1681,13 @@ frommapinfo:
 //
 // G_WorldDone
 //
+
+/* The staged Teleport_NewMap destination (warp number); the hexen
+ * intermission needs it to pick the cluster message. */
+int G_GetLeaveMap(void)
+{
+  return LeaveMap;
+}
 
 void G_WorldDone (void)
 {

@@ -4145,6 +4145,231 @@ void A_WraithMissile(mobj_t *actor)
     S_StartSound(actor, hexen_sfx_wraith_missile_fire);
 }
 
+void A_WraithInit(mobj_t *actor)
+{
+  actor->z += 48 * FRACUNIT;
+  actor->special1.i = 0;            /* index into FloatBobOffsets */
+}
+
+void A_WraithRaiseInit(mobj_t *actor)
+{
+  actor->flags2 &= ~MF2_DONTDRAW;
+  actor->flags2 &= ~MF2_NONSHOOTABLE;
+  actor->flags |= MF_SHOOTABLE | MF_SOLID;
+  actor->floorclip = actor->info->height;
+}
+
+void A_WraithRaise(mobj_t *actor)
+{
+  if (A_RaiseMobj(actor))
+  {
+    /* reached its target height */
+    P_SetMobjState(actor, HEXEN_S_WRAITH_CHASE1);
+  }
+  P_SpawnDirt(actor, actor->radius);
+}
+
+void A_WraithFX2(mobj_t *actor)
+{
+  mobj_t *mo;
+  angle_t angle;
+  int i;
+
+  for (i = 0; i < 2; i++)
+  {
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_WRAITHFX2);
+    if (mo)
+    {
+      if (P_Random(pr_heretic) < 128)
+        angle = actor->angle + (P_Random(pr_heretic) << 22);
+      else
+        angle = actor->angle - (P_Random(pr_heretic) << 22);
+      mo->momz = 0;
+      mo->momx = FixedMul((P_Random(pr_heretic) << 7) + FRACUNIT,
+                          finecosine[angle >> ANGLETOFINESHIFT]);
+      mo->momy = FixedMul((P_Random(pr_heretic) << 7) + FRACUNIT,
+                          finesine[angle >> ANGLETOFINESHIFT]);
+      P_SetTarget(&mo->target, actor);
+      mo->floorclip = 10 * FRACUNIT;
+    }
+  }
+}
+
+void A_WraithFX3(mobj_t *actor)
+{
+  mobj_t *mo;
+  int numdropped = P_Random(pr_heretic) % 15;
+  int i;
+
+  for (i = 0; i < numdropped; i++)
+  {
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_WRAITHFX3);
+    if (mo)
+    {
+      mo->x += (P_Random(pr_heretic) - 128) << 11;
+      mo->y += (P_Random(pr_heretic) - 128) << 11;
+      mo->z += (P_Random(pr_heretic) << 10);
+      P_SetTarget(&mo->target, actor);
+    }
+  }
+}
+
+void A_WraithFX4(mobj_t *actor)
+{
+  mobj_t *mo;
+  int chance = P_Random(pr_heretic);
+  int spawn4, spawn5;
+
+  if (chance < 10)
+  {
+    spawn4 = TRUE;
+    spawn5 = FALSE;
+  }
+  else if (chance < 20)
+  {
+    spawn4 = FALSE;
+    spawn5 = TRUE;
+  }
+  else if (chance < 25)
+  {
+    spawn4 = TRUE;
+    spawn5 = TRUE;
+  }
+  else
+  {
+    spawn4 = FALSE;
+    spawn5 = FALSE;
+  }
+
+  if (spawn4)
+  {
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_WRAITHFX4);
+    if (mo)
+    {
+      mo->x += (P_Random(pr_heretic) - 128) << 12;
+      mo->y += (P_Random(pr_heretic) - 128) << 12;
+      mo->z += (P_Random(pr_heretic) << 10);
+      P_SetTarget(&mo->target, actor);
+    }
+  }
+  if (spawn5)
+  {
+    mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_WRAITHFX5);
+    if (mo)
+    {
+      mo->x += (P_Random(pr_heretic) - 128) << 11;
+      mo->y += (P_Random(pr_heretic) - 128) << 11;
+      mo->z += (P_Random(pr_heretic) << 10);
+      P_SetTarget(&mo->target, actor);
+    }
+  }
+}
+
+void A_WraithLook(mobj_t *actor)
+{
+  A_Look(actor);
+}
+
+void A_WraithChase(mobj_t *actor)
+{
+  int weaveindex = actor->special1.i;
+
+  actor->z += FloatBobOffsets[weaveindex];
+  actor->special1.i = (weaveindex + 2) & 63;
+  A_Chase(actor);
+  A_WraithFX4(actor);
+}
+
+void A_CentaurAttack2(mobj_t *actor)
+{
+  if (!actor->target)
+    return;
+  P_SpawnMissile(actor, actor->target, HEXEN_MT_CENTAUR_FX);
+  S_StartSound(actor, hexen_sfx_centaurleader_attack);
+}
+
+void A_CentaurDropStuff(mobj_t *actor)
+{
+  mobj_t *mo;
+  angle_t angle;
+
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z + 45 * FRACUNIT,
+                   HEXEN_MT_CENTAUR_SHIELD);
+  if (mo)
+  {
+    angle = actor->angle + ANG90;
+    mo->momz = FRACUNIT * 8 + (P_Random(pr_heretic) << 10);
+    mo->momx = FixedMul(((P_Random(pr_heretic) - 128) << 11) + FRACUNIT,
+                        finecosine[angle >> ANGLETOFINESHIFT]);
+    mo->momy = FixedMul(((P_Random(pr_heretic) - 128) << 11) + FRACUNIT,
+                        finesine[angle >> ANGLETOFINESHIFT]);
+    P_SetTarget(&mo->target, actor);
+  }
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z + 45 * FRACUNIT,
+                   HEXEN_MT_CENTAUR_SWORD);
+  if (mo)
+  {
+    angle = actor->angle - ANG90;
+    mo->momz = FRACUNIT * 8 + (P_Random(pr_heretic) << 10);
+    mo->momx = FixedMul(((P_Random(pr_heretic) - 128) << 11) + FRACUNIT,
+                        finecosine[angle >> ANGLETOFINESHIFT]);
+    mo->momy = FixedMul(((P_Random(pr_heretic) - 128) << 11) + FRACUNIT,
+                        finesine[angle >> ANGLETOFINESHIFT]);
+    P_SetTarget(&mo->target, actor);
+  }
+}
+
+void A_SetShootable(mobj_t *actor)
+{
+  actor->flags2 &= ~MF2_NONSHOOTABLE;
+  actor->flags |= MF_SHOOTABLE;
+}
+
+void A_UnSetShootable(mobj_t *actor)
+{
+  actor->flags2 |= MF2_NONSHOOTABLE;
+  actor->flags &= ~MF_SHOOTABLE;
+}
+
+void A_SetAltShadow(mobj_t *actor)
+{
+  actor->flags &= ~MF_SHADOW;
+  actor->flags |= MF_ALTSHADOW;
+}
+
+void A_SpeedFade(mobj_t *actor)
+{
+  actor->flags |= MF_SHADOW;
+  actor->flags &= ~MF_ALTSHADOW;
+  if (actor->target)
+    actor->sprite = actor->target->sprite;
+}
+
+void A_DropMace(mobj_t *actor)
+{
+  mobj_t *mo;
+
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z + (actor->height >> 1),
+                   HEXEN_MT_ETTIN_MACE);
+  if (mo)
+  {
+    mo->momx = (P_Random(pr_heretic) - 128) << 11;
+    mo->momy = (P_Random(pr_heretic) - 128) << 11;
+    mo->momz = FRACUNIT * 10 + (P_Random(pr_heretic) << 10);
+    P_SetTarget(&mo->target, actor);
+  }
+}
+
+void A_CheckFloor(mobj_t *actor)
+{
+  if (actor->z <= actor->floorz)
+  {
+    actor->z = actor->floorz;
+    actor->flags2 &= ~MF2_LOGRAV;
+    P_SetMobjState(actor, actor->info->deathstate);
+  }
+}
+
 void A_DemonAttack1(mobj_t *actor)
 {
   if (!actor->target)

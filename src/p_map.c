@@ -2062,6 +2062,15 @@ dbool PIT_RadiusAttack (mobj_t* thing)
   if (!bombdamagesource && thing == bombsource)
     return TRUE;
 
+  if (hexen)
+  {
+    /* Hexen explosions have a vertical reach limit; without it a blast
+     * hits everything in the 2D radius regardless of height. */
+    if (D_abs((thing->z - bombspot->z) >> FRACBITS) > 2 * bombdistance)
+      return TRUE;              /* too high/low */
+  }
+  else
+  {
   // Boss spider and cyborg
   // take no damage from concussion.
 
@@ -2084,6 +2093,7 @@ dbool PIT_RadiusAttack (mobj_t* thing)
   /* MBF21: splash-group immunity (target vs. the explosion origin). */
   if (mbf21_features && P_SplashImmune(thing, bombspot))
     return TRUE;
+  }
 
   dx = D_abs(thing->x - bombspot->x);
   dy = D_abs(thing->y - bombspot->y);
@@ -2099,8 +2109,30 @@ dbool PIT_RadiusAttack (mobj_t* thing)
 
   if ( P_CheckSight (thing, bombspot) )
     {
-    // must be in direct path
-    P_DamageMobj (thing, bombspot, bombsource, bombdamage - dist);
+    int damage;
+
+    /* must be in direct path.
+     *
+     * Doom's classic falloff (damage - dist) silently relies on every
+     * caller passing damage == distance; all Doom explosions do.  Raven
+     * explosions routinely pass independent values (flechette gas is
+     * 4/40, the Heresiarch's rapid-fire spell 20/128, bloodscourge
+     * 64/192, ...), for which the classic formula goes NEGATIVE for
+     * targets further than `damage` units: P_DamageMobj then heals the
+     * victim, and a negative player damagecount drives the pain-palette
+     * index negative, sending V_Palette16 out of bounds and crashing
+     * every 16bpp column draw.  Use the proportional falloff (as Hexen
+     * and Eternity do) whenever the two values differ. */
+    if (!hexen && bombdamage == bombdistance)
+      damage = bombdamage - dist;
+    else
+      damage = (bombdamage * (bombdistance - dist) / bombdistance) + 1;
+
+    /* Hexen: players take a quarter of splash damage. */
+    if (hexen && thing->player)
+      damage >>= 2;
+
+    P_DamageMobj (thing, bombspot, bombsource, damage);
     }
 
   return TRUE;

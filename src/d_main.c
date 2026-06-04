@@ -320,8 +320,13 @@ void D_Display (void)
   // draw pause pic
   if (paused && (menuactive != mnact_full)) {
     // Simplified the "logic" here and no need for x-coord caching - POPE
-    V_DrawNamePatch((320 - V_NamePatchWidth("M_PAUSE"))/2, 4,
-                    0, "M_PAUSE", CR_DEFAULT, VPT_STRETCH);
+    {
+      /* Raven names its pause graphic PAUSED; M_PAUSE is Doom's.  Looking
+       * up the wrong one crashes the patch cache. */
+      const char *pause_patch = raven ? "PAUSED" : "M_PAUSE";
+      V_DrawNamePatch((320 - V_NamePatchWidth(pause_patch))/2, 4,
+                      0, pause_patch, CR_DEFAULT, VPT_STRETCH);
+    }
   }
 
   // menus go directly to the screen
@@ -623,14 +628,16 @@ void D_DoAdvanceDemo(void)
   pagetic = TICRATE * 11;         /* killough 11/98: default behavior */
   gamestate = GS_DEMOSCREEN;
 
-  /* Heretic's attract-mode demos are recorded in a Heretic-specific demo
-   * format that this engine's Doom demo reader (G_ReadDemoHeader) cannot
-   * parse, which hangs the attract loop. Until Heretic demo playback is
-   * wired up, keep showing the title page instead of advancing into a
-   * demo.  The page-cycling D_DrawTitle* path (which would normally start
-   * the title music) is skipped here, so start it explicitly; S_StartMusic
-   * is a no-op once the title song is already playing. */
-  if (heretic)
+  /* The Raven attract-mode demos are recorded in game-specific demo
+   * formats that this engine's Doom demo reader (G_ReadDemoHeader) cannot
+   * parse: Heretic's hangs the attract loop, and Hexen's misreads as
+   * garbage input -- including stray pause presses, which then crash the
+   * pause overlay.  Until Raven demo playback is wired up, keep showing
+   * the title page instead of advancing into a demo.  The page-cycling
+   * D_DrawTitle* path (which would normally start the title music) is
+   * skipped here, so start it explicitly; S_StartMusic is a no-op once
+   * the title song is already playing. */
+  if (raven)
   {
     pagetic = TICRATE * 11;
     pagename = "TITLE";

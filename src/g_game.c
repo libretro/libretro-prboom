@@ -75,6 +75,7 @@
 #include "r_data.h"
 #include "r_sky.h"
 #include "hexen/p_mapinfo.h"
+#include "hexen/sv_save.h"
 #include "hexen/p_acs.h"
 #include "d_deh.h"              // Ty 3/27/98 deh declarations
 #include "p_inter.h"
@@ -1714,6 +1715,17 @@ void G_DoWorldDone (void)
   idmusnum = -1;             //jff 3/17/98 allow new level's music to be loaded
   gamestate = GS_LEVEL;
   gameepisode = wminfo.nextep + 1;
+
+  /* Hexen hub travel: archive the departing map and restore the
+   * destination's archived state when revisiting (sv_save.c). */
+  if (hexen)
+  {
+    SV_MapTeleport(wminfo.next + 1, RebornPosition);
+    gameaction = ga_nothing;
+    AM_clearMarks();
+    return;
+  }
+
   gamemap = wminfo.next + 1;
   gamemapinfo = G_LookupMapinfo(gameepisode, gamemap);
   G_DoLoadLevel();
@@ -2450,6 +2462,9 @@ void G_ReloadDefaults(void)
 
 void G_DoNewGame (void)
 {
+  /* a fresh game forgets any hub map archives */
+  if (hexen)
+    SV_HubInit();
   G_ReloadDefaults();            // killough 3/1/98
   netgame = FALSE;               // killough 3/29/98
   deathmatch = FALSE;

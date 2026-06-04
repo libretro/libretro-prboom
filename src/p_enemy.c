@@ -3322,9 +3322,9 @@ extern fixed_t FloatBobOffsets[64];
  * once the queue is full the oldest corpse is removed so a long fight does
  * not leave an unbounded pile.  Reset by P_InitCreatureCorpseQueue at level
  * load. */
-#define CORPSEQUEUESIZE 64
-static mobj_t *corpseQueue[CORPSEQUEUESIZE];
-static int     corpseQueueSlot;
+/* exposed for hub map archiving (hexen/sv_save.c) */
+mobj_t *corpseQueue[CORPSEQUEUESIZE];
+int     corpseQueueSlot;
 
 void A_QueueCorpse(mobj_t *actor)
 {

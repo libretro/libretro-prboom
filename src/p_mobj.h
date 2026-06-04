@@ -457,6 +457,10 @@ typedef struct mobj_s
     // new field: last known enemy -- killough 2/15/98
     struct mobj_s*      lastenemy;
 
+    /* Hexen hub travel: index assigned while archiving a map's mobjs so
+     * cross-references can be restored (sv_save.c). */
+    int                 archiveNum;
+
     // killough 8/2/98: friction properties part of sectors,
     // not objects -- removed friction properties from here
     // e6y: restored friction properties here

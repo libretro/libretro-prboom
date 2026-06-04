@@ -36,6 +36,11 @@
 #ifndef __P_ENEMY__
 #define __P_ENEMY__
 
+/* Hexen corpse queue (p_enemy.c), archived across hub travel. */
+#define CORPSEQUEUESIZE 64
+extern struct mobj_s *corpseQueue[CORPSEQUEUESIZE];
+extern int corpseQueueSlot;
+
 #include "p_mobj.h"
 
 void P_NoiseAlert (mobj_t *target, mobj_t *emmiter);

@@ -1696,12 +1696,14 @@ static void P_KillMobj(mobj_t *source, mobj_t *target)
   // This determines the kind of object spawned
   // during the death frame of a thing.
   //
-  // Raven: Heretic mobjinfo has no droppeditem field, so every Heretic
-  // actor's droppeditem reads as 0 -- which is NOT MT_NULL (-1), so this
-  // Doom path fired on every Heretic death and spawned mobjinfo[0] (an
-  // empty type that renders state 0 / the IMPX gargoyle sprite). Heretic
-  // does its own drops from A_NoBlocking via P_DropItem, so skip this.
-  if (!heretic && target->info->droppeditem != MT_NULL)
+  // Raven: Heretic and Hexen mobjinfo have no droppeditem field, so every
+  // Raven actor's droppeditem reads as 0 -- which is NOT MT_NULL (-1), so
+  // this Doom path fired on every Raven death and spawned mobjinfo[0] (an
+  // empty type that renders state 0: the IMPX gargoyle sprite in Heretic
+  // and a frozen, unpickable phantom of the MAN1 blue mana in Hexen).
+  // Heretic does its own drops from A_NoBlocking via P_DropItem and Hexen
+  // monsters drop nothing, so skip this for both.
+  if (!raven && target->info->droppeditem != MT_NULL)
   {
     mobj_t     *mo;
     mo = P_SpawnMobj (target->x,target->y,ONFLOORZ, target->info->droppeditem);

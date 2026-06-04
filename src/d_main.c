@@ -670,6 +670,11 @@ void D_AddFile (const char *file, wad_source_t source)
   char *gwa_filename      = NULL;
 
   wadfiles = realloc(wadfiles, sizeof(*wadfiles)*(numwadfiles+1));
+  /* Zero the fresh slot: realloc leaves it uninitialised, and a non-NULL
+   * embedded_data here would make W_AddFile wrongly treat this file WAD as
+   * a baked-in one and dereference garbage.  memset also covers handle/data
+   * and guards against future struct fields. */
+  memset(&wadfiles[numwadfiles], 0, sizeof(wadfiles[numwadfiles]));
   wadfiles[numwadfiles].name =
     AddDefaultExtension(strcpy(malloc(file_len + 5), file), ".wad");
   wadfiles[numwadfiles].src = source; // Ty 08/29/98
@@ -685,6 +690,7 @@ void D_AddFile (const char *file, wad_source_t source)
     char *ext = &gwa_filename[gwa_filename_len - 4];
     ext[1]    = 'g'; ext[2] = 'w'; ext[3] = 'a';
     wadfiles  = realloc(wadfiles, sizeof(*wadfiles)*(numwadfiles+1));
+    memset(&wadfiles[numwadfiles], 0, sizeof(wadfiles[numwadfiles]));
     wadfiles[numwadfiles].name = gwa_filename;
     wadfiles[numwadfiles].src = source; // Ty 08/29/98
     numwadfiles++;

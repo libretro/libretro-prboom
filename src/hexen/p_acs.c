@@ -13,6 +13,7 @@
 #include "doomtype.h"
 #include "doomstat.h"
 #include "hexen/p_mapinfo.h"
+#include "hexen/hexen.h"
 #include "hexen/po_man.h"
 #include "z_zone.h"
 #include "m_swap.h"
@@ -402,15 +403,19 @@ static const char *StringLookup(int index)
   return ACStrings[index];
 }
 
-/* Resolve a sound by lump name against the (Hexen-rewritten) S_sfx table. */
+/* Resolve an ACS sound name to a sfx index.  ACS scripts name sounds by
+ * their SNDINFO tag ("GlassShatter"), but the live S_sfx table no longer
+ * carries the tags: S_HexenLoadSndInfo repoints each entry's name at the
+ * actual lump SNDINFO assigns it.  The pristine seed table keeps the tag
+ * names at the same indices, so resolve against that. */
 static int ACS_GetSoundID(const char *name)
 {
   int i;
 
   if (!name || !name[0])
     return 0;
-  for (i = 1; i < num_sfx; i++)
-    if (S_sfx[i].name && !strcasecmp(name, S_sfx[i].name))
+  for (i = 1; i < HEXEN_NUMSFX; i++)
+    if (hexen_S_sfx[i].name && !strcasecmp(name, hexen_S_sfx[i].name))
       return i;
   return 0;
 }

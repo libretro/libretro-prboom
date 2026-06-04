@@ -1500,6 +1500,7 @@ void P_UnArchiveSounds(void)
   int soundID;
   byte polySnd;
   int secNum;
+  int seq_count;
   mobj_t *sndMobj;
 
   if (!hexen)
@@ -1525,8 +1526,13 @@ void P_UnArchiveSounds(void)
     else
       sndMobj = (mobj_t *) &polyobjs[secNum].startSpot;
 
+    /* SN_StartSequence prepends, so the just-started node is index 0;
+     * indexing by i here would apply each record's saved position to an
+     * earlier sequence's node, walking shorter scripts out of bounds. */
+    seq_count = ActiveSequences;
     SN_StartSequence(sndMobj, sequence);
-    SN_ChangeNodeData(i, seqOffset, delayTics, volume, soundID);
+    if (ActiveSequences > seq_count)
+      SN_ChangeNodeData(0, seqOffset, delayTics, volume, soundID);
     i++;
   }
 }

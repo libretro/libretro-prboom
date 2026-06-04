@@ -740,6 +740,7 @@ static void UnarchiveSounds(void)
   int     soundID;
   int     polySnd;
   int     secNum;
+  int     seq_count;
   mobj_t *sndMobj;
 
   AssertSegment(ASEG_SOUNDS);
@@ -760,8 +761,11 @@ static void UnarchiveSounds(void)
     else
       sndMobj = (mobj_t *) &polyobjs[secNum].startSpot;
 
+    /* SN_StartSequence prepends; see the matching fix in P_UnArchiveSounds */
+    seq_count = ActiveSequences;
     SN_StartSequence(sndMobj, sequence);
-    SN_ChangeNodeData(i, seqOffset, delayTics, volume, soundID);
+    if (ActiveSequences > seq_count)
+      SN_ChangeNodeData(0, seqOffset, delayTics, volume, soundID);
   }
 }
 

@@ -308,7 +308,11 @@ typedef struct {
 
 extern udmf_t udmf;
 
-typedef void (*udmf_errorfunc)(const char *fmt, ...); /* must not return */
+#include <boolean.h> /* match I_Error's bool return so callers need no cast */
+/* The parser's error callback aborts (does not return); it is given
+ * I_Error's exact signature so it can be passed without a function-type
+ * cast.  The bool return is never used. */
+typedef bool (*udmf_errorfunc)(const char *fmt, ...);
 
 void dsda_ParseUDMF(const unsigned char* buffer, size_t length, udmf_errorfunc err);
 

@@ -2201,8 +2201,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
        * runtime geometry from it.  Namespace must resolve or the parser
        * I_Errors via the callback. */
       udmf_namespace = UDMF_NONE;
-      dsda_ParseUDMF(W_CacheLumpNum(textmap), W_LumpLength(textmap),
-                     (udmf_errorfunc)I_Error);
+      dsda_ParseUDMF(W_CacheLumpNum(textmap), W_LumpLength(textmap), I_Error);
       if (udmf_namespace == UDMF_NONE)
          I_Error("P_SetupLevel: %s: unsupported or missing UDMF namespace", lumpname);
 
@@ -2358,6 +2357,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    if (!hexen)
       P_SpawnSpecials();
    else
+   {
       /* P_SpawnSpecials interprets line->special as Doom special numbers, so
        * it must not run over a Hexen map - but P_InitTagLists lives inside
        * it, and skipping that too leaves every firsttag/nexttag hash slot at
@@ -2368,6 +2368,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
        * for any sector tag simply terminate at the -1 list ends. */
       P_InitTagLists();
       P_InitHexenTaggedLines();
+   }
 
 
    /* The map's sectors are loaded now, so the lightning storm can scan for

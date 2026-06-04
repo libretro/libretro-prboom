@@ -855,6 +855,31 @@ static dbool PIT_CheckThing(mobj_t *thing) // killough 3/26/98: make static
           !(tmthing->flags2 & MF2_RIP))
         return FALSE;
 
+      /* Raven ripper missiles (the Mage's Wand shots, the Bloodscourge
+       * balls): tear through with their own damage dice and a spray of
+       * blood, shoving pushable things along, and never stop traversing.
+       * The recursion through P_DamageMobj can reset the spechit
+       * accounting, so it is cleared the way dsda-doom does. */
+      if (raven && (tmthing->flags2 & MF2_RIP))
+        {
+          if (!(thing->flags & MF_NOBLOOD) &&
+              !(thing->flags2 & MF2_REFLECTIVE) &&
+              !(thing->flags2 & MF2_INVULNERABLE))
+            P_RipperBlood(tmthing, thing);
+          if (heretic)
+            S_StartSound(tmthing, heretic_sfx_ripslop);
+          damage = ((P_Random(pr_heretic) & 3) + 2) * tmthing->info->damage;
+          P_DamageMobj(thing, tmthing, tmthing->target, damage);
+          if ((thing->flags2 & MF2_PUSHABLE) &&
+              !(tmthing->flags2 & MF2_CANNOTPUSH))
+            {                   /* push thing */
+              thing->momx += tmthing->momx >> 2;
+              thing->momy += tmthing->momy >> 2;
+            }
+          numspechit = 0;
+          return TRUE;
+        }
+
       // damage / explode
 
       damage = ((P_Random(pr_damage)%8)+1)*tmthing->info->damage;
@@ -888,6 +913,15 @@ static dbool PIT_CheckThing(mobj_t *thing) // killough 3/26/98: make static
 
       // don't traverse any more
       return FALSE;
+    }
+
+  /* Raven: pushable things (the pottery) are shoved along by whatever
+   * walks into them. */
+  if (raven && (thing->flags2 & MF2_PUSHABLE) &&
+      !(tmthing->flags2 & MF2_CANNOTPUSH))
+    {
+      thing->momx += tmthing->momx >> 2;
+      thing->momy += tmthing->momy >> 2;
     }
 
   // check for special pickup

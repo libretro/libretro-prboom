@@ -2336,6 +2336,24 @@ void P_SpawnPuff(fixed_t x,fixed_t y,fixed_t z)
 /* Hexen blood effects for hitscan/melee hits on fleshy things: a spray of
  * blood drops (shift 10, weight 3 per Raven's Hexen values) and, for the
  * axe, the big AXEBLOOD splat. */
+/* Raven: the spray a ripper missile tears out of whatever it is passing
+ * through. */
+void P_RipperBlood(mobj_t *mo, mobj_t *bleeder)
+{
+  mobj_t *th;
+  fixed_t x, y, z;
+
+  x = mo->x + (P_SubRandom() << 12);
+  y = mo->y + (P_SubRandom() << 12);
+  z = mo->z + (P_SubRandom() << 12);
+  th = P_SpawnMobj(x, y, z, hexen ? HEXEN_MT_BLOOD : HERETIC_MT_BLOOD);
+  if (!hexen)
+    th->flags |= MF_NOGRAVITY;
+  th->momx = mo->momx >> 1;
+  th->momy = mo->momy >> 1;
+  th->tics += P_Random(pr_heretic) & 3;
+}
+
 void P_BloodSplatter(fixed_t x, fixed_t y, fixed_t z, mobj_t *originator)
 {
   mobj_t *mo;

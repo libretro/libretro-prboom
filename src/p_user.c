@@ -315,115 +315,6 @@ void P_MovePlayer (player_t* player)
 
   mo->angle += cmd->angleturn << 16;
 
-#ifdef HEXEN
-  onground = (player->mo->z <= player->mo->floorz
-        || (player->mo->flags2&MF2_ONMOBJ)) ? true : false;
-
-  if(cmd->forwardmove)
-  {
-     if(onground || player->mo->flags2&MF2_FLY)
-     {
-        P_Thrust(player, player->mo->angle, ((int)cmd->forwardmove)*2048);
-     }
-     else
-     {
-        P_Thrust(player, player->mo->angle, FRACUNIT>>8);
-     }
-  }
-  if(cmd->sidemove)
-  {
-     if(onground || player->mo->flags2&MF2_FLY)
-     {
-        P_Thrust(player, player->mo->angle-ANG90, cmd->sidemove*2048);
-     }
-     else
-     {
-        P_Thrust(player, player->mo->angle, FRACUNIT>>8);
-     }
-  }
-  if(cmd->forwardmove || cmd->sidemove)
-  {
-     if(player->mo->state == &states[PStateNormal[player->class]])
-     {
-        P_SetMobjState(player->mo, PStateRun[player->class]);
-     }
-  }
-
-  look = cmd->lookfly&15;
-  if(look > 7)
-  {
-     look -= 16;
-  }
-  if(look)
-  {
-     if(look == TOCENTER)
-     {
-        player->centering = true;
-     }
-     else
-     {
-        player->lookdir += 5*look;
-        if(player->lookdir > 90 || player->lookdir < -110)
-        {
-           player->lookdir -= 5*look;
-        }
-     }
-  }
-  if(player->centering)
-  {
-     if(player->lookdir > 0)
-     {
-        player->lookdir -= 8;
-     }
-     else if(player->lookdir < 0)
-     {
-        player->lookdir += 8;
-     }
-     if(abs(player->lookdir) < 8)
-     {
-        player->lookdir = 0;
-        player->centering = false;
-     }
-  }
-  fly = cmd->lookfly>>4;
-  if(fly > 7)
-  {
-     fly -= 16;
-  }
-  if(fly && player->powers[pw_flight])
-  {
-     if(fly != TOCENTER)
-     {
-        player->flyheight = fly*2;
-        if(!(player->mo->flags2&MF2_FLY))
-        {
-           player->mo->flags2 |= MF2_FLY;
-           player->mo->flags |= MF_NOGRAVITY;
-           if(player->mo->momz <= -39*FRACUNIT)
-           { // stop falling scream
-              S_StopSound(player->mo);
-           }
-        }
-     }
-     else
-     {
-        player->mo->flags2 &= ~MF2_FLY;
-        player->mo->flags &= ~MF_NOGRAVITY;
-     }
-  }
-  else if(fly > 0)
-  {
-     P_PlayerUseArtifact(player, arti_fly);
-  }
-  if(player->mo->flags2&MF2_FLY)
-  {
-     player->mo->momz = player->flyheight*FRACUNIT;
-     if(player->flyheight)
-     {
-        player->flyheight /= 2;
-     }
-  }
-#else
   onground = mo->z <= mo->floorz;
 
   // e6y
@@ -561,7 +452,6 @@ void P_MovePlayer (player_t* player)
       }
     }
   }
-#endif
 }
 
 #define ANG5 (ANG90/18)
@@ -1597,55 +1487,10 @@ void P_PlayerThink (player_t* player)
       }
    }
 
-#ifdef HEXEN
-   if(cmd->arti)
-   { // Use an artifact
-      if((cmd->arti&AFLAG_JUMP) && onground && !player->jumpTics)
-      {
-         if(player->morphTics)
-         {
-            player->mo->momz = 6*FRACUNIT;
-         }
-         else
-         {
-            player->mo->momz = 9*FRACUNIT;
-         }
-         player->mo->flags2 &= ~MF2_ONMOBJ;
-         player->jumpTics = 18;
-      }
-      else if(cmd->arti&AFLAG_SUICIDE)
-      {
-         P_DamageMobj(player->mo, NULL, NULL, 10000);
-      }
-      if(cmd->arti == NUMARTIFACTS)
-      { // use one of each artifact (except puzzle artifacts)
-         int i;
-
-         for(i = 1; i < arti_firstpuzzitem; i++)
-         {
-            P_PlayerUseArtifact(player, i);
-         }
-      }
-      else
-      {
-         P_PlayerUseArtifact(player, cmd->arti&AFLAG_MASK);
-      }
-   }
-   // Check for weapon change
-   if(cmd->buttons&BT_SPECIAL)
-   { // A special event has no other buttons
-      cmd->buttons = 0;
-   }
-
-#endif
-
    /* Check for weapon change. */
 
-   if(cmd->buttons&BT_CHANGE
-#ifdef HEXEN
-         && !player->morphTics
-#endif
-         )
+   /* Hexen: a morphed (pig) player cannot change weapons. */
+   if(cmd->buttons&BT_CHANGE && !player->morphTics)
    {
       // The actual changing of the weapon is done when the weapon
       // psprite can do it (A_WeaponReady), so it doesn't happen in

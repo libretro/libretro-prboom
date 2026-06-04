@@ -65,7 +65,7 @@ const char *hexen_sprnames[HEXEN_NUMSPRITES + 1] = {
  * {(arg0_t)NULL} (Option A: actors spawn/animate but are inert).  The
  * keep/stub split is taken from the linker's exported symbols, NOT a
  * source grep: the Hexen player-weapon codepointers in p_pspr.c live
- * inside a dormant #ifdef HEXEN block and are not compiled, so they are
+ * not yet ported to a live code path, so they are
  * stubbed here too.  31 codepointers genuinely link (shared Doom/Heretic
  * actions plus the Heretic minotaur/artifact ones Hexen reuses) and are
  * kept; the other 195 referenced names are stubbed.  The explicit

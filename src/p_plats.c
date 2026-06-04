@@ -156,12 +156,10 @@ void T_PlatRaise(plat_t* plat)
             else
                plat->status = PLAT_DOWN;   // if at top, start down
 
-#ifdef HEXEN
-            SN_StartSequence((mobj_t *)&plat->sector->soundorg, 
-                  SEQ_PLATFORM+plat->sector->seqType);
-#else
-            if (!hexen) S_StartSound((mobj_t *)&plat->sector->soundorg,sfx_pstart);
-#endif
+            /* Hexen plats live in their own layer (EV_DoHexenPlat /
+             * Hexen_EV_StopPlat, which removes rather than stasises), so
+             * this shared stasis path is never reached on hexen maps. */
+            S_StartSound((mobj_t *)&plat->sector->soundorg,sfx_pstart);
          }
          break; //jff 1/27/98 don't pickup code added later to in_stasis
 
@@ -189,7 +187,6 @@ int EV_DoPlat
   int             secnum = -1;
   int                rtn = 0;
 
-#ifndef HEXEN
   /* Activate all <type> plats that are in_stasis */
   switch(type)
   {
@@ -205,18 +202,15 @@ int EV_DoPlat
     default:
       break;
   }
-#endif
 
   /* act on all sectors tagged the same as the activating linedef */
   while ((secnum = P_FindSectorFromLineTag(line,secnum)) >= 0)
   {
      sector_t *sec = &sectors[secnum];
 
-#ifndef HEXEN
      /* don't start a second floor function if already moving */
      if (P_SectorActive(floor_special,sec)) /* jff 2/23/98 multiple thinkers */
         continue;
-#endif
 
      /* Create a thinker */
      rtn = 1;

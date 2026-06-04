@@ -109,11 +109,7 @@ void F_StartFinale (void)
      case registered:
      case retail:
         {
-#ifdef HEXEN
-           S_StartSongName("hall", false);
-#else
            S_ChangeMusic(mus_victor, true);
-#endif
 
            switch (gameepisode)
            {
@@ -207,10 +203,8 @@ void F_StartFinale (void)
 dbool   F_Responder (event_t *event)
 {
   if (heretic) return Heretic_F_Responder(event);
-#ifndef HEXEN
-  if (FinaleStage == 2)
+  if (!hexen && FinaleStage == 2)
     return F_CastResponder (event);
-#endif
 
   return FALSE;
 }

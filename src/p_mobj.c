@@ -326,11 +326,125 @@ static void P_XYMovement (mobj_t* mo)
       else
         if (mo->flags & MF_MISSILE)
     {
+      /* Hexen floor-bouncers striking something in the XY plane ricochet
+       * off reflective or non-creature blockers at 0.75 speed, explode on
+       * players and monsters, and bounce off walls (the Heresiarch's balls
+       * stay silent doing it). */
+      if (hexen && mo->flags2 & MF2_FLOORBOUNCE)
+        {
+        if (BlockingMobj)
+          {
+          if ((BlockingMobj->flags2 & MF2_REFLECTIVE) ||
+              (!BlockingMobj->player &&
+               !(BlockingMobj->flags & MF_COUNTKILL)))
+            {
+            fixed_t speed;
+            angle_t angle;
+
+            angle = R_PointToAngle2(BlockingMobj->x, BlockingMobj->y,
+                                    mo->x, mo->y) +
+                    ANG1 * ((P_Random(pr_heretic) % 16) - 8);
+            speed = P_AproxDistance(mo->momx, mo->momy);
+            speed = FixedMul(speed, (fixed_t)(0.75 * FRACUNIT));
+            mo->angle = angle;
+            angle >>= ANGLETOFINESHIFT;
+            mo->momx = FixedMul(speed, finecosine[angle]);
+            mo->momy = FixedMul(speed, finesine[angle]);
+            if (mo->info->seesound)
+              S_StartSound(mo, mo->info->seesound);
+            return;
+            }
+          /* struck a player or creature: explode (vanilla falls on through
+           * to the explosion below) */
+          }
+        else
+          {                     /* struck a wall */
+          P_BounceWall(mo);
+          switch (mo->type)
+            {
+            case HEXEN_MT_SORCBALL1:
+            case HEXEN_MT_SORCBALL2:
+            case HEXEN_MT_SORCBALL3:
+            case HEXEN_MT_SORCFX1:
+              break;
+            default:
+              if (mo->info->seesound)
+                S_StartSound(mo, mo->info->seesound);
+              break;
+            }
+          return;
+          }
+        }
+
+      /* Hexen reflective blockers: the Centaur's raised shield bats the
+       * missile away within its frontal arc (the Wraithverge spirit and
+       * out-of-arc hits just explode), the Heresiarch deflects by 45
+       * degrees, anything else reflects with a small scatter.  The missile
+       * is re-aimed at half its base speed and now belongs to the
+       * reflector; seekers stash the old quarry and hunt the shooter. */
+      if (hexen && BlockingMobj &&
+          (BlockingMobj->flags2 & MF2_REFLECTIVE))
+        {
+        dbool explode_it = FALSE;
+        angle_t angle = R_PointToAngle2(BlockingMobj->x, BlockingMobj->y,
+                                        mo->x, mo->y);
+
+        switch (BlockingMobj->type)
+          {
+          case HEXEN_MT_CENTAUR:
+          case HEXEN_MT_CENTAURLEADER:
+            if ((D_abs((int) angle - (int) BlockingMobj->angle) >> 24) > 45 ||
+                mo->type == HEXEN_MT_HOLY_FX)
+              {
+              explode_it = TRUE;
+              break;
+              }
+            /* fall through */
+          case HEXEN_MT_SORCBOSS: /* the Heresiarch's full 45-degree deflection */
+            if (P_Random(pr_heretic) < 128)
+              angle += ANG45;
+            else
+              angle -= ANG45;
+            break;
+          default:
+            angle += ANG1 * ((P_Random(pr_heretic) % 16) - 8);
+            break;
+          }
+
+        if (!explode_it)
+          {
+          mo->angle = angle;
+          angle >>= ANGLETOFINESHIFT;
+          mo->momx = FixedMul(mo->info->speed >> 1, finecosine[angle]);
+          mo->momy = FixedMul(mo->info->speed >> 1, finesine[angle]);
+          if (mo->flags2 & MF2_SEEKERMISSILE)
+            P_SetTarget(&mo->special1.m, mo->target);
+          P_SetTarget(&mo->target, BlockingMobj);
+          return;
+          }
+        }
+
       // explode a missile
 
       if (ceilingline &&
           ceilingline->backsector &&
           ceilingline->backsector->ceilingpic == skyflatnum)
+        {
+        /* Raven sky-line cases: a popped skull drops back down instead of
+         * vanishing, and the Wraithverge spirit explodes. */
+        if (raven &&
+            mo->type == (hexen ? HEXEN_MT_BLOODYSKULL
+                               : HERETIC_MT_BLOODYSKULL))
+          {
+          mo->momx = mo->momy = 0;
+          mo->momz = -FRACUNIT;
+          return;
+          }
+        if (hexen && mo->type == HEXEN_MT_HOLY_FX)
+          {
+          P_ExplodeMissile(mo);
+          return;
+          }
         if (demo_compatibility ||  // killough
       mo->z > ceilingline->backsector->ceilingheight)
           {
@@ -341,6 +455,7 @@ static void P_XYMovement (mobj_t* mo)
       P_RemoveMobj (mo);
       return;
           }
+        }
       P_ExplodeMissile (mo);
     }
         else // whatever else it is, it is now standing still in (x,y)

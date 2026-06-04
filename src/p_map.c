@@ -643,25 +643,13 @@ static dbool PIT_CheckThing(mobj_t *thing) // killough 3/26/98: make static
   return !(thing->flags & MF_SOLID); // didn't do any damage
 
       /* Hexen: a missile striking a reflective thing (the Centaur's raised
-       * shield) is turned back the way it came and re-aimed at whoever it
-       * was, rather than dealing damage.  RIP missiles are not reflected. */
+       * shield, the Heresiarch) is blocked without damage; P_XYMovement
+       * reflects it off BlockingMobj vanilla-style.  RIP missiles are not
+       * reflected.  Damage to the shield bearer is separately shrugged off
+       * through MF2_INVULNERABLE in P_DamageMobj. */
       if (hexen && (thing->flags2 & MF2_REFLECTIVE) &&
           !(tmthing->flags2 & MF2_RIP))
-      {
-        angle_t ang = R_PointToAngle2(thing->x, thing->y,
-                                      tmthing->x, tmthing->y);
-        ang += ANG1 * ((P_Random(pr_heretic) % 16) - 8);
-        tmthing->angle = ang;
-        ang >>= ANGLETOFINESHIFT;
-        {
-          fixed_t spd = P_AproxDistance(tmthing->momx, tmthing->momy);
-          tmthing->momx = FixedMul(spd, finecosine[ang]);
-          tmthing->momy = FixedMul(spd, finesine[ang]);
-        }
-        if (tmthing->target)
-          P_SetTarget(&tmthing->target, thing);
-        return TRUE; /* pass through, now travelling back */
-      }
+        return FALSE;
 
       // damage / explode
 
@@ -1608,6 +1596,82 @@ void P_SlideMove(mobj_t *mo)
   }
     }  // killough 3/15/98: Allow objects to drop off ledges:
   while (!P_TryMove(mo, mo->x+tmxmove, mo->y+tmymove, TRUE));
+}
+
+/* --- Hexen wall bouncing (the Heresiarch's balls, glass shards) -------- */
+
+static dbool PTR_BounceTraverse(intercept_t *in)
+{
+  line_t *li;
+
+  if (!in->isaline)
+    I_Error("PTR_BounceTraverse: not a line?");
+
+  li = in->d.line;
+
+  if (!(li->flags & ML_TWOSIDED))
+  {
+    if (P_PointOnLineSide(slidemo->x, slidemo->y, li))
+      return true;              /* don't hit the back side */
+    goto bounceblocking;
+  }
+
+  P_LineOpening(li);            /* set openrange, opentop, openbottom */
+  if (openrange < slidemo->height)
+    goto bounceblocking;        /* doesn't fit */
+  if (opentop - slidemo->z < slidemo->height)
+    goto bounceblocking;        /* mobj is too high */
+  return true;                  /* this line doesn't block movement */
+
+bounceblocking:                 /* the line blocks: remember the closest */
+  if (in->frac < bestslidefrac)
+  {
+    bestslidefrac = in->frac;
+    bestslideline = li;
+  }
+  return false;                 /* stop */
+}
+
+void P_BounceWall(mobj_t *mo)
+{
+  fixed_t leadx, leady;
+  int side;
+  angle_t lineangle, moveangle, deltaangle;
+  fixed_t movelen;
+
+  slidemo = mo;
+
+  /* trace along the leading corner */
+  if (mo->momx > 0)
+    leadx = mo->x + mo->radius;
+  else
+    leadx = mo->x - mo->radius;
+  if (mo->momy > 0)
+    leady = mo->y + mo->radius;
+  else
+    leady = mo->y - mo->radius;
+  bestslidefrac = FRACUNIT + 1;
+  bestslideline = NULL;
+  P_PathTraverse(leadx, leady, leadx + mo->momx, leady + mo->momy,
+                 PT_ADDLINES, PTR_BounceTraverse);
+  if (!bestslideline)
+    return;                     /* nothing to bounce off */
+
+  side = P_PointOnLineSide(mo->x, mo->y, bestslideline);
+  lineangle = R_PointToAngle2(0, 0, bestslideline->dx, bestslideline->dy);
+  if (side == 1)
+    lineangle += ANG180;
+  moveangle = R_PointToAngle2(0, 0, mo->momx, mo->momy);
+  deltaangle = (2 * lineangle) - moveangle;
+
+  deltaangle >>= ANGLETOFINESHIFT;
+
+  movelen = P_AproxDistance(mo->momx, mo->momy);
+  movelen = FixedMul(movelen, (fixed_t)(0.75 * FRACUNIT));   /* friction */
+  if (movelen < FRACUNIT)
+    movelen = 2 * FRACUNIT;
+  mo->momx = FixedMul(movelen, finecosine[deltaangle]);
+  mo->momy = FixedMul(movelen, finesine[deltaangle]);
 }
 
 //

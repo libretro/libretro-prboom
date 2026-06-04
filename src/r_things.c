@@ -509,11 +509,6 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 
 static void R_ProjectSprite (mobj_t* thing, int lightlevel)
 {
-   /* Hexen: buried thrust spikes, dormant wraiths etc. are flagged
-    * MF2_DONTDRAW and must not be rendered. */
-   if (raven && (thing->flags2 & MF2_DONTDRAW))
-      return;
-
    fixed_t   gzt;               // killough 3/27/98
    fixed_t   tx;
    fixed_t   xscale;
@@ -533,6 +528,11 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    fixed_t gxt, gyt;
    fixed_t tz;
    int width;
+
+   /* Hexen: buried thrust spikes, dormant wraiths etc. are flagged
+    * MF2_DONTDRAW and must not be rendered. */
+   if (raven && (thing->flags2 & MF2_DONTDRAW))
+      return;
 
    if (movement_smooth)
    {

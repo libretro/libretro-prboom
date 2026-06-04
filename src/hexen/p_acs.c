@@ -848,9 +848,9 @@ static int CmdSectorSound(void)
 }
 static int CmdThingSound(void)
 {
-  int tid, sound, volume, searcher = -1;
+  int tid, sound, searcher = -1;
   mobj_t *mobj;
-  volume = Pop();
+  Pop();                        /* volume: sounds play at default volume */
   sound = ACS_GetSoundID(StringLookup(Pop()));
   tid = Pop();
   while ((mobj = P_FindMobjFromTID(tid, &searcher)) != NULL)

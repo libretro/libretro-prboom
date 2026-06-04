@@ -206,8 +206,13 @@ void S_HexenLoadSndInfo(void)
         sbuf[ss] = '\0';
         mapnum = atoi(nbuf);
         if (mapnum >= 1 && mapnum <= 98 && sbuf[0])
-          strncpy(hexen_map_song[mapnum], sbuf,
-                  sizeof(hexen_map_song[0]) - 1);
+        {
+          size_t cl = strlen(sbuf);
+          if (cl > sizeof(hexen_map_song[0]) - 1)
+            cl = sizeof(hexen_map_song[0]) - 1;
+          memcpy(hexen_map_song[mapnum], sbuf, cl);
+          hexen_map_song[mapnum][cl] = '\0';
+        }
       }
       while (i < len && buf[i] != '\n')
         i++;

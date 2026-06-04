@@ -244,13 +244,10 @@ typedef enum
  * rather than by the Doom weapon identity, so these alias the low
  * weapontype_t ordinals (0-3) that a Hexen game uses.  The 2D Hexen weapon
  * tables are indexed [WP_*][class]. */
-enum
-{
-  WP_FIRST  = 0,
-  WP_SECOND = 1,
-  WP_THIRD  = 2,
-  WP_FOURTH = 3
-};
+#define WP_FIRST  ((weapontype_t)0)
+#define WP_SECOND ((weapontype_t)1)
+#define WP_THIRD  ((weapontype_t)2)
+#define WP_FOURTH ((weapontype_t)3)
 
 /* Hexen mana (the two-mana ammo model).  MANA_NONE/MANA_BOTH are sentinels
  * used by the weapon tables; MANA_1/MANA_2 index player->mana[]. */

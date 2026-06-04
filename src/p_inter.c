@@ -1145,7 +1145,7 @@ static int Hexen_GiveWeaponPiece(player_t *player, pclass_t matchClass,
 {
   *gaveWeapon = false;
 
-  if (player->class != matchClass)
+  if ((pclass_t) player->class != matchClass)
   {
     /* wrong class: pick up only for the mana */
     int gaveMana = (int)P_GiveMana(player, MANA_1, 20)

@@ -1206,7 +1206,7 @@ void G_PlayerReborn (int player)
      * weapon identity is resolved through WeaponInfo[slot][class]. */
     int j;
     p->class = PlayerClass[player];
-    p->readyweapon = p->pendingweapon = (weapontype_t) WP_FIRST;
+    p->readyweapon = p->pendingweapon = WP_FIRST;
     p->weaponowned[WP_FIRST] = true;
     p->maxmana = MAX_MANA;
     for (j = 0; j < NUMMANA; j++)

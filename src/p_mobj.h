@@ -233,6 +233,10 @@
  * this is an MF_ (flags) bit and is distinct from the equally-valued
  * MF2_CANTLEAVEFLOORPIC, which lives in the separate flags2 field. */
 #define MF_ALTSHADOW        LONGLONG(0x0000040000000000)
+/* Raven (Hexen): a frozen corpse -- the brittle statue an ice death leaves
+ * behind, shattered by A_FreezeDeathChunks or another hit.  Bit 43 is free;
+ * the value matches dsda-doom's MF_ICECORPSE. */
+#define MF_ICECORPSE        LONGLONG(0x0000080000000000)
 
 
 // The flags below are switching order, starting from the most significant bit,

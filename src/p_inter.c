@@ -1582,6 +1582,37 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
 //
 // KillMobj
 //
+/* Is there a Dark Servant out for this master that still has time on the
+ * clock?  Used when one dies, to decide whether the summoner's icon power
+ * should lapse.  The fork's summon stores its start time directly in
+ * special_args[0]. */
+static mobj_t *ActiveMinotaur(player_t *master)
+{
+  mobj_t *mo;
+  thinker_t *think;
+
+  for (think = thinkercap.next; think != &thinkercap; think = think->next)
+  {
+    if (think->function.arg1 != (void (*)(void *)) P_MobjThinker)
+      continue;
+    mo = (mobj_t *) think;
+    if (mo->type != HEXEN_MT_MINOTAUR)
+      continue;
+    if (mo->health <= 0)
+      continue;
+    if (!(mo->flags & MF_COUNTKILL))
+      continue;                 /* for morphed minotaurs */
+    if (mo->flags & MF_CORPSE)
+      continue;
+    if ((unsigned) (leveltime - mo->special_args[0]) >=
+        (unsigned) MAULATORTICS)
+      continue;
+    if (mo->special1.m && mo->special1.m->player == master)
+      return mo;
+  }
+  return NULL;
+}
+
 static void P_KillMobj(mobj_t *source, mobj_t *target)
 {
   target->flags &= ~(MF_SHOOTABLE|MF_FLOAT|MF_SKULLFLY);
@@ -1628,7 +1659,18 @@ static void P_KillMobj(mobj_t *source, mobj_t *target)
       if (target->flags & MF_COUNTKILL)
         source->player->killcount++;
       if (target->player)
-        source->player->frags[target->player-players]++;
+        {
+          source->player->frags[target->player-players]++;
+          /* Heretic frag flourishes: the announcer sting for your own
+           * frags, and fragging as a chicken makes a super chicken. */
+          if (heretic && target != source)
+            {
+              if (source->player == &players[consoleplayer])
+                S_StartSound(NULL, heretic_sfx_gfrag);
+              if (source->player->chickenTics)
+                P_GivePower(source->player, pw_weaponlevel2);
+            }
+        }
     }
     else
       if (target->flags & MF_COUNTKILL) { /* Add to kills tally */
@@ -1677,8 +1719,153 @@ static void P_KillMobj(mobj_t *source, mobj_t *target)
       target->player->playerstate = PST_DEAD;
       P_DropWeapon (target->player);
 
+      /* Raven: a fire kill burns the player down on screen instead of the
+       * ordinary death -- per class in hexen, one animation in heretic. */
+      if (raven && (target->flags2 & MF2_FIREDAMAGE))
+        {
+          switch (hexen ? target->player->class : PCLASS_NULL)
+            {
+              case PCLASS_NULL: /* heretic */
+                P_SetMobjState(target, HERETIC_S_PLAY_FDTH1);
+                return;
+              case PCLASS_FIGHTER:
+                S_StartSound(target, hexen_sfx_player_fighter_burn_death);
+                P_SetMobjState(target, HEXEN_S_PLAY_F_FDTH1);
+                return;
+              case PCLASS_CLERIC:
+                S_StartSound(target, hexen_sfx_player_cleric_burn_death);
+                P_SetMobjState(target, HEXEN_S_PLAY_C_FDTH1);
+                return;
+              case PCLASS_MAGE:
+                S_StartSound(target, hexen_sfx_player_mage_burn_death);
+                P_SetMobjState(target, HEXEN_S_PLAY_M_FDTH1);
+                return;
+              default:
+                break;
+            }
+        }
+
+      /* Hexen: an ice kill freezes the player solid. */
+      if (hexen && (target->flags2 & MF2_ICEDAMAGE))
+        {
+          target->flags &= ~(7 << MF_TRANSSHIFT);   /* no translation */
+          target->flags |= MF_ICECORPSE;
+          switch (target->player->class)
+            {
+              case PCLASS_FIGHTER:
+                P_SetMobjState(target, HEXEN_S_FPLAY_ICE);
+                return;
+              case PCLASS_CLERIC:
+                P_SetMobjState(target, HEXEN_S_CPLAY_ICE);
+                return;
+              case PCLASS_MAGE:
+                P_SetMobjState(target, HEXEN_S_MPLAY_ICE);
+                return;
+              case PCLASS_PIG:
+                P_SetMobjState(target, HEXEN_S_PIG_ICE);
+                return;
+              default:
+                break;
+            }
+        }
+
       if (target->player == &players[consoleplayer] && (automapmode & am_active))
         AM_Stop();    // don't die in auto map; switch view prior to dying
+    }
+
+  /* Hexen: monster fire and ice deaths.  The class triad burns like the
+   * players they are, the destructible tree explodes, and an ice kill
+   * freezes the victim into a brittle statue (its state chain runs
+   * A_FreezeDeath / A_FreezeDeathChunks). */
+  if (hexen)
+    {
+      if (target->flags2 & MF2_FIREDAMAGE)
+        {
+          if (target->type == HEXEN_MT_FIGHTER_BOSS)
+            {
+              S_StartSound(target, hexen_sfx_player_fighter_burn_death);
+              P_SetMobjState(target, HEXEN_S_PLAY_F_FDTH1);
+              return;
+            }
+          else if (target->type == HEXEN_MT_CLERIC_BOSS)
+            {
+              S_StartSound(target, hexen_sfx_player_cleric_burn_death);
+              P_SetMobjState(target, HEXEN_S_PLAY_C_FDTH1);
+              return;
+            }
+          else if (target->type == HEXEN_MT_MAGE_BOSS)
+            {
+              S_StartSound(target, hexen_sfx_player_mage_burn_death);
+              P_SetMobjState(target, HEXEN_S_PLAY_M_FDTH1);
+              return;
+            }
+          else if (target->type == HEXEN_MT_TREEDESTRUCTIBLE)
+            {
+              P_SetMobjState(target, HEXEN_S_ZTREEDES_X1);
+              target->height = 24 * FRACUNIT;
+              S_StartSound(target, hexen_sfx_tree_explode);
+              return;
+            }
+        }
+      if (target->flags2 & MF2_ICEDAMAGE)
+        {
+          target->flags |= MF_ICECORPSE;
+          switch (target->type)
+            {
+              case HEXEN_MT_BISHOP:
+                P_SetMobjState(target, HEXEN_S_BISHOP_ICE);
+                return;
+              case HEXEN_MT_CENTAUR:
+              case HEXEN_MT_CENTAURLEADER:
+                P_SetMobjState(target, HEXEN_S_CENTAUR_ICE);
+                return;
+              case HEXEN_MT_DEMON:
+              case HEXEN_MT_DEMON2:
+                P_SetMobjState(target, HEXEN_S_DEMON_ICE);
+                return;
+              case HEXEN_MT_SERPENT:
+              case HEXEN_MT_SERPENTLEADER:
+                P_SetMobjState(target, HEXEN_S_SERPENT_ICE);
+                return;
+              case HEXEN_MT_WRAITH:
+              case HEXEN_MT_WRAITHB:
+                P_SetMobjState(target, HEXEN_S_WRAITH_ICE);
+                return;
+              case HEXEN_MT_ETTIN:
+                P_SetMobjState(target, HEXEN_S_ETTIN_ICE1);
+                return;
+              case HEXEN_MT_FIREDEMON:
+                P_SetMobjState(target, HEXEN_S_FIRED_ICE1);
+                return;
+              case HEXEN_MT_FIGHTER_BOSS:
+                P_SetMobjState(target, HEXEN_S_FIGHTER_ICE);
+                return;
+              case HEXEN_MT_CLERIC_BOSS:
+                P_SetMobjState(target, HEXEN_S_CLERIC_ICE);
+                return;
+              case HEXEN_MT_MAGE_BOSS:
+                P_SetMobjState(target, HEXEN_S_MAGE_ICE);
+                return;
+              case HEXEN_MT_PIG:
+                P_SetMobjState(target, HEXEN_S_PIG_ICE);
+                return;
+              default:
+                target->flags &= ~MF_ICECORPSE;
+                break;
+            }
+        }
+
+      if (target->type == HEXEN_MT_MINOTAUR)
+        {
+          /* a fallen Dark Servant releases its summoner's icon power,
+           * unless another of theirs is still serving */
+          mobj_t *master = target->special1.m;
+          if (master && master->health > 0 && master->player &&
+              !ActiveMinotaur(master->player))
+            master->player->powers[pw_minotaur] = 0;
+        }
+      else if (target->type == HEXEN_MT_TREEDESTRUCTIBLE)
+        target->height = 24 * FRACUNIT;
     }
 
   /* Heretic uses a more lenient extreme-death (gib) threshold than Doom:
@@ -1955,7 +2142,21 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
     return; // shouldn't happen...
 
   if (target->health <= 0)
+  {
+    /* Hexen: hitting what is already dead only matters for ice statues --
+     * an ice attack leaves the statue alone, anything else shatters it. */
+    if (hexen)
+    {
+      if (inflictor && (inflictor->flags2 & MF2_ICEDAMAGE))
+        return;
+      else if (target->flags & MF_ICECORPSE)  /* frozen */
+      {
+        target->tics = 1;
+        target->momx = target->momy = 0;
+      }
+    }
     return;
+  }
 
   /* Hexen: the Banishment Device's projectiles teleport their victim away
    * instead of damaging it - players always, monsters unless they are
@@ -2215,6 +2416,43 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
   target->health -= damage;
   if (target->health <= 0)
     {
+      /* Raven: mark fire and ice kills on the victim so P_KillMobj plays
+       * the burn or freeze death instead of the ordinary one.  Unmorphed
+       * players only burn when the killing blow was hot enough to leave
+       * no body to speak of (alive enough to scream: health > -50 and a
+       * 25+ point hit). */
+      if (heretic)
+        {
+          target->special1.i = damage;
+          if (target->type == HERETIC_MT_POD && source &&
+              source->type != HERETIC_MT_POD)
+            {  /* make sure players get frags for chain-reaction kills */
+              P_SetTarget(&target->target, source);
+            }
+          if (player && inflictor && !player->chickenTics)
+            {  /* check for flame death */
+              if ((inflictor->flags2 & MF2_FIREDAMAGE)
+                  || (inflictor->type == HERETIC_MT_PHOENIXFX1 &&
+                      target->health > -50 && damage > 25))
+                target->flags2 |= MF2_FIREDAMAGE;
+            }
+        }
+      else if (hexen && inflictor)
+        {
+          if (inflictor->flags2 & MF2_FIREDAMAGE)
+            {
+              if (player && !player->morphTics)
+                {  /* check for flame death */
+                  if (target->health > -50 && damage > 25)
+                    target->flags2 |= MF2_FIREDAMAGE;
+                }
+              else
+                target->flags2 |= MF2_FIREDAMAGE;
+            }
+          else if (inflictor->flags2 & MF2_ICEDAMAGE)
+            target->flags2 |= MF2_ICEDAMAGE;
+        }
+
       P_KillMobj (source, target);
       return;
     }

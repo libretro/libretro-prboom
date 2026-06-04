@@ -30,6 +30,8 @@
 
 /* Run a Hexen line special.  Returns true if it did something (so use/switch
  * activation can flip the switch texture). */
+void P_InitHexenTaggedLines(void);
+line_t *P_FindHexenLine(int lineTag, int *searchPosition);
 dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
                                 int side, mobj_t *mo);
 

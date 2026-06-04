@@ -38,6 +38,7 @@
 #include "doomstat.h"
 #include "hexen/sn_sonix.h"
 #include "hexen/p_acs.h"
+#include "hexen/p_spec_hexen.h"
 #include "hexen/po_man.h"
 #include "m_bbox.h"
 #include "m_argv.h"
@@ -2004,6 +2005,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
        * up.  Build the chains; Hexen linedefs all carry tag 0, so lookups
        * for any sector tag simply terminate at the -1 list ends. */
       P_InitTagLists();
+      P_InitHexenTaggedLines();
 
 
    /* The map's sectors are loaded now, so the lightning storm can scan for

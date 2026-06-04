@@ -337,15 +337,6 @@ static int ACS_FindSectorFromTag(int tag, int start)
   return -1;
 }
 
-static int ACS_FindLineFromTag(int tag, int start)
-{
-  int i;
-  for (i = start + 1; i < numlines; i++)
-    if (lines[i].tag == tag)
-      return i;
-  return -1;
-}
-
 static void Push(int value)
 {
   if (ACScript->stackPtr < ACS_STACK_DEPTH)
@@ -884,10 +875,10 @@ static int CmdSetLineTexture(void)
   int position = Pop();
   int side = Pop();
   int lineTag = Pop();
-  int s = -1;
-  while ((s = ACS_FindLineFromTag(lineTag, s)) >= 0)
+  int searcher = -1;
+  line_t *line;
+  while ((line = P_FindHexenLine(lineTag, &searcher)) != NULL)
   {
-    line_t *line = &lines[s];
     if (line->sidenum[side] == NO_INDEX)
       continue;
     if (position == TEXTURE_MIDDLE)
@@ -903,9 +894,10 @@ static int CmdSetLineBlocking(void)
 {
   int blocking = Pop() ? ML_BLOCKING : 0;
   int lineTag = Pop();
-  int s = -1;
-  while ((s = ACS_FindLineFromTag(lineTag, s)) >= 0)
-    lines[s].flags = (lines[s].flags & ~ML_BLOCKING) | blocking;
+  int searcher = -1;
+  line_t *line;
+  while ((line = P_FindHexenLine(lineTag, &searcher)) != NULL)
+    line->flags = (line->flags & ~ML_BLOCKING) | blocking;
   return SCRIPT_CONTINUE;
 }
 static int CmdSetLineSpecial(void)
@@ -917,10 +909,10 @@ static int CmdSetLineSpecial(void)
   int arg1 = Pop();
   int special = Pop();
   int lineTag = Pop();
-  int s = -1;
-  while ((s = ACS_FindLineFromTag(lineTag, s)) >= 0)
+  int searcher = -1;
+  line_t *line;
+  while ((line = P_FindHexenLine(lineTag, &searcher)) != NULL)
   {
-    line_t *line = &lines[s];
     line->special = special;
     line->args[0] = (unsigned char) arg1;
     line->args[1] = (unsigned char) arg2;

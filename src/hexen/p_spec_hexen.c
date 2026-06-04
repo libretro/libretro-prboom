@@ -1777,6 +1777,58 @@ int Hexen_EV_SectorSoundChange(byte *args)
 }
 
 
+/* Hexen line identification.  Hexen linedefs carry no Doom tag; lines that
+ * ACS scripts address by id instead carry special 121 (Line_SetIdentification)
+ * with the id in args[0].  Raven registers those lines at level setup and
+ * clears the special; the ACS line opcodes then resolve ids through the
+ * registry. */
+#define MAX_TAGGED_LINES 64
+
+static struct
+{
+  line_t *line;
+  int     lineTag;
+} TaggedLines[MAX_TAGGED_LINES];
+static int TaggedLineCount;
+
+void P_InitHexenTaggedLines(void)
+{
+  int i;
+
+  TaggedLineCount = 0;
+  for (i = 0; i < numlines; i++)
+  {
+    if (lines[i].special == 121)
+    {                           /* Line_SetIdentification */
+      if (lines[i].args[0])
+      {
+        if (TaggedLineCount == MAX_TAGGED_LINES)
+          I_Error("P_InitHexenTaggedLines: MAX_TAGGED_LINES (%d) exceeded.",
+                  MAX_TAGGED_LINES);
+        TaggedLines[TaggedLineCount].line = &lines[i];
+        TaggedLines[TaggedLineCount++].lineTag = lines[i].args[0];
+      }
+      lines[i].special = 0;
+    }
+  }
+}
+
+line_t *P_FindHexenLine(int lineTag, int *searchPosition)
+{
+  int i;
+
+  for (i = *searchPosition + 1; i < TaggedLineCount; i++)
+  {
+    if (TaggedLines[i].lineTag == lineTag)
+    {
+      *searchPosition = i;
+      return TaggedLines[i].line;
+    }
+  }
+  *searchPosition = -1;
+  return NULL;
+}
+
 dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
                                 int side, mobj_t *mo)
 {

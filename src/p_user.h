@@ -39,6 +39,10 @@
 #include "d_player.h"
 
 void P_PlayerThink(player_t *player);
+
+/* Hexen player morph (Porkalator) */
+void P_MorphPlayerThink(player_t *player);
+dbool P_UndoPlayerMorph(player_t *player);
 void P_CalcHeight(player_t *player);
 void P_DeathThink(player_t *player);
 void P_MovePlayer(player_t *player);

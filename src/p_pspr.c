@@ -189,6 +189,49 @@ static void P_BringUpWeapon(player_t *player)
 //
 //---------------------------------------------------------------------------
 
+/* Hexen: like P_SetPsprite but without running action functions; used when
+ * snapping the pig snout into place. */
+void P_SetPspriteNF(player_t *player, int position, statenum_t stnum)
+{
+   pspdef_t *psp;
+   state_t *state;
+
+   psp = &player->psprites[position];
+   do
+   {
+      if (!stnum)
+      {                          /* object removed itself */
+         psp->state = NULL;
+         break;
+      }
+      state = &states[stnum];
+      psp->state = state;
+      psp->tics = state->tics;   /* could be 0 */
+      if (state->misc1)
+         psp->sx = state->misc1 << FRACBITS;
+      if (state->misc2)
+         psp->sy = state->misc2 << FRACBITS;
+      stnum = psp->state->nextstate;
+   } while (!psp->tics);         /* an initial state of 0 could cycle through */
+}
+
+/* Hexen: morphing snaps the snout up; unmorphing raises the stashed weapon. */
+void P_ActivateMorphWeapon(player_t *player)
+{
+   player->pendingweapon = WP_NOCHANGE;
+   player->psprites[ps_weapon].sy = WEAPONTOP;
+   player->readyweapon = WP_FIRST;  /* snout is the first weapon */
+   P_SetPsprite(player, ps_weapon, HEXEN_S_SNOUTREADY);
+}
+
+void P_PostMorphWeapon(player_t *player, weapontype_t weapon)
+{
+   player->pendingweapon = WP_NOCHANGE;
+   player->readyweapon = weapon;
+   player->psprites[ps_weapon].sy = WEAPONBOTTOM;
+   P_SetPsprite(player, ps_weapon, WeaponInfo[weapon][player->class].upstate);
+}
+
 /* Hexen: true if there is enough mana for the ready weapon; otherwise picks
  * the best owned weapon the player can afford and starts lowering. */
 static dbool P_CheckMana(player_t *player)

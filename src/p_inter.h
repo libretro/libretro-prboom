@@ -47,6 +47,8 @@ dbool   P_GivePower(player_t *, int);
 void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher);
 void P_DamageMobj(mobj_t *target,mobj_t *inflictor,mobj_t *source,int damage);
 void P_FallingDamage(player_t *player);
+dbool P_MorphPlayer(player_t *player);
+#define MAXMORPHHEALTH 30
 
 /* killough 5/2/98: moved from d_deh.c, g_game.c, m_misc.c, others: */
 

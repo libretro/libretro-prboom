@@ -1737,6 +1737,105 @@ static dbool P_InfightingImmune(mobj_t *target, mobj_t *source)
 /* Hexen poison: P_PoisonPlayer raises the player's poison level (the tick in
  * P_PlayerThink then drains it as P_PoisonDamage hits); P_PoisonDamage is the
  * armor-ignoring damage path poison uses, after Raven's code. */
+/* Hexen: the Porkalator.  Players become pigs for MORPHTICS; monsters get
+ * their own pig with the original type stashed for the unmorph. */
+dbool P_MorphPlayer(player_t *player)
+{
+  mobj_t *pmo;
+  mobj_t *fog;
+  mobj_t *beastMo;
+  fixed_t x;
+  fixed_t y;
+  fixed_t z;
+  angle_t angle;
+  int oldFlags2;
+
+  if (player->powers[pw_invulnerability])
+    return false;               /* immune when invulnerable */
+  if (player->morphTics)
+    return false;               /* already a beast */
+
+  pmo = player->mo;
+  x = pmo->x;
+  y = pmo->y;
+  z = pmo->z;
+  angle = pmo->angle;
+  oldFlags2 = pmo->flags2;
+  P_SetMobjState(pmo, HEXEN_S_FREETARGMOBJ);
+  fog = P_SpawnMobj(x, y, z + TELEFOGHEIGHT, HEXEN_MT_TFOG);
+  S_StartSound(fog, hexen_sfx_teleport);
+  beastMo = P_SpawnMobj(x, y, z, HEXEN_MT_PIGPLAYER);
+  beastMo->special1.i = player->readyweapon;
+  beastMo->angle = angle;
+  beastMo->player = player;
+  player->health = beastMo->health = MAXMORPHHEALTH;
+  player->mo = beastMo;
+  memset(&player->hexen_armorpoints[0], 0, NUMARMOR * sizeof(int));
+  player->class = PCLASS_PIG;
+  if (oldFlags2 & MF2_FLY)
+    beastMo->flags2 |= MF2_FLY;
+  player->morphTics = MORPHTICS;
+  P_ActivateMorphWeapon(player);
+  return true;
+}
+
+static dbool P_MorphMonster(mobj_t *actor)
+{
+  mobj_t *master, *monster, *fog;
+  mobjtype_t moType;
+  fixed_t x;
+  fixed_t y;
+  fixed_t z;
+  mobj_t oldMonster;
+
+  if (actor->player)
+    return false;
+  if (!(actor->flags & MF_COUNTKILL))
+    return false;
+  if (actor->flags2 & MF2_BOSS)
+    return false;
+  moType = actor->type;
+  switch (moType)
+  {
+    case HEXEN_MT_PIG:
+    case HEXEN_MT_FIGHTER_BOSS:
+    case HEXEN_MT_CLERIC_BOSS:
+    case HEXEN_MT_MAGE_BOSS:
+      return false;
+    default:
+      break;
+  }
+
+  oldMonster = *actor;
+  x = oldMonster.x;
+  y = oldMonster.y;
+  z = oldMonster.z;
+  P_RemoveMobjFromTIDList(actor);
+  P_SetMobjState(actor, HEXEN_S_FREETARGMOBJ);
+  fog = P_SpawnMobj(x, y, z + TELEFOGHEIGHT, HEXEN_MT_TFOG);
+  S_StartSound(fog, hexen_sfx_teleport);
+  monster = P_SpawnMobj(x, y, z, HEXEN_MT_PIG);
+  monster->special2.i = moType;
+  monster->special1.i = MORPHTICS + P_Random(pr_heretic);
+  monster->flags |= (oldMonster.flags & MF_SHADOW);
+  P_SetTarget(&monster->target, oldMonster.target);
+  monster->angle = oldMonster.angle;
+  monster->tid = oldMonster.tid;
+  monster->special = oldMonster.special;
+  P_InsertMobjIntoTIDList(monster, oldMonster.tid);
+  memcpy(monster->special_args, oldMonster.special_args,
+         sizeof(monster->special_args));
+
+  /* a morphed Dark Servant releases its summoner's icon power */
+  if (moType == HEXEN_MT_MINOTAUR)
+  {
+    master = oldMonster.special1.m;
+    if (master && master->health > 0 && master->player)
+      master->player->powers[pw_minotaur] = 0;
+  }
+  return true;
+}
+
 void P_PoisonPlayer(player_t *player, mobj_t *poisoner, int poison)
 {
   if ((player->cheats & CF_GODMODE) || player->powers[pw_invulnerability])
@@ -1856,6 +1955,12 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
           return;
         }
         break;
+      case HEXEN_MT_EGGFX:
+        if (target->player)
+          P_MorphPlayer(target->player);
+        else
+          P_MorphMonster(target);
+        return;                 /* the egg never deals damage */
       case HEXEN_MT_FSWORD_MISSILE:
         if (target->player)
           damage -= damage >> 2;

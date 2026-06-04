@@ -40,6 +40,7 @@
 #include "p_spec.h"
 #include "map_format.h"
 #include "p_user.h"
+#include "lprintf.h"
 #include "r_demo.h"
 #include "r_fps.h"
 #include "g_game.h"
@@ -569,7 +570,6 @@ void P_DeathThink (player_t* player)
    R_SmoothPlaying_Reset(player); // e6y
 }
 
-#ifdef HEXEN
 //----------------------------------------------------------------------------
 //
 // PROC P_MorphPlayerThink
@@ -584,21 +584,21 @@ void P_MorphPlayerThink(player_t *player)
 		return;
 
 	pmo = player->mo;
-	if(!(pmo->momx+pmo->momy) && P_Random() < 64)
+	if(!(pmo->momx+pmo->momy) && P_Random(pr_heretic) < 64)
 	{ // Snout sniff
-		P_SetPspriteNF(player, ps_weapon, S_SNOUTATK2);
-		S_StartSound(pmo, SFX_PIG_ACTIVE1); // snort
+		P_SetPspriteNF(player, ps_weapon, HEXEN_S_SNOUTATK2);
+		S_StartSound(pmo, hexen_sfx_pig_active1); // snort
 		return;
 	}
-	if(P_Random() < 48)
+	if(P_Random(pr_heretic) < 48)
 	{
-		if(P_Random() < 128)
+		if(P_Random(pr_heretic) < 128)
 		{
-			S_StartSound(pmo, SFX_PIG_ACTIVE1);
+			S_StartSound(pmo, hexen_sfx_pig_active1);
 		}
 		else
 		{
-			S_StartSound(pmo, SFX_PIG_ACTIVE2);
+			S_StartSound(pmo, hexen_sfx_pig_active2);
 		}
 	}
 }
@@ -629,22 +629,22 @@ dbool   P_UndoPlayerMorph(player_t *player)
    y = pmo->y;
    z = pmo->z;
    angle = pmo->angle;
-   weapon = pmo->special1;
+   weapon = pmo->special1.i;
    oldFlags = pmo->flags;
    oldFlags2 = pmo->flags2;
    oldBeast = pmo->type;
-   P_SetMobjState(pmo, S_FREETARGMOBJ);
+   P_SetMobjState(pmo, HEXEN_S_FREETARGMOBJ);
    playerNum = P_GetPlayerNum(player);
    switch(PlayerClass[playerNum])
    {
       case PCLASS_FIGHTER:
-         mo = P_SpawnMobj(x, y, z, MT_PLAYER_FIGHTER);
+         mo = P_SpawnMobj(x, y, z, HEXEN_MT_PLAYER_FIGHTER);
          break;
       case PCLASS_CLERIC:
-         mo = P_SpawnMobj(x, y, z, MT_PLAYER_CLERIC);
+         mo = P_SpawnMobj(x, y, z, HEXEN_MT_PLAYER_CLERIC);
          break;
       case PCLASS_MAGE:
-         mo = P_SpawnMobj(x, y, z, MT_PLAYER_MAGE);
+         mo = P_SpawnMobj(x, y, z, HEXEN_MT_PLAYER_MAGE);
          break;
       default:
          I_Error("P_UndoPlayerMorph:  Unknown player class %d\n",
@@ -656,7 +656,7 @@ dbool   P_UndoPlayerMorph(player_t *player)
       mo = P_SpawnMobj(x, y, z, oldBeast);
       mo->angle = angle;
       mo->health = player->health;
-      mo->special1 = weapon;
+      mo->special1.i = weapon;
       mo->player = player;
       mo->flags = oldFlags;
       mo->flags2 = oldFlags2;
@@ -695,12 +695,11 @@ dbool   P_UndoPlayerMorph(player_t *player)
    player->class = PlayerClass[playerNum];
    angle >>= ANGLETOFINESHIFT;
    fog = P_SpawnMobj(x+20*finecosine[angle],
-         y+20*finesine[angle], z+TELEFOGHEIGHT, MT_TFOG);
-   S_StartSound(fog, SFX_TELEPORT);
+         y+20*finesine[angle], z+TELEFOGHEIGHT, HEXEN_MT_TFOG);
+   S_StartSound(fog, hexen_sfx_teleport);
    P_PostMorphWeapon(player, weapon);
    return(true);
 }
-#endif
 
 /*
 =================
@@ -1415,6 +1414,10 @@ void P_PlayerThink (player_t* player)
    }
 
 
+   /* Hexen: pig snuffling and snorting. */
+   if (player->morphTics)
+      P_MorphPlayerThink(player);
+
    // Move around.
    // Reactiontime is used to prevent movement
    //  for a bit after a teleport.
@@ -1549,7 +1552,6 @@ void P_PlayerThink (player_t* player)
    else
       player->usedown = FALSE;
 
-#ifdef HEXEN
    // Morph counter
    if(player->morphTics)
    {
@@ -1558,7 +1560,6 @@ void P_PlayerThink (player_t* player)
          P_UndoPlayerMorph(player);
       }
    }
-#endif
 
    /* cycle psprites */
    P_MovePsprites (player);

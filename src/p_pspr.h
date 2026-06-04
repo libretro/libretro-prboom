@@ -93,6 +93,9 @@ dbool P_CheckAmmo(struct player_s *player);
 void P_SetupPsprites(struct player_s *curplayer);
 void P_MovePsprites(struct player_s *curplayer);
 void P_DropWeapon(struct player_s *player);
+void P_SetPspriteNF(struct player_s *player, int position, statenum_t stnum);
+void P_ActivateMorphWeapon(struct player_s *player);
+void P_PostMorphWeapon(struct player_s *player, weapontype_t weapon);
 
 typedef struct player_s player_t;
 

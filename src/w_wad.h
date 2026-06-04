@@ -93,6 +93,14 @@ typedef struct {
   int position;
   int length;
 #endif
+  /* Embedded (baked-in) WAD support.  When embedded_data is non-NULL the
+   * wad's bytes live in a const array compiled into the core rather than on
+   * the filesystem: W_AddFile reads the header/directory from it and skips
+   * filestream_open, and W_ReadLump memcpys lumps out of it.  Works in both
+   * normal and MEMORY_LOW builds (these fields are outside the #ifndef so
+   * the embedded path is always available). */
+  const unsigned char *embedded_data;
+  int embedded_length;
 } wadfile_info_t;
 
 extern wadfile_info_t *wadfiles;

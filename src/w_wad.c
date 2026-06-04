@@ -137,6 +137,44 @@ static void W_AddFile(wadfile_info_t *wadfile)
    filelump_t *fileinfo2free=NULL; //killough
    filelump_t singleinfo;
 
+   /* Baked-in WAD: the bytes are a const array compiled into the core, not
+    * a file.  Treat it exactly like the precached-into-memory path -- parse
+    * the header and directory straight out of the embedded buffer -- but
+    * with no filestream_open and no handle.  This runs identically in
+    * MEMORY_LOW and normal builds (W_ReadLump also special-cases
+    * embedded_data), so the engine never touches the filesystem for it. */
+   if (wadfile->embedded_data)
+   {
+      lprintf(LO_INFO, " adding %s (embedded)\n",
+              wadfile->name ? wadfile->name : "prboom.wad");
+      startlump = numlumps;
+
+      memcpy(&header, wadfile->embedded_data, sizeof(header));
+      if (strncmp(header.identification, "IWAD", 4) &&
+          strncmp(header.identification, "PWAD", 4))
+         I_Error("W_AddFile: embedded wad has no IWAD or PWAD id");
+      header.numlumps     = LONG(header.numlumps);
+      header.infotableofs = LONG(header.infotableofs);
+      length = header.numlumps * sizeof(filelump_t);
+      fileinfo2free = fileinfo = malloc(length);
+      memcpy(fileinfo, &wadfile->embedded_data[header.infotableofs], length);
+      numlumps += header.numlumps;
+
+      lumpinfo = realloc(lumpinfo, numlumps * sizeof(lumpinfo_t));
+      lump_p = &lumpinfo[startlump];
+      for (i = startlump; (int)i < numlumps; i++, lump_p++, fileinfo++)
+      {
+         lump_p->wadfile = wadfile;
+         lump_p->position = LONG(fileinfo->filepos);
+         lump_p->size = LONG(fileinfo->size);
+         lump_p->li_namespace = ns_global;
+         strncpy(lump_p->name, fileinfo->name, 8);
+         lump_p->source = wadfile->src;
+      }
+      free(fileinfo2free);
+      return;
+   }
+
    // open the file and add to directory
    wadfile->handle = filestream_open(wadfile->name,
          RETRO_VFS_FILE_ACCESS_READ,
@@ -564,6 +602,14 @@ void W_ReadLump(int lump, void *dest)
 
    if (l->wadfile)
    {
+      /* Baked-in WAD: copy straight out of the embedded const array,
+       * regardless of MEMORY_LOW (there is no handle to read from). */
+      if (l->wadfile->embedded_data)
+      {
+         if (l->size > 0)
+            memcpy(dest, &l->wadfile->embedded_data[l->position], l->size);
+         return;
+      }
 #ifdef MEMORY_LOW
       if (l->size > 0)
       {

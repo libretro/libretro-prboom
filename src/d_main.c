@@ -62,6 +62,7 @@
 #include "sounds.h"
 #include "z_zone.h"
 #include "w_wad.h"
+#include "prboom_wad_data.h"
 #include "s_sound.h"
 #include "v_video.h"
 #include "f_finale.h"
@@ -1307,15 +1308,22 @@ bool D_DoomMainSetup(void)
    * Doom) weapon states. */
   D_InitWeaponInfo();
 
-  // Load prboom.wad after IWAD but before everything else
+  // prboom.wad is baked into the core: add it as an embedded WAD here,
+  // after the IWAD but before everything else.  The engine no longer looks
+  // for prboom.wad on the filesystem -- the compiled-in copy is always used,
+  // so the data is guaranteed present and cannot be overridden or omitted.
   {
-    char *data_wad_path = I_FindFile(PACKAGE ".wad", NULL);
-
-    if (!data_wad_path)
-      lprintf(LO_INFO, PACKAGE ".wad not found - internal default data will be used\n");
-    else
-      D_AddFile(data_wad_path, source_pre);
-    free(data_wad_path);
+    char *embed_name = malloc(sizeof(PACKAGE ".wad"));
+    wadfiles = realloc(wadfiles, sizeof(*wadfiles) * (numwadfiles + 1));
+    memset(&wadfiles[numwadfiles], 0, sizeof(wadfiles[numwadfiles]));
+    /* name is a label only (never opened); malloc'd so W_ReleaseAllWads
+     * frees it uniformly with every other entry. */
+    strcpy(embed_name, PACKAGE ".wad");
+    wadfiles[numwadfiles].name = embed_name;
+    wadfiles[numwadfiles].src  = source_pre;
+    wadfiles[numwadfiles].embedded_data   = prboom_wad_data;
+    wadfiles[numwadfiles].embedded_length = (int)prboom_wad_data_len;
+    numwadfiles++;
   }
 
   // e6y: DEH files preloaded in wrong order

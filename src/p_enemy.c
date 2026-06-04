@@ -5621,6 +5621,498 @@ void A_KBoltRaise(mobj_t *actor)
   }
 }
 
+/*
+ * Morphed monsters (pigs).  special1 = remaining morph tics, special2 =
+ * the original monster type to restore.
+ */
+
+dbool P_UpdateMorphedMonster(mobj_t *actor, int tics)
+{
+  mobj_t *fog;
+  fixed_t x;
+  fixed_t y;
+  fixed_t z;
+  mobjtype_t moType;
+  mobj_t *mo;
+  mobj_t oldMonster;
+
+  actor->special1.i -= tics;
+  if (actor->special1.i > 0)
+    return FALSE;
+  moType = actor->special2.i;
+  switch (moType)
+  {
+    case HEXEN_MT_WRAITHB:             /* these must remain morphed */
+    case HEXEN_MT_SERPENT:
+    case HEXEN_MT_SERPENTLEADER:
+    case HEXEN_MT_MINOTAUR:
+      return FALSE;
+    default:
+      break;
+  }
+  x = actor->x;
+  y = actor->y;
+  z = actor->z;
+  oldMonster = *actor;                 /* save pig vars */
+
+  P_RemoveMobjFromTIDList(actor);
+  P_SetMobjState(actor, HEXEN_S_FREETARGMOBJ);
+  mo = P_SpawnMobj(x, y, z, moType);
+  if (P_TestMobjLocation(mo) == FALSE)
+  {                                    /* didn't fit */
+    P_RemoveMobj(mo);
+    mo = P_SpawnMobj(x, y, z, oldMonster.type);
+    mo->angle = oldMonster.angle;
+    mo->flags = oldMonster.flags;
+    mo->health = oldMonster.health;
+    P_SetTarget(&mo->target, oldMonster.target);
+    mo->special = oldMonster.special;
+    mo->special1.i = 5 * 35;           /* next try in 5 seconds */
+    mo->special2.i = moType;
+    mo->tid = oldMonster.tid;
+    memcpy(mo->special_args, oldMonster.special_args,
+           sizeof(mo->special_args));
+    P_InsertMobjIntoTIDList(mo, oldMonster.tid);
+    return FALSE;
+  }
+  mo->angle = oldMonster.angle;
+  P_SetTarget(&mo->target, oldMonster.target);
+  mo->tid = oldMonster.tid;
+  mo->special = oldMonster.special;
+  memcpy(mo->special_args, oldMonster.special_args,
+         sizeof(mo->special_args));
+  P_InsertMobjIntoTIDList(mo, oldMonster.tid);
+  fog = P_SpawnMobj(x, y, z + TELEFOGHEIGHT, HEXEN_MT_TFOG);
+  S_StartSound(fog, hexen_sfx_teleport);
+  return TRUE;
+}
+
+void A_PigLook(mobj_t *actor)
+{
+  if (P_UpdateMorphedMonster(actor, 10))
+    return;
+  A_Look(actor);
+}
+
+void A_PigChase(mobj_t *actor)
+{
+  if (P_UpdateMorphedMonster(actor, 3))
+    return;
+  A_Chase(actor);
+}
+
+void A_PigAttack(mobj_t *actor)
+{
+  if (P_UpdateMorphedMonster(actor, 18))
+    return;
+  if (!actor->target)
+    return;
+  if (P_CheckMeleeRange(actor))
+  {
+    P_DamageMobj(actor->target, actor, actor, 2 + (P_Random(pr_heretic) & 1));
+    S_StartSound(actor, hexen_sfx_pig_attack);
+  }
+}
+
+void A_PigPain(mobj_t *actor)
+{
+  A_Pain(actor);
+  if (actor->z <= actor->floorz)
+    actor->momz = (7 * FRACUNIT) / 2;
+}
+
+/*
+ * Death Wyvern.  The dragon flies a circuit of map spots: special1 holds
+ * the current destination spot, and each spot's args list the TIDs of the
+ * spots reachable from it.
+ */
+
+static void DragonSeek(mobj_t *actor, angle_t thresh, angle_t turnMax)
+{
+  int dir;
+  int dist;
+  angle_t delta;
+  angle_t angle;
+  mobj_t *target;
+  int search;
+  int i;
+  int bestArg;
+  angle_t bestAngle;
+  angle_t angleToSpot, angleToTarget;
+  mobj_t *mo;
+
+  target = actor->special1.m;
+  if (target == NULL)
+    return;
+  dir = P_FaceMobj(actor, target, &delta);
+  if (delta > thresh)
+  {
+    delta >>= 1;
+    if (delta > turnMax)
+      delta = turnMax;
+  }
+  if (dir)
+  {                                    /* turn clockwise */
+    actor->angle += delta;
+  }
+  else
+  {                                    /* turn counter clockwise */
+    actor->angle -= delta;
+  }
+  angle = actor->angle >> ANGLETOFINESHIFT;
+  actor->momx = FixedMul(actor->info->speed, finecosine[angle]);
+  actor->momy = FixedMul(actor->info->speed, finesine[angle]);
+  if (actor->z + actor->height < target->z
+      || target->z + target->height < actor->z)
+  {
+    dist = P_AproxDistance(target->x - actor->x, target->y - actor->y);
+    dist = dist / actor->info->speed;
+    if (dist < 1)
+      dist = 1;
+    actor->momz = (target->z - actor->z) / dist;
+  }
+  else
+  {
+    dist = P_AproxDistance(target->x - actor->x, target->y - actor->y);
+    dist = dist / actor->info->speed;
+  }
+  if (target->flags & MF_SHOOTABLE && P_Random(pr_heretic) < 64)
+  {                  /* attack the destination mobj if it's attackable */
+    mobj_t *oldTarget;
+
+    if (abs((int) actor->angle -
+            (int) R_PointToAngle2(actor->x, actor->y,
+                                  target->x, target->y)) < ANG45 / 2)
+    {
+      oldTarget = actor->target;
+      actor->target = target;
+      if (P_CheckMeleeRange(actor))
+      {
+        P_DamageMobj(actor->target, actor, actor, HX_HITDICE(10));
+        S_StartSound(actor, hexen_sfx_dragon_attack);
+      }
+      else if (P_Random(pr_heretic) < 128 && P_CheckMissileRange(actor))
+      {
+        P_SpawnMissile(actor, target, HEXEN_MT_DRAGON_FX);
+        S_StartSound(actor, hexen_sfx_dragon_attack);
+      }
+      actor->target = oldTarget;
+    }
+  }
+  if (dist < 4)
+  {                                    /* hit the target thing */
+    if (actor->target && P_Random(pr_heretic) < 200)
+    {
+      bestArg = -1;
+      bestAngle = ANGLE_MAX;
+      angleToTarget = R_PointToAngle2(actor->x, actor->y,
+                                      actor->target->x, actor->target->y);
+      for (i = 0; i < 5; i++)
+      {
+        int mo_x, mo_y;
+        if (!target->special_args[i])
+          continue;
+        search = -1;
+        mo = P_FindMobjFromTID(target->special_args[i], &search);
+        /* fix wyvern + porkalator bug */
+        if (mo == NULL)
+        {
+          lprintf(LO_WARN,
+                  "DragonSeek: P_FindMobjFromTID() returned NULL mobj!\n");
+          mo_x = 0;
+          mo_y = 0;
+        }
+        else
+        {
+          mo_x = mo->x;
+          mo_y = mo->y;
+        }
+        angleToSpot = R_PointToAngle2(actor->x, actor->y, mo_x, mo_y);
+        if ((angle_t) abs((int) angleToSpot - (int) angleToTarget) <
+            bestAngle)
+        {
+          bestAngle = abs((int) angleToSpot - (int) angleToTarget);
+          bestArg = i;
+        }
+      }
+      if (bestArg != -1)
+      {
+        search = -1;
+        P_SetTarget(&actor->special1.m,
+                    P_FindMobjFromTID(target->special_args[bestArg],
+                                      &search));
+      }
+    }
+    else
+    {
+      do
+      {
+        i = (P_Random(pr_heretic) >> 2) % 5;
+      }
+      while (!target->special_args[i]);
+      search = -1;
+      P_SetTarget(&actor->special1.m,
+                  P_FindMobjFromTID(target->special_args[i], &search));
+    }
+  }
+}
+
+void A_DragonInitFlight(mobj_t *actor)
+{
+  int search;
+
+  search = -1;
+  do
+  {            /* find the first thing with a tid identical to the dragon's */
+    P_SetTarget(&actor->special1.m,
+                P_FindMobjFromTID(actor->tid, &search));
+    if (search == -1)
+    {
+      P_SetMobjState(actor, actor->info->spawnstate);
+      return;
+    }
+  }
+  while (actor->special1.m == actor);
+  P_RemoveMobjFromTIDList(actor);
+}
+
+void A_DragonFlight(mobj_t *actor)
+{
+  angle_t angle;
+
+  DragonSeek(actor, 4 * ANG1, 8 * ANG1);
+  if (actor->target)
+  {
+    if (!(actor->target->flags & MF_SHOOTABLE))
+    {                                  /* target died */
+      P_SetTarget(&actor->target, NULL);
+      return;
+    }
+    angle = R_PointToAngle2(actor->x, actor->y, actor->target->x,
+                            actor->target->y);
+    if (abs((int) actor->angle - (int) angle) < ANG45 / 2
+        && P_CheckMeleeRange(actor))
+    {
+      P_DamageMobj(actor->target, actor, actor, HX_HITDICE(8));
+      S_StartSound(actor, hexen_sfx_dragon_attack);
+    }
+    else if (abs((int) actor->angle - (int) angle) <= ANG1 * 20)
+    {
+      P_SetMobjState(actor, actor->info->missilestate);
+      S_StartSound(actor, hexen_sfx_dragon_attack);
+    }
+  }
+  else
+  {
+    P_LookForPlayers(actor, TRUE);
+  }
+}
+
+void A_DragonFlap(mobj_t *actor)
+{
+  A_DragonFlight(actor);
+  if (P_Random(pr_heretic) < 240)
+    S_StartSound(actor, hexen_sfx_dragon_wingflap);
+  else
+    S_StartSound(actor, actor->info->activesound);
+}
+
+void A_DragonAttack(mobj_t *actor)
+{
+  P_SpawnMissile(actor, actor->target, HEXEN_MT_DRAGON_FX);
+}
+
+void A_DragonFX2(mobj_t *actor)
+{
+  mobj_t *mo;
+  int i;
+  int r1, r2, r3;
+  int delay;
+
+  delay = 16 + (P_Random(pr_heretic) >> 3);
+  for (i = 1 + (P_Random(pr_heretic) & 3); i; i--)
+  {
+    r1 = P_Random(pr_heretic);
+    r2 = P_Random(pr_heretic);
+    r3 = P_Random(pr_heretic);
+    mo = P_SpawnMobj(actor->x + ((r3 - 128) << 14),
+                     actor->y + ((r2 - 128) << 14),
+                     actor->z + ((r1 - 128) << 12),
+                     HEXEN_MT_DRAGON_FX2);
+    if (mo)
+    {
+      mo->tics = delay + (P_Random(pr_heretic) & 3) * i * 2;
+      P_SetTarget(&mo->target, actor->target);
+    }
+  }
+}
+
+void A_DragonPain(mobj_t *actor)
+{
+  A_Pain(actor);
+  if (!actor->special1.m)
+  {                                    /* no destination spot yet */
+    P_SetMobjState(actor, HEXEN_S_DRAGON_INIT);
+  }
+}
+
+void A_DragonCheckCrash(mobj_t *actor)
+{
+  if (actor->z <= actor->floorz)
+    P_SetMobjState(actor, HEXEN_S_DRAGON_CRASH1);
+}
+
+/*
+ * Class bosses (the Fighter, Cleric, and Mage of the Shadow Wood
+ * seven portals).  special2 = strafe timer.
+ */
+
+#define CLASS_BOSS_STRAFE_RANGE (64 * 10 * FRACUNIT)
+
+void A_FastChase(mobj_t *actor)
+{
+  int delta;
+  fixed_t dist;
+  angle_t ang;
+  mobj_t *target;
+
+  if (actor->reactiontime)
+    actor->reactiontime--;
+
+  /* modify target threshold */
+  if (actor->threshold)
+    actor->threshold--;
+
+  if (gameskill == sk_nightmare || fastparm)
+  {                            /* monsters move faster in nightmare mode */
+    actor->tics -= actor->tics / 2;
+    if (actor->tics < 3)
+      actor->tics = 3;
+  }
+
+  /* turn towards movement direction if not there yet */
+  if (actor->movedir < 8)
+  {
+    actor->angle &= (7u << 29);
+    delta = actor->angle - (actor->movedir << 29);
+    if (delta > 0)
+      actor->angle -= ANG90 / 2;
+    else if (delta < 0)
+      actor->angle += ANG90 / 2;
+  }
+
+  if (!actor->target || !(actor->target->flags & MF_SHOOTABLE))
+  {                                    /* look for a new target */
+    if (P_LookForPlayers(actor, TRUE))
+      return;                          /* got a new target */
+    P_SetMobjState(actor, actor->info->spawnstate);
+    return;
+  }
+
+  /* don't attack twice in a row */
+  if (actor->flags & MF_JUSTATTACKED)
+  {
+    actor->flags &= ~MF_JUSTATTACKED;
+    if (gameskill != sk_nightmare && !fastparm)
+      P_NewChaseDir(actor);
+    return;
+  }
+
+  /* strafe */
+  if (actor->special2.i > 0)
+  {
+    actor->special2.i--;
+  }
+  else
+  {
+    target = actor->target;
+    actor->special2.i = 0;
+    actor->momx = actor->momy = 0;
+    dist = P_AproxDistance(actor->x - target->x, actor->y - target->y);
+    if (dist < CLASS_BOSS_STRAFE_RANGE)
+    {
+      if (P_Random(pr_heretic) < 100)
+      {
+        ang = R_PointToAngle2(actor->x, actor->y, target->x, target->y);
+        if (P_Random(pr_heretic) < 128)
+          ang += ANG90;
+        else
+          ang -= ANG90;
+        ang >>= ANGLETOFINESHIFT;
+        actor->momx = FixedMul(13 * FRACUNIT, finecosine[ang]);
+        actor->momy = FixedMul(13 * FRACUNIT, finesine[ang]);
+        actor->special2.i = 3;         /* strafe time */
+      }
+    }
+  }
+
+  /* check for missile attack */
+  if (actor->info->missilestate)
+  {
+    if (gameskill < sk_nightmare && !fastparm && actor->movecount)
+      goto nomissile;
+    if (!P_CheckMissileRange(actor))
+      goto nomissile;
+    P_SetMobjState(actor, actor->info->missilestate);
+    actor->flags |= MF_JUSTATTACKED;
+    return;
+  }
+nomissile:
+
+  /* possibly choose another target */
+  if (netgame && !actor->threshold && !P_CheckSight(actor, actor->target))
+  {
+    if (P_LookForPlayers(actor, TRUE))
+      return;                          /* got a new target */
+  }
+
+  /* chase towards player */
+  if (!actor->special2.i)
+  {
+    if (--actor->movecount < 0 || !P_Move(actor, FALSE))
+      P_NewChaseDir(actor);
+  }
+}
+
+void A_FighterAttack(mobj_t *actor)
+{
+  extern void A_FSwordAttack2(mobj_t *actor);
+
+  if (!actor->target)
+    return;
+  A_FSwordAttack2(actor);
+}
+
+void A_ClericAttack(mobj_t *actor)
+{
+  extern void A_CHolyAttack3(mobj_t *actor);
+
+  if (!actor->target)
+    return;
+  A_CHolyAttack3(actor);
+}
+
+void A_MageAttack(mobj_t *actor)
+{
+  extern void A_MStaffAttack2(mobj_t *actor);
+
+  if (!actor->target)
+    return;
+  A_MStaffAttack2(actor);
+}
+
+void A_ClassBossHealth(mobj_t *actor)
+{
+  if (netgame && !deathmatch)          /* co-op only */
+  {
+    if (!actor->special1.i)
+    {
+      actor->health *= 5;
+      actor->special1.i = TRUE;        /* has been initialized */
+    }
+  }
+}
+
 void A_DemonAttack1(mobj_t *actor)
 {
   if (!actor->target)

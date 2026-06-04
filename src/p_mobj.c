@@ -928,6 +928,7 @@ int  P_FaceMobj(mobj_t *source, mobj_t *target, angle_t *delta);
 #define FOOTCLIPSIZE (10*FRACUNIT)
 #endif
 mobjtype_t PuffType;
+mobj_t *PuffSpawned;  /* last puff actor spawned by P_SpawnPuff (Hexen melee feedback) */
 mobj_t *PuffSpawned;   /* last puff P_SpawnPuff created (Raven games) */
 int P_SubRandom(void);  /* heretic/p_action.c */
 void S_StartMobjSound(mobj_t *mobj, int sfx_id);  /* heretic/p_action.c */
@@ -1768,6 +1769,7 @@ void P_SpawnPuff(fixed_t x,fixed_t y,fixed_t z)
   if (raven)
   {
     th = P_SpawnMobj(x, y, z + (P_SubRandom() << 10), PuffType);
+    PuffSpawned = th;
     if (hexen && linetarget && th->info->seesound)
       S_StartMobjSound(th, th->info->seesound);
     else if (th->info->attacksound)

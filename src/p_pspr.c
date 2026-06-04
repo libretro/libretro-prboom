@@ -59,6 +59,7 @@ void A_UnHideThing(mobj_t *thing);
 
 extern void P_Thrust(player_t *, angle_t, fixed_t);
 extern mobjtype_t PuffType;   /* puff actor the next hitscan/melee spawns */
+extern mobj_t *PuffSpawned;   /* last puff spawned by P_SpawnPuff */
 
 extern void retro_set_rumble_damage(int damage, float duration);
 
@@ -1194,6 +1195,74 @@ axedone:
 }
 
 #define HX_HAMMER_RANGE (MELEERANGE+MELEERANGE/2)
+
+/* Class-boss weapon secondaries: the Fighter/Cleric/Mage bosses fire the
+ * fourth-weapon attacks as monster (mobj-level) actions. */
+
+void A_FSwordAttack2(mobj_t *actor)
+{
+  angle_t angle = actor->angle;
+
+  P_SpawnMissileAngle(actor, HEXEN_MT_FSWORD_MISSILE, angle + ANG45 / 4, 0);
+  P_SpawnMissileAngle(actor, HEXEN_MT_FSWORD_MISSILE, angle + ANG45 / 8, 0);
+  P_SpawnMissileAngle(actor, HEXEN_MT_FSWORD_MISSILE, angle, 0);
+  P_SpawnMissileAngle(actor, HEXEN_MT_FSWORD_MISSILE, angle - ANG45 / 8, 0);
+  P_SpawnMissileAngle(actor, HEXEN_MT_FSWORD_MISSILE, angle - ANG45 / 4, 0);
+  S_StartSound(actor, hexen_sfx_fighter_sword_fire);
+}
+
+static void MStaffSpawn2(mobj_t *actor, angle_t angle)
+{
+  mobj_t *mo;
+
+  mo = P_SpawnMissileAngle(actor, HEXEN_MT_MSTAFF_FX2, angle, 0);
+  if (mo)
+  {
+    P_SetTarget(&mo->target, actor);
+    P_SetTarget(&mo->special1.m, P_RoughTargetSearch(mo, 0, 10));
+  }
+}
+
+void A_MStaffAttack2(mobj_t *actor)
+{
+  angle_t angle;
+
+  angle = actor->angle;
+  MStaffSpawn2(actor, angle);
+  MStaffSpawn2(actor, angle - ANG1 * 5);
+  MStaffSpawn2(actor, angle + ANG1 * 5);
+  S_StartSound(actor, hexen_sfx_mage_staff_fire);
+}
+
+void A_CHolyAttack3(mobj_t *actor)
+{
+  P_SpawnMissile(actor, actor->target, HEXEN_MT_HOLY_MISSILE);
+  S_StartSound(actor, hexen_sfx_choly_fire);
+}
+
+void A_SnoutAttack(player_t *player, pspdef_t *psp)
+{
+  angle_t angle;
+  int damage;
+  int slope;
+
+  damage = 3 + (P_Random(pr_heretic) & 3);
+  angle = player->mo->angle;
+  slope = P_AimLineAttack(player->mo, angle, MELEERANGE, 0);
+  PuffType = HEXEN_MT_SNOUTPUFF;
+  PuffSpawned = NULL;
+  P_LineAttack(player->mo, angle, MELEERANGE, slope, damage);
+  S_StartSound(player->mo,
+               hexen_sfx_pig_active1 + (P_Random(pr_heretic) & 1));
+  if (linetarget)
+  {
+    AdjustPlayerAngle(player->mo);
+    if (PuffSpawned)
+    {                                  /* bit something */
+      S_StartSound(player->mo, hexen_sfx_pig_attack);
+    }
+  }
+}
 
 void A_FHammerAttack(player_t *player, pspdef_t *psp)
 {

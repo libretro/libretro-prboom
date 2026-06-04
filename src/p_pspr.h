@@ -101,6 +101,7 @@ void A_WeaponReady(player_t *player, pspdef_t *psp);
 /* Hexen Fighter fists (active). */
 void A_FPunchAttack(player_t *player, pspdef_t *psp);
 void A_FAxeAttack(player_t *player, pspdef_t *psp);
+void A_SnoutAttack(player_t *player, pspdef_t *psp);
 void A_FHammerAttack(player_t *player, pspdef_t *psp);
 void A_FHammerThrow(player_t *player, pspdef_t *psp);
 void A_FSwordAttack(player_t *player, pspdef_t *psp);

@@ -955,6 +955,88 @@ static void P_LoadThings (int lump)
 = Also counts secret lines for intermissions
 =================
 */
+/* Shared linedef finalization: resolve v1/v2 from vertex indices, derive
+ * dx/dy, slopetype, bbox and sound origin, and apply killough's missing/
+ * out-of-range sidedef fixups.  Factored out of P_LoadLineDefs so the UDMF
+ * linedef loader produces byte-identical geometry post-processing.  Operates
+ * purely on fields already set on ld; i is used only for warning messages. */
+static void P_FinalizeLineDef(line_t *ld, unsigned short mv1,
+                              unsigned short mv2, int i)
+{
+  vertex_t *v1, *v2;
+
+  v1 = ld->v1 = &vertexes[mv1];
+  v2 = ld->v2 = &vertexes[mv2];
+  ld->dx = v2->x - v1->x;
+  ld->dy = v2->y - v1->y;
+
+  ld->slopetype = !ld->dx ? ST_VERTICAL : !ld->dy ? ST_HORIZONTAL :
+    FixedDiv(ld->dy, ld->dx) > 0 ? ST_POSITIVE : ST_NEGATIVE;
+
+  if (v1->x < v2->x)
+    {
+      ld->bbox[BOXLEFT] = v1->x;
+      ld->bbox[BOXRIGHT] = v2->x;
+    }
+  else
+    {
+      ld->bbox[BOXLEFT] = v2->x;
+      ld->bbox[BOXRIGHT] = v1->x;
+    }
+  if (v1->y < v2->y)
+    {
+      ld->bbox[BOXBOTTOM] = v1->y;
+      ld->bbox[BOXTOP] = v2->y;
+    }
+  else
+    {
+      ld->bbox[BOXBOTTOM] = v2->y;
+      ld->bbox[BOXTOP] = v1->y;
+    }
+
+  /* calculate sound origin of line to be its midpoint */
+  //e6y: fix sound origin for large levels
+  // no need for comp_sound test, these are only used when comp_sound = 0
+  ld->soundorg.x = ld->bbox[BOXLEFT] / 2 + ld->bbox[BOXRIGHT] / 2;
+  ld->soundorg.y = ld->bbox[BOXTOP] / 2 + ld->bbox[BOXBOTTOM] / 2;
+
+  {
+    /* cph 2006/09/30 - fix sidedef errors right away.
+     * cph 2002/07/20 - these errors are fatal if not fixed, so apply them
+     * in compatibility mode - a desync is better than a crash! */
+    int j;
+
+    for (j=0; j < 2; j++)
+    {
+      if (ld->sidenum[j] != NO_INDEX && ld->sidenum[j] >= numsides) {
+        ld->sidenum[j] = NO_INDEX;
+        lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
+                " has out-of-range sidedef number\n", i);
+      }
+    }
+
+    // killough 11/98: fix common wad errors (missing sidedefs):
+
+    if (ld->sidenum[0] == NO_INDEX) {
+      ld->sidenum[0] = 0;  // Substitute dummy sidedef for missing right side
+      // cph - print a warning about the bug
+      lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
+              " missing first sidedef\n", i);
+    }
+
+    if ((ld->sidenum[1] == NO_INDEX) && (ld->flags & ML_TWOSIDED)) {
+      ld->flags &= ~ML_TWOSIDED;  // Clear 2s flag for missing left side
+      // cph - print a warning about the bug
+      lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
+              " has two-sided flag set, but no second sidedef\n", i);
+    }
+  }
+
+  // killough 4/4/98: support special sidedef interpretation below
+  if (ld->sidenum[0] != NO_INDEX && ld->special)
+    sides[*ld->sidenum].special = ld->special;
+}
+
 static void P_LoadLineDefs (int lump)
 {
   const uint8_t *data; // cph - const*
@@ -970,7 +1052,6 @@ static void P_LoadLineDefs (int lump)
   for (i=0; i<numlines; i++)
     {
       line_t *ld = lines+i;
-      vertex_t *v1, *v2;
       unsigned short mv1, mv2;
 
       if (hexen_fmt)
@@ -1003,76 +1084,7 @@ static void P_LoadLineDefs (int lump)
           ld->sidenum[1] = SHORT(mld->sidenum[1]);
         }
 
-      v1 = ld->v1 = &vertexes[mv1];
-      v2 = ld->v2 = &vertexes[mv2];
-      ld->dx = v2->x - v1->x;
-      ld->dy = v2->y - v1->y;
-
-      ld->slopetype = !ld->dx ? ST_VERTICAL : !ld->dy ? ST_HORIZONTAL :
-        FixedDiv(ld->dy, ld->dx) > 0 ? ST_POSITIVE : ST_NEGATIVE;
-
-      if (v1->x < v2->x)
-        {
-          ld->bbox[BOXLEFT] = v1->x;
-          ld->bbox[BOXRIGHT] = v2->x;
-        }
-      else
-        {
-          ld->bbox[BOXLEFT] = v2->x;
-          ld->bbox[BOXRIGHT] = v1->x;
-        }
-      if (v1->y < v2->y)
-        {
-          ld->bbox[BOXBOTTOM] = v1->y;
-          ld->bbox[BOXTOP] = v2->y;
-        }
-      else
-        {
-          ld->bbox[BOXBOTTOM] = v2->y;
-          ld->bbox[BOXTOP] = v1->y;
-        }
-
-      /* calculate sound origin of line to be its midpoint */
-      //e6y: fix sound origin for large levels
-      // no need for comp_sound test, these are only used when comp_sound = 0
-      ld->soundorg.x = ld->bbox[BOXLEFT] / 2 + ld->bbox[BOXRIGHT] / 2;
-      ld->soundorg.y = ld->bbox[BOXTOP] / 2 + ld->bbox[BOXBOTTOM] / 2;
-
-      {
-        /* cph 2006/09/30 - fix sidedef errors right away.
-         * cph 2002/07/20 - these errors are fatal if not fixed, so apply them
-         * in compatibility mode - a desync is better than a crash! */
-        int j;
-        
-        for (j=0; j < 2; j++)
-        {
-          if (ld->sidenum[j] != NO_INDEX && ld->sidenum[j] >= numsides) {
-            ld->sidenum[j] = NO_INDEX;
-            lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
-                    " has out-of-range sidedef number\n", i);
-          }
-        }
-        
-        // killough 11/98: fix common wad errors (missing sidedefs):
-        
-        if (ld->sidenum[0] == NO_INDEX) {
-          ld->sidenum[0] = 0;  // Substitute dummy sidedef for missing right side
-          // cph - print a warning about the bug
-          lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
-                  " missing first sidedef\n", i);
-        }
-        
-        if ((ld->sidenum[1] == NO_INDEX) && (ld->flags & ML_TWOSIDED)) {
-          ld->flags &= ~ML_TWOSIDED;  // Clear 2s flag for missing left side
-          // cph - print a warning about the bug
-          lprintf(LO_WARN, "P_LoadLineDefs: linedef %d"
-                  " has two-sided flag set, but no second sidedef\n", i);
-        }
-      }
-
-      // killough 4/4/98: support special sidedef interpretation below
-      if (ld->sidenum[0] != NO_INDEX && ld->special)
-        sides[*ld->sidenum].special = ld->special;
+      P_FinalizeLineDef(ld, mv1, mv2, i);
     }
 
   W_UnlockLumpNum(lump); // cph - release the lump

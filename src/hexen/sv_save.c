@@ -45,6 +45,8 @@
 #include "hexen/p_mapinfo.h"
 #include "hexen/p_spec_hexen.h"
 #include "hexen/sv_save.h"
+#include "p_saveg.h"
+#include "g_game.h"
 
 #define SV_MAX_MAPS         99
 #define MAX_TARGET_PLAYERS 512
@@ -399,7 +401,14 @@ static void ArchiveMobjs(void)
      * are not resurrected on the other side */
     SV_WriteLong(th->function.arg1 ==
                  (void (*)(void *)) P_RemoveThinkerDelayed);
-    SV_Write(mobj, sizeof(mobj_t));
+    {
+      /* the record must be position-independent so user savegames can carry
+       * it across runs of the program: state is the one pointer the reader
+       * uses that would otherwise stay raw */
+      mobj_t copy = *mobj;
+      copy.state = (state_t *) (uintptr_t) (mobj->state - states);
+      SV_Write(&copy, sizeof(mobj_t));
+    }
     SV_WriteLong(GetMobjNum(mobj->target));
     SV_WriteLong(GetMobjNum(mobj->tracer));
     SV_WriteLong(GetMobjNum(mobj->lastenemy));
@@ -433,6 +442,7 @@ static void UnarchiveMobjs(void)
     mobj = MobjList[i];
     delayed[i] = SV_ReadLong();
     SV_Read(mobj, sizeof(mobj_t));
+    mobj->state = states + (uintptr_t) mobj->state;
 
     /* invalidate everything that cannot survive the reload */
     memset(&mobj->thinker, 0, sizeof(thinker_t));
@@ -550,6 +560,12 @@ static void ArchiveThinkers(void)
         SV_WriteLong(GetMobjNum(script->activator));
         SV_WriteLong(script->line ? (int)(script->line - lines) : -1);
       }
+      if (ThinkerInfo[i].tclass == TC_VERTICAL_DOOR)
+      {
+        /* keep the record position-independent (see ArchiveMobjs) */
+        vldoor_t *door = (vldoor_t *) th;
+        SV_WriteLong(door->line ? (int)(door->line - lines) : -1);
+      }
       break;
     }
     if (i == NUM_THINKER_INFO &&
@@ -596,10 +612,20 @@ static void UnarchiveThinkers(void)
     {
       case TC_MOVE_CEILING:
         ((ceiling_t *) th)->sector->ceilingdata = th;
+        /* T_HexenMoveCeiling finishes via P_RemoveActiveCeiling, which walks
+         * ceiling->list; without re-adding, the restored thinker holds a
+         * stale list node and removal is a use-after-free */
+        P_AddActiveCeiling((ceiling_t *) th);
         break;
       case TC_VERTICAL_DOOR:
-        ((vldoor_t *) th)->sector->ceilingdata = th;
+      {
+        vldoor_t *door = (vldoor_t *) th;
+        int       lnum = SV_ReadLong();
+
+        door->line = lnum >= 0 ? &lines[lnum] : NULL;
+        door->sector->ceilingdata = th;
         break;
+      }
       case TC_MOVE_FLOOR:
         ((floormove_t *) th)->sector->floordata = th;
         break;
@@ -758,6 +784,86 @@ static void SV_LoadMap(void)
 
   free(MobjList);
   MobjList = NULL;
+}
+
+/* ------------------------------------------------------------------------ */
+/* User savegames                                                            */
+/* ------------------------------------------------------------------------ */
+
+/* The per-map archives above only live in memory, so a user save made
+ * mid-hub used to forget every other map in the cluster: loading it and
+ * walking back through a portal re-entered the old map fresh.  Embed the
+ * archive buffers (now position-independent) in the savegame stream, plus
+ * RebornPosition so respawns after the load use the right player start. */
+
+void SV_ArchiveMaps(void)
+{
+  int map;
+  int present = 0;
+
+  if (!hexen)
+    return;
+
+  for (map = 0; map < SV_MAX_MAPS; map++)
+    if (map_archive[map].buffer)
+      present++;
+
+  CheckSaveGame(2 * sizeof(int));
+  memcpy(save_p, &RebornPosition, sizeof(int));
+  save_p += sizeof(int);
+  memcpy(save_p, &present, sizeof(int));
+  save_p += sizeof(int);
+
+  for (map = 0; map < SV_MAX_MAPS; map++)
+  {
+    int size;
+
+    if (!map_archive[map].buffer)
+      continue;
+
+    size = (int) map_archive[map].size;
+    CheckSaveGame(2 * sizeof(int) + size);
+    memcpy(save_p, &map, sizeof(int));
+    save_p += sizeof(int);
+    memcpy(save_p, &size, sizeof(int));
+    save_p += sizeof(int);
+    memcpy(save_p, map_archive[map].buffer, size);
+    save_p += size;
+  }
+}
+
+void SV_UnArchiveMaps(void)
+{
+  int i;
+  int present;
+
+  if (!hexen)
+    return;
+
+  SV_HubInit();                 /* forget whatever hub we were in */
+
+  memcpy(&RebornPosition, save_p, sizeof(int));
+  save_p += sizeof(int);
+  memcpy(&present, save_p, sizeof(int));
+  save_p += sizeof(int);
+
+  for (i = 0; i < present; i++)
+  {
+    int map, size;
+
+    memcpy(&map, save_p, sizeof(int));
+    save_p += sizeof(int);
+    memcpy(&size, save_p, sizeof(int));
+    save_p += sizeof(int);
+
+    if (map < 0 || map >= SV_MAX_MAPS || size <= 0)
+      I_Error("SV_UnArchiveMaps: corrupt hub archive");
+
+    map_archive[map].size = size;
+    map_archive[map].buffer = malloc(size);
+    memcpy(map_archive[map].buffer, save_p, size);
+    save_p += size;
+  }
 }
 
 static dbool hub_travel;

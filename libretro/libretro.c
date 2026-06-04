@@ -2266,10 +2266,10 @@ struct extra_serialize {
 size_t retro_serialize_size(void)
 {
   /* Hexen savegames are much larger than Doom/Heretic ones: the maps carry
-   * far more mobjs plus the ACS/polyobj/sound-sequence world state, and a
-   * retail map at skill 4 already needs ~390KB (the old 192KB budget made
-   * retro_serialize fail silently on the bigger hubs). */
-  return sizeof(struct extra_serialize) + (hexen ? 0x100000 : 0x30000);
+   * far more mobjs plus the ACS/polyobj/sound-sequence world state, and the
+   * save now also embeds the hub map archives -- a retail map at skill 4
+   * needs ~390KB on its own and a fully explored hub several times that. */
+  return sizeof(struct extra_serialize) + (hexen ? 0x400000 : 0x30000);
 }
 
 bool retro_serialize(void *data_, size_t size)

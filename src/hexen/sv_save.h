@@ -27,4 +27,10 @@ dbool SV_IsHubTravel(void);
 /* Forget all per-map archives (new game / new cluster). */
 void SV_HubInit(void);
 
+/* Embed/restore the hub map archives in a user savegame (no-ops outside
+ * hexen).  Called from the savegame code between the sound-sequence block
+ * and the consistency marker. */
+void SV_ArchiveMaps(void);
+void SV_UnArchiveMaps(void);
+
 #endif

@@ -1928,10 +1928,13 @@ static int G_DoLoadGameFromSaveBuffer(int length)
    * layout mismatch is unrecoverable, unlike a wad/checksum mismatch. */
   if (raven)
   {
-    /* 'RVN2': the raven mobj record became the full struct (the legacy
+    /* RVN2: the raven mobj record became the full struct (the legacy
      * truncated layout lost tid/special/damage/floorclip) and hexen saves
-     * gained the world state (ACS, polyobjs, sound sequences) */
-    static const char raven_magic[4] = { 'R','V','N','2' };
+     * gained the world state (ACS, polyobjs, sound sequences).
+     * RVN3 (hexen only): the hub map archives ride in the savegame. */
+    char raven_magic[4] = { 'R','V','N','2' };
+    if (hexen)
+      raven_magic[3] = '3';
     if (memcmp(save_p, raven_magic, sizeof raven_magic))
       return -2;
     save_p += sizeof raven_magic;
@@ -2008,6 +2011,7 @@ static int G_DoLoadGameFromSaveBuffer(int length)
   P_UnArchiveSpecials ();
   P_UnArchiveScripts (); /* hexen ACS script states + map vars (no-op otherwise) */
   P_UnArchiveSounds ();  /* hexen active sound sequences (no-op otherwise) */
+  SV_UnArchiveMaps (); /* hexen hub map archives (no-op otherwise) */
   P_UnArchiveRNG ();    // killough 1/18/98: load RNG information
   P_UnArchiveMap ();    // killough 1/22/98: load automap information
   P_MapEnd();
@@ -2162,7 +2166,9 @@ static int G_DoSaveGameToSaveBuffer() {
    * with upstream). */
   if (raven)
   {
-    static const char raven_magic[4] = { 'R','V','N','2' };
+    char raven_magic[4] = { 'R','V','N','2' };
+    if (hexen)
+      raven_magic[3] = '3';
     CheckSaveGame(sizeof raven_magic);
     memcpy(save_p, raven_magic, sizeof raven_magic);
     save_p += sizeof raven_magic;
@@ -2244,6 +2250,7 @@ static int G_DoSaveGameToSaveBuffer() {
   P_ArchiveSpecials();
   P_ArchiveScripts();  /* hexen ACS script states + map vars (no-op otherwise) */
   P_ArchiveSounds();   /* hexen active sound sequences (no-op otherwise) */
+  SV_ArchiveMaps();    /* hexen hub map archives (no-op otherwise) */
   P_ArchiveRNG();    // killough 1/18/98: save RNG information
   P_ArchiveMap();    // killough 1/22/98: save automap information
 

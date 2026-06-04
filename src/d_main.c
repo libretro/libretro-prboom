@@ -298,7 +298,11 @@ void D_Display (void)
      * direct-rendering. */
 
     // Now do the drawing
-    if (viewactive)
+    /* A failed or incomplete level load (e.g. a UDMF map whose node format
+     * we cannot decode) can leave the player with no mobj.  R_SetupFrame
+     * dereferences player->mo immediately, so guard the 3D view here rather
+     * than crash; the frame just renders empty. */
+    if (viewactive && players[displayplayer].mo)
       R_RenderPlayerView (&players[displayplayer]);
     if (automapmode & am_active)
       AM_Drawer();

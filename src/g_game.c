@@ -767,6 +767,21 @@ static void G_DoLoadLevel (void)
   }
 
   P_SetupLevel (gameepisode, gamemap, 0, gameskill);
+
+  {
+    /* P_SetupLevel could not build a usable level (e.g. a UDMF map whose
+     * node format we cannot decode).  Don't run or render it -- drop back
+     * to the demo/title screen so the core stays responsive instead of
+     * ticking and rendering a level with no player mobj or BSP. */
+    extern dbool level_setup_failed;
+    if (level_setup_failed)
+    {
+      gamestate = GS_DEMOSCREEN;
+      gameaction = ga_nothing;
+      return;
+    }
+  }
+
   if (!demoplayback) /* Don't switch views if playing a demo */
     displayplayer = consoleplayer;    /* view the guy you are playing */
   gameaction = ga_nothing;

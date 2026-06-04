@@ -79,7 +79,7 @@ sector_t *sectors = NULL;
 
 int      numsubsectors = 0;
 subsector_t *subsectors = NULL;
-
+dbool level_setup_failed = FALSE;  /* set by P_SetupLevel on an unloadable map */
 int      numnodes = 0;
 node_t   *nodes = NULL;
 
@@ -2138,6 +2138,8 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    R_StopAllInterpolations();
 
+   level_setup_failed = FALSE;
+
    /* Select the per-game map format before any linedefs/specials are
     * processed.  For Doom this installs the Doom descriptor (no behaviour
     * change); Heretic/Hexen selection is added later. */
@@ -2213,33 +2215,54 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       int textmap = lumpnum + 1;
       int znodes;
 
-      /* Parse the TEXTMAP lump into the udmf record set, then build the
-       * runtime geometry from it.  Namespace must resolve or the parser
-       * I_Errors via the callback. */
+      /* Parse the TEXTMAP lump, then validate the node lump before
+       * committing to building the level.
+       *
+       * Note: in this libretro core I_Error logs and *returns* (it is not
+       * upstream prboom's noreturn abort), and I_SafeExit only sets a
+       * deferred flag.  An unloadable map is handled by setting
+       * level_setup_failed and returning here; G_DoLoadLevel sees the flag
+       * and abandons the gamestate transition rather than running and
+       * rendering a level that has no player start or BSP. */
       udmf_namespace = UDMF_NONE;
       dsda_ParseUDMF(W_CacheLumpNum(textmap), W_LumpLength(textmap), P_UDMFError);
       if (udmf_namespace == UDMF_NONE)
+      {
          I_Error("P_SetupLevel: %s: unsupported or missing UDMF namespace", lumpname);
+         level_setup_failed = TRUE;
+         return;
+      }
+
+      /* BSP: UDMF stores nodes in a named ZNODES lump.  Only the
+       * uncompressed extended formats (XNOD/XGLN) are supported; compressed
+       * ZNODES (ZNOD/ZGLN) and the newer GL formats (XGL2/XGL3 and their
+       * compressed variants) need inflate / a different decoder this loader
+       * does not have.  Reject up-front so we never build a level we cannot
+       * give a working BSP. */
+      znodes = P_FindUDMFLump(lumpnum, "ZNODES");
+      if (znodes < 0)
+      {
+         I_Error("P_SetupLevel: %s: UDMF map has no ZNODES lump", lumpname);
+         level_setup_failed = TRUE;
+         return;
+      }
+      {
+         char id[4];
+         if (!ReadIdentifier(znodes, id) ||
+             (memcmp(id, "XNOD", 4) && memcmp(id, "XGLN", 4)))
+         {
+            I_Error("P_SetupLevel: %s: ZNODES are '%.4s'; only uncompressed "
+                    "XNOD/XGLN are supported (rebuild nodes with zdbsp -X)",
+                    lumpname, id);
+            level_setup_failed = TRUE;
+            return;
+         }
+      }
 
       P_LoadUDMFVertexes();
       P_LoadUDMFSectors();
       P_LoadUDMFSideDefs();
       P_LoadUDMFLineDefs();
-
-      /* BSP: UDMF stores nodes in a named ZNODES lump.  Only the
-       * uncompressed extended formats (XNOD/XGLN) are supported here; a
-       * compressed ZNODES needs zlib inflate, which this loader does not do
-       * -- fail clearly rather than misread it. */
-      znodes = P_FindUDMFLump(lumpnum, "ZNODES");
-      if (znodes < 0)
-         I_Error("P_SetupLevel: %s: UDMF map has no ZNODES lump", lumpname);
-      {
-         char id[4];
-         if (!ReadIdentifier(znodes, id) ||
-             (memcmp(id, "XNOD", 4) && memcmp(id, "XGLN", 4)))
-            I_Error("P_SetupLevel: %s: ZNODES must be uncompressed XNOD/XGLN "
-                    "(rebuild nodes with zdbsp -X)", lumpname);
-      }
       P_LoadXNOD(znodes);
 
       {

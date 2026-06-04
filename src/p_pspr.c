@@ -110,19 +110,21 @@ static void P_SetPsprite(player_t *player, int position, statenum_t stnum)
       psp->state = state;
       psp->tics  = state->tics;        // could be 0
 
-      if (state->misc1)
+      /* Hexen treats the two offsets independently (several weapon frames
+       * set only a vertical offset); Doom keeps misc1 gating both. */
+      if (hexen)
+      {
+         if (state->misc1)
+            psp->sx = state->misc1 << FRACBITS;
+         if (state->misc2)
+            psp->sy = state->misc2 << FRACBITS;
+      }
+      else if (state->misc1)
       {
          /* coordinate set */
          psp->sx = state->misc1 << FRACBITS;
          psp->sy = state->misc2 << FRACBITS;
       }
-
-#ifdef HEXEN
-      if(state->misc2)
-      {
-         psp->sy = state->misc2<<FRACBITS;
-      }
-#endif
 
       // Call action routine.
       // Modified handling.
@@ -150,17 +152,22 @@ static void P_BringUpWeapon(player_t *player)
    if (player->pendingweapon == WP_NOCHANGE)
       player->pendingweapon = player->readyweapon;
 
-#ifdef HEXEN
-   if(player->class == PCLASS_FIGHTER && player->pendingweapon == WP_SECOND
-         && player->mana[MANA_1])
-      newstate = S_FAXEUP_G;
+   /* Hexen: raise states come from the per-class weapon table; the
+    * Fighter's axe has a powered raise animation when blue mana is up. */
+   if (hexen)
+   {
+      if (player->class == PCLASS_FIGHTER && player->pendingweapon == WP_SECOND
+            && player->mana[MANA_1])
+         newstate = HEXEN_S_FAXEUP_G;
+      else
+         newstate = WeaponInfo[player->pendingweapon][player->class].upstate;
+   }
    else
+   {
+      if (player->pendingweapon == WP_CHAINSAW)
+         S_StartSound (player->mo, sfx_sawup);
       newstate = weaponinfo[player->pendingweapon].upstate;
-#else
-   if (player->pendingweapon == WP_CHAINSAW)
-      S_StartSound (player->mo, sfx_sawup);
-   newstate = weaponinfo[player->pendingweapon].upstate;
-#endif
+   }
 
    player->pendingweapon = WP_NOCHANGE;
 
@@ -182,8 +189,9 @@ static void P_BringUpWeapon(player_t *player)
 //
 //---------------------------------------------------------------------------
 
-#ifdef HEXEN
-dbool P_CheckMana(player_t *player)
+/* Hexen: true if there is enough mana for the ready weapon; otherwise picks
+ * the best owned weapon the player can afford and starts lowering. */
+static dbool P_CheckMana(player_t *player)
 {
    manatype_t mana;
    int count;
@@ -229,7 +237,6 @@ dbool P_CheckMana(player_t *player)
          WeaponInfo[player->readyweapon][player->class].downstate);
    return(false);
 }
-#endif
 
 // The first set is where the weapon preferences from             // killough,
 // default.cfg are stored. These values represent the keys used   // phares
@@ -403,7 +410,7 @@ static void P_FireWeapon(player_t *player)
 {
   statenum_t newstate;
 
-  if (!P_CheckAmmo(player))
+  if (hexen ? !P_CheckMana(player) : !P_CheckAmmo(player))
     return;
 
   P_SetMobjState(player->mo, g_s_play_atk1);
@@ -439,7 +446,9 @@ static void P_FireWeapon(player_t *player)
 
 void P_DropWeapon(player_t *player)
 {
-  P_SetPsprite(player, ps_weapon, weaponinfo[player->readyweapon].downstate);
+  P_SetPsprite(player, ps_weapon, hexen
+      ? WeaponInfo[player->readyweapon][player->class].downstate
+      : weaponinfo[player->readyweapon].downstate);
 }
 
 /*
@@ -452,17 +461,16 @@ void P_DropWeapon(player_t *player)
 
 void A_WeaponReady(player_t *player, pspdef_t *psp)
 {
-#ifdef HEXEN
-   // Change player from attack state
-	if(player->mo->state >= &states[PStateAttack[player->class]]
-		&& player->mo->state <= &states[PStateAttackEnd[player->class]])
-      P_SetMobjState(player->mo, PStateNormal[player->class]);
-#else
    /* get out of attack state */
-   if (player->mo->state == &states[g_s_play_atk1]
+   if (hexen)
+   {
+      if (player->mo->state >= &states[PStateAttack[player->class]]
+            && player->mo->state <= &states[PStateAttackEnd[player->class]])
+         P_SetMobjState(player->mo, PStateNormal[player->class]);
+   }
+   else if (player->mo->state == &states[g_s_play_atk1]
          || player->mo->state == &states[g_s_play_atk2] )
       P_SetMobjState(player->mo, g_s_play);
-#endif
 
    if (player->readyweapon == WP_CHAINSAW && psp->state == &states[S_SAW])
       S_StartSound(player->mo, sfx_sawidl);
@@ -473,7 +481,9 @@ void A_WeaponReady(player_t *player, pspdef_t *psp)
    if (player->pendingweapon != WP_NOCHANGE || !player->health)
    {
       // change weapon (pending weapon should already be validated)
-      statenum_t newstate = weaponinfo[player->readyweapon].downstate;
+      statenum_t newstate = hexen
+         ? WeaponInfo[player->readyweapon][player->class].downstate
+         : weaponinfo[player->readyweapon].downstate;
       P_SetPsprite(player, ps_weapon, newstate);
       return;
    }
@@ -500,9 +510,8 @@ void A_WeaponReady(player_t *player, pspdef_t *psp)
    else
       player->attackdown = false;
 
-#ifdef HEXEN
+   /* Hexen: the pig snout doesn't bob. */
    if(!player->morphTics)
-#endif
    {
       /* bob the weapon based on movement speed */
       int angle = (128*leveltime) & FINEMASK;
@@ -532,11 +541,10 @@ void A_ReFire(player_t *player, pspdef_t *psp)
   else
     {
       player->refire = 0;
-#ifdef HEXEN
-      P_CheckMana(player);
-#else
-      P_CheckAmmo(player);
-#endif
+      if (hexen)
+         P_CheckMana(player);
+      else
+         P_CheckAmmo(player);
     }
 }
 
@@ -560,11 +568,10 @@ void A_CheckReload(player_t *player, pspdef_t *psp)
 
 void A_Lower(player_t *player, pspdef_t *psp)
 {
-#ifdef HEXEN
+   /* Hexen: a morphed player's weapon drops instantly. */
    if(player->morphTics)
       psp->sy = WEAPONBOTTOM;
    else
-#endif
       psp->sy += LOWERSPEED;
 
    // Is already down.
@@ -609,21 +616,26 @@ void A_Raise(player_t *player, pspdef_t *psp)
 
   psp->sy = WEAPONTOP;
 
-#ifdef HEXEN
-  if(player->class == PCLASS_FIGHTER && player->readyweapon == WP_SECOND
-        && player->mana[MANA_1])
-     P_SetPsprite(player, ps_weapon, S_FAXEREADY_G);
-  else
-     P_SetPsprite(player, ps_weapon,
-           WeaponInfo[player->readyweapon][player->class].readystate);
-#else
+  /* Hexen: ready states come from the per-class table; the Fighter's axe
+   * idles in its powered animation while blue mana is available. */
+  if (hexen)
+  {
+     if (player->class == PCLASS_FIGHTER && player->readyweapon == WP_SECOND
+           && player->mana[MANA_1])
+        P_SetPsprite(player, ps_weapon, HEXEN_S_FAXEREADY_G);
+     else
+        P_SetPsprite(player, ps_weapon,
+              WeaponInfo[player->readyweapon][player->class].readystate);
+     return;
+  }
+
   /* The weapon has been raised all the way,
    *  so change to the ready state. */
 
   newstate = weaponinfo[player->readyweapon].readystate;
 
   P_SetPsprite(player, ps_weapon, newstate);
-#endif
+
 
 }
 

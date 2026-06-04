@@ -33,6 +33,7 @@
  *-----------------------------------------------------------------------------*/
 
 #include <math.h>
+#include <stdarg.h>
 
 #include "config.h"
 #include "doomstat.h"
@@ -2110,6 +2111,21 @@ static void P_LoadUDMFThings(void)
   }
 }
 
+/* dsda_ParseUDMF and the scanner take a void-returning error callback, but
+ * the engine's I_Error returns bool, so it can't be passed (or cast) without
+ * tripping -Wcast-function-type.  This thin void wrapper forwards a formatted
+ * message to I_Error, which aborts.  Buffer/format handling mirrors I_Error
+ * itself (vsprintf is the C89/MSVC-safe choice here). */
+static void P_UDMFError(const char *fmt, ...)
+{
+  char msg[1024];
+  va_list ap;
+  va_start(ap, fmt);
+  vsprintf(msg, fmt, ap);
+  va_end(ap);
+  I_Error("%s", msg);
+}
+
 void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 {
    int   i;
@@ -2201,7 +2217,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
        * runtime geometry from it.  Namespace must resolve or the parser
        * I_Errors via the callback. */
       udmf_namespace = UDMF_NONE;
-      dsda_ParseUDMF(W_CacheLumpNum(textmap), W_LumpLength(textmap), I_Error);
+      dsda_ParseUDMF(W_CacheLumpNum(textmap), W_LumpLength(textmap), P_UDMFError);
       if (udmf_namespace == UDMF_NONE)
          I_Error("P_SetupLevel: %s: unsupported or missing UDMF namespace", lumpname);
 

@@ -41,6 +41,7 @@
 
 /* Hexen: use the readied puzzle artifact against a special-129 line/thing */
 dbool P_UsePuzzleItem(player_t *player, int itemType);
+void PIT_ThrustSpike(mobj_t *actor);
 #define MELEERANGE      (64*FRACUNIT)
 #define MISSILERANGE    (32*64*FRACUNIT)
 

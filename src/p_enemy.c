@@ -48,6 +48,7 @@
 #include "p_tick.h"
 #include "m_bbox.h"
 #include "lprintf.h"
+#include "hexen/p_spec_hexen.h"
 
 #ifdef PSX
 #include <stddef.h>
@@ -3658,6 +3659,189 @@ void A_CheckTeleRing(mobj_t *actor)
 {
   if (actor->special1.i-- <= 0)
     P_SetMobjState(actor, actor->info->deathstate);
+}
+
+/* Raising/sinking things out of and into the floor: thrust spikes (fast,
+ * speed in special2) and, later, raised wraiths.  P_SpawnDirt scatters the
+ * digging debris. */
+dbool A_SinkMobj(mobj_t *actor)
+{
+  if (actor->floorclip < actor->info->height)
+  {
+    switch (actor->type)
+    {
+      case HEXEN_MT_THRUSTFLOOR_DOWN:
+      case HEXEN_MT_THRUSTFLOOR_UP:
+        actor->floorclip += 6 * FRACUNIT;
+        break;
+      default:
+        actor->floorclip += FRACUNIT;
+        break;
+    }
+    return false;
+  }
+  return true;
+}
+
+dbool A_RaiseMobj(mobj_t *actor)
+{
+  int done = true;
+
+  /* raise a mobj from the ground */
+  if (actor->floorclip > 0)
+  {
+    switch (actor->type)
+    {
+      case HEXEN_MT_WRAITHB:
+        actor->floorclip -= 2 * FRACUNIT;
+        break;
+      case HEXEN_MT_THRUSTFLOOR_DOWN:
+      case HEXEN_MT_THRUSTFLOOR_UP:
+        actor->floorclip -= actor->special2.i * FRACUNIT;
+        break;
+      default:
+        actor->floorclip -= 2 * FRACUNIT;
+        break;
+    }
+    if (actor->floorclip <= 0)
+    {
+      actor->floorclip = 0;
+      done = true;
+    }
+    else
+      done = false;
+  }
+  return done;                  /* reached target height */
+}
+
+void P_SpawnDirt(mobj_t *actor, fixed_t radius)
+{
+  fixed_t x, y, z;
+  int dtype = 0;
+  mobj_t *mo;
+  angle_t angle;
+
+  angle = P_Random(pr_heretic) << 5;    /* <<24 >>19 */
+  x = actor->x + FixedMul(radius, finecosine[angle]);
+  y = actor->y + FixedMul(radius, finesine[angle]);
+  z = actor->z + (P_Random(pr_heretic) << 9) + FRACUNIT;
+  switch (P_Random(pr_heretic) % 6)
+  {
+    case 0: dtype = HEXEN_MT_DIRT1; break;
+    case 1: dtype = HEXEN_MT_DIRT2; break;
+    case 2: dtype = HEXEN_MT_DIRT3; break;
+    case 3: dtype = HEXEN_MT_DIRT4; break;
+    case 4: dtype = HEXEN_MT_DIRT5; break;
+    case 5: dtype = HEXEN_MT_DIRT6; break;
+  }
+  mo = P_SpawnMobj(x, y, z, dtype);
+  if (mo)
+    mo->momz = P_Random(pr_heretic) << 10;
+}
+
+/* Thrust spikes.  special1 holds the dirt clump mobj, special2 the raise
+ * speed; args[0] marks raised, args[1] marks bloody. */
+void A_ThrustInitUp(mobj_t *actor)
+{
+  actor->special2.i = 5;        /* raise speed */
+  actor->special_args[0] = 1;   /* mark as up */
+  actor->floorclip = 0;
+  actor->flags = MF_SOLID;
+  actor->flags2 = MF2_NOTELEPORT | MF2_FOOTCLIP;
+  P_SetTarget(&actor->special1.m, NULL);
+}
+
+void A_ThrustInitDn(mobj_t *actor)
+{
+  mobj_t *mo;
+
+  actor->special2.i = 5;        /* raise speed */
+  actor->special_args[0] = 0;   /* mark as down */
+  actor->floorclip = actor->info->height;
+  actor->flags = 0;
+  actor->flags2 = MF2_NOTELEPORT | MF2_FOOTCLIP | MF2_DONTDRAW;
+  mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_DIRTCLUMP);
+  P_SetTarget(&actor->special1.m, mo);
+}
+
+void A_ThrustRaise(mobj_t *actor)
+{
+  if (A_RaiseMobj(actor))
+  {                             /* reached its target height */
+    actor->special_args[0] = 1;
+    if (actor->special_args[1])
+      P_SetMobjStateNF(actor, HEXEN_S_BTHRUSTINIT2_1);
+    else
+      P_SetMobjStateNF(actor, HEXEN_S_THRUSTINIT2_1);
+  }
+
+  /* lose the dirt clump */
+  if (actor->floorclip < actor->height && actor->special1.m)
+  {
+    P_RemoveMobj(actor->special1.m);
+    P_SetTarget(&actor->special1.m, NULL);
+  }
+
+  /* spawn some dirt */
+  if (P_Random(pr_heretic) < 40)
+    P_SpawnDirt(actor, actor->radius);
+  actor->special2.i++;          /* increase raise speed */
+}
+
+void A_ThrustLower(mobj_t *actor)
+{
+  if (A_SinkMobj(actor))
+  {
+    actor->special_args[0] = 0;
+    if (actor->special_args[1])
+      P_SetMobjStateNF(actor, HEXEN_S_BTHRUSTINIT1_1);
+    else
+      P_SetMobjStateNF(actor, HEXEN_S_THRUSTINIT1_1);
+  }
+}
+
+void A_ThrustBlock(mobj_t *actor)
+{
+  actor->flags |= MF_SOLID;
+}
+
+void A_ThrustImpale(mobj_t *actor)
+{
+  /* impale all shootables in radius */
+  PIT_ThrustSpike(actor);
+}
+
+/* A smashed Suit of Armor bursts into chunks and may free an item. */
+void A_SoAExplode(mobj_t *actor)
+{
+  mobj_t *mo = NULL;
+  int i;
+  int r1, r2, r3;
+
+  for (i = 0; i < 10; i++)
+  {
+    r1 = P_Random(pr_heretic);
+    r2 = P_Random(pr_heretic);
+    r3 = P_Random(pr_heretic);
+    mo = P_SpawnMobj(actor->x + ((r3 - 128) << 12),
+                     actor->y + ((r2 - 128) << 12),
+                     actor->z + (r1 * actor->height / 256),
+                     HEXEN_MT_ZARMORCHUNK);
+    if (mo)
+    {
+      P_SetMobjState(mo, mo->info->spawnstate + i);
+      mo->momz = ((P_Random(pr_heretic) & 7) + 5) * FRACUNIT;
+      mo->momx = P_SubRandom() << (FRACBITS - 6);
+      mo->momy = P_SubRandom() << (FRACBITS - 6);
+    }
+  }
+  if (actor->special_args[0])
+  {                             /* spawn an item */
+    P_SpawnMobj(actor->x, actor->y, actor->z,
+                TranslateThingType[actor->special_args[0]]);
+  }
+  S_StartSound(mo, hexen_sfx_suitofarmor_break);
+  P_RemoveMobj(actor);
 }
 
 /* Flechette.  The Cleric's bag becomes a drifting poison cloud

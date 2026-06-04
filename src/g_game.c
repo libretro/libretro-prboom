@@ -1422,7 +1422,7 @@ void G_DoReborn (int playernum)
    }
 
    /* he's going to be inside something.  Too bad. */
-   P_SpawnPlayer (playernum, &playerstarts[playernum]);
+   P_SpawnPlayer (playernum, G_PlayerStart(playernum));
 }
 
 // DOOM Par Times

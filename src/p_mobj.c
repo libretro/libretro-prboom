@@ -1775,6 +1775,32 @@ void P_SpawnPuff(fixed_t x,fixed_t y,fixed_t z)
     P_SetMobjState (th, S_PUFF3);
 }
 
+/* Hexen blood effects for hitscan/melee hits on fleshy things: a spray of
+ * blood drops (shift 10, weight 3 per Raven's Hexen values) and, for the
+ * axe, the big AXEBLOOD splat. */
+void P_BloodSplatter(fixed_t x, fixed_t y, fixed_t z, mobj_t *originator)
+{
+  mobj_t *mo;
+
+  mo = P_SpawnMobj(x, y, z, HEXEN_MT_BLOODSPLATTER);
+  P_SetTarget(&mo->target, originator);
+  mo->momx = P_SubRandom() << 10;
+  mo->momy = P_SubRandom() << 10;
+  mo->momz = FRACUNIT * 3;
+}
+
+void P_BloodSplatter2(fixed_t x, fixed_t y, fixed_t z, mobj_t *originator)
+{
+  mobj_t *mo;
+  int r1, r2;
+
+  r1 = P_Random(pr_heretic);
+  r2 = P_Random(pr_heretic);
+  mo = P_SpawnMobj(x + ((r2 - 128) << 11), y + ((r1 - 128) << 11), z,
+                   HEXEN_MT_AXEBLOOD);
+  P_SetTarget(&mo->target, originator);
+}
+
 
 //
 // P_SpawnBlood

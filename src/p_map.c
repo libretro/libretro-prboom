@@ -43,6 +43,8 @@
 #include "map_format.h"
 #include "hexen/p_spec_hexen.h"
 #include "hexen/p_acs.h"
+
+extern mobjtype_t PuffType;   /* puff actor the next hitscan/melee spawns */
 #include "s_sound.h"
 #include "sounds.h"
 #include "p_inter.h"
@@ -1663,14 +1665,27 @@ dbool PTR_ShootTraverse (intercept_t* in)
 
    // Spawn bullet puffs or blod spots,
    // depending on target type.
-   // Heretic has no blood -- a shot thing always produces a puff.
-   if (heretic || (in->d.thing->flags & MF_NOBLOOD))
+   // Raven games always produce the weapon's puff on a thing hit; the Doom
+   // MT_BLOOD actor has no valid Raven states.  Hexen additionally sprays
+   // blood-splatter drops on fleshy hits (and the big axe splat), after
+   // Raven's code.
+   if (raven || (in->d.thing->flags & MF_NOBLOOD))
       P_SpawnPuff (x,y,z);
    else
       P_SpawnBlood (x,y,z, la_damage);
 
    if (la_damage)
+   {
+      if (hexen && !(in->d.thing->flags & MF_NOBLOOD) &&
+          !(in->d.thing->flags2 & MF2_INVULNERABLE))
+      {
+         if (PuffType == HEXEN_MT_AXEPUFF || PuffType == HEXEN_MT_AXEPUFF_GLOW)
+            P_BloodSplatter2(x, y, z, in->d.thing);
+         if (P_Random(pr_heretic) < 192)
+            P_BloodSplatter(x, y, z, in->d.thing);
+      }
       P_DamageMobj (th, shootthing, shootthing, la_damage);
+   }
 
    // don't go any farther
    return FALSE;

@@ -115,6 +115,44 @@ dbool messageNeedsInput; // timed message = no input from user
 
 void (*messageRoutine)(int response);
 
+
+/* Menu feedback sounds: this file speaks doom sfx ids, but under the raven
+ * games those numeric ids land on entirely different entries in the unified
+ * sound table -- hexen's "select entry" came out as a player scream.
+ * Translate to each game's vanilla menu sounds (heretic MN_menu uses the
+ * door close for select/open/close, the switch for the cursor, the key-up
+ * blip for sliders and the chat beep for messages; hexen uses the hammer
+ * clank for the cursor, the light door close for select/open, the platform
+ * stop for close and the key pickup for sliders). */
+static int M_MenuSound(int sfx)
+{
+  if (heretic)
+    switch (sfx)
+    {
+      case sfx_pstop:  return heretic_sfx_switch;
+      case sfx_pistol: return heretic_sfx_dorcls;
+      case sfx_swtchn: return heretic_sfx_dorcls;
+      case sfx_swtchx: return heretic_sfx_dorcls;
+      case sfx_stnmov: return heretic_sfx_keyup;
+      case sfx_itemup: return heretic_sfx_chat;
+      case sfx_oof:    return heretic_sfx_plroof;
+      default:         return sfx;
+    }
+  if (hexen)
+    switch (sfx)
+    {
+      case sfx_pstop:  return hexen_sfx_fighter_hammer_hitwall;
+      case sfx_pistol: return hexen_sfx_door_light_close;
+      case sfx_swtchn: return hexen_sfx_door_light_close;
+      case sfx_swtchx: return hexen_sfx_platform_stop;
+      case sfx_stnmov: return hexen_sfx_pickup_key;
+      case sfx_itemup: return hexen_sfx_chat;
+      case sfx_oof:    return hexen_sfx_chat;
+      default:         return sfx;
+    }
+  return sfx;
+}
+
 #define SAVESTRINGSIZE  24
 
 /* killough 8/15/98: when changes are allowed to sync-critical variables */
@@ -1463,7 +1501,7 @@ char tempstring[80];
 void M_QuickSave(void)
 {
   if (!usergame && (!demoplayback || netgame)) { /* killough 10/98 */
-    S_StartSound(NULL,sfx_oof);
+    S_StartSound(NULL,M_MenuSound(sfx_oof));
     return;
   }
 
@@ -1479,7 +1517,7 @@ void M_QuickSave(void)
   }
   sprintf(tempstring,s_QSPROMPT,savegamestrings[quickSaveSlot]); // Ty 03/27/98 - externalized
   M_DoSave(quickSaveSlot);
-  S_StartSound(NULL,sfx_swtchx);
+  S_StartSound(NULL,M_MenuSound(sfx_swtchx));
 }
 
 /////////////////////////////
@@ -1491,7 +1529,7 @@ static void M_QuickLoadResponse(int ch)
 {
   if (ch == 'y') {
     M_LoadSelect(quickSaveSlot);
-    S_StartSound(NULL,sfx_swtchx);
+    S_StartSound(NULL,M_MenuSound(sfx_swtchx));
   }
 }
 
@@ -3713,7 +3751,7 @@ static void M_SelectDone(setup_menu_t* ptr)
 {
   ptr->m_flags &= ~S_SELECT;
   ptr->m_flags |= S_HILITE;
-  S_StartSound(NULL,sfx_itemup);
+  S_StartSound(NULL,M_MenuSound(sfx_itemup));
   setup_select = FALSE;
   colorbox_active = FALSE;
   if (print_warning_about_changes)     // killough 8/15/98
@@ -4350,7 +4388,7 @@ dbool M_Responder (event_t* ev) {
       messageRoutine(ch);
 
     menuactive = mnact_inactive;
-    S_StartSound(NULL,sfx_swtchx);
+    S_StartSound(NULL,M_MenuSound(sfx_swtchx));
     return TRUE;
   }
 
@@ -4370,14 +4408,14 @@ dbool M_Responder (event_t* ev) {
       currentMenu = &HelpDef;         // killough 10/98: new help screen
 
       itemOn = 0;
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       return TRUE;
       }
 
     if (ch == key_savegame)     // Save Game
       {
       M_StartControlPanel();
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       M_SaveGame(0);
       return TRUE;
       }
@@ -4385,7 +4423,7 @@ dbool M_Responder (event_t* ev) {
     if (ch == key_loadgame)     // Load Game
       {
       M_StartControlPanel();
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       M_LoadGame(0);
       return TRUE;
       }
@@ -4395,20 +4433,20 @@ dbool M_Responder (event_t* ev) {
       M_StartControlPanel ();
       currentMenu = &SoundDef;
       itemOn = sfx_vol;
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       return TRUE;
       }
 
     if (ch == key_quicksave)      // Quicksave
       {
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       M_QuickSave();
       return TRUE;
       }
 
     if (ch == key_endgame)      // End game
       {
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       M_EndGame(0);
       return TRUE;
       }
@@ -4416,20 +4454,20 @@ dbool M_Responder (event_t* ev) {
     if (ch == key_messages)      // Toggle messages
       {
       M_ChangeMessages(0);
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       return TRUE;
       }
 
     if (ch == key_quickload)      // Quickload
       {
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       M_QuickLoad();
       return TRUE;
       }
 
     if (ch == key_quit)       // Quit DOOM
       {
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       has_exited = TRUE;
       return TRUE;
       }
@@ -4455,7 +4493,7 @@ dbool M_Responder (event_t* ev) {
       if ((automapmode & am_active) || chat_on)
         return FALSE;
       M_SizeDisplay(0);
-      S_StartSound(NULL,sfx_stnmov);
+      S_StartSound(NULL,M_MenuSound(sfx_stnmov));
       return TRUE;
       }
 
@@ -4464,14 +4502,14 @@ dbool M_Responder (event_t* ev) {
       if ((automapmode & am_active) || chat_on)     // allow
         return FALSE;                   // key_hud==key_zoomin
       M_SizeDisplay(1);                                             //  ^
-      S_StartSound(NULL,sfx_stnmov);                                //  |
+      S_StartSound(NULL,M_MenuSound(sfx_stnmov));                                //  |
       return TRUE;                                                  // phares
       }
 
     /* killough 10/98: allow key shortcut into Setup menu */
     if (ch == key_setup) {
       M_StartControlPanel();
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       M_SetupNextMenu(&SetupDef);
       return TRUE;
     }
@@ -4483,7 +4521,7 @@ dbool M_Responder (event_t* ev) {
     if (ch == key_escape)                                     // phares
       {
       M_StartControlPanel ();
-      S_StartSound(NULL,sfx_swtchn);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchn));
       return TRUE;
       }
     return FALSE;
@@ -4632,7 +4670,7 @@ dbool M_Responder (event_t* ev) {
              value > ptr1->var.def->maxvalue))
           value = ptr1->var.def->maxvalue;
         if (*ptr1->var.def->location.pi != value)
-          S_StartSound(NULL,sfx_pstop);
+          S_StartSound(NULL,M_MenuSound(sfx_pstop));
         *ptr1->var.def->location.pi = value;
       }
       if (ptr1->var.def->type == def_str) {
@@ -4644,7 +4682,7 @@ dbool M_Responder (event_t* ev) {
         if (value < 0)
           value = 0;
         if (old_value != value)
-          S_StartSound(NULL,sfx_pstop);
+          S_StartSound(NULL,M_MenuSound(sfx_pstop));
         *ptr1->var.def->location.ppsz = ptr1->selectstrings[value];
       }
     }
@@ -4660,7 +4698,7 @@ dbool M_Responder (event_t* ev) {
              value > ptr1->var.def->maxvalue))
           value = ptr1->var.def->maxvalue;
         if (*ptr1->var.def->location.pi != value)
-          S_StartSound(NULL,sfx_pstop);
+          S_StartSound(NULL,M_MenuSound(sfx_pstop));
         *ptr1->var.def->location.pi = value;
       }
       if (ptr1->var.def->type == def_str) {
@@ -4672,7 +4710,7 @@ dbool M_Responder (event_t* ev) {
         if (ptr1->selectstrings[value] == NULL)
           value = old_value;
         if (old_value != value)
-          S_StartSound(NULL,sfx_pstop);
+          S_StartSound(NULL,M_MenuSound(sfx_pstop));
         *ptr1->var.def->location.ppsz = ptr1->selectstrings[value];
       }
     }
@@ -4833,7 +4871,7 @@ dbool M_Responder (event_t* ev) {
         {
     if (++color_palette_y == 16)
       color_palette_y = 0;
-    S_StartSound(NULL,sfx_itemup);
+    S_StartSound(NULL,M_MenuSound(sfx_itemup));
     return TRUE;
         }
 
@@ -4841,7 +4879,7 @@ dbool M_Responder (event_t* ev) {
         {
     if (--color_palette_y < 0)
       color_palette_y = 15;
-    S_StartSound(NULL,sfx_itemup);
+    S_StartSound(NULL,M_MenuSound(sfx_itemup));
     return TRUE;
         }
 
@@ -4849,7 +4887,7 @@ dbool M_Responder (event_t* ev) {
         {
     if (--color_palette_x < 0)
       color_palette_x = 15;
-    S_StartSound(NULL,sfx_itemup);
+    S_StartSound(NULL,M_MenuSound(sfx_itemup));
     return TRUE;
         }
 
@@ -4857,7 +4895,7 @@ dbool M_Responder (event_t* ev) {
         {
     if (++color_palette_x == 16)
       color_palette_x = 0;
-    S_StartSound(NULL,sfx_itemup);
+    S_StartSound(NULL,M_MenuSound(sfx_itemup));
     return TRUE;
         }
 
@@ -5027,7 +5065,7 @@ dbool M_Responder (event_t* ev) {
 
     ptr1->m_flags |= S_SELECT;
     setup_select = TRUE;
-    S_StartSound(NULL,sfx_itemup);
+    S_StartSound(NULL,M_MenuSound(sfx_itemup));
     return TRUE;
   }
 
@@ -5040,7 +5078,7 @@ dbool M_Responder (event_t* ev) {
         {
     currentMenu = currentMenu->prevMenu;
     itemOn = currentMenu->lastOn;
-    S_StartSound(NULL,sfx_swtchn);
+    S_StartSound(NULL,M_MenuSound(sfx_swtchn));
         }
     ptr1->m_flags &= ~(S_HILITE|S_SELECT);// phares 4/19/98
     setup_active = FALSE;
@@ -5056,7 +5094,7 @@ dbool M_Responder (event_t* ev) {
     set_general_active = FALSE;    // killough 10/98
           set_compat_active = FALSE;    // killough 10/98
     HU_Start();    // catch any message changes // phares 4/19/98
-    S_StartSound(NULL,sfx_swtchx);
+    S_StartSound(NULL,M_MenuSound(sfx_swtchx));
     return TRUE;
   }
 
@@ -5082,7 +5120,7 @@ dbool M_Responder (event_t* ev) {
       print_warning_about_changes = FALSE; // killough 10/98
       while (current_setup_menu[set_menu_itemon++].m_flags&S_SKIP);
       current_setup_menu[--set_menu_itemon].m_flags |= S_HILITE;
-      S_StartSound(NULL,sfx_pstop);  // killough 10/98
+      S_StartSound(NULL,M_MenuSound(sfx_pstop));  // killough 10/98
       return TRUE;
     }
       }
@@ -5104,7 +5142,7 @@ dbool M_Responder (event_t* ev) {
       print_warning_about_changes = FALSE; // killough 10/98
       while (current_setup_menu[set_menu_itemon++].m_flags&S_SKIP);
       current_setup_menu[--set_menu_itemon].m_flags |= S_HILITE;
-      S_StartSound(NULL,sfx_pstop);  // killough 10/98
+      S_StartSound(NULL,M_MenuSound(sfx_pstop));  // killough 10/98
       return TRUE;
     }
       }
@@ -5124,7 +5162,7 @@ dbool M_Responder (event_t* ev) {
       itemOn = 0;
     else
       itemOn++;
-    S_StartSound(NULL,sfx_pstop);
+    S_StartSound(NULL,M_MenuSound(sfx_pstop));
   }
       while(currentMenu->menuitems[itemOn].status==-1);
       return TRUE;
@@ -5138,7 +5176,7 @@ dbool M_Responder (event_t* ev) {
       itemOn = currentMenu->numitems-1;
     else
       itemOn--;
-    S_StartSound(NULL,sfx_pstop);
+    S_StartSound(NULL,M_MenuSound(sfx_pstop));
   }
       while(currentMenu->menuitems[itemOn].status==-1);
       return TRUE;
@@ -5149,7 +5187,7 @@ dbool M_Responder (event_t* ev) {
       if (currentMenu->menuitems[itemOn].routine &&
     currentMenu->menuitems[itemOn].status == 2)
   {
-    S_StartSound(NULL,sfx_stnmov);
+    S_StartSound(NULL,M_MenuSound(sfx_stnmov));
     currentMenu->menuitems[itemOn].routine(0);
   }
       return TRUE;
@@ -5160,7 +5198,7 @@ dbool M_Responder (event_t* ev) {
       if (currentMenu->menuitems[itemOn].routine &&
     currentMenu->menuitems[itemOn].status == 2)
   {
-    S_StartSound(NULL,sfx_stnmov);
+    S_StartSound(NULL,M_MenuSound(sfx_stnmov));
     currentMenu->menuitems[itemOn].routine(1);
   }
       return TRUE;
@@ -5175,12 +5213,12 @@ dbool M_Responder (event_t* ev) {
     if (currentMenu->menuitems[itemOn].status == 2)
       {
         currentMenu->menuitems[itemOn].routine(1);   // right arrow
-        S_StartSound(NULL,sfx_stnmov);
+        S_StartSound(NULL,M_MenuSound(sfx_stnmov));
       }
     else
       {
         currentMenu->menuitems[itemOn].routine(itemOn);
-        S_StartSound(NULL,sfx_pistol);
+        S_StartSound(NULL,M_MenuSound(sfx_pistol));
       }
   }
       //jff 3/24/98 remember last skill selected
@@ -5192,7 +5230,7 @@ dbool M_Responder (event_t* ev) {
     {
       currentMenu->lastOn = itemOn;
       M_ClearMenus ();
-      S_StartSound(NULL,sfx_swtchx);
+      S_StartSound(NULL,M_MenuSound(sfx_swtchx));
       return TRUE;
     }
 
@@ -5219,7 +5257,7 @@ dbool M_Responder (event_t* ev) {
     else
       currentMenu = currentMenu->prevMenu;
     itemOn = currentMenu->lastOn;
-    S_StartSound(NULL,sfx_swtchn);
+    S_StartSound(NULL,M_MenuSound(sfx_swtchn));
   }
       return TRUE;
     }
@@ -5230,14 +5268,14 @@ dbool M_Responder (event_t* ev) {
   if (currentMenu->menuitems[i].alphaKey == ch)
     {
       itemOn = i;
-      S_StartSound(NULL,sfx_pstop);
+      S_StartSound(NULL,M_MenuSound(sfx_pstop));
       return TRUE;
     }
       for (i = 0;i <= itemOn;i++)
   if (currentMenu->menuitems[i].alphaKey == ch)
     {
       itemOn = i;
-      S_StartSound(NULL,sfx_pstop);
+      S_StartSound(NULL,M_MenuSound(sfx_pstop));
       return TRUE;
     }
     }

@@ -73,6 +73,7 @@ typedef struct
   void *origin;        // origin of sound
   int handle;          // handle of the sound being played
   int is_pickup;       // killough 4/25/98: whether sound is a player's weapon
+  int priority;        // heretic: for the per-sound channel cap
 } channel_t;
 
 // the set of channels available
@@ -491,10 +492,46 @@ static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
       }
 
   // try to find a channel
+  /* Heretic caps how many instances of one sound type may play at
+   * once (vanilla's sfxinfo numchannels, ported per sound from
+   * dsda-doom).  At the cap, the least important running instance is
+   * stopped to make room; if every running instance outranks the new
+   * sound (heretic priorities ascend), the new sound is dropped.
+   * Vanilla compares raw table priorities here, before the distance
+   * handicaps below. */
+  if (heretic && sfx->numchannels > 0)
+  {
+    int i, found, least, least_pri;
+
+    found = 0;
+    least = -1;
+    least_pri = priority;
+    for (i = 0; i < numChannels; i++)
+    {
+      if (channels[i].sfxinfo == sfx && channels[i].origin)
+      {
+        found++;
+        if (least_pri >= channels[i].priority)
+        {
+          least = i;
+          least_pri = channels[i].priority;
+        }
+      }
+    }
+    if (found >= sfx->numchannels)
+    {
+      if (least < 0)
+        return;             /* all running instances outrank us */
+      S_StopChannel(least);
+    }
+  }
+
   cnum = S_getChannel(origin, sfx, is_pickup);
 
   if (cnum<0)
     return;
+
+  channels[cnum].priority = priority;
 
   // get lumpnum if necessary
   // killough 2/28/98: make missing sounds non-fatal

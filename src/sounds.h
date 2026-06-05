@@ -73,6 +73,11 @@ struct sfxinfo_struct {
 
   // lump number of sfx
   int lumpnum;
+
+  /* heretic: max concurrent instances of this sound (vanilla's
+   * sfxinfo numchannels).  Trailing field so existing initializers
+   * leave it 0; 0 or -1 means uncapped. */
+  int numchannels;
 };
 
 //

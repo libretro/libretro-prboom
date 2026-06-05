@@ -168,20 +168,40 @@ weaponinfo_t    doom_weaponinfo[NUMWEAPONS] =
  * Heretic has its own ammo types that this build's ammotype_t does not yet
  * enumerate; the per-weapon ammo here is mapped onto the existing slots as a
  * placeholder (AM_NOAMMO for the no-ammo weapons). Ammo accounting is not the
- * subject of this table -- correct weapon frames are -- and the Tome-of-Power
- * level-2 forms are a later addition.
+ * subject of this table -- correct weapon frames are.  The Tome-of-Power
+ * level-2 forms live in heretic_wpnlev2info below; the firing and raise
+ * paths in p_pspr.c select between the two while the tome is active.
  */
 weaponinfo_t    heretic_weaponinfo[NUMWEAPONS] =
 {
-  { /* staff      */ AM_NOAMMO, HERETIC_S_STAFFUP,    HERETIC_S_STAFFDOWN,    HERETIC_S_STAFFREADY,    HERETIC_S_STAFFATK1_1,    S_NULL, 0, -1 },
-  { /* gold wand  */ AM_CLIP,   HERETIC_S_GOLDWANDUP, HERETIC_S_GOLDWANDDOWN, HERETIC_S_GOLDWANDREADY, HERETIC_S_GOLDWANDATK1_1, S_NULL, 0, -1 },
-  { /* crossbow   */ AM_CLIP,   HERETIC_S_CRBOWUP,    HERETIC_S_CRBOWDOWN,    HERETIC_S_CRBOW1,        HERETIC_S_CRBOWATK1_1,    S_NULL, 0, -1 },
-  { /* blaster    */ AM_CLIP,   HERETIC_S_BLASTERUP,  HERETIC_S_BLASTERDOWN,  HERETIC_S_BLASTERREADY,  HERETIC_S_BLASTERATK1_1,  S_NULL, 0, -1 },
-  { /* skull rod  */ AM_CLIP,   HERETIC_S_HORNRODUP,  HERETIC_S_HORNRODDOWN,  HERETIC_S_HORNRODREADY,  HERETIC_S_HORNRODATK1_1,  S_NULL, 0, -1 },
-  { /* phoenix    */ AM_CLIP,   HERETIC_S_PHOENIXUP,  HERETIC_S_PHOENIXDOWN,  HERETIC_S_PHOENIXREADY,  HERETIC_S_PHOENIXATK1_1,  S_NULL, WPF_NOAUTOFIRE, -1 },
-  { /* mace       */ AM_CLIP,   HERETIC_S_MACEUP,     HERETIC_S_MACEDOWN,     HERETIC_S_MACEREADY,     HERETIC_S_MACEATK1_1,     S_NULL, 0, -1 },
-  { /* gauntlets  */ AM_NOAMMO, HERETIC_S_GAUNTLETUP, HERETIC_S_GAUNTLETDOWN, HERETIC_S_GAUNTLETREADY, HERETIC_S_GAUNTLETATK1_1, S_NULL, 0, -1 },
-  { /* beak       */ AM_NOAMMO, HERETIC_S_BEAKUP,     HERETIC_S_BEAKDOWN,     HERETIC_S_BEAKREADY,     HERETIC_S_BEAKATK1_1,     S_NULL, 0, -1 }
+  { /* staff      */ AM_NOAMMO, HERETIC_S_STAFFUP,    HERETIC_S_STAFFDOWN,    HERETIC_S_STAFFREADY,    HERETIC_S_STAFFATK1_1,    S_NULL, 0, -1, HERETIC_S_STAFFATK1_1 },
+  { /* gold wand  */ AM_CLIP,   HERETIC_S_GOLDWANDUP, HERETIC_S_GOLDWANDDOWN, HERETIC_S_GOLDWANDREADY, HERETIC_S_GOLDWANDATK1_1, S_NULL, 0, -1, HERETIC_S_GOLDWANDATK1_1 },
+  { /* crossbow   */ AM_CLIP,   HERETIC_S_CRBOWUP,    HERETIC_S_CRBOWDOWN,    HERETIC_S_CRBOW1,        HERETIC_S_CRBOWATK1_1,    S_NULL, 0, -1, HERETIC_S_CRBOWATK1_1 },
+  { /* blaster    */ AM_CLIP,   HERETIC_S_BLASTERUP,  HERETIC_S_BLASTERDOWN,  HERETIC_S_BLASTERREADY,  HERETIC_S_BLASTERATK1_1,  S_NULL, 0, -1, HERETIC_S_BLASTERATK1_3 },
+  { /* skull rod  */ AM_CLIP,   HERETIC_S_HORNRODUP,  HERETIC_S_HORNRODDOWN,  HERETIC_S_HORNRODREADY,  HERETIC_S_HORNRODATK1_1,  S_NULL, 0, -1, HERETIC_S_HORNRODATK1_1 },
+  { /* phoenix    */ AM_CLIP,   HERETIC_S_PHOENIXUP,  HERETIC_S_PHOENIXDOWN,  HERETIC_S_PHOENIXREADY,  HERETIC_S_PHOENIXATK1_1,  S_NULL, WPF_NOAUTOFIRE, -1, HERETIC_S_PHOENIXATK1_1 },
+  { /* mace       */ AM_CLIP,   HERETIC_S_MACEUP,     HERETIC_S_MACEDOWN,     HERETIC_S_MACEREADY,     HERETIC_S_MACEATK1_1,     S_NULL, 0, -1, HERETIC_S_MACEATK1_2 },
+  { /* gauntlets  */ AM_NOAMMO, HERETIC_S_GAUNTLETUP, HERETIC_S_GAUNTLETDOWN, HERETIC_S_GAUNTLETREADY, HERETIC_S_GAUNTLETATK1_1, S_NULL, 0, -1, HERETIC_S_GAUNTLETATK1_3 },
+  { /* beak       */ AM_NOAMMO, HERETIC_S_BEAKUP,     HERETIC_S_BEAKDOWN,     HERETIC_S_BEAKREADY,     HERETIC_S_BEAKATK1_1,     S_NULL, 0, -1, HERETIC_S_BEAKATK1_1 }
+};
+
+/* Tome-of-Power forms of the Heretic arsenal (vanilla wpnlev2info).  Ammo,
+ * flags and ammopershot mirror the level-1 rows; only the states differ.
+ * The staff and gauntlets glow with powered up/down/ready animations, the
+ * rest share the level-1 raise frames and swap the attacks: quad wand
+ * spread, triple bolts, ripper blaster, skull rod rain, phoenix
+ * flamethrower (held), giant mace ball, and the beak's bigger bite. */
+weaponinfo_t    heretic_wpnlev2info[NUMWEAPONS] =
+{
+  { /* staff      */ AM_NOAMMO, HERETIC_S_STAFFUP2,   HERETIC_S_STAFFDOWN2,   HERETIC_S_STAFFREADY2_1, HERETIC_S_STAFFATK2_1,    S_NULL, 0, -1, HERETIC_S_STAFFATK2_1 },
+  { /* gold wand  */ AM_CLIP,   HERETIC_S_GOLDWANDUP, HERETIC_S_GOLDWANDDOWN, HERETIC_S_GOLDWANDREADY, HERETIC_S_GOLDWANDATK2_1, S_NULL, 0, -1, HERETIC_S_GOLDWANDATK2_1 },
+  { /* crossbow   */ AM_CLIP,   HERETIC_S_CRBOWUP,    HERETIC_S_CRBOWDOWN,    HERETIC_S_CRBOW1,        HERETIC_S_CRBOWATK2_1,    S_NULL, 0, -1, HERETIC_S_CRBOWATK2_1 },
+  { /* blaster    */ AM_CLIP,   HERETIC_S_BLASTERUP,  HERETIC_S_BLASTERDOWN,  HERETIC_S_BLASTERREADY,  HERETIC_S_BLASTERATK2_1,  S_NULL, 0, -1, HERETIC_S_BLASTERATK2_3 },
+  { /* skull rod  */ AM_CLIP,   HERETIC_S_HORNRODUP,  HERETIC_S_HORNRODDOWN,  HERETIC_S_HORNRODREADY,  HERETIC_S_HORNRODATK2_1,  S_NULL, 0, -1, HERETIC_S_HORNRODATK2_1 },
+  { /* phoenix    */ AM_CLIP,   HERETIC_S_PHOENIXUP,  HERETIC_S_PHOENIXDOWN,  HERETIC_S_PHOENIXREADY,  HERETIC_S_PHOENIXATK2_1,  S_NULL, WPF_NOAUTOFIRE, -1, HERETIC_S_PHOENIXATK2_2 },
+  { /* mace       */ AM_CLIP,   HERETIC_S_MACEUP,     HERETIC_S_MACEDOWN,     HERETIC_S_MACEREADY,     HERETIC_S_MACEATK2_1,     S_NULL, 0, -1, HERETIC_S_MACEATK2_1 },
+  { /* gauntlets  */ AM_NOAMMO, HERETIC_S_GAUNTLETUP2,HERETIC_S_GAUNTLETDOWN2,HERETIC_S_GAUNTLETREADY2_1, HERETIC_S_GAUNTLETATK2_1, S_NULL, 0, -1, HERETIC_S_GAUNTLETATK2_3 },
+  { /* beak       */ AM_NOAMMO, HERETIC_S_BEAKUP,     HERETIC_S_BEAKDOWN,     HERETIC_S_BEAKREADY,     HERETIC_S_BEAKATK2_1,     S_NULL, 0, -1, HERETIC_S_BEAKATK2_1 }
 };
 
 /* Active weapon table. Points at the Doom table by default; swapped to the

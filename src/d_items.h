@@ -59,9 +59,15 @@ typedef struct
   /* MBF21 (inert unless mbf21_features): */
   int         flags;       /* WPF_* */
   int         ammopershot;  /* ammo consumed per shot; -1 = use vanilla */
+
+  /* Heretic: attack state while the trigger is held (refire).  Trailing
+   * field so the positional Doom rows above leave it zeroed; only read
+   * under Heretic. */
+  int         holdatkstate;
 } weaponinfo_t;
 
 extern  weaponinfo_t   *weaponinfo;
+extern  weaponinfo_t   heretic_wpnlev2info[];  /* Tome-of-Power forms */
 extern  weaponinfo_t    doom_weaponinfo[NUMWEAPONS];
 extern  weaponinfo_t    heretic_weaponinfo[NUMWEAPONS];
 

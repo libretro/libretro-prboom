@@ -2512,8 +2512,12 @@ mobj_t *P_SpawnPlayerMissile(mobj_t* source,mobjtype_t type)
   x = source->x;
   y = source->y;
   z = source->z + 4*8*FRACUNIT;
+  if (raven && (source->flags2 & MF2_FEETARECLIPPED))
+    z -= FOOTCLIPSIZE;          /* heretic: fire from sunken feet */
 
-  th = P_SpawnMobj (x,y,z, type);
+  /* heretic consumers (A_FireSkullRodPL2) read the spawned missile from
+   * this global because they need it even if it exploded on spawn. */
+  MissileMobj = th = P_SpawnMobj (x,y,z, type);
   if (!th)
     return NULL;
 

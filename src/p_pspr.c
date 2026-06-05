@@ -145,6 +145,16 @@ static void P_SetPsprite(player_t *player, int position, statenum_t stnum)
  * Uses player
 */
 
+/* Heretic: the Tome of Power swaps the whole weapon table to the level-2
+ * forms (vanilla wpnlev2info), except in deathmatch.  Everyone else gets
+ * the active weaponinfo table back. */
+static const weaponinfo_t *P_WeaponLevelInfo(player_t *player)
+{
+   if (heretic && player->powers[pw_weaponlevel2] && !deathmatch)
+      return heretic_wpnlev2info;
+   return weaponinfo;
+}
+
 static void P_BringUpWeapon(player_t *player)
 {
    statenum_t newstate;
@@ -166,7 +176,7 @@ static void P_BringUpWeapon(player_t *player)
    {
       if (player->pendingweapon == WP_CHAINSAW)
          S_StartSound (player->mo, sfx_sawup);
-      newstate = weaponinfo[player->pendingweapon].upstate;
+      newstate = P_WeaponLevelInfo(player)[player->pendingweapon].upstate;
    }
 
    player->pendingweapon = WP_NOCHANGE;
@@ -459,6 +469,18 @@ static void P_FireWeapon(player_t *player)
   P_SetMobjState(player->mo, g_s_play_atk1);
   newstate = weaponinfo[player->readyweapon].atkstate;
 
+  /* Heretic: the tome selects the level-2 attack, and holding the trigger
+   * runs the hold-attack form (the phoenix flamethrower, the mace's
+   * windup skip, the blaster's rapid loop). */
+  if (heretic)
+  {
+    const weaponinfo_t *info = P_WeaponLevelInfo(player);
+
+    newstate = player->refire
+      ? info[player->readyweapon].holdatkstate
+      : info[player->readyweapon].atkstate;
+  }
+
   /* Hexen: pick the attack state from the per-class weapon table rather
    * than the Doom-shaped weaponinfo[], and put the player model into its
    * class attack pose.  The Fighter's axe (WP_SECOND) additionally has a
@@ -491,7 +513,7 @@ void P_DropWeapon(player_t *player)
 {
   P_SetPsprite(player, ps_weapon, hexen
       ? WeaponInfo[player->readyweapon][player->class].downstate
-      : weaponinfo[player->readyweapon].downstate);
+      : P_WeaponLevelInfo(player)[player->readyweapon].downstate);
 }
 
 /*
@@ -681,7 +703,7 @@ void A_Raise(player_t *player, pspdef_t *psp)
   /* The weapon has been raised all the way,
    *  so change to the ready state. */
 
-  newstate = weaponinfo[player->readyweapon].readystate;
+  newstate = P_WeaponLevelInfo(player)[player->readyweapon].readystate;
 
   P_SetPsprite(player, ps_weapon, newstate);
 

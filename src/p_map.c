@@ -427,6 +427,19 @@ dbool PIT_CheckLine (line_t* ld)
   // killough 7/24/98: allow player to move out of 1s wall, to prevent sticking
   if (!ld->backsector) // one sided line
     {
+      /* Heretic: missiles hitting a one-sided special wall remember it so
+       * the failed move can gun-trigger it (vanilla PIT_CheckLine +
+       * CheckMissileImpact). */
+      if (heretic && (tmthing->flags & MF_MISSILE) && ld->special)
+      {
+        if (numspechit >= spechit_max)
+        {
+          spechit_max = spechit_max ? spechit_max * 2 : 8;
+          spechit = realloc(spechit, sizeof *spechit * spechit_max);
+        }
+        spechit[numspechit++] = ld;
+      }
+
       /* Hexen: a thing running or shooting into a wall fires its push or
        * impact activation (vanilla PIT_CheckLine; blasted things take
        * impact damage here too). */
@@ -1309,6 +1322,22 @@ static void Hexen_PushLineHits(mobj_t *thing)
   }
 }
 
+/* Heretic: a player's missile whose move was blocked gun-triggers every
+ * special line the attempt touched (vanilla CheckMissileImpact); this is
+ * how projectiles operate heretic's shoot-activated switches and walls,
+ * which doom reserves for hitscans. */
+static void Heretic_CheckMissileImpact(mobj_t *mobj)
+{
+  int i;
+
+  if (!numspechit || !(mobj->flags & MF_MISSILE) || !mobj->target)
+    return;
+  if (!mobj->target->player)
+    return;                     /* fired by a monster, not a player */
+  for (i = numspechit - 1; i >= 0; i--)
+    P_ShootSpecialLine(mobj->target, spechit[i]);
+}
+
 dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
                   dbool dropoff) // killough 3/15/98: allow dropoff as option
   {
@@ -1321,6 +1350,8 @@ dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
     {
       if (hexen)
         Hexen_PushLineHits(thing);
+      else if (heretic)
+        Heretic_CheckMissileImpact(thing);
       return FALSE;   // solid wall or thing
     }
 
@@ -1343,6 +1374,8 @@ dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
 
           if (hexen && !unstuck)
             Hexen_PushLineHits(thing);
+          else if (heretic && !unstuck)
+            Heretic_CheckMissileImpact(thing);
           return unstuck;
         }
 

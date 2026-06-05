@@ -234,7 +234,16 @@ static void createPatch(int id) {
   postsDataSize = numPostsTotal * sizeof(rpost_t);
 
   // allocate our data chunk
-  dataSize = pixelDataSize + columnsDataSize + postsDataSize;
+  /* The pixel region carries one extra column's worth of 0xff padding:
+   * masked drawing rebases texturemid per post (source = pixels +
+   * topdelta), and a sloped-edge or rounding overshoot of one sub-texel
+   * above the post start wraps through the texheight modulo to the
+   * texture's bottom row, i.e. a read at pixels[col*height + topdelta +
+   * height-1].  For the last column with topdelta > 0 that lands past
+   * the pixel region, in the rcolumn_t array, whose pointer bytes vary
+   * per process -- the rendered pixel then differs from run to run.
+   * The padding keeps that read inside deterministic 0xff bytes. */
+  dataSize = pixelDataSize + patch->height + columnsDataSize + postsDataSize;
   /* Pass &patch->data as the user back-pointer so that when this
    * PU_CACHE block is auto-purged (Z_Malloc's cache-purge under
    * memory pressure, or an explicit Z_FreeTags(PU_CACHE)), the
@@ -259,10 +268,10 @@ static void createPatch(int id) {
 
   // set out pixel, column, and post pointers into our data array
   patch->pixels = patch->data;
-  patch->columns = (rcolumn_t*)((unsigned char*)patch->pixels + pixelDataSize);
+  patch->columns = (rcolumn_t*)((unsigned char*)patch->pixels + pixelDataSize + patch->height);
   patch->posts = (rpost_t*)((unsigned char*)patch->columns + columnsDataSize);
 
-  memset(patch->pixels, 0xff, (patch->width*patch->height));
+  memset(patch->pixels, 0xff, (patch->width*patch->height + patch->height));
 
   // fill in the pixels, posts, and columns
   numPostsUsedSoFar = 0;
@@ -479,7 +488,9 @@ static void createTextureCompositePatch(int id) {
   postsDataSize = numPostsTotal * sizeof(rpost_t);
 
   // allocate our data chunk
-  dataSize = pixelDataSize + columnsDataSize + postsDataSize;
+  /* One extra column of 0xff padding after the pixels, for the same
+   * post-relative bottom-row wrap as in the single-patch case above. */
+  dataSize = pixelDataSize + composite_patch->height + columnsDataSize + postsDataSize;
   /* See r_patch.c:238 — back-pointer would point into texture_composites[],
    * unsafe at teardown.  No user back-pointer here. */
   composite_patch->data = (unsigned char*)Z_Malloc(dataSize, PU_STATIC, NULL);
@@ -487,10 +498,10 @@ static void createTextureCompositePatch(int id) {
 
   // set out pixel, column, and post pointers into our data array
   composite_patch->pixels = composite_patch->data;
-  composite_patch->columns = (rcolumn_t*)((unsigned char*)composite_patch->pixels + pixelDataSize);
+  composite_patch->columns = (rcolumn_t*)((unsigned char*)composite_patch->pixels + pixelDataSize + composite_patch->height);
   composite_patch->posts = (rpost_t*)((unsigned char*)composite_patch->columns + columnsDataSize);
 
-  memset(composite_patch->pixels, 0xff, (composite_patch->width*composite_patch->height));
+  memset(composite_patch->pixels, 0xff, (composite_patch->width*composite_patch->height + composite_patch->height));
 
   numPostsUsedSoFar = 0;
 

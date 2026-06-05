@@ -1156,13 +1156,38 @@ static void G_PlayerFinishLevel(int player)
     p->poisoncount = 0;
   }
 
-  memset(p->powers, 0, sizeof p->powers);
-  /* Hexen keys are hub-scoped: they survive Teleport_NewMap within a
-   * cluster and are stripped only when the destination lies in a different
-   * one (or the game is ending), matching G_PlayerExitMap. */
-  if (!hexen || LeaveMap == -1 ||
-      P_GetMapCluster(gamemap) != P_GetMapCluster(P_TranslateMapWarp(LeaveMap)))
-    memset(p->cards, 0, sizeof p->cards);
+  /* Hexen keys and flight are hub-scoped: both survive Teleport_NewMap
+   * within a cluster.  Keys are stripped when the destination lies in a
+   * different cluster (or the game is ending), matching G_PlayerExitMap;
+   * flight carries within a cluster, while leaving the cluster burns any
+   * banked flight artifacts (up to 25) before stripping the power. */
+  {
+    dbool different_cluster = (!hexen || LeaveMap == -1 ||
+        P_GetMapCluster(gamemap) != P_GetMapCluster(P_TranslateMapWarp(LeaveMap)));
+    int flight_carryover = 0;
+
+    if (hexen && !deathmatch)
+    {
+      if (!different_cluster)
+        flight_carryover = p->powers[pw_flight];
+      else
+      {
+        int i;
+        for (i = 0; i < 25; i++)
+        {
+          p->powers[pw_flight] = 0;
+          P_PlayerUseArtifact(p, hexen_arti_fly);
+        }
+      }
+    }
+
+    memset(p->powers, 0, sizeof p->powers);
+    p->powers[pw_flight] = flight_carryover;
+
+    if (different_cluster)
+      memset(p->cards, 0, sizeof p->cards);
+
+  }
 
   p->mo = NULL;           // cph - this is allocated PU_LEVEL so it's gone
   p->extralight = 0;      /* cancel gun flashes */

@@ -304,7 +304,7 @@ default_t defaults[] =
    1,
 #endif
    def_int, ss_gen, NULL, NULL}, // 0 = off, 1 = Adlib (OPL), 2 = Fluidsynth
-  {"snd_channels",{&default_numChannels, NULL},{8, NULL},1,32,
+  {"snd_channels",{&default_numChannels, NULL},{0, NULL},0,2,
    def_int,ss_gen, NULL, NULL}, // number of audio events simultaneously // killough
 
   {"Video settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},

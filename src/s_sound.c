@@ -254,7 +254,9 @@ void S_HexenLoadSndInfo(void)
 void S_Init(int sfxVolume, int musicVolume)
 {
   //jff 1/22/98 skip sound init if sound not enabled
-  numChannels = default_numChannels;
+  /* snd_channels is stored as a menu choice index: 0=8, 1=16, 2=32. */
+  numChannels = 8 << (default_numChannels < 0 ? 0 :
+                      default_numChannels > 2 ? 2 : default_numChannels);
   if (!nosfxparm)
   {
     int i;

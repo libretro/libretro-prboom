@@ -3063,6 +3063,7 @@ static const char *framerates[] = {"35fps", "40fps", "50fps", "60fps", "70fps", 
 static const char *gamma_lvls[] = {"OFF", "Lv. 1", "Lv. 2", "Lv. 3", "Lv. 4", NULL};
 static const char *aspect_opts[] = {"4:3", "16:9", "16:10", "32:9", "21:9", NULL};
 static const char *dimlight_opts[] = {"Default", "Enhanced", NULL};
+static const char *sndchan_opts[] = {"8", "16", "32", NULL};
 static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD", NULL};
 static const char *midi_player_opts[] = {
   "Off",
@@ -3092,8 +3093,8 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
 
   SETUP_MENU_TITLE("Sound & Music", G_X, G_YA2 + general_title_sound*8 - 2),
 
-  {"Number of Sound Channels", S_NUM|S_PRGWARN, m_null, G_X,
-   G_YA2 + general_sndchan*8, {"snd_channels"}, 0, 0, NULL, NULL},
+  {"Number of Sound Channels", S_CHOICE|S_PRGWARN, m_null, G_X,
+   G_YA2 + general_sndchan*8, {"snd_channels"}, 0, 0, NULL, sndchan_opts},
 
   {"Enable v1.1 Pitch Effects", S_YESNO, m_null, G_X,
    G_YA2 + general_pitch*8, {"pitched_sounds"}, 0, 0, NULL, NULL},

@@ -2179,6 +2179,29 @@ void P_ShootHexenSpecialLine(mobj_t *thing, line_t *line)
   P_ActivateHexenLine(line, thing, 0, SPAC_IMPACT);
 }
 
+/* Vanilla hexen's CheckForPushSpecial: things bumping or shooting into a
+ * line fire its push or impact activation.  Following dsda-doom's default,
+ * a missile activates impact lines as its shooter (mo->target) so ACS
+ * scripts see a sensible activator; PUSHWALL movers (the player classes)
+ * fire push lines as themselves. */
+void P_CheckForPushSpecial(line_t *line, int side, mobj_t *mobj)
+{
+  if (line->special)
+  {
+    if (mobj->flags2 & MF2_PUSHWALL)
+    {
+      P_ActivateHexenLine(line, mobj, side, SPAC_PUSH);
+    }
+    else if (mobj->flags2 & MF2_IMPACT)
+    {
+      if (!(mobj->flags & MF_MISSILE) || !mobj->target)
+        P_ActivateHexenLine(line, mobj, side, SPAC_IMPACT);
+      else
+        P_ActivateHexenLine(line, mobj->target, side, SPAC_IMPACT);
+    }
+  }
+}
+
 dbool P_UseHexenSpecialLine(mobj_t *thing, line_t *line, int side)
 {
   return P_ActivateHexenLine(line, thing, side, SPAC_USE);

@@ -73,6 +73,7 @@ void  Hexen_EV_StopPlat(line_t *line, byte *args);
 /* Line activation entry points (wired through map_format). */
 void  P_CrossHexenSpecialLine(line_t *line, int side, mobj_t *thing);
 void  P_ShootHexenSpecialLine(mobj_t *thing, line_t *line);
+void  P_CheckForPushSpecial(line_t *line, int side, mobj_t *mobj);
 dbool P_UseHexenSpecialLine(mobj_t *thing, line_t *line, int side);
 
 #endif

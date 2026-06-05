@@ -427,6 +427,15 @@ dbool PIT_CheckLine (line_t* ld)
   // killough 7/24/98: allow player to move out of 1s wall, to prevent sticking
   if (!ld->backsector) // one sided line
     {
+      /* Hexen: a thing running or shooting into a wall fires its push or
+       * impact activation (vanilla PIT_CheckLine; blasted things take
+       * impact damage here too). */
+      if (hexen)
+      {
+        if (tmthing->flags2 & MF2_BLASTED)
+          P_DamageMobj(tmthing, NULL, NULL, (int)(tmthing->info->mass >> 5));
+        P_CheckForPushSpecial(ld, 0, tmthing);
+      }
       blockline = ld;
       return tmunstuck && !untouched(ld) &&
   FixedMul(tmx-tmthing->x,ld->dy) > FixedMul(tmy-tmthing->y,ld->dx);
@@ -439,7 +448,15 @@ dbool PIT_CheckLine (line_t* ld)
           /* MBF21: line blocks players (bit 13) */
           (mbf21_features && tmthing->player &&
            (ld->flags & ML_BLOCKPLAYERS)))
-  return tmunstuck && !untouched(ld);  // killough 8/1/98: allow escape
+        {
+          if (hexen)
+          {
+            if (tmthing->flags2 & MF2_BLASTED)
+              P_DamageMobj(tmthing, NULL, NULL, (int)(tmthing->info->mass >> 5));
+            P_CheckForPushSpecial(ld, 0, tmthing);
+          }
+          return tmunstuck && !untouched(ld);  // killough 8/1/98: allow escape
+        }
 
       // killough 8/9/98: monster-blockers don't affect friends
       if (!(tmthing->flags & MF_FRIEND || tmthing->player)
@@ -1266,6 +1283,32 @@ dbool P_CheckPosition (mobj_t* thing,fixed_t x,fixed_t y)
 // Attempt to move to a new position,
 // crossing special lines unless MF_TELEPORT is set.
 //
+/* Hexen: a failed move fires push/impact activations on every special line
+ * the attempt touched, in reverse collection order (vanilla P_TryMove's
+ * pushline tail).  This is how the impact-activated lines that sit behind
+ * two-sided geometry -- Winnowing Hall's breakable windows -- are reached:
+ * the missile's move is rejected by the window's height opening, and the
+ * special fires from the spechit list. */
+static void Hexen_PushLineHits(mobj_t *thing)
+{
+  if (!(thing->flags & (MF_TELEPORT | MF_NOCLIP)))
+  {
+    int i;
+    int side;
+    line_t *ld;
+
+    if (thing->flags2 & MF2_BLASTED)
+      P_DamageMobj(thing, NULL, NULL, (int)(thing->info->mass >> 5));
+
+    for (i = numspechit - 1; i >= 0; i--)
+    {
+      ld = spechit[i];
+      side = P_PointOnLineSide(thing->x, thing->y, ld);
+      P_CheckForPushSpecial(ld, side, thing);
+    }
+  }
+}
+
 dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
                   dbool dropoff) // killough 3/15/98: allow dropoff as option
   {
@@ -1275,7 +1318,11 @@ dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
   felldown = floatok = FALSE;               // killough 11/98
 
   if (!P_CheckPosition (thing, x, y))
-    return FALSE;   // solid wall or thing
+    {
+      if (hexen)
+        Hexen_PushLineHits(thing);
+      return FALSE;   // solid wall or thing
+    }
 
   if ( !(thing->flags & MF_NOCLIP) )
     {
@@ -1289,9 +1336,15 @@ dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
     // too big a step up
     (!(thing->flags & MF_TELEPORT) &&
      tmfloorz - thing->z > STEPSIZE))
-  return tmunstuck
-    && !(ceilingline && untouched(ceilingline))
-    && !(  floorline && untouched(  floorline));
+        {
+          dbool unstuck = tmunstuck
+            && !(ceilingline && untouched(ceilingline))
+            && !(  floorline && untouched(  floorline));
+
+          if (hexen && !unstuck)
+            Hexen_PushLineHits(thing);
+          return unstuck;
+        }
 
       /* killough 3/15/98: Allow certain objects to drop off
        * killough 7/24/98, 8/1/98:

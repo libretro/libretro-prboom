@@ -2253,11 +2253,70 @@ void A_Explode(mobj_t *thingy)
 // if on first boss level
 //
 
+/* Heretic boss deaths: map 8 of each episode ends with a tag-666 floor
+ * lower when the last episode boss dies (Ironliches, Maulotaurs, or
+ * D'Sparil per episode); episodes past the first also slay every
+ * remaining monster.  Vanilla heretic A_BossDeath. */
+static void Heretic_A_BossDeath(mobj_t *actor)
+{
+    void P_Massacre(void);      /* heretic/p_action.c */
+    mobj_t *mo;
+    thinker_t *think;
+    line_t dummyLine;
+    static const mobjtype_t bossType[6] = {
+        HERETIC_MT_HEAD,
+        HERETIC_MT_MINOTAUR,
+        HERETIC_MT_SORCERER2,
+        HERETIC_MT_HEAD,
+        HERETIC_MT_MINOTAUR,
+        -1
+    };
+
+    if (gamemap != 8)
+    {                           // Not a boss level
+        return;
+    }
+    if (gameepisode < 1 || gameepisode > 6)
+    {
+        return;
+    }
+    if (actor->type != bossType[gameepisode - 1])
+    {                           // Not considered a boss in this episode
+        return;
+    }
+    // Make sure all bosses are dead
+    for (think = thinkercap.next; think != &thinkercap; think = think->next)
+    {
+        if (think->function.arg1 != (void (*)(void *)) P_MobjThinker)
+        {                       // Not a mobj thinker
+            continue;
+        }
+        mo = (mobj_t *) think;
+        if ((mo != actor) && (mo->type == actor->type) && (mo->health > 0))
+        {                       // Found a living boss
+            return;
+        }
+    }
+    if (gameepisode > 1)
+    {                           // Kill any remaining monsters
+        P_Massacre();
+    }
+    memset(&dummyLine, 0, sizeof(dummyLine));
+    dummyLine.tag = 666;
+    EV_DoFloor(&dummyLine, FLEV_LOWERFLOOR);
+}
+
 void A_BossDeath(mobj_t *mo)
 {
   thinker_t *th;
   line_t    junk;
   int       i;
+
+  if (heretic)
+  {
+    Heretic_A_BossDeath(mo);
+    return;
+  }
 
   /* MBF21: when the dying thing carries MBF21 boss flags, qualification
    * and the triggered action are driven by those flags instead of the

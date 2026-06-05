@@ -2689,10 +2689,16 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    if (heretic)
       P_InitAmbientSound();
 
+   if (heretic)
+      P_OpenWeapons();          /* reset firemace spot collection */
+
    if (udmf_level)
       P_LoadUDMFThings();
    else
       P_LoadThings(lumpnum+ML_THINGS);
+
+   if (heretic)
+      P_CloseWeapons();         /* place (at most) one firemace */
 
    if (hexen && !udmf_level)
       PO_Init(lumpnum+ML_THINGS); /* spawn and place the polyobjects */

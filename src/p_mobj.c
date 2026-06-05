@@ -2025,6 +2025,17 @@ void P_SpawnMapThing (const mapthing_t* mthing)
     options &= MTF_EASY|MTF_NORMAL|MTF_HARD|MTF_AMBUSH|MTF_NOTSINGLE;
   }
 
+  /* Heretic: firemace things are spawn-spot candidates, not direct spawns;
+   * P_CloseWeapons picks at most one of them after the things load.  The
+   * collection happens before the options filtering on purpose -- vanilla
+   * flags the spots multiplayer-only precisely so that nothing spawns from
+   * them directly, while the spot list ignores the options. */
+  if (heretic && thingtype == 2002)
+  {
+    P_AddMaceSpot(mthing->x << FRACBITS, mthing->y << FRACBITS);
+    return;
+  }
+
   // count deathmatch start positions
 
   // doom2.exe has at most 10 deathmatch starts

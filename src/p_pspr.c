@@ -3161,12 +3161,74 @@ void A_StaffAttackPL2(player_t * player, pspdef_t * psp)
 }
 
 
-/* P_RepositionMace relocates the mace spawn among the map's mace spots;
- * the mace-spot scan is not implemented in this core yet, so this is a
- * no-op (the mace simply stays put). */
+/* The firemace appears at one randomly chosen mace spot per map (and
+ * sometimes not at all outside deathmatch); the spots are collected from
+ * the map's WMACE things by P_AddMaceSpot during P_SpawnMapThing, between
+ * P_OpenWeapons and P_CloseWeapons. */
+
+#define MAX_MACE_SPOTS 8
+
+static int MaceSpotCount;
+static struct
+{
+    fixed_t x;
+    fixed_t y;
+} MaceSpots[MAX_MACE_SPOTS];
+
+void P_OpenWeapons(void)
+{
+    MaceSpotCount = 0;
+}
+
+void P_AddMaceSpot(fixed_t x, fixed_t y)
+{
+    if (MaceSpotCount == MAX_MACE_SPOTS)
+        return;                 /* vanilla I_Errors; just ignore extras */
+    MaceSpots[MaceSpotCount].x = x;
+    MaceSpots[MaceSpotCount].y = y;
+    MaceSpotCount++;
+}
+
+void P_CloseWeapons(void)
+{
+    int spot;
+
+    if (!MaceSpotCount)
+    {                           /* no maces placed */
+        return;
+    }
+    /* pr_lastlook, not pr_heretic: in vanilla the shared P_Random cursor
+     * was advanced once per thing spawned, which is what varied this roll
+     * per map.  In boom's split-class RNG the class P_SpawnMobj advances
+     * is pr_lastlook; pr_heretic would be untouched at this point and --
+     * with the libretro core's fixed time seed -- roll the same constant
+     * on every cold start, never (or always) placing the mace. */
+    if (!deathmatch && P_Random(pr_lastlook) < 64)
+    {                           /* sometimes doesn't show up if not in deathmatch */
+        return;
+    }
+    spot = P_Random(pr_lastlook) % MaceSpotCount;
+    P_SpawnMobj(MaceSpots[spot].x, MaceSpots[spot].y, ONFLOORZ,
+                HERETIC_MT_WMACE);
+}
+
+/* P_RepositionMace relocates the mace among the map's mace spots when a
+ * mace ball's dropoff timer expires without a hit. */
 void P_RepositionMace(mobj_t *mo)
 {
-  (void)mo;
+    int spot;
+    subsector_t *ss;
+
+    if (!MaceSpotCount)
+        return;
+    P_UnsetThingPosition(mo);
+    spot = P_Random(pr_lastlook) % MaceSpotCount;  /* see P_CloseWeapons */
+    mo->x = MaceSpots[spot].x;
+    mo->y = MaceSpots[spot].y;
+    ss = R_PointInSubsector(mo->x, mo->y);
+    mo->z = mo->floorz = ss->sector->floorheight;
+    mo->ceilingz = ss->sector->ceilingheight;
+    P_SetThingPosition(mo);
 }
 
 void A_FireMacePL1B(player_t * player, pspdef_t * psp)

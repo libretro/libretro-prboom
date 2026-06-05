@@ -75,10 +75,14 @@ typedef struct
     int sfxid;
     int leftvol, rightvol;   /* 0..127 per-channel volume scalars */
     int handle;
-    /* 16.16 fixed-point playback position and step.  step == FRACUNIT
-     * plays at the recorded rate; the raven games randomize it per
-     * sound (vanilla pitch jitter, +/- up to ~8%). */
-    unsigned int pos_fx, step_fx;
+    /* Playback cursor: integer sample pointer plus a 16-bit fractional
+     * accumulator, advanced by the 16.16 step (FRACUNIT plays at the
+     * recorded rate; the raven games randomize it per sound -- vanilla
+     * pitch jitter).  Splitting the position this way keeps it exact
+     * for sounds of any length; a single 32-bit 16.16 position wraps
+     * after 65536 samples (~1.5s) and the channel never ends. */
+    int16_t *cur;
+    unsigned int frac, step_fx;
 } channel_t;
 
 /* Playback-rate multiplier per vanilla pitch value: 2^((p-128)/64) in
@@ -381,7 +385,8 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     // Set pointers to raw sound data start & end.
     channels[slot].snd_start_ptr = (int16_t*)S_sfx[id].data;
     channels[slot].snd_end_ptr   = channels[slot].snd_start_ptr + lengths[id];
-    channels[slot].pos_fx        = 0;
+    channels[slot].cur           = channels[slot].snd_start_ptr;
+    channels[slot].frac          = 0;
     /* Doom plays at the recorded rate (prboom never pitched); the raven
      * games honor vanilla's per-sound pitch jitter. */
     channels[slot].step_fx       = raven ? steptable[pitch & 0xff] : (1u << 16);
@@ -533,11 +538,11 @@ void I_UpdateSound(void)
          for (j = 0; j < n_active; j++)
          {
             channel_t *c = active[j];
-            /* Remaining output frames before this channel's read position
-             * crosses its sample length, at its playback step. */
-            int64_t len_fx = ((int64_t)(c->snd_end_ptr - c->snd_start_ptr)) << 16;
-            int     rem    = (int)((len_fx - c->pos_fx + c->step_fx - 1) /
-                                   c->step_fx);
+            /* Remaining output frames before this channel's read cursor
+             * crosses its sample end, at its playback step. */
+            int64_t left_fx = (((int64_t)(c->snd_end_ptr - c->cur)) << 16) -
+                              c->frac;
+            int     rem     = (int)((left_fx + c->step_fx - 1) / c->step_fx);
             if (rem < chunk)
                chunk = rem;
          }
@@ -556,8 +561,10 @@ void I_UpdateSound(void)
             for (j = 0; j < n_active; j++)
             {
                channel_t *c = active[j];
-               int        s = c->snd_start_ptr[c->pos_fx >> 16];
-               c->pos_fx += c->step_fx;
+               int        s = *c->cur;
+               c->frac   += c->step_fx;
+               c->cur    += c->frac >> 16;
+               c->frac   &= 0xffff;
                /* s is signed 16-bit; leftvol/rightvol are 0..127.
                 * (s * vol) >> 7 scales by vol/128, keeping full
                 * precision and the int16 output range. */
@@ -585,9 +592,7 @@ void I_UpdateSound(void)
             int dst = 0;
             for (j = 0; j < n_active; j++)
             {
-               if ((int64_t)active[j]->pos_fx >=
-                   ((int64_t)(active[j]->snd_end_ptr -
-                              active[j]->snd_start_ptr)) << 16)
+               if (active[j]->cur >= active[j]->snd_end_ptr)
                   memset(active[j], 0, sizeof(channel_t));
                else
                   active[dst++] = active[j];

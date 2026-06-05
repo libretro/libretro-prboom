@@ -393,10 +393,18 @@ int P_GetAmmoLevel(player_t *player, weapontype_t weapon)
   ammotype_t ammo = weaponinfo[weapon].ammo;
   int current, min, max, result;
 
+  /* Heretic: the per-shot cost is the minimum needed to fire, and the Tome
+   * of Power raises it for some weapons (level-2 table). */
+  if (heretic)
+  {
+    min = P_WeaponLevelInfo(player)[weapon].ammopershot;
+    if (min <= 0)
+      min = 1;
+  }
   /* MBF21: a weapon with an explicit Ammo per shot uses it as the minimum
    * needed to fire.  ammopershot defaults to -1 (vanilla) for every weapon,
    * so this branch is inert unless a deh patch set the field. */
-  if (mbf21_features && weaponinfo[weapon].ammopershot >= 0)
+  else if (mbf21_features && weaponinfo[weapon].ammopershot >= 0)
     min = weaponinfo[weapon].ammopershot;
   else if (weapon == WP_BFG) // Minimal amount for one shot varies.
     min = BFGCELLS;
@@ -2643,18 +2651,6 @@ static fixed_t p_pspr_PlayerSlope(player_t *player) { return (player->lookdir <<
 /* Heretic ammo types (separate space from this core's Doom AM_* enum). */
 
 /* Heretic per-shot ammo costs. */
-#define USE_GWND_AMMO_1 1
-#define USE_GWND_AMMO_2 1
-#define USE_CBOW_AMMO_1 1
-#define USE_CBOW_AMMO_2 1
-#define USE_BLSR_AMMO_1 1
-#define USE_BLSR_AMMO_2 5
-#define USE_SKRD_AMMO_1 1
-#define USE_SKRD_AMMO_2 5
-#define USE_PHRD_AMMO_1 1
-#define USE_PHRD_AMMO_2 1
-#define USE_MACE_AMMO_1 1
-#define USE_MACE_AMMO_2 5
 
 
 

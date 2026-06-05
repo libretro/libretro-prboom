@@ -66,6 +66,22 @@ typedef struct
   int         holdatkstate;
 } weaponinfo_t;
 
+/* Heretic per-shot ammo costs (level 1 / Tome of Power level 2); used by
+ * the firing codepointers and as the minimum-to-fire in the weapon tables'
+ * ammopershot columns. */
+#define USE_GWND_AMMO_1 1
+#define USE_GWND_AMMO_2 1
+#define USE_CBOW_AMMO_1 1
+#define USE_CBOW_AMMO_2 1
+#define USE_BLSR_AMMO_1 1
+#define USE_BLSR_AMMO_2 5
+#define USE_SKRD_AMMO_1 1
+#define USE_SKRD_AMMO_2 5
+#define USE_PHRD_AMMO_1 1
+#define USE_PHRD_AMMO_2 1
+#define USE_MACE_AMMO_1 1
+#define USE_MACE_AMMO_2 5
+
 extern  weaponinfo_t   *weaponinfo;
 extern  weaponinfo_t   heretic_wpnlev2info[];  /* Tome-of-Power forms */
 extern  weaponinfo_t    doom_weaponinfo[NUMWEAPONS];

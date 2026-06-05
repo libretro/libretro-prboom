@@ -80,15 +80,21 @@ int monsters_infight = 0; // e6y: Dehacked support - monsters infight
 // a weapon is found with two clip loads,
 // a big item has five clip loads
 // Sized to NUMAMMO (6, Heretic). Doom uses the first four; the trailing
-// two are unused under Doom. Heretic values are selected at player init
-// (see G_PlayerReborn) via heretic_maxammo / heretic_clipammo.
+// two are unused under Doom. Heretic maximums are selected at player init
+// (see G_PlayerReborn) via heretic_maxammo; Heretic pickups pass exact
+// counts, so clipammo plays no part there.
 int maxammo[NUMAMMO]  = {200, 50, 300, 50, 0, 0};
 int clipammo[NUMAMMO] = { 10,  4,  20,  1, 0, 0};
 
-/* Heretic per-type maximum ammo and pickup clip sizes (vanilla Heretic):
+/* Heretic per-type maximum ammo (vanilla Heretic):
  *   goldwand, crossbow, blaster, skullrod, phoenixrod, mace */
 int heretic_maxammo[NUMAMMO]  = {100, 50, 200, 200, 20, 150};
-int heretic_clipammo[NUMAMMO] = { 10,  5,  10,  20,  1,  10};
+
+/* Ammo granted with each Heretic weapon pickup (vanilla GetWeaponAmmo):
+ * staff, gold wand, crossbow, blaster, skull rod, phoenix, mace,
+ * gauntlets, beak. */
+static const int heretic_weapon_ammo[NUMWEAPONS] =
+   { 0, 25, 10, 30, 50, 2, 50, 0, 0 };
 
 //
 // GET STUFF
@@ -123,14 +129,24 @@ static dbool   P_GiveAmmo(player_t *player, ammotype_t ammo, int num)
    if ( player->ammo[ammo] == player->maxammo[ammo]  )
       return FALSE;
 
-   if (num)
-      num *= clipammo[ammo];
+   if (heretic)
+   {
+      /* Heretic callers pass the exact crystal count (no clip multiples);
+       * baby and nightmare skills give half again as much. */
+      if (gameskill == sk_baby || gameskill == sk_nightmare)
+         num += num >> 1;
+   }
    else
-      num = clipammo[ammo]/2;
+   {
+      if (num)
+         num *= clipammo[ammo];
+      else
+         num = clipammo[ammo]/2;
 
-   // give double ammo in trainer mode, you'll need in nightmare
-   if (gameskill == sk_baby || gameskill == sk_nightmare)
-      num <<= 1;
+      // give double ammo in trainer mode, you'll need in nightmare
+      if (gameskill == sk_baby || gameskill == sk_nightmare)
+         num <<= 1;
+   }
 
    oldammo = player->ammo[ammo];
    player->ammo[ammo] += num;
@@ -225,7 +241,8 @@ static dbool   P_GiveWeapon(player_t *player, weapontype_t weapon, dbool   dropp
       player->bonuscount += BONUSADD;
       player->weaponowned[weapon] = TRUE;
 
-      P_GiveAmmo(player, weaponinfo[weapon].ammo, deathmatch ? 5 : 2);
+      P_GiveAmmo(player, weaponinfo[weapon].ammo,
+                 heretic ? heretic_weapon_ammo[weapon] : (deathmatch ? 5 : 2));
 
       player->pendingweapon = weapon;
       /* cph 20028/10 - for old-school DM addicts, allow old behavior
@@ -239,8 +256,10 @@ static dbool   P_GiveWeapon(player_t *player, weapontype_t weapon, dbool   dropp
   if (weaponinfo[weapon].ammo != AM_NOAMMO)
     {
       // give one clip with a dropped weapon,
-      // two clips with a found weapon
-      gaveammo = P_GiveAmmo (player, weaponinfo[weapon].ammo, dropped ? 1 : 2);
+      // two clips with a found weapon (heretic: the weapon's fixed grant)
+      gaveammo = P_GiveAmmo (player, weaponinfo[weapon].ammo,
+                             heretic ? heretic_weapon_ammo[weapon]
+                                     : (dropped ? 1 : 2));
     }
   else
     gaveammo = FALSE;

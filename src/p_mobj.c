@@ -2286,6 +2286,16 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   mobj->angle = ANG45 * (mthing->angle/45);
   if (options & MTF_AMBUSH)
     mobj->flags |= MF_AMBUSH;
+
+  /* Hexen: dormant things spawn frozen (tics -1 stops the state machine)
+   * and flagged so damage passes through; Thing_Activate wakes them. */
+  if (hexen && options & MTF_HEXEN_DORMANT)
+  {
+    mobj->flags2 |= MF2_DORMANT;
+    if (mobj->type == HEXEN_MT_ICEGUY)
+      P_SetMobjState(mobj, HEXEN_S_ICEGUY_DORMANT);
+    mobj->tics = -1;
+  }
 }
 
 

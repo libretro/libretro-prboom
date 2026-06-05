@@ -2427,6 +2427,10 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
       return;
   }
 
+  /* Hexen: dormant things are invulnerable and won't wake. */
+  if (target->flags2 & MF2_DORMANT)
+    return;
+
   if (target->flags & MF_SKULLFLY)
   {
     /* A charging Maulotaur shrugs damage off entirely. */

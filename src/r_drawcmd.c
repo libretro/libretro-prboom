@@ -25,6 +25,9 @@
 #include "r_data.h"
 #include "r_drawcmd.h"
 #include "lprintf.h"
+#include "doomstat.h"
+
+#define WALL_RUN_MAX 64
 
 typedef struct
 {
@@ -73,17 +76,119 @@ void R_DrawCmdAdoptTextureLock(int texnum)
   locks[lock_count++] = texnum;
 }
 
+/* Per-x bucket chains for run formation.  head/stamp are indexed by
+ * screen column; a bucket is live only when its stamp matches the
+ * current frame epoch, so no per-frame clearing pass is needed.  next
+ * chains records that landed on the same column (wall tiers). */
+static int bucket_head[MAX_SCREENWIDTH];
+static int bucket_tail[MAX_SCREENWIDTH];
+static unsigned bucket_stamp[MAX_SCREENWIDTH];
+static unsigned bucket_epoch = 0;
+static int *bucket_next = NULL;
+static int  bucket_next_cap = 0;
+
+/* A record qualifies for the wall-run kernel when its drawer is one
+ * the kernel reproduces and its texture height is zero or a power of
+ * two (the drawers have a modulo path for other heights that the
+ * kernel does not mirror). */
+static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
+{
+  int cls = R_WallColumnKernelClass(cmd->fn);
+  int th  = cmd->dc.texheight;
+
+  if (cls && (th & (th - 1)) == 0)
+    return cls;
+  return 0;
+}
+
 void R_DrawCmdReplay(void)
 {
-  int i;
+  int i, x;
+  int sweep_remaining = 0;
 
-  /* Emission order replay: solid wall columns cover disjoint pixels
-   * (the clip arrays guarantee it), so ordering is free for output
-   * correctness, but emission order also walks the 4-column batching
-   * state machine in r_draw exactly as inline drawing did, keeping the
-   * output bit-identical. */
+  /* Solid wall columns cover disjoint pixels (the clip arrays
+   * guarantee it), so replay order is free for output correctness.
+   * Records the wall-run kernel cannot reproduce replay individually
+   * through their drawers, in emission order; the rest are bucketed by
+   * screen column and rasterized as x-adjacent runs, row-major,
+   * straight into the framebuffer. */
+  bucket_epoch++;
+  if (bucket_next_cap < cmd_cap)
+  {
+    bucket_next_cap = cmd_cap;
+    bucket_next = (int *) realloc(bucket_next, bucket_next_cap * sizeof(int));
+    if (!bucket_next)
+      I_Error("R_DrawCmdReplay: failed to grow the bucket chain");
+  }
+
   for (i = 0; i < cmd_count; i++)
-    cmds[i].fn(&cmds[i].dc);
+  {
+    int cx = cmds[i].dc.x;
+
+    if (!R_DrawCmdKernelClass(&cmds[i]))
+    {
+      cmds[i].fn(&cmds[i].dc);
+      continue;
+    }
+    if (bucket_stamp[cx] != bucket_epoch)
+    {
+      bucket_stamp[cx] = bucket_epoch;
+      bucket_head[cx] = -1;
+      bucket_tail[cx] = -1;
+    }
+    /* Append at the tail: sweep k must pop the k-th emitted record of
+     * each column, so that where two records cover the same pixel
+     * (rare clip-boundary overlaps), the later-emitted one still wins,
+     * exactly as in emission-order replay. */
+    bucket_next[i] = -1;
+    if (bucket_tail[cx] >= 0)
+      bucket_next[bucket_tail[cx]] = i;
+    else
+      bucket_head[cx] = i;
+    bucket_tail[cx] = i;
+    sweep_remaining++;
+  }
+
+  /* Each sweep pops at most one record per column, so x-adjacent pops
+   * form runs of strictly ascending x; a column with several tier
+   * records feeds one to each sweep. */
+  while (sweep_remaining > 0)
+  {
+    const draw_column_vars_t *run[WALL_RUN_MAX];
+    int run_n = 0;
+    int run_cls = 0;
+    int last_x = -2;
+
+    for (x = 0; x < SCREENWIDTH; x++)
+    {
+      int idx = -1;
+      int cls = 0;
+
+      if (bucket_stamp[x] == bucket_epoch && bucket_head[x] >= 0)
+      {
+        idx = bucket_head[x];
+        bucket_head[x] = bucket_next[idx];
+        sweep_remaining--;
+        cls = R_DrawCmdKernelClass(&cmds[idx]);
+      }
+
+      if (run_n &&
+          (idx < 0 || x != last_x + 1 || cls != run_cls ||
+           run_n == WALL_RUN_MAX))
+      {
+        R_DrawWallColumnRun(run, run_n, run_cls == 2);
+        run_n = 0;
+      }
+      if (idx >= 0)
+      {
+        run[run_n++] = &cmds[idx].dc;
+        run_cls = cls;
+        last_x = x;
+      }
+    }
+    if (run_n)
+      R_DrawWallColumnRun(run, run_n, run_cls == 2);
+  }
   cmd_count = 0;
 
   /* Every record has drawn; the texture data may move again. */

@@ -5219,6 +5219,108 @@ R_DrawColumn_f R_GetDrawColumnFunc(enum column_pipeline_e type,
   return result;
 }
 
+/* Classify a column drawer for the wall-run kernel below: 1 for the
+ * unlit point drawer (composed palette), 2 for the lit point drawer
+ * (composed colormap), 0 for everything else.  Only these two are
+ * reproduced by R_DrawWallColumnRun; records using any other drawer
+ * replay individually. */
+int R_WallColumnKernelClass(R_DrawColumn_f fn)
+{
+  if (fn == R_DrawColumn16_PointUV)
+    return 1;
+  if (fn == R_DrawColumn16_PointUV_PointZ)
+    return 2;
+  return 0;
+}
+
+/* Row-major rasterization of a run of x-adjacent wall columns,
+ * writing the framebuffer directly instead of going through the
+ * 4-column temp buffer and its transposing flush.  The caller (the
+ * draw-record replay) guarantees: x ascends by one across the run,
+ * drawingmasked is clear, and every column's texheight is zero or a
+ * power of two, so the texel fetch is a mask in every lane.
+ *
+ * Per-pixel arithmetic is exactly the point drawers':
+ *   frac(y) = texturemid + (y - centery) * iscale
+ *   texel   = source[(frac & mask) >> 16]
+ *   pixel   = lut[texel]
+ * The drawers compute frac iteratively from yl; starting the iteration
+ * at the run's first row instead is the same integer sequence (adds
+ * are associative mod 2^32), so every written pixel is bit-identical
+ * to individual replay -- only the visit order changes, and solid
+ * wall pixels are disjoint.  frac advances every row whether or not
+ * the column covers it, which keeps the row loop uniform (and is the
+ * shape a vector version of this kernel wants). */
+#define WALL_RUN_MAX 64
+
+void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int pointz)
+{
+  const uint8_t     *src[WALL_RUN_MAX];
+  const lighttable_t *cmap[WALL_RUN_MAX];
+  fixed_t            frac[WALL_RUN_MAX];
+  fixed_t            step[WALL_RUN_MAX];
+  unsigned int       mask[WALL_RUN_MAX];
+  int                cyl[WALL_RUN_MAX];
+  int                cyh[WALL_RUN_MAX];
+  const uint16_t    *pal_lut = NULL;
+  int                ymin, ymax, y, j;
+  int                x0 = cols[0]->x;
+
+  /* The lit drawer's composed colormap table is a single-slot cache, so
+   * a run whose columns carry different colormaps (per-column light
+   * scaling) cannot prefetch one table per column.  The kernel instead
+   * evaluates the table's defining expression directly,
+   * V_Palette16[colormap[texel]*64 + 63], which is the same value the
+   * drawer reads out of the composed table.  The unlit drawer's palette
+   * table has no per-column key and is shared. */
+  if (!pointz)
+    pal_lut = R_GetComposedPalette();
+
+  ymin = cols[0]->yl;
+  ymax = cols[0]->yh;
+  for (j = 0; j < n; j++)
+  {
+    const draw_column_vars_t *c = cols[j];
+    cyl[j]  = c->yl;
+    cyh[j]  = c->yh;
+    if (c->yl < ymin) ymin = c->yl;
+    if (c->yh > ymax) ymax = c->yh;
+    src[j]  = c->source;
+    step[j] = c->iscale;
+    cmap[j] = c->colormap;
+    mask[j] = ((unsigned int)(c->texheight - 1) << 16) | 0xffffu;
+  }
+  for (j = 0; j < n; j++)
+    frac[j] = cols[j]->texturemid + (ymin - centery) * step[j];
+
+  if (pointz)
+  {
+    for (y = ymin; y <= ymax; y++)
+    {
+      uint16_t *row = drawvars.short_topleft + y * SURFACE_SHORT_PITCH + x0;
+      for (j = 0; j < n; j++)
+      {
+        if (y >= cyl[j] && y <= cyh[j])
+          row[j] = V_Palette16[ cmap[j][ src[j][(frac[j] & mask[j]) >> 16] ] * 64 + 63 ];
+        frac[j] += step[j];
+      }
+    }
+  }
+  else
+  {
+    for (y = ymin; y <= ymax; y++)
+    {
+      uint16_t *row = drawvars.short_topleft + y * SURFACE_SHORT_PITCH + x0;
+      for (j = 0; j < n; j++)
+      {
+        if (y >= cyl[j] && y <= cyh[j])
+          row[j] = pal_lut[ src[j][(frac[j] & mask[j]) >> 16] ];
+        frac[j] += step[j];
+      }
+    }
+  }
+}
+
 void R_SetDefaultDrawColumnVars(draw_column_vars_t *dcvars)
 {
    dcvars->x             = 0;

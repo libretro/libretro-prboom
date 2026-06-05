@@ -125,6 +125,12 @@ extern uint8_t playernumtotrans[MAXPLAYERS]; // CPhipps - what translation table
 extern uint8_t       *translationtables;
 
 typedef void (*R_DrawColumn_f)(draw_column_vars_t *dcvars);
+
+/* Wall-run kernel (r_draw.c): classification of drawers it reproduces,
+ * and row-major rasterization of an x-adjacent record run.  Used by the
+ * draw-record replay in r_drawcmd.c. */
+int R_WallColumnKernelClass(R_DrawColumn_f fn);
+void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int pointz);
 R_DrawColumn_f R_GetDrawColumnFunc(enum column_pipeline_e type,
                                    enum draw_filter_type_e filter,
                                    enum draw_filter_type_e filterz);

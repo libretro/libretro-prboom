@@ -60,6 +60,7 @@
 #include "p_saveg.h"
 #include "p_tick.h"
 #include "p_map.h"
+#include "p_user.h"
 #include "d_main.h"
 #include "wi_stuff.h"
 #include "hu_stuff.h"
@@ -1120,6 +1121,40 @@ void G_Ticker (void)
 static void G_PlayerFinishLevel(int player)
 {
   player_t *p = &players[player];
+
+  /* Heretic end-of-level housekeeping (vanilla G_PlayerFinishLevel):
+   * artifact stacks shrink to one of each, any Wings of Wrath are used up
+   * (flight does not carry between maps), and a morphed player reverts --
+   * the pre-morph weapon rides in the chicken mobj's special1.  The rain
+   * trackers point at PU_LEVEL mobjs and must not dangle into the next
+   * map.  The morph restore applies to hexen's pig as well. */
+  if (heretic)
+  {
+    int i;
+
+    for (i = 0; i < p->inventorySlotNum; i++)
+      p->inventory[i].count = 1;
+    p->artifactCount = p->inventorySlotNum;
+
+    if (!deathmatch)
+      for (i = 0; i < 16; i++)
+        P_PlayerUseArtifact(p, arti_fly);
+  }
+
+  if (raven && (p->chickenTics || p->morphTics) && p->mo)
+  {
+    p->readyweapon = p->mo->special1.i;       /* restore weapon */
+    p->chickenTics = 0;
+    p->morphTics = 0;
+  }
+
+  if (raven)
+  {
+    p->lookdir = 0;
+    p->rain1 = NULL;
+    p->rain2 = NULL;
+    p->poisoncount = 0;
+  }
 
   memset(p->powers, 0, sizeof p->powers);
   /* Hexen keys are hub-scoped: they survive Teleport_NewMap within a

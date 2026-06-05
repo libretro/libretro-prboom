@@ -11,6 +11,7 @@
 #include "libretro.h"
 
 #include "../src/i_sound.h"
+#include "../src/doomstat.h"
 #include "../src/dsda_hacked.h"
 #include "../src/musicplayer.h"
 #include "../src/flplayer.h"
@@ -387,9 +388,13 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     channels[slot].snd_end_ptr   = channels[slot].snd_start_ptr + lengths[id];
     channels[slot].cur           = channels[slot].snd_start_ptr;
     channels[slot].frac          = 0;
-    /* Doom plays at the recorded rate (prboom never pitched); the raven
-     * games honor vanilla's per-sound pitch jitter. */
-    channels[slot].step_fx       = raven ? steptable[pitch & 0xff] : (1u << 16);
+    /* The raven games honor vanilla's per-sound pitch jitter always;
+     * doom only when the v1.1 pitch effects setting is enabled, matching
+     * prboom's pitched_sounds.  The engine computes (and draws RNG for)
+     * doom's pitch either way, exactly as vanilla and prboom do, so demo
+     * sync is unaffected by the toggle. */
+    channels[slot].step_fx       = (raven || pitched_sounds)
+                                 ? steptable[pitch & 0xff] : (1u << 16);
 
     // Save starting gametic.
     channels[slot].starttic      = gametic;

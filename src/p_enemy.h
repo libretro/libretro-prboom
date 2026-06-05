@@ -100,6 +100,7 @@ void A_PotteryExplode(mobj_t *);
 void A_PotteryChooseBit(mobj_t *);
 void A_PotteryCheck(mobj_t *);
 void A_QueueCorpse(mobj_t *);
+void A_DeQueueCorpse(mobj_t *);
 void A_DemonDeath(mobj_t *);
 void A_Demon2Death(mobj_t *);
 void P_InitCreatureCorpseQueue(void);

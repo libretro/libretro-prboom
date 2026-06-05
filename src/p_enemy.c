@@ -3400,6 +3400,23 @@ void A_QueueCorpse(mobj_t *actor)
   corpseQueueSlot++;
 }
 
+/* Drop a mobj from the corpse queue when it is removed by any other
+ * means, so the queue never holds a freed pointer for A_QueueCorpse's
+ * eviction to re-remove (from dsda-doom). */
+void A_DeQueueCorpse(mobj_t *actor)
+{
+  int slot;
+
+  for (slot = 0; slot < CORPSEQUEUESIZE; slot++)
+  {
+    if (corpseQueue[slot] == actor)
+    {
+      corpseQueue[slot] = NULL;
+      break;
+    }
+  }
+}
+
 void P_InitCreatureCorpseQueue(void)
 {
   corpseQueueSlot = 0;

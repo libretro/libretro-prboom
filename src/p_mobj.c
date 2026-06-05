@@ -1550,6 +1550,15 @@ void P_RemoveMobj (mobj_t* mobj)
   if (hexen && mobj->tid != 0)
     P_RemoveMobjFromTIDList(mobj);
 
+  /* Hexen: a mobj leaving the world by any path must leave the corpse
+   * queue too, or its slot dangles and A_QueueCorpse's eviction later
+   * removes freed memory.  dsda-doom gates this on the corpse flags,
+   * but several hexen removal paths reach here without them and were
+   * observed dangling on MAP40, so the scan runs for every removal --
+   * it is 64 pointer compares. */
+  if (hexen)
+    A_DeQueueCorpse(mobj);
+
   if ((mobj->flags & MF_SPECIAL)
       && !(mobj->flags & MF_DROPPED)
       && (mobj->type != MT_INV)

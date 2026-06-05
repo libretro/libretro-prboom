@@ -1618,6 +1618,17 @@ void G_DoCompleted (void)
         if (gamemap == 9)
           {
             // returning from secret level
+            if (heretic)
+              {
+                /* vanilla heretic afterSecret: E1M9 returns to E1M7, the
+                 * middle episodes to M5, episode 5 to M4 (0-biased here) */
+                static const int after_secret[5] = { 6, 4, 4, 4, 3 };
+                if (gameepisode >= 1 && gameepisode <= 5)
+                  wminfo.next = after_secret[gameepisode - 1];
+                else
+                  wminfo.next = 0;
+              }
+            else
             switch (gameepisode)
               {
               case 1:
@@ -1632,18 +1643,23 @@ void G_DoCompleted (void)
               case 4:
                 wminfo.next = 2;
                 break;
-              case 5:
-                wminfo.next = 6;
-                break;
               }
           }
         else
           wminfo.next = gamemap;          // go to next level
     }
 
+  /* Par lookups are bounds-guarded: the tables cover Doom's episodes and
+   * maps only, and Heretic reaches episode 6 (no par times exist for it
+   * at all; its intermission shows none). */
+  wminfo.partime = 0;
   if ( gamemode == commercial )
-    wminfo.partime = TICRATE*cpars[gamemap-1];
-  else
+  {
+    if (gamemap >= 1 && gamemap <= 34)
+      wminfo.partime = TICRATE*cpars[gamemap-1];
+  }
+  else if (!heretic && gameepisode >= 1 && gameepisode <= 4
+           && gamemap >= 1 && gamemap <= 9)
     wminfo.partime = TICRATE*pars[gameepisode][gamemap];
 
 frommapinfo:

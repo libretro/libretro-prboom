@@ -79,13 +79,13 @@ void T_VerticalDoor (vldoor_t* door)
           case normal:
           case genRaise:
             door->direction = -1; // time to go back down
-            S_StartSound((mobj_t *)&door->sector->soundorg,sfx_dorcls);
+            S_StartSound((mobj_t *)&door->sector->soundorg,g_sfx_dorcls);
             break;
 
           case close30ThenOpen:
           case genCdO:
             door->direction = 1;  // time to go back up
-            S_StartSound((mobj_t *)&door->sector->soundorg,sfx_doropn);
+            S_StartSound((mobj_t *)&door->sector->soundorg,g_sfx_doropn);
             break;
 
           case genBlazeCdO:
@@ -108,7 +108,7 @@ void T_VerticalDoor (vldoor_t* door)
           case raiseIn5Mins:
             door->direction = 1;  // time to raise then
             door->type = normal;  // door acts just like normal 1 DR door now
-            S_StartSound((mobj_t *)&door->sector->soundorg,sfx_doropn);
+            S_StartSound((mobj_t *)&door->sector->soundorg,g_sfx_doropn);
             break;
 
           default:
@@ -208,7 +208,7 @@ void T_VerticalDoor (vldoor_t* door)
           // fall through
           default:             // other types bounce off the obstruction
             door->direction = 1;
-            S_StartSound((mobj_t *)&door->sector->soundorg,sfx_doropn);
+            S_StartSound((mobj_t *)&door->sector->soundorg,g_sfx_doropn);
             break;
         }
       }
@@ -399,13 +399,13 @@ int EV_DoDoor
         door->topheight = P_FindLowestCeilingSurrounding(sec);
         door->topheight -= 4*FRACUNIT;
         door->direction = -1;
-        S_StartSound((mobj_t *)&door->sector->soundorg,sfx_dorcls);
+        S_StartSound((mobj_t *)&door->sector->soundorg,g_sfx_dorcls);
         break;
 
       case close30ThenOpen:
         door->topheight = sec->ceilingheight;
         door->direction = -1;
-        S_StartSound((mobj_t *)&door->sector->soundorg,sfx_dorcls);
+        S_StartSound((mobj_t *)&door->sector->soundorg,g_sfx_dorcls);
         break;
 
       case blazeRaise:
@@ -424,7 +424,7 @@ int EV_DoDoor
         door->topheight = P_FindLowestCeilingSurrounding(sec);
         door->topheight -= 4*FRACUNIT;
         if (door->topheight != sec->ceilingheight)
-          S_StartSound((mobj_t *)&door->sector->soundorg,sfx_doropn);
+          S_StartSound((mobj_t *)&door->sector->soundorg,g_sfx_doropn);
         break;
 
       default:

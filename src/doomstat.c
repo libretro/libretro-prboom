@@ -55,6 +55,17 @@ mobjtype_t g_mt_tfog = MT_TFOG;      /* teleport-fog mobjtype; set per-game */
 mobjtype_t g_mt_teleportman = MT_TELEPORTMAN; /* teleport-dest mobjtype; per-game */
 int g_telefog_height = 0;            /* teleport-fog spawn height; set per-game */
 int g_sfx_telept = sfx_telept;       /* teleport sound; set per-game */
+/* World feedback sounds referenced from shared code by doom id; the raven
+ * games resolve them to their own entries at game init (dsda_hacked.c). */
+int g_sfx_doropn  = sfx_doropn;
+int g_sfx_dorcls  = sfx_dorcls;
+int g_sfx_stnmov  = sfx_stnmov;       /* door/floor/ceiling movement */
+int g_sfx_stnmov_plats = sfx_stnmov;  /* plat movement */
+int g_sfx_pstart  = sfx_pstart;
+int g_sfx_pstop   = sfx_pstop;
+int g_sfx_swtchn  = sfx_swtchn;
+int g_sfx_oof     = sfx_oof;
+int g_sfx_respawn = sfx_itmbk;
 const char *g_menu_flat = "FLOOR4_6"; /* fullscreen-menu background flat; set per-game */
 
 // Language.

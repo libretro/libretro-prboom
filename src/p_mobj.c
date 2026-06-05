@@ -1685,7 +1685,7 @@ void P_RespawnSpecials (void)
 
   ss = R_PointInSubsector (x,y);
   mo = P_SpawnMobj (x, y, ss->sector->floorheight , MT_IFOG);
-  S_StartSound (mo, sfx_itmbk);
+  S_StartSound (mo, g_sfx_respawn);
 
   // find which type to spawn
 

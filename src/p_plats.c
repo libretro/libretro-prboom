@@ -69,7 +69,7 @@ void T_PlatRaise(plat_t* plat)
                || plat->type == raiseToNearestAndChange)
          {
             if (!(leveltime&7))
-               if (!hexen) S_StartSound((mobj_t *)&plat->sector->soundorg, sfx_stnmov);
+               if (!hexen) S_StartSound((mobj_t *)&plat->sector->soundorg, g_sfx_stnmov_plats);
          }
 
          // if encountered an obstacle, and not a crush type, reverse direction
@@ -77,7 +77,7 @@ void T_PlatRaise(plat_t* plat)
          {
             plat->count  = plat->wait;
             plat->status = PLAT_DOWN;
-            if (!hexen) S_StartSound((mobj_t *)&plat->sector->soundorg, sfx_pstart);
+            if (!hexen) S_StartSound((mobj_t *)&plat->sector->soundorg, g_sfx_pstart);
          }
          else if (res == RES_PASTDEST) // end of stroke
          {
@@ -86,7 +86,7 @@ void T_PlatRaise(plat_t* plat)
             {
                plat->count  = plat->wait;
                plat->status = PLAT_WAITING;
-               if (!hexen) S_StartSound((mobj_t *)&plat->sector->soundorg, sfx_pstop);
+               if (!hexen) S_StartSound((mobj_t *)&plat->sector->soundorg, g_sfx_pstop);
             }
             else /* else go into stasis awaiting next toggle activation */
             {
@@ -121,7 +121,7 @@ void T_PlatRaise(plat_t* plat)
             {                           /* is silent, instant, no waiting */
                plat->count  = plat->wait;
                plat->status = PLAT_WAITING;
-               if (!hexen) S_StartSound((mobj_t *)&plat->sector->soundorg,sfx_pstop);
+               if (!hexen) S_StartSound((mobj_t *)&plat->sector->soundorg,g_sfx_pstop);
             }
             else // instant toggles go into stasis awaiting next activation
             {
@@ -159,7 +159,7 @@ void T_PlatRaise(plat_t* plat)
             /* Hexen plats live in their own layer (EV_DoHexenPlat /
              * Hexen_EV_StopPlat, which removes rather than stasises), so
              * this shared stasis path is never reached on hexen maps. */
-            S_StartSound((mobj_t *)&plat->sector->soundorg,sfx_pstart);
+            S_StartSound((mobj_t *)&plat->sector->soundorg,g_sfx_pstart);
          }
          break; //jff 1/27/98 don't pickup code added later to in_stasis
 
@@ -316,7 +316,7 @@ int EV_DoPlat
            //jff 3/14/98 clear old field as well
            sec->oldspecial = 0;
 
-           S_StartSound((mobj_t *)&sec->soundorg,sfx_stnmov);
+           S_StartSound((mobj_t *)&sec->soundorg,g_sfx_stnmov_plats);
            break;
 
         case raiseAndChange:
@@ -326,7 +326,7 @@ int EV_DoPlat
            plat->wait    = 0;
            plat->status  = PLAT_UP;
 
-           S_StartSound((mobj_t *)&sec->soundorg,sfx_stnmov);
+           S_StartSound((mobj_t *)&sec->soundorg,g_sfx_stnmov_plats);
            break;
 
         case downWaitUpStay:
@@ -339,7 +339,7 @@ int EV_DoPlat
            plat->high   = sec->floorheight;
            plat->wait   = 35*PLATWAIT;
            plat->status = PLAT_DOWN;
-           S_StartSound((mobj_t *)&sec->soundorg,sfx_pstart);
+           S_StartSound((mobj_t *)&sec->soundorg,g_sfx_pstart);
            break;
 
         case blazeDWUS:
@@ -352,7 +352,7 @@ int EV_DoPlat
            plat->high   = sec->floorheight;
            plat->wait   = 35*PLATWAIT;
            plat->status = PLAT_DOWN;
-           S_StartSound((mobj_t *)&sec->soundorg,sfx_pstart);
+           S_StartSound((mobj_t *)&sec->soundorg,g_sfx_pstart);
            break;
 
         case perpetualRaise:
@@ -370,7 +370,7 @@ int EV_DoPlat
            plat->wait = 35*PLATWAIT;
            plat->status = P_Random(pr_plats)&1;
 
-           S_StartSound((mobj_t *)&sec->soundorg,sfx_pstart);
+           S_StartSound((mobj_t *)&sec->soundorg,g_sfx_pstart);
            break;
 
         case toggleUpDn: //jff 3/14/98 add new type to support instant toggle

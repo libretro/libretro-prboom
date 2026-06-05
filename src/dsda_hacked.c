@@ -332,6 +332,15 @@ void dsda_InitTables(void)
     g_mt_teleportman = HEXEN_MT_TELEPORTMAN;
     g_telefog_height = TELEFOGHEIGHT;
     g_sfx_telept = hexen_sfx_teleport;
+    g_sfx_doropn = hexen_sfx_door_open;
+    g_sfx_dorcls = hexen_sfx_door_light_close;
+    g_sfx_stnmov = hexen_sfx_door_light_close;
+    g_sfx_stnmov_plats = hexen_sfx_door_light_close;
+    g_sfx_pstart = hexen_sfx_platform_start;
+    g_sfx_pstop = hexen_sfx_platform_stop;
+    g_sfx_swtchn = hexen_sfx_fighter_hammer_hitwall;
+    g_sfx_oof = hexen_sfx_player_fighter_grunt;
+    g_sfx_respawn = hexen_sfx_respawn;
     g_menu_flat = "F_032";
 
     num_states     = HEXEN_NUMSTATES;
@@ -394,6 +403,15 @@ void dsda_InitTables(void)
     g_mt_teleportman = HERETIC_MT_TELEPORTMAN;
     g_telefog_height = TELEFOGHEIGHT;
     g_sfx_telept = heretic_sfx_telept;
+    g_sfx_doropn = heretic_sfx_doropn;
+    g_sfx_dorcls = heretic_sfx_doropn;   /* vanilla closes with the open sound */
+    g_sfx_stnmov = heretic_sfx_dormov;
+    g_sfx_stnmov_plats = heretic_sfx_stnmov;
+    g_sfx_pstart = heretic_sfx_pstart;
+    g_sfx_pstop = heretic_sfx_pstop;
+    g_sfx_swtchn = heretic_sfx_switch;
+    g_sfx_oof = heretic_sfx_plroof;
+    g_sfx_respawn = heretic_sfx_respawn;
     g_menu_flat = "FLAT513";
 
     num_states     = HERETIC_NUMSTATES;
@@ -447,6 +465,15 @@ void dsda_InitTables(void)
   g_mt_teleportman = MT_TELEPORTMAN;
   g_telefog_height = 0;
   g_sfx_telept = sfx_telept;
+  g_sfx_doropn = sfx_doropn;
+  g_sfx_dorcls = sfx_dorcls;
+  g_sfx_stnmov = sfx_stnmov;
+  g_sfx_stnmov_plats = sfx_stnmov;
+  g_sfx_pstart = sfx_pstart;
+  g_sfx_pstop = sfx_pstop;
+  g_sfx_swtchn = sfx_swtchn;
+  g_sfx_oof = sfx_oof;
+  g_sfx_respawn = sfx_itmbk;
   g_menu_flat = "FLOOR4_6";
 
   num_states     = NUMSTATES;

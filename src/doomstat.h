@@ -75,6 +75,15 @@ extern mobjtype_t g_mt_tfog;      /* teleport-fog mobjtype; set per-game */
 extern mobjtype_t g_mt_teleportman; /* teleport-dest mobjtype; set per-game */
 extern int g_telefog_height;      /* teleport-fog spawn height; set per-game */
 extern int g_sfx_telept;          /* teleport sound; set per-game */
+extern int g_sfx_doropn;
+extern int g_sfx_dorcls;
+extern int g_sfx_stnmov;
+extern int g_sfx_stnmov_plats;
+extern int g_sfx_pstart;
+extern int g_sfx_pstop;
+extern int g_sfx_swtchn;
+extern int g_sfx_oof;
+extern int g_sfx_respawn;
 extern const char *g_menu_flat;
 
 // Set if homebrew PWAD stuff has been added.

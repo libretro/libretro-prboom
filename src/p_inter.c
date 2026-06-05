@@ -249,7 +249,7 @@ static dbool   P_GiveWeapon(player_t *player, weapontype_t weapon, dbool   dropp
        * where only consoleplayer's pickup sounds are heard */
       // displayplayer, not consoleplayer, for viewing multiplayer demos
       if (!comp[comp_sound] || player == &players[displayplayer])
-        S_StartSound (player->mo, sfx_wpnup|PICKUP_SOUND); // killough 4/25/98
+        S_StartSound (player->mo, (heretic ? heretic_sfx_wpnup : sfx_wpnup)|PICKUP_SOUND); // killough 4/25/98
       return FALSE;
     }
 

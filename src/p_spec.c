@@ -952,7 +952,7 @@ dbool P_CanUnlockGenDoor
       )
       {
         player->message = s_PD_ANY; // Ty 03/27/98 - externalized
-        S_StartSound(player->mo,sfx_oof);             // killough 3/20/98
+        S_StartSound(player->mo,g_sfx_oof);           // killough 3/20/98
         return FALSE;
       }
       break;
@@ -964,7 +964,7 @@ dbool P_CanUnlockGenDoor
       )
       {
         player->message = skulliscard? s_PD_REDK : s_PD_REDC; // Ty 03/27/98 - externalized
-        S_StartSound(player->mo,sfx_oof);             // killough 3/20/98
+        S_StartSound(player->mo,g_sfx_oof);           // killough 3/20/98
         return FALSE;
       }
       break;
@@ -976,7 +976,7 @@ dbool P_CanUnlockGenDoor
       )
       {
         player->message = skulliscard? s_PD_BLUEK : s_PD_BLUEC; // Ty 03/27/98 - externalized
-        S_StartSound(player->mo,sfx_oof);             // killough 3/20/98
+        S_StartSound(player->mo,g_sfx_oof);           // killough 3/20/98
         return FALSE;
       }
       break;
@@ -988,7 +988,7 @@ dbool P_CanUnlockGenDoor
       )
       {
         player->message = skulliscard? s_PD_YELLOWK : s_PD_YELLOWC; // Ty 03/27/98 - externalized
-        S_StartSound(player->mo,sfx_oof);             // killough 3/20/98
+        S_StartSound(player->mo,g_sfx_oof);           // killough 3/20/98
         return FALSE;
       }
       break;
@@ -1000,7 +1000,7 @@ dbool P_CanUnlockGenDoor
       )
       {
         player->message = skulliscard? s_PD_REDK : s_PD_REDS; // Ty 03/27/98 - externalized
-        S_StartSound(player->mo,sfx_oof);             // killough 3/20/98
+        S_StartSound(player->mo,g_sfx_oof);           // killough 3/20/98
         return FALSE;
       }
       break;
@@ -1012,7 +1012,7 @@ dbool P_CanUnlockGenDoor
       )
       {
         player->message = skulliscard? s_PD_BLUEK : s_PD_BLUES; // Ty 03/27/98 - externalized
-        S_StartSound(player->mo,sfx_oof);             // killough 3/20/98
+        S_StartSound(player->mo,g_sfx_oof);           // killough 3/20/98
         return FALSE;
       }
       break;
@@ -1024,7 +1024,7 @@ dbool P_CanUnlockGenDoor
       )
       {
         player->message = skulliscard? s_PD_YELLOWK : s_PD_YELLOWS; // Ty 03/27/98 - externalized
-        S_StartSound(player->mo,sfx_oof);             // killough 3/20/98
+        S_StartSound(player->mo,g_sfx_oof);           // killough 3/20/98
         return FALSE;
       }
       break;
@@ -1043,7 +1043,7 @@ dbool P_CanUnlockGenDoor
       )
       {
         player->message = s_PD_ALL6; // Ty 03/27/98 - externalized
-        S_StartSound(player->mo,sfx_oof);             // killough 3/20/98
+        S_StartSound(player->mo,g_sfx_oof);           // killough 3/20/98
         return FALSE;
       }
       if
@@ -1060,7 +1060,7 @@ dbool P_CanUnlockGenDoor
       )
       {
         player->message = s_PD_ALL3; // Ty 03/27/98 - externalized
-        S_StartSound(player->mo,sfx_oof);             // killough 3/20/98
+        S_StartSound(player->mo,g_sfx_oof);           // killough 3/20/98
         return FALSE;
       }
       break;
@@ -2801,7 +2801,7 @@ void P_UpdateSpecials (void)
             /* since the buttonlist array is usually zeroed out,
              * button popouts generally appear to come from (0,0) */
             so = (mobj_t *)&buttonlist[i].soundorg;
-          S_StartSound(so, sfx_swtchn);
+          S_StartSound(so, g_sfx_swtchn);
         }
         memset(&buttonlist[i],0,sizeof(button_t));
       }

@@ -269,7 +269,7 @@ void P_ChangeSwitchTexture
    int16_t *ttop     = &sides[line->sidenum[0]].toptexture;
    int16_t *tmid     = &sides[line->sidenum[0]].midtexture;
    int16_t *tbot     = &sides[line->sidenum[0]].bottomtexture;
-   int sound         = sfx_swtchn;
+   int sound         = g_sfx_swtchn;
 
    /* use the sound origin of the linedef (its midpoint)
     * unless in a compatibility mode */

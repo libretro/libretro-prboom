@@ -2036,6 +2036,17 @@ void P_SpawnMapThing (const mapthing_t* mthing)
     return;
   }
 
+  /* Heretic: boss-spot markers (editor number 56) are D'Sparil teleport
+   * destinations, not spawnable things. */
+  if (heretic && thingtype == 56)
+  {
+    void P_AddBossSpot(fixed_t bx, fixed_t by, angle_t bangle);  /* heretic/p_action.c */
+
+    P_AddBossSpot(mthing->x << FRACBITS, mthing->y << FRACBITS,
+                  ANG45 * (mthing->angle / 45));
+    return;
+  }
+
   // count deathmatch start positions
 
   // doom2.exe has at most 10 deathmatch starts

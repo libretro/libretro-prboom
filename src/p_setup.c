@@ -2690,7 +2690,13 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       P_InitAmbientSound();
 
    if (heretic)
+   {
       P_OpenWeapons();          /* reset firemace spot collection */
+      {
+         void P_InitMonsters(void);  /* heretic/p_action.c */
+         P_InitMonsters();           /* reset D'Sparil boss-spot collection */
+      }
+   }
 
    if (udmf_level)
       P_LoadUDMFThings();

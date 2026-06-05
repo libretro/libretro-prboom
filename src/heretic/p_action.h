@@ -28,6 +28,10 @@ void A_ChicPain(mobj_t *actor);
 void A_ClinkAttack(mobj_t *actor);
 void A_ContMobjSound(mobj_t *actor);
 void A_DeathBallImpact(mobj_t *actor);
+/* D'Sparil boss-spot system (spots collected by P_SpawnMapThing) */
+void P_InitMonsters(void);
+void P_AddBossSpot(fixed_t x, fixed_t y, angle_t angle);
+
 void A_DripBlood(mobj_t *actor);
 void A_ESound(mobj_t *actor);
 void A_Feathers(mobj_t *actor);

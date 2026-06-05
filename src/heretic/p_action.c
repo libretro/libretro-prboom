@@ -87,8 +87,34 @@ extern mobj_t **bodyque;
 #define MAX_GEN_PODS 16
 #define BF_DAMAGESOURCE 0x01
 
-/* Boss-spot list is not present in this core; no spots => count 0. */
-#define BossSpotCount 0
+/* D'Sparil teleport destinations: boss-spot map things (editor number 56)
+ * collected by P_SpawnMapThing between P_InitMonsters and level start. */
+#define MAX_BOSS_SPOTS 8
+
+typedef struct
+{
+    fixed_t x;
+    fixed_t y;
+    angle_t angle;
+} BossSpot_t;
+
+static int BossSpotCount;
+static BossSpot_t BossSpots[MAX_BOSS_SPOTS];
+
+void P_InitMonsters(void)
+{
+    BossSpotCount = 0;
+}
+
+void P_AddBossSpot(fixed_t x, fixed_t y, angle_t angle)
+{
+    if (BossSpotCount == MAX_BOSS_SPOTS)
+        return;                 /* vanilla I_Errors; just ignore extras */
+    BossSpots[BossSpotCount].x = x;
+    BossSpots[BossSpotCount].y = y;
+    BossSpots[BossSpotCount].angle = angle;
+    BossSpotCount++;
+}
 
 /* This core is Heretic-only; the Hexen branches in the ported codepointers
  * are dead.  Define 'hexen' as 0 so they fold out, and alias the Hexen-only
@@ -181,9 +207,39 @@ void P_Massacre(void)
 
 void P_DSparilTeleport(mobj_t *actor)
 {
-  /* The boss-spot list is not present in this core yet; without spots the
-   * teleport is a no-op (matches dsda's "no spots" early return). */
-  (void)actor;
+    int i;
+    fixed_t x;
+    fixed_t y;
+    fixed_t prevX;
+    fixed_t prevY;
+    fixed_t prevZ;
+    mobj_t *mo;
+
+    if (!BossSpotCount)
+    {                           // No spots
+        return;
+    }
+    i = P_Random(pr_heretic);
+    do
+    {
+        i++;
+        x = BossSpots[i % BossSpotCount].x;
+        y = BossSpots[i % BossSpotCount].y;
+    }
+    while (P_AproxDistance(actor->x - x, actor->y - y) < 128 * FRACUNIT);
+    prevX = actor->x;
+    prevY = actor->y;
+    prevZ = actor->z;
+    if (P_TeleportMove(actor, x, y, false))
+    {
+        mo = P_SpawnMobj(prevX, prevY, prevZ, HERETIC_MT_SOR2TELEFADE);
+        S_StartSound(mo, heretic_sfx_telept);
+        P_SetMobjState(actor, HERETIC_S_SOR2_TELE1);
+        S_StartSound(actor, heretic_sfx_telept);
+        actor->z = actor->floorz;
+        actor->angle = BossSpots[i % BossSpotCount].angle;
+        actor->momx = actor->momy = actor->momz = 0;
+    }
 }
 
 dbool P_UpdateChicken(mobj_t *actor, int tics)

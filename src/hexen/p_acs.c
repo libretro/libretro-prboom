@@ -201,10 +201,14 @@ dbool P_StartACS(int number, int map, byte *args, mobj_t *activator,
   aste_t *statePtr;
 
   NewScript = NULL;
-  /* ACS map numbers are MAPINFO warp numbers, so the current map must be
-   * compared in warp space (they differ from lump numbers in PWADs like
-   * Deathkings). */
-  if (map && map != P_GetMapWarpTrans(gamemap))
+  /* ACS map arguments are map (lump) numbers, compared against gamemap
+   * directly -- vanilla and dsda-doom both do this, including for
+   * Deathkings.  Comparing in warp space deferred retail scripts whose
+   * map's warptrans differs from its number: MAP40's Korax fight
+   * self-references "map 40" but has warptrans 31, so its phase-two
+   * script was stored for a map that never loads and Korax stayed
+   * dormant forever. */
+  if (map && map != gamemap)
     return AddToACSStore(map, number, args);
 
   infoIndex = GetACSIndex(number);
@@ -310,7 +314,7 @@ void P_CheckACSStore(void)
 
   for (store = ACSStore; store->map != 0; store++)
   {
-    if (store->map == P_GetMapWarpTrans(gamemap))
+    if (store->map == gamemap)
     {
       P_StartACS(store->script, 0, store->args, NULL, NULL, 0);
       store->map = -1;

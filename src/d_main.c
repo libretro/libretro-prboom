@@ -537,7 +537,9 @@ static void D_DrawTitle1(const char *name)
 
 static void D_DrawTitle2(const char *name)
 {
-  if (!heretic)
+  if (raven)
+    S_StartMusic(mus_intro);    /* raven title theme (per-game remap) */
+  else
     S_StartMusic(mus_dm2ttl);
   D_SetPageName(name);
 }
@@ -628,16 +630,15 @@ void D_DoAdvanceDemo(void)
   pagetic = TICRATE * 11;         /* killough 11/98: default behavior */
   gamestate = GS_DEMOSCREEN;
 
-  /* The Raven attract-mode demos are recorded in game-specific demo
-   * formats that this engine's Doom demo reader (G_ReadDemoHeader) cannot
-   * parse: Heretic's hangs the attract loop, and Hexen's misreads as
-   * garbage input -- including stray pause presses, which then crash the
-   * pause overlay.  Until Raven demo playback is wired up, keep showing
-   * the title page instead of advancing into a demo.  The page-cycling
+  /* Heretic's attract-mode demos are recorded in a Heretic-specific demo
+   * format that this engine's demo reader cannot parse yet, which hangs
+   * the attract loop; keep showing the title page instead.  (Hexen's
+   * versionless demo format is handled by G_ReadDemoHeader, so hexen
+   * advances into its attract demos normally.)  The page-cycling
    * D_DrawTitle* path (which would normally start the title music) is
    * skipped here, so start it explicitly; S_StartMusic is a no-op once
    * the title song is already playing. */
-  if (raven)
+  if (heretic)
   {
     pagetic = TICRATE * 11;
     pagename = "TITLE";

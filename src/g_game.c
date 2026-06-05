@@ -2786,7 +2786,8 @@ void G_ReadDemoTiccmd (ticcmd_t* cmd)
 
   if (*demo_p == DEMOMARKER)
     G_CheckDemoStatus();      // end of demo data stream
-  else if (demoplayback && demo_p + (longtics?5:4) > demobuffer + demolength)
+  else if (demoplayback &&
+           demo_p + (longtics?5:4) + (raven?2:0) > demobuffer + demolength)
   {
     lprintf(LO_WARN, "G_ReadDemoTiccmd: missing DEMOMARKER\n");
     G_CheckDemoStatus();
@@ -2802,10 +2803,20 @@ void G_ReadDemoTiccmd (ticcmd_t* cmd)
       cmd->angleturn = (((signed int)(*demo_p++))<<8) + lowbyte;
     }
     cmd->buttons = (unsigned char)*demo_p++;
-    /* arti/lookfly are not part of the Doom demo format; clear them so a
-     * stale ring-buffer value can't leak into playback. */
-    cmd->arti    = 0;
-    cmd->lookfly = 0;
+    if (raven)
+    {
+      /* Raven demo tics carry two extra bytes: look/fly and the artifact
+       * used this tic. */
+      cmd->lookfly = (unsigned char)*demo_p++;
+      cmd->arti    = (unsigned char)*demo_p++;
+    }
+    else
+    {
+      /* arti/lookfly are not part of the Doom demo format; clear them so a
+       * stale ring-buffer value can't leak into playback. */
+      cmd->arti    = 0;
+      cmd->lookfly = 0;
+    }
     // e6y: ability to play tasdoom demos directly
     if (compatibility_level == tasdoom_compatibility)
     {
@@ -3050,6 +3061,64 @@ static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, dbool
    // killough 2/22/98, 2/28/98: autodetect old demos and act accordingly.
    // Old demos turn on demo_compatibility => compatibility; new demos load
    // compatibility flag, and other flags as well, as a part of the demo.
+
+   /* Vanilla Hexen demos are versionless: skill, episode, map, then for
+    * each of MAXPLAYERS a presence byte and a class byte.  The vvHeretic
+    * extension bits some tools put on the first presence byte (0x20
+    * -respawn, 0x10 -longtics, 0x02 -nomonsters) are honoured; retail
+    * lumps carry a plain 1 there. */
+   if (hexen)
+   {
+#define HEXEN_DEMO_MAXPLAYERS 8
+      int i;
+      int skill, episode, map;
+
+      if (CheckForOverrun(header_p, demo_p, size, 3 + 2 * HEXEN_DEMO_MAXPLAYERS,
+                          failonerror))
+         return NULL;
+
+      skill   = *demo_p++;
+      episode = *demo_p++;
+      map     = *demo_p++;
+
+      longtics = 0;
+      deathmatch = FALSE;
+      consoleplayer = 0;
+      respawnparm = fastparm = nomonsters = FALSE;
+      if (*demo_p & 0x20)
+         respawnparm = TRUE;
+      if (*demo_p & 0x10)
+         longtics = 1;
+      if (*demo_p & 0x02)
+         nomonsters = TRUE;
+
+      for (i = 0; i < HEXEN_DEMO_MAXPLAYERS; i++)
+      {
+         /* the on-disk header always carries vanilla hexen's 8 player
+          * slots, regardless of this engine's MAXPLAYERS */
+         if (i < MAXPLAYERS)
+         {
+            playeringame[i] = (*demo_p++) != 0;
+            PlayerClass[i]  = *demo_p++ + 1;
+         }
+         else
+            demo_p += 2;
+      }
+
+      if (playeringame[1])
+      {
+         netgame = TRUE;
+         netdemo = TRUE;
+      }
+
+      if (gameaction != ga_loadgame)
+         G_InitNew(skill, episode, map);
+
+      for (i = 0; i < MAXPLAYERS; i++)
+         players[i].cheats = 0;
+
+      return demo_p;
+   }
 
    //e6y: check for overrun
    if (CheckForOverrun(header_p, demo_p, size, 1, failonerror))

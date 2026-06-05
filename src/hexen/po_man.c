@@ -1008,6 +1008,7 @@ dbool EV_RotatePoly(line_t *line, byte *args, int direction, dbool overRide)
     I_Error("EV_RotatePoly:  Invalid polyobj num: %d\n", polyNum);
   }
   pe = Z_Malloc(sizeof(polyevent_t), PU_LEVEL, 0);
+    memset(pe, 0, sizeof(*pe));  /* P_AddThinker reads thinker fields */
   P_AddThinker(&pe->thinker);
   pe->thinker.function.arg1 = (void (*)(void *))T_RotatePoly;
   pe->polyobj = polyNum;
@@ -1038,6 +1039,7 @@ dbool EV_RotatePoly(line_t *line, byte *args, int direction, dbool overRide)
       break;
     }
     pe = Z_Malloc(sizeof(polyevent_t), PU_LEVEL, 0);
+    memset(pe, 0, sizeof(*pe));  /* P_AddThinker reads thinker fields */
     P_AddThinker(&pe->thinker);
     pe->thinker.function.arg1 = (void (*)(void *))T_RotatePoly;
     poly->specialdata = pe;
@@ -1102,6 +1104,7 @@ static void EV_SpawnMovePolyEvent(int polyNum, polyobj_t *poly, fixed_t speed,
   polyevent_t *pe;
 
   pe = Z_Malloc(sizeof(polyevent_t), PU_LEVEL, 0);
+    memset(pe, 0, sizeof(*pe));  /* P_AddThinker reads thinker fields */
   P_AddThinker(&pe->thinker);
   pe->thinker.function.arg1 = (void (*)(void *))T_MovePoly;
   pe->polyobj = polyNum;
@@ -1121,6 +1124,7 @@ static void EV_SpawnMovePolyEvent(int polyNum, polyobj_t *poly, fixed_t speed,
       break;
     }
     pe = Z_Malloc(sizeof(polyevent_t), PU_LEVEL, 0);
+    memset(pe, 0, sizeof(*pe));  /* P_AddThinker reads thinker fields */
     P_AddThinker(&pe->thinker);
     pe->thinker.function.arg1 = (void (*)(void *))T_MovePoly;
     pe->polyobj = mirror;
@@ -1318,6 +1322,7 @@ dbool EV_OpenPolyDoor(line_t *line, byte *args, podoortype_t type)
     I_Error("EV_OpenPolyDoor:  Invalid polyobj num: %d\n", polyNum);
   }
   pd = Z_Malloc(sizeof(polydoor_t), PU_LEVEL, 0);
+    memset(pd, 0, sizeof(*pd));  /* P_AddThinker reads thinker fields */
   memset(pd, 0, sizeof(polydoor_t));
   P_AddThinker(&pd->thinker);
   pd->thinker.function.arg1 = (void (*)(void *))T_PolyDoor;
@@ -1355,6 +1360,7 @@ dbool EV_OpenPolyDoor(line_t *line, byte *args, podoortype_t type)
       break;
     }
     pd = Z_Malloc(sizeof(polydoor_t), PU_LEVEL, 0);
+    memset(pd, 0, sizeof(*pd));  /* P_AddThinker reads thinker fields */
     memset(pd, 0, sizeof(polydoor_t));
     P_AddThinker(&pd->thinker);
     pd->thinker.function.arg1 = (void (*)(void *))T_PolyDoor;

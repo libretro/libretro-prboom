@@ -40,6 +40,7 @@
 #include "r_plane.h"
 #include "r_things.h"
 #include "r_draw.h"
+#include "r_drawcmd.h"
 #include "w_wad.h"
 #include "v_video.h"
 #include "lprintf.h"
@@ -502,7 +503,7 @@ static void R_RenderSegLoop (void)
             dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
          }
          dcvars.texheight = midtexheight;
-         colfunc (&dcvars);
+         R_DrawCmdEmitColumn(&dcvars, colfunc);
          tex_patch = NULL;
          cc_rwx = viewheight;
          fc_rwx = -1;
@@ -533,7 +534,7 @@ static void R_RenderSegLoop (void)
                   dcvars.nextsource = R_GetTextureColumn(tex_patch,texturecolumn+1);
                }
                dcvars.texheight = toptexheight;
-               colfunc (&dcvars);
+               R_DrawCmdEmitColumn(&dcvars, colfunc);
                tex_patch = NULL;
                cc_rwx = mid;
             }
@@ -569,7 +570,7 @@ static void R_RenderSegLoop (void)
                   dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
                }
                dcvars.texheight = bottomtexheight;
-               colfunc (&dcvars);
+               R_DrawCmdEmitColumn(&dcvars, colfunc);
                tex_patch = NULL;
                fc_rwx = mid;
             }
@@ -604,9 +605,11 @@ static void R_RenderSegLoop (void)
    }
 
    /* release the per-tier composite patches locked once before the loop */
-   if (midpatch) R_UnlockTextureCompositePatchNum(midtexture);
-   if (toppatch) R_UnlockTextureCompositePatchNum(toptexture);
-   if (botpatch) R_UnlockTextureCompositePatchNum(bottomtexture);
+   /* The emitted records still point into these composites; hand the
+    * locks to the command buffer, which unlocks them after replay. */
+   if (midpatch) R_DrawCmdAdoptTextureLock(midtexture);
+   if (toppatch) R_DrawCmdAdoptTextureLock(toptexture);
+   if (botpatch) R_DrawCmdAdoptTextureLock(bottomtexture);
 }
 
 // killough 5/2/98: move from r_main.c, made static, simplified

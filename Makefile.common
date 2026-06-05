@@ -107,6 +107,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/r_draw.c \
 				 $(CORE_DIR)/r_main.c \
 				 $(CORE_DIR)/r_plane.c \
+				 $(CORE_DIR)/r_drawcmd.c \
 				 $(CORE_DIR)/r_segs.c \
 				 $(CORE_DIR)/r_sky.c \
 				 $(CORE_DIR)/r_things.c \

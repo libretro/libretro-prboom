@@ -39,6 +39,7 @@
 #include "d_net.h"
 #include "w_wad.h"
 #include "r_main.h"
+#include "r_drawcmd.h"
 #include "r_data.h"
 #include "r_state.h"
 #include "r_things.h"
@@ -852,6 +853,9 @@ void R_RenderPlayerView (player_t* player)
 
   // The head node is the last node output.
   R_RenderBSPNode (numnodes-1);
+
+  /* Rasterize the wall columns the walk recorded (see r_drawcmd.h). */
+  R_DrawCmdReplay();
   R_ResetColumnBuffer();
 
 #ifdef PRBOOM_RENDER_PROFILE

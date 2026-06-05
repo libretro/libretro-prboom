@@ -456,13 +456,18 @@ static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
         sep = NORM_SEP;
 
   /* hacks to vary the sfx pitches */
-  if (heretic)
+  if (raven)
   {
-    /* Heretic applies a small symmetric pitch jitter to every sound
-     * (NORM_PITCH +/- up to 7), consuming two RNG values. The Doom
-     * saw-pitch range check below is meaningless for Heretic's sfx ids
+    /* Heretic applies a small symmetric pitch jitter to every sound;
+     * Hexen only to sounds whose table entry asks for it (the pitch
+     * field carries vanilla's changePitch).  Both consume two RNG
+     * values per jittered sound (NORM_PITCH +/- up to 7).  The Doom
+     * saw-pitch range check below is meaningless for raven sfx ids
      * and would consume the RNG on a different schedule. */
-    pitch = NORM_PITCH + (M_Random() & 7) - (M_Random() & 7);
+    if (heretic || sfx->pitch > 0)
+      pitch = NORM_PITCH + (M_Random() & 7) - (M_Random() & 7);
+    else
+      pitch = NORM_PITCH;
   }
   else if (sfx_id >= sfx_sawup && sfx_id <= sfx_sawhit)
     pitch += 8 - (M_Random()&15);

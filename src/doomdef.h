@@ -226,6 +226,13 @@ typedef enum {
   WP_NOCHANGE              // No pending weapon change.
 } weapontype_t;
 
+/* Heretic's chicken-morph beak occupies the heretic_weaponinfo row that
+ * doom uses for the super shotgun (index 8); it is never weaponowned, so
+ * weapon cycling cannot reach it.  Vanilla heretic instead places wp_beak
+ * past NUMWEAPONS with oversized tables. */
+#define HERETIC_WP_BEAK      WP_SUPERSHOTGUN
+#define MAXCHICKENHEALTH     30
+
 /* Hexen player classes.  Numbering matches the original Hexen / dsda-doom
  * pclass_t so the (currently dormant) Hexen player and weapon code resolves
  * against it.  Inert for Doom/Heretic, which leave player->class at

@@ -621,8 +621,8 @@ dbool   P_UndoPlayerMorph(player_t *player)
    angle_t angle;
    int playerNum;
    weapontype_t weapon;
-   int oldFlags;
-   int oldFlags2;
+   uint64_t oldFlags;
+   uint64_t oldFlags2;
    int oldBeast;
 
    pmo = player->mo;
@@ -701,6 +701,105 @@ dbool   P_UndoPlayerMorph(player_t *player)
    P_PostMorphWeapon(player, weapon);
    return(true);
 }
+
+/* Heretic player chicken morph: revert to human form.  Mirrors the hexen
+ * pig revert above; the pre-morph weapon rides in the chicken mobj's
+ * special1.  Returns FALSE when the human form doesn't fit, leaving the
+ * player a chicken for another couple of seconds. */
+static dbool P_UndoPlayerChicken(player_t *player)
+{
+   mobj_t *fog;
+   mobj_t *mo;
+   mobj_t *pmo;
+   fixed_t x;
+   fixed_t y;
+   fixed_t z;
+   angle_t angle;
+   int playerNum;
+   weapontype_t weapon;
+   uint64_t oldFlags;
+   uint64_t oldFlags2;
+
+   pmo = player->mo;
+   x = pmo->x;
+   y = pmo->y;
+   z = pmo->z;
+   angle = pmo->angle;
+   weapon = pmo->special1.i;
+   oldFlags = pmo->flags;
+   oldFlags2 = pmo->flags2;
+   P_SetMobjState(pmo, HERETIC_S_FREETARGMOBJ);
+   mo = P_SpawnMobj(x, y, z, g_mt_player);
+   if (P_TestMobjLocation(mo) == false)
+   { // Didn't fit
+      P_RemoveMobj(mo);
+      mo = P_SpawnMobj(x, y, z, HERETIC_MT_CHICPLAYER);
+      mo->angle = angle;
+      mo->health = player->health;
+      mo->special1.i = weapon;
+      mo->player = player;
+      mo->flags = oldFlags;
+      mo->flags2 = oldFlags2;
+      player->mo = mo;
+      player->chickenTics = 2*35;
+      return FALSE;
+   }
+   playerNum = P_GetPlayerNum(player);
+   if (playerNum != 0)
+   { // Set color translation
+      mo->flags |= playerNum<<MF_TRANSSHIFT;
+   }
+   mo->angle = angle;
+   mo->player = player;
+   mo->reactiontime = 18;
+   if (oldFlags2 & MF2_FLY)
+   {
+      mo->flags2 |= MF2_FLY;
+      mo->flags |= MF_NOGRAVITY;
+   }
+   player->chickenTics = 0;
+   player->powers[pw_weaponlevel2] = 0;
+   player->health = mo->health = MAXHEALTH;
+   player->mo = mo;
+   angle >>= ANGLETOFINESHIFT;
+   fog = P_SpawnMobj(x+20*finecosine[angle],
+         y+20*finesine[angle], z+TELEFOGHEIGHT, HERETIC_MT_TFOG);
+   S_StartSound(fog, heretic_sfx_telept);
+   P_PostChickenWeapon(player, weapon);
+   return TRUE;
+}
+
+/* Per-tic chicken behavior: beak bob, view twitch, hops and clucks. */
+static void P_ChickenPlayerThink(player_t *player)
+{
+   int P_SubRandom(void);       /* heretic/p_action.c */
+   mobj_t *pmo;
+
+   if (player->health > 0)
+   { // Handle beak movement
+      P_UpdateBeak(player, &player->psprites[ps_weapon]);
+   }
+   if (player->chickenTics & 15)
+   {
+      return;
+   }
+   pmo = player->mo;
+   if (!(pmo->momx + pmo->momy) && P_Random(pr_heretic) < 160)
+   { // Twitch view angle
+      pmo->angle += P_SubRandom() << 19;
+   }
+   if ((pmo->z <= pmo->floorz) && (P_Random(pr_heretic) < 32))
+   { // Jump and noise
+      pmo->momz += FRACUNIT;
+      P_SetMobjState(pmo, HERETIC_S_CHICPLAY_PAIN);
+      return;
+   }
+   if (P_Random(pr_heretic) < 48)
+   { // Just noise
+      S_StartSound(pmo, heretic_sfx_chicact);
+   }
+}
+
 
 /*
 =================
@@ -1289,11 +1388,16 @@ dbool P_UseArtifact(player_t *player, int arti)
       break;
     case arti_tomeofpower:
       if (player->chickenTics)
-      {                         /* would undo a chicken morph; the morph
-                                 * system is not active for Heretic yet, so
-                                 * just clear the timer for now. */
-        player->chickenTics = 0;
-        S_StartSound(player->mo, heretic_sfx_wpnup);
+      {                         /* attempt to undo chicken */
+        if (P_UndoPlayerChicken(player) == false)
+        {                       /* failed */
+          P_DamageMobj(player->mo, NULL, NULL, 10000);
+        }
+        else
+        {                       /* succeeded */
+          player->chickenTics = 0;
+          S_StartSound(player->mo, heretic_sfx_wpnup);
+        }
       }
       else
       {
@@ -1414,6 +1518,11 @@ void P_PlayerThink (player_t* player)
       return;
    }
 
+   if (player->chickenTics)
+   {
+      P_ChickenPlayerThink(player);
+   }
+
 
    /* Hexen: pig snuffling and snorting. */
    if (player->morphTics)
@@ -1501,7 +1610,7 @@ void P_PlayerThink (player_t* player)
       cmd->buttons = 0;
 
    /* Hexen: a morphed (pig) player cannot change weapons. */
-   if(cmd->buttons&BT_CHANGE && !player->morphTics)
+   if(cmd->buttons&BT_CHANGE && !player->morphTics && !player->chickenTics)
    {
       // The actual changing of the weapon is done when the weapon
       // psprite can do it (A_WeaponReady), so it doesn't happen in
@@ -1557,6 +1666,19 @@ void P_PlayerThink (player_t* player)
    }
    else
       player->usedown = FALSE;
+
+   // Chicken counter
+   if(player->chickenTics)
+   {
+      if(player->chickenPeck)
+      { // Chicken attack counter
+         player->chickenPeck -= 3;
+      }
+      if(!--player->chickenTics)
+      { // Attempt to undo the chicken
+         P_UndoPlayerChicken(player);
+      }
+   }
 
    // Morph counter
    if(player->morphTics)

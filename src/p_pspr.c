@@ -504,6 +504,12 @@ void P_DropWeapon(player_t *player)
 
 void A_WeaponReady(player_t *player, pspdef_t *psp)
 {
+   if (player->chickenTics)
+   {                            /* change to the chicken beak */
+      P_ActivateBeak(player);
+      return;
+   }
+
    /* get out of attack state */
    if (hexen)
    {
@@ -2629,6 +2635,39 @@ static fixed_t p_pspr_PlayerSlope(player_t *player) { return (player->lookdir <<
 #define USE_MACE_AMMO_2 5
 
 
+
+/* Heretic player chicken morph: while morphed the player's only weapon is
+ * the beak, which lives in the heretic weapon table's spare row (see
+ * HERETIC_WP_BEAK).  It is raised instantly and never owned. */
+
+void P_ActivateBeak(player_t *player)
+{
+    player->pendingweapon = WP_NOCHANGE;
+    player->readyweapon = HERETIC_WP_BEAK;
+    player->psprites[ps_weapon].sy = WEAPONTOP;
+    P_SetPsprite(player, ps_weapon, HERETIC_S_BEAKREADY);
+}
+
+/* Restore the pre-morph weapon when the chicken reverts. */
+
+void P_PostChickenWeapon(player_t *player, weapontype_t weapon)
+{
+    if (weapon == HERETIC_WP_BEAK)
+    {                           /* should never happen */
+        weapon = WP_FIST;       /* heretic staff row */
+    }
+    player->pendingweapon = WP_NOCHANGE;
+    player->readyweapon = weapon;
+    player->psprites[ps_weapon].sy = WEAPONBOTTOM;
+    P_SetPsprite(player, ps_weapon, weaponinfo[weapon].upstate);
+}
+
+/* Bob the beak up with each peck. */
+
+void P_UpdateBeak(player_t *player, pspdef_t *psp)
+{
+    psp->sy = WEAPONTOP + (player->chickenPeck << (FRACBITS - 1));
+}
 
 void A_BeakAttackPL1(player_t * player, pspdef_t * psp)
 {

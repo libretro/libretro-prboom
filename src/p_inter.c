@@ -43,6 +43,7 @@
 #include "lprintf.h"
 
 #include "p_inter.h"
+#include "p_pspr.h"
 #include "hexen/p_acs.h"
 #include "hexen/p_spec_hexen.h"
 #include "p_enemy.h"
@@ -2041,6 +2042,58 @@ int P_SubRandom(void);  /* heretic/p_action.c */
  * what it was (the chic actions tick P_UpdateChicken to turn it back).
  * Pods, chickens, iron liches, the Maulotaur, and both D'Sparil forms
  * shrug the egg off. */
+/* Morph the player into a chicken (Morph Ovum hit).  A second egg while
+ * already morphed upgrades to a super chicken via the tome power; the
+ * pre-morph weapon rides in the chicken mobj's special1 for the revert. */
+static dbool P_ChickenMorphPlayer(player_t *player)
+{
+  mobj_t *pmo;
+  mobj_t *fog;
+  mobj_t *chicken;
+  fixed_t x, y, z;
+  angle_t angle;
+  uint64_t oldFlags2;
+
+  if (player->chickenTics)
+  {
+    if ((player->chickenTics < CHICKENTICS - TICRATE)
+        && !player->powers[pw_weaponlevel2])
+    {                           /* make a super chicken */
+      P_GivePower(player, pw_weaponlevel2);
+    }
+    return FALSE;
+  }
+  if (player->powers[pw_invulnerability])
+  {                             /* immune when invulnerable */
+    return FALSE;
+  }
+  pmo = player->mo;
+  x = pmo->x;
+  y = pmo->y;
+  z = pmo->z;
+  angle = pmo->angle;
+  oldFlags2 = pmo->flags2;
+  P_SetMobjState(pmo, HERETIC_S_FREETARGMOBJ);
+  fog = P_SpawnMobj(x, y, z + TELEFOGHEIGHT, HERETIC_MT_TFOG);
+  S_StartSound(fog, heretic_sfx_telept);
+  chicken = P_SpawnMobj(x, y, z, HERETIC_MT_CHICPLAYER);
+  chicken->special1.i = player->readyweapon;
+  chicken->angle = angle;
+  chicken->player = player;
+  player->health = chicken->health = MAXCHICKENHEALTH;
+  player->mo = chicken;
+  player->armorpoints = player->armortype = 0;
+  player->powers[pw_invisibility] = 0;
+  player->powers[pw_weaponlevel2] = 0;
+  if (oldFlags2 & MF2_FLY)
+  {
+    chicken->flags2 |= MF2_FLY;
+  }
+  player->chickenTics = CHICKENTICS;
+  P_ActivateBeak(player);
+  return TRUE;
+}
+
 static dbool P_ChickenMorph(mobj_t *actor)
 {
   mobj_t *fog;
@@ -2369,10 +2422,11 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
     switch (inflictor->type)
     {
       case HERETIC_MT_EGGFX:
-        /* The Morph Ovum never deals damage.  Monsters become chickens;
-         * the player-side chicken morph awaits the heretic morph system,
-         * so the egg passes harmlessly through players for now. */
-        if (!target->player)
+        /* The Morph Ovum never deals damage; the target becomes a
+         * chicken instead. */
+        if (target->player)
+          P_ChickenMorphPlayer(target->player);
+        else
           P_ChickenMorph(target);
         return;
       case HERETIC_MT_WHIRLWIND:

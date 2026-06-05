@@ -2338,7 +2338,35 @@ dbool PTR_UseTraverse (intercept_t* in)
     P_LineOpening (in->d.line);
     if (openrange <= 0)
       {
-      S_StartSound (usething, sfx_noway);
+      /* Vanilla raven feedback for using a blank wall: hexen plays the
+       * class's failed-use grunt (the pig snorts), heretic says nothing,
+       * doom keeps its noway sound. */
+      if (hexen && usething->player)
+        {
+        int sound;
+
+        switch (usething->player->class)
+          {
+          case PCLASS_FIGHTER:
+            sound = hexen_sfx_player_fighter_failed_use;
+            break;
+          case PCLASS_CLERIC:
+            sound = hexen_sfx_player_cleric_failed_use;
+            break;
+          case PCLASS_MAGE:
+            sound = hexen_sfx_player_mage_failed_use;
+            break;
+          case PCLASS_PIG:
+            sound = hexen_sfx_pig_active1;
+            break;
+          default:
+            sound = hexen_sfx_None;
+            break;
+          }
+        S_StartSound(usething, sound);
+        }
+      else if (!heretic)
+        S_StartSound (usething, sfx_noway);
 
       // can't use through a wall
       return FALSE;
@@ -2421,7 +2449,8 @@ void P_UseLines (player_t*  player)
   // This added test makes the "oof" sound work on 2s lines -- killough:
 
   if (P_PathTraverse ( x1, y1, x2, y2, PT_ADDLINES, PTR_UseTraverse ))
-    if (!comp[comp_sound] && !P_PathTraverse ( x1, y1, x2, y2, PT_ADDLINES, PTR_NoWayTraverse ))
+    if (!raven && !comp[comp_sound] &&
+        !P_PathTraverse ( x1, y1, x2, y2, PT_ADDLINES, PTR_NoWayTraverse ))
       S_StartSound (usething, sfx_noway);
 }
 

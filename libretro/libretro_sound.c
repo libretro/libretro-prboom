@@ -59,6 +59,10 @@ extern int snd_SfxVolume;
 extern int snd_MusicVolume;
 
 int *lengths = NULL;
+/* Per-sfx 16.16 playback step at the output rate (orig_rate / SAMPLERATE),
+ * recorded by the loader; samples are stored at their native rate and the
+ * mixer advances through them at this step. */
+static unsigned int *sfx_steps = NULL;
 static int lengths_size = 0;
 int snd_card = 1;
 int mus_card = 0;
@@ -131,15 +135,13 @@ static channel_t channels[NUM_CHANNELS];
  * over from a buffering scheme the libretro mixer doesn't use; the
  * mix loop terminates each channel via the snd_start_ptr/snd_end_ptr
  * comparison. */
-static void* I_SndLoadSample(const char* sfxname, int* len)
+static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
 {
-    int             out_i, sfxlump_num, sfxlump_len, out_len;
+    int             out_i, sfxlump_num, sfxlump_len;
     char            sfxlump_name[20];
     const uint8_t  *sfxlump_data, *sfxlump_sound;
     int16_t        *out_data;
     uint16_t        orig_rate;
-    unsigned int    step_fx;     /* 16.16 input step per output sample */
-    unsigned int    pos_fx;      /* 16.16 input position accumulator */
 
     /* Doom sfx lumps are DS<name> (DSPISTOL); Heretic uses the bare name
      * (GLDHIT, IMPAT1, ...). Build the right one. W_CheckNumForName
@@ -174,59 +176,29 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
     if (orig_rate == 0)
         orig_rate = 11025;  /* defensive: malformed lump */
 
-    /* Output length: input_samples * (SAMPLERATE / orig_rate),
-     * rounded up so we don't drop the tail.  Computed in integer
-     * math via a 64-bit intermediate: (sfxlump_len * SAMPLERATE)
-     * overflows int32 once sfxlump_len passes ~48 KB, which can
-     * happen for the longer DMX sound lumps (e.g. DSBAREXP).  Use
-     * uint64_t to keep the computation clean and let the result
-     * fit back into int (output is at most ~4x input length so
-     * always fits int32). */
-    out_len = (int)(((uint64_t)sfxlump_len * (uint64_t)SAMPLERATE +
-                     (uint64_t)orig_rate - 1) /
-                    (uint64_t)orig_rate);
-    out_data = (int16_t*)malloc((size_t)out_len * sizeof(int16_t));
+    /* Samples are kept at the lump's native rate; the mixer's per-channel
+     * 16.16 stepping (added for the raven pitch jitter) resamples at mix
+     * time, with linear interpolation between adjacent samples in the
+     * inner loop.  Storing native-rate audio instead of upsampling to the
+     * output rate at load cuts the resident sound data to a quarter
+     * (11025 -> 44100 was a 4x expansion: ~28 MB for hexen's set) and
+     * removes the per-lump resample pass from startup.
+     *
+     * Convert unsigned 8-bit PCM (centre 128) to signed 16-bit:
+     * (s - 128) << 8.  One extra sample is appended duplicating the last,
+     * so the mixer's interpolated fetch of cur[1] at the final sample
+     * stays in bounds; the reported length excludes it. */
+    out_data = (int16_t*)malloc(((size_t)sfxlump_len + 1) * sizeof(int16_t));
     if (!out_data)
     {
         W_UnlockLumpNum (sfxlump_num);
         return 0;
     }
+    for (out_i = 0; out_i < sfxlump_len; out_i++)
+        out_data[out_i] = (int16_t)(((int)sfxlump_sound[out_i] - 128) << 8);
+    out_data[sfxlump_len] = out_data[sfxlump_len - 1];
 
-    /* 16.16 fixed-point step: orig_rate / SAMPLERATE input samples
-     * per output sample.  E.g. for 11025 -> 44100 this is 0.25,
-     * encoded as (1 << 14) = 16384. */
-    step_fx = ((unsigned int)orig_rate << 16) / (unsigned int)SAMPLERATE;
-    pos_fx  = 0;
-
-    /* Linear interpolation between adjacent input samples, written out
-     * as signed 16-bit.  The DMX SFX are unsigned 8-bit PCM at
-     * 11025/22050 Hz.  Interpolating between sfxlump_sound[x] and [x+1]
-     * by the 16.16 fractional position removes the upsampling staircase;
-     * keeping the result in 16-bit (rather than re-quantising back to
-     * 8-bit) preserves that interpolated precision all the way into the
-     * mixer.  Convert unsigned 8-bit (centre 128) to signed and scale to
-     * the 16-bit range: (s - 128) << 8 maps 0..255 to -32768..+32512. */
-    for (out_i = 0; out_i < out_len; out_i++)
-    {
-        unsigned int x    = pos_fx >> 16;
-        unsigned int frac = pos_fx & 0xffff;
-        int          val;
-
-        if (x + 1 < (unsigned int)sfxlump_len)
-        {
-            int a = (int)sfxlump_sound[x]     - 128;
-            int b = (int)sfxlump_sound[x + 1] - 128;
-            val = (int)((a * (int)(0x10000 - frac) + b * (int)frac) >> 16);
-        }
-        else if (x < (unsigned int)sfxlump_len)
-            val = (int)sfxlump_sound[x] - 128;  /* last sample: hold */
-        else
-            val = 0;                            /* past end: silence */
-
-        out_data[out_i] = (int16_t)(val << 8);
-
-        pos_fx += step_fx;
-    }
+    *step = (unsigned int)(((uint64_t)orig_rate << 16) / (uint64_t)SAMPLERATE);
 
     /* Release the cached lump back to the zone via the cache's
      * lock-count mechanism.  The previous Z_Free here freed the
@@ -237,7 +209,7 @@ static void* I_SndLoadSample(const char* sfxname, int* len)
      * instead of re-reading.  Use the proper unlock path. */
     W_UnlockLumpNum (sfxlump_num);
 
-    *len = out_len;
+    *len = sfxlump_len;
     return (void *)(out_data);
 }
 
@@ -388,13 +360,17 @@ int I_StartSound (int id, int channel, int vol, int sep, int pitch, int priority
     channels[slot].snd_end_ptr   = channels[slot].snd_start_ptr + lengths[id];
     channels[slot].cur           = channels[slot].snd_start_ptr;
     channels[slot].frac          = 0;
-    /* The raven games honor vanilla's per-sound pitch jitter always;
-     * doom only when the v1.1 pitch effects setting is enabled, matching
-     * prboom's pitched_sounds.  The engine computes (and draws RNG for)
-     * doom's pitch either way, exactly as vanilla and prboom do, so demo
-     * sync is unaffected by the toggle. */
+    /* Playback step = the sound's native-rate step times the pitch
+     * multiplier.  The raven games honor vanilla's per-sound pitch
+     * jitter always; doom only when the v1.1 pitch effects setting is
+     * enabled, matching prboom's pitched_sounds.  The engine computes
+     * (and draws RNG for) doom's pitch either way, exactly as vanilla
+     * and prboom do, so demo sync is unaffected by the toggle. */
     channels[slot].step_fx       = (raven || pitched_sounds)
-                                 ? steptable[pitch & 0xff] : (1u << 16);
+       ? (unsigned int)(((uint64_t)sfx_steps[id] * steptable[pitch & 0xff]) >> 16)
+       : sfx_steps[id];
+    if (!channels[slot].step_fx)
+        channels[slot].step_fx = 1;   /* defensive: never a zero step */
 
     // Save starting gametic.
     channels[slot].starttic      = gametic;
@@ -566,7 +542,14 @@ void I_UpdateSound(void)
             for (j = 0; j < n_active; j++)
             {
                channel_t *c = active[j];
-               int        s = *c->cur;
+               /* Linear interpolation between the sample under the read
+                * cursor and its neighbor (the loader appends a sentinel
+                * duplicate of the final sample, so cur[1] is always in
+                * bounds).  The fraction is taken at 8 bits so the
+                * multiply stays comfortably inside 32-bit arithmetic. */
+               int        a = c->cur[0];
+               int        s = a + ((((int)c->cur[1] - a) *
+                                    (int)(c->frac >> 8)) >> 8);
                c->frac   += c->step_fx;
                c->cur    += c->frac >> 16;
                c->frac   &= 0xffff;
@@ -678,21 +661,24 @@ void I_InitSound(void)
   if (lengths_size < num_sfx)
   {
     lengths = (int*)realloc(lengths, num_sfx * sizeof(int));
+    sfx_steps = (unsigned int*)realloc(sfx_steps, num_sfx * sizeof(unsigned int));
     lengths_size = num_sfx;
   }
   memset(lengths, 0, sizeof(int) * num_sfx);
+  memset(sfx_steps, 0, sizeof(unsigned int) * num_sfx);
 
   for (i = 1; i < num_sfx; i++)
   {
      // Alias? Example is the chaingun sound linked to pistol.
      if (!S_sfx[i].link) // Load data from WAD file.
-        S_sfx[i].data = I_SndLoadSample( S_sfx[i].name, &lengths[i] );
+        S_sfx[i].data = I_SndLoadSample( S_sfx[i].name, &lengths[i], &sfx_steps[i] );
      else // Previously loaded already?
      {
         S_sfx[i].data = S_sfx[i].link->data;
         /* link - S_sfx is already an element index (pointer subtraction of
          * sfxinfo_t*); do not divide by sizeof again. */
         lengths[i]    = lengths[S_sfx[i].link - S_sfx];
+        sfx_steps[i]  = sfx_steps[S_sfx[i].link - S_sfx];
      }
   }
 

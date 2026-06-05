@@ -3317,6 +3317,20 @@ static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, dbool
       if (CheckForOverrun(header_p, demo_p, size, 4, failonerror))
          return NULL;
 
+      /* Heretic demos share the doom 1.2 header layout; the vvHeretic
+       * extension bits some tools put on the first presence byte (0x20
+       * -respawn, 0x10 -longtics, 0x02 -nomonsters) are honoured here.
+       * Retail lumps carry a plain 1. */
+      if (heretic)
+      {
+         if (*demo_p & 0x20)
+            respawnparm = TRUE;
+         if (*demo_p & 0x10)
+            longtics = 1;
+         if (*demo_p & 0x02)
+            nomonsters = TRUE;
+      }
+
       for (i=0; i<4; i++)  // intentionally hard-coded 4 -- killough
          playeringame[i] = *demo_p++;
       for (;i < MAXPLAYERS; i++)

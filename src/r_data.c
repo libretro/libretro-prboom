@@ -411,21 +411,22 @@ const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
   {
    /* The returned pointer is still snapped to one of NUMCOLORMAPS bands
     * (everything downstream assumes that).  But for Smooth shading we also
-    * publish the same darkness value at VID_NUMCOLORWEIGHTS (64) resolution
-    * -- the very "keep all the precision until the final step" refinement
-    * noted above -- as a 0..63 weight (63 = brightest).  Computed by scaling
-    * the identical band formula by VID_NUMCOLORWEIGHTS instead of
-    * NUMCOLORMAPS, so the two agree exactly at band boundaries. */
+    * publish the same darkness value at SMOOTH_WEIGHTS resolution -- the very
+    * "keep all the precision until the final step" refinement noted above --
+    * computed by scaling the identical band formula by SMOOTH_WEIGHTS instead
+    * of NUMCOLORMAPS, so the two agree exactly at band boundaries.  The
+    * distance term's shift is reduced by log2(SMOOTH_WEIGHTS/NUMCOLORMAPS)
+    * (= 3 for 256/32) to match the finer scale. */
    int band = between(0,NUMCOLORMAPS-1,
          ((256-lightlevel)*2*NUMCOLORMAPS/256) - 4
          - (FixedMul(spryscale,pspriteiscale)/2 >> LIGHTSCALESHIFT)
          );
-   int fine = between(0,VID_NUMCOLORWEIGHTS-1,
-         ((256-lightlevel)*2*VID_NUMCOLORWEIGHTS/256) - 4*(VID_NUMCOLORWEIGHTS/NUMCOLORMAPS)
-         - (FixedMul(spryscale,pspriteiscale)/2 >> (LIGHTSCALESHIFT-1))
+   int fine = between(0,SMOOTH_WEIGHTS-1,
+         ((256-lightlevel)*2*SMOOTH_WEIGHTS/256) - 4*(SMOOTH_WEIGHTS/NUMCOLORMAPS)
+         - (FixedMul(spryscale,pspriteiscale)/2 >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))
          );
-   /* fine 'darkness' index 0=bright..63=dark -> weight 63=bright..0=dark */
-   r_fine_lightweight = (VID_NUMCOLORWEIGHTS-1) - fine;
+   /* fine 'darkness' 0=bright..max=dark -> weight max=bright..0=dark */
+   r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine;
    r_fine_colormap    = fullcolormap + band*256;
    return r_fine_colormap;
   }

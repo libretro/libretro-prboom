@@ -120,8 +120,22 @@ typedef struct {
 extern draw_vars_t drawvars;
 
 extern int diminished_lighting;       /* General > Video menu setting; applied via R_ApplyDiminishedLighting (r_main.h) */
-extern int r_smooth_shading;          /* set by R_ApplyDiminishedLighting when diminished_lighting==2 (Smooth) */
-extern int r_fine_lightweight;        /* Smooth mode: sub-band light weight 0..63 (63=bright), -1 if none */
+/* Smooth shading uses a PRIVATE luma ramp finer than VID_NUMCOLORWEIGHTS (64),
+ * so distance gradients band far less at high output resolutions, WITHOUT
+ * enlarging the shared V_Palette16 (which the filtered/translucency per-pixel
+ * paths stride through -- growing it would risk their cache behaviour).  The
+ * ramp is built lazily, keyed on the active V_Palette16, and read only by the
+ * composed-LUT build.  256 is the natural ceiling: source intensity is 8-bit,
+ * so finer than 256 luma steps cannot represent anything new.  Must stay a
+ * power of two (the band->weight scaling uses a shift). */
+#define SMOOTH_WEIGHTS 256
+/* log2(SMOOTH_WEIGHTS / NUMCOLORMAPS); NUMCOLORMAPS is 32, so 256/32 = 8 = 2^3.
+ * Used to reduce the distance-term shift when scaling the band light formula
+ * up to SMOOTH_WEIGHTS resolution.  Keep in sync if either constant changes. */
+#define SMOOTH_WEIGHTS_SHIFT 3
+
+extern int r_smooth_shading;          /* set by R_ApplyDiminishedLighting when diminished_lighting==1 (Smooth) */
+extern int r_fine_lightweight;        /* Smooth mode: sub-band light weight 0..SMOOTH_WEIGHTS-1 (max=bright), -1 if none */
 extern const lighttable_t *r_fine_colormap; /* colormap ptr r_fine_lightweight was computed for (self-validation) */
 
 extern uint8_t playernumtotrans[MAXPLAYERS]; // CPhipps - what translation table for what player

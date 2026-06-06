@@ -168,6 +168,52 @@ int r_fine_lightweight = -1;
 const lighttable_t *r_fine_colormap = NULL; /* pointer r_fine_lightweight was computed for */
 static int composed_weight = -2; /* cache key companion; -2 = never built */
 
+/* Private fine luma ramp for Smooth shading: [colour][SMOOTH_WEIGHTS].
+ * Rebuilt lazily when the active palette (V_Palette16) changes -- gamma swap,
+ * invuln flash, palette blend -- so it always matches the rest of the
+ * renderer's colours.  Each colour's full-bright RGB565 is taken from
+ * V_Palette16 at its top weight, decomposed to channels, and rescaled across
+ * SMOOTH_WEIGHTS steps the same way V_Palette16 scales across its 64 -- just
+ * finer.  Only the composed-LUT build reads this; the shared V_Palette16 and
+ * every per-pixel path that strides it are left exactly as they were. */
+static uint16_t       smooth_ramp[256 * SMOOTH_WEIGHTS];
+static const uint16_t *smooth_ramp_pal = NULL;
+
+static void R_BuildSmoothRamp(void)
+{
+   int i, w;
+   for (i = 0; i < 256; i++)
+   {
+      /* Full-bright 565 of this palette entry (weight 63 in V_Palette16). */
+      uint16_t full = V_Palette16[ i*VID_NUMCOLORWEIGHTS + (VID_NUMCOLORWEIGHTS-1) ];
+#if defined(ABGR1555)
+      int r = (full      ) & 0x1f;
+      int g = (full >>  5) & 0x1f;
+      int b = (full >> 10) & 0x1f;
+#else
+      int r = (full >> 11) & 0x1f;
+      int g = (full >>  5) & 0x3f;
+      int b = (full      ) & 0x1f;
+#endif
+      uint16_t *row = &smooth_ramp[i * SMOOTH_WEIGHTS];
+      for (w = 0; w < SMOOTH_WEIGHTS; w++)
+      {
+         /* t in [0,1]; rounded scale of each channel, matching the engine's
+          * (channel * t + 0.5) intent but in fixed point (no float in the
+          * hot build).  +(SMOOTH_WEIGHTS-1)/2 rounds to nearest. */
+         int nr = (r * w + (SMOOTH_WEIGHTS-1)/2) / (SMOOTH_WEIGHTS-1);
+         int ng = (g * w + (SMOOTH_WEIGHTS-1)/2) / (SMOOTH_WEIGHTS-1);
+         int nb = (b * w + (SMOOTH_WEIGHTS-1)/2) / (SMOOTH_WEIGHTS-1);
+#if defined(ABGR1555)
+         row[w] = (uint16_t)((nb<<10) | (ng<<5) | nr);
+#else
+         row[w] = (uint16_t)((nr<<11) | (ng<<5) | nb);
+#endif
+      }
+   }
+   smooth_ramp_pal = V_Palette16;
+}
+
 static INLINE const uint16_t *R_GetComposedColormap(const lighttable_t *colormap)
 {
    /* The fine weight is only valid for the exact colormap pointer it was
@@ -200,40 +246,48 @@ static INLINE const uint16_t *R_GetComposedColormap(const lighttable_t *colormap
          int is_band = (off >= 0) && ((off & 255) == 0)
                        && band >= 0 && band < NUMCOLORMAPS;
 
+         if (smooth_ramp_pal != V_Palette16)
+            R_BuildSmoothRamp();
+
          if (is_band && fine >= 0)
          {
-            /* Sub-band precision published by the light-selection chokepoint. */
+            /* Sub-band precision published by the light-selection chokepoint
+             * (already at SMOOTH_WEIGHTS resolution). */
             weight = fine;
          }
          else if (is_band)
          {
             /* Sprite/patch at a distance band, no fine value: map the band
-             * level 0..31 onto the 0..63 weight axis. */
-            weight = (NUMCOLORMAPS-1 - band) * (VID_NUMCOLORWEIGHTS-1)
+             * level 0..31 onto the 0..(SMOOTH_WEIGHTS-1) ramp. */
+            weight = (NUMCOLORMAPS-1 - band) * (SMOOTH_WEIGHTS-1)
                      / (NUMCOLORMAPS-1);
          }
          else
          {
-            /* Not a distance band (invuln inverse map, etc.): full bright
-             * through the supplied map -- identical to the point path. */
-            weight = VID_NUMCOLORWEIGHTS-1;
+            /* Not a distance band (invuln inverse map, etc.): full bright. */
+            weight = SMOOTH_WEIGHTS-1;
          }
 
-         if (weight < 0)                          weight = 0;
-         else if (weight > VID_NUMCOLORWEIGHTS-1)  weight = VID_NUMCOLORWEIGHTS-1;
+         if (weight < 0)                       weight = 0;
+         else if (weight > SMOOTH_WEIGHTS-1)    weight = SMOOTH_WEIGHTS-1;
 
          /* Distance darkening is applied ENTIRELY through the luma weight (the
           * CRY way), so for a distance band the texel is looked up through the
           * UNDIMMED base map (band 0 = fullcolormap), NOT the dimmed band the
           * renderer selected.  Indexing the dimmed band AND applying the weight
-          * darkens twice -- an over-dark, blotchy image.  fullcolormap still
-          * carries any sector / translation remap; only the per-distance
-          * dimming is dropped, since weight now supplies it.  Non-band maps
-          * (invuln) keep their own map so their special remap is preserved. */
+          * darkens twice -- an over-dark, blotchy image.  For a non-band map
+          * (invuln) the special remap must be preserved, so fall back to the
+          * shared V_Palette16 at full weight (the point-path output).  For a
+          * distance band, index the private fine ramp by the undimmed texel. */
+         if (is_band)
          {
-            const lighttable_t *base = is_band ? fullcolormap : colormap;
             for (i = 0; i < 256; i++)
-               composed_lut[i] = V_Palette16[ base[i]*VID_NUMCOLORWEIGHTS + weight ];
+               composed_lut[i] = smooth_ramp[ fullcolormap[i]*SMOOTH_WEIGHTS + weight ];
+         }
+         else
+         {
+            for (i = 0; i < 256; i++)
+               composed_lut[i] = V_Palette16[ colormap[i]*VID_NUMCOLORWEIGHTS + (VID_NUMCOLORWEIGHTS-1) ];
          }
 
          composed_weight = want_weight;

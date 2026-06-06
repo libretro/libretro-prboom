@@ -215,23 +215,23 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
        * via:  level = startmap - (scale>>LIGHTSCALESHIFT)/DISTMAP, with
        *       startmap = ((LIGHTLEVELS-1-light)*2)*NUMCOLORMAPS/LIGHTLEVELS
        * and scale = FixedDiv(320/2*FRACUNIT,(index+1)<<LIGHTZSHIFT).
-       * Recompute the same value with NUMCOLORMAPS replaced by
-       * VID_NUMCOLORWEIGHTS (64) so the darkness index carries sub-band
-       * precision while agreeing with Default at the band centres.  Mapped
-       * to a 0..63 weight (63 = brightest). */
+       * Recompute the same value with NUMCOLORMAPS replaced by SMOOTH_WEIGHTS
+       * so the darkness index carries sub-band precision while agreeing with
+       * Default at the band centres.  Mapped to a 0..(SMOOTH_WEIGHTS-1)
+       * weight (max = brightest). */
       if (r_smooth_shading && fullcolormap)
       {
          int startmap = ((LIGHTLEVELS-1-planelightlevel)*2)
-                        * VID_NUMCOLORWEIGHTS / LIGHTLEVELS;
+                        * SMOOTH_WEIGHTS / LIGHTLEVELS;
          int scale    = FixedDiv((320/2*FRACUNIT),(index+1)<<LIGHTZSHIFT);
-         /* Both halves scaled to VID_NUMCOLORWEIGHTS resolution: startmap via
-          * the *VID_NUMCOLORWEIGHTS factor above, and the distance term via
-          * the shift reduced by log2(VID_NUMCOLORWEIGHTS/NUMCOLORMAPS)=1, so
-          * fine == band*2 at the band centres (verified to drift <= 1). */
-         int fine2    = startmap - (scale >> (LIGHTSCALESHIFT-1))/DISTMAP;
-         if (fine2 < 0)                          fine2 = 0;
-         else if (fine2 > VID_NUMCOLORWEIGHTS-1)  fine2 = VID_NUMCOLORWEIGHTS-1;
-         r_fine_lightweight = (VID_NUMCOLORWEIGHTS-1) - fine2;
+         /* Both halves scaled to SMOOTH_WEIGHTS resolution: startmap via the
+          * *SMOOTH_WEIGHTS factor above, and the distance term via the shift
+          * reduced by log2(SMOOTH_WEIGHTS/NUMCOLORMAPS)=SMOOTH_WEIGHTS_SHIFT,
+          * so fine agrees with the 32-band zlight at the band centres. */
+         int fine2    = startmap - (scale >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))/DISTMAP;
+         if (fine2 < 0)                       fine2 = 0;
+         else if (fine2 > SMOOTH_WEIGHTS-1)   fine2 = SMOOTH_WEIGHTS-1;
+         r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine2;
          r_fine_colormap    = dsvars->colormap;
       }
       else

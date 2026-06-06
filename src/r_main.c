@@ -752,6 +752,10 @@ static void R_SetupFrame (player_t *player)
 
   R_InterpolateView (player);
 
+  /* Low-latency turning: fold the mouse counts the next tic will
+   * consume into this frame's view angle (g_game.c). */
+  viewangle += G_PendingTurn();
+
   extralight = player->extralight;
 
   viewsin = finesine[viewangle>>ANGLETOFINESHIFT];

@@ -103,6 +103,23 @@ void D_BuildNewTiccmds(void)
   }
 }
 
+/* Net turn staged in local ticcmds the simulation has not consumed yet:
+ * the exact view-angle delta the next tic(s) will apply.  R_SetupFrame
+ * adds this to the rendered view angle when low-latency turning is on,
+ * so the camera answers input at frame rate while the simulation and
+ * any demo being recorded see byte-identical ticcmds.  Summing shorts
+ * wraps exactly like the angle's top sixteen bits, so the preview
+ * equals the sim's future result modulo full revolutions. */
+int D_PendingLocalTurn(void)
+{
+  int t;
+  signed short sum = 0;
+
+  for (t = gametic; t < maketic; t++)
+    sum += localcmds[t % BACKUPTICS].angleturn;
+  return sum;
+}
+
 void TryRunTics(void)
 {
   fixed_t overflow = 0;

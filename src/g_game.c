@@ -253,6 +253,8 @@ static dbool   mousearray[4];
 static dbool   *mousebuttons = &mousearray[1];    // allow [-1]
 
 // mouse values are used once
+int lowlatency_turning; /* config: apply pending mouse turn to the view
+                         * every rendered frame (m_misc.c, general menu) */
 static int   mousex;
 static int   mousey;
 
@@ -635,6 +637,28 @@ void G_BuildTiccmd(ticcmd_t* cmd)
     cmd->buttons = special_event;
     special_event = 0;
   }
+}
+
+/* Mouse turn accumulated since the last ticcmd, as a view angle delta.
+ * R_SetupFrame adds this to the rendered view angle every frame, so the
+ * camera answers the mouse at frame rate while the simulation still
+ * consumes the identical counts at the next tic: G_BuildTiccmd folds
+ * mousex into cmd->angleturn (a short, so it wraps exactly like the
+ * angle's top sixteen bits) and zeroes the accumulator, at which point
+ * the preview returns to zero in the same frame.  The ticcmd is never
+ * altered, so demos record byte-identical with the feature on or off.
+ *
+ * Inert while strafing (the same condition under which G_BuildTiccmd
+ * turns mousex into sidemove), during demo playback (mouse events are
+ * not driving the player), and outside levels. */
+angle_t G_PendingTurn(void)
+{
+  int D_PendingLocalTurn(void);
+
+  if (!lowlatency_turning || demoplayback || gamestate != GS_LEVEL ||
+      menuactive || paused)
+    return 0;
+  return (angle_t) D_PendingLocalTurn() << 16;
 }
 
 //

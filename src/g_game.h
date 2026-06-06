@@ -35,6 +35,7 @@
 #include "doomdef.h"
 #include "d_event.h"
 #include "d_ticcmd.h"
+#include "tables.h" /* angle_t, for G_PendingTurn */
 
 //
 // GAME
@@ -47,6 +48,7 @@
 #define MAX_EPISODE_NUM 7
 
 dbool   G_Responder(event_t *ev);
+angle_t G_PendingTurn(void); /* frame-rate mouse turn preview */
 dbool   G_CheckDemoStatus(void);
 void G_DeathMatchSpawnPlayer(int playernum);
 void G_InitNew(skill_t skill, int episode, int map);

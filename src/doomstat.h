@@ -283,6 +283,7 @@ extern  dbool precache;
 //  to force a wipe on the next draw
 extern  gamestate_t     wipegamestate;
 
+extern  int             lowlatency_turning;     /* per-frame mouse turn */
 extern  int             mouseSensitivity_horiz; // killough
 extern  int             mouseSensitivity_vert;
 

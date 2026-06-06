@@ -3040,6 +3040,7 @@ enum {
   general_gamma,
   general_aspect,
   general_dimlight,
+  general_llturn,
 
   general_title_sound,
   general_sndchan,
@@ -3089,6 +3090,9 @@ setup_menu_t gen_settings1[] = { // General Settings screen1
 
   {"Diminished Lighting", S_CHOICE, m_null, G_X,
   G_YA + general_dimlight*8, {"diminished_lighting"}, 0, 0, M_ChangeDiminishedLighting, dimlight_opts},
+
+  {"Low-Latency Turning", S_YESNO, m_null, G_X,
+  G_YA + general_llturn*8, {"lowlatency_turning"}, 0, 0, NULL, NULL},
 
 
   SETUP_MENU_TITLE("Sound & Music", G_X, G_YA2 + general_title_sound*8 - 2),

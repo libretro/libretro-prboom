@@ -39,6 +39,7 @@
 #include "r_state.h"
 #include "p_spec.h"
 #include "hexen/p_spec_hexen.h"
+#include "hexen/po_man.h"
 #include "r_demo.h"
 #include "r_fps.h"
 
@@ -205,7 +206,7 @@ static void R_DoAnInterpolation (int i, fixed_t smoothratio)
     break;
   case INTERP_Vertex:
     adr1 = &((vertex_t*)curipos[i].address)->x;
-////    adr2 = &((vertex_t*)curipos[i].Address)->y;
+    adr2 = &((vertex_t*)curipos[i].address)->y;
     break;
   case INTERP_WallPanning:
     adr1 = &((side_t*)curipos[i].address)->rowoffset;
@@ -454,6 +455,33 @@ static void R_InterpolationGetData(thinker_t *th,
   }
 }
 
+/* Hexen polyobjects: the mover thinkers carry the polyobj tag (both
+ * thinker structs lay it out right after the thinker header), and the
+ * polyobj moves its segs' vertices directly, so vertex interpolation is
+ * what smooths it.  Returns the polyobj a mover thinker drives, or NULL
+ * for every other thinker. */
+static polyobj_t *R_PolyobjForThinker(thinker_t *th)
+{
+  int num;
+  int i;
+
+  if (!hexen)
+    return NULL;
+
+  if (th->function.arg1 == (void (*)(void *))T_RotatePoly ||
+      th->function.arg1 == (void (*)(void *))T_MovePoly)
+    num = ((polyevent_t *) th)->polyobj;
+  else if (th->function.arg1 == (void (*)(void *))T_PolyDoor)
+    num = ((polydoor_t *) th)->polyobj;
+  else
+    return NULL;
+
+  for (i = 0; i < po_NumPolyobjs; i++)
+    if (polyobjs[i].tag == num)
+      return &polyobjs[i];
+  return NULL;
+}
+
 void R_ActivateThinkerInterpolations(thinker_t *th)
 {
   void *posptr1;
@@ -471,6 +499,21 @@ void R_ActivateThinkerInterpolations(thinker_t *th)
 
     if(posptr2)
       R_SetInterpolation (type2, posptr2);
+  }
+
+  {
+    const polyobj_t *po = R_PolyobjForThinker(th);
+
+    if (po)
+    {
+      int i;
+
+      for (i = 0; i < po->numsegs; i++)
+      {
+        R_SetInterpolation (INTERP_Vertex, po->segs[i]->v1);
+        R_SetInterpolation (INTERP_Vertex, po->segs[i]->v2);
+      }
+    }
   }
 }
 
@@ -490,5 +533,20 @@ void R_StopInterpolationIfNeeded(thinker_t *th)
     R_StopInterpolation (type1, posptr1);
     if(posptr2)
       R_StopInterpolation (type2, posptr2);
+  }
+
+  {
+    const polyobj_t *po = R_PolyobjForThinker(th);
+
+    if (po)
+    {
+      int i;
+
+      for (i = 0; i < po->numsegs; i++)
+      {
+        R_StopInterpolation (INTERP_Vertex, po->segs[i]->v1);
+        R_StopInterpolation (INTERP_Vertex, po->segs[i]->v2);
+      }
+    }
   }
 }

@@ -1436,7 +1436,25 @@ static void P_LoadLineDefs (int lump)
           const hexen_maplinedef_t *mld =
             (const hexen_maplinedef_t *) data + i;
           int a;
-          ld->flags   = (unsigned short)SHORT(mld->flags);
+          unsigned short raw = (unsigned short)SHORT(mld->flags);
+          /* The hexen-format flag word shares only its low 9 bits with
+           * Doom's.  Above that sit repeat-special (0x0200) and the
+           * activation type (0x1C00), and ZDoom extends the word with
+           * monsters-can-activate (0x2000), block-players (0x4000) and
+           * block-everything (0x8000).  The engine's extended Doom bits
+           * occupy the same space (Boom pass-use 0x0200, MBF21
+           * block-land-monsters 0x1000 / block-players 0x2000), so the
+           * raw word must not reach those readers: chex3.wad's doors
+           * carry monsters-can-activate and would read as MBF21
+           * block-players, fencing the player out of an open door.
+           * Keep the Doom-shared bits plus repeat+SPAC (read by the
+           * Hexen activation layer), translate ZDoom's hard blockers
+           * onto ML_BLOCKING, and drop monsters-can-activate (the
+           * activation layer has no such refinement).  The readers of
+           * the in-mask Doom bits are gated on the map format. */
+          ld->flags = raw & (0x01ff | ML_REPEATSPECIAL | HML_SPAC_MASK);
+          if (raw & 0xc000)
+            ld->flags |= ML_BLOCKING;
           /* Hexen replaces the Doom special/tag with a byte special and
            * five byte args.  Store the special and args; the dedicated
            * arg0-as-tag handling lives in the Hexen specials layer. */

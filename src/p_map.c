@@ -458,8 +458,11 @@ dbool PIT_CheckLine (line_t* ld)
   if (!(tmthing->flags & (MF_MISSILE | MF_BOUNCES)))
     {
       if (ld->flags & ML_BLOCKING ||        // explicitly blocking everything
-          /* MBF21: line blocks players (bit 13) */
-          (mbf21_features && tmthing->player &&
+          /* MBF21: line blocks players (bit 13).  Hexen-format maps use
+           * bit 13 for ZDoom's monsters-can-activate (sanitized away at
+           * load) and bit 12 as part of the activation field, so the
+           * MBF21 reading only applies to Doom-format maps. */
+          (mbf21_features && !map_format.hexen && tmthing->player &&
            (ld->flags & ML_BLOCKPLAYERS)))
         {
           if (hexen)
@@ -474,8 +477,12 @@ dbool PIT_CheckLine (line_t* ld)
       // killough 8/9/98: monster-blockers don't affect friends
       if (!(tmthing->flags & MF_FRIEND || tmthing->player)
     && (ld->flags & ML_BLOCKMONSTERS ||
-        /* MBF21: line blocks land (non-floating) monsters (bit 12) */
-        (mbf21_features && (ld->flags & ML_BLOCKLANDMONSTERS) &&
+        /* MBF21: line blocks land (non-floating) monsters (bit 12).
+         * On hexen-format maps bit 12 belongs to the activation field
+         * (any SPAC of push/pcross would read as this), so Doom-format
+         * maps only. */
+        (mbf21_features && !map_format.hexen &&
+         (ld->flags & ML_BLOCKLANDMONSTERS) &&
          !(tmthing->flags & MF_FLOAT))))
   return FALSE; // block monsters only
     }
@@ -2418,11 +2425,16 @@ dbool PTR_UseTraverse (intercept_t* in)
 
   /* Hexen line specials use a byte special + args encoding handled by the
    * Hexen specials layer (also ZDoom Doom-in-Hexen maps); Doom maps use the
-   * classic P_UseSpecialLine. */
+   * classic P_UseSpecialLine.  Hexen has no Boom pass-use: bit 9 is
+   * repeat-special there, so reading it as ML_PASSUSE would make every
+   * repeatable line use-through.  Stop at the first special line. */
   if (map_format.hexen)
-    P_UseHexenSpecialLine (usething, in->d.line, side);
-  else
-    P_UseSpecialLine (usething, in->d.line, side);
+    {
+      P_UseHexenSpecialLine (usething, in->d.line, side);
+      return FALSE;
+    }
+
+  P_UseSpecialLine (usething, in->d.line, side);
 
   //WAS can't use for than one special line in a row
   //jff 3/21/98 NOW multiple use allowed with enabling line flag

@@ -125,6 +125,11 @@ extern void V_DrawNumPatch(int x, int y, int scrn,
 // V_DrawNamePatch - Draws the patch from lump "name"
 #define V_DrawNamePatch(x,y,s,n,t,f) V_DrawNumPatch(x,y,s,W_GetNumForName(n),t,f)
 
+/* fullscreen page draw: centers wide offset-less patches (issue #195) */
+extern void V_DrawNumPatchFS(int x, int y, int scrn,
+                             int lump, int cm, enum patch_translation_e flags);
+#define V_DrawNamePatchFS(x,y,s,n,t,f) V_DrawNumPatchFS(x,y,s,W_GetNumForName(n),t,f)
+
 /* Draws a static full-screen art lump stretched to the whole surface,
  * caching the rendered result (see v_video.c).  For finale / help art
  * screens that redraw the same lump every frame. */

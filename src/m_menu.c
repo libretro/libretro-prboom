@@ -3995,7 +3995,7 @@ void M_DrawExtHelp(void)
   namebfr[4] = extended_help_index/10 + 0x30;
   namebfr[5] = extended_help_index%10 + 0x30;
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(0, 0, 0, namebfr, CR_DEFAULT, VPT_STRETCH);
+  V_DrawNamePatchFS(0, 0, 0, namebfr, CR_DEFAULT, VPT_STRETCH);
 }
 
 //

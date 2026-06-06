@@ -470,7 +470,7 @@ static void D_PageDrawer(void)
         if (raven)
           V_DrawRawScreen(pagename);
         else
-          V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
+          V_DrawNamePatchFS(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
 
         screens[0].data        = saved_data;
         drawvars.short_topleft = saved_short_tl;
@@ -488,7 +488,7 @@ static void D_PageDrawer(void)
         if (raven)
           V_DrawRawScreen(pagename);
         else
-          V_DrawNamePatch(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
+          V_DrawNamePatchFS(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
         return;
       }
     }

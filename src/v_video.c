@@ -750,6 +750,35 @@ void V_DrawNumPatch(int x, int y, int scrn, int lump,
   R_UnlockPatchNum(lump);
 }
 
+/* [FG] fullscreen page draw: automatically center patches wider than 320
+ * that carry no horizontal offset.  The KEX re-release add-on wads ship
+ * 426-wide title cards with a zero leftoffset, which a plain draw at
+ * (0,0) leaves left-aligned with the right side cropped (issue #195);
+ * id's own widescreen packs set leftoffset and center through the normal
+ * offset path.  Matches Woof / dsda-doom. */
+static int V_WidePatchCenter(const rpatch_t *patch, int x)
+{
+  if (patch->width > 320 && patch->leftoffset == 0)
+    x -= (patch->width - 320) / 2;
+  return x;
+}
+
+void V_DrawNumPatchFS(int x, int y, int scrn, int lump,
+         int cm, enum patch_translation_e flags)
+{
+  const rpatch_t *patch;
+
+  if(lump < 0)
+  {
+    I_Error("V_DrawNumPatchFS: missing lump won't be drawn");
+    return;
+  }
+
+  patch = R_CachePatchNum(lump);
+  V_DrawMemPatch(V_WidePatchCenter(patch, x), y, scrn, patch, cm, flags);
+  R_UnlockPatchNum(lump);
+}
+
 /*
  * V_DrawNumPatchFullScreenCached
  *
@@ -790,9 +819,14 @@ void V_DrawNumPatchFullScreenCached(int scrn, int lump, int cm)
     return;
   }
 
-  /* Miss: render the stretched patch the normal way, then snapshot it. */
-  V_DrawMemPatch(0, 0, scrn, R_CachePatchNum(lump), cm, VPT_STRETCH);
-  R_UnlockPatchNum(lump);
+  /* Miss: render the stretched patch the normal way, then snapshot it.
+   * Wide offset-less patches are centered like every full-screen draw. */
+  {
+    const rpatch_t *patch = R_CachePatchNum(lump);
+    V_DrawMemPatch(V_WidePatchCenter(patch, 0), 0, scrn, patch, cm,
+                   VPT_STRETCH);
+    R_UnlockPatchNum(lump);
+  }
 
   {
     uint8_t *nc = (uint8_t *)realloc(fs_cache, surf_bytes);

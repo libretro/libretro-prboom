@@ -506,7 +506,7 @@ static void WI_slamBackground(void)
         drawvars.short_topleft = wi_bg_cache;
         drawvars.int_topleft   = (unsigned int *)wi_bg_cache;
 
-        V_DrawNamePatch(0, 0, FB, name, CR_DEFAULT, VPT_STRETCH);
+        V_DrawNamePatchFS(0, 0, FB, name, CR_DEFAULT, VPT_STRETCH);
 
         screens[FB].data       = saved_data;
         drawvars.short_topleft = saved_short_tl;
@@ -520,7 +520,7 @@ static void WI_slamBackground(void)
       else
       {
         /* allocation failed -- draw directly, uncached */
-        V_DrawNamePatch(0, 0, FB, name, CR_DEFAULT, VPT_STRETCH);
+        V_DrawNamePatchFS(0, 0, FB, name, CR_DEFAULT, VPT_STRETCH);
         return;
       }
     }

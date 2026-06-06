@@ -314,8 +314,8 @@ default_t defaults[] =
    def_int,ss_gen, NULL, NULL}, // gamma correction level // killough 1/18/98
   {"uncapped_framerate", {&movement_smooth, NULL},  {3, NULL},0,35,
    def_int,ss_gen, NULL, NULL},
-  {"lowlatency_turning", {&lowlatency_turning, NULL}, {0, NULL},0,1,
-   def_bool,ss_gen, NULL, NULL}, /* per-frame mouse turn on the view */
+  {"lowlatency_turning", {&lowlatency_turning, NULL}, {1, NULL},0,1,
+   def_bool,ss_gen, NULL, NULL}, /* per-frame turn preview on the view */
   {"filter_wall",{(int*)&drawvars.filterwall, NULL},{RDRAW_FILTER_POINT, NULL},
    RDRAW_FILTER_POINT, RDRAW_FILTER_ROUNDED, def_int,ss_gen, NULL, NULL},
   {"filter_floor",{(int*)&drawvars.filterfloor, NULL},{RDRAW_FILTER_POINT, NULL},

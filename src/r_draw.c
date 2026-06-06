@@ -5259,7 +5259,14 @@ int R_WallColumnKernelClass(R_DrawColumn_f fn)
  *
  * Per-pixel arithmetic is exactly the point drawers':
  *   frac(y) = texturemid + (y - centery) * iscale
- *   texel   = source[(frac & mask) >> 16]
+ *   texel   = source[(int)(frac & mask) >> 16]
+ *
+ * The shift is arithmetic on purpose: the drawers index
+ * source[frac>>16] on the signed frac, so for texheight 0 (mask all
+ * ones) a negative frac on the first rows must read the column
+ * padding at index -1, exactly as they do, rather than a huge
+ * unsigned index.  For the power-of-two masks the & clears the sign
+ * bit and the arithmetic shift is identical to the logical one.
  *   pixel   = lut[texel]
  * The drawers compute frac iteratively from yl; starting the iteration
  * at the run's first row instead is the same integer sequence (adds
@@ -5342,7 +5349,7 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
     {                                                      \
       if (y >= cyl[j] && y <= cyh[j])                      \
       {                                                    \
-        int texel = src[j][(frac[j] & mask[j]) >> 16];     \
+        int texel = src[j][(int)(frac[j] & mask[j]) >> 16]; \
         row[j] = EXPR;                                     \
       }                                                    \
       frac[j] += step[j];                                  \
@@ -5355,7 +5362,7 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
                   + y * SURFACE_SHORT_PITCH + x0;          \
     for (j = 0; j < n; j++)                                \
     {                                                      \
-      int texel = src[j][(frac[j] & mask[j]) >> 16];       \
+      int texel = src[j][(int)(frac[j] & mask[j]) >> 16];   \
       row[j] = EXPR;                                       \
       frac[j] += step[j];                                  \
     }                                                      \
@@ -5384,7 +5391,7 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
         __m128i m = _mm_loadu_si128((const __m128i *)&mask[J]);       \
         __m128i s = _mm_loadu_si128((const __m128i *)&step[J]);       \
         _mm_storeu_si128((__m128i *)idx4,                             \
-                         _mm_srli_epi32(_mm_and_si128(f, m), 16));    \
+                         _mm_srai_epi32(_mm_and_si128(f, m), 16));    \
         _mm_storeu_si128((__m128i *)&frac[J], _mm_add_epi32(f, s));   \
       }
 #elif defined(WALL_RUN_NEON)
@@ -5393,7 +5400,9 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
         uint32x4_t f = vld1q_u32((const uint32_t *)&frac[J]);         \
         uint32x4_t m = vld1q_u32(&mask[J]);                           \
         uint32x4_t s = vld1q_u32((const uint32_t *)&step[J]);         \
-        vst1q_u32(idx4, vshrq_n_u32(vandq_u32(f, m), 16));            \
+        vst1q_s32(idx4,                                               \
+                  vshrq_n_s32(vreinterpretq_s32_u32(vandq_u32(f, m)),  \
+                              16));                                   \
         vst1q_u32((uint32_t *)&frac[J], vaddq_u32(f, s));             \
       }
 #endif
@@ -5406,7 +5415,7 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
       int j4 = n & ~3;
       for (j = 0; j < j4; j += 4)
       {
-        unsigned int idx4[4];
+        int32_t      idx4[4];
         uint16_t     out4[4];
         WALL_RUN_VEC4(j)
         out4[0] = lut[src[j + 0][idx4[0]]];
@@ -5417,7 +5426,7 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
       }
       for (; j < n; j++)
       {
-        row[j] = lut[ src[j][(frac[j] & mask[j]) >> 16] ];
+        row[j] = lut[ src[j][(int)(frac[j] & mask[j]) >> 16] ];
         frac[j] += step[j];
       }
     }

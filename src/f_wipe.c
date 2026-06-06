@@ -91,13 +91,13 @@ static int wipe_doMelt(int ticks)
 
    while (ticks--)
    {
-      for (i=0;i<(SCREENWIDTH);i++)
-      {
-         uint8_t *s, *d;
-         int j;
-         int boundary;  /* row at which end-screen meets start-screen */
+      int y;
 
-         /* Advance this column's melt position by one tick. */
+      /* Advance every column's melt position by one tick.  The melt
+       * math is unchanged; it is only split out of the paint loop so
+       * the paint can run row-major below. */
+      for (i = 0; i < SCREENWIDTH; i++)
+      {
          if (y_lookup[i] < 0)
          {
             y_lookup[i]++;
@@ -116,54 +116,60 @@ static int wipe_doMelt(int ticks)
             done = FALSE;
          }
          /* else: column already at SCREENHEIGHT, no advance. */
+      }
 
-         /* Paint the column from scratch this frame.  Under the
-          * direct-render path screens[0].data (= wipe_scr.data)
-          * points at the frontend's current buffer and rotates
-          * per frame, so we cannot rely on previous frames'
-          * writes still being there.  Each frame writes a full
-          * SCREENHEIGHT column: end-screen above the boundary,
-          * start-screen below.
-          *
-          * The boundary is max(0, y_lookup[i]) -- columns that
-          * have not yet started scrolling have boundary = 0
-          * (entire column is start-screen), columns fully
-          * scrolled in have boundary = SCREENHEIGHT (entire
-          * column is end-screen). */
-         boundary = y_lookup[i] < 0 ? 0 : y_lookup[i];
+      /* Paint the frame row-major.  The old loop walked columns and
+       * copied two bytes at a time with a full row pitch between
+       * writes -- at 2560x1600 that is four million strided
+       * write-allocates per wipe frame, which is what made the melt
+       * hitch at high resolutions.  Per destination row, a pixel at
+       * column i shows the end screen when the column's boundary
+       * (max(0, y_lookup[i])) is still below this row, else the
+       * start screen scrolled down by that boundary, exactly as
+       * before; the writes are now sequential, and since the melt
+       * boundaries vary slowly across columns the end-screen pixels
+       * form long horizontal runs that copy with memcpy.
+       *
+       * Under the direct-render path screens[0].data (= wipe_scr.data)
+       * rotates per frame, so every frame still paints the full
+       * screen rather than relying on previous frames' writes. */
+      for (y = 0; y < SCREENHEIGHT; y++)
+      {
+         uint16_t *drow =
+            (uint16_t *)(wipe_scr.data + (size_t)y * SURFACE_BYTE_PITCH);
+         const uint16_t *erow =
+            (const uint16_t *)(wipe_scr_end.data + (size_t)y * SURFACE_BYTE_PITCH);
 
-         /* End-screen above the boundary. */
-         if (boundary > 0)
+         i = 0;
+         while (i < SCREENWIDTH)
          {
-            s = wipe_scr_end.data + (i * SURFACE_PIXEL_DEPTH);
-            d = wipe_scr.data     + (i * SURFACE_PIXEL_DEPTH);
-            for (j = boundary; j; j--)
+            int b = y_lookup[i] < 0 ? 0 : y_lookup[i];
+
+            if (b > y)
             {
-               d[0] = s[0];
-               d[1] = s[1];
-               d += SURFACE_BYTE_PITCH;
-               s += SURFACE_BYTE_PITCH;
+               /* End-screen run: extend while the boundary stays
+                * below this row. */
+               int run = i + 1;
+               while (run < SCREENWIDTH)
+               {
+                  int rb = y_lookup[run] < 0 ? 0 : y_lookup[run];
+                  if (rb <= y)
+                     break;
+                  run++;
+               }
+               memcpy(&drow[i], &erow[i],
+                      (size_t)(run - i) * SURFACE_PIXEL_DEPTH);
+               i = run;
             }
-         }
-
-         /* Start-screen below the boundary, scrolled DOWN by
-          * `boundary` rows so the source's row 0 maps to dest's
-          * row `boundary`.  This produces the iconic Doom melt
-          * look where the original screen "drips" downward as
-          * the new screen pushes in from the top. */
-         if (boundary < SCREENHEIGHT)
-         {
-            s = wipe_scr_start.data
-                + (i * SURFACE_PIXEL_DEPTH);
-            d = wipe_scr.data
-                + (boundary * SURFACE_BYTE_PITCH)
-                + (i * SURFACE_PIXEL_DEPTH);
-            for (j = SCREENHEIGHT - boundary; j; j--)
+            else
             {
-               d[0] = s[0];
-               d[1] = s[1];
-               d += SURFACE_BYTE_PITCH;
-               s += SURFACE_BYTE_PITCH;
+               /* Start-screen pixel, scrolled down by the boundary:
+                * dest row y reads source row y - b. */
+               const uint16_t *srow =
+                  (const uint16_t *)(wipe_scr_start.data
+                     + (size_t)(y - b) * SURFACE_BYTE_PITCH);
+               drow[i] = srow[i];
+               i++;
             }
          }
       }

@@ -262,12 +262,23 @@ static void createPatch(int id) {
    * &patches[i].data is safe because patches[] is still alive
    * throughout R_FlushAllPatches's loop.  By the time Z_Close
    * runs, no patches.data blocks remain. */
+  /* Eight bytes of 0xff lead padding before the pixels: the filtered
+   * drawers index source[frac>>16] on the signed frac, which reaches
+   * -1 on a column's first rows when the half-texel centering pushes
+   * frac below zero.  For every column but the first that lands on
+   * the previous column's last byte; for column 0 it landed on the
+   * allocation header's padding -- an uninitialised byte, so the
+   * blended output depended on the allocator.  Eight bytes (not one)
+   * keep the rcolumn_t/rpost_t arrays after the pixels aligned.
+   * Companion to the trailing padding column below. */
+  dataSize += 8;
   patch->data = (unsigned char*)Z_Malloc(dataSize, PU_CACHE,
                                          (void **)&patch->data);
   memset(patch->data, 0, dataSize);
+  memset(patch->data, 0xff, 8);
 
   // set out pixel, column, and post pointers into our data array
-  patch->pixels = patch->data;
+  patch->pixels = patch->data + 8;
   patch->columns = (rcolumn_t*)((unsigned char*)patch->pixels + pixelDataSize + patch->height);
   patch->posts = (rpost_t*)((unsigned char*)patch->columns + columnsDataSize);
 
@@ -493,11 +504,22 @@ static void createTextureCompositePatch(int id) {
   dataSize = pixelDataSize + composite_patch->height + columnsDataSize + postsDataSize;
   /* See r_patch.c:238 — back-pointer would point into texture_composites[],
    * unsafe at teardown.  No user back-pointer here. */
+  /* Eight bytes of 0xff lead padding before the pixels: the filtered
+   * drawers index source[frac>>16] on the signed frac, which reaches
+   * -1 on a column's first rows when the half-texel centering pushes
+   * frac below zero.  For every column but the first that lands on
+   * the previous column's last byte; for column 0 it landed on the
+   * allocation header's padding -- an uninitialised byte, so the
+   * blended output depended on the allocator.  Eight bytes (not one)
+   * keep the rcolumn_t/rpost_t arrays after the pixels aligned.
+   * Companion to the trailing padding column below. */
+  dataSize += 8;
   composite_patch->data = (unsigned char*)Z_Malloc(dataSize, PU_STATIC, NULL);
   memset(composite_patch->data, 0, dataSize);
+  memset(composite_patch->data, 0xff, 8);
 
   // set out pixel, column, and post pointers into our data array
-  composite_patch->pixels = composite_patch->data;
+  composite_patch->pixels = composite_patch->data + 8;
   composite_patch->columns = (rcolumn_t*)((unsigned char*)composite_patch->pixels + pixelDataSize + composite_patch->height);
   composite_patch->posts = (rpost_t*)((unsigned char*)composite_patch->columns + columnsDataSize);
 

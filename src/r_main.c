@@ -35,6 +35,9 @@
 
 
 #include "config.h"
+
+#include <math.h>
+
 #include "doomstat.h"
 #include "d_net.h"
 #include "w_wad.h"
@@ -397,11 +400,21 @@ static void R_InitTextureMapping (void)
   //  xtoviewangle will give the smallest view angle
   //  that maps to x.
 
+  /* The table-scan inverse quantizes the per-column view angle to the
+   * 13-bit fine-angle grid (multiples of 1<<ANGLETOFINESHIFT).  At high
+   * resolutions that quantization wobbles the wall texture-column
+   * computation by a fraction of a texel, which flips floor() on
+   * close-up walls whose texture coordinate hovers near a texel
+   * boundary: 1-2 pixel stripes of the neighbouring texture column
+   * that flicker during interpolated motion.  Compute the exact angle
+   * each column subtends instead; this is the precise inverse of the
+   * viewangletox construction above and is only run at init. */
   for (x=0; x<=viewwidth; x++)
     {
-      for (i=0; viewangletox[i] > x; i++)
-        ;
-      xtoviewangle[x] = (i<<ANGLETOFINESHIFT)-ANG90;
+      double tanx = (double)(centerxfrac - ((fixed_t)x << FRACBITS))
+                    / (double)focallength;
+      xtoviewangle[x] = (angle_t)(int64_t)(atan(tanx)
+                                           * (2147483648.0 / M_PI));
     }
 
   // Take out the fencepost cases from viewangletox.

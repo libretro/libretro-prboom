@@ -245,6 +245,23 @@ static fixed_t R_ScaleFromGlobalAngle(angle_t visangle)
    return scale;
 }
 
+/* finetangent[] lookup with sub-step linear interpolation: the raw table
+ * quantizes the angle to 13 bits, which is what the precise xtoviewangle
+ * (see R_InitTextureMapping) is paired against; without the interpolation
+ * the table would re-quantize the angle and reintroduce the texel-boundary
+ * wobble on close-up walls. */
+static fixed_t R_FineTangentLerp(angle_t a)
+{
+   unsigned int idx = a >> ANGLETOFINESHIFT;
+   unsigned int f = (a >> (ANGLETOFINESHIFT - 8)) & 0xff;
+   fixed_t t0;
+
+   if (idx >= FINEANGLES/2 - 1)
+      return finetangent[FINEANGLES/2 - 1];
+   t0 = finetangent[idx];
+   return t0 + (fixed_t)(((int64_t)(finetangent[idx + 1] - t0) * f) >> 8);
+}
+
 //
 // R_RenderMaskedSegRange
 //
@@ -320,8 +337,10 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
          continue;
 
       // calculate texture offset - POPE
-      angle = (ds->rw_centerangle + xtoviewangle[dcvars.x]) >> ANGLETOFINESHIFT;
-      dcvars.texu = ds->rw_offset - FixedMul(finetangent[angle], ds->rw_distance);
+      dcvars.texu = ds->rw_offset
+                  - FixedMul(R_FineTangentLerp(ds->rw_centerangle
+                                               + xtoviewangle[dcvars.x]),
+                             ds->rw_distance);
       if (drawvars.filterwall == RDRAW_FILTER_LINEAR)
          dcvars.texu -= (FRACUNIT>>1);
 
@@ -485,9 +504,10 @@ static void R_RenderSegLoop (void)
       if (segtextured)
       {
          // calculate texture offset
-         angle_t angle =(rw_centerangle+xtoviewangle[rw_x])>>ANGLETOFINESHIFT;
+         fixed_t tangent = R_FineTangentLerp(rw_centerangle
+                                             + xtoviewangle[rw_x]);
 
-         texturecolumn = rw_offset-FixedMul(finetangent[angle],rw_distance);
+         texturecolumn = rw_offset-FixedMul(tangent,rw_distance);
          if (linear_filter)
             texturecolumn -= (FRACUNIT>>1);
          dcvars.texu = texturecolumn; // for filtering -- POPE

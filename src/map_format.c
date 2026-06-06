@@ -147,10 +147,12 @@ static dbool P_ExecuteZDoomLineSpecial(int special, byte *args, line_t *line,
     case 244:                   /* Exit_Secret */
       G_SecretExitLevel();
       return true;
+    case 206:                   /* Plat_DownWaitUpStayLip */
+      return EV_DoHexenPlat(line, args, PLAT_DOWNWAITUPSTAY, args[3]);
+    case 207:                   /* Plat_PerpetualRaiseLip */
+      return EV_DoHexenPlat(line, args, PLAT_PERPETUALRAISE, args[3]);
     case 181:                   /* Plane_Align (slopes): unsupported */
-    case 206:                   /* Plane_Copy (slopes): unsupported */
-    case 207:
-    case 208:                   /* TranslucentLine: unsupported */
+    case 208:                   /* TranslucentLine: static, applied at load */
       return false;
     default:
       return P_ExecuteHexenLineSpecial(special, args, line, side, mo);

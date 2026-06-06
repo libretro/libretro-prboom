@@ -909,7 +909,6 @@ int EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount)
   plat_t   *plat;
 
   (void) line;
-  (void) amount;
 
   HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
   {
@@ -932,7 +931,9 @@ int EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount)
     switch (type)
     {
       case PLAT_DOWNWAITUPSTAY:
-        plat->low = P_FindLowestFloorSurrounding(sec) + 8 * FRACUNIT;
+        /* `amount` is the lip in map units (8 for the Hexen specials,
+         * args[3] for ZDoom's Plat_*Lip variants) */
+        plat->low = P_FindLowestFloorSurrounding(sec) + amount * FRACUNIT;
         if (plat->low > sec->floorheight)
           plat->low = sec->floorheight;
         plat->high   = sec->floorheight;
@@ -964,7 +965,7 @@ int EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount)
         plat->status = PLAT_UP;
         break;
       case PLAT_PERPETUALRAISE:
-        plat->low = P_FindLowestFloorSurrounding(sec) + 8 * FRACUNIT;
+        plat->low = P_FindLowestFloorSurrounding(sec) + amount * FRACUNIT;
         if (plat->low > sec->floorheight)
           plat->low = sec->floorheight;
         plat->high = P_FindHighestFloorSurrounding(sec);
@@ -2134,14 +2135,14 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
       ok = Hexen_EV_DoFloor(line, args, FLEV_MOVETOVALUETIMES8);
       break;
     case 60:                    /* Plat_PerpetualRaise */
-      ok = EV_DoHexenPlat(line, args, PLAT_PERPETUALRAISE, 0);
+      ok = EV_DoHexenPlat(line, args, PLAT_PERPETUALRAISE, 8);
       break;
     case 61:                    /* Plat_Stop */
       Hexen_EV_StopPlat(line, args);
       ok = true;
       break;
     case 62:                    /* Plat_DownWaitUpStay */
-      ok = EV_DoHexenPlat(line, args, PLAT_DOWNWAITUPSTAY, 0);
+      ok = EV_DoHexenPlat(line, args, PLAT_DOWNWAITUPSTAY, 8);
       break;
     case 63:                    /* Plat_DownByValueWaitUpStay */
       ok = EV_DoHexenPlat(line, args, PLAT_DOWNBYVALUEWAITUPSTAY, 0);

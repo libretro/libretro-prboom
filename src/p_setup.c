@@ -529,16 +529,27 @@ static void P_LoadSegs (int lump)
       ldef = &lines[linedef];
       li->linedef = ldef;
       side = SHORT(ml->side);
-      li->sidedef = &sides[ldef->sidenum[side]];
 
       /* cph 2006/09/30 - our frontsector can be the second side of the
        * linedef, so must check for NO_INDEX in case we are incorrectly
-       * referencing the back of a 1S line */
-      if (ldef->sidenum[side] != NO_INDEX)
-        li->frontsector = sides[ldef->sidenum[side]].sector;
-      else {
-        li->frontsector = 0;
+       * referencing the back of a 1S line.  The sidedef pointer must
+       * respect the same check: &sides[NO_INDEX] is a wild non-NULL
+       * pointer that P_GroupLines' NULL test cannot catch (chex3.wad's
+       * nodes put a seg on the back of a one-sided line, issue #86).
+       * Substitute sidedef 0, after killough's linedef fixups -- a
+       * wrong texture in a broken spot beats a crash, and it keeps the
+       * subsector -> sector resolution alive when this is the
+       * subsector's only seg. */
+      if (ldef->sidenum[side] == NO_INDEX)
+      {
         lprintf(LO_WARN, "P_LoadSegs: front of seg %i has no sidedef\n", i);
+        li->sidedef = &sides[0];
+        li->frontsector = sides[0].sector;
+      }
+      else
+      {
+        li->sidedef = &sides[ldef->sidenum[side]];
+        li->frontsector = sides[ldef->sidenum[side]].sector;
       }
 
       if (ldef->flags & ML_TWOSIDED && ldef->sidenum[side^1]!=NO_INDEX)
@@ -583,9 +594,19 @@ static void P_LoadGLSegs(int lump)
       segs[i].miniseg = FALSE;
       segs[i].angle = R_PointToAngle2(segs[i].v1->x,segs[i].v1->y,segs[i].v2->x,segs[i].v2->y);
 
-      segs[i].sidedef = &sides[ldef->sidenum[ml->side]];
+      /* missing side: substitute sidedef 0, as in P_LoadSegs (issue #86) */
+      if (ldef->sidenum[ml->side] == NO_INDEX)
+      {
+        lprintf(LO_WARN, "P_LoadGLSegs: front of seg %i has no sidedef\n", i);
+        segs[i].sidedef = &sides[0];
+        segs[i].frontsector = sides[0].sector;
+      }
+      else
+      {
+        segs[i].sidedef = &sides[ldef->sidenum[ml->side]];
+        segs[i].frontsector = sides[ldef->sidenum[ml->side]].sector;
+      }
       segs[i].length  = GetDistance(segs[i].v2->x - segs[i].v1->x, segs[i].v2->y - segs[i].v1->y);
-      segs[i].frontsector = sides[ldef->sidenum[ml->side]].sector;
       if (ldef->flags & ML_TWOSIDED)
         segs[i].backsector = sides[ldef->sidenum[ml->side^1]].sector;
       else
@@ -1141,9 +1162,18 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
 
         seg->miniseg = FALSE;
         seg->linedef = ldef;
-        seg->sidedef = &sides[ldef->sidenum[side]];
-        seg->frontsector = (ldef->sidenum[side] != NO_INDEX)
-                           ? sides[ldef->sidenum[side]].sector : NULL;
+        /* missing side: substitute sidedef 0, as in P_LoadSegs (issue #86) */
+        if (ldef->sidenum[side] == NO_INDEX)
+        {
+          lprintf(LO_WARN, "P_LoadXGLNodes: front of seg has no sidedef\n");
+          seg->sidedef = &sides[0];
+          seg->frontsector = sides[0].sector;
+        }
+        else
+        {
+          seg->sidedef = &sides[ldef->sidenum[side]];
+          seg->frontsector = sides[ldef->sidenum[side]].sector;
+        }
         seg->backsector = ((ldef->flags & ML_TWOSIDED)
                            && ldef->sidenum[side ^ 1] != NO_INDEX)
                           ? sides[ldef->sidenum[side ^ 1]].sector : NULL;

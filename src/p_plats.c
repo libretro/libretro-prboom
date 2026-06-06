@@ -185,14 +185,20 @@ void T_HexenPlatRaise(plat_t *plat)
          {
             plat->count  = plat->wait;
             plat->status = PLAT_DOWN;
-            SN_StartSequence((mobj_t *) &plat->sector->soundorg,
-                             SEQ_PLATFORM + plat->sector->seqType);
+            if (hexen)
+               SN_StartSequence((mobj_t *) &plat->sector->soundorg,
+                                SEQ_PLATFORM + plat->sector->seqType);
+            else
+               S_StartSound((mobj_t *) &plat->sector->soundorg, g_sfx_pstart);
          }
          else if (res == RES_PASTDEST)
          {
             plat->count  = plat->wait;
             plat->status = PLAT_WAITING;
-            SN_StopSequence((mobj_t *) &plat->sector->soundorg);
+            if (hexen)
+               SN_StopSequence((mobj_t *) &plat->sector->soundorg);
+            else
+               S_StartSound((mobj_t *) &plat->sector->soundorg, g_sfx_pstop);
             switch (plat->type)
             {
                case PLAT_DOWNWAITUPSTAY:
@@ -221,7 +227,10 @@ void T_HexenPlatRaise(plat_t *plat)
                default:
                   break;
             }
-            SN_StopSequence((mobj_t *) &plat->sector->soundorg);
+            if (hexen)
+               SN_StopSequence((mobj_t *) &plat->sector->soundorg);
+            else
+               S_StartSound((mobj_t *) &plat->sector->soundorg, g_sfx_pstop);
          }
          break;
 
@@ -232,8 +241,11 @@ void T_HexenPlatRaise(plat_t *plat)
                plat->status = PLAT_UP;
             else
                plat->status = PLAT_DOWN;
-            SN_StartSequence((mobj_t *) &plat->sector->soundorg,
-                             SEQ_PLATFORM + plat->sector->seqType);
+            if (hexen)
+               SN_StartSequence((mobj_t *) &plat->sector->soundorg,
+                                SEQ_PLATFORM + plat->sector->seqType);
+            else
+               S_StartSound((mobj_t *) &plat->sector->soundorg, g_sfx_pstart);
          }
          break;
 

@@ -2873,11 +2873,25 @@ void P_SpawnSpecials (void)
     if (!sector->special)
       continue;
 
-    /* ZDoom Doom-in-Hexen maps carry ZDoom-numbered sector specials, which
-     * this switch (and the Boom generalized bits) would misinterpret.  Leave
-     * the values in place for the translation layer; spawn nothing for now. */
+    /* ZDoom Doom-in-Hexen sector specials wrap the Doom types at +64
+     * (dLight_Flicker=65 ... dDamage_SuperHellslime=80, dSector_Door*=74/75,
+     * up to dDamage_LavaHefty=89): translate and fall through to the Doom
+     * initialization, after which the per-tic P_PlayerInSpecialSector logic
+     * works on Doom numbers too.  Light_Phased(1) approximates as Doom's
+     * glowing light; specials with no Doom equivalent (the 200s scrollers
+     * and friction/wind groups) are cleared rather than misinterpreted. */
     if (map_format.zdoom)
-      continue;
+    {
+      if (sector->special >= 65 && sector->special <= 89)
+        sector->special -= 64;
+      else if (sector->special == 1)
+        sector->special = 8;
+      else
+      {
+        sector->special = 0;
+        continue;
+      }
+    }
 
     if (sector->special&SECRET_MASK) //jff 3/15/98 count extended
       totalsecret++;                 // secret sectors too

@@ -37,6 +37,7 @@
 #include "p_spec.h"
 #include "p_tick.h"
 #include "p_saveg.h"
+#include "map_format.h"
 #include "m_random.h"
 #include "am_map.h"
 #include "p_enemy.h"
@@ -766,6 +767,12 @@ void P_UnArchiveThinkers (void)
   }
 
   free(mobj_p);    // free translation table
+
+  /* ZDoom Doom-in-Hexen: rebuild the thing-id table from the restored
+   * mobjs so Teleport(tid) keeps working after a load (the Hexen game
+   * does the same from G_DoLoadGame). */
+  if (map_format.zdoom)
+    P_CreateTIDList();
 
   // killough 3/26/98: Spawn icon landings:
   if (gamemode == commercial)

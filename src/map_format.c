@@ -14,6 +14,11 @@
 #include "p_spec.h"
 #include "map_format.h"
 #include "hexen/p_spec_hexen.h"
+#include "g_game.h"
+#include "s_sound.h"
+#include "sounds.h"
+#include "d_deh.h"
+#include "lprintf.h"
 
 map_format_t map_format;
 
@@ -68,25 +73,88 @@ void P_ApplyMapFormat(void)
  * Hexen-stride parsing in p_setup and the positive-bit thing filtering in
  * P_SpawnMapThing; zdoom marks the specials as ZDoom-numbered.
  *
- * The trigger dispatchers are inert stubs for now: ZDoom action specials
- * share Hexen's special+args encoding but not its numbering, and the Doom
- * dispatchers would misinterpret the numbers as Doom line types.  The
- * specials translation layer lands in a later commit; until then such maps
- * load and are walkable, but lines and scripted sectors do nothing. */
+ * ZDoom action specials share Hexen's special+args encoding and -- for the
+ * classic range -- its numbering, so activation routes through the Hexen
+ * dispatchers and the executor below handles the ZDoom-only cases before
+ * delegating the rest to the Hexen executor (whose movers are game-aware). */
 
-static void P_InertCrossSpecialLine(line_t *line, int side, mobj_t *thing)
+/* ZDoom lock numbers for Doom-format games follow the Boom generalized
+ * scheme plus combination locks: 1-3 cards, 4-6 skulls, 100 any key,
+ * 101 all keys, 129-131 card-or-skull of each colour. */
+static dbool P_CheckZDoomLock(mobj_t *mo, int lock)
 {
-  (void)line; (void)side; (void)thing;
+  player_t   *p;
+  const char *msg = NULL;
+  dbool       ok  = false;
+
+  if (!mo || !mo->player)
+    return false;
+  p = mo->player;
+
+  switch (lock)
+  {
+    case 0:
+      return true;
+    case 1:   ok = p->cards[it_redcard];    msg = s_PD_REDK;    break;
+    case 2:   ok = p->cards[it_bluecard];   msg = s_PD_BLUEK;   break;
+    case 3:   ok = p->cards[it_yellowcard]; msg = s_PD_YELLOWK; break;
+    case 4:   ok = p->cards[it_redskull];   msg = s_PD_REDK;    break;
+    case 5:   ok = p->cards[it_blueskull];  msg = s_PD_BLUEK;   break;
+    case 6:   ok = p->cards[it_yellowskull];msg = s_PD_YELLOWK; break;
+    case 100:
+      ok = p->cards[it_redcard] || p->cards[it_bluecard] ||
+           p->cards[it_yellowcard] || p->cards[it_redskull] ||
+           p->cards[it_blueskull] || p->cards[it_yellowskull];
+      msg = s_PD_ANY;
+      break;
+    case 101:
+      ok = p->cards[it_redcard] && p->cards[it_bluecard] &&
+           p->cards[it_yellowcard] && p->cards[it_redskull] &&
+           p->cards[it_blueskull] && p->cards[it_yellowskull];
+      msg = s_PD_ALL6;
+      break;
+    case 129: ok = p->cards[it_redcard]    || p->cards[it_redskull];
+              msg = s_PD_REDK;    break;
+    case 130: ok = p->cards[it_bluecard]   || p->cards[it_blueskull];
+              msg = s_PD_BLUEK;   break;
+    case 131: ok = p->cards[it_yellowcard] || p->cards[it_yellowskull];
+              msg = s_PD_YELLOWK; break;
+    default:
+      lprintf(LO_WARN, "P_CheckZDoomLock: unhandled lock %d, opening\n", lock);
+      return true;
+  }
+
+  if (!ok)
+  {
+    p->message = msg;
+    S_StartSound(mo, sfx_oof);
+  }
+  return ok;
 }
 
-static void P_InertShootSpecialLine(mobj_t *thing, line_t *line)
+static dbool P_ExecuteZDoomLineSpecial(int special, byte *args, line_t *line,
+                                       int side, mobj_t *mo)
 {
-  (void)thing; (void)line;
-}
-
-static void P_InertPlayerInSpecialSector(player_t *player)
-{
-  (void)player;
+  switch (special)
+  {
+    case 13:                    /* Door_LockedRaise: Doom keys, not Hexen's */
+      if (!P_CheckZDoomLock(mo, args[3]))
+        return false;
+      return P_ExecuteHexenLineSpecial(12, args, line, side, mo);
+    case 243:                   /* Exit_Normal */
+      G_ExitLevel();
+      return true;
+    case 244:                   /* Exit_Secret */
+      G_SecretExitLevel();
+      return true;
+    case 181:                   /* Plane_Align (slopes): unsupported */
+    case 206:                   /* Plane_Copy (slopes): unsupported */
+    case 207:
+    case 208:                   /* TranslucentLine: unsupported */
+      return false;
+    default:
+      return P_ExecuteHexenLineSpecial(special, args, line, side, mo);
+  }
 }
 
 static const map_format_t zdoom_in_doom_map_format =
@@ -98,10 +166,10 @@ static const map_format_t zdoom_in_doom_map_format =
   false,                      /* sndseq   */
   false,                      /* animdefs */
   false,                      /* doublesky*/
-  P_InertCrossSpecialLine,
-  P_InertShootSpecialLine,
-  P_InertPlayerInSpecialSector,
-  NULL,                       /* execute_line_special (not yet) */
+  P_CrossHexenSpecialLine,
+  P_ShootHexenSpecialLine,
+  P_PlayerInSpecialSector,    /* sector specials are translated to Doom's */
+  P_ExecuteZDoomLineSpecial,
   VF_DOOM
 };
 

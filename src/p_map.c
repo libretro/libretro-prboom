@@ -1348,7 +1348,7 @@ dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
 
   if (!P_CheckPosition (thing, x, y))
     {
-      if (hexen)
+      if (map_format.hexen)
         Hexen_PushLineHits(thing);
       else if (heretic)
         Heretic_CheckMissileImpact(thing);
@@ -1372,7 +1372,7 @@ dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
             && !(ceilingline && untouched(ceilingline))
             && !(  floorline && untouched(  floorline));
 
-          if (hexen && !unstuck)
+          if (map_format.hexen && !unstuck)
             Hexen_PushLineHits(thing);
           else if (heretic && !unstuck)
             Heretic_CheckMissileImpact(thing);
@@ -2417,8 +2417,9 @@ dbool PTR_UseTraverse (intercept_t* in)
   //  return FALSE;   // don't use back side
 
   /* Hexen line specials use a byte special + args encoding handled by the
-   * Hexen specials layer; Doom maps use the classic P_UseSpecialLine. */
-  if (hexen)
+   * Hexen specials layer (also ZDoom Doom-in-Hexen maps); Doom maps use the
+   * classic P_UseSpecialLine. */
+  if (map_format.hexen)
     P_UseHexenSpecialLine (usething, in->d.line, side);
   else
     P_UseSpecialLine (usething, in->d.line, side);

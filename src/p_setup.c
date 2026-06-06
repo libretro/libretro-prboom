@@ -2586,7 +2586,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    {
       lprintf(LO_INFO,
               "P_SetupLevel: %s: ZDoom Doom-in-Hexen format map; "
-              "line specials not yet supported\n", lumpname);
+              "specials translated (slopes unsupported)\n", lumpname);
       P_ApplyZDoomInDoomMapFormat();
    }
 
@@ -2816,6 +2816,14 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
        * hub travel completes -- consuming them here would start them on the
        * freshly set-up level only for the hub restore to destroy their
        * thinkers and overwrite their effects (sv_save.c). */
+   }
+   else if (map_format.zdoom)
+   {
+      /* ZDoom Doom-in-Hexen: Teleport(tid) destinations are looked up by
+       * thing id, and Line_SetIdentification(121) lines carry their tag in
+       * args[0]; both tables hang off the freshly spawned level data. */
+      P_InitHexenTaggedLines();
+      P_CreateTIDList();
    }
 
    P_MapEnd();

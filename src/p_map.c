@@ -2839,12 +2839,38 @@ dbool PIT_ChangeSector (mobj_t* thing)
 
   if (thing->health <= 0)
     {
-    P_SetMobjState (thing, S_GIBS);
+    if (hexen)
+      {
+      /* Hexen only crunches corpses, and its giblet state is its own --
+       * S_GIBS is a Doom state number and indexes the bell's ring
+       * animation in the Hexen table.  Dead-but-not-yet-corpse things
+       * fall through and take crushing damage below, as in vanilla. */
+      if (thing->flags & MF_CORPSE)
+        {
+        if (thing->flags & MF_NOBLOOD)
+          {
+          P_RemoveMobj(thing);
+          }
+        else if (thing->state != &states[HEXEN_S_GIBS1])
+          {
+          P_SetMobjState(thing, HEXEN_S_GIBS1);
+          thing->height = 0;
+          thing->radius = 0;
+          S_StartSound(thing, hexen_sfx_player_falling_splat);
+          }
+        return TRUE; // keep checking
+        }
+      }
+    else
+      {
+      if (!heretic) /* Heretic crushes leave the corpse state alone */
+        P_SetMobjState (thing, S_GIBS);
 
-    thing->flags &= ~MF_SOLID;
-    thing->height = 0;
-    thing->radius = 0;
-    return TRUE; // keep checking
+      thing->flags &= ~MF_SOLID;
+      thing->height = 0;
+      thing->radius = 0;
+      return TRUE; // keep checking
+      }
     }
 
   // crunch dropped items

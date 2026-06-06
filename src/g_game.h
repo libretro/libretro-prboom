@@ -48,7 +48,8 @@
 #define MAX_EPISODE_NUM 7
 
 dbool   G_Responder(event_t *ev);
-angle_t G_PendingTurn(void); /* frame-rate mouse turn preview */
+angle_t G_PendingTurn(void); /* frame-rate turn preview */
+dbool   G_PendingTurnActive(void);
 dbool   G_CheckDemoStatus(void);
 void G_DeathMatchSpawnPlayer(int playernum);
 void G_InitNew(skill_t skill, int episode, int map);

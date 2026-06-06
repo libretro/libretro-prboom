@@ -752,9 +752,18 @@ static void R_SetupFrame (player_t *player)
 
   R_InterpolateView (player);
 
-  /* Low-latency turning: fold the mouse counts the next tic will
-   * consume into this frame's view angle (g_game.c). */
-  viewangle += G_PendingTurn();
+  /* Low-latency turning: the view answers staged turn input every
+   * frame instead of waiting for the tic.  The base must be the
+   * LATEST tic's angle, not the interpolated one: the staged turn is
+   * shown in full as it accumulates, and once a tic consumes it the
+   * angle lerp would replay the same delta gradually while the new
+   * pending restarts at zero -- a backward snap and re-advance every
+   * tic.  Player rotation only ever comes from ticcmds, so anchoring
+   * to the latest angle plus the staged remainder loses nothing and
+   * advances monotonically. */
+  if (G_PendingTurnActive())
+    viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset
+              + G_PendingTurn();
 
   extralight = player->extralight;
 

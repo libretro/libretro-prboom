@@ -651,12 +651,17 @@ void G_BuildTiccmd(ticcmd_t* cmd)
  * Inert while strafing (the same condition under which G_BuildTiccmd
  * turns mousex into sidemove), during demo playback (mouse events are
  * not driving the player), and outside levels. */
+dbool G_PendingTurnActive(void)
+{
+  return lowlatency_turning && !demoplayback && gamestate == GS_LEVEL &&
+         !menuactive && !paused;
+}
+
 angle_t G_PendingTurn(void)
 {
   int D_PendingLocalTurn(void);
 
-  if (!lowlatency_turning || demoplayback || gamestate != GS_LEVEL ||
-      menuactive || paused)
+  if (!G_PendingTurnActive())
     return 0;
   return (angle_t) D_PendingLocalTurn() << 16;
 }

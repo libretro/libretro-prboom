@@ -3143,11 +3143,16 @@ enum {
   general_smoothfactor,
   general_defskill,
   general_persist,
+  general_bloodcap,
 };
 
 
 #define G_YB  60
 #define G_YB1 (G_YB+20)
+
+static const char *gen_bloodcapstrings[] = {
+  "256", "512", "1024", "2048", "4096", "Unlimited", NULL
+};
 
 static const char *gen_skillstrings[] = {
   // Dummy first option because defaultskill is 1-based
@@ -3179,6 +3184,9 @@ setup_menu_t gen_settings2[] = { // General Settings screen2
 
   {"Persistent State", S_YESNO, m_null, G_X,
    G_YB1 + general_persist*8, {"persistent_state"}, 0, 0, NULL, NULL},
+
+  {"Persistent Blood Cap", S_CHOICE, m_null, G_X,
+   G_YB1 + general_bloodcap*8, {"persistent_blood_cap"}, 0, 0, NULL, gen_bloodcapstrings},
 
   SETUP_MENU_PREV(gen_settings1, KB_PREV, KB_Y+20*8),
   SETUP_MENU_NEXT(gen_settings3, KB_NEXT, KB_Y+20*8),

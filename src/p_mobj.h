@@ -540,6 +540,7 @@ void    P_CreateTIDList(void);
 void    P_InsertMobjIntoTIDList(mobj_t *mobj, short tid);
 void    P_RemoveMobjFromTIDList(mobj_t *mobj);
 void    P_RipperBlood(mobj_t *mo, mobj_t *bleeder);
+void    P_ResetBloodQueue(void); /* persistent-state blood ring */
 void    P_BloodSplatter(fixed_t x, fixed_t y, fixed_t z, mobj_t *originator);
 void    P_BloodSplatter2(fixed_t x, fixed_t y, fixed_t z, mobj_t *originator);
 mobj_t *P_FindMobjFromTID(short tid, int *searchPosition);

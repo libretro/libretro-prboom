@@ -285,6 +285,7 @@ extern  gamestate_t     wipegamestate;
 
 extern  int             lowlatency_turning;     /* per-frame mouse turn */
 extern  int             persistent_state;       /* debris stays on the floor */
+extern  int             persistent_blood_cap;   /* resting blood ring size choice */
 extern  int             mouseSensitivity_horiz; // killough
 extern  int             mouseSensitivity_vert;
 

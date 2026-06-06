@@ -2675,6 +2675,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    // a much simpler fix is in g_game.c -- killough 10/98
 
    bodyqueslot = 0;
+   P_ResetBloodQueue();
 
    /* cph - reset all multiplayer starts */
    memset(playerstarts,0,sizeof(playerstarts));

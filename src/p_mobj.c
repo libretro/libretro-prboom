@@ -82,12 +82,90 @@ fixed_t FloatBobOffsets[64] =
 //
 
 /* Persistent State (config persistent_state, General -> Miscellaneous):
- * Hexen's stained-glass shards land in a rest state that expires after
- * 30 tics and removes them; pottery bits, by contrast, rest forever.
- * With the setting on, the shards keep their debris too.  Guarded off
- * during demos and netgames, since whether a mobj lingers is
- * simulation state. */
+ * expiring debris rests instead of being cleaned up.  Hexen's
+ * stained-glass shards land in a rest state that expires after 30
+ * tics; ice chunks from a freeze-death shatter melt away after a
+ * randomized delay; and blood splats in all three games vanish less
+ * than a second after a hit.  Pottery bits and crushed-corpse gibs,
+ * by contrast, rest forever in vanilla -- this setting extends that
+ * treatment to the rest of the debris.  Guarded off during demos and
+ * netgames, since whether a mobj lingers is simulation state.
+ *
+ * Blood is unbounded -- every hitscan hit spawns a splat -- so resting
+ * blood is kept in a ring whose size persistent_blood_cap selects;
+ * the oldest splat is recycled when the ring is full.  The ring is
+ * reset on level setup, so blood restored by a savegame or hub
+ * archive is simply no longer tracked (it persists, bounded by what
+ * the save contains). */
 int persistent_state;
+int persistent_blood_cap; /* choice index into blood_cap_values */
+
+static const int blood_cap_values[] = {256, 512, 1024, 2048, 4096, 0};
+
+#define BLOODQUE_MAX 4096
+static mobj_t *bloodque[BLOODQUE_MAX];
+static int bloodque_head, bloodque_len;
+
+void P_ResetBloodQueue(void)
+{
+  bloodque_head = 0;
+  bloodque_len = 0;
+}
+
+static dbool P_PersistentDebrisActive(void)
+{
+  return persistent_state && !demoplayback && !netgame;
+}
+
+static dbool P_IsRestingDebris(const mobj_t *mobj)
+{
+  return hexen &&
+         ((mobj->type >= HEXEN_MT_SGSHARD1 &&
+           mobj->type <= HEXEN_MT_SGSHARD0) ||
+          mobj->type == HEXEN_MT_ICECHUNK);
+}
+
+static dbool P_IsBlood(const mobj_t *mobj)
+{
+  if (hexen)
+    return mobj->type == HEXEN_MT_BLOOD ||
+           mobj->type == HEXEN_MT_BLOODSPLATTER;
+  if (heretic)
+    return mobj->type == HERETIC_MT_BLOOD ||
+           mobj->type == HERETIC_MT_BLOODSPLATTER;
+  return mobj->type == MT_BLOOD;
+}
+
+/* pin an expiring rest frame; for blood, enter it into the capped ring */
+static void P_PinDebris(mobj_t *mobj)
+{
+  int cap;
+
+  if (P_IsRestingDebris(mobj))
+  {
+    mobj->tics = -1;
+    return;
+  }
+  if (!P_IsBlood(mobj))
+    return;
+
+  mobj->tics = -1;
+  cap = blood_cap_values[persistent_blood_cap];
+  if (cap > BLOODQUE_MAX)
+    cap = BLOODQUE_MAX;
+  if (cap > 0)
+  {
+    while (bloodque_len >= cap)
+    {
+      int tail = (bloodque_head - bloodque_len + BLOODQUE_MAX) % BLOODQUE_MAX;
+      P_RemoveMobj(bloodque[tail]);
+      bloodque_len--;
+    }
+    bloodque[bloodque_head] = mobj;
+    bloodque_head = (bloodque_head + 1) % BLOODQUE_MAX;
+    bloodque_len++;
+  }
+}
 
 dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
 {
@@ -143,12 +221,6 @@ dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
     st = &states[state];
     mobj->state = st;
     mobj->tics = st->tics;
-
-    /* Persistent State: pin a glass shard's expiring rest state */
-    if (persistent_state && hexen && !demoplayback && !netgame &&
-        mobj->type >= HEXEN_MT_SGSHARD1 && mobj->type <= HEXEN_MT_SGSHARD0 &&
-        mobj->tics > 0 && st->nextstate == HEXEN_S_NULL)
-      mobj->tics = -1;
     mobj->sprite = st->sprite;
     mobj->frame = st->frame;
 
@@ -157,6 +229,14 @@ dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
 
     if (st->action.arg1)
       st->action.arg1(mobj);
+
+    /* Persistent State: a debris mobj entering a finite rest frame that
+     * chains to S_NULL is about to expire -- pin it instead.  After the
+     * action call, so A_IceSetTics has already re-randomized the melt
+     * (and consumed its P_Random) before the pin overrides it. */
+    if (mobj->state == st && mobj->tics > 0 && st->nextstate == S_NULL &&
+        P_PersistentDebrisActive())
+      P_PinDebris(mobj);
 
     seenstate[state] = 1 + st->nextstate;   // killough 4/9/98
 

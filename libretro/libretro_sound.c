@@ -225,6 +225,8 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
 
 void I_SetChannels(void)
 {
+   int i;
+
    {
       int p;
       double base = 1.0;
@@ -249,8 +251,6 @@ void I_SetChannels(void)
     * This function sets up internal lookups used during
     * the mixing process.
     */
-
-   int i;
 
    /* Okay, reset internal mixing channels to zero. */
    for (i = 0; i < NUM_CHANNELS; i++)

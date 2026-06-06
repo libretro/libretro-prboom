@@ -83,6 +83,11 @@ void R_PrecacheLevel (void);
 // lookup by name. For animation?
 int R_FlatNumForName (const char* name);   // killough -- const added
 
+/* Synthetic flats: ZDoom wall textures used as floors (chex3.wad), served
+ * from a side table at flat numbers >= numflats. */
+dbool R_IsSyntheticFlat(int picnum);
+const uint8_t *R_GetSyntheticFlat(int picnum);
+
 
 // R_*TextureNumForName returns the texture number for the texture name, or NO_TEXTURE if 
 //  there is no texture (i.e. "-") specified.

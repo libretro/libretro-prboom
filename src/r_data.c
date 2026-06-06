@@ -436,11 +436,117 @@ void R_InitData(void)
 // killough 4/17/98: changed to use ns_flats namespace
 //
 
+/* --- Synthetic flats: wall textures used as floors -------------------------
+ * ZDoom allows any texture on any surface, so ZDoom-targeted wads
+ * (chex3.wad) name wall textures in sector floor/ceiling fields; the name
+ * then exists in the texture namespace but not the flats one.  When the
+ * name is also a single patch lump (true for all of chex3's cases, whose
+ * textures are one same-named 128x128 patch each), decode the patch and
+ * point-sample it to the 64x64 raw cell the span renderer draws,
+ * registering the result in a side table addressed by flat numbers from
+ * numflats upward.  R_DoDrawPlane serves these directly, R_PrecacheLevel
+ * skips them, and the animation tables can never match them.  Multi-patch
+ * compositing is not attempted; such names keep the placeholder flat. */
+
+#define MAX_SYNTH_FLATS 32
+
+static struct synth_flat_s
+{
+  char    name[9];
+  uint8_t data[4096];
+} synth_flats[MAX_SYNTH_FLATS];
+static int num_synth_flats;
+
+dbool R_IsSyntheticFlat(int picnum)
+{
+  return picnum >= numflats && picnum < numflats + num_synth_flats;
+}
+
+const uint8_t *R_GetSyntheticFlat(int picnum)
+{
+  return synth_flats[picnum - numflats].data;
+}
+
+static int R_SynthFlatFromPatch(const char *name)
+{
+  int            i, lump, w, h, x, y;
+  size_t         lumplen;
+  const uint8_t *pat;
+  uint8_t       *tmp;
+  struct synth_flat_s *sf;
+
+  for (i = 0; i < num_synth_flats; i++)
+    if (!strncasecmp(synth_flats[i].name, name, 8))
+      return numflats + i;
+
+  if (num_synth_flats == MAX_SYNTH_FLATS)
+    return -1;
+
+  lump = (W_CheckNumForName)(name, ns_global);
+  if (lump < 0)
+    return -1;
+  lumplen = W_LumpLength(lump);
+  if (lumplen < 8)
+    return -1;
+
+  pat = W_CacheLumpNum(lump);
+  w = (short)(pat[0] | (pat[1] << 8));
+  h = (short)(pat[2] | (pat[3] << 8));
+  if (w <= 0 || h <= 0 || w > 1024 || h > 1024 ||
+      lumplen < 8 + 4 * (size_t)w)
+  {
+    W_UnlockLumpNum(lump);
+    return -1;
+  }
+
+  tmp = calloc((size_t)w * h, 1);
+  if (!tmp)
+  {
+    W_UnlockLumpNum(lump);
+    return -1;
+  }
+
+  for (x = 0; x < w; x++)
+  {
+    size_t ofs = (size_t)(pat[8 + 4 * x]       |
+                         (pat[8 + 4 * x + 1] << 8)  |
+                         (pat[8 + 4 * x + 2] << 16) |
+                ((size_t) pat[8 + 4 * x + 3] << 24));
+    /* walk the column's posts, staying inside the lump */
+    while (ofs + 1 < lumplen && pat[ofs] != 0xff)
+    {
+      int topdelta = pat[ofs];
+      int len      = pat[ofs + 1];
+      if (ofs + 4 + (size_t)len > lumplen)
+        break;
+      for (y = 0; y < len; y++)
+        if (topdelta + y < h)
+          tmp[(topdelta + y) * w + x] = pat[ofs + 3 + y];
+      ofs += (size_t)len + 4;
+    }
+  }
+  W_UnlockLumpNum(lump);
+
+  sf = &synth_flats[num_synth_flats];
+  strncpy(sf->name, name, 8);
+  sf->name[8] = 0;
+  for (y = 0; y < 64; y++)
+    for (x = 0; x < 64; x++)
+      sf->data[y * 64 + x] = tmp[(y * h / 64) * w + (x * w / 64)];
+  free(tmp);
+
+  lprintf(LO_INFO, "R_FlatNumForName: %.8s served from texture patch\n", name);
+  return numflats + num_synth_flats++;
+}
+
 int R_FlatNumForName(const char *name)    // killough -- const added
 {
   int i = (W_CheckNumForName)(name, ns_flats);
   if (i == -1)
   {
+    /* ZDoom-style texture-on-floor: serve the texture's patch as a flat. */
+    int synth = R_SynthFlatFromPatch(name);
+
     /* I_Error is non-fatal in this core (logs and returns).  A missing
      * flat usually means a wrong/absent IWAD; don't fall through and
      * return a negative index that callers use to index flat arrays out
@@ -451,6 +557,9 @@ int R_FlatNumForName(const char *name)    // killough -- const added
      * E1M2, whose sectors name flats that only exist in ZDoom's textures
      * namespace). */
     static int fallback = -2;
+
+    if (synth >= 0)
+      return synth;
 
     I_Error("R_FlatNumForName: %.8s not found", name);
 
@@ -558,7 +667,13 @@ void R_PrecacheLevel(void)
   memset(hitlist, 0, numflats);
 
   for (i = numsectors; --i >= 0; )
-    hitlist[sectors[i].floorpic] = hitlist[sectors[i].ceilingpic] = 1;
+  {
+    /* synthetic flats (textures on floors) sit beyond the hitlist */
+    if (sectors[i].floorpic < numflats)
+      hitlist[sectors[i].floorpic] = 1;
+    if (sectors[i].ceilingpic < numflats)
+      hitlist[sectors[i].ceilingpic] = 1;
+  }
 
   for (i = numflats; --i >= 0; )
     if (hitlist[i])

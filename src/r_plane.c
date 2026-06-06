@@ -608,7 +608,12 @@ static void R_DoDrawPlane(visplane_t *pl)
          int stop, light;
          draw_span_vars_t dsvars;
 
-         dsvars.source = W_CacheLumpNum(firstflat + flattranslation[pl->picnum]);
+         /* Synthetic flats (textures on floors) live outside the lump
+          * range and the animation translation table. */
+         if (R_IsSyntheticFlat(pl->picnum))
+            dsvars.source = R_GetSyntheticFlat(pl->picnum);
+         else
+            dsvars.source = W_CacheLumpNum(firstflat + flattranslation[pl->picnum]);
 
          xoffs = pl->xoffs;  // killough 2/28/98: Add offsets
          yoffs = pl->yoffs;
@@ -629,7 +634,8 @@ static void R_DoDrawPlane(visplane_t *pl)
             R_MakeSpans(x,pl->top[x-1],pl->bottom[x-1],
                   pl->top[x],pl->bottom[x], &dsvars);
 
-         W_UnlockLumpNum(firstflat + flattranslation[pl->picnum]);
+         if (!R_IsSyntheticFlat(pl->picnum))
+            W_UnlockLumpNum(firstflat + flattranslation[pl->picnum]);
       }
    }
 }

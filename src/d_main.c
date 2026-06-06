@@ -91,6 +91,7 @@
 #include "am_map.h"
 #include "u_mapinfo.h"
 #include "u_decorate.h"
+#include "u_zmapinfo.h"
 
 void GetFirstMap(int *ep, int *map); // Ty 08/29/98 - add "-warp x" functionality
 static void D_PageDrawer(void);
@@ -1648,6 +1649,18 @@ bool D_DoomMainSetup(void)
       lprintf(LO_INFO,"U_ParseMapInfo: Loading Custom Episode and Map Information.\n");
       data = (const char *)W_CacheLumpNum(p);
       U_ParseMapInfo(data, W_LumpLength(p));
+    }
+
+    /* ZDoom wads carry episode structure in a MAPINFO lump instead;
+     * translate it into the UMAPINFO tables when no UMAPINFO took
+     * precedence.  Hexen and Heretic interpret MAPINFO themselves. */
+    if (!hexen && !heretic && !U_mapinfo.mapcount &&
+        (p = W_CheckNumForName("MAPINFO")) >= 0)
+    {
+      const char *data;
+      lprintf(LO_INFO,"U_ParseZMapInfo: Translating ZDoom MAPINFO.\n");
+      data = (const char *)W_CacheLumpNum(p);
+      U_ParseZMapInfo(data, W_LumpLength(p));
     }
   }
 

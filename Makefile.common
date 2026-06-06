@@ -142,6 +142,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/u_mapinfo.c \
 				 $(CORE_DIR)/u_musinfo.c \
 				 $(CORE_DIR)/u_decorate.c \
+				 $(CORE_DIR)/u_zmapinfo.c \
 
 
 ifeq ($(WANT_FLUIDSYNTH), 1)

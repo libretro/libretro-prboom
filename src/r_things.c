@@ -150,14 +150,82 @@ static void R_InstallSpriteLump(int lump, unsigned frame,
 
 #define R_SpriteNameHash(s) ((unsigned)((s)[0]-((s)[1]*3-(s)[3]*2-(s)[2])*2))
 
+/* DECORATE-bearing wads (ZDoom-targeted pwads such as chex3.wad) redefine
+ * their decorations' state sequences in DECORATE, which this engine cannot
+ * read.  When such a wad replaces only a subset of a sprite's frames, the
+ * vanilla state tables keep cycling through the full sequence and the
+ * remaining frames leak the older wad's art mid-animation (chex3 carries
+ * only frame A of BAR1/COL5, so Doom's barrel/pillar art shows every other
+ * cycle).  The DECORATE wad never meant the older art to appear, so unify
+ * the sprite to its art: slots sourced from older wads borrow the nearest
+ * same-rotation frame the DECORATE wad does provide.  Wads without a
+ * DECORATE lump are untouched -- partial sprite overrides there (smooth
+ * weapon packs, single-frame fix wads) mix sources intentionally. */
+static void R_UnifyDecorateSprite(const wadfile_info_t *decorate_wad)
+{
+   int f, r, f2;
+   int has_dec = 0, has_old = 0;
+
+   for (f = 0; f <= maxframe; f++)
+      for (r = 0; r < 8; r++)
+         if (sprtemp[f].lump[r] != -1)
+         {
+            if (lumpinfo[firstspritelump + sprtemp[f].lump[r]].wadfile
+                == decorate_wad)
+               has_dec = 1;
+            else
+               has_old = 1;
+         }
+
+   if (!has_dec || !has_old)
+      return;
+
+   for (f = 0; f <= maxframe; f++)
+      for (r = 0; r < 8; r++)
+      {
+         if (sprtemp[f].lump[r] == -1)
+            continue;
+         if (lumpinfo[firstspritelump + sprtemp[f].lump[r]].wadfile
+             == decorate_wad)
+            continue;
+
+         /* nearest frame letter below, then above, with this rotation
+          * supplied by the DECORATE wad */
+         {
+            int found = -1;
+            for (f2 = f - 1; f2 >= 0 && found < 0; f2--)
+               if (sprtemp[f2].lump[r] != -1
+                   && lumpinfo[firstspritelump + sprtemp[f2].lump[r]].wadfile
+                      == decorate_wad)
+                  found = f2;
+            for (f2 = f + 1; f2 <= maxframe && found < 0; f2++)
+               if (sprtemp[f2].lump[r] != -1
+                   && lumpinfo[firstspritelump + sprtemp[f2].lump[r]].wadfile
+                      == decorate_wad)
+                  found = f2;
+            if (found >= 0)
+            {
+               sprtemp[f].lump[r] = sprtemp[found].lump[r];
+               sprtemp[f].flip[r] = sprtemp[found].flip[r];
+            }
+         }
+      }
+}
+
 static void R_InitSpriteDefs(const char * const * namelist)
 {
    size_t numentries = lastspritelump-firstspritelump+1;
    struct { int index, next; } *hash;
    int i;
+   const wadfile_info_t *decorate_wad = NULL;
+   int decorate_lump;
 
    if (!numentries || !*namelist)
       return;
+
+   decorate_lump = W_CheckNumForName("DECORATE");
+   if (decorate_lump >= 0)
+      decorate_wad = lumpinfo[decorate_lump].wadfile;
 
    // DSDHacked: the sprite-name table can be grown by dehacked and may
    // contain NULL gaps at unfilled indices, so its length is the runtime
@@ -231,6 +299,9 @@ static void R_InitSpriteDefs(const char * const * namelist)
             }
          }
          while ((j = hash[j].next) >= 0);
+
+         if (decorate_wad && maxframe >= 0)
+            R_UnifyDecorateSprite(decorate_wad);
 
          // check the frames that were found for completeness
          if ((sprites[i].numframes = ++maxframe))  // killough 1/31/98

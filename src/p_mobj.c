@@ -81,6 +81,14 @@ fixed_t FloatBobOffsets[64] =
 // Returns TRUE if the mobj is still present.
 //
 
+/* Persistent State (config persistent_state, General -> Miscellaneous):
+ * Hexen's stained-glass shards land in a rest state that expires after
+ * 30 tics and removes them; pottery bits, by contrast, rest forever.
+ * With the setting on, the shards keep their debris too.  Guarded off
+ * during demos and netgames, since whether a mobj lingers is
+ * simulation state. */
+int persistent_state;
+
 dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
 {
   state_t*  st;
@@ -135,6 +143,12 @@ dbool P_SetMobjState(mobj_t* mobj,statenum_t state)
     st = &states[state];
     mobj->state = st;
     mobj->tics = st->tics;
+
+    /* Persistent State: pin a glass shard's expiring rest state */
+    if (persistent_state && hexen && !demoplayback && !netgame &&
+        mobj->type >= HEXEN_MT_SGSHARD1 && mobj->type <= HEXEN_MT_SGSHARD0 &&
+        mobj->tics > 0 && st->nextstate == HEXEN_S_NULL)
+      mobj->tics = -1;
     mobj->sprite = st->sprite;
     mobj->frame = st->frame;
 
@@ -635,7 +649,16 @@ static void P_FloorBounceMissile(mobj_t *mo)
         mo->momz = FixedMul(mo->momz, (fixed_t)(-0.3 * FRACUNIT));
         if (D_abs(mo->momz) < (FRACUNIT / 2))
         {
-          P_SetMobjState(mo, HEXEN_S_NULL);
+          /* Persistent State: a settling shard comes to rest in its
+           * lying-down frame (whose expiry P_SetMobjState pins) instead
+           * of vanishing the moment it stops bouncing */
+          if (persistent_state && !demoplayback && !netgame)
+          {
+            mo->momx = mo->momy = mo->momz = 0;
+            P_SetMobjState(mo, mo->info->deathstate);
+          }
+          else
+            P_SetMobjState(mo, HEXEN_S_NULL);
           return;
         }
         break;

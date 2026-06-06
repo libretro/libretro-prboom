@@ -3142,6 +3142,7 @@ enum {
   general_smooth,
   general_smoothfactor,
   general_defskill,
+  general_persist,
 };
 
 
@@ -3175,6 +3176,9 @@ setup_menu_t gen_settings2[] = { // General Settings screen2
 
   {"Default skill level", S_CHOICE, m_null, G_X,
     G_YB1 + general_defskill*8, {"default_skill"}, 0, 0, NULL, gen_skillstrings},
+
+  {"Persistent State", S_YESNO, m_null, G_X,
+   G_YB1 + general_persist*8, {"persistent_state"}, 0, 0, NULL, NULL},
 
   SETUP_MENU_PREV(gen_settings1, KB_PREV, KB_Y+20*8),
   SETUP_MENU_NEXT(gen_settings3, KB_NEXT, KB_Y+20*8),

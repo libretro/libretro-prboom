@@ -284,6 +284,7 @@ extern  dbool precache;
 extern  gamestate_t     wipegamestate;
 
 extern  int             lowlatency_turning;     /* per-frame mouse turn */
+extern  int             persistent_state;       /* debris stays on the floor */
 extern  int             mouseSensitivity_horiz; // killough
 extern  int             mouseSensitivity_vert;
 

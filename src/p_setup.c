@@ -51,6 +51,7 @@
 #include "p_maputl.h"
 #include "p_map.h"
 #include "p_setup.h"
+#include "u_zanimdefs.h"
 #include "p_spec.h"
 #include "map_format.h"
 #include "udmf.h"
@@ -2871,6 +2872,7 @@ void P_Init (void)
 {
    P_InitSwitchList();
    P_InitPicAnims();
+   U_LoadAnimDefs();
    P_InitFTAnims();  /* hexen ANIMDEFS (no-op otherwise) */
    P_InitLava();     /* raven fire inflictor (no-op otherwise) */
    P_InitTerrainTypes();

@@ -55,6 +55,7 @@
 #include "r_things.h"
 #include "r_sky.h"
 #include "r_plane.h"
+#include "u_zanimdefs.h"
 #include "v_video.h"
 #include "lprintf.h"
 #include "i_system.h"
@@ -493,7 +494,14 @@ static void R_DoDrawPlane(visplane_t *pl)
          else
          {    // Normal Doom sky, only one allowed per level
             dcvars.texturemid = skytexturemid;    // Default y-offset
-            texture = skytexture;             // Default texture
+            /* ZDoom ANIMDEFS can animate the sky texture, which is drawn
+             * outside the texturetranslation path walls use; read through
+             * the translation so an animated sky cycles.  Without
+             * ANIMDEFS the translation is the identity. */
+            if (U_ZAnimPresent)
+               texture = texturetranslation[skytexture];
+            else
+               texture = skytexture;          // Default texture
             flip = 0;                         // Doom flips it
 
             /* Hexen scrolls the sky horizontally.  Sky1ColumnOffset

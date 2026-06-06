@@ -41,6 +41,7 @@
 
 #include "doomstat.h"
 #include "p_spec.h"
+#include "u_zanimdefs.h"
 #include "map_format.h"
 #include "hexen/p_spec_hexen.h"
 #include "p_saveg.h"
@@ -2770,6 +2771,10 @@ void P_UpdateSpecials (void)
         flattranslation[i] = pic;
     }
   }
+
+  /* ZDoom ANIMDEFS frame-list animations */
+  if (U_ZAnimPresent)
+    U_UpdateZAnims();
 
   // Check buttons (retriggerable switches) and change texture on timeout
   for (i = 0; i < MAXBUTTONS; i++)

@@ -2876,22 +2876,30 @@ void P_SpawnSpecials (void)
 
     /* ZDoom Doom-in-Hexen sector specials wrap the Doom types at +64
      * (dLight_Flicker=65 ... dDamage_SuperHellslime=80, dSector_Door*=74/75,
-     * up to dDamage_LavaHefty=89): translate and fall through to the Doom
-     * initialization, after which the per-tic P_PlayerInSpecialSector logic
-     * works on Doom numbers too.  Light_Phased(1) approximates as Doom's
-     * glowing light; specials with no Doom equivalent (the 200s scrollers
-     * and friction/wind groups) are cleared rather than misinterpreted. */
+     * up to dDamage_LavaHefty=89) and carry Boom's generalized flags
+     * shifted up by 3: damage 0x0300, secret 0x0400, friction 0x0800 and
+     * push 0x1000 correspond to Boom's 0x60/0x80/0x100/0x200.  Translate
+     * the base type, shift the flags down, and fall through to the Doom
+     * initialization: the per-tic P_PlayerInSpecialSector logic and the
+     * secret counting below then work on Doom/Boom numbers throughout.
+     * Light_Phased(1) approximates as Doom's glowing light; base types
+     * with no Doom equivalent (the 200s scroll/carry group) are cleared
+     * rather than misinterpreted. */
     if (map_format.zdoom)
     {
-      if (sector->special >= 65 && sector->special <= 89)
-        sector->special -= 64;
-      else if (sector->special == 1)
-        sector->special = 8;
+      int base = sector->special & 0xFF;
+      int bits = sector->special & (0x0300 | 0x0400 | 0x0800 | 0x1000);
+
+      if (base >= 65 && base <= 89)
+        base -= 64;
+      else if (base == 1)
+        base = 8;
       else
-      {
-        sector->special = 0;
+        base = 0;
+
+      sector->special = base | (bits >> 3);
+      if (!sector->special)
         continue;
-      }
     }
 
     if (sector->special&SECRET_MASK) //jff 3/15/98 count extended

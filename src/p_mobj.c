@@ -40,6 +40,7 @@
 #include "p_tick.h"
 #include "p_spec.h"
 #include "map_format.h"
+#include "u_decorate.h"
 #include "dsda_hacked.h"
 #include "sounds.h"
 #include "st_stuff.h"
@@ -2354,8 +2355,25 @@ void P_SpawnMapThing (const mapthing_t* mthing)
 
   if (i >= num_mobj_types)
   {
-    doom_printf("Unknown Thing type %i at (%i, %i)",mthing->type,mthing->x,mthing->y);
-    return;
+    /* ZDoom Doom-in-Hexen maps: a DECORATE actor with a new editor number
+     * may be a reskinned base-game monster -- spawn it as the class its
+     * inheritance chain roots in (chex3.wad's Larva and Quadrumpus).
+     * ZDoom editor-only things (cameras, particle fountains, view stacks)
+     * are skipped without the warning. */
+    if (map_format.zdoom)
+    {
+      int alias;
+      if (U_IsInertZDoomThing(thingtype))
+        return;
+      alias = U_DecorateAliasDoomedNum(thingtype);
+      if (alias >= 0)
+        i = P_FindDoomedNum(alias);
+    }
+    if (i >= num_mobj_types)
+    {
+      doom_printf("Unknown Thing type %i at (%i, %i)",mthing->type,mthing->x,mthing->y);
+      return;
+    }
   }
 
   // don't spawn keycards and players in deathmatch

@@ -58,6 +58,13 @@
 #include "u_zanimdefs.h"
 #include "v_video.h"
 #include "lprintf.h"
+
+/* DISTMAP mirrors the (file-local) constant in r_main.c's R_InitLightTables;
+ * the Smooth floor fine-weight recompute must use the identical value so its
+ * 64-resolution darkness agrees with the 32-band zlight table at band centres. */
+#ifndef DISTMAP
+#define DISTMAP 2
+#endif
 #include "i_system.h"
 
 #define MAXVISPLANES 128    /* must be a power of 2 */
@@ -91,6 +98,7 @@ static int spanstart[MAX_SCREENHEIGHT];                // killough 2/8/98
 //
 
 static const lighttable_t **planezlight;
+static int                  planelightlevel; /* LIGHTLEVELS index of current plane, for Smooth fine weight */
 static fixed_t planeheight;
 
 // killough 2/8/98: make variables static
@@ -201,6 +209,34 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
       if (index >= MAXLIGHTZ )
          index = MAXLIGHTZ-1;
       dsvars->colormap = planezlight[index];
+
+      /* Smooth shading: publish the distance darkness at 64-step resolution.
+       * R_InitLightTables baked planezlight at NUMCOLORMAPS (32) granularity
+       * via:  level = startmap - (scale>>LIGHTSCALESHIFT)/DISTMAP, with
+       *       startmap = ((LIGHTLEVELS-1-light)*2)*NUMCOLORMAPS/LIGHTLEVELS
+       * and scale = FixedDiv(320/2*FRACUNIT,(index+1)<<LIGHTZSHIFT).
+       * Recompute the same value with NUMCOLORMAPS replaced by
+       * VID_NUMCOLORWEIGHTS (64) so the darkness index carries sub-band
+       * precision while agreeing with Default at the band centres.  Mapped
+       * to a 0..63 weight (63 = brightest). */
+      if (r_smooth_shading && fullcolormap)
+      {
+         int startmap = ((LIGHTLEVELS-1-planelightlevel)*2)
+                        * VID_NUMCOLORWEIGHTS / LIGHTLEVELS;
+         int scale    = FixedDiv((320/2*FRACUNIT),(index+1)<<LIGHTZSHIFT);
+         /* Both halves scaled to VID_NUMCOLORWEIGHTS resolution: startmap via
+          * the *VID_NUMCOLORWEIGHTS factor above, and the distance term via
+          * the shift reduced by log2(VID_NUMCOLORWEIGHTS/NUMCOLORMAPS)=1, so
+          * fine == band*2 at the band centres (verified to drift <= 1). */
+         int fine2    = startmap - (scale >> (LIGHTSCALESHIFT-1))/DISTMAP;
+         if (fine2 < 0)                          fine2 = 0;
+         else if (fine2 > VID_NUMCOLORWEIGHTS-1)  fine2 = VID_NUMCOLORWEIGHTS-1;
+         r_fine_lightweight = (VID_NUMCOLORWEIGHTS-1) - fine2;
+         r_fine_colormap    = dsvars->colormap;
+      }
+      else
+         r_fine_lightweight = -1;
+
       /* nextcolormap is only read by the *_LinearZ span drawers, which are
        * selected by filterz (NOT filterfloor: PointUV_LinearZ reads it too,
        * and filterz goes LINEAR whenever diminished_lighting is on).  Skip
@@ -636,6 +672,7 @@ static void R_DoDrawPlane(visplane_t *pl)
 
          stop = pl->maxx + 1;
          planezlight = zlight[light];
+         planelightlevel = light;
          pl->top[pl->minx-1] = pl->top[stop] = 0xffffffffu; // dropoff overflow
 
          for (x = pl->minx ; x <= stop ; x++)

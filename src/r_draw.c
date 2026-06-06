@@ -146,38 +146,79 @@ static uint16_t            composed_lut[256];
  * colormap[i]) is preserved; only the brightness selection changes. */
 int r_smooth_shading = 0; /* set by R_ApplyDiminishedLighting (mode 2) */
 
+/* Fine (sub-band) light weight side channel for Smooth mode.
+ *
+ * The band-level Smooth path recovers light from the colormap pointer,
+ * which the renderer has already snapped to one of NUMCOLORMAPS (32)
+ * bands -- so it cannot represent light variation finer than 32 steps even
+ * though V_Palette16 carries 64 luma weights.  R_ColourMap (walls/sprites)
+ * and the plane light selection (floors/ceilings) additionally publish the
+ * light level here at the full 0..(VID_NUMCOLORWEIGHTS-1) resolution,
+ * computed from the same formulas at 2x granularity (63 = brightest, 0 =
+ * darkest), so band boundaries still agree with Default.  When >= 0 the
+ * Smooth LUT uses it directly; -1 means "no fine value published, fall
+ * back to band recovery" (e.g. the patch/HUD path, or a fixedcolormap).
+ *
+ * This is the "keep all the precision until the final step" refinement the
+ * R_ColourMap comment anticipates.  Capping at 64 matches what the weight
+ * ramp can actually express, which also bounds the composed-LUT rebuild
+ * rate: at most VID_NUMCOLORWEIGHTS distinct tables per frame rather than
+ * the unbounded per-column rebuilds a finer-than-ramp value would force. */
+int r_fine_lightweight = -1;
+const lighttable_t *r_fine_colormap = NULL; /* pointer r_fine_lightweight was computed for */
+static int composed_weight = -2; /* cache key companion; -2 = never built */
+
 static INLINE const uint16_t *R_GetComposedColormap(const lighttable_t *colormap)
 {
-   if (colormap != composed_cm || V_Palette16 != composed_pal)
+   /* The fine weight is only valid for the exact colormap pointer it was
+    * published against (R_ColourMap / the plane span setup).  Sprite paths
+    * that assign vis->colormap directly -- spectre NULL, fixedcolormap,
+    * FF_FULLBRIGHT -> fullcolormap -- never publish a fine weight, so the
+    * pointer check rejects a stale value and falls back to band recovery. */
+   int fine = (r_smooth_shading && colormap == r_fine_colormap)
+              ? r_fine_lightweight : -1;
+   /* In Smooth mode the fine weight participates in the cache key, since two
+    * columns sharing a colormap band can still differ in sub-band light. */
+   int want_weight = (r_smooth_shading) ? fine : -2;
+
+   if (colormap != composed_cm || V_Palette16 != composed_pal
+       || want_weight != composed_weight)
    {
       int i;
 
       if (r_smooth_shading && fullcolormap)
       {
-         /* Recover the distance-light level (0 = brightest) from the
-          * colormap pointer's offset against the active base, then map it
-          * onto the continuous weight axis: level 0 -> weight 63 (full
-          * bright), level NUMCOLORMAPS-1 -> weight ~0 (darkest). */
-         int       level = (int)(colormap - fullcolormap) >> 8; /* 256 bytes/level */
-         int       weight;
+         int weight;
 
-         if (level < 0)               level = 0;
-         else if (level > NUMCOLORMAPS-1) level = NUMCOLORMAPS-1;
+         if (fine >= 0)
+         {
+            /* Sub-band precision published by the light-selection chokepoint. */
+            weight = fine;
+         }
+         else
+         {
+            /* No fine value (sprite/patch/fixedcolormap): recover the band
+             * level from the colormap pointer and map 0..31 -> 0..63. */
+            int level = (int)(colormap - fullcolormap) >> 8; /* 256 bytes/level */
+            if (level < 0)                   level = 0;
+            else if (level > NUMCOLORMAPS-1)  level = NUMCOLORMAPS-1;
+            weight = (NUMCOLORMAPS-1 - level) * (VID_NUMCOLORWEIGHTS-1)
+                     / (NUMCOLORMAPS-1);
+         }
 
-         /* (NUMCOLORMAPS-1-level) in [0,31] -> [0,63]; the *2 maps the 32
-          * light levels evenly onto the 64-entry ramp.  Clamp for safety. */
-         weight = (NUMCOLORMAPS-1 - level) * (VID_NUMCOLORWEIGHTS-1)
-                  / (NUMCOLORMAPS-1);
-         if (weight < 0)                    weight = 0;
-         else if (weight > VID_NUMCOLORWEIGHTS-1) weight = VID_NUMCOLORWEIGHTS-1;
+         if (weight < 0)                          weight = 0;
+         else if (weight > VID_NUMCOLORWEIGHTS-1)  weight = VID_NUMCOLORWEIGHTS-1;
 
          for (i = 0; i < 256; i++)
             composed_lut[i] = V_Palette16[ colormap[i]*VID_NUMCOLORWEIGHTS + weight ];
+
+         composed_weight = want_weight;
       }
       else
       {
          for (i = 0; i < 256; i++)
             composed_lut[i] = V_Palette16[ colormap[i]*64 + (64-1) ];
+         composed_weight = -2;
       }
       composed_cm  = colormap;
       composed_pal = V_Palette16;
@@ -378,6 +419,7 @@ void R_ApplyDiminishedLighting(void)
     * the active colormap happens to change. */
    composed_cm  = NULL;
    composed_pal = NULL;
+   composed_weight = -2;
 }
 
 //

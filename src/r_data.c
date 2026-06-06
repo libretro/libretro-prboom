@@ -36,6 +36,7 @@
 #include "doomstat.h"
 #include "w_wad.h"
 #include "r_draw.h"
+#include "v_video.h"
 #include "r_main.h"
 #include "r_sky.h"
 #include "i_system.h"
@@ -380,7 +381,10 @@ static INLINE int between(int l,int u,int x)
 const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
 {
   if (fixedcolormap)
+  {
+     r_fine_lightweight = -1; /* fixed map: no distance fade, use band recovery */
      return fixedcolormap;
+  }
 
   if (curline)
   {
@@ -404,10 +408,27 @@ const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
    * precision until the final step, so slight scale differences can count
    * against slight light level variations.
    */
-   return fullcolormap + between(0,NUMCOLORMAPS-1,
+  {
+   /* The returned pointer is still snapped to one of NUMCOLORMAPS bands
+    * (everything downstream assumes that).  But for Smooth shading we also
+    * publish the same darkness value at VID_NUMCOLORWEIGHTS (64) resolution
+    * -- the very "keep all the precision until the final step" refinement
+    * noted above -- as a 0..63 weight (63 = brightest).  Computed by scaling
+    * the identical band formula by VID_NUMCOLORWEIGHTS instead of
+    * NUMCOLORMAPS, so the two agree exactly at band boundaries. */
+   int band = between(0,NUMCOLORMAPS-1,
          ((256-lightlevel)*2*NUMCOLORMAPS/256) - 4
          - (FixedMul(spryscale,pspriteiscale)/2 >> LIGHTSCALESHIFT)
-         )*256;
+         );
+   int fine = between(0,VID_NUMCOLORWEIGHTS-1,
+         ((256-lightlevel)*2*VID_NUMCOLORWEIGHTS/256) - 4*(VID_NUMCOLORWEIGHTS/NUMCOLORMAPS)
+         - (FixedMul(spryscale,pspriteiscale)/2 >> (LIGHTSCALESHIFT-1))
+         );
+   /* fine 'darkness' index 0=bright..63=dark -> weight 63=bright..0=dark */
+   r_fine_lightweight = (VID_NUMCOLORWEIGHTS-1) - fine;
+   r_fine_colormap    = fullcolormap + band*256;
+   return r_fine_colormap;
+  }
 }
 
 //

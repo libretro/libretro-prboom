@@ -121,6 +121,8 @@ extern draw_vars_t drawvars;
 
 extern int diminished_lighting;       /* General > Video menu setting; applied via R_ApplyDiminishedLighting (r_main.h) */
 extern int r_smooth_shading;          /* set by R_ApplyDiminishedLighting when diminished_lighting==2 (Smooth) */
+extern int r_fine_lightweight;        /* Smooth mode: sub-band light weight 0..63 (63=bright), -1 if none */
+extern const lighttable_t *r_fine_colormap; /* colormap ptr r_fine_lightweight was computed for (self-validation) */
 
 extern uint8_t playernumtotrans[MAXPLAYERS]; // CPhipps - what translation table for what player
 extern uint8_t       *translationtables;

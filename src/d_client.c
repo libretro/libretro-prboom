@@ -99,7 +99,25 @@ void D_BuildNewTiccmds(void)
 
 	 G_BuildTiccmd(cmd);
 	 cmd->angleturn += prevcmd.angleturn;
-	 cmd->buttons |= prevcmd.buttons;
+
+	 /* issue #185: a special command (save/load/pause/restart) staged by
+	  * an earlier build of this tic carries its payload in the button
+	  * bits, so OR-merging gameplay buttons over it corrupts it:
+	  * BT_ATTACK and BT_USE land in the BTS code field and BT_CHANGE
+	  * lands in the save-slot field, quietly turning a slot-0 save or
+	  * load into slot 1 and then dying on the missing file.  A special
+	  * command supersedes gameplay buttons for its tic (G_BuildTiccmd
+	  * itself assigns, not ORs, when staging one), so the merge must
+	  * preserve it whole: a special built this call wins outright, an
+	  * earlier staged one is carried over verbatim, and only ordinary
+	  * buttons are OR-merged. */
+	 if (!(cmd->buttons & BT_SPECIAL))
+	 {
+	   if (prevcmd.buttons & BT_SPECIAL)
+	     cmd->buttons = prevcmd.buttons;
+	   else
+	     cmd->buttons |= prevcmd.buttons;
+	 }
   }
 }
 

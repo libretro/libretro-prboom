@@ -52,7 +52,8 @@ typedef enum
   INTERP_Vertex,
   INTERP_WallPanning,
   INTERP_FloorPanning,
-  INTERP_CeilingPanning
+  INTERP_CeilingPanning,
+  INTERP_SectorLight
 } interpolation_type_e;
 
 typedef struct
@@ -158,6 +159,9 @@ static void R_CopyInterpToOld (int i)
     oldipos[i][0] = ((sector_t*)curipos[i].address)->ceiling_xoffs;
     oldipos[i][1] = ((sector_t*)curipos[i].address)->ceiling_yoffs;
     break;
+  case INTERP_SectorLight:
+    oldipos[i][0] = ((sector_t*)curipos[i].address)->lightlevel;
+    break;
   }
 }
 
@@ -186,6 +190,9 @@ static void R_CopyBakToInterp (int i)
   case INTERP_CeilingPanning:
     ((sector_t*)curipos[i].address)->ceiling_xoffs = bakipos[i][0];
     ((sector_t*)curipos[i].address)->ceiling_yoffs = bakipos[i][1];
+    break;
+  case INTERP_SectorLight:
+    ((sector_t*)curipos[i].address)->lightlevel = (short) bakipos[i][0];
     break;
   }
 }
@@ -220,6 +227,19 @@ static void R_DoAnInterpolation (int i, fixed_t smoothratio)
     adr1 = &((sector_t*)curipos[i].address)->ceiling_xoffs;
     adr2 = &((sector_t*)curipos[i].address)->ceiling_yoffs;
     break;
+
+  case INTERP_SectorLight:
+    {
+      /* lightlevel is a short, so it cannot ride the fixed_t pointer
+       * path above; lerp it in place with the same old/bak protocol */
+      sector_t *sec = (sector_t *) curipos[i].address;
+      fixed_t cur = sec->lightlevel;
+
+      bakipos[i][0] = cur;
+      sec->lightlevel =
+        (short) (oldipos[i][0] + FixedMul(cur - oldipos[i][0], smoothratio));
+      return;
+    }
 
  default:
     return;
@@ -432,6 +452,27 @@ static void R_InterpolationGetData(thinker_t *th,
   {
     *type1 = INTERP_SectorFloor;
     *posptr1 = ((planeWaggle_t *)th)->sector;
+  }
+  else
+  if (th->function.arg1 == (void (*)(void *))T_Glow)
+  {
+    /* Ramp lights only: glows and fades step lightlevel a little every
+     * tic, so they interpolate cleanly.  Flashes, strobes, and flickers
+     * are square waves -- interpolating them would soften hard strobes
+     * into pulses and change the look, so they stay stepped. */
+    *type1 = INTERP_SectorLight;
+    *posptr1 = ((glow_t *)th)->sector;
+  }
+  else
+  if (th->function.arg1 == (void (*)(void *))T_HexenLight)
+  {
+    const light_t *light = (const light_t *) th;
+
+    if (light->type == LITE_FADE || light->type == LITE_GLOW)
+    {
+      *type1 = INTERP_SectorLight;
+      *posptr1 = light->sector;
+    }
   }
   else
   if (th->function.arg1 == (void (*)(void *))T_Scroll)

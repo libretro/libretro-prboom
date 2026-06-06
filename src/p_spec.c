@@ -42,6 +42,7 @@
 #include "doomstat.h"
 #include "p_spec.h"
 #include "map_format.h"
+#include "hexen/p_spec_hexen.h"
 #include "p_saveg.h"
 #include "p_tick.h"
 #include "p_setup.h"
@@ -3023,9 +3024,42 @@ void P_SpawnSpecials (void)
         for (s = -1; (s = P_FindSectorFromLineTag(lines+i,s)) >= 0;)
           sectors[s].sky = i | PL_SKYFLAT;
         break;
+
+      // killough 4/11/98: translucent 2s normal textures.  The classic
+      // implementation selects a TRANMAP blend lump; this renderer blends
+      // directly on the RGB565 framebuffer, so the line is just flagged
+      // (tag 0: this line; otherwise every same-tagged line).
+      case 260:
+        if (!lines[i].tag)
+          lines[i].translucent = 1;
+        else
+          for (s = -1; (s = P_FindLineFromLineTag(lines+i,s)) >= 0;)
+            lines[s].translucent = 1;
+        break;
    }
 
   } /* !map_format.zdoom */
+  else
+  {
+    /* ZDoom TranslucentLine(lineid, amount) is a static property applied at
+     * level load; arg0 zero means the line itself, otherwise the lines
+     * carrying that Line_SetIdentification id.  The blend is the renderer's
+     * 50/50 regardless of amount. */
+    for (i = 0; i < numlines; i++)
+      if (lines[i].special == 208)
+      {
+        if (!lines[i].args[0])
+          lines[i].translucent = 1;
+        else
+        {
+          int search = -1;
+          line_t *tl;
+          while ((tl = P_FindHexenLine(lines[i].args[0], &search)) != NULL)
+            tl->translucent = 1;
+        }
+        lines[i].special = 0;
+      }
+  }
 }
 
 // killough 2/28/98:

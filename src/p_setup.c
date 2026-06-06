@@ -1555,6 +1555,12 @@ static void P_LoadSideDefs2(int lump)
           break;
 
         case 260: // killough 4/11/98: apply translucency to 2s normal texture
+          /* The classic code reads the midtexture field as an optional
+           * custom TRANMAP lump name; this renderer blends directly, so
+           * the sidedef parses its textures normally. */
+          sd->midtexture = R_SafeTextureNumForName(msd->midtexture, i);
+          sd->toptexture = R_SafeTextureNumForName(msd->toptexture, i);
+          sd->bottomtexture = R_SafeTextureNumForName(msd->bottomtexture, i);
           break;
 
         default:                        // normal cases

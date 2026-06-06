@@ -266,6 +266,11 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
     */
    curline     = ds->curline;  // OPTIMIZE: get rid of LIGHTSEGSHIFT globally
    colfunc     = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, drawvars.filterwall, drawvars.filterz);
+
+   /* Boom 260 / ZDoom TranslucentLine: route this line's midtexture columns
+    * through the blending batch type (restored before returning). */
+   if (curline->linedef->translucent)
+      R_SetSpriteTranslucency(1);
    frontsector = curline->frontsector;
    backsector  = curline->backsector;
    texnum      = curline->sidedef->midtexture;
@@ -368,6 +373,9 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
    }
 
    R_UnlockTextureCompositePatchNum(texnum);
+
+   if (curline->linedef->translucent)
+      R_SetSpriteTranslucency(0);
 
    curline = NULL; /* cph 2001/11/18 - must clear curline now we're done with it, so R_ColourMap doesn't try using it for other things */
 }

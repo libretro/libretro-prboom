@@ -2580,7 +2580,16 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    if ((i = lumpnum + ML_BLOCKMAP + 1) < numlumps
          && !strncasecmp(lumpinfo[i].name, "BEHAVIOR", 8)
          && !hexen)
-      I_Error("P_SetupLevel: %s: Hexen format not supported", lumpname);
+   {
+      /* In this core I_Error logs and returns rather than aborting, so the
+       * refusal must also abandon the load the way the UDMF path below
+       * does -- otherwise the Doom-sized loaders misread the Hexen-sized
+       * records and crash in P_GroupLines (issue #86, chex3.wad: ZDoom
+       * 'Doom-in-Hexen' format maps in a Doom IWAD). */
+      I_Error("P_SetupLevel: %s: Hexen-format map in a Doom game is not supported", lumpname);
+      level_setup_failed = TRUE;
+      return;
+   }
 
    // figgi 10/19/00 -- check for gl lumps and load them
    udmf_level = P_LevelIsUDMF(lumpnum);

@@ -5593,8 +5593,12 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
    * frac advances every row in every lane throughout, as before, so
    * the per-pixel arithmetic is unchanged -- this only removes tests
    * and table indirections that cannot change the written values. */
-  dtop = cyl[0];
-  dbot = cyh[0];
+  /* Seed from cols[0] directly (cyl[0]/cyh[0] hold the same values):
+   * the function requires n >= 1 -- cols[0] is dereferenced above
+   * unconditionally -- but the compiler cannot see that across the
+   * call boundary and warns that the arrays may be uninitialized. */
+  dtop = cols[0]->yl;
+  dbot = cols[0]->yh;
   for (j = 1; j < n; j++)
   {
     if (cyl[j] > dtop) dtop = cyl[j];

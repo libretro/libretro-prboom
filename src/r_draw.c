@@ -144,7 +144,7 @@ static uint16_t            composed_lut[256];
  * continuously, like CRY, instead of snapping the palette index.  The
  * texel's own colormap remap (translations, invuln inversion baked into
  * colormap[i]) is preserved; only the brightness selection changes. */
-int r_smooth_shading = 0; /* set by R_ApplyDiminishedLighting (mode 2) */
+int r_smooth_shading = 0; /* set by R_ApplyDiminishedLighting (diminished_lighting==1, Smooth) */
 
 /* Fine (sub-band) light weight side channel for Smooth mode.
  *
@@ -408,19 +408,20 @@ draw_vars_t drawvars = {
 /* "Diminished Lighting" setting (General > Video menu).
  *   0 = Default  : point-sampled light selection -- the standard 32
  *                  discrete distance/light colormap bands.
- *   1 = Dithered : the dithered-Z path (filterz = LINEAR), which ordered-
- *                  dithers between adjacent light colormaps so the band
- *                  boundaries blend into apparent smooth light gradients.
- *                  Stays 16bpp (no extra colormap memory); costs a little
- *                  more per drawn pixel, hence opt-in.
- *   2 = Smooth   : CRY-style continuous luma shading (see r_smooth_shading
+ *   1 = Smooth   : CRY-style continuous luma shading (see r_smooth_shading
  *                  and R_GetComposedColormap).  Keeps the point path's
  *                  single-lookup inner loop -- same per-pixel cost as
  *                  Default -- but selects the texel's brightness from
  *                  V_Palette16's 64-step continuous luma ramp by recovered
  *                  light level instead of snapping through the 32 colormap
- *                  bands.  Removes the band edges without the dither
- *                  stipple of mode 1.
+ *                  bands, removing the band edges.
+ *
+ * A third mode (Dithered: filterz = LINEAR, ordered dither between adjacent
+ * light colormaps) was removed: it was visually near-indistinguishable from
+ * Default yet roughly halved the framerate (e.g. 368 -> 179 fps), and Smooth
+ * supersedes it -- smoother result at Default's per-pixel cost.  Configs that
+ * still hold the old value 2 (Smooth) or 1 (Dithered) are migrated to the new
+ * Smooth (1) at apply time; see R_ApplyDiminishedLighting.
  * R_ApplyDiminishedLighting() pushes the value into drawvars.filterz; it
  * is called once at R_Init (after the config is loaded) and again from
  * the menu change callback.  Render-only: never touches playsim, so it is
@@ -429,13 +430,16 @@ int diminished_lighting = 0;
 
 void R_ApplyDiminishedLighting(void)
 {
-   /* Mode 1 (Dithered) routes the Z filter through the LINEAR dither path;
-    * modes 0 (Default) and 2 (Smooth) both keep point-sampled Z so they can
-    * use the single-lookup composed LUT.  Mode 2 additionally flips the LUT
-    * build to the continuous-luma path. */
-   drawvars.filterz = (diminished_lighting == 1) ? RDRAW_FILTER_LINEAR
-                                                 : RDRAW_FILTER_POINT;
-   r_smooth_shading = (diminished_lighting == 2);
+   /* Migrate old 3-state configs (0 Default / 1 Dithered / 2 Smooth) to the
+    * 2-state scheme (0 Default / 1 Smooth): any nonzero value -> Smooth.  The
+    * removed Dithered mode mapped to LINEAR filterz; with it gone, both modes
+    * keep point-sampled Z and use the single-lookup composed LUT, so filterz
+    * is always POINT here. */
+   if (diminished_lighting > 1)
+      diminished_lighting = 1;
+
+   drawvars.filterz = RDRAW_FILTER_POINT;
+   r_smooth_shading  = (diminished_lighting == 1);
 
    /* The composed LUT is cached on (colormap ptr, V_Palette16); neither
     * changes when only the shading mode flips, so force a rebuild on the

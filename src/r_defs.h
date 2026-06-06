@@ -255,6 +255,8 @@ typedef struct
   vertex_t *v1, *v2;
   fixed_t offset;
   angle_t angle;
+  angle_t pangle;       /* re-calculated angle used for rendering */
+  uint32_t halflength;  /* fix long wall wobble */
   side_t* sidedef;
   line_t* linedef;
 

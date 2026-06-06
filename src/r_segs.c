@@ -665,8 +665,7 @@ static void R_StoreWallRange_impl(const int start, const int stop)
 void R_StoreWallRange(const int start, const int stop)
 #endif
 {
-   fixed_t hyp;
-   angle_t offsetangle;
+   int64_t rw_offset_dot;
 
    if (ds_p == drawsegs+maxdrawsegs)   // killough 1/98 -- fix 2s line HOM
    {
@@ -687,16 +686,33 @@ void R_StoreWallRange(const int start, const int stop)
    linedef->flags |= ML_MAPPED;
 
    // calculate rw_distance for scale calculation
-   rw_normalangle = curline->angle + ANG90;
+   rw_normalangle = curline->pangle + ANG90; // [crispy] use re-calculated angle
 
-   offsetangle = rw_normalangle-rw_angle1;
+   // [Linguica] Fix long wall error
+   // shift right to avoid possibility of int64 overflow in rw_distance
+   {
+      const int shift_bits = 1;
+      int64_t dx, dy, dx1, dy1, dist, len;
 
-   if (D_abs(offsetangle) > ANG90)
-      offsetangle = ANG90;
+      dx  = ((int64_t)curline->v2->x - curline->v1->x) >> shift_bits;
+      dy  = ((int64_t)curline->v2->y - curline->v1->y) >> shift_bits;
+      dx1 = ((int64_t)viewx - curline->v1->x) >> shift_bits;
+      dy1 = ((int64_t)viewy - curline->v1->y) >> shift_bits;
+      len = curline->halflength; /* no need to shift */
 
-   hyp = (viewx==curline->v1->x && viewy==curline->v1->y)?
-      0 : R_PointToDist (curline->v1->x, curline->v1->y);
-   rw_distance = FixedMul(hyp, finecosine[offsetangle>>ANGLETOFINESHIFT]);
+      if (len == 0)
+         len = 1;
+      dist = ((dy * dx1 - dx * dy1) / len) << shift_bits;
+      rw_distance = (fixed_t)(dist < INT_MIN ? INT_MIN :
+                              dist > INT_MAX ? INT_MAX : dist);
+
+      /* exact texture offset along the wall for the same reason: all
+       * segs of a linedef must agree on the texture phase, or thin
+       * stripes of the neighbouring texture column appear at the seg
+       * junctions on close-up walls (visible at high resolutions with
+       * interpolated views) */
+      rw_offset_dot = ((dx * dx1 + dy * dy1) / len) << shift_bits;
+   }
 
    ds_p->x1 = rw_x = start;
    ds_p->x2 = stop;
@@ -921,7 +937,10 @@ void R_StoreWallRange(const int start, const int stop)
 
    if (segtextured)
    {
-      rw_offset = FixedMul (hyp, -finesine[offsetangle >>ANGLETOFINESHIFT]);
+      // [crispy] fix long wall wobble
+      rw_offset = (fixed_t)(rw_offset_dot < INT_MIN ? INT_MIN :
+                            rw_offset_dot > INT_MAX ? INT_MAX :
+                            rw_offset_dot);
 
       rw_offset += sidedef->textureoffset + curline->offset;
 

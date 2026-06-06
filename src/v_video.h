@@ -152,6 +152,7 @@ void V_DestroyTrueColorPalette(void);
 void V_UpdateTrueColorPalette(void);
 // CPhipps - function to set the palette to palette number pal.
 void V_SetPalette(int pal);
+void V_SetPaletteBlend(int pal1, int pal2, fixed_t t); /* frame-rate flash fades */
 
 // CPhipps - function to plot a pixel
 

@@ -969,6 +969,89 @@ void V_SetRawPalette(const char *lump_name)
   V_Palette16 = RawPalette16;
 }
 
+/* V_SetPaletteBlend: point V_Palette16 at a scratch palette mixing two
+ * PLAYPAL palettes, for frame-rate pain/bonus fades (movement_smooth).
+ * The blend is computed on the gamma-corrected components, mirroring
+ * V_UpdateTrueColorPalette.  Two scratch blocks ping-pong so the
+ * V_Palette16 pointer changes whenever the contents do -- the flat and
+ * fullscreen draw caches key on that pointer. */
+static uint16_t *BlendPal16[2];
+static int blend_flip;
+
+void V_SetPaletteBlend(int pal1, int pal2, fixed_t t)
+{
+  static int last_pal1 = -1, last_pal2 = -1, last_gamma = -1;
+  static fixed_t last_t = -1;
+  int pplump;
+  int gtlump;
+  const uint8_t *pal;
+  const uint8_t *gtable;
+  uint16_t *dst;
+  int i, w;
+
+  if (!Palettes16) /* palette machinery not up yet */
+  {
+    V_SetPalette(pal1);
+    return;
+  }
+  if (pal1 == last_pal1 && pal2 == last_pal2 && t == last_t &&
+      usegamma == last_gamma && BlendPal16[blend_flip])
+  {
+    V_Palette16 = BlendPal16[blend_flip];
+    return;
+  }
+  last_pal1 = pal1; last_pal2 = pal2; last_t = t; last_gamma = usegamma;
+
+  pplump = W_GetNumForName("PLAYPAL");
+  gtlump = (W_CheckNumForName)("GAMMATBL", ns_prboom);
+  pal    = W_CacheLumpNum(pplump);
+  gtable = ((gtlump == -1) ? gammatable
+                           : (const uint8_t *) W_CacheLumpNum(gtlump))
+           + (256 * usegamma);
+
+  blend_flip ^= 1;
+  if (!BlendPal16[blend_flip])
+    BlendPal16[blend_flip] =
+      malloc(256 * sizeof(uint16_t) * VID_NUMCOLORWEIGHTS);
+  dst = BlendPal16[blend_flip];
+
+  for (i = 0; i < 256; i++)
+  {
+    uint8_t r1 = gtable[pal[(256*pal1+i)*3+0]];
+    uint8_t g1 = gtable[pal[(256*pal1+i)*3+1]];
+    uint8_t b1 = gtable[pal[(256*pal1+i)*3+2]];
+    uint8_t r2 = gtable[pal[(256*pal2+i)*3+0]];
+    uint8_t g2 = gtable[pal[(256*pal2+i)*3+1]];
+    uint8_t b2 = gtable[pal[(256*pal2+i)*3+2]];
+    uint8_t r = (uint8_t) ((r1 * (FRACUNIT - t) + r2 * t) >> FRACBITS);
+    uint8_t g = (uint8_t) ((g1 * (FRACUNIT - t) + g2 * t) >> FRACBITS);
+    uint8_t b = (uint8_t) ((b1 * (FRACUNIT - t) + b2 * t) >> FRACBITS);
+    float roundUpR = (r > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+    float roundUpG = (g > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+    float roundUpB = (b > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+
+    for (w = 0; w < VID_NUMCOLORWEIGHTS; w++)
+    {
+      float wt = (float) (w) / (float) (VID_NUMCOLORWEIGHTS - 1);
+#if defined(ABGR1555)
+      int nr = (int) ((r >> 3) * wt + roundUpR);
+      int ng = (int) ((g >> 3) * wt + roundUpG);
+      int nb = (int) ((b >> 3) * wt + roundUpB);
+      dst[i * VID_NUMCOLORWEIGHTS + w] = (uint16_t) ((nb << 10) | (ng << 5) | nr);
+#else
+      int nr = (int) ((r >> 3) * wt + roundUpR);
+      int ng = (int) ((g >> 2) * wt + roundUpG);
+      int nb = (int) ((b >> 3) * wt + roundUpB);
+      dst[i * VID_NUMCOLORWEIGHTS + w] = (uint16_t) ((nr << 11) | (ng << 5) | nb);
+#endif
+    }
+  }
+  W_UnlockLumpNum(pplump);
+  if (gtlump != -1)
+    W_UnlockLumpNum(gtlump);
+  V_Palette16 = BlendPal16[blend_flip];
+}
+
 //
 // V_RestorePalette
 //

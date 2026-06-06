@@ -35,6 +35,7 @@
 
 #include "doomdef.h"
 #include "doomstat.h"
+#include "r_fps.h" /* tic_vars, for the flash-fade blend */
 #include "m_random.h"
 #include "i_video.h"
 #include "w_wad.h"
@@ -811,6 +812,54 @@ static void ST_doPaletteStuff(void)
       int bzc = 12 - (plyr->powers[pw_strength]>>6);
       if (bzc > cnt)
         cnt = bzc;
+    }
+
+  /* Frame-rate flash fades: the pain and bonus counters step once per
+   * tic and the discrete path quantizes them into one of a handful of
+   * flash palettes, so a fade-out moves in visible 35Hz chunks.  With
+   * movement_smooth on, reconstruct the continuous counter the same way
+   * the view interpolates -- lerp(prev, cur, frac) with prev = cur + 1,
+   * since the counters decrement by one per tic -- and blend between
+   * the two flash palettes it falls between.  Pure presentation: the
+   * counters themselves are untouched, and with the setting off this
+   * block is never entered.  The radiation-suit flicker is a square
+   * wave and stays discrete. */
+  if (movement_smooth && gamestate == GS_LEVEL && (cnt || plyr->bonuscount))
+    {
+      fixed_t cont, pos;
+      int level_max, start, lo, hi;
+
+      if (cnt)
+        {
+          cont = ((fixed_t) cnt << FRACBITS) + FRACUNIT - tic_vars.frac;
+          if (menuactive)
+            cont >>= 1;  /* mirror the discrete path's red reduction */
+          level_max = NUMREDPALS;
+          start = STARTREDPALS;
+        }
+      else
+        {
+          cont = ((fixed_t) plyr->bonuscount << FRACBITS)
+               + FRACUNIT - tic_vars.frac;
+          level_max = NUMBONUSPALS;
+          start = STARTBONUSPALS;
+        }
+
+      pos = cont >> 3;  /* counter / 8, still 16.16 */
+      if (pos > ((fixed_t) level_max << FRACBITS))
+        pos = (fixed_t) level_max << FRACBITS;
+      lo = pos >> FRACBITS;
+      hi = lo + 1;
+      if (hi > level_max)
+        hi = level_max;
+
+      /* level 0 is the base palette; level L is the Lth flash palette */
+      V_SetPaletteBlend(lo ? start - 1 + lo : 0,
+                        hi ? start - 1 + hi : 0,
+                        pos & (FRACUNIT - 1));
+      st_palette = -2;      /* poison the cache: contents change per frame */
+      st_firsttime = TRUE;  /* the status bar bakes the palette at draw */
+      return;
     }
 
   if (cnt)

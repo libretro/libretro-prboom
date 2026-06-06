@@ -1485,6 +1485,21 @@ void P_MobjThinker (mobj_t* mobj)
       return; /* removed */
   }
 
+  /* Persistent State: resting debris is NOBLOCKMAP, so P_ChangeSector
+   * never height-clips it when its sector's floor moves -- vanilla
+   * never notices because the debris is gone within a second.  Follow
+   * the floor manually: both down (a lowering platform takes the blood
+   * with it) and up (a rising one would otherwise bury it).  Only our
+   * pinned debris types ever rest at -1 tics, so the test is exact
+   * regardless of the setting's current value. */
+  if (mobj->tics == -1 &&
+      mobj->z != mobj->subsector->sector->floorheight &&
+      (P_IsBlood(mobj) || P_IsRestingDebris(mobj)))
+  {
+    mobj->floorz = mobj->subsector->sector->floorheight;
+    mobj->z = mobj->floorz;
+  }
+
   // cycle through states,
   // calling action functions at transitions
 

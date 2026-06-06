@@ -197,6 +197,18 @@ static void (*tl_flush_whole)(void) = R_FlushWhole16;
 static void (*tl_flush_ht)(void)    = R_FlushHT16;
 static void (*tl_flush_quad)(void)  = R_FlushQuad16;
 
+/* Non-inline linkage for the composed lookup tables, for the direct
+ * sprite column path in r_things.c. */
+const uint16_t *R_ComposedColormap(const lighttable_t *colormap)
+{
+  return R_GetComposedColormap(colormap);
+}
+
+const uint16_t *R_ComposedPalette(void)
+{
+  return R_GetComposedPalette();
+}
+
 void R_SetSpriteTranslucency(int mode)
 {
   if (mode)

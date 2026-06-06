@@ -130,6 +130,8 @@ typedef void (*R_DrawColumn_f)(draw_column_vars_t *dcvars);
  * and row-major rasterization of an x-adjacent record run.  Used by the
  * draw-record replay in r_drawcmd.c. */
 int R_WallColumnKernelClass(R_DrawColumn_f fn);
+const uint16_t *R_ComposedColormap(const lighttable_t *colormap);
+const uint16_t *R_ComposedPalette(void);
 void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int pointz);
 R_DrawColumn_f R_GetDrawColumnFunc(enum column_pipeline_e type,
                                    enum draw_filter_type_e filter,

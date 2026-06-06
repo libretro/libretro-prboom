@@ -422,6 +422,69 @@ void R_DrawMaskedColumn(
 //  mfloorclip and mceilingclip should also be set.
 //
 // CPhipps - new wad lump handling, *'s to const*'s
+/* Direct framebuffer path for opaque, point-sampled, square-edged
+ * sprite columns.  The temp-buffer machinery writes every masked
+ * pixel twice (column buffer, then flush), pays a batching preamble
+ * per drawn post, and -- because a column's second post fails the
+ * batcher's x-continuity test -- degenerates to a flush per post on
+ * multi-post columns.  For the plain opaque pipeline none of that
+ * buys anything, so this walks the same posts with the same clip and
+ * frac arithmetic as R_DrawMaskedColumn and writes the framebuffer
+ * once.
+ *
+ * The texel index wraps by the patch height: the point drawers do
+ * the same through their height mask or modulo prep, which a post's
+ * fractionally negative first-row frac (FixedDiv-rounded iscale) can
+ * reach.  Both styles reduce to index mod texheight for the values a
+ * post produces. */
+static void R_DrawMaskedColumnDirect(const rpatch_t *patch,
+                                     draw_column_vars_t *dcvars,
+                                     const rcolumn_t *column,
+                                     const uint16_t *lut)
+{
+  const fixed_t iscale = dcvars->iscale;
+  const int     spr_th = patch->height;
+  const int     x      = dcvars->x;
+  int i;
+
+  for (i = 0; i < column->numPosts; i++)
+  {
+    const rpost_t *post = &column->posts[i];
+    int topscreen    = sprtopscreen + spryscale * post->topdelta;
+    int bottomscreen = topscreen + spryscale * post->length;
+    int yl = (topscreen + FRACUNIT - 1) >> FRACBITS;
+    int yh = (bottomscreen - 1) >> FRACBITS;
+
+    if (yh >= mfloorclip[x])
+      yh = mfloorclip[x] - 1;
+    if (yl <= mceilingclip[x])
+      yl = mceilingclip[x] + 1;
+
+    if (yl <= yh && yh < viewheight)
+    {
+      const uint8_t *source = column->pixels + post->topdelta;
+      fixed_t frac = (dcvars->texturemid - (post->topdelta << FRACBITS))
+                   + (yl - centery) * iscale;
+      uint16_t *dest = drawvars.short_topleft
+                     + yl * SURFACE_SHORT_PITCH + x;
+      int count = yh - yl + 1;
+
+      while (count--)
+      {
+        int idx = frac >> 16;
+
+        while (idx < 0)
+          idx += spr_th;
+        while (idx >= spr_th)
+          idx -= spr_th;
+        *dest = lut[ source[idx] ];
+        dest += SURFACE_SHORT_PITCH;
+        frac += iscale;
+      }
+    }
+  }
+}
+
 static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 {
   int      texturecolumn;
@@ -483,19 +546,75 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
     sprtopscreen += (viewheight/2 - centery)<<FRACBITS;
   }
 
-  for (dcvars.x=vis->x1 ; dcvars.x<=vis->x2 ; dcvars.x++, frac += vis->xiscale)
   {
-    texturecolumn = frac>>FRACBITS;
-    dcvars.texu = frac;
+    /* Opaque + point + square edges takes the direct path; the raven
+     * shadow modes blend in the column flushers even on the standard
+     * pipeline, so they stay on the machinery along with fuzz,
+     * translated, filtered, and sloped-edge sprites. */
+    int run_cls = R_WallColumnKernelClass(colfunc);
 
-    R_DrawMaskedColumn(
-      patch,
-      colfunc,
-      &dcvars,
-      R_GetPatchColumnClamped(patch, texturecolumn),
-      R_GetPatchColumnClamped(patch, texturecolumn-1),
-      R_GetPatchColumnClamped(patch, texturecolumn+1)
-    );
+    if ((run_cls == 1 || run_cls == 2) &&
+        dcvars.edgetype != RDRAW_MASKEDCOLUMNEDGE_SLOPED &&
+        !(raven && (vis->mobjflags & (MF_SHADOW | MF_ALTSHADOW)) &&
+          vis->colormap))
+    {
+      const uint16_t *lut = (run_cls == 1)
+          ? R_ComposedPalette()
+          : R_ComposedColormap(dcvars.colormap);
+
+      /* A previous sprite's tail may still be batched in the temp
+       * buffer; its flush must land before any direct writes, not
+       * after. */
+      R_ResetColumnBuffer();
+      for (dcvars.x=vis->x1 ; dcvars.x<=vis->x2 ; dcvars.x++, frac += vis->xiscale)
+      {
+        const rcolumn_t *column;
+
+        texturecolumn = frac>>FRACBITS;
+        column = R_GetPatchColumnClamped(patch, texturecolumn);
+
+        /* Single-post columns batch well in the temp machinery (four
+         * adjacent columns flush as 4-wide rows); a column's second
+         * post fails the batcher's x-continuity test and forces a
+         * flush per post, so multi-post columns go direct.  The two
+         * paths never touch the same pixels -- columns are disjoint
+         * in x -- so they interleave safely within a sprite. */
+        if (column->numPosts > 1)
+        {
+          dcvars.texheight = patch->height;
+          R_DrawMaskedColumnDirect(patch, &dcvars, column, lut);
+        }
+        else
+        {
+          dcvars.texu = frac;
+          R_DrawMaskedColumn(
+            patch,
+            colfunc,
+            &dcvars,
+            column,
+            R_GetPatchColumnClamped(patch, texturecolumn-1),
+            R_GetPatchColumnClamped(patch, texturecolumn+1)
+          );
+        }
+      }
+    }
+    else
+    {
+      for (dcvars.x=vis->x1 ; dcvars.x<=vis->x2 ; dcvars.x++, frac += vis->xiscale)
+      {
+        texturecolumn = frac>>FRACBITS;
+        dcvars.texu = frac;
+
+        R_DrawMaskedColumn(
+          patch,
+          colfunc,
+          &dcvars,
+          R_GetPatchColumnClamped(patch, texturecolumn),
+          R_GetPatchColumnClamped(patch, texturecolumn-1),
+          R_GetPatchColumnClamped(patch, texturecolumn+1)
+        );
+      }
+    }
   }
   R_UnlockPatchNum(vis->patch+firstspritelump); // cph - release lump
 

@@ -444,10 +444,28 @@ int R_FlatNumForName(const char *name)    // killough -- const added
     /* I_Error is non-fatal in this core (logs and returns).  A missing
      * flat usually means a wrong/absent IWAD; don't fall through and
      * return a negative index that callers use to index flat arrays out
-     * of bounds.  Clamp to the first flat so the level loads (with a
-     * placeholder flat) instead of crashing. */
+     * of bounds.  Substitute a real flat so the level loads with a
+     * placeholder instead of crashing.  Index 0 is NOT safe: doom.wad's
+     * flats namespace opens with the zero-byte F1_START marker, and
+     * pointing a span at a zero-byte lump reads out of bounds (chex3.wad
+     * E1M2, whose sectors name flats that only exist in ZDoom's textures
+     * namespace). */
+    static int fallback = -2;
+
     I_Error("R_FlatNumForName: %.8s not found", name);
-    return 0;
+
+    if (fallback == -2)
+    {
+      int k;
+      fallback = 0;
+      for (k = firstflat; k <= lastflat; k++)
+        if (W_LumpLength(k) >= 4096)
+        {
+          fallback = k - firstflat;
+          break;
+        }
+    }
+    return fallback;
   }
   return i - firstflat;
 }

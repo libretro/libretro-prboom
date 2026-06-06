@@ -129,7 +129,8 @@ static dbool P_IsBlood(const mobj_t *mobj)
 {
   if (hexen)
     return mobj->type == HEXEN_MT_BLOOD ||
-           mobj->type == HEXEN_MT_BLOODSPLATTER;
+           mobj->type == HEXEN_MT_BLOODSPLATTER ||
+           mobj->type == HEXEN_MT_AXEBLOOD;
   if (heretic)
     return mobj->type == HERETIC_MT_BLOOD ||
            mobj->type == HERETIC_MT_BLOODSPLATTER;
@@ -277,10 +278,19 @@ void P_ExplodeMissile (mobj_t* mo)
   /* Heretic does not randomize the explosion's death tics. */
   if (!heretic)
   {
-    mo->tics -= P_Random(pr_explode)&3;
+    int adj = P_Random(pr_explode)&3;
 
-    if (mo->tics < 1)
-      mo->tics = 1;
+    /* Persistent State: a pinned death frame (blood splatter resting at
+     * -1 tics) must stay pinned; the adjustment would clamp it to 1 and
+     * remove the splat a tic later.  The P_Random is consumed either
+     * way, keeping the stream identical with the setting on or off. */
+    if (mo->tics != -1)
+    {
+      mo->tics -= adj;
+
+      if (mo->tics < 1)
+        mo->tics = 1;
+    }
   }
 
   mo->flags &= ~MF_MISSILE;

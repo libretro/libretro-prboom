@@ -41,6 +41,7 @@
 
 #include "doomstat.h"
 #include "p_spec.h"
+#include "map_format.h"
 #include "p_saveg.h"
 #include "p_tick.h"
 #include "p_setup.h"
@@ -2872,6 +2873,12 @@ void P_SpawnSpecials (void)
     if (!sector->special)
       continue;
 
+    /* ZDoom Doom-in-Hexen maps carry ZDoom-numbered sector specials, which
+     * this switch (and the Boom generalized bits) would misinterpret.  Leave
+     * the values in place for the translation layer; spawn nothing for now. */
+    if (map_format.zdoom)
+      continue;
+
     if (sector->special&SECRET_MASK) //jff 3/15/98 count extended
       totalsecret++;                 // secret sectors too
 
@@ -2947,6 +2954,12 @@ void P_SpawnSpecials (void)
 
   P_InitTagLists();   // killough 1/30/98: Create xref tables for tags
 
+  /* ZDoom-numbered line specials: the Boom initializers below would read
+   * them as Doom/Boom line types (e.g. ZDoom 100 Scroll_Texture_Left looks
+   * like a Boom scroller).  Skip them all until the translation layer. */
+  if (!map_format.zdoom)
+  {
+
   P_SpawnScrollers(); // killough 3/7/98: Add generalized scrollers
 
   P_SpawnFriction();  // phares 3/12/98: New friction model using linedefs
@@ -2997,6 +3010,8 @@ void P_SpawnSpecials (void)
           sectors[s].sky = i | PL_SKYFLAT;
         break;
    }
+
+  } /* !map_format.zdoom */
 }
 
 // killough 2/28/98:

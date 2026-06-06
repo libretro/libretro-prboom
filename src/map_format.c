@@ -62,3 +62,50 @@ void P_ApplyMapFormat(void)
   else
     map_format = doom_map_format;
 }
+
+/* ZDoom 'Doom-in-Hexen': Hexen-sized THINGS/LINEDEFS records in a Doom-game
+ * map (detected by a BEHAVIOR lump).  The hexen format flag drives the
+ * Hexen-stride parsing in p_setup and the positive-bit thing filtering in
+ * P_SpawnMapThing; zdoom marks the specials as ZDoom-numbered.
+ *
+ * The trigger dispatchers are inert stubs for now: ZDoom action specials
+ * share Hexen's special+args encoding but not its numbering, and the Doom
+ * dispatchers would misinterpret the numbers as Doom line types.  The
+ * specials translation layer lands in a later commit; until then such maps
+ * load and are walkable, but lines and scripted sectors do nothing. */
+
+static void P_InertCrossSpecialLine(line_t *line, int side, mobj_t *thing)
+{
+  (void)line; (void)side; (void)thing;
+}
+
+static void P_InertShootSpecialLine(mobj_t *thing, line_t *line)
+{
+  (void)thing; (void)line;
+}
+
+static void P_InertPlayerInSpecialSector(player_t *player)
+{
+  (void)player;
+}
+
+static const map_format_t zdoom_in_doom_map_format =
+{
+  true,                       /* zdoom    */
+  true,                       /* hexen    */
+  false,                      /* polyobjs */
+  false,                      /* acs      */
+  false,                      /* sndseq   */
+  false,                      /* animdefs */
+  false,                      /* doublesky*/
+  P_InertCrossSpecialLine,
+  P_InertShootSpecialLine,
+  P_InertPlayerInSpecialSector,
+  NULL,                       /* execute_line_special (not yet) */
+  VF_DOOM
+};
+
+void P_ApplyZDoomInDoomMapFormat(void)
+{
+  map_format = zdoom_in_doom_map_format;
+}

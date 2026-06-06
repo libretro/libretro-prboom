@@ -2574,21 +2574,20 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    /* Hexen-format maps carry a BEHAVIOR lump right after BLOCKMAP.  When the
     * Hexen game flag is set the Hexen-sized linedef/thing loaders (selected via
-    * map_format) handle the larger records, so allow the load to proceed.  If
-    * a BEHAVIOR-bearing map turns up without the Hexen flag, the loaders would
-    * misread the records, so refuse it as before. */
+    * map_format) handle the larger records.  When a BEHAVIOR-bearing map turns
+    * up in a Doom-game wad it is ZDoom's 'Doom-in-Hexen' format (issue #86,
+    * chex3.wad): install the zdoom descriptor so the loaders use the Hexen
+    * record sizes and P_SpawnMapThing filters by the positive game-mode bits.
+    * Line/sector specials are ZDoom-numbered and stay inert until the
+    * translation layer lands. */
    if ((i = lumpnum + ML_BLOCKMAP + 1) < numlumps
          && !strncasecmp(lumpinfo[i].name, "BEHAVIOR", 8)
          && !hexen)
    {
-      /* In this core I_Error logs and returns rather than aborting, so the
-       * refusal must also abandon the load the way the UDMF path below
-       * does -- otherwise the Doom-sized loaders misread the Hexen-sized
-       * records and crash in P_GroupLines (issue #86, chex3.wad: ZDoom
-       * 'Doom-in-Hexen' format maps in a Doom IWAD). */
-      I_Error("P_SetupLevel: %s: Hexen-format map in a Doom game is not supported", lumpname);
-      level_setup_failed = TRUE;
-      return;
+      lprintf(LO_INFO,
+              "P_SetupLevel: %s: ZDoom Doom-in-Hexen format map; "
+              "line specials not yet supported\n", lumpname);
+      P_ApplyZDoomInDoomMapFormat();
    }
 
    // figgi 10/19/00 -- check for gl lumps and load them

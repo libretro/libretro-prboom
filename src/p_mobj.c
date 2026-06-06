@@ -39,6 +39,7 @@
 #include "p_map.h"
 #include "p_tick.h"
 #include "p_spec.h"
+#include "map_format.h"
 #include "dsda_hacked.h"
 #include "sounds.h"
 #include "st_stuff.h"
@@ -2152,7 +2153,7 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   // bits that weren't used in Doom (such as HellMaker wads). So we should
   // then simply ignore all upper bits.
 
-  if (!hexen &&
+  if (!map_format.hexen &&
       (demo_compatibility ||
       (compatibility_level >= lxdoom_1_compatibility  &&
        options & MTF_RESERVED))) {
@@ -2240,10 +2241,13 @@ void P_SpawnMapThing (const mapthing_t* mthing)
 
   // check for apropriate skill level
 
-  if (hexen)
+  if (map_format.hexen)
   {
-    /* Hexen filters by positive "appears in this game mode" bits and by the
-     * player's character class, rather than Doom's NOT* bits. */
+    /* Hexen-format things filter by positive "appears in this game mode"
+     * bits rather than Doom's NOT* bits; ZDoom Doom-in-Hexen maps use the
+     * same bits.  The character-class bits only mean anything in the Hexen
+     * game itself -- ZDoom-format Doom wads set them on everything, so they
+     * must be ignored there. */
     extern pclass_t PlayerClass[];
     int classbit;
 
@@ -2263,15 +2267,18 @@ void P_SpawnMapThing (const mapthing_t* mthing)
         return;
     }
 
-    switch (PlayerClass[consoleplayer])
+    if (hexen)
     {
-      case PCLASS_FIGHTER: classbit = MTF_HEXEN_FIGHTER; break;
-      case PCLASS_CLERIC:  classbit = MTF_HEXEN_CLERIC;  break;
-      case PCLASS_MAGE:    classbit = MTF_HEXEN_MAGE;    break;
-      default:             classbit = 0;                break;
+      switch (PlayerClass[consoleplayer])
+      {
+        case PCLASS_FIGHTER: classbit = MTF_HEXEN_FIGHTER; break;
+        case PCLASS_CLERIC:  classbit = MTF_HEXEN_CLERIC;  break;
+        case PCLASS_MAGE:    classbit = MTF_HEXEN_MAGE;    break;
+        default:             classbit = 0;                break;
+      }
+      if (!netgame && classbit && !(options & classbit))
+        return;
     }
-    if (!netgame && classbit && !(options & classbit))
-      return;
   }
   else
   {
@@ -2375,10 +2382,11 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   mobj->spawnpoint = *mthing;
   mobj->iden_num = iden_num;
 
-  /* Hexen: carry the thing id and scripted-special arguments onto the mobj
-   * (staged by P_LoadThings).  P_CreateTIDList picks the tid up after the
+  /* Hexen-format maps (the Hexen game and ZDoom Doom-in-Hexen): carry the
+   * thing id and scripted-special arguments onto the mobj (staged by
+   * P_LoadThings).  In Hexen, P_CreateTIDList picks the tid up after the
    * level finishes loading. */
-  if (hexen)
+  if (map_format.hexen)
   {
     int a;
     mobj->tid = hexen_thing_tid;

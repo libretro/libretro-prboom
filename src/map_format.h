@@ -65,4 +65,10 @@ extern map_format_t map_format;
  * added with their handlers in later commits. */
 void P_ApplyMapFormat(void);
 
+/* Install the ZDoom 'Doom-in-Hexen' descriptor: Hexen-sized map records in
+ * a Doom/Heretic game.  Called by P_SetupLevel when a BEHAVIOR lump is found
+ * on a non-Hexen map; P_ApplyMapFormat resets the per-game descriptor at the
+ * top of every level setup, so the override only lasts for that map. */
+void P_ApplyZDoomInDoomMapFormat(void);
+
 #endif

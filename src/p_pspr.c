@@ -2402,10 +2402,26 @@ void P_SetupPsprites(player_t *player)
  * P_MovePsprites
  * Called every tic by player thinking routine.
 */
+/* Snapshot of each psprite's position and state from before the most
+ * recent psprite tic, for weapon sprite interpolation in R_DrawPSprite. */
+psp_inter_t psp_oldpos[MAXPLAYERS][NUMPSPRITES];
+
 void P_MovePsprites(player_t *player)
 {
   int i;
   pspdef_t *psp  = player->psprites;
+  psp_inter_t *old = psp_oldpos[player - players];
+
+  /* Record where this tic starts from, so the renderer can interpolate
+   * between the previous and current positions.  The state pointer lets
+   * it tell continuous motion (bob, raise, lower) from the discontinuous
+   * reposition a weapon change makes. */
+  for (i = 0; i < NUMPSPRITES; i++)
+  {
+    old[i].sx    = psp[i].sx;
+    old[i].sy    = psp[i].sy;
+    old[i].state = psp[i].state;
+  }
 
   /* a null state means not active
    * drop tic count and possibly change state

@@ -83,6 +83,18 @@ typedef struct
   fixed_t sy;
 } pspdef_t;
 
+/* Previous-tic psprite positions for render interpolation (p_pspr.c).
+ * Kept beside the psprites rather than in pspdef_t so player_t and the
+ * savegame layout are untouched. */
+typedef struct
+{
+  fixed_t        sx;
+  fixed_t        sy;
+  const state_t *state;
+} psp_inter_t;
+
+extern psp_inter_t psp_oldpos[][NUMPSPRITES];
+
 extern int weapon_preferences[2][NUMWEAPONS+1];      /* killough 5/2/98 */
 int P_WeaponPreferred(int w1, int w2);
 

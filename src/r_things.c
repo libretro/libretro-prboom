@@ -905,6 +905,7 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    vissprite_t   avis;
    int           width;
    fixed_t       topoffset;
+   fixed_t       sx, sy;
 
    // decide which patch to use
 
@@ -933,11 +934,32 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    if (lump < 0 || lump >= numspritelumps)
       return;
 
+   /* Weapon sprite interpolation: the bob and the raise/lower motion
+    * step per tic, so at uncapped framerates the gun judders against
+    * the interpolated world.  Blend from the previous tic's position
+    * with the same fraction the rest of the frame uses.  A weapon
+    * change repositions the sprite discontinuously and swaps to a
+    * different graphic, so only blend while the previous state exists
+    * and draws the same sprite. */
+   sx = psp->sx;
+   sy = psp->sy;
+   if (movement_smooth)
+   {
+      const psp_inter_t *old =
+         &psp_oldpos[viewplayer - players][psp - viewplayer->psprites];
+
+      if (old->state && old->state->sprite == psp->state->sprite)
+      {
+         sx = old->sx + FixedMul (tic_vars.frac, psp->sx - old->sx);
+         sy = old->sy + FixedMul (tic_vars.frac, psp->sy - old->sy);
+      }
+   }
+
    {
       const rpatch_t* patch = R_CachePatchNum(lump+firstspritelump);
       // calculate edges of the shape
       fixed_t       tx;
-      tx = psp->sx-160*FRACUNIT;
+      tx = sx-160*FRACUNIT;
 
       tx -= patch->leftoffset<<FRACBITS;
       x1 = (centerxfrac + FixedMul (tx,pspritescale))>>FRACBITS;
@@ -959,7 +981,7 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    vis->mobjflags = MF_PLAYERSPRITE;
    // killough 12/98: fix psprite positioning problem
    vis->texturemid = (BASEYCENTER<<FRACBITS) /* +  FRACUNIT/2 */ -
-      (psp->sy-topoffset);
+      (sy-topoffset);
 
    /* Heretic draws weapons lower when the status bar is hidden (full view).
     * Vanilla/dsda apply a per-weapon downward offset in that case; without

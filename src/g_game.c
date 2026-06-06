@@ -2112,6 +2112,8 @@ static int G_DoLoadGameFromSaveBuffer(int length)
   save_p += strlen((const char*)save_p)+1;
 
   compatibility_level = (savegame_compatibility >= prboom_4_compatibility) ? *save_p : savegame_compatibility;
+  if (raven) /* raven ignores compat gates; old saves may carry mbf21 */
+    compatibility_level = best_compatibility;
   if (savegame_compatibility < prboom_6_compatibility)
     compatibility_level = map_old_comp_levels[compatibility_level];
   save_p++;
@@ -2639,6 +2641,15 @@ void G_ReloadDefaults(void)
     }
   }
   if (compatibility_level == (unsigned) -1)
+    compatibility_level = best_compatibility;
+
+  /* Raven: the heretic and hexen sim predates and ignores the
+   * Boom/MBF compatibility gates, and mbf21's extra flag semantics
+   * break it outright (heretic players take no damage, hexen monsters
+   * never attack).  dsda-doom pins raven to a fixed level for the
+   * same reason; pin to best_compatibility, which is what 'auto' has
+   * always resolved to for these games. */
+  if (raven)
     compatibility_level = best_compatibility;
 
   if (mbf_features)

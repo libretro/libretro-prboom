@@ -762,8 +762,13 @@ static void R_SetupFrame (player_t *player)
    * to the latest angle plus the staged remainder loses nothing and
    * advances monotonically. */
   if (G_PendingTurnActive())
+  {
     viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset
               + G_PendingTurn();
+    /* and the freelook analogue: anchor the pitch to the latest tic and
+     * add the unconsumed look backlog, instead of lerping a stale pair */
+    viewpitch = G_PendingPitch(player->mo) + viewpitchoffset;
+  }
 
   extralight = player->extralight;
 

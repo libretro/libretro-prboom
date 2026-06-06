@@ -39,6 +39,7 @@
 #include "d_player.h"
 
 void P_PlayerThink(player_t *player);
+void P_CheckPitch(angle_t *pitch);
 
 /* Hexen player morph (Porkalator) */
 void P_MorphPlayerThink(player_t *player);

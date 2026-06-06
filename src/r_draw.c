@@ -45,15 +45,20 @@
 #include "am_map.h"
 #include "lprintf.h"
 
-/* Wall-run kernel SSE2 path (see R_DrawWallColumnRun): vectorizes the
- * per-lane frac mask/shift/step arithmetic of the dense band and pairs
- * the texel/table lookups, which stay scalar (no byte gather below
- * AVX2, and none on NEON).  Behind the baseline x86-64 macro, so every
- * x86-64 build takes it; other targets keep the portable loop, which
- * has the same shape a NEON pass would want. */
+/* Wall-run kernel vector paths (see R_DrawWallColumnRun): vectorize
+ * the per-lane frac mask/shift/step arithmetic of the dense band and
+ * pair the texel/table lookups, which stay scalar on both ISAs (no
+ * byte gather below AVX2 and none on NEON).  SSE2 is baseline on
+ * x86-64; NEON is baseline on AArch64 and opt-in on ARMv7
+ * (-mfpu=neon).  Everything else keeps the portable band loop.  The
+ * frac adds run in unsigned lanes on both paths, the same bits as the
+ * signed C arithmetic mod 2^32. */
 #if defined(__SSE2__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2) || defined(_M_X64)
 #define WALL_RUN_SSE2 1
 #include <emmintrin.h>
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(_M_ARM64)
+#define WALL_RUN_NEON 1
+#include <arm_neon.h>
 #endif
 
 
@@ -5372,7 +5377,28 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
   {
     for (y = ymin; y < dtop; y++)
       WALL_RUN_RAGGED_ROW(lut[texel])
-#ifdef WALL_RUN_SSE2
+#if defined(WALL_RUN_SSE2)
+#define WALL_RUN_VEC4(J)                                              \
+      {                                                               \
+        __m128i f = _mm_loadu_si128((const __m128i *)&frac[J]);       \
+        __m128i m = _mm_loadu_si128((const __m128i *)&mask[J]);       \
+        __m128i s = _mm_loadu_si128((const __m128i *)&step[J]);       \
+        _mm_storeu_si128((__m128i *)idx4,                             \
+                         _mm_srli_epi32(_mm_and_si128(f, m), 16));    \
+        _mm_storeu_si128((__m128i *)&frac[J], _mm_add_epi32(f, s));   \
+      }
+#elif defined(WALL_RUN_NEON)
+#define WALL_RUN_VEC4(J)                                              \
+      {                                                               \
+        uint32x4_t f = vld1q_u32((const uint32_t *)&frac[J]);         \
+        uint32x4_t m = vld1q_u32(&mask[J]);                           \
+        uint32x4_t s = vld1q_u32((const uint32_t *)&step[J]);         \
+        vst1q_u32(idx4, vshrq_n_u32(vandq_u32(f, m), 16));            \
+        vst1q_u32((uint32_t *)&frac[J], vaddq_u32(f, s));             \
+      }
+#endif
+
+#ifdef WALL_RUN_VEC4
     for (y = dtop; y <= dbot; y++)
     {
       uint16_t *row = drawvars.short_topleft
@@ -5382,12 +5408,7 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
       {
         unsigned int idx4[4];
         uint16_t     out4[4];
-        __m128i f = _mm_loadu_si128((const __m128i *)&frac[j]);
-        __m128i m = _mm_loadu_si128((const __m128i *)&mask[j]);
-        __m128i s = _mm_loadu_si128((const __m128i *)&step[j]);
-        _mm_storeu_si128((__m128i *)idx4,
-                         _mm_srli_epi32(_mm_and_si128(f, m), 16));
-        _mm_storeu_si128((__m128i *)&frac[j], _mm_add_epi32(f, s));
+        WALL_RUN_VEC4(j)
         out4[0] = lut[src[j + 0][idx4[0]]];
         out4[1] = lut[src[j + 1][idx4[1]]];
         out4[2] = lut[src[j + 2][idx4[2]]];
@@ -5400,6 +5421,7 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
         frac[j] += step[j];
       }
     }
+#undef WALL_RUN_VEC4
 #else
     for (y = dtop; y <= dbot; y++)
       WALL_RUN_DENSE_ROW(lut[texel])

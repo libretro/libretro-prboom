@@ -2181,40 +2181,6 @@ static int P_GroupLines (void)
 // Firelines (TM) is a Rezistered Trademark of MBF Productions
 //
 
-/* [crispy] fix long wall wobble: the angle the renderer uses for a seg is
- * re-derived from the (slime-trail-adjusted) vertex coordinates in double
- * precision so all segs of a linedef agree exactly; if the node builder's
- * angle disagrees wildly (rotated/broken nodes), keep the original. */
-static angle_t P_AngleDiff(angle_t a, angle_t b)
-{
-  if (b > a)
-    return P_AngleDiff(b, a);
-  if (a - b < ANG180)
-    return a - b;
-  return b - a;
-}
-
-static void R_CalcSegsLength(void)
-{
-  int i;
-  for (i = 0; i < numsegs; i++)
-  {
-    seg_t  *li = segs + i;
-    int64_t dx = (int64_t)li->v2->x - li->v1->x;
-    int64_t dy = (int64_t)li->v2->y - li->v1->y;
-    double  length = sqrt((double)dx * dx + (double)dy * dy);
-    angle_t pangle;
-
-    li->halflength = (uint32_t)(length / 2.0);
-    pangle = (angle_t)(int64_t)(atan2((double)dy, (double)dx)
-                                * (2147483648.0 / M_PI));
-    /* more than just a little adjustment? back to the original then */
-    if (P_AngleDiff(pangle, li->angle) > ANG45 * 2 / 3)  /* ANG30 */
-      pangle = li->angle;
-    li->pangle = pangle;
-  }
-}
-
 static void P_RemoveSlimeTrails(void)         // killough 10/98
 {
   uint8_t *hit = calloc(1, numvertexes);         // Hitlist for vertices
@@ -2767,9 +2733,6 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    // http://www.doomworld.com/vb/showthread.php?s=&postid=627257#post627257
    if (compatibility_level>=lxdoom_1_compatibility || M_CheckParm("-force_remove_slime_trails") > 0)
       P_RemoveSlimeTrails();    // killough 10/98: remove slime trails from wad
-
-   /* [crispy] fix long wall wobble: must run after any vertex adjustment */
-   R_CalcSegsLength();
 
    // Note: you don't need to clear player queue slots --
    // a much simpler fix is in g_game.c -- killough 10/98

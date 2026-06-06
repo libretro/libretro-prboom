@@ -116,13 +116,69 @@ static const lighttable_t *composed_cm  = NULL;
 static const uint16_t     *composed_pal = NULL;
 static uint16_t            composed_lut[256];
 
+/* Smooth (CRY-style) distance shading.
+ *
+ * The Atari Jaguar port of Doom applied distance light entirely as a
+ * continuous luma (Y) bias in the blitter (the B_IINC register), leaving
+ * each texel's hue/saturation untouched -- one fresh 0..255 light value
+ * per wall column, interpolated linearly with depth, with no quantisation
+ * to a fixed set of light maps.  The DOS/PC engine instead snaps distance
+ * light to one of NUMCOLORMAPS (32) discrete colormaps, each of which also
+ * re-points the texel to the nearest palette index; that double snap is
+ * what produces the characteristic light banding on walls and floors.
+ *
+ * V_Palette16 already stores every palette colour expanded across
+ * VID_NUMCOLORWEIGHTS (64) continuous luma weights, computed in RGB space
+ * and packed to 565 -- structurally identical to the Jaguar's per-column
+ * Y value, only precomputed into a table rather than applied by hardware.
+ * The point path normally ignores that ramp: it reads weight 63 (full
+ * bright) and takes all its distance light from colormap[i]'s index snap.
+ *
+ * Smooth mode keeps the SAME single-lookup inner loop (so the per-pixel
+ * cost is identical to the banded point path) but builds the 256-entry
+ * table differently: it recovers the colormap's distance-light level from
+ * its offset against the active base (fullcolormap; sector and fixed
+ * colormaps are all expressed as fullcolormap + level*256), maps that
+ * 0..(NUMCOLORMAPS-1) level onto the 64-weight luma axis, and reads
+ * V_Palette16[ texel*64 + weight ].  Distance darkening now scales luma
+ * continuously, like CRY, instead of snapping the palette index.  The
+ * texel's own colormap remap (translations, invuln inversion baked into
+ * colormap[i]) is preserved; only the brightness selection changes. */
+int r_smooth_shading = 0; /* set by R_ApplyDiminishedLighting (mode 2) */
+
 static INLINE const uint16_t *R_GetComposedColormap(const lighttable_t *colormap)
 {
    if (colormap != composed_cm || V_Palette16 != composed_pal)
    {
       int i;
-      for (i = 0; i < 256; i++)
-         composed_lut[i] = V_Palette16[ colormap[i]*64 + (64-1) ];
+
+      if (r_smooth_shading && fullcolormap)
+      {
+         /* Recover the distance-light level (0 = brightest) from the
+          * colormap pointer's offset against the active base, then map it
+          * onto the continuous weight axis: level 0 -> weight 63 (full
+          * bright), level NUMCOLORMAPS-1 -> weight ~0 (darkest). */
+         int       level = (int)(colormap - fullcolormap) >> 8; /* 256 bytes/level */
+         int       weight;
+
+         if (level < 0)               level = 0;
+         else if (level > NUMCOLORMAPS-1) level = NUMCOLORMAPS-1;
+
+         /* (NUMCOLORMAPS-1-level) in [0,31] -> [0,63]; the *2 maps the 32
+          * light levels evenly onto the 64-entry ramp.  Clamp for safety. */
+         weight = (NUMCOLORMAPS-1 - level) * (VID_NUMCOLORWEIGHTS-1)
+                  / (NUMCOLORMAPS-1);
+         if (weight < 0)                    weight = 0;
+         else if (weight > VID_NUMCOLORWEIGHTS-1) weight = VID_NUMCOLORWEIGHTS-1;
+
+         for (i = 0; i < 256; i++)
+            composed_lut[i] = V_Palette16[ colormap[i]*VID_NUMCOLORWEIGHTS + weight ];
+      }
+      else
+      {
+         for (i = 0; i < 256; i++)
+            composed_lut[i] = V_Palette16[ colormap[i]*64 + (64-1) ];
+      }
       composed_cm  = colormap;
       composed_pal = V_Palette16;
    }
@@ -287,20 +343,41 @@ draw_vars_t drawvars = {
 /* "Diminished Lighting" setting (General > Video menu).
  *   0 = Default  : point-sampled light selection -- the standard 32
  *                  discrete distance/light colormap bands.
- *   1 = Enhanced : the dithered-Z path (filterz = LINEAR), which ordered-
+ *   1 = Dithered : the dithered-Z path (filterz = LINEAR), which ordered-
  *                  dithers between adjacent light colormaps so the band
  *                  boundaries blend into apparent smooth light gradients.
  *                  Stays 16bpp (no extra colormap memory); costs a little
  *                  more per drawn pixel, hence opt-in.
+ *   2 = Smooth   : CRY-style continuous luma shading (see r_smooth_shading
+ *                  and R_GetComposedColormap).  Keeps the point path's
+ *                  single-lookup inner loop -- same per-pixel cost as
+ *                  Default -- but selects the texel's brightness from
+ *                  V_Palette16's 64-step continuous luma ramp by recovered
+ *                  light level instead of snapping through the 32 colormap
+ *                  bands.  Removes the band edges without the dither
+ *                  stipple of mode 1.
  * R_ApplyDiminishedLighting() pushes the value into drawvars.filterz; it
  * is called once at R_Init (after the config is loaded) and again from
- * the menu change callback. */
+ * the menu change callback.  Render-only: never touches playsim, so it is
+ * savegame- and netgame-neutral. */
 int diminished_lighting = 0;
 
 void R_ApplyDiminishedLighting(void)
 {
-   drawvars.filterz = diminished_lighting ? RDRAW_FILTER_LINEAR
-                                          : RDRAW_FILTER_POINT;
+   /* Mode 1 (Dithered) routes the Z filter through the LINEAR dither path;
+    * modes 0 (Default) and 2 (Smooth) both keep point-sampled Z so they can
+    * use the single-lookup composed LUT.  Mode 2 additionally flips the LUT
+    * build to the continuous-luma path. */
+   drawvars.filterz = (diminished_lighting == 1) ? RDRAW_FILTER_LINEAR
+                                                 : RDRAW_FILTER_POINT;
+   r_smooth_shading = (diminished_lighting == 2);
+
+   /* The composed LUT is cached on (colormap ptr, V_Palette16); neither
+    * changes when only the shading mode flips, so force a rebuild on the
+    * next lookup, otherwise a stale banded/smooth table would persist until
+    * the active colormap happens to change. */
+   composed_cm  = NULL;
+   composed_pal = NULL;
 }
 
 //

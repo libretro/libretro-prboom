@@ -342,7 +342,7 @@ default_t defaults[] =
    def_int,ss_gen,NULL, NULL},
   {"r_wiggle_fix",{(int*)&r_wiggle_fix, NULL},{1, NULL},0,1,
    def_bool,ss_gen,NULL, NULL},
-  {"diminished_lighting",{&diminished_lighting, NULL},{0, NULL},0,1,
+  {"diminished_lighting",{&diminished_lighting, NULL},{0, NULL},0,2,
    def_int,ss_gen,NULL, NULL},
 
   {"Mouse settings",{NULL, NULL},{0, NULL},UL,UL,def_none,ss_none, NULL, NULL},

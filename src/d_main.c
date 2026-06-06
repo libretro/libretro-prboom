@@ -90,6 +90,7 @@
 #include "lprintf.h"  // jff 08/03/98 - declaration of lprintf
 #include "am_map.h"
 #include "u_mapinfo.h"
+#include "u_decorate.h"
 
 void GetFirstMap(int *ep, int *map); // Ty 08/29/98 - add "-warp x" functionality
 static void D_PageDrawer(void);
@@ -1650,6 +1651,12 @@ bool D_DoomMainSetup(void)
     }
   }
 
+
+  /* ZDoom DECORATE decorations: register static props before the sprite
+   * definitions and the editor-number hash freeze (Doom game only -- the
+   * shared mobjinfo table would expose them to Heretic lookups too). */
+  if (!hexen && !heretic && W_CheckNumForName("DECORATE") >= 0)
+    U_RegisterDecorateThings();
 
   //jff 9/3/98 use logical output routine
   lprintf(LO_INFO,"R_Init: Init DOOM refresh daemon - ");

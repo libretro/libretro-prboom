@@ -25,8 +25,12 @@
 #include <string.h>
 
 #include "doomtype.h"
+#include "doomstat.h"
+#include "info.h"
+#include "m_fixed.h"
 #include "w_wad.h"
 #include "lprintf.h"
+#include "dsda_hacked.h"
 #include "u_decorate.h"
 
 #define MAX_DECORATE_ACTORS 512
@@ -38,11 +42,20 @@ typedef struct
   char parent[MAX_NAME];
   char replaces[MAX_NAME];
   int  doomednum;               /* -1 if none */
+
+  /* simple-prop registration (static single-frame actors only) */
+  int  radius, height;          /* map units; -1 if unspecified */
+  int  solid, nogravity, spawnceiling;
+  char sprite[5];               /* 4-char sprite of a "SPRT F -1" spawn */
+  int  frame;                   /* 0-based frame letter, FF_FULLBRIGHT or'd */
+  int  spawn_static;            /* spawn state parsed and tics == -1 */
 } decorate_actor_t;
 
 static decorate_actor_t actors[MAX_DECORATE_ACTORS];
 static int num_actors;
 static int parsed;              /* one-shot lazy parse */
+
+static void parse_body(decorate_actor_t *a, const char *p, const char *end);
 
 /* ZDoom class names with fixed editor numbers, for chains that leave the
  * DECORATE lump.  Doom monsters plus ZDoom's Chex Quest class names (from
@@ -109,6 +122,7 @@ static void parse_header(const char *p, const char *end)
   a = &actors[num_actors];
   memset(a, 0, sizeof(*a));
   a->doomednum = -1;
+  a->radius = a->height = -1;
 
   p = skip_space(p, end);
   p = read_word(p, end, a->name, sizeof(a->name));
@@ -169,10 +183,29 @@ static void parse_decorate(void)
              (i == 0 || txt[i - 1] == '\n'))
     {
       size_t eol = i + 5;
+      size_t body, bend;
+      int    bdepth = 0;
       while (eol < len && txt[eol] != '\n' && txt[eol] != '{')
         eol++;
       parse_header(txt + i + 5, txt + eol);
-      i = eol - 1;
+      /* locate the body braces and parse the new actor's properties */
+      body = eol;
+      while (body < len && txt[body] != '{')
+        body++;
+      bend = body;
+      while (bend < len)
+      {
+        if (txt[bend] == '{')
+          bdepth++;
+        else if (txt[bend] == '}' && --bdepth == 0)
+          break;
+        bend++;
+      }
+      if (num_actors > 0 && body < len && bend > body)
+        parse_body(&actors[num_actors - 1], txt + body + 1, txt + bend);
+      i = bend;
+      depth = 0;
+      continue;
     }
   }
   W_UnlockLumpNum(lump);
@@ -226,6 +259,167 @@ static int resolve_class(const char *name, const decorate_actor_t *from,
   if (a->replaces[0])
     return resolve_class(a->replaces, from, depth + 1);
   return -1;
+}
+
+/* Parse the body span of the most recently added actor for the few
+ * properties simple static decorations use.  Anything beyond a single
+ * "SPRT F -1" spawn frame leaves spawn_static unset and the actor is not
+ * registered. */
+static void parse_body(decorate_actor_t *a, const char *p, const char *end)
+{
+  char word[MAX_NAME];
+  int  in_spawn = 0;
+
+  while (p < end)
+  {
+    p = skip_space(p, end);
+    if (p >= end)
+      break;
+    if (*p == '\n' || *p == '{' || *p == '}')
+    {
+      p++;
+      continue;
+    }
+    p = read_word(p, end, word, sizeof(word));
+    if (!word[0])
+    {
+      p++;
+      continue;
+    }
+
+    /* read_word stops before ':': a state label arrives as the bare word
+     * with the colon still unconsumed */
+    if (p < end && *p == ':')
+    {
+      p++;
+      in_spawn = !strcasecmp(word, "Spawn");
+      continue;
+    }
+
+    if (!strcasecmp(word, "Radius"))
+    {
+      p = skip_space(p, end);
+      p = read_word(p, end, word, sizeof(word));
+      a->radius = atoi(word);
+    }
+    else if (!strcasecmp(word, "Height"))
+    {
+      p = skip_space(p, end);
+      p = read_word(p, end, word, sizeof(word));
+      a->height = atoi(word);
+    }
+    else if (!strcasecmp(word, "+SOLID"))
+      a->solid = 1;
+    else if (!strcasecmp(word, "+NOGRAVITY"))
+      a->nogravity = 1;
+    else if (!strcasecmp(word, "+SPAWNCEILING"))
+      a->spawnceiling = 1;
+    else if (in_spawn && !a->spawn_static && strlen(word) == 4)
+    {
+      /* "SPRT F -1 [BRIGHT]" -- a single static frame */
+      char fr[MAX_NAME], tics[MAX_NAME];
+      const char *q = skip_space(p, end);
+      q = read_word(q, end, fr, sizeof(fr));
+      q = skip_space(q, end);
+      q = read_word(q, end, tics, sizeof(tics));
+      if (strlen(fr) == 1 && fr[0] >= 'A' && fr[0] <= 'Z' &&
+          !strcmp(tics, "-1"))
+      {
+        const char *r = skip_space(q, end);
+        char b[MAX_NAME];
+        memcpy(a->sprite, word, 4);
+        a->sprite[4] = 0;
+        a->frame = fr[0] - 'A';
+        read_word(r, end, b, sizeof(b));
+        if (!strcasecmp(b, "BRIGHT"))
+          a->frame |= FF_FULLBRIGHT;
+        a->spawn_static = 1;
+        p = q;
+      }
+      in_spawn = 0;
+    }
+  }
+}
+
+static dbool engine_knows_doomednum(int dn)
+{
+  int i;
+  for (i = 0; i < num_mobj_types; i++)
+    if (mobjinfo[i].doomednum == dn)
+      return true;
+  return false;
+}
+
+/* Register static single-frame DECORATE decorations as real thing types
+ * via the DSDHacked growable tables.  Must run before the first
+ * P_FindDoomedNum call (its hash is built once) and before R_Init (the
+ * sprite definitions are built once from sprnames); d_main calls this
+ * right before R_Init, and only for the Doom game. */
+void U_RegisterDecorateThings(void)
+{
+  int i, count = 0;
+  /* The dsda tables double when their end is touched: allocate
+   * sequentially from the counts captured here so ten registrations cost
+   * one doubling, not ten. */
+  int st_base = num_states;
+  int mt_base = num_mobj_types;
+  int sp_next = num_sprites;
+
+  if (!parsed)
+    parse_decorate();
+
+  for (i = 0; i < num_actors; i++)
+  {
+    decorate_actor_t *a = &actors[i];
+    int st, mt, sp, k;
+    mobjinfo_t *info;
+    state_t *state;
+
+    if (a->doomednum < 0 || !a->spawn_static)
+      continue;
+    if (engine_knows_doomednum(a->doomednum))
+      continue;
+    if (resolve_class(a->name, a, 0) >= 0)
+      continue;                 /* monsters etc. handled by aliasing */
+
+    sp = -1;
+    for (k = 0; k < sp_next; k++)
+      if (sprnames[k] && !strncasecmp(sprnames[k], a->sprite, 4))
+      {
+        sp = k;
+        break;
+      }
+    if (sp < 0)
+    {
+      sp = sp_next++;
+      *dsda_GetSprite(sp) = strdup(a->sprite);
+    }
+
+    st = st_base + count;
+    state = dsda_GetState(st);
+    state->sprite    = sp;
+    state->frame     = a->frame;
+    state->tics      = -1;
+    state->nextstate = st;
+
+    mt = mt_base + count;
+    info = dsda_GetMobjInfo(mt);
+    info->doomednum   = a->doomednum;
+    info->spawnstate  = st;
+    info->spawnhealth = 1000;
+    info->mass        = 100;
+    info->radius      = (a->radius >= 0 ? a->radius : 20) * FRACUNIT;
+    info->height      = (a->height >= 0 ? a->height : 16) * FRACUNIT;
+    info->flags       = (a->solid ? MF_SOLID : 0) |
+                        (a->nogravity ? MF_NOGRAVITY : 0) |
+                        (a->spawnceiling ? (MF_SPAWNCEILING | MF_NOGRAVITY)
+                                         : 0);
+    count++;
+  }
+
+  if (count)
+    lprintf(LO_INFO, "U_RegisterDecorateThings: %d static decorations\n",
+            count);
 }
 
 int U_DecorateAliasDoomedNum(int doomednum)

@@ -10,6 +10,11 @@
  * otherwise -1. */
 int U_DecorateAliasDoomedNum(int doomednum);
 
+/* Register static single-frame DECORATE decorations as thing types via the
+ * DSDHacked tables.  Call once at startup, after dehacked processing and
+ * before R_Init; Doom game only. */
+void U_RegisterDecorateThings(void);
+
 /* ZDoom editor-only map things (particle fountains, interpolation points,
  * camera/view stacks, editor cameras): skip without a warning. */
 dbool U_IsInertZDoomThing(int doomednum);

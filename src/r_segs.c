@@ -399,7 +399,16 @@ static void R_RenderSegLoop (void)
     *    Lock each once around the whole loop and reuse the cached pointer, so
     *    the per-column lock churn and &texture_composites[id] lookup are gone
     *    from the renderer's hottest loop. */
+   /* Which optional dcvars fields the selected drawers will read:
+    * LinearUV reads nextsource, RoundedUV reads prevsource and
+    * nextsource (both selected by filterwall), and the *_LinearZ
+    * dither drawers read nextcolormap (selected by filterz,
+    * independent of filterwall) -- the same split as the span setup
+    * in r_plane.c.  The half-texel texturecolumn centering stays
+    * LINEAR-only, as in the original filter code. */
    const int linear_filter = (drawvars.filterwall == RDRAW_FILTER_LINEAR);
+   const int uv_filter     = (drawvars.filterwall != RDRAW_FILTER_POINT);
+   const int z_filter      = (drawvars.filterz == RDRAW_FILTER_LINEAR);
    const rpatch_t *midpatch = midtexture    ? R_CacheTextureCompositePatchNum(midtexture)    : NULL;
    const rpatch_t *toppatch = toptexture    ? R_CacheTextureCompositePatchNum(toptexture)    : NULL;
    const rpatch_t *botpatch = bottomtexture ? R_CacheTextureCompositePatchNum(bottomtexture) : NULL;
@@ -477,10 +486,9 @@ static void R_RenderSegLoop (void)
          texturecolumn >>= FRACBITS;
 
          dcvars.colormap = R_ColourMap(rw_lightlevel,rw_scale);
-         /* nextcolormap is only read by the LINEAR-filter wall drawers; the
-          * default POINT path ignores it, so skip the extra colormap lookup
-          * when not filtering. */
-         if (linear_filter)
+         /* Only the *_LinearZ dither drawers read nextcolormap; skip the
+          * extra colormap lookup otherwise. */
+         if (z_filter)
             dcvars.nextcolormap = R_ColourMap(rw_lightlevel+1,rw_scale); // for filtering -- POPE
          dcvars.z = rw_scale; // for filtering -- POPE
 
@@ -497,7 +505,7 @@ static void R_RenderSegLoop (void)
          dcvars.texturemid = rw_midtexturemid;
          tex_patch = midpatch;
          dcvars.source = R_GetTextureColumn(tex_patch, texturecolumn);
-         if (linear_filter)
+         if (uv_filter)
          {
             dcvars.prevsource = R_GetTextureColumn(tex_patch, texturecolumn-1);
             dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
@@ -528,7 +536,7 @@ static void R_RenderSegLoop (void)
                dcvars.texturemid = rw_toptexturemid;
                tex_patch = toppatch;
                dcvars.source = R_GetTextureColumn(tex_patch,texturecolumn);
-               if (linear_filter)
+               if (uv_filter)
                {
                   dcvars.prevsource = R_GetTextureColumn(tex_patch,texturecolumn-1);
                   dcvars.nextsource = R_GetTextureColumn(tex_patch,texturecolumn+1);
@@ -564,7 +572,7 @@ static void R_RenderSegLoop (void)
                dcvars.texturemid = rw_bottomtexturemid;
                tex_patch = botpatch;
                dcvars.source = R_GetTextureColumn(tex_patch, texturecolumn);
-               if (linear_filter)
+               if (uv_filter)
                {
                   dcvars.prevsource = R_GetTextureColumn(tex_patch, texturecolumn-1);
                   dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);

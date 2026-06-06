@@ -52,6 +52,7 @@ angle_t G_PendingTurn(void); /* frame-rate turn preview */
 dbool   G_PendingTurnActive(void);
 struct mobj_s;
 angle_t G_PendingPitch(const struct mobj_s *mo); /* freelook preview */
+dbool   G_PendingPitchActive(const struct mobj_s *mo);
 dbool   G_CheckDemoStatus(void);
 void G_DeathMatchSpawnPlayer(int playernum);
 void G_InitNew(skill_t skill, int episode, int map);

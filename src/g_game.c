@@ -669,17 +669,27 @@ angle_t G_PendingTurn(void)
 /* The freelook analogue of G_PendingTurn.  mlooky is the look input
  * G_BuildTiccmd has accumulated since P_SetPitch last consumed it, so
  * the pitch the next tic will commit is simply the latest pitch plus
- * that backlog, under the same conditions P_SetPitch applies it: only
- * for mouselook (the Heretic keyboard-look path never accumulates
- * mlooky), never during the post-teleport reaction pause, and never
- * under the full-screen automap.  Returns the anchored preview pitch;
- * with no backlog this is just the latest tic's pitch. */
+ * that backlog, clamped as the tic will clamp it.
+ *
+ * The preview is only valid for pitch that mlooky itself drives, which
+ * is why the caller must check G_PendingPitchActive first: under the
+ * Heretic/Hexen keyboard- and gamepad-look path (mouselook off) the
+ * pitch moves per tic from lookdir with no backlog to anchor on, so
+ * overriding the renderer's interpolated pitch there would replace a
+ * smooth ramp with raw 35Hz steps.  The same applies during the
+ * post-teleport reaction pause and under the full-screen automap,
+ * where P_SetPitch leaves mlooky unconsumed. */
+dbool G_PendingPitchActive(const mobj_t *mo)
+{
+  return movement_mouselook && !mo->reactiontime &&
+         !((automapmode & am_active) && !(automapmode & am_overlay));
+}
+
 angle_t G_PendingPitch(const mobj_t *mo)
 {
   angle_t pitch = mo->pitch;
 
-  if (!movement_mouselook || mo->reactiontime ||
-      ((automapmode & am_active) && !(automapmode & am_overlay)))
+  if (!G_PendingPitchActive(mo))
     return pitch;
   pitch += (angle_t) (mlooky << 16);
   P_CheckPitch(&pitch);

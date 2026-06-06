@@ -766,8 +766,12 @@ static void R_SetupFrame (player_t *player)
     viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset
               + G_PendingTurn();
     /* and the freelook analogue: anchor the pitch to the latest tic and
-     * add the unconsumed look backlog, instead of lerping a stale pair */
-    viewpitch = G_PendingPitch(player->mo) + viewpitchoffset;
+     * add the unconsumed look backlog, instead of lerping a stale pair.
+     * Only when mouselook drives the pitch -- the keyboard/gamepad
+     * lookdir path has no backlog, and anchoring it would just strip
+     * the interpolation and step the view at 35Hz. */
+    if (G_PendingPitchActive(player->mo))
+      viewpitch = G_PendingPitch(player->mo) + viewpitchoffset;
   }
 
   extralight = player->extralight;

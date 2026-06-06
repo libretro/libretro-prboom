@@ -549,6 +549,53 @@ static void R_FlushQuadTL16(void)
    int        count = commonbot - commontop + 1;
    int        alt   = (temptype == COL_ALTTRANS);
 
+   /* Two rows per step: the transpose buffer is contiguous (8 lanes in one
+    * load), the framebuffer rows are a pitch apart (two 64-bit halves).
+    * The vector arithmetic is the TL_BLEND565 mask/shift/add per 16-bit
+    * lane, so the output is bit-identical to the scalar rows below, which
+    * also finish any odd row. */
+#if defined(WALL_RUN_SSE2)
+   {
+      const __m128i mask = _mm_set1_epi16((short)0xF7DEu);
+      while (count >= 2)
+      {
+         __m128i s  = _mm_loadu_si128((const __m128i *)source);
+         __m128i d0 = _mm_loadl_epi64((const __m128i *)dest);
+         __m128i d1 = _mm_loadl_epi64((const __m128i *)(dest + SURFACE_SHORT_PITCH));
+         __m128i d  = _mm_unpacklo_epi64(d0, d1);
+         __m128i dh = _mm_srli_epi16(_mm_and_si128(d, mask), 1);
+         __m128i px = _mm_add_epi16(_mm_srli_epi16(_mm_and_si128(s, mask), 1), dh);
+         if (alt)
+            px = _mm_add_epi16(_mm_srli_epi16(_mm_and_si128(px, mask), 1), dh);
+         _mm_storel_epi64((__m128i *)dest, px);
+         _mm_storel_epi64((__m128i *)(dest + SURFACE_SHORT_PITCH),
+                          _mm_unpackhi_epi64(px, px));
+         source += 8;
+         dest   += 2 * SURFACE_SHORT_PITCH;
+         count  -= 2;
+      }
+   }
+#elif defined(WALL_RUN_NEON)
+   {
+      const uint16x8_t mask = vdupq_n_u16(0xF7DEu);
+      while (count >= 2)
+      {
+         uint16x8_t s  = vld1q_u16(source);
+         uint16x8_t d  = vcombine_u16(vld1_u16(dest),
+                                      vld1_u16(dest + SURFACE_SHORT_PITCH));
+         uint16x8_t dh = vshrq_n_u16(vandq_u16(d, mask), 1);
+         uint16x8_t px = vaddq_u16(vshrq_n_u16(vandq_u16(s, mask), 1), dh);
+         if (alt)
+            px = vaddq_u16(vshrq_n_u16(vandq_u16(px, mask), 1), dh);
+         vst1_u16(dest, vget_low_u16(px));
+         vst1_u16(dest + SURFACE_SHORT_PITCH, vget_high_u16(px));
+         source += 8;
+         dest   += 2 * SURFACE_SHORT_PITCH;
+         count  -= 2;
+      }
+   }
+#endif
+
    while(--count >= 0)
    {
       int i;

@@ -188,29 +188,53 @@ static INLINE const uint16_t *R_GetComposedColormap(const lighttable_t *colormap
 
       if (r_smooth_shading && fullcolormap)
       {
-         int weight;
+         int  weight;
+         long off  = (long)(colormap - fullcolormap);
+         int  band = (int)(off >> 8);
+         /* A distance-light band is colormap == fullcolormap + level*256 for
+          * level in [0, NUMCOLORMAPS).  Anything else -- the invulnerability /
+          * light-amp INVERSECOLORMAP (level == NUMCOLORMAPS), a sector map we
+          * can't express as a band offset, or a misaligned pointer -- is NOT a
+          * distance fade and must be drawn through its own map at full bright,
+          * exactly as the banded point path does. */
+         int is_band = (off >= 0) && ((off & 255) == 0)
+                       && band >= 0 && band < NUMCOLORMAPS;
 
-         if (fine >= 0)
+         if (is_band && fine >= 0)
          {
             /* Sub-band precision published by the light-selection chokepoint. */
             weight = fine;
          }
+         else if (is_band)
+         {
+            /* Sprite/patch at a distance band, no fine value: map the band
+             * level 0..31 onto the 0..63 weight axis. */
+            weight = (NUMCOLORMAPS-1 - band) * (VID_NUMCOLORWEIGHTS-1)
+                     / (NUMCOLORMAPS-1);
+         }
          else
          {
-            /* No fine value (sprite/patch/fixedcolormap): recover the band
-             * level from the colormap pointer and map 0..31 -> 0..63. */
-            int level = (int)(colormap - fullcolormap) >> 8; /* 256 bytes/level */
-            if (level < 0)                   level = 0;
-            else if (level > NUMCOLORMAPS-1)  level = NUMCOLORMAPS-1;
-            weight = (NUMCOLORMAPS-1 - level) * (VID_NUMCOLORWEIGHTS-1)
-                     / (NUMCOLORMAPS-1);
+            /* Not a distance band (invuln inverse map, etc.): full bright
+             * through the supplied map -- identical to the point path. */
+            weight = VID_NUMCOLORWEIGHTS-1;
          }
 
          if (weight < 0)                          weight = 0;
          else if (weight > VID_NUMCOLORWEIGHTS-1)  weight = VID_NUMCOLORWEIGHTS-1;
 
-         for (i = 0; i < 256; i++)
-            composed_lut[i] = V_Palette16[ colormap[i]*VID_NUMCOLORWEIGHTS + weight ];
+         /* Distance darkening is applied ENTIRELY through the luma weight (the
+          * CRY way), so for a distance band the texel is looked up through the
+          * UNDIMMED base map (band 0 = fullcolormap), NOT the dimmed band the
+          * renderer selected.  Indexing the dimmed band AND applying the weight
+          * darkens twice -- an over-dark, blotchy image.  fullcolormap still
+          * carries any sector / translation remap; only the per-distance
+          * dimming is dropped, since weight now supplies it.  Non-band maps
+          * (invuln) keep their own map so their special remap is preserved. */
+         {
+            const lighttable_t *base = is_band ? fullcolormap : colormap;
+            for (i = 0; i < 256; i++)
+               composed_lut[i] = V_Palette16[ base[i]*VID_NUMCOLORWEIGHTS + weight ];
+         }
 
          composed_weight = want_weight;
       }

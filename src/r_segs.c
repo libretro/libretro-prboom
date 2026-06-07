@@ -339,12 +339,26 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
       // calculate texture offset - POPE
       angle = (ds->rw_centerangle + xtoviewangle[dcvars.x]) >> ANGLETOFINESHIFT;
       dcvars.texu = ds->rw_offset - FixedMul(finetangent[angle], ds->rw_distance);
-      if (dcvars.texu < mulo)
-         dcvars.texu = mulo;
-      else if (dcvars.texu > muhi)
-         dcvars.texu = muhi;
       if (drawvars.filterwall == RDRAW_FILTER_LINEAR)
+      {
+         /* see R_RenderSegLoop: keep both linear taps inside the seg */
+         fixed_t lo = mulo + (FRACUNIT>>1);
+         fixed_t hi = muhi - (FRACUNIT>>1);
+         if (lo > hi)
+            lo = hi = mulo + ((muhi - mulo) >> 1);
+         if (dcvars.texu < lo)
+            dcvars.texu = lo;
+         else if (dcvars.texu > hi)
+            dcvars.texu = hi;
          dcvars.texu -= (FRACUNIT>>1);
+      }
+      else
+      {
+         if (dcvars.texu < mulo)
+            dcvars.texu = mulo;
+         else if (dcvars.texu > muhi)
+            dcvars.texu = muhi;
+      }
 
       if (!fixedcolormap)
          dcvars.z = spryscale; // for filtering -- POPE
@@ -509,12 +523,33 @@ static void R_RenderSegLoop (void)
          angle_t angle =(rw_centerangle+xtoviewangle[rw_x])>>ANGLETOFINESHIFT;
 
          texturecolumn = rw_offset-FixedMul(finetangent[angle],rw_distance);
-         if (texturecolumn < rw_uclamp_lo)
-            texturecolumn = rw_uclamp_lo;
-         else if (texturecolumn > rw_uclamp_hi)
-            texturecolumn = rw_uclamp_hi;
          if (linear_filter)
+         {
+            /* The linear kernel blends floor(u - 1/2) and the next
+             * column, so a u clamped merely to [lo, hi] still reads
+             * one texel past the seg on each side once the half-texel
+             * shift is applied; at a seg's first column that wraps to
+             * the far side of the texture and the strip returns.
+             * Pull the clamp in by half a texel so both taps stay
+             * inside the seg (CLAMP_TO_EDGE: the edge column goes
+             * sharp instead of blending across the wrap). */
+            fixed_t lo = rw_uclamp_lo + (FRACUNIT>>1);
+            fixed_t hi = rw_uclamp_hi - (FRACUNIT>>1);
+            if (lo > hi)
+               lo = hi = rw_uclamp_lo + ((rw_uclamp_hi - rw_uclamp_lo) >> 1);
+            if (texturecolumn < lo)
+               texturecolumn = lo;
+            else if (texturecolumn > hi)
+               texturecolumn = hi;
             texturecolumn -= (FRACUNIT>>1);
+         }
+         else
+         {
+            if (texturecolumn < rw_uclamp_lo)
+               texturecolumn = rw_uclamp_lo;
+            else if (texturecolumn > rw_uclamp_hi)
+               texturecolumn = rw_uclamp_hi;
+         }
          dcvars.texu = texturecolumn; // for filtering -- POPE
          texturecolumn >>= FRACBITS;
 

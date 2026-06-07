@@ -888,7 +888,7 @@ void retro_get_system_info(struct retro_system_info *info)
 #endif
    info->library_version  = "v2.5.0" GIT_VERSION;
    info->need_fullpath    = true;
-   info->valid_extensions = "wad|iwad|pwad|lmp|m3u";
+   info->valid_extensions = "wad|iwad|pwad|lmp|m3u|pk3|ipk3|zip";
    info->block_extract    = false;
 }
 
@@ -1951,6 +1951,42 @@ bool retro_load_game(const struct retro_game_info *info)
                          "IWAD next to '%s' or use an m3u playlist to "
                          "name the IWAD explicitly.\n",
                          g_basename, g_basename);
+               argv[argc++] = strdup("-file");
+               argv[argc++] = strdup(info->path);
+            }
+         }
+         else if(header.identification[0] == 'P' &&
+                 header.identification[1] == 'K' &&
+                 header.identification[2] == 0x03 &&
+                 header.identification[3] == 0x04)
+         {
+            /* PK3/ZIP archive.  These are add-ons (no PLAYPAL routing
+             * heuristic applies: standalone archives are ipk3 games this
+             * core does not support yet), so pair them with whatever IWAD
+             * is findable.  ZDoom-targeted archives overwhelmingly assume
+             * doom2.wad, so prefer the DOOM2 generation. */
+            char *iwad_match = find_iwad_for_kind(PWAD_MAP_DOOM2);
+            if (!iwad_match)
+               iwad_match = find_iwad_for_kind(PWAD_MAP_DOOM1);
+            if (iwad_match)
+            {
+               if (log_cb)
+                  log_cb(RETRO_LOG_INFO,
+                         "retro_load_game: steering archive '%s' toward "
+                         "IWAD '%s'\n", g_basename, iwad_match);
+               argv[argc++] = strdup("-iwad");
+               argv[argc++] = iwad_match;  /* heap from FindFileInDir */
+               argv[argc++] = strdup("-file");
+               argv[argc++] = strdup(info->path);
+            }
+            else
+            {
+               if (log_cb)
+                  log_cb(RETRO_LOG_WARN,
+                         "retro_load_game: archive '%s' loaded with no "
+                         "IWAD found nearby; the engine's auto-detect "
+                         "will try, but a doom2.wad next to the archive "
+                         "is the expected setup.\n", g_basename);
                argv[argc++] = strdup("-file");
                argv[argc++] = strdup(info->path);
             }

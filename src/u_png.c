@@ -142,10 +142,23 @@ static unsigned *zpng_decode(const unsigned char *d, int len,
   if (r != IMAGE_PROCESS_END || !out || !*w || !*h ||
       *w > 4096 || *h > 4096)
   {
-    free(out);
+    (free)(out);
     return NULL;
   }
-  return out;
+
+  /* Allocator boundary: rpng compiles without the z_zone malloc macros
+   * (raw libc -- memalign on GEKKO), so its buffer must never meet the
+   * zone free.  Copy it into zone memory here, the single crossing
+   * point, and release the original with the real libc free --
+   * parenthesized to suppress the macro.  Everything downstream owns a
+   * zone buffer and frees it normally. */
+  {
+    unsigned *zoned = malloc((size_t)*w * (size_t)*h * 4);
+    if (zoned)
+      memcpy(zoned, out, (size_t)*w * (size_t)*h * 4);
+    (free)(out);
+    return zoned;
+  }
 }
 
 /* ---- patch synthesis ----------------------------------------------------- */

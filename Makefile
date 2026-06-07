@@ -753,3 +753,12 @@ uninstall:
 
 .PHONY: clean clean-objs install uninstall
 endif
+
+# rpng is vendored verbatim and must run on raw libc, outside the
+# z_zone malloc-macro regime: on GEKKO it includes newlib's <malloc.h>
+# (for memalign), whose malloc prototype the function-like macros
+# mangle into a syntax error, and it memaligns its output buffer there,
+# which must never meet Z_Free.  u_png.c frees rpng-owned buffers with
+# (free) for the same reason.
+libretro/libretro-common/formats/png/rpng.o: libretro/libretro-common/formats/png/rpng.c
+	$(CC) $(filter-out -include z_zone.h,$(CFLAGS)) -c $(OBJOUT)$@ $<

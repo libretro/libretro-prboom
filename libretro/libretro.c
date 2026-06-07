@@ -776,7 +776,7 @@ double I_RenderProfileUsec(void)
 {
    if (perf_get_time_usec_cb)
       return (double)perf_get_time_usec_cb();
-#if defined(CLOCK_MONOTONIC)
+#if defined(CLOCK_MONOTONIC) && !defined(_WIN32)
    {
       /* Fallback when the frontend exposes no perf interface (e.g. a
        * headless test harness): use the monotonic clock directly so the

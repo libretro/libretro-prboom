@@ -582,13 +582,13 @@ void R_InitData(void)
  * skips them, and the animation tables can never match them.  Multi-patch
  * compositing is not attempted; such names keep the placeholder flat. */
 
-#define MAX_SYNTH_FLATS 32
 
 static struct synth_flat_s
 {
-  char    name[9];
+  char name[9];
   uint8_t data[4096];
-} synth_flats[MAX_SYNTH_FLATS];
+} *synth_flats;
+static int num_synth_flats, cap_synth_flats;
 static int num_synth_flats;
 
 dbool R_IsSyntheticFlat(int picnum)
@@ -601,9 +601,24 @@ const uint8_t *R_GetSyntheticFlat(int picnum)
   return synth_flats[picnum - numflats].data;
 }
 
+static int R_SynthGrow(void)
+{
+  if (num_synth_flats == cap_synth_flats)
+  {
+    int nc = cap_synth_flats ? cap_synth_flats * 2 : 64;
+    struct synth_flat_s *ns =
+      Z_Malloc(nc * sizeof(*ns), PU_STATIC, 0);
+    if (synth_flats)
+      memcpy(ns, synth_flats, num_synth_flats * sizeof(*ns));
+    synth_flats = ns;
+    cap_synth_flats = nc;
+  }
+  return num_synth_flats;
+}
+
 static int R_SynthFlatFromPatch(const char *name)
 {
-  int            i, lump, w, h, x, y;
+  int            i, lump, w, h, x, y, tex;
   size_t         lumplen;
   const uint8_t *pat;
   uint8_t       *tmp;
@@ -613,9 +628,40 @@ static int R_SynthFlatFromPatch(const char *name)
     if (!strncasecmp(synth_flats[i].name, name, 8))
       return numflats + i;
 
-  if (num_synth_flats == MAX_SYNTH_FLATS)
-    return -1;
+  /* Wall texture on a floor (ZDoom's unified namespace): sample the
+   * composite.  This covers both TEXTUREx composites (SHAWN2, BRICK4 on
+   * MyHouse floors) and the standalone TX-namespace textures, whose
+   * rpatch columns expose a solid per-column pixel buffer. */
+  tex = R_CheckTextureNumForName(name);
+  if (tex >= 0)
+  {
+    const rpatch_t *rp = R_CacheTextureCompositePatchNum(tex);
+    if (rp && rp->width > 0 && rp->height > 0)
+    {
+      {
+        int slot = R_SynthGrow();   /* grows synth_flats: sequence first */
+        sf = &synth_flats[slot];
+      }
+      memset(sf->name, 0, sizeof(sf->name));
+      strncpy(sf->name, name, 8);
+      for (y = 0; y < 64; y++)
+        for (x = 0; x < 64; x++)
+        {
+          int sx = x * rp->width / 64;
+          int sy = y * rp->height / 64;
+          sf->data[y * 64 + x] = rp->columns[sx].pixels[sy];
+        }
+      R_UnlockTextureCompositePatchNum(tex);
+      lprintf(LO_INFO, "R_FlatNumForName: %.8s served from wall texture\n",
+              name);
+      return numflats + num_synth_flats++;
+    }
+    if (rp)
+      R_UnlockTextureCompositePatchNum(tex);
+  }
 
+  /* Raw patch lump in the global namespace (chex3's CJFCOMM* case).
+   * Posts decode with the DeePsea tall-patch rule, matching r_patch.c. */
   lump = (W_CheckNumForName)(name, ns_global);
   if (lump < 0)
     return -1;
@@ -626,7 +672,7 @@ static int R_SynthFlatFromPatch(const char *name)
   pat = W_CacheLumpNum(lump);
   w = (short)(pat[0] | (pat[1] << 8));
   h = (short)(pat[2] | (pat[3] << 8));
-  if (w <= 0 || h <= 0 || w > 1024 || h > 1024 ||
+  if (w <= 0 || h <= 0 || w > 4096 || h > 4096 ||
       lumplen < 8 + 4 * (size_t)w)
   {
     W_UnlockLumpNum(lump);
@@ -642,6 +688,7 @@ static int R_SynthFlatFromPatch(const char *name)
 
   for (x = 0; x < w; x++)
   {
+    int top = -1;
     size_t ofs = (size_t)(pat[8 + 4 * x]       |
                          (pat[8 + 4 * x + 1] << 8)  |
                          (pat[8 + 4 * x + 2] << 16) |
@@ -653,17 +700,21 @@ static int R_SynthFlatFromPatch(const char *name)
       int len      = pat[ofs + 1];
       if (ofs + 4 + (size_t)len > lumplen)
         break;
+      top = (topdelta <= top) ? top + topdelta : topdelta;
       for (y = 0; y < len; y++)
-        if (topdelta + y < h)
-          tmp[(topdelta + y) * w + x] = pat[ofs + 3 + y];
+        if (top + y < h)
+          tmp[(top + y) * w + x] = pat[ofs + 3 + y];
       ofs += (size_t)len + 4;
     }
   }
   W_UnlockLumpNum(lump);
 
-  sf = &synth_flats[num_synth_flats];
+  {
+    int slot = R_SynthGrow();       /* grows synth_flats: sequence first */
+    sf = &synth_flats[slot];
+  }
+  memset(sf->name, 0, sizeof(sf->name));
   strncpy(sf->name, name, 8);
-  sf->name[8] = 0;
   for (y = 0; y < 64; y++)
     for (x = 0; x < 64; x++)
       sf->data[y * 64 + x] = tmp[(y * h / 64) * w + (x * w / 64)];

@@ -972,14 +972,9 @@ void P_TeleportOther(mobj_t *victim)
     /* a monster's death action runs when it is banished */
     if (victim->flags & MF_COUNTKILL && victim->special)
     {
-      byte b[5];
-      b[0] = (byte) victim->special_args[0];
-      b[1] = (byte) victim->special_args[1];
-      b[2] = (byte) victim->special_args[2];
-      b[3] = (byte) victim->special_args[3];
-      b[4] = (byte) victim->special_args[4];
       P_RemoveMobjFromTIDList(victim);
-      P_ExecuteHexenLineSpecial(victim->special, b, NULL, 0, victim);
+      P_ExecuteHexenLineSpecial(victim->special, victim->special_args,
+                                NULL, 0, victim);
       victim->special = 0;
     }
     /* all monsters go to the deathmatch spots */

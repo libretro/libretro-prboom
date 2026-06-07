@@ -1589,14 +1589,13 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
    * activator (vanilla Hexen, e.g. picking up the key that seals a door). */
   if (special->special)
   {
-    byte b[5];
-    int  a;
-    for (a = 0; a < 5; a++)
-      b[a] = (byte) special->special_args[a];
-    /* route through the format's executor so ZDoom-numbered specials
-     * translate on Doom-in-Hexen maps */
+    /* special_args are already full-width ints, matching the widened
+     * executor signatures; route through the format's executor so
+     * ZDoom-numbered specials translate on Doom-in-Hexen maps */
     if (map_format.execute_line_special)
-      map_format.execute_line_special(special->special, b, NULL, 0, toucher);
+      map_format.execute_line_special(special->special,
+                                      special->special_args, NULL, 0,
+                                      toucher);
     special->special = 0;
   }
   P_RemoveMobj(special);
@@ -1666,16 +1665,13 @@ static void P_KillMobj(mobj_t *source, mobj_t *target)
   {
     if (target->type == HEXEN_MT_SORCBOSS)
     {
-      byte dummyArgs[3] = {0, 0, 0};
+      int dummyArgs[3] = {0, 0, 0};
       P_StartACS(target->special, 0, dummyArgs, target, NULL, 0);
     }
     else
     {
-      byte b[5];
-      int  a;
-      for (a = 0; a < 5; a++)
-        b[a] = (byte) target->special_args[a];
-      P_ExecuteHexenLineSpecial(target->special, b, NULL, 0, target);
+      P_ExecuteHexenLineSpecial(target->special, target->special_args,
+                                NULL, 0, target);
     }
   }
 

@@ -1680,6 +1680,7 @@ bool D_DoomMainSetup(void)
    * shared mobjinfo table would expose them to Heretic lookups too). */
   if (!hexen && !heretic && W_CheckNumForName("DECORATE") >= 0)
     U_RegisterDecorateThings();
+    U_RegisterZDoomUtilityThings();
 
   //jff 9/3/98 use logical output routine
   lprintf(LO_INFO,"R_Init: Init DOOM refresh daemon - ");

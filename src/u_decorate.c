@@ -497,5 +497,42 @@ dbool U_IsInertZDoomThing(int doomednum)
 {
   return (doomednum >= 9027 && doomednum <= 9033) ||  /* particle fountains */
          (doomednum >= 9070 && doomednum <= 9078) ||  /* interp/camera/stacks */
-         (doomednum >= 32000 && doomednum <= 32003);  /* editor cameras */
+         (doomednum >= 32000 && doomednum <= 32003) ||/* editor cameras */
+         doomednum == 9024 ||                         /* patrol point */
+         doomednum == 9025 ||                         /* security camera */
+         doomednum == 9026 ||                         /* spark */
+         (doomednum >= 9080 && doomednum <= 9082) ||  /* sky viewpoint/picker/silencer */
+         (doomednum >= 9800 && doomednum <= 9859) ||  /* GZDoom dynamic lights */
+         (doomednum >= 9982 && doomednum <= 9999) ||  /* sector actions (unimplemented) */
+         (doomednum >= 14001 && doomednum <= 14067) ||/* ambient sounds */
+         (doomednum >= 1400 && doomednum <= 1410);    /* sound sequence overrides */
+}
+
+/* Spawnable ZDoom utility markers: invisible, intangible mobjs whose
+ * whole purpose is to carry a TID -- ACS SpawnSpot anchors and teleport
+ * destinations.  Cloned from MT_TELEPORTMAN (S_NULL spawn state,
+ * NOBLOCKMAP|NOSECTOR), with actor names so ACS ThingCountName can see
+ * them. */
+void U_RegisterZDoomUtilityThings(void)
+{
+  static const struct { int ednum; const char *name; } spots[] =
+  {
+    { 9001, "MapSpot" },
+    { 9013, "MapSpotGravity" },
+    { 9043, "TeleportDest3" },
+    { 9044, "TeleportDest2" },
+  };
+  size_t i;
+
+  int base = num_mobj_types;
+
+  /* one growth covers all entries (the table doubles when touched) */
+  dsda_GetMobjInfo(base + (int)(sizeof(spots) / sizeof(spots[0])) - 1);
+  for (i = 0; i < sizeof(spots) / sizeof(spots[0]); i++)
+  {
+    mobjinfo_t *info = &mobjinfo[base + (int)i];
+    *info = mobjinfo[MT_TELEPORTMAN];
+    info->doomednum = spots[i].ednum;
+    info->actorname = spots[i].name;
+  }
 }

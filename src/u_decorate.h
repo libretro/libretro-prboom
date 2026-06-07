@@ -23,4 +23,8 @@ void U_RegisterDecorateThings(void);
  * camera/view stacks, editor cameras): skip without a warning. */
 dbool U_IsInertZDoomThing(int doomednum);
 
+/* Register spawnable ZDoom utility markers (MapSpot, TeleportDest2/3)
+ * as dynamic mobj types; call once after dsda_InitTables. */
+void U_RegisterZDoomUtilityThings(void);
+
 #endif

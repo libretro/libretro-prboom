@@ -1709,7 +1709,11 @@ void P_RemoveMobj (mobj_t* mobj)
 {
   P_BloodQueueUnhook(mobj);
 
-  if (hexen && mobj->tid != 0)
+  /* All TID-bearing formats (Hexen and the ZDoom map formats, which
+   * build the TID list in P_SetupLevel) must unhook removed mobjs, or
+   * TIDMobj keeps a dangling pointer and P_FindMobjFromTID hands out
+   * freed memory.  Doom-format mobjs always carry tid 0: no cost. */
+  if (mobj->tid != 0)
     P_RemoveMobjFromTIDList(mobj);
 
   /* Hexen: a mobj leaving the world by any path must leave the corpse

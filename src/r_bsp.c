@@ -506,7 +506,8 @@ static void R_Subsector(int num)
   // killough 3/16/98: add floorlightlevel
   // killough 10/98: add support for skies transferred from sidedefs
 
-  floorplane = frontsector->floorheight < viewz || // killough 3/7/98
+  floorplane = frontsector->floor_slope ||        /* sloped: never cull */
+    frontsector->floorheight < viewz || // killough 3/7/98
     (frontsector->heightsec != -1 &&
      sectors[frontsector->heightsec].ceilingpic == skyflatnum) ?
     R_FindPlane(frontsector->floorheight,
@@ -515,10 +516,12 @@ static void R_Subsector(int num)
                 frontsector->floorpic,
                 floorlightlevel,                // killough 3/16/98
                 frontsector->floor_xoffs,       // killough 3/7/98
-                frontsector->floor_yoffs
+                frontsector->floor_yoffs,
+                frontsector->floor_slope
                 ) : NULL;
 
-  ceilingplane = frontsector->ceilingheight > viewz ||
+  ceilingplane = frontsector->ceiling_slope ||    /* sloped: never cull */
+    frontsector->ceilingheight > viewz ||
     frontsector->ceilingpic == skyflatnum ||
     (frontsector->heightsec != -1 &&
      sectors[frontsector->heightsec].floorpic == skyflatnum) ?
@@ -528,7 +531,8 @@ static void R_Subsector(int num)
                 frontsector->ceilingpic,
                 ceilinglightlevel,              // killough 4/11/98
                 frontsector->ceiling_xoffs,     // killough 3/7/98
-                frontsector->ceiling_yoffs
+                frontsector->ceiling_yoffs,
+                frontsector->ceiling_slope
                 ) : NULL;
 
   // killough 9/18/98: Fix underwater slowdown, by passing real sector

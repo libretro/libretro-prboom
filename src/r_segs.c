@@ -42,6 +42,7 @@
 #include "r_things.h"
 #include "r_draw.h"
 #include "r_drawcmd.h"
+#include "p_slope.h"
 #include "w_wad.h"
 #include "v_video.h"
 #include "lprintf.h"
@@ -87,6 +88,7 @@ static int      worldtop;
 static int      worldbottom;
 static int      worldhigh;
 static int      worldlow;
+static dbool    rw_anyslope;    /* any sloped plane borders this seg */
 static fixed_t  pixhigh;
 static fixed_t  pixlow;
 static fixed_t  pixhighstep;
@@ -706,6 +708,34 @@ static fixed_t R_PointToDist(fixed_t x, fixed_t y)
             + ANG90) >> ANGLETOFINESHIFT]);
 }
 
+/* World hit of the view ray through screen column x with the current
+ * seg's line, for sloped plane heights at the clipped seg ends.  The
+ * seg's vertices may sit well past the clip, so the heights must come
+ * from the ray/line intersection, not the vertices.  Doubles: this
+ * runs at most four times per sloped seg. */
+static void R_SlopeWallPoint(int x, fixed_t *wx, fixed_t *wy)
+{
+   angle_t ang = viewangle + xtoviewangle[x];
+   double rdx = finecosine[ang >> ANGLETOFINESHIFT] / 65536.0;
+   double rdy = finesine[ang >> ANGLETOFINESHIFT] / 65536.0;
+   double p1x = curline->v1->x / 65536.0, p1y = curline->v1->y / 65536.0;
+   double ldx = (curline->v2->x - curline->v1->x) / 65536.0;
+   double ldy = (curline->v2->y - curline->v1->y) / 65536.0;
+   double vx = viewx / 65536.0, vy = viewy / 65536.0;
+   double den = ldx * rdy - ldy * rdx;
+   double tt;
+
+   if (den == 0)
+   {
+      *wx = curline->v1->x;
+      *wy = curline->v1->y;
+      return;
+   }
+   tt = ((vx - p1x) * rdy - (vy - p1y) * rdx) / den;
+   *wx = (fixed_t)((p1x + tt * ldx) * 65536.0);
+   *wy = (fixed_t)((p1y + tt * ldy) * 65536.0);
+}
+
 //
 // R_StoreWallRange
 // A wall segment will be drawn
@@ -713,6 +743,7 @@ static fixed_t R_PointToDist(fixed_t x, fixed_t y)
 //
 #ifdef PRBOOM_RENDER_PROFILE
 static void R_StoreWallRange_impl(const int start, const int stop);
+
 void R_StoreWallRange(const int start, const int stop)
 {
    extern double prof_storewall_usec;
@@ -827,6 +858,8 @@ void R_StoreWallRange(const int start, const int stop)
 
    worldtop = frontsector->ceilingheight - viewz;
    worldbottom = frontsector->floorheight - viewz;
+   rw_anyslope = frontsector->floor_slope || frontsector->ceiling_slope ||
+     (backsector && (backsector->floor_slope || backsector->ceiling_slope));
 
    midtexture = toptexture = bottomtexture = maskedtexture = 0;
    ds_p->maskedtexturecol = NULL;
@@ -913,6 +946,7 @@ void R_StoreWallRange(const int start, const int stop)
          worldtop = worldhigh;
 
       markfloor = worldlow != worldbottom
+         || frontsector->floor_slope || backsector->floor_slope
          || backsector->floorpic != frontsector->floorpic
          || backsector->lightlevel != frontsector->lightlevel
 
@@ -929,6 +963,7 @@ void R_StoreWallRange(const int start, const int stop)
          ;
 
       markceiling = worldhigh != worldtop
+         || frontsector->ceiling_slope || backsector->ceiling_slope
          || backsector->ceilingpic != frontsector->ceilingpic
          || backsector->lightlevel != frontsector->lightlevel
 
@@ -1030,9 +1065,11 @@ void R_StoreWallRange(const int start, const int stop)
    // killough 3/7/98: add deep water check
    if (frontsector->heightsec == -1)
    {
-      if (frontsector->floorheight >= viewz)       // above view plane
+      if (frontsector->floorheight >= viewz &&
+            !frontsector->floor_slope)             // above view plane
          markfloor = FALSE;
       if (frontsector->ceilingheight <= viewz &&
+            !frontsector->ceiling_slope &&
             frontsector->ceilingpic != skyflatnum)   // below view plane
          markceiling = FALSE;
    }
@@ -1061,6 +1098,70 @@ void R_StoreWallRange(const int start, const int stop)
       {
          pixlow = (centeryfrac >> invhgtbits) - FixedMul (worldlow, rw_scale);
          pixlowstep = -FixedMul (rw_scalestep,worldlow);
+      }
+   }
+
+   /* Sloped sector planes: a plane's edge along the wall is a straight
+    * 3D line, and perspective projection maps lines to lines, so the
+    * per-column screen boundary is still linear -- only the endpoint
+    * heights differ.  Re-derive frac/step from the plane heights at the
+    * clipped seg's first and last column rays. */
+   if (rw_anyslope)
+   {
+      fixed_t wx1, wy1, wx2, wy2, s1, s2;
+      int span = rw_stopx - 1 - rw_x;
+
+      R_SlopeWallPoint(rw_x, &wx1, &wy1);
+      R_SlopeWallPoint(rw_stopx - 1, &wx2, &wy2);
+      s1 = rw_scale;
+      s2 = span > 0 ? rw_scale + rw_scalestep * span : rw_scale;
+
+      if (frontsector->ceiling_slope)
+      {
+         fixed_t z1 = (P_PlaneZatPoint(frontsector->ceiling_slope, wx1, wy1)
+                       - viewz) >> invhgtbits;
+         fixed_t z2 = (P_PlaneZatPoint(frontsector->ceiling_slope, wx2, wy2)
+                       - viewz) >> invhgtbits;
+         fixed_t f2;
+         topfrac = (centeryfrac >> invhgtbits) - FixedMul(z1, s1);
+         f2      = (centeryfrac >> invhgtbits) - FixedMul(z2, s2);
+         topstep = span > 0 ? (f2 - topfrac) / span : 0;
+      }
+      if (frontsector->floor_slope)
+      {
+         fixed_t z1 = (P_PlaneZatPoint(frontsector->floor_slope, wx1, wy1)
+                       - viewz) >> invhgtbits;
+         fixed_t z2 = (P_PlaneZatPoint(frontsector->floor_slope, wx2, wy2)
+                       - viewz) >> invhgtbits;
+         fixed_t f2;
+         bottomfrac = (centeryfrac >> invhgtbits) - FixedMul(z1, s1);
+         f2         = (centeryfrac >> invhgtbits) - FixedMul(z2, s2);
+         bottomstep = span > 0 ? (f2 - bottomfrac) / span : 0;
+      }
+      if (backsector)
+      {
+         if (worldhigh < worldtop && backsector->ceiling_slope)
+         {
+            fixed_t z1 = (P_PlaneZatPoint(backsector->ceiling_slope, wx1, wy1)
+                          - viewz) >> invhgtbits;
+            fixed_t z2 = (P_PlaneZatPoint(backsector->ceiling_slope, wx2, wy2)
+                          - viewz) >> invhgtbits;
+            fixed_t f2;
+            pixhigh = (centeryfrac >> invhgtbits) - FixedMul(z1, s1);
+            f2      = (centeryfrac >> invhgtbits) - FixedMul(z2, s2);
+            pixhighstep = span > 0 ? (f2 - pixhigh) / span : 0;
+         }
+         if (worldlow > worldbottom && backsector->floor_slope)
+         {
+            fixed_t z1 = (P_PlaneZatPoint(backsector->floor_slope, wx1, wy1)
+                          - viewz) >> invhgtbits;
+            fixed_t z2 = (P_PlaneZatPoint(backsector->floor_slope, wx2, wy2)
+                          - viewz) >> invhgtbits;
+            fixed_t f2;
+            pixlow = (centeryfrac >> invhgtbits) - FixedMul(z1, s1);
+            f2     = (centeryfrac >> invhgtbits) - FixedMul(z2, s2);
+            pixlowstep = span > 0 ? (f2 - pixlow) / span : 0;
+         }
       }
    }
 

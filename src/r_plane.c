@@ -124,6 +124,130 @@ void R_InitPlanes (void)
 }
 
 //
+/* ---- tilted (sloped) visplanes ----------------------------------------
+ *
+ * A sloped visplane cannot use the constant-z row walk: depth varies
+ * along each row.  Instead each span is subdivided into short chunks;
+ * the exact world hit point of the view ray is computed at the chunk
+ * endpoints by intersecting the ray with the plane (doubles), and the
+ * existing affine span drawer fills between them.  Chunks are 8 pixels,
+ * narrow enough that the residual perspective error on the shallow
+ * Plane_Align ramps this supports is under a texel.
+ *
+ * Ray construction: forward = (cos,sin,0), right = (sin,-cos,0),
+ * up = (0,0,1); the ray through pixel (sx, sy) is
+ *   dir = forward + right * (sx-centerx)/fx + up * (centery-sy)/fy
+ * with fx/fy the horizontal/vertical focal lengths (anisotropic under
+ * hor+ widescreen).  dir's forward component is 1, so the plane-hit
+ * parameter t is also the light/shading distance. */
+
+static const secplane_t *tilt_plane;
+static double tilt_nx, tilt_ny, tilt_nz, tilt_num;  /* normal, -dist(view) */
+static double tilt_vx, tilt_vy;                      /* view origin */
+static double tilt_sin, tilt_cos;                    /* view angle */
+static double tilt_ifx, tilt_ify;                    /* 1/focal lengths */
+
+static void R_TiltedPlaneSetup(const visplane_t *pl)
+{
+   tilt_plane = pl->slope;
+   tilt_nx = tilt_plane->a / 65536.0;
+   tilt_ny = tilt_plane->b / 65536.0;
+   tilt_nz = tilt_plane->c / 65536.0;
+   tilt_vx = viewx / 65536.0;
+   tilt_vy = viewy / 65536.0;
+   tilt_num = -(tilt_nx * tilt_vx + tilt_ny * tilt_vy +
+                tilt_nz * (viewz / 65536.0) + tilt_plane->d / 65536.0);
+   tilt_sin = finesine[viewangle >> ANGLETOFINESHIFT] / 65536.0;
+   tilt_cos = finecosine[viewangle >> ANGLETOFINESHIFT] / 65536.0;
+   tilt_ifx = 65536.0 / projectionx;
+   tilt_ify = 65536.0 / projectiony;
+}
+
+/* world-space hit of the ray through pixel (x, y); returns depth t and
+ * writes the hit's world coordinates */
+static double R_TiltedHit(int x, int y, double *wx, double *wy)
+{
+   double sx = (x - centerx + 0.5) * tilt_ifx;
+   double sy = (centery - y - 0.5) * tilt_ify;
+   double dx = tilt_cos + sx * tilt_sin;
+   double dy = tilt_sin - sx * tilt_cos;
+   double den = tilt_nx * dx + tilt_ny * dy + tilt_nz * sy;
+   double tt = den ? tilt_num / den : 0;
+   *wx = tilt_vx + tt * dx;
+   *wy = tilt_vy + tt * dy;
+   return tt;
+}
+
+#define TILT_CHUNK 8
+
+static void R_MapTiltedPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
+{
+   double wx, wy, wx2, wy2, tt;
+   int cx1 = x1;
+
+   while (cx1 <= x2)
+   {
+      int cx2 = cx1 + TILT_CHUNK - 1;
+      int len;
+      if (cx2 > x2)
+         cx2 = x2;
+      len = cx2 - cx1 + 1;
+
+      tt = R_TiltedHit(cx1, y, &wx, &wy);
+      R_TiltedHit(cx2 + 1, y, &wx2, &wy2);   /* one past, exact end step */
+      if (tt <= 0)
+      {
+         cx1 = cx2 + 1;
+         continue;                            /* behind or parallel */
+      }
+
+      dsvars->xfrac = xoffs + (fixed_t)(wx * 65536.0);
+      dsvars->yfrac = yoffs - (fixed_t)(wy * 65536.0);
+      dsvars->xstep = (fixed_t)((wx2 - wx) * 65536.0) / len;
+      dsvars->ystep = -((fixed_t)((wy2 - wy) * 65536.0) / len);
+      if (drawvars.filterfloor == RDRAW_FILTER_LINEAR)
+      {
+         dsvars->xfrac -= (FRACUNIT >> 1);
+         dsvars->yfrac -= (FRACUNIT >> 1);
+      }
+
+      if (!(dsvars->colormap = fixedcolormap))
+      {
+         fixed_t distance = (fixed_t)(tt * 65536.0);
+         unsigned index = distance >> LIGHTZSHIFT;
+         if (index >= MAXLIGHTZ)
+            index = MAXLIGHTZ - 1;
+         dsvars->z = distance;
+         dsvars->colormap = planezlight[index];
+         if (r_smooth_shading && fullcolormap)
+         {
+            int startmap = ((LIGHTLEVELS-1-planelightlevel)*2)
+                           * SMOOTH_WEIGHTS / LIGHTLEVELS;
+            int scale    = FixedDiv((320/2*FRACUNIT),((int)index+1)<<LIGHTZSHIFT);
+            int fine2    = startmap
+                         - (scale >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))/DISTMAP;
+            if (fine2 < 0)                       fine2 = 0;
+            else if (fine2 > SMOOTH_WEIGHTS-1)   fine2 = SMOOTH_WEIGHTS-1;
+            r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine2;
+            r_fine_colormap    = dsvars->colormap;
+         }
+         else
+            r_fine_lightweight = -1;
+      }
+      else
+      {
+         dsvars->z = 0;
+         r_fine_lightweight = -1;
+      }
+
+      dsvars->y = y;
+      dsvars->x1 = cx1;
+      dsvars->x2 = cx2;
+      R_DrawSpan(dsvars);
+      cx1 = cx2 + 1;
+   }
+}
+
 // R_MapPlane
 //
 // Uses global vars:
@@ -144,6 +268,12 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
    fixed_t distance;
    int dx, dy;
    unsigned index;
+
+   if (tilt_plane)
+   {
+      R_MapTiltedPlane(y, x1, x2, dsvars);
+      return;
+   }
 
    if ((dy = abs(centery - y)) == 0)
       return; // skip early if there's no change
@@ -316,6 +446,7 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
       new_pl->lightlevel = pl->lightlevel;
       new_pl->xoffs = pl->xoffs;           // killough 2/28/98
       new_pl->yoffs = pl->yoffs;
+      new_pl->slope = pl->slope;
       new_pl->minx = start;
       new_pl->maxx = stop;
       new_pl->modified = 0;
@@ -329,22 +460,22 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
 
 #ifdef PRBOOM_RENDER_PROFILE
 static visplane_t *R_FindPlane_impl(fixed_t height, int picnum, int lightlevel,
-                        fixed_t xoffs, fixed_t yoffs);
+                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope);
 visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
-                        fixed_t xoffs, fixed_t yoffs)
+                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope)
 {
    extern double prof_findplane_usec;
    visplane_t *r;
    double _t0 = I_RenderProfileUsec();
-   r = R_FindPlane_impl(height, picnum, lightlevel, xoffs, yoffs);
+   r = R_FindPlane_impl(height, picnum, lightlevel, xoffs, yoffs, slope);
    prof_findplane_usec += (I_RenderProfileUsec() - _t0);
    return r;
 }
 static visplane_t *R_FindPlane_impl(fixed_t height, int picnum, int lightlevel,
-                        fixed_t xoffs, fixed_t yoffs)
+                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope)
 #else
 visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
-                        fixed_t xoffs, fixed_t yoffs)
+                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope)
 #endif
 {
    visplane_t *check;
@@ -361,7 +492,8 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
             picnum == check->picnum &&
             lightlevel == check->lightlevel &&
             xoffs == check->xoffs &&      // killough 2/28/98: Add offset checks
-            yoffs == check->yoffs)
+            yoffs == check->yoffs &&
+            slope == check->slope)        /* tilted planes never merge with flat */
          return check;
 
    check = new_visplane(hash);         // killough
@@ -373,6 +505,7 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
    check->maxx = -1;
    check->xoffs = xoffs;               // killough 2/28/98: Save offsets
    check->yoffs = yoffs;
+   check->slope = slope;
    check->modified = 0;
 
    memset (check->top, 0xff, sizeof check->top);
@@ -675,9 +808,16 @@ static void R_DoDrawPlane(visplane_t *pl)
          planelightlevel = light;
          pl->top[pl->minx-1] = pl->top[stop] = 0xffffffffu; // dropoff overflow
 
+         if (pl->slope)
+            R_TiltedPlaneSetup(pl);
+         else
+            tilt_plane = NULL;
+
          for (x = pl->minx ; x <= stop ; x++)
             R_MakeSpans(x,pl->top[x-1],pl->bottom[x-1],
                   pl->top[x],pl->bottom[x], &dsvars);
+
+         tilt_plane = NULL;
 
          if (!R_IsSyntheticFlat(pl->picnum))
             W_UnlockLumpNum(firstflat + flattranslation[pl->picnum]);

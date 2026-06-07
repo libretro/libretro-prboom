@@ -463,6 +463,7 @@ typedef struct visplane
   struct visplane *next;        // Next visplane in hash chain -- killough
   int picnum, lightlevel, minx, maxx;
   fixed_t height;
+  const secplane_t *slope;      /* tilted plane (NULL = horizontal) */
   fixed_t xoffs, yoffs;         // killough 2/28/98: Support scrolling flats
   byte modified;              // set when a seg actually writes a span here
   unsigned int pad1;          // leave pads for [minx-1]/[maxx+1]

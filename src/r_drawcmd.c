@@ -96,6 +96,21 @@ static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
   int cls = R_WallColumnKernelClass(cmd->fn);
   int th  = cmd->dc.texheight;
 
+  /* The LinearUV drawers are deliberately not kernel-classed.  A
+   * row-major run kernel for them was built and proven bit-identical
+   * (it needs the drawers' half-texel frac seed, a signed shift for
+   * the texheight==0 index so negative fracs read the column padding
+   * like frac>>16 does, and a re-creation of the drawer head that
+   * delegates columns with iscale > drawvars.mag_threshold to the
+   * point drawer for the current filterz), but it measured ~6%
+   * slower than the column-major drawers at 2560x1600: the four
+   * texel and four V_Palette16 loads per pixel amortize the
+   * temp-buffer overhead the kernel exists to remove, and walking
+   * the run row-major touches every lane's texture columns per row
+   * where the drawers stream one column sequentially.  Demoting only
+   * the mag_threshold columns to the point classes was within noise,
+   * since those columns are distant and short and the linear/point
+   * class transitions fragment the runs. */
   if (cls && (th & (th - 1)) == 0)
     return cls;
   return 0;

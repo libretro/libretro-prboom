@@ -9,6 +9,8 @@
 #ifndef __DSDA_UDMF__
 #define __DSDA_UDMF__
 
+#include "m_fixed.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -56,6 +58,10 @@ typedef enum {
 } udmf_namespace_t;
 
 extern udmf_namespace_t udmf_namespace;
+
+/* parse a UDMF coordinate/value string ("128", "-64.5", "0.375") to
+ * fixed_t (integer part shifted by FRACBITS, fractional digits scaled) */
+fixed_t udmf_to_fixed(const char *x);
 
 /* ---- line flags ---- */
 #define UDMF_ML_BLOCKING           0x0000000000000001UL

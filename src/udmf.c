@@ -31,6 +31,61 @@ extern int heretic;  /* nonzero when running Heretic     */
 extern int hexen;    /* nonzero when running Hexen        */
 
 udmf_namespace_t udmf_namespace = UDMF_NONE;
+
+/* ------------------------------------------------------------------ */
+/* dsda_StringToFixed: parse a UDMF coordinate/value string ("128",    */
+/* "-64.5", "0.375") to fixed_t.  C89, no sscanf -- a hand cursor      */
+/* parser matching the semantics of DSDA's helper (integer part shifted */
+/* by FRACBITS, up to 8 fractional digits scaled by their power of 10).*/
+/* ------------------------------------------------------------------ */
+fixed_t udmf_to_fixed(const char *x)
+{
+  dbool negative;
+  fixed_t ipart;
+  const char *p;
+  long frac_num;
+  long frac_div;
+  int  frac_digits;
+
+  if (!x || !*x)
+    return 0;
+
+  p = x;
+  negative = FALSE;
+  if (*p == '-') { negative = TRUE; p++; }
+  else if (*p == '+') { p++; }
+
+  /* integer part */
+  ipart = 0;
+  while (*p >= '0' && *p <= '9')
+  {
+    ipart = ipart * 10 + (*p - '0');
+    p++;
+  }
+  ipart <<= FRACBITS;
+
+  /* fractional part: accumulate up to 8 digits, tracking the divisor */
+  frac_num = 0;
+  frac_div = 1;
+  frac_digits = 0;
+  if (*p == '.')
+  {
+    p++;
+    while (*p >= '0' && *p <= '9' && frac_digits < 8)
+    {
+      frac_num = frac_num * 10 + (*p - '0');
+      frac_div *= 10;
+      frac_digits++;
+      p++;
+    }
+  }
+
+  if (frac_num)
+    ipart += (fixed_t)(((long long)frac_num * FRACUNIT) / frac_div);
+
+  return negative ? -ipart : ipart;
+}
+
 udmf_t udmf;
 
 /* ------------------------------------------------------------------ */

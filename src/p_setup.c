@@ -2611,8 +2611,10 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
     * up in a Doom-game wad it is ZDoom's 'Doom-in-Hexen' format (issue #86,
     * chex3.wad): install the zdoom descriptor so the loaders use the Hexen
     * record sizes and P_SpawnMapThing filters by the positive game-mode bits.
-    * Line/sector specials are ZDoom-numbered and stay inert until the
-    * translation layer lands. */
+    * Line and sector specials are ZDoom-numbered: the descriptor's executor
+    * translates the ZDoom-only action specials onto the Hexen dispatchers,
+    * and P_SpawnSpecials translates the sector specials onto Doom's
+    * (Plane_Align slopes remain unsupported). */
    if ((i = lumpnum + ML_BLOCKMAP + 1) < numlumps
          && !strncasecmp(lumpinfo[i].name, "BEHAVIOR", 8)
          && !hexen)

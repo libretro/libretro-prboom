@@ -799,9 +799,10 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
         else if (!strncmp(fileinfo[length].name, "MAPINFO", 7) &&
                  fileinfo[length].name[7] == 0)
         {
-          /* MAPINFO is unique to a Hexen IWAD among the games this core
-           * supports (Doom/Doom2 and Heretic carry no such lump), so it is
-           * the unambiguous Hexen signature. */
+          /* All Hexen IWADs carry a MAPINFO lump, but MAPINFO alone is NOT
+           * a Hexen signature: ZDoom-targeted standalone Doom-engine wads
+           * (chex3.wad) carry one too.  The hexn check below therefore
+           * also requires Hexen's other invariants. */
           ++hexn;
         }
 
@@ -821,9 +822,15 @@ static bool CheckIWAD(const char *iwadname,GameMode_t *gmode,dbool *hassec)
 
     *gmode = indetermined;
     *hassec = FALSE;
-    if (hexn)
+    if (hexn && htic && cm && !sw && !rg && !ud)
     {
-      /* Hexen IWAD.  Hexen uses MAP## levels like commercial Doom and shares
+      /* Hexen IWAD.  The signature is the conjunction of Hexen's lump-table
+       * invariants: a MAPINFO lump, the M_HTIC title patch shared with
+       * Heretic, MAP## level markers, and no ExMy markers.  MAPINFO alone
+       * is not enough -- ZDoom-targeted standalone Doom wads (chex3.wad,
+       * ExMy maps, no M_HTIC) carry one and must fall through to the Doom
+       * gamemode logic below.
+       * Hexen uses MAP## levels like commercial Doom and shares
        * a great deal of code with Heretic, so set both the hexen flag and the
        * raven umbrella (raven == heretic || hexen).  The full game has 30+
        * maps; the 4-map demo IWAD also carries MAPINFO, so treat anything

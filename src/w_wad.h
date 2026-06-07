@@ -83,7 +83,10 @@ typedef enum {
    * WAV, FLAC).  Quarantined out of ns_global so a modern-format asset
    * sharing a name with an IWAD lump can never reach the wrong loader;
    * future consumers (PNG patches, sample decoders) look them up here. */
-  ns_pk3_deferred
+  ns_pk3_deferred,
+  /* ZDoom TEXTURES/ folder members: standalone wall textures, registered
+   * by R_InitTextures from the TX_START/TX_END group. */
+  ns_zdoom_tx
 } lumpinfo_namespace_t;
 
 // CPhipps - changed wad init
@@ -113,6 +116,14 @@ extern wadfile_info_t *wadfiles;
 extern size_t numwadfiles; // CPhipps - size of the wadfiles array
 
 void W_Init(void); // CPhipps - uses the above array
+
+/* Swap a lump's backing bytes for a caller-owned buffer (e.g. a decoded
+ * PNG).  Must run before the lump is first cached; the buffer must stay
+ * valid for the program's lifetime. */
+void W_ReplaceLumpData(int lump, const void *data, int size);
+
+/* drop a lump's cached copy; see w_memcache.c */
+void W_InvalidateLumpCache(int lump);
 void W_ReleaseAllWads(void); // Proff - Added for iwad switching
 void W_InitCache(void);
 void W_DoneCache(void);

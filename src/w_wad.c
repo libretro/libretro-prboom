@@ -550,6 +550,7 @@ void W_Init(void)
   W_CoalesceMarkedResource("HI_START", "HI_END", ns_hires);
   /* modern-format PK3 members synthesized by W_TranslatePK3 */
   W_CoalesceMarkedResource("PD_START", "PD_END", ns_pk3_deferred);
+  W_CoalesceMarkedResource("TX_START", "TX_END", ns_zdoom_tx);
 
   // killough 1/31/98: initialize lump hash table
   W_HashLumps();
@@ -623,6 +624,28 @@ int W_LumpLength (int lump)
   if (lump >= numlumps)
     I_Error ("W_LumpLength: %i >= numlumps",lump);
   return lumpinfo[lump].size;
+}
+
+/* W_ReplaceLumpData
+ * Repoint a lump at a caller-owned buffer.  Implemented through the
+ * embedded-wad path, which W_ReadLump serves with a straight memcpy in
+ * both normal and MEMORY_LOW builds. */
+void W_ReplaceLumpData(int lump, const void *data, int size)
+{
+  wadfile_info_t *wf;
+
+  if (lump < 0 || lump >= numlumps)
+    I_Error("W_ReplaceLumpData: %i >= numlumps", lump);
+  wf = calloc(1, sizeof(*wf));
+  if (!wf)
+    I_Error("W_ReplaceLumpData: out of memory");
+  wf->name = NULL;
+  wf->embedded_data = data;
+  wf->embedded_length = size;
+  lumpinfo[lump].wadfile = wf;
+  lumpinfo[lump].position = 0;
+  lumpinfo[lump].size = size;
+  W_InvalidateLumpCache(lump);
 }
 
 //

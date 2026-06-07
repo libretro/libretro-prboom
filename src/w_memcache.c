@@ -90,6 +90,25 @@ void W_DoneCache(void)
    }
 }
 
+/* W_InvalidateLumpCache
+ * Drop the cached copy of a lump so the next W_CacheLumpNum re-reads
+ * it from its (possibly replaced) backing store.  W_ReplaceLumpData
+ * calls this: without it, a lump cached before replacement keeps
+ * serving the old bytes forever.  Invalidating a locked lump would
+ * yank memory out from under a live caller, so that is a bug. */
+void W_InvalidateLumpCache(int lump)
+{
+  if (!cachelump || lump < 0 || lump >= numlumps)
+    return;
+  if (!cachelump[lump].cache)
+    return;
+  if (cachelump[lump].locks > 0)
+    I_Error("W_InvalidateLumpCache: lump %.8s is locked",
+            lumpinfo[lump].name);
+  Z_Free(cachelump[lump].cache);
+  cachelump[lump].cache = NULL;
+}
+
 /* W_CacheLumpNum
  * killough 4/25/98: simplified
  * CPhipps - modified for new lump locking scheme

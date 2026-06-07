@@ -49,7 +49,10 @@ typedef enum {
   UDMF_DOOM,
   UDMF_HERETIC,
   UDMF_HEXEN,
-  UDMF_DSDA
+  UDMF_DSDA,
+  /* ZDoom namespace: Hexen-numbered specials with int args and per-line
+   * UDMF activation flags; routed through the zdoom-in-doom map format. */
+  UDMF_ZDOOM
 } udmf_namespace_t;
 
 extern udmf_namespace_t udmf_namespace;

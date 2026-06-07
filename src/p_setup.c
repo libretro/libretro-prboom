@@ -2438,15 +2438,49 @@ static void P_LoadUDMFLineDefs(void)
     const udmf_line_t *mld = &udmf.lines[i];
     unsigned short mv1, mv2;
 
-    ld->flags   = (unsigned short)(mld->flags & UDMF_LINE_ENGINE_FLAGS);
+    if (map_format.zdoom)
+    {
+      /* Hexen flag layout: PASSUSE (0x200) and the MBF21 bits (0x1000,
+       * 0x2000) collide with REPEATSPECIAL and the SPAC field, so only
+       * the low Doom bits are copied; activation is rebuilt from the
+       * UDMF flags.  The Hexen model holds a single activation class:
+       * pick by priority and fall back to SPAC_NONE so static specials
+       * (Plane_Align, Sector_Set3DFloor, portals) stay inert -- a bare
+       * flags word would read as SPAC_CROSS and fire on walkover.
+       * monsteractivate is a modifier the single-slot model cannot
+       * carry alongside a player activation; it maps to SPAC_MCROSS
+       * only when no player activation is present. */
+      int spac = SPAC_NONE;
+
+      if (mld->flags & (UDMF_ML_PLAYERUSE | UDMF_ML_PLAYERUSEBACK))
+        spac = SPAC_USE;
+      else if (mld->flags & (UDMF_ML_PLAYERCROSS | UDMF_ML_ANYCROSS))
+        spac = SPAC_CROSS;
+      else if (mld->flags & (UDMF_ML_MONSTERCROSS | UDMF_ML_MONSTERACTIVATE))
+        spac = SPAC_MCROSS;
+      else if (mld->flags & UDMF_ML_IMPACT)
+        spac = SPAC_IMPACT;
+      else if (mld->flags & UDMF_ML_PLAYERPUSH)
+        spac = SPAC_PUSH;
+      else if (mld->flags & UDMF_ML_MISSILECROSS)
+        spac = SPAC_PCROSS;
+
+      ld->flags = (unsigned short)
+        (mld->flags & (UDMF_LINE_ENGINE_FLAGS & ~(udmf_line_flags_t)UDMF_ML_PASSUSE));
+      ld->flags |= (unsigned short)(spac << HML_SPAC_SHIFT);
+      if (mld->flags & UDMF_ML_REPEATSPECIAL)
+        ld->flags |= ML_REPEATSPECIAL;
+    }
+    else
+      ld->flags = (unsigned short)(mld->flags & UDMF_LINE_ENGINE_FLAGS);
     ld->special = (short)mld->special;
     /* In the Hexen/UDMF model the editor "id" is the line tag. */
     ld->tag     = (mld->id >= 0) ? mld->id : 0;
-    ld->args[0] = (unsigned char)mld->arg0;
-    ld->args[1] = (unsigned char)mld->arg1;
-    ld->args[2] = (unsigned char)mld->arg2;
-    ld->args[3] = (unsigned char)mld->arg3;
-    ld->args[4] = (unsigned char)mld->arg4;
+    ld->args[0] = mld->arg0;
+    ld->args[1] = mld->arg1;
+    ld->args[2] = mld->arg2;
+    ld->args[3] = mld->arg3;
+    ld->args[4] = mld->arg4;
 
     mv1 = (unsigned short)mld->v1;
     mv2 = (unsigned short)mld->v2;
@@ -2496,12 +2530,24 @@ static void P_LoadUDMFThings(void)
     if (dmt->flags & UDMF_TF_SKILL4) mt.options |= MTF_HARD;
     if (dmt->flags & UDMF_TF_SKILL5) mt.options |= MTF_HARD;
     if (dmt->flags & UDMF_TF_AMBUSH) mt.options |= MTF_AMBUSH;
-    /* UDMF uses positive single/coop/dm presence flags; the engine uses
-     * the inverted MTF_NOTSINGLE/NOTCOOP/NOTDM.  Absent => "not". */
-    if (!(dmt->flags & UDMF_TF_SINGLE)) mt.options |= MTF_NOTSINGLE;
-    if (!(dmt->flags & UDMF_TF_COOP))   mt.options |= MTF_NOTCOOP;
-    if (!(dmt->flags & UDMF_TF_DM))     mt.options |= MTF_NOTDM;
-    if (dmt->flags & UDMF_TF_FRIEND)    mt.options |= MTF_FRIEND;
+    /* UDMF uses positive single/coop/dm presence flags.  The Hexen thing
+     * model (active for ZDoom-namespace maps) filters by the same
+     * positive convention, so those bits pass straight through; the Doom
+     * model inverts to MTF_NOTSINGLE/NOTCOOP/NOTDM (absent => "not"). */
+    if (map_format.hexen)
+    {
+      if (dmt->flags & UDMF_TF_SINGLE) mt.options |= MTF_HEXEN_GSINGLE;
+      if (dmt->flags & UDMF_TF_COOP)   mt.options |= MTF_HEXEN_GCOOP;
+      if (dmt->flags & UDMF_TF_DM)     mt.options |= MTF_HEXEN_GDEATHMATCH;
+      if (dmt->flags & UDMF_TF_FRIEND) mt.options |= MTF_ZDOOM_FRIENDLY;
+    }
+    else
+    {
+      if (!(dmt->flags & UDMF_TF_SINGLE)) mt.options |= MTF_NOTSINGLE;
+      if (!(dmt->flags & UDMF_TF_COOP))   mt.options |= MTF_NOTCOOP;
+      if (!(dmt->flags & UDMF_TF_DM))     mt.options |= MTF_NOTDM;
+      if (dmt->flags & UDMF_TF_FRIEND)    mt.options |= MTF_FRIEND;
+    }
 
     /* stage the Hexen scripted-special args for P_SpawnMapThing */
     hexen_thing_tid     = (short)dmt->id;
@@ -2649,6 +2695,19 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
          I_Error("P_SetupLevel: %s: unsupported or missing UDMF namespace", lumpname);
          level_setup_failed = TRUE;
          return;
+      }
+
+      /* ZDoom-namespace UDMF on the Doom game: Hexen-numbered specials
+       * with full-width args and per-line activation flags.  Install the
+       * zdoom-in-doom descriptor before the line/thing loaders run so
+       * they emit Hexen-model flags (SPAC bits, positive game-mode thing
+       * bits) and activation routes through the Hexen dispatchers. */
+      if (udmf_namespace == UDMF_ZDOOM && !raven)
+      {
+         lprintf(LO_INFO,
+                 "P_SetupLevel: %s: ZDoom UDMF map; "
+                 "specials routed through the Hexen dispatchers\n", lumpname);
+         P_ApplyZDoomInDoomMapFormat();
       }
 
       /* BSP: UDMF stores nodes in a named ZNODES lump.  All eight ZDBSP

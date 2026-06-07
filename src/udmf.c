@@ -179,7 +179,8 @@ static void dsda_ParseUDMFLineDef(scanner_t *s)
 {
   udmf_line_t line;
   memset(&line, 0, sizeof(line));
-  line.id = (udmf_namespace == UDMF_DSDA || udmf_namespace == UDMF_HEXEN) ? -1 : 0;
+  line.id = (udmf_namespace == UDMF_DSDA || udmf_namespace == UDMF_HEXEN ||
+             udmf_namespace == UDMF_ZDOOM) ? -1 : 0;
   line.sideback = -1;
   line.alpha = 1.0f;
 
@@ -475,8 +476,10 @@ static void dsda_ParseUDMFIdentifier(scanner_t *s)
       udmf_namespace = UDMF_HERETIC;
     else if (scanner_string_match(s, "hexen") && hexen)
       udmf_namespace = UDMF_HEXEN;
-    else if ((scanner_string_match(s, "dsda") || scanner_string_match(s, "zdoom")) && !raven)
+    else if (scanner_string_match(s, "dsda") && !raven)
       udmf_namespace = UDMF_DSDA;
+    else if (scanner_string_match(s, "zdoom") && !raven)
+      udmf_namespace = UDMF_ZDOOM;
     else
       udmf_err("Unsupported UDMF namespace \"%s\"", s->string);
 

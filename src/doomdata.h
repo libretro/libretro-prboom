@@ -175,6 +175,13 @@ typedef struct {
 #define SPAC_IMPACT  3           /* projectile hits the line               */
 #define SPAC_PUSH    4           /* player bumps the line                  */
 #define SPAC_PCROSS  5           /* projectile crosses the line            */
+#define SPAC_NONE    6           /* no runtime activation.  Not a Hexen
+                                  * value: synthesized for ZDoom UDMF lines
+                                  * carrying static specials (Plane_Align,
+                                  * Sector_Set3DFloor, ...) with no
+                                  * activation flags -- GET_SPAC of a bare
+                                  * flags word is SPAC_CROSS, which would
+                                  * fire those specials on walkover.       */
 
 // Sector definition, from editing.
 typedef struct {

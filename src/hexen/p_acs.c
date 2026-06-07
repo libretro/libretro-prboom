@@ -1,11 +1,12 @@
-/* Hexen ACS (Action Code Script) — loader and script bookkeeping.
+/* Hexen ACS (Action Code Script) — loader, interpreter, and script store.
  *
- * Scaffold commit: this loads a map's BEHAVIOR lump, registers its scripts,
- * auto-starts the "open" scripts, and provides P_StartACS / terminate /
- * suspend plus the cross-map script store.  The started scripts are real
- * thinkers, but the bytecode interpreter (T_InterpretACS) is a no-op here, so
- * scripts schedule and unschedule cleanly without yet executing.  The
- * interpreter and the ACS_Execute line specials land in following commits. */
+ * Loads a map's BEHAVIOR lump, registers its scripts, auto-starts the
+ * "open" scripts, and runs started scripts as thinkers through the full
+ * p-code interpreter (T_InterpretACS dispatching PCodeCmds).  P_StartACS
+ * runs scripts addressed to the current map and defers the rest into the
+ * cross-map store, which SV_MapTeleport drains on every hub arrival --
+ * fresh or archived -- so guardian-style progress on one hub map drives
+ * gates on another. */
 
 #include <string.h>
 #include <stdio.h>

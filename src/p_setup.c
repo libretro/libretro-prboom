@@ -2002,8 +2002,16 @@ static void P_LoadReject(int lumpnum, int totallines)
       pad >>= 8; // rotate the next byte down
     }
   }
-  lprintf(LO_WARN, "P_LoadReject: REJECT too short (%u<%u) - padded\n",
-          length, required);
+  /* a zero-length REJECT is a deliberate modern-wad omission (chex3,
+   * most ZDoom-era maps): all-visible padding is the intended result,
+   * not a defect worth a warning.  A truncated nonzero table is real
+   * damage and keeps the warning. */
+  if (length)
+    lprintf(LO_WARN, "P_LoadReject: REJECT too short (%u<%u) - padded\n",
+            length, required);
+  else
+    lprintf(LO_DEBUG, "P_LoadReject: empty REJECT padded to %u bytes\n",
+            required);
 }
 
 //

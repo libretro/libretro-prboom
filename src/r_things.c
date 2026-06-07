@@ -39,6 +39,7 @@
 #include "r_segs.h"
 #include "r_draw.h"
 #include "r_things.h"
+#include "u_decorate.h"
 #include "r_fps.h"
 #include "v_video.h"
 #include "lprintf.h"
@@ -300,7 +301,13 @@ static void R_InitSpriteDefs(const char * const * namelist)
          }
          while ((j = hash[j].next) >= 0);
 
-         if (decorate_wad && maxframe >= 0)
+         /* only when DECORATE actually redefines this sprite's sequence:
+          * a wad can carry DECORATE for new actors while intentionally
+          * mixing old and new art on untouched vanilla sprites (nova4.wad
+          * reskins the zombies' walk frames but keeps doom2's death
+          * frames; unifying those drew corpses with standing art) */
+         if (decorate_wad && maxframe >= 0 &&
+             U_DecorateMentionsSprite(spritename))
             R_UnifyDecorateSprite(decorate_wad);
 
          // check the frames that were found for completeness

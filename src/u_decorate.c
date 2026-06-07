@@ -53,6 +53,13 @@ typedef struct
 
 static decorate_actor_t actors[MAX_DECORATE_ACTORS];
 static int num_actors;
+
+/* every 4-char sprite name appearing on a state line anywhere in the
+ * DECORATE lump; R_InitSpriteDefs only unifies a sprite's art when the
+ * lump actually redefines that sprite's sequence */
+#define MAX_DECORATE_SPRITES 512
+static char sprite_names[MAX_DECORATE_SPRITES][5];
+static int num_sprite_names;
 static int parsed;              /* one-shot lazy parse */
 
 static void parse_body(decorate_actor_t *a, const char *p, const char *end);
@@ -314,8 +321,40 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       a->nogravity = 1;
     else if (!strcasecmp(word, "+SPAWNCEILING"))
       a->spawnceiling = 1;
-    else if (in_spawn && !a->spawn_static && strlen(word) == 4)
+    else if (strlen(word) == 4)
     {
+      /* a state line is "SPRT ABCD 5 [action]": a 4-char word, a word of
+       * frame letters, then a numeric tic count.  Record the sprite name;
+       * properties never match (their value words are not all letters or
+       * are not followed by a number). */
+      char fr[MAX_NAME], tics[MAX_NAME];
+      const char *q = skip_space(p, end);
+      q = read_word(q, end, fr, sizeof(fr));
+      q = skip_space(q, end);
+      q = read_word(q, end, tics, sizeof(tics));
+      if (fr[0] && (tics[0] == '-' || (tics[0] >= '0' && tics[0] <= '9')))
+      {
+        size_t fi;
+        int letters = 1;
+        for (fi = 0; fr[fi]; fi++)
+          if (fr[fi] < 'A' || fr[fi] > '_')
+            letters = 0;
+        if (letters)
+        {
+          int k;
+          for (k = 0; k < num_sprite_names; k++)
+            if (!strncasecmp(sprite_names[k], word, 4))
+              break;
+          if (k == num_sprite_names && k < MAX_DECORATE_SPRITES)
+          {
+            memcpy(sprite_names[k], word, 4);
+            sprite_names[k][4] = 0;
+            num_sprite_names++;
+          }
+        }
+      }
+      if (in_spawn && !a->spawn_static)
+      {
       /* "SPRT F -1 [BRIGHT]" -- a single static frame */
       char fr[MAX_NAME], tics[MAX_NAME];
       const char *q = skip_space(p, end);
@@ -337,6 +376,7 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         p = q;
       }
       in_spawn = 0;
+      }
     }
   }
 }
@@ -420,6 +460,18 @@ void U_RegisterDecorateThings(void)
   if (count)
     lprintf(LO_INFO, "U_RegisterDecorateThings: %d static decorations\n",
             count);
+}
+
+/* does the DECORATE lump redefine this sprite's state sequence? */
+dbool U_DecorateMentionsSprite(const char *name)
+{
+  int i;
+  if (!parsed)
+    parse_decorate();
+  for (i = 0; i < num_sprite_names; i++)
+    if (!strncasecmp(sprite_names[i], name, 4))
+      return true;
+  return false;
 }
 
 int U_DecorateAliasDoomedNum(int doomednum)

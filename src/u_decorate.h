@@ -10,6 +10,10 @@
  * otherwise -1. */
 int U_DecorateAliasDoomedNum(int doomednum);
 
+/* true if the wad's DECORATE lump redefines the named sprite's state
+ * sequence (r_things only unifies art for such sprites) */
+dbool U_DecorateMentionsSprite(const char *name);
+
 /* Register static single-frame DECORATE decorations as thing types via the
  * DSDHacked tables.  Call once at startup, after dehacked processing and
  * before R_Init; Doom game only. */

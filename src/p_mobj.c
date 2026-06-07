@@ -114,6 +114,29 @@ void P_ResetBloodQueue(void)
   bloodque_len = 0;
 }
 
+static dbool P_IsBlood(const mobj_t *mobj);
+
+/* A queued resting splat removed by any path other than the ring's own
+ * recycling -- a savegame edge, a future cleanup pass -- would leave its
+ * ring slot dangling, and the eventual eviction would call P_RemoveMobj
+ * on freed memory.  Clear the slot when a queued splat is removed. */
+static void P_BloodQueueUnhook(mobj_t *mobj)
+{
+  int i;
+
+  if (!bloodque_len || !P_IsBlood(mobj))
+    return;
+  for (i = 0; i < bloodque_len; i++)
+  {
+    int slot = (bloodque_head - 1 - i + BLOODQUE_MAX) % BLOODQUE_MAX;
+    if (bloodque[slot] == mobj)
+    {
+      bloodque[slot] = NULL;
+      return;
+    }
+  }
+}
+
 static dbool P_PersistentDebrisActive(void)
 {
   return persistent_state && !demoplayback && !netgame;
@@ -161,8 +184,14 @@ static void P_PinDebris(mobj_t *mobj)
     while (bloodque_len >= cap)
     {
       int tail = (bloodque_head - bloodque_len + BLOODQUE_MAX) % BLOODQUE_MAX;
-      P_RemoveMobj(bloodque[tail]);
+      mobj_t *old = bloodque[tail];
+      /* clear the slot before removing: P_RemoveMobj's unhook scan then
+       * has nothing to find, and a slot already cleared by the unhook
+       * (a queued splat removed by some other path) is simply skipped */
+      bloodque[tail] = NULL;
       bloodque_len--;
+      if (old)
+        P_RemoveMobj(old);
     }
     bloodque[bloodque_head] = mobj;
     bloodque_head = (bloodque_head + 1) % BLOODQUE_MAX;
@@ -1677,6 +1706,8 @@ int        iquetail;
 
 void P_RemoveMobj (mobj_t* mobj)
 {
+  P_BloodQueueUnhook(mobj);
+
   if (hexen && mobj->tid != 0)
     P_RemoveMobjFromTIDList(mobj);
 

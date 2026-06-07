@@ -40,6 +40,7 @@
 #include "sounds.h"
 #include "d_deh.h"  // Ty 03/22/98 - externalized strings
 #include "p_tick.h"
+#include "u_zmapinfo.h"
 #include "lprintf.h"
 
 #include "p_inter.h"
@@ -2681,6 +2682,11 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
    * a target with NOTHRESHOLD has no targeting threshold (always retargets).
    * flags2 is zero outside complevel 21, so vanilla behaviour is preserved. */
   if (source && source != target && !(source->flags & MF_NOTARGET) &&
+      /* ZDoom MAPINFO noinfighting: monsters never retarget onto other
+       * monsters from damage on such maps (chex3.wad sets it on every
+       * map); retaliation against players is untouched */
+      !(!source->player && !target->player && gamemapinfo &&
+        U_ZMapNoInfighting(gamemapinfo)) &&
       !(source->flags2 & MF2_DMGIGNORED) &&
       !(mbf21_features && P_InfightingImmune(target, source)) &&
       (!target->threshold || (target->flags2 & MF2_NOTHRESHOLD) ||

@@ -42,6 +42,8 @@ typedef struct
   char *value;
 } zlang_entry_t;
 
+static int *map_noinfight;   /* ZDoom 'noinfighting' per map */
+
 static zlang_entry_t *zlang;
 static int            zlang_count;
 static int            zlang_parsed;
@@ -138,6 +140,20 @@ void U_ZLanguageApplyStrings(void)
             applied);
 }
 
+/* ZDoom MAPINFO 'noinfighting': monsters on this map never acquire
+ * other monsters as targets from damage (retaliation against players
+ * is untouched).  Queried with the live gamemapinfo pointer. */
+dbool U_ZMapNoInfighting(const mapentry_t *e)
+{
+  int idx;
+  if (!e || !U_mapinfo.maps || !map_noinfight)
+    return false;
+  idx = (int)(e - U_mapinfo.maps);
+  if (idx < 0 || idx >= (int)U_mapinfo.mapcount)
+    return false;
+  return map_noinfight[idx] != 0;
+}
+
 const char *U_ZLanguageLookup(const char *key)
 {
   int i;
@@ -181,6 +197,9 @@ static mapentry_t *Z_NewMapEntry(const char *mapname)
                            U_mapinfo.mapcount * sizeof(*U_mapinfo.maps));
   map_cluster = realloc(map_cluster, U_mapinfo.mapcount * sizeof(*map_cluster));
   map_cluster[U_mapinfo.mapcount - 1] = -1;
+  map_noinfight = realloc(map_noinfight,
+                          U_mapinfo.mapcount * sizeof(*map_noinfight));
+  map_noinfight[U_mapinfo.mapcount - 1] = 0;
   e = &U_mapinfo.maps[U_mapinfo.mapcount - 1];
   memset(e, 0, sizeof(*e));
   e->mapname = strdup(mapname);
@@ -340,6 +359,11 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         {
           if ((tok = z_arg(&s, line)) > 0)
             map->partime = s.number;
+        }
+        else if (!strcasecmp(s.string, "noinfighting"))
+        {
+          /* flag key, no argument */
+          map_noinfight[U_mapinfo.mapcount - 1] = 1;
         }
         else if (!strcasecmp(s.string, "cluster"))
         {

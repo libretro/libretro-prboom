@@ -5,6 +5,8 @@
 #define U_ZMAPINFO_H
 
 #include <stddef.h>
+#include "doomtype.h"
+#include "u_mapinfo.h"
 
 int U_ParseZMapInfo(const char *buffer, size_t length);
 
@@ -13,5 +15,8 @@ const char *U_ZLanguageLookup(const char *key);
 
 /* apply LANGUAGE strings onto the BEX string table (before deh) */
 void U_ZLanguageApplyStrings(void);
+
+/* ZDoom MAPINFO 'noinfighting' flag for the given map entry */
+dbool U_ZMapNoInfighting(const mapentry_t *e);
 
 #endif

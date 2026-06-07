@@ -35,6 +35,7 @@
 #include "config.h"
 #include "doomstat.h"
 #include "w_wad.h"
+#include "u_png.h"
 #include "r_draw.h"
 #include "v_video.h"
 #include "r_main.h"
@@ -195,7 +196,8 @@ static void R_InitTextures (void)
    * name not shadowed by a TEXTUREx entry becomes a 64x64 wall texture */
   numflattex = 0;
   for (i = 0; i < numlumps; i++)
-    if (lumpinfo[i].li_namespace == ns_flats && W_LumpLength(i) >= 64 * 64)
+    if ((lumpinfo[i].li_namespace == ns_flats && W_LumpLength(i) >= 64 * 64)
+        || (lumpinfo[i].li_namespace == ns_zdoom_tx && W_LumpLength(i) >= 8))
       numflattex++;
 
   textures      = Z_Malloc((numtextures + numflattex) * sizeof(*textures), PU_STATIC, 0);
@@ -309,6 +311,62 @@ static void R_InitTextures (void)
       texture->widthmask = 63;
       textureheight[numtextures] = 64 << FRACBITS;
       numtextures++;
+    }
+  }
+
+  /* append ZDoom TEXTURES/ members as standalone single-patch wall
+   * textures, dimensions from the (materialized) patch headers.  ZDoom
+   * gives the TX namespace precedence, so a TX entry replaces any
+   * same-named TEXTUREx definition. */
+  {
+    int k;
+    for (k = 0; k < numlumps; k++)
+    {
+      int t2, j2, pw, ph;
+      const unsigned char *hdr;
+      if (lumpinfo[k].li_namespace != ns_zdoom_tx || W_LumpLength(k) < 8)
+        continue;
+      hdr = W_CacheLumpNum(k);
+      pw = (short)(hdr[0] | (hdr[1] << 8));
+      ph = (short)(hdr[2] | (hdr[3] << 8));
+      W_UnlockLumpNum(k);
+      if (pw <= 0 || ph <= 0 || pw > 4096 || ph > 4096)
+      {
+        lprintf(LO_WARN, "R_InitTextures: TX lump %.8s has bad "
+                "dimensions %dx%d\n", lumpinfo[k].name, pw, ph);
+        continue;
+      }
+      for (t2 = 0; t2 < numtextures; t2++)
+        if (!strncasecmp(textures[t2]->name, lumpinfo[k].name, 8))
+          break;
+      if (t2 < numtextures)
+        texture = textures[t2] = Z_Malloc(sizeof(texture_t), PU_STATIC, 0);
+      else
+        texture = textures[numtextures] =
+          Z_Malloc(sizeof(texture_t), PU_STATIC, 0);
+      texture->width = (short)pw;
+      texture->height = (short)ph;
+      texture->patchcount = 1;
+      texture->patches[0].originx = 0;
+      texture->patches[0].originy = 0;
+      texture->patches[0].patch = k;
+      {
+        size_t n = strlen(lumpinfo[k].name);
+        if (n > sizeof(texture->name))
+          n = sizeof(texture->name);
+        memset(texture->name, 0, sizeof(texture->name));
+        memcpy(texture->name, lumpinfo[k].name, n);
+      }
+      for (j2 = 1; j2 * 2 <= texture->width; j2 <<= 1)
+        ;
+      texture->widthmask = j2 - 1;
+      if (t2 < numtextures)
+        textureheight[t2] = texture->height << FRACBITS;
+      else
+      {
+        textureheight[numtextures] = texture->height << FRACBITS;
+        numtextures++;
+      }
     }
   }
 
@@ -493,6 +551,8 @@ const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
 
 void R_InitData(void)
 {
+  /* decode pk3 PNG assets into patches/flats before anything reads them */
+  U_PNGMaterializeLumps();
   lprintf(LO_INFO, "Textures\n");
   R_InitTextures();
   lprintf(LO_INFO, "Flats\n");

@@ -122,6 +122,11 @@ static void pk3_lump_name(char out[9], const char *path)
   out[i] = 0;
 }
 
+static dbool pk3_is_png(const unsigned char *d, int len)
+{
+  return len >= 4 && d[0] == 0x89 && d[1] == 'P' && d[2] == 'N' && d[3] == 'G';
+}
+
 /* Formats the engine cannot consume yet; these get quarantined. */
 static dbool pk3_is_deferred_format(const unsigned char *d, int len)
 {
@@ -194,8 +199,9 @@ static int pk3_add_inner_wad(pk3_build_t *b, const char *member,
 #define PK3_PASS_ROOT     0   /* no '/': root files and inner wads  */
 #define PK3_PASS_SPRITES  1
 #define PK3_PASS_FLATS    2
-#define PK3_PASS_GLOBAL   3   /* every other folder, native formats */
-#define PK3_PASS_DEFERRED 4   /* modern formats from any folder     */
+#define PK3_PASS_TEXTURES 3   /* textures/: standalone wall textures */
+#define PK3_PASS_GLOBAL   4   /* every other folder, native formats */
+#define PK3_PASS_DEFERRED 5   /* modern formats from any folder     */
 
 static int pk3_pass_of(const char *path, const unsigned char *d, int len)
 {
@@ -203,12 +209,21 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
 
   if (!slash)
     return PK3_PASS_ROOT;
+  /* PNG members of the renderable namespaces stay in their groups:
+   * U_PNGMaterializeLumps converts them to patches/flats in place
+   * before the renderer reads them.  Other modern formats (Ogg, WAV,
+   * FLAC) are still quarantined from everywhere. */
+  if (!strncasecmp(path, "sprites/", 8))
+    return (!pk3_is_png(d, len) && pk3_is_deferred_format(d, len))
+           ? PK3_PASS_DEFERRED : PK3_PASS_SPRITES;
+  if (!strncasecmp(path, "flats/", 6))
+    return (!pk3_is_png(d, len) && pk3_is_deferred_format(d, len))
+           ? PK3_PASS_DEFERRED : PK3_PASS_FLATS;
+  if (!strncasecmp(path, "textures/", 9))
+    return (!pk3_is_png(d, len) && pk3_is_deferred_format(d, len))
+           ? PK3_PASS_DEFERRED : PK3_PASS_TEXTURES;
   if (pk3_is_deferred_format(d, len))
     return PK3_PASS_DEFERRED;
-  if (!strncasecmp(path, "sprites/", 8))
-    return PK3_PASS_SPRITES;
-  if (!strncasecmp(path, "flats/", 6))
-    return PK3_PASS_FLATS;
   return PK3_PASS_GLOBAL;
 }
 
@@ -290,6 +305,7 @@ unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
           /* open this pass's marker group */
           if (pass == PK3_PASS_SPRITES  && !pk3_add_lump(&b, "SS_START", NULL, 0)) goto oom;
           if (pass == PK3_PASS_FLATS    && !pk3_add_lump(&b, "FF_START", NULL, 0)) goto oom;
+          if (pass == PK3_PASS_TEXTURES && !pk3_add_lump(&b, "TX_START", NULL, 0)) goto oom;
           if (pass == PK3_PASS_DEFERRED && !pk3_add_lump(&b, "PD_START", NULL, 0)) goto oom;
         }
         if (!pk3_add_lump(&b, name, data, (int)size))
@@ -313,6 +329,7 @@ oom:
       int ok = 1;
       if (pass == PK3_PASS_SPRITES)  ok = pk3_add_lump(&b, "SS_END", NULL, 0);
       if (pass == PK3_PASS_FLATS)    ok = pk3_add_lump(&b, "FF_END", NULL, 0);
+      if (pass == PK3_PASS_TEXTURES) ok = pk3_add_lump(&b, "TX_END", NULL, 0);
       if (pass == PK3_PASS_DEFERRED) ok = pk3_add_lump(&b, "PD_END", NULL, 0);
       if (!ok)
       {

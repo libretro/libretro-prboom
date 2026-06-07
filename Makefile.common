@@ -2,14 +2,13 @@ DEPS_DIR           = $(ROOT_DIR)/deps
 LIBRETRO_DIR       = $(ROOT_DIR)/libretro
 LIBRETRO_COMM_DIR  = $(ROOT_DIR)/libretro/libretro-common
 
-COREDEFINES += -DHAVE_ZLIB=1
 INCFLAGS    = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(DEPS_DIR)/libmad -I$(DEPS_DIR)/miniz -I$(LIBRETRO_COMM_DIR)/include
 
 ifneq (,$(findstring msvc2003,$(platform)))
 INCFLAGS += -I$(LIBRETRO_COMM_DIR)/include/compat/msvc
 endif
 
-COREDEFINES = -DFPM_DEFAULT
+COREDEFINES = -DFPM_DEFAULT -DHAVE_ZLIB=1
 
 ifneq (,$(findstring msvc,$(platform)))
 COREDEFINES += -DINLINE="_inline"
@@ -151,6 +150,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/u_zsndinfo.c \
    $(CORE_DIR)/p_slope.c \
    $(CORE_DIR)/p_zacs.c \
+   $(CORE_DIR)/u_png.c \
 				 $(CORE_DIR)/u_zmapinfo.c \
 				 $(CORE_DIR)/u_zanimdefs.c \
 

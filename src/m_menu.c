@@ -886,7 +886,10 @@ static void M_VerifyNightmare(int ch)
   if (ch != 'y')
     return;
 
-  G_DeferedInitNew(sk_nightmare,epi+1,1);
+  if (!EpiCustom)
+    G_DeferedInitNew(sk_nightmare,epi+1,1);
+  else
+    G_DeferedInitNew(sk_nightmare, EpiMenuEpi[epi], EpiMenuMap[epi]);
   M_ClearMenus ();
 }
 

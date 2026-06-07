@@ -233,6 +233,79 @@ static int z_arg(u_scanner_t *s, unsigned int line)
   return s->tokenLine == line ? 1 : 0;
 }
 
+/* ---- episode menu translation ------------------------------------------ */
+
+/* m_menu.c's UMAPINFO hook; same private declaration u_mapinfo.c uses. */
+void M_AddEpisode(const char *map, char *def);
+
+/* Episode block being collected.  ZDoom's old-syntax episode directive is
+ *
+ *     clearepisodes
+ *     episode E1M1
+ *     picname M_EPI1
+ *
+ * (chex3.wad defines exactly three of these).  Without translating them
+ * the menu falls back to M_Init's E?M1 lump probe, and when chex3.wad is
+ * routed as a PWAD on top of an Ultimate Doom IWAD that probe finds
+ * doom.wad's E4M1, so the episode menu grows a fourth entry drawn with
+ * doom.wad's M_EPI4 patch ("Thy Flesh Consumed") that starts Doom maps. */
+static char  zepi_map[9];
+static char  zepi_pic[9];
+static char *zepi_name;      /* heap; may be NULL */
+static char  zepi_key;
+static int   zepi_open;      /* currently inside an episode block */
+static int   zepi_optional;  /* ZDoom 'optional': skip if map lump absent */
+static int   zepi_remove;    /* ZDoom 'remove': do not add this episode */
+static int   zepi_added;     /* episodes fed to the menu (for the summary) */
+
+/* Close the pending episode block and feed it to the menu.  M_AddEpisode
+ * keeps the title pointer (second line of def) alive as the menu item's
+ * alttext, so the composed buffer is deliberately never freed. */
+static void Z_FlushEpisode(void)
+{
+  char  *def;
+  size_t len;
+
+  if (!zepi_open)
+    return;
+  zepi_open = 0;
+
+  /* 'remove' asks for deletion of an existing entry; deleting from the
+   * already-built menu is not supported, so at least do not add it.
+   * 'optional' episodes only appear when their start map exists. */
+  if (zepi_remove ||
+      (zepi_optional && W_CheckNumForName(zepi_map) < 0))
+  {
+    free(zepi_name);
+    zepi_name = NULL;
+    return;
+  }
+
+  len = strlen(zepi_pic) + 1;
+  if (zepi_name)
+    len += strlen(zepi_name) + 1;
+  if (zepi_key)
+    len += 2;
+  def = malloc(len);
+  strcpy(def, zepi_pic);
+  if (zepi_name)
+  {
+    strcat(def, "\n");
+    strcat(def, zepi_name);
+    if (zepi_key)
+    {
+      size_t at = strlen(def);
+      def[at]     = '\n';
+      def[at + 1] = zepi_key;
+      def[at + 2] = '\0';
+    }
+  }
+  free(zepi_name);
+  zepi_name = NULL;
+  M_AddEpisode(zepi_map, def);
+  zepi_added++;
+}
+
 /* the classic A_BossDeath callers a ZDoom special action may come from */
 static void Z_AddBossActions(mapentry_t *e, int special, int tag)
 {
@@ -275,6 +348,7 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
       {
         clus = NULL;
         map = NULL;
+        Z_FlushEpisode();
         if ((tok = z_arg(&s, line)) > 0)
         {
           map = Z_NewMapEntry(s.string);
@@ -292,6 +366,7 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
       {
         map = NULL;
         clus = NULL;
+        Z_FlushEpisode();
         if ((tok = z_arg(&s, line)) > 0 && num_zclusters < MAX_ZCLUSTERS)
         {
           clus = &zclusters[num_zclusters++];
@@ -299,12 +374,77 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
           clus->id = s.number;
         }
       }
-      else if (!strcasecmp(s.string, "episode") ||
-               !strcasecmp(s.string, "gameinfo") ||
+      else if (!strcasecmp(s.string, "episode"))
+      {
+        map = NULL;
+        clus = NULL;
+        Z_FlushEpisode();
+        if ((tok = z_arg(&s, line)) > 0)
+        {
+          zlump_name(zepi_map, s.string);
+          zepi_pic[0]   = 0;
+          zepi_name     = NULL;
+          zepi_key      = 0;
+          zepi_optional = 0;
+          zepi_remove   = 0;
+          zepi_open     = 1;
+        }
+      }
+      else if (!strcasecmp(s.string, "clearepisodes"))
+      {
+        static char zepi_clear[] = "-";
+        map = NULL;
+        clus = NULL;
+        Z_FlushEpisode();
+        M_AddEpisode("", zepi_clear);
+      }
+      else if (!strcasecmp(s.string, "gameinfo") ||
                !strcasecmp(s.string, "skill"))
       {
         map = NULL;
         clus = NULL;
+        Z_FlushEpisode();
+      }
+      /* ---- episode keys ---- */
+      else if (zepi_open)
+      {
+        if (!strcasecmp(s.string, "picname"))
+        {
+          if ((tok = z_arg(&s, line)) > 0)
+            zlump_name(zepi_pic, s.string);
+        }
+        else if (!strcasecmp(s.string, "name"))
+        {
+          if ((tok = z_arg(&s, line)) > 0)
+          {
+            if (!strcasecmp(s.string, "lookup"))
+            {
+              if ((tok = z_arg(&s, line)) > 0)
+              {
+                const char *v = U_ZLanguageLookup(s.string);
+                if (v)
+                {
+                  free(zepi_name);
+                  zepi_name = strdup(v);
+                }
+              }
+            }
+            else
+            {
+              free(zepi_name);
+              zepi_name = strdup(s.string);
+            }
+          }
+        }
+        else if (!strcasecmp(s.string, "key"))
+        {
+          if ((tok = z_arg(&s, line)) > 0)
+            zepi_key = s.string[0];
+        }
+        else if (!strcasecmp(s.string, "optional"))
+          zepi_optional = 1;
+        else if (!strcasecmp(s.string, "remove"))
+          zepi_remove = 1;
       }
       /* ---- cluster keys ---- */
       else if (clus)
@@ -417,6 +557,9 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
   }
   U_ScanClose(&s);
 
+  /* an episode block ending at EOF still needs flushing */
+  Z_FlushEpisode();
+
   /* episode-end maps inherit their cluster's text screen */
   for (i = 0; i < U_mapinfo.mapcount; i++)
   {
@@ -447,9 +590,9 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         ntext++;
     }
     lprintf(LO_INFO,
-            "U_ParseZMapInfo: %u maps, %d clusters, %d boss actions, "
-            "%d text screens\n",
-            U_mapinfo.mapcount, num_zclusters, nboss, ntext);
+            "U_ParseZMapInfo: %u maps, %d clusters, %d episodes, "
+            "%d boss actions, %d text screens\n",
+            U_mapinfo.mapcount, num_zclusters, zepi_added, nboss, ntext);
   }
   return 1;
 }

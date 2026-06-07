@@ -73,6 +73,8 @@ fixed_t P_InterceptVector (const divline_t *v2, const divline_t *v1);
 fixed_t P_InterceptVector2(const divline_t *v2, const divline_t *v1);
 
 void    P_LineOpening (const line_t *linedef);
+/* slope-aware variant, heights evaluated at (x,y) */
+void    P_LineOpeningAt(const line_t *linedef, fixed_t x, fixed_t y);
 void    P_UnsetThingPosition(mobj_t *thing);
 void    P_SetThingPosition(mobj_t *thing);
 dbool P_BlockLinesIterator (int x, int y, dbool func(line_t *));

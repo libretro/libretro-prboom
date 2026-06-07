@@ -38,6 +38,7 @@
 #include "m_bbox.h"
 #include "r_main.h"
 #include "p_maputl.h"
+#include "p_slope.h"
 #include "p_map.h"
 #include "p_setup.h"
 #include "hexen/po_man.h"
@@ -207,6 +208,41 @@ void P_LineOpening(const line_t *linedef)
     {
       openbottom = openbacksector->floorheight;
       lowfloor = openfrontsector->floorheight;
+    }
+  openrange = opentop - openbottom;
+}
+
+/* P_LineOpeningAt: as P_LineOpening, with the heights evaluated at a
+ * point for sloped sectors.  Flat sectors take exactly the constant
+ * heights, so behaviour off sloped maps is bit-identical. */
+void P_LineOpeningAt(const line_t *linedef, fixed_t x, fixed_t y)
+{
+  fixed_t fc, bc, ff, bf;
+
+  if (linedef->sidenum[1] == NO_INDEX)      /* single sided line */
+    {
+      openrange = 0;
+      return;
+    }
+
+  openfrontsector = linedef->frontsector;
+  openbacksector = linedef->backsector;
+
+  fc = P_CeilingZAtPoint(openfrontsector, x, y);
+  bc = P_CeilingZAtPoint(openbacksector, x, y);
+  ff = P_FloorZAtPoint(openfrontsector, x, y);
+  bf = P_FloorZAtPoint(openbacksector, x, y);
+
+  opentop = fc < bc ? fc : bc;
+  if (ff > bf)
+    {
+      openbottom = ff;
+      lowfloor = bf;
+    }
+  else
+    {
+      openbottom = bf;
+      lowfloor = ff;
     }
   openrange = opentop - openbottom;
 }

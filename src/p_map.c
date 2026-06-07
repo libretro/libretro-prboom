@@ -37,6 +37,7 @@
 #include "p_mobj.h"
 #include "p_maputl.h"
 #include "p_map.h"
+#include "p_slope.h"
 #include "p_setup.h"
 #include "p_tick.h"
 #include "p_spec.h"
@@ -303,8 +304,8 @@ dbool P_TeleportMove (mobj_t* thing,fixed_t x,fixed_t y, dbool boss)
   // Any contacted lines the step closer together
   // will adjust them.
 
-  tmfloorz = tmdropoffz = newsubsec->sector->floorheight;
-  tmceilingz = newsubsec->sector->ceilingheight;
+  tmfloorz = tmdropoffz = P_FloorZAtPoint(newsubsec->sector, x, y);
+  tmceilingz = P_CeilingZAtPoint(newsubsec->sector, x, y);
 
   validcount++;
   numspechit = 0;
@@ -490,7 +491,7 @@ dbool PIT_CheckLine (line_t* ld)
   // set openrange, opentop, openbottom
   // these define a 'window' from one sector to another across this line
 
-  P_LineOpening (ld);
+  P_LineOpeningAt(ld, tmx, tmy);    /* heights at the move point (slopes) */
 
   // adjust floor & ceiling heights
 
@@ -1255,8 +1256,8 @@ dbool P_CheckPosition (mobj_t* thing,fixed_t x,fixed_t y)
   // Any contacted lines the step closer together
   // will adjust them.
 
-  tmfloorz = tmdropoffz = newsubsec->sector->floorheight;
-  tmceilingz = newsubsec->sector->ceilingheight;
+  tmfloorz = tmdropoffz = P_FloorZAtPoint(newsubsec->sector, x, y);
+  tmceilingz = P_CeilingZAtPoint(newsubsec->sector, x, y);
   validcount++;
   numspechit = 0;
 
@@ -1818,7 +1819,8 @@ dbool PTR_SlideTraverse (intercept_t* in)
   // set openrange, opentop, openbottom.
   // These define a 'window' from one sector to another across a line
 
-  P_LineOpening (li);
+  P_LineOpeningAt(li, trace.x + FixedMul(trace.dx, in->frac),
+                  trace.y + FixedMul(trace.dy, in->frac));
 
   if (openrange < slidemo->height)
     goto isblocking;  // doesn't fit
@@ -2375,7 +2377,8 @@ dbool PTR_UseTraverse (intercept_t* in)
 
   if (!in->d.line->special)
     {
-    P_LineOpening (in->d.line);
+    P_LineOpeningAt(in->d.line, trace.x + FixedMul(trace.dx, in->frac),
+                    trace.y + FixedMul(trace.dy, in->frac));
     if (openrange <= 0)
       {
       /* Vanilla raven feedback for using a blank wall: hexen plays the
@@ -2459,7 +2462,8 @@ dbool PTR_NoWayTraverse(intercept_t* in)
                                            // This linedef
   return ld->special || !(                 // Ignore specials
    ld->flags & ML_BLOCKING || (            // Always blocking
-   P_LineOpening(ld),                      // Find openings
+   P_LineOpeningAt(ld, trace.x + FixedMul(trace.dx, in->frac),
+                   trace.y + FixedMul(trace.dy, in->frac)), // Find openings
    openrange <= 0 ||                       // No opening
    openbottom > usething->z+24*FRACUNIT || // Too high it blocks
    opentop < usething->z+usething->height  // Too low it blocks

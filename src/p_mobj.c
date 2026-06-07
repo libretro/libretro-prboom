@@ -36,6 +36,7 @@
 #include "m_random.h"
 #include "r_main.h"
 #include "p_maputl.h"
+#include "p_slope.h"
 #include "p_map.h"
 #include "p_tick.h"
 #include "p_spec.h"
@@ -1671,8 +1672,8 @@ mobj_t* P_SpawnMobj(fixed_t x,fixed_t y,fixed_t z,mobjtype_t type)
   P_SetThingPosition (mobj);
 
   mobj->dropoffz =           /* killough 11/98: for tracking dropoffs */
-  mobj->floorz   = mobj->subsector->sector->floorheight;
-  mobj->ceilingz = mobj->subsector->sector->ceilingheight;
+  mobj->floorz   = P_FloorZAtPoint(mobj->subsector->sector, x, y);
+  mobj->ceilingz = P_CeilingZAtPoint(mobj->subsector->sector, x, y);
 
   mobj->z = z == ONFLOORZ ? mobj->floorz : z == ONCEILINGZ ?
     mobj->ceilingz - mobj->height : z;

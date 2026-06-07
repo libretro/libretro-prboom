@@ -19,4 +19,7 @@ void U_ZLanguageApplyStrings(void);
 /* ZDoom MAPINFO 'noinfighting' flag for the given map entry */
 dbool U_ZMapNoInfighting(const mapentry_t *e);
 
+/* ZDoom MAPINFO 'sucktime' hours for the given map entry (0 = none) */
+int U_ZMapSuckTime(const mapentry_t *e);
+
 #endif

@@ -39,6 +39,7 @@
 #include "r_main.h"
 #include "v_video.h"
 #include "wi_stuff.h"
+#include "u_zmapinfo.h"
 #include "heretic/in_lude.h"
 #include "hexen/in_lude.h"
 #include "s_sound.h"
@@ -945,6 +946,11 @@ static void WI_drawPercent(int x, int y, int p)
 // CPhipps - static
 //         - largely rewritten to display hours and use slightly better algorithm
 
+/* ZDoom MAPINFO sucktime: hours past which the level clock shows SUCKS
+ * (chex3.wad sets 1 on every map); 0 keeps the vanilla never-in-practice
+ * 100-hour threshold.  Applies to the level time only. */
+static int wi_suckhours;
+
 static void WI_drawTime(int x, int y, int t)
 {
   int   n;
@@ -952,7 +958,7 @@ static void WI_drawTime(int x, int y, int t)
   if (t<0)
     return;
 
-  if (t < 100*60*60)
+  if (t < (wi_suckhours ? wi_suckhours*60*60 : 100*60*60))
     for(;;) {
       n = t % 60;
       t /= 60;
@@ -1013,7 +1019,9 @@ void WI_initNoState(void)
 static void WI_drawTimeStats(int cnt_time, int cnt_total_time, int cnt_par)
 {
   V_DrawNamePatch(SP_TIMEX, SP_TIMEY, FB, time1, CR_DEFAULT, VPT_STRETCH);
+  wi_suckhours = gamemapinfo ? U_ZMapSuckTime(gamemapinfo) : 0;
   WI_drawTime(320/2 - SP_TIMEX, SP_TIMEY, cnt_time);
+  wi_suckhours = 0;
 
   V_DrawNamePatch(SP_TIMEX, (SP_TIMEY+200)/2, FB, total, CR_DEFAULT, VPT_STRETCH);
   WI_drawTime(320/2 - SP_TIMEX, (SP_TIMEY+200)/2, cnt_total_time);

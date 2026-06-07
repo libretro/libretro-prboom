@@ -43,6 +43,7 @@ typedef struct
 } zlang_entry_t;
 
 static int *map_noinfight;   /* ZDoom 'noinfighting' per map */
+static int *map_sucktime;    /* ZDoom 'sucktime' hours per map (0 = none) */
 
 static zlang_entry_t *zlang;
 static int            zlang_count;
@@ -143,6 +144,19 @@ void U_ZLanguageApplyStrings(void)
 /* ZDoom MAPINFO 'noinfighting': monsters on this map never acquire
  * other monsters as targets from damage (retaliation against players
  * is untouched).  Queried with the live gamemapinfo pointer. */
+/* ZDoom MAPINFO 'sucktime': hours of level time after which the
+ * intermission shows SUCKS instead of the clock (0 = never). */
+int U_ZMapSuckTime(const mapentry_t *e)
+{
+  int idx;
+  if (!e || !U_mapinfo.maps || !map_sucktime)
+    return 0;
+  idx = (int)(e - U_mapinfo.maps);
+  if (idx < 0 || idx >= (int)U_mapinfo.mapcount)
+    return 0;
+  return map_sucktime[idx];
+}
+
 dbool U_ZMapNoInfighting(const mapentry_t *e)
 {
   int idx;
@@ -200,6 +214,9 @@ static mapentry_t *Z_NewMapEntry(const char *mapname)
   map_noinfight = realloc(map_noinfight,
                           U_mapinfo.mapcount * sizeof(*map_noinfight));
   map_noinfight[U_mapinfo.mapcount - 1] = 0;
+  map_sucktime = realloc(map_sucktime,
+                         U_mapinfo.mapcount * sizeof(*map_sucktime));
+  map_sucktime[U_mapinfo.mapcount - 1] = 0;
   e = &U_mapinfo.maps[U_mapinfo.mapcount - 1];
   memset(e, 0, sizeof(*e));
   e->mapname = strdup(mapname);
@@ -364,6 +381,11 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         {
           /* flag key, no argument */
           map_noinfight[U_mapinfo.mapcount - 1] = 1;
+        }
+        else if (!strcasecmp(s.string, "sucktime"))
+        {
+          if ((tok = z_arg(&s, line)) > 0)
+            map_sucktime[U_mapinfo.mapcount - 1] = s.number;
         }
         else if (!strcasecmp(s.string, "cluster"))
         {

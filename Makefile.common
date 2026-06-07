@@ -2,6 +2,7 @@ DEPS_DIR           = $(ROOT_DIR)/deps
 LIBRETRO_DIR       = $(ROOT_DIR)/libretro
 LIBRETRO_COMM_DIR  = $(ROOT_DIR)/libretro/libretro-common
 
+COREDEFINES += -DHAVE_ZLIB=1
 INCFLAGS    = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(DEPS_DIR)/libmad -I$(DEPS_DIR)/miniz -I$(LIBRETRO_COMM_DIR)/include
 
 ifneq (,$(findstring msvc2003,$(platform)))
@@ -30,7 +31,11 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.c \
 				 $(LIBRETRO_COMM_DIR)/file/file_path.c \
 				 $(LIBRETRO_COMM_DIR)/file/file_path_io.c \
-				 $(LIBRETRO_COMM_DIR)/time/rtime.c
+				 $(LIBRETRO_COMM_DIR)/time/rtime.c \
+				 $(LIBRETRO_COMM_DIR)/formats/png/rpng.c \
+				 $(LIBRETRO_COMM_DIR)/streams/trans_stream.c \
+				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_zlib.c \
+				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c
 
 SOURCES_C += $(DEPS_DIR)/miniz/miniz.c \
 				 $(DEPS_DIR)/libmad/bit.c \

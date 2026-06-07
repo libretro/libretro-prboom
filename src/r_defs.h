@@ -315,6 +315,10 @@ typedef struct polyobj_s
   int seqType;
   void *specialdata;       /* the mover thinker while the poly is moving */
   subsector_t *subsector;
+  /* Several polyobjs can resolve to the same render subsector (ZDoom
+   * maps stack geometry; vanilla Hexen fataled on this).  The subsector
+   * holds the head and this chains the rest. */
+  struct polyobj_s *subnext;
 } polyobj_t;
 
 typedef struct polyblock_s

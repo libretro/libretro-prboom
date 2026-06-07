@@ -819,11 +819,10 @@ static void TranslateToStartSpot(int tag, int originX, int originY)
   avg.x /= po->numsegs;
   avg.y /= po->numsegs;
   sub = R_PointInSubsector(avg.x << FRACBITS, avg.y << FRACBITS);
-  if (sub->poly != NULL)
-  {
-    I_Error("PO_TranslateToStartSpot:  Multiple polyobjs in a single subsector.\n");
-  }
+  /* several polyobjs may resolve to the same render subsector (stacked
+   * ZDoom geometry); chain them rather than vanilla Hexen's fatal */
   po->subsector = sub;
+  po->subnext = sub->poly;
   sub->poly = po;
 }
 

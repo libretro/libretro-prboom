@@ -552,7 +552,11 @@ static void R_Subsector(int num)
 
   /* Hexen: render the polyobj in the subsector first */
   if (sub->poly)
-    R_AddPolyLines(sub->poly);
+  {
+    polyobj_t *po;
+    for (po = sub->poly; po; po = po->subnext)
+      R_AddPolyLines(po);
+  }
 
   while (count--)
   {

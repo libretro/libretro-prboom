@@ -432,6 +432,10 @@ typedef enum
   CLEV_RAISEBYVALUE,
   CLEV_CRUSHRAISEANDSTAY,
   CLEV_MOVETOVALUETIMES8,
+  /* ZDoom additions (Ceiling_Lower/RaiseInstant move by value*8 at
+   * instant speed, mirroring the FLEV TIMES8INSTANT pattern) */
+  CLEV_LOWERTIMES8INSTANT,
+  CLEV_RAISETIMES8INSTANT,
 } ceiling_e;
 
 // p_floor
@@ -501,6 +505,8 @@ typedef enum
   FLEV_LOWERTIMES8INSTANT,
   FLEV_RAISETIMES8INSTANT,
   FLEV_MOVETOVALUETIMES8,
+  /* ZDoom Floor_MoveToValue: like MOVETOVALUETIMES8 without the *8 */
+  FLEV_MOVETOVALUE,
   FLEV_RAISEBUILDSTEP
 } floor_e;
 

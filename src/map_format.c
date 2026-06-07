@@ -141,6 +141,48 @@ static dbool P_ExecuteZDoomLineSpecial(int special, int *args, line_t *line,
       if (!P_CheckZDoomLock(mo, args[3]))
         return false;
       return P_ExecuteHexenLineSpecial(12, args, line, side, mo);
+    case 37:                    /* Floor_MoveToValue */
+      return Hexen_EV_DoFloor(line, args, FLEV_MOVETOVALUE);
+    case 193:                   /* Ceiling_LowerInstant */
+      return Hexen_EV_DoCeiling(line, args, CLEV_LOWERTIMES8INSTANT);
+    case 194:                   /* Ceiling_RaiseInstant */
+      return Hexen_EV_DoCeiling(line, args, CLEV_RAISETIMES8INSTANT);
+    case 215:                   /* Teleport_Line(thisid, destid, flip) */
+    {
+      /* EV_SilentLineTeleport pairs lines through the source line's tag;
+       * ZDoom names the destination in args[1].  Swap the tag for the
+       * lookup and restore it -- the teleport itself does not re-read it. */
+      int saved, ok;
+      if (!line)
+        return false;
+      saved = line->tag;
+      line->tag = args[1];
+      ok = EV_SilentLineTeleport(line, side, mo, args[2] != 0);
+      line->tag = saved;
+      return ok;
+    }
+    case 80:                    /* ACS_Execute */
+    case 81:                    /* ACS_Suspend */
+    case 82:                    /* ACS_Terminate */
+    case 83:                    /* ACS_LockedExecute */
+      if (!map_format.acs)
+      {
+        /* ZDoom-namespace maps carry enhanced-format (ACSE/ACSe)
+         * bytecode this engine cannot run yet; surface the gap instead
+         * of silently no-opping through an empty script table. */
+        static int acs_warnings;
+        if (acs_warnings < 8)
+        {
+          acs_warnings++;
+          lprintf(LO_WARN,
+                  "P_ExecuteZDoomLineSpecial: ACS special %d "
+                  "(script %d) ignored: ACS not supported on this map%s\n",
+                  special, args[0],
+                  acs_warnings == 8 ? " (further warnings suppressed)" : "");
+        }
+        return false;
+      }
+      return P_ExecuteHexenLineSpecial(special, args, line, side, mo);
     case 243:                   /* Exit_Normal */
       G_ExitLevel();
       return true;

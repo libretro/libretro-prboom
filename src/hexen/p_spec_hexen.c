@@ -388,7 +388,10 @@ int Hexen_EV_DoFloor(line_t *line, int *args, floor_e floortype)
         floor->floordestheight = sec->floorheight + args[2] * FRACUNIT * 8;
         break;
       case FLEV_MOVETOVALUETIMES8:
-        floor->floordestheight = args[2] * FRACUNIT * 8;
+      case FLEV_MOVETOVALUE:
+        floor->floordestheight = args[2] * FRACUNIT;
+        if (floortype == FLEV_MOVETOVALUETIMES8)
+          floor->floordestheight *= 8;
         if (args[3])
           floor->floordestheight = -floor->floordestheight;
         if (floor->floordestheight > sec->floorheight)
@@ -525,6 +528,16 @@ int Hexen_EV_DoCeiling(line_t *line, int *args, ceiling_e type)
       case CLEV_LOWERBYVALUE:
         ceiling->bottomheight = sec->ceilingheight - args[2] * FRACUNIT;
         ceiling->direction = -1;
+        break;
+      case CLEV_LOWERTIMES8INSTANT:
+        ceiling->bottomheight = sec->ceilingheight - args[2] * FRACUNIT * 8;
+        ceiling->direction = -1;
+        ceiling->speed = 2000 << FRACBITS;
+        break;
+      case CLEV_RAISETIMES8INSTANT:
+        ceiling->topheight = sec->ceilingheight + args[2] * FRACUNIT * 8;
+        ceiling->direction = 1;
+        ceiling->speed = 2000 << FRACBITS;
         break;
       case CLEV_RAISEBYVALUE:
         ceiling->topheight = sec->ceilingheight + args[2] * FRACUNIT;

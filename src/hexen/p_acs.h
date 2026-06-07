@@ -60,11 +60,11 @@ typedef struct
 {
   int  map;                     /* target map */
   int  script;                  /* script number on target map */
-  byte args[4];
+  int args[4];
 } acsstore_t;
 
 void  P_LoadACScripts(int lump);
-dbool P_StartACS(int number, int map, byte *args, mobj_t *activator,
+dbool P_StartACS(int number, int map, int *args, mobj_t *activator,
                  line_t *line, int side);
 void CheckACSPresent(int number);
 dbool P_TerminateACS(int number, int map);

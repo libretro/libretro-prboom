@@ -53,7 +53,7 @@ typedef struct
   void (*player_in_special_sector)(player_t *player);
   /* Hexen scripted line-special executor: decodes a byte special + 5 args
    * and runs the corresponding action.  NULL for Doom/Heretic. */
-  dbool (*execute_line_special)(int special, byte *args, line_t *line,
+  dbool (*execute_line_special)(int special, int *args, line_t *line,
                                 int side, mobj_t *mo);
   int visibility;
 } map_format_t;

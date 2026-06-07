@@ -201,7 +201,9 @@ typedef struct line_s
   /* Hexen line special arguments (args[0..4]).  Zero for Doom/Heretic maps;
    * filled from the Hexen-format linedef.  Consumed by the Hexen line
    * specials / ACS layer added later. */
-  unsigned char args[5];
+  /* Widened from unsigned char: ZDoom UDMF args are full ints (line ids,
+   * tags and TIDs in large maps exceed 255; heights can be negative). */
+  int args[5];
   unsigned short sidenum[2];        // Visual appearance: SideDefs.
   fixed_t bbox[4];       // A bounding box, for the linedef's extent
   slopetype_t slopetype; // To aid move clipping.

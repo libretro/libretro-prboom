@@ -132,7 +132,7 @@ static dbool P_CheckZDoomLock(mobj_t *mo, int lock)
   return ok;
 }
 
-static dbool P_ExecuteZDoomLineSpecial(int special, byte *args, line_t *line,
+static dbool P_ExecuteZDoomLineSpecial(int special, int *args, line_t *line,
                                        int side, mobj_t *mo)
 {
   switch (special)

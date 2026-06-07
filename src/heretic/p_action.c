@@ -1976,7 +1976,7 @@ void A_Quake(mobj_t * actor)
     }
 }
 
-dbool A_LocalQuake(byte * args, mobj_t * actor)
+dbool A_LocalQuake(int * args, mobj_t * actor)
 {
     mobj_t *focus, *target;
     int     lastfound = -1;

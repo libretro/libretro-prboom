@@ -32,22 +32,22 @@
  * activation can flip the switch texture). */
 void P_InitHexenTaggedLines(void);
 line_t *P_FindHexenLine(int lineTag, int *searchPosition);
-dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
+dbool P_ExecuteHexenLineSpecial(int special, int *args, line_t *line,
                                 int side, mobj_t *mo);
 
 /* Door handlers + thinker. */
 void  T_HexenVerticalDoor(vldoor_t *door);
-int   Hexen_EV_DoDoor(line_t *line, byte *args, vldoor_e type);
+int   Hexen_EV_DoDoor(line_t *line, int *args, vldoor_e type);
 dbool Hexen_EV_VerticalDoor(line_t *line, mobj_t *thing);
-int   Hexen_EV_DoFloor(line_t *line, byte *args, floor_e floortype);
+int   Hexen_EV_DoFloor(line_t *line, int *args, floor_e floortype);
 void  T_HexenMoveCeiling(ceiling_t *ceiling);
-int   Hexen_EV_DoCeiling(line_t *line, byte *args, ceiling_e type);
-int   Hexen_EV_CeilingCrushStop(line_t *line, byte *args);
+int   Hexen_EV_DoCeiling(line_t *line, int *args, ceiling_e type);
+int   Hexen_EV_CeilingCrushStop(line_t *line, int *args);
 void  T_HexenBuildPillar(pillar_t *pillar);
-int   EV_BuildPillar(line_t *line, byte *args, int crush);
-int   EV_OpenPillar(line_t *line, byte *args);
+int   EV_BuildPillar(line_t *line, int *args, int crush);
+int   EV_OpenPillar(line_t *line, int *args);
 void  T_HexenLight(light_t *light);
-int   EV_SpawnLight(line_t *line, byte *args, lighttype_t type);
+int   EV_SpawnLight(line_t *line, int *args, lighttype_t type);
 dbool P_HexenTeleport(mobj_t *thing, fixed_t x, fixed_t y, angle_t angle,
                       dbool useFog);
 dbool EV_HexenTeleport(int tid, mobj_t *thing, dbool fog);
@@ -55,20 +55,20 @@ int   EV_ThingActivate(int tid);
 int   EV_ThingDeactivate(int tid);
 int   EV_ThingRemove(int tid);
 int   EV_ThingDestroy(int tid);
-int   Hexen_EV_BuildStairs(line_t *line, byte *args, int direction,
+int   Hexen_EV_BuildStairs(line_t *line, int *args, int direction,
                            int stairsType);
-int   EV_ThingProjectile(byte *args, int gravity);
-int   EV_ThingSpawn(byte *args, int fog);
-int   Hexen_EV_FloorCrushStop(line_t *line, byte *args);
-int   Hexen_EV_DoFloorAndCeiling(line_t *line, byte *args, int raise);
-int   Hexen_EV_SectorSoundChange(byte *args);
+int   EV_ThingProjectile(int *args, int gravity);
+int   EV_ThingSpawn(int *args, int fog);
+int   Hexen_EV_FloorCrushStop(line_t *line, int *args);
+int   Hexen_EV_DoFloorAndCeiling(line_t *line, int *args, int raise);
+int   Hexen_EV_SectorSoundChange(int *args);
 void  T_FloorWaggle(planeWaggle_t *waggle);
 int   EV_StartFloorWaggle(int tag, int height, int speed, int offset, int timer);
 
 #define TRANSLATE_THING_TYPE_COUNT 109
 extern const mobjtype_t TranslateThingType[TRANSLATE_THING_TYPE_COUNT];
-int   EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount);
-void  Hexen_EV_StopPlat(line_t *line, byte *args);
+int   EV_DoHexenPlat(line_t *line, int *args, plattype_e type, int amount);
+void  Hexen_EV_StopPlat(line_t *line, int *args);
 
 /* Line activation entry points (wired through map_format). */
 void  P_CrossHexenSpecialLine(line_t *line, int side, mobj_t *thing);

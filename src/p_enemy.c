@@ -5294,7 +5294,7 @@ void A_KoraxChase(mobj_t *actor)
 {
   mobj_t *spot;
   int lastfound;
-  byte args[3] = {0, 0, 0};
+  int args[3] = {0, 0, 0};
 
   if ((!actor->special2.i) &&
       (actor->health <= (actor->info->spawnhealth / 2)))
@@ -5375,7 +5375,7 @@ static void KSpiritInit(mobj_t *spirit, mobj_t *korax)
 void A_KoraxBonePop(mobj_t *actor)
 {
   mobj_t *mo;
-  byte args[5];
+  int args[5];
 
   args[0] = args[1] = args[2] = args[3] = args[4] = 0;
 
@@ -5464,7 +5464,7 @@ void A_KoraxMissile(mobj_t *actor)
 
 void A_KoraxCommand(mobj_t *actor)
 {
-  byte args[5];
+  int args[5];
   fixed_t x, y, z;
   angle_t ang;
   int numcommands;

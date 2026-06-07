@@ -2567,7 +2567,7 @@ static dbool   PuzzleActivated;
 static dbool PTR_PuzzleItemTraverse(intercept_t *in)
 {
   mobj_t *mobj;
-  byte args[3];
+  int args[3];
   int sound;
 
   if (in->isaline)

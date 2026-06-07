@@ -64,7 +64,7 @@ static acs_t *NewScript;
 
 static void  StartOpenACS(int number, int infoIndex, int offset);
 static int   GetACSIndex(int number);
-static dbool AddToACSStore(int map, int number, byte *args);
+static dbool AddToACSStore(int map, int number, int *args);
 
 static int ReadCodeInt(void)
 {
@@ -193,7 +193,7 @@ void CheckACSPresent(int number)
   }
 }
 
-dbool P_StartACS(int number, int map, byte *args, mobj_t *activator,
+dbool P_StartACS(int number, int map, int *args, mobj_t *activator,
                  line_t *line, int side)
 {
   int     i;
@@ -273,7 +273,7 @@ dbool P_SuspendACS(int number, int map)
   return true;
 }
 
-static dbool AddToACSStore(int map, int number, byte *args)
+static dbool AddToACSStore(int map, int number, int *args)
 {
   int i;
   int index = -1;
@@ -429,12 +429,12 @@ static int ACS_GetSoundID(const char *name)
  * SpecArgs, the dispatcher takes a byte[5]. */
 static void ACS_ExecLineSpecial(int special)
 {
-  byte b[5];
-  b[0] = (byte) SpecArgs[0];
-  b[1] = (byte) SpecArgs[1];
-  b[2] = (byte) SpecArgs[2];
-  b[3] = (byte) SpecArgs[3];
-  b[4] = (byte) SpecArgs[4];
+  int b[5];
+  b[0] = SpecArgs[0];
+  b[1] = SpecArgs[1];
+  b[2] = SpecArgs[2];
+  b[3] = SpecArgs[3];
+  b[4] = SpecArgs[4];
   P_ExecuteHexenLineSpecial(special, b, ACScript->line, ACScript->side,
                             ACScript->activator);
 }

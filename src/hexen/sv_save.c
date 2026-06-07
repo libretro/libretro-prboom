@@ -324,7 +324,7 @@ static void UnarchiveWorld(void)
     li->flags   = SV_ReadLong();
     li->special = SV_ReadLong();
     for (j = 0; j < 5; j++)
-      li->args[j] = (byte) SV_ReadLong();
+      li->args[j] = SV_ReadLong();
     for (j = 0; j < 2; j++)
     {
       if (li->sidenum[j] == NO_INDEX)

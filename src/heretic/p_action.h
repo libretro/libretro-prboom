@@ -148,7 +148,7 @@ mobj_t *P_SpawnMissileAngle(mobj_t *source, mobjtype_t type, angle_t angle, fixe
 
 /* Hexen earthquake. */
 void  A_Quake(mobj_t *actor);
-dbool A_LocalQuake(byte *args, mobj_t *actor);
+dbool A_LocalQuake(int *args, mobj_t *actor);
 extern int localQuakeHappening[MAXPLAYERS];
 
 #endif

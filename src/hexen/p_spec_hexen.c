@@ -204,7 +204,7 @@ void T_HexenVerticalDoor(vldoor_t *door)
   }
 }
 
-int Hexen_EV_DoDoor(line_t *line, byte *args, vldoor_e type)
+int Hexen_EV_DoDoor(line_t *line, int *args, vldoor_e type)
 {
   int       secnum;
   int       rtn = 0;
@@ -313,7 +313,7 @@ static dbool CheckedLockedDoor(mobj_t *mo, byte lock)
  * the Hexen movement types fall through its texture/special switch unchanged.
  * Until the sound-sequence subsystem lands the movement sound is the engine's
  * default (sfx_stnmov inside T_MoveFloor). */
-int Hexen_EV_DoFloor(line_t *line, byte *args, floor_e floortype)
+int Hexen_EV_DoFloor(line_t *line, int *args, floor_e floortype)
 {
   int          secnum;
   int          rtn = 0;
@@ -470,7 +470,7 @@ void T_HexenMoveCeiling(ceiling_t *ceiling)
   }
 }
 
-int Hexen_EV_DoCeiling(line_t *line, byte *args, ceiling_e type)
+int Hexen_EV_DoCeiling(line_t *line, int *args, ceiling_e type)
 {
   int        secnum;
   int        rtn = 0;
@@ -571,7 +571,7 @@ int Hexen_EV_DoCeiling(line_t *line, byte *args, ceiling_e type)
   return rtn;
 }
 
-int Hexen_EV_CeilingCrushStop(line_t *line, byte *args)
+int Hexen_EV_CeilingCrushStop(line_t *line, int *args)
 {
   ceilinglist_t *cl;
 
@@ -669,7 +669,7 @@ void T_HexenLight(light_t *light)
   }
 }
 
-int EV_SpawnLight(line_t *line, byte *args, lighttype_t type)
+int EV_SpawnLight(line_t *line, int *args, lighttype_t type)
 {
   int       secnum;
   int       rtn = 0;
@@ -780,7 +780,7 @@ void T_HexenBuildPillar(pillar_t *pillar)
   }
 }
 
-int EV_BuildPillar(line_t *line, byte *args, int crush)
+int EV_BuildPillar(line_t *line, int *args, int crush)
 {
   int       secnum;
   int       rtn = 0;
@@ -837,7 +837,7 @@ int EV_BuildPillar(line_t *line, byte *args, int crush)
   return rtn;
 }
 
-int EV_OpenPillar(line_t *line, byte *args)
+int EV_OpenPillar(line_t *line, int *args)
 {
   int       secnum;
   int       rtn = 0;
@@ -901,7 +901,7 @@ int EV_OpenPillar(line_t *line, byte *args)
  * the Hexen movement types set low/high/wait/status and otherwise fall
  * through the thinker's Doom change-type handling.  Movement sound is the
  * engine default until the sound-sequence subsystem lands. */
-int EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount)
+int EV_DoHexenPlat(line_t *line, int *args, plattype_e type, int amount)
 {
   int       secnum;
   int       rtn = 0;
@@ -983,7 +983,7 @@ int EV_DoHexenPlat(line_t *line, byte *args, plattype_e type, int amount)
   return rtn;
 }
 
-void Hexen_EV_StopPlat(line_t *line, byte *args)
+void Hexen_EV_StopPlat(line_t *line, int *args)
 {
   platlist_t *pl;
   platlist_t *next;
@@ -1112,7 +1112,7 @@ static void ProcessStairSector(sector_t *sec, int type, int height,
   }
 }
 
-int Hexen_EV_BuildStairs(line_t *line, byte *args, int direction,
+int Hexen_EV_BuildStairs(line_t *line, int *args, int direction,
                          int stairsType)
 {
   int       secnum;
@@ -1268,7 +1268,7 @@ const mobjtype_t TranslateThingType[] = {
 
 #define TT_COUNT ((int)(sizeof(TranslateThingType) / sizeof(TranslateThingType[0])))
 
-int EV_ThingProjectile(byte *args, int gravity)
+int EV_ThingProjectile(int *args, int gravity)
 {
   int        tid = args[0];
   int        searcher = -1;
@@ -1316,7 +1316,7 @@ int EV_ThingProjectile(byte *args, int gravity)
   return success;
 }
 
-int EV_ThingSpawn(byte *args, int fog)
+int EV_ThingSpawn(int *args, int fog)
 {
   int        tid = args[0];
   int        searcher = -1;
@@ -1741,7 +1741,7 @@ int EV_StartFloorWaggle(int tag, int height, int speed, int offset, int timer)
 
 /* --- Dispatcher ----------------------------------------------------------- */
 
-int Hexen_EV_FloorCrushStop(line_t *line, byte *args)
+int Hexen_EV_FloorCrushStop(line_t *line, int *args)
 {
   thinker_t *think;
   int        rtn = 0;
@@ -1766,7 +1766,7 @@ int Hexen_EV_FloorCrushStop(line_t *line, byte *args)
   return rtn;
 }
 
-int Hexen_EV_DoFloorAndCeiling(line_t *line, byte *args, int raise)
+int Hexen_EV_DoFloorAndCeiling(line_t *line, int *args, int raise)
 {
   int       secnum;
   int       floorOk;
@@ -1798,7 +1798,7 @@ int Hexen_EV_DoFloorAndCeiling(line_t *line, byte *args, int raise)
   return floorOk | ceilingOk;
 }
 
-int Hexen_EV_SectorSoundChange(byte *args)
+int Hexen_EV_SectorSoundChange(int *args)
 {
   int secnum;
   int rtn = 0;
@@ -1867,7 +1867,7 @@ line_t *P_FindHexenLine(int lineTag, int *searchPosition)
   return NULL;
 }
 
-dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
+dbool P_ExecuteHexenLineSpecial(int special, int *args, line_t *line,
                                 int side, mobj_t *mo)
 {
   dbool ok = false;
@@ -1931,7 +1931,7 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
     case 83:                    /* ACS_LockedExecute */
       if (CheckedLockedDoor(mo, args[4]))
       {
-        byte newArgs[5];
+        int newArgs[5];
         newArgs[0] = args[0];
         newArgs[1] = args[1];
         newArgs[2] = args[2];
@@ -2173,7 +2173,7 @@ dbool P_ExecuteHexenLineSpecial(int special, byte *args, line_t *line,
 static dbool P_ActivateHexenLine(line_t *line, mobj_t *mo, int side,
                                  int activation)
 {
-  byte  args[5];
+  int  args[5];
   dbool repeat;
   dbool ok;
 

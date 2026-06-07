@@ -73,7 +73,7 @@ void P_ChangeSwitchTexture(line_t *line, int useAgain);
 #define HEXEN_FOR_TAGGED_SECTORS(secvar, tag) \
   for ((secvar) = -1; ((secvar) = P_FindSectorFromTag((tag), (secvar))) >= 0; )
 
-static int P_FindSectorFromTag(int tag, int start)
+int P_FindSectorFromTag(int tag, int start)
 {
   int i;
   for (i = start + 1; i < numsectors; i++)

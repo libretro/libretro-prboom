@@ -32,6 +32,10 @@
  * activation can flip the switch texture). */
 void P_InitHexenTaggedLines(void);
 line_t *P_FindHexenLine(int lineTag, int *searchPosition);
+/* next sector with the given tag after 'start' (-1 to begin); the Hexen
+ * specials and the ZACS VM share this */
+int P_FindSectorFromTag(int tag, int start);
+
 dbool P_ExecuteHexenLineSpecial(int special, int *args, line_t *line,
                                 int side, mobj_t *mo);
 

@@ -896,12 +896,13 @@ static void PO_LoadThings(int lump)
   /* Find the startSpot points, and spawn each polyobj */
   for (i = 0; i < numthings; i++, mt++)
   {
+    dbool crush, hurt;
+
     x = SHORT(mt->x);
     y = SHORT(mt->y);
     angle = SHORT(mt->angle);
     type = SHORT(mt->type);
 
-    dbool crush, hurt;
     if (PO_IsSpawnType(type, &crush, &hurt))
     { /* Polyobj StartSpot Pt. */
       polyobjs[polyIndex].startSpot.x = x << FRACBITS;

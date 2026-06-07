@@ -304,7 +304,7 @@ void Hexen_IN_Ticker(void)
 
 static void DrNumberBase(int val, int x, int y, int wrapThresh, dbool bold)
 {
-  char buff[8] = "XX";
+  char buff[12] = "XX";       /* "%d" of an int needs up to 11 chars + NUL */
 
   if (!(val < -9 && wrapThresh < 1000))
     snprintf(buff, sizeof(buff), "%d", val >= wrapThresh ? val % wrapThresh : val);

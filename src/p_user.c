@@ -648,8 +648,11 @@ dbool   P_UndoPlayerMorph(player_t *player)
          mo = P_SpawnMobj(x, y, z, HEXEN_MT_PLAYER_MAGE);
          break;
       default:
+         /* this fork's I_Error logs and returns: bail out explicitly or
+          * the location test below reads an uninitialized mobj pointer */
          I_Error("P_UndoPlayerMorph:  Unknown player class %d\n",
                player->class);
+         return false;
    }
    if(P_TestMobjLocation(mo) == false)
    { // Didn't fit

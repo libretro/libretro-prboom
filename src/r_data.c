@@ -296,8 +296,16 @@ static void R_InitTextures (void)
       texture->patches[0].originx = 0;
       texture->patches[0].originy = 0;
       texture->patches[0].patch = k;
-      memset(texture->name, 0, sizeof(texture->name));
-      strncpy(texture->name, lumpinfo[k].name, sizeof(texture->name));
+      /* texture names are 8 bytes, NUL-padded but not NUL-terminated --
+       * the strncpy pattern -Wstringop-truncation flags; zero-fill and
+       * copy a clamped length instead */
+      {
+        size_t n = strlen(lumpinfo[k].name);
+        if (n > sizeof(texture->name))
+          n = sizeof(texture->name);
+        memset(texture->name, 0, sizeof(texture->name));
+        memcpy(texture->name, lumpinfo[k].name, n);
+      }
       texture->widthmask = 63;
       textureheight[numtextures] = 64 << FRACBITS;
       numtextures++;

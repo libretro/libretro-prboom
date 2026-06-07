@@ -34,6 +34,7 @@
 // 4/25/98, 5/2/98 killough: reformatted, beautified
 
 #include "doomstat.h"
+#include <math.h> /* sqrt for the seg texture-u range */
 #include "r_main.h"
 #include "r_bsp.h"
 #include "r_segs.h"
@@ -74,6 +75,8 @@ static int      rw_x;
 static int      rw_stopx;
 static angle_t  rw_centerangle;
 static fixed_t  rw_offset;
+static fixed_t  rw_uclamp_lo;  /* the seg's own texture-u range; edge */
+static fixed_t  rw_uclamp_hi;  /* columns extrapolate past it otherwise */
 static fixed_t  rw_scale;
 static fixed_t  rw_scalestep;
 static fixed_t  rw_midtexturemid;
@@ -257,6 +260,7 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
    R_DrawColumn_f colfunc;
    draw_column_vars_t dcvars;
    angle_t angle;
+   fixed_t mulo, muhi;
 
    R_SetDefaultDrawColumnVars(&dcvars);
 
@@ -312,6 +316,19 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
 
    patch = R_CacheTextureCompositePatchNum(texnum);
 
+   /* the seg's own texture-u range; see R_StoreWallRange */
+   {
+      double sdx = (double)ds->curline->v2->x - (double)ds->curline->v1->x;
+      double sdy = (double)ds->curline->v2->y - (double)ds->curline->v1->y;
+      double slen = sqrt(sdx*sdx + sdy*sdy);
+      if (slen > 2147483520.0)
+         slen = 2147483520.0;
+      mulo = ds->curline->sidedef->textureoffset + ds->curline->offset;
+      muhi = mulo + (fixed_t)slen - 1;
+      if (muhi < mulo)
+         muhi = mulo;
+   }
+
    /* draw the columns */
 
    for (dcvars.x = x1 ; dcvars.x <= x2 ; dcvars.x++, spryscale += rw_scalestep)
@@ -322,6 +339,10 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
       // calculate texture offset - POPE
       angle = (ds->rw_centerangle + xtoviewangle[dcvars.x]) >> ANGLETOFINESHIFT;
       dcvars.texu = ds->rw_offset - FixedMul(finetangent[angle], ds->rw_distance);
+      if (dcvars.texu < mulo)
+         dcvars.texu = mulo;
+      else if (dcvars.texu > muhi)
+         dcvars.texu = muhi;
       if (drawvars.filterwall == RDRAW_FILTER_LINEAR)
          dcvars.texu -= (FRACUNIT>>1);
 
@@ -488,6 +509,10 @@ static void R_RenderSegLoop (void)
          angle_t angle =(rw_centerangle+xtoviewangle[rw_x])>>ANGLETOFINESHIFT;
 
          texturecolumn = rw_offset-FixedMul(finetangent[angle],rw_distance);
+         if (texturecolumn < rw_uclamp_lo)
+            texturecolumn = rw_uclamp_lo;
+         else if (texturecolumn > rw_uclamp_hi)
+            texturecolumn = rw_uclamp_hi;
          if (linear_filter)
             texturecolumn -= (FRACUNIT>>1);
          dcvars.texu = texturecolumn; // for filtering -- POPE
@@ -924,6 +949,34 @@ void R_StoreWallRange(const int start, const int stop)
       rw_offset = FixedMul (hyp, -finesine[offsetangle >>ANGLETOFINESHIFT]);
 
       rw_offset += sidedef->textureoffset + curline->offset;
+
+      /* The seg covers whole screen columns, so the first and last
+       * column's ray centres land slightly past the seg's vertices
+       * and the per-angle texture offset extrapolates beyond the
+       * seg's own u range.  On textures whose content is
+       * discontinuous across the horizontal wrap that single column
+       * samples the wrong side and draws a tall one-pixel strip
+       * (Chex Quest 3 E1M1: the first column of a 19-unit STONPOIS
+       * piece computes u = -0.0135, floors to -1, wraps to column 63
+       * on the far side of the painted trim diagonal).  The overshoot
+       * is measured in texels, so it is resolution independent and
+       * hits 320x200 hardest, and it survives any precision fix
+       * because the exact u for that ray really is outside the seg.
+       * Clamp to the seg's range, as hardware renderers implicitly do
+       * by interpolating endpoint texture coordinates.  The lower
+       * bound is the seg's chained textureoffset + offset, not zero,
+       * so intentional negative-offset tiling keeps its wrap. */
+      {
+         double sdx = (double)curline->v2->x - (double)curline->v1->x;
+         double sdy = (double)curline->v2->y - (double)curline->v1->y;
+         double slen = sqrt(sdx*sdx + sdy*sdy);
+         if (slen > 2147483520.0)
+            slen = 2147483520.0;
+         rw_uclamp_lo = sidedef->textureoffset + curline->offset;
+         rw_uclamp_hi = rw_uclamp_lo + (fixed_t)slen - 1;
+         if (rw_uclamp_hi < rw_uclamp_lo)
+            rw_uclamp_hi = rw_uclamp_lo;
+      }
 
       rw_centerangle = ANG90 + viewangle - rw_normalangle;
 

@@ -225,11 +225,18 @@ static mapentry_t *Z_NewMapEntry(const char *mapname)
 
 /* Same-line argument fetch: advance the scanner; returns 1 when the new
  * token is still on `line` (an argument), 0 when it begins the next line
- * (current token must be reprocessed by the caller), -1 at end of input. */
+ * (current token must be reprocessed by the caller), -1 at end of input.
+ * New-syntax (ZMAPINFO-style) lumps write `key = value`; the '=' is
+ * skipped so both syntaxes feed the same key handlers. */
 static int z_arg(u_scanner_t *s, unsigned int line)
 {
   if (!U_GetNextToken(s, TRUE))
     return -1;
+  if (s->token == '=' && s->tokenLine == line)
+  {
+    if (!U_GetNextToken(s, TRUE))
+      return -1;
+  }
   return s->tokenLine == line ? 1 : 0;
 }
 
@@ -349,20 +356,30 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         clus = NULL;
         map = NULL;
         Z_FlushEpisode();
-        if ((tok = z_arg(&s, line)) > 0)
+        if ((tok = z_arg(&s, line)) > 0 && s.token == TK_Identifier)
         {
           map = Z_NewMapEntry(s.string);
-          if ((tok = z_arg(&s, line)) > 0 &&
-              !strcasecmp(s.string, "lookup") &&
-              (tok = z_arg(&s, line)) > 0)
+          if ((tok = z_arg(&s, line)) > 0)
           {
-            const char *v = U_ZLanguageLookup(s.string);
-            if (v)
-              map->levelname = strdup(v);
+            if (!strcasecmp(s.string, "lookup"))
+            {
+              if ((tok = z_arg(&s, line)) > 0)
+              {
+                const char *v = U_ZLanguageLookup(s.string);
+                if (v)
+                  map->levelname = strdup(v);
+              }
+            }
+            else if (s.token == TK_StringConst)
+            {
+              /* new syntax: map MAPxx "display name" */
+              map->levelname = strdup(s.string);
+            }
           }
         }
       }
-      else if (!strcasecmp(s.string, "clusterdef"))
+      else if (!strcasecmp(s.string, "clusterdef") ||
+               (!map && !strcasecmp(s.string, "cluster")))
       {
         map = NULL;
         clus = NULL;
@@ -398,9 +415,20 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         Z_FlushEpisode();
         M_AddEpisode("", zepi_clear);
       }
-      else if (!strcasecmp(s.string, "gameinfo") ||
-               !strcasecmp(s.string, "skill"))
+      else if (!strcasecmp(s.string, "gameinfo")        ||
+               !strcasecmp(s.string, "skill")           ||
+               !strcasecmp(s.string, "adddefaultmap")   ||
+               !strcasecmp(s.string, "defaultmap")      ||
+               !strcasecmp(s.string, "doomednums")      ||
+               !strcasecmp(s.string, "spawnnums")       ||
+               !strcasecmp(s.string, "conversationids") ||
+               !strcasecmp(s.string, "intermission")    ||
+               !strcasecmp(s.string, "automap")         ||
+               !strcasecmp(s.string, "gamedefaults")    ||
+               !strcasecmp(s.string, "damagetype"))
       {
+        /* top-level blocks (both syntaxes) whose keys must not leak
+         * into a stale map / cluster / episode context */
         map = NULL;
         clus = NULL;
         Z_FlushEpisode();
@@ -505,7 +533,21 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         else if (!strcasecmp(s.string, "music"))
         {
           if ((tok = z_arg(&s, line)) > 0)
-            zlump_name(map->music, s.string);
+          {
+            if (!strncasecmp(s.string, "$MUSIC_", 7))
+            {
+              /* gzdoom language indirection for the stock tracks:
+               * $MUSIC_RUNNIN is D_RUNNIN */
+              char dname[10];
+              dname[0] = 'D';
+              dname[1] = '_';
+              strncpy(dname + 2, s.string + 7, 6);
+              dname[8] = 0;
+              zlump_name(map->music, dname);
+            }
+            else
+              zlump_name(map->music, s.string);
+          }
         }
         else if (!strcasecmp(s.string, "titlepatch"))
         {

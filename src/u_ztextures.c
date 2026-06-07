@@ -134,10 +134,10 @@ static void zt_parse_lump(int lump)
         }
         else if (!strcasecmp(s.string, "Offset"))
         {
+          /* consume "x, y"; offsets are unused for wall textures */
           double a, b;
-          if (!zt_number(&s, &a) || !U_CheckToken(&s, ',') ||
-              !zt_number(&s, &b))
-            ;                       /* offsets unused for walls */
+          if (zt_number(&s, &a) && U_CheckToken(&s, ','))
+            zt_number(&s, &b);
         }
         else if (!strcasecmp(s.string, "Patch") ||
                  !strcasecmp(s.string, "Sprite") ||

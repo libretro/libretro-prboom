@@ -2269,7 +2269,36 @@ size_t retro_serialize_size(void)
    * far more mobjs plus the ACS/polyobj/sound-sequence world state, and the
    * save now also embeds the hub map archives -- a retail map at skill 4
    * needs ~390KB on its own and a fully explored hub several times that. */
-  return sizeof(struct extra_serialize) + (hexen ? 0x400000 : 0x30000);
+  size_t need = 0x30000;
+
+  /* The old fixed 192KB Doom/Heretic budget is too small for large
+   * megawad maps (nova4.wad MAP16 carries ~700 thinkers and its save
+   * exceeds the cap), which made retro_serialize fail outright; under
+   * run-ahead or rewind the frontend then restores a stale state every
+   * frame and the world appears frozen -- monsters stuck on one frame,
+   * death animations never advancing.  Size the budget from the live
+   * world instead: mobj thinkers dominate a savegame, sector and line
+   * deltas scale with the map, and the thinker term is doubled so
+   * mid-level spawning (lost souls, arch-vile resurrections, the icon
+   * of sin) has headroom.  The old constant stays as the floor so
+   * small maps report a stable size. */
+  if (!hexen && thinkercap.next != NULL)
+  {
+    size_t      nthinkers = 0;
+    thinker_t  *th;
+    for (th = thinkercap.next; th != &thinkercap; th = th->next)
+      nthinkers++;
+    {
+      size_t est = nthinkers * (sizeof(mobj_t) + 64) * 2
+                 + (size_t)numsectors * 64
+                 + (size_t)numlines * 64
+                 + 0x10000;
+      if (est > need)
+        need = est;
+    }
+  }
+
+  return sizeof(struct extra_serialize) + (hexen ? 0x400000 : need);
 }
 
 bool retro_serialize(void *data_, size_t size)

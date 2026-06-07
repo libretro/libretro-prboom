@@ -431,6 +431,65 @@ static void removePostFromColumn(rcolumn_t *column, int post) {
 }
 
 //---------------------------------------------------------------------------
+/* A texture whose single "patch" is a raw flat lump (R_InitTextures
+ * appends these for ZDoom-style flats-on-walls).  Flats carry no patch
+ * structure to replicate vanilla column bugs from: build the composite
+ * directly as 64 full-height columns of one post each, transposing the
+ * row-major flat into column-major pixels. */
+static void createFlatCompositePatch(rpatch_t *composite_patch,
+                                     const texture_t *texture)
+{
+  int x, y;
+  int pixelDataSize, columnsDataSize, postsDataSize, dataSize;
+  const uint8_t *flat;
+  int lump = texture->patches[0].patch;
+
+  composite_patch->width = texture->width;
+  composite_patch->height = texture->height;
+  composite_patch->widthmask = texture->widthmask;
+  composite_patch->leftoffset = 0;
+  composite_patch->topoffset = 0;
+  composite_patch->isNotTileable = 0;
+
+  pixelDataSize = (composite_patch->width * composite_patch->height + 4) & ~3;
+  columnsDataSize = sizeof(rcolumn_t) * composite_patch->width;
+  postsDataSize = composite_patch->width * sizeof(rpost_t);
+
+  /* same layout as the patch-built composite: eight bytes of 0xff lead
+   * padding for the filtered drawers' frac==-1 reads, and a trailing
+   * padding column for post-relative bottom-row wraps */
+  dataSize = 8 + pixelDataSize + composite_patch->height
+             + columnsDataSize + postsDataSize;
+  composite_patch->data = (unsigned char *)Z_Malloc(dataSize, PU_STATIC, NULL);
+  memset(composite_patch->data, 0, dataSize);
+  memset(composite_patch->data, 0xff, 8);
+
+  composite_patch->pixels = composite_patch->data + 8;
+  composite_patch->columns = (rcolumn_t *)((unsigned char *)composite_patch->pixels
+                             + pixelDataSize + composite_patch->height);
+  composite_patch->posts = (rpost_t *)((unsigned char *)composite_patch->columns
+                           + columnsDataSize);
+
+  flat = (const uint8_t *)W_CacheLumpNum(lump);
+  for (x = 0; x < composite_patch->width; x++)
+  {
+    rpost_t *post = &composite_patch->posts[x];
+
+    composite_patch->columns[x].pixels =
+      composite_patch->pixels + x * composite_patch->height;
+    composite_patch->columns[x].numPosts = 1;
+    composite_patch->columns[x].posts = post;
+    post->topdelta = 0;
+    post->length = composite_patch->height;
+    post->slope = 0;
+
+    for (y = 0; y < composite_patch->height; y++)
+      composite_patch->columns[x].pixels[y] =
+        flat[y * composite_patch->width + x];
+  }
+  W_UnlockLumpNum(lump);
+}
+
 static void createTextureCompositePatch(int id) {
   rpatch_t *composite_patch;
   texture_t *texture;
@@ -454,6 +513,13 @@ static void createTextureCompositePatch(int id) {
   composite_patch = &texture_composites[id];
 
   texture = textures[id];
+
+  if (texture->patchcount == 1 &&
+      lumpinfo[texture->patches[0].patch].li_namespace == ns_flats)
+  {
+    createFlatCompositePatch(composite_patch, texture);
+    return;
+  }
 
   composite_patch->width = texture->width;
   composite_patch->height = texture->height;

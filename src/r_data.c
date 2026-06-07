@@ -137,6 +137,7 @@ static void R_InitTextures (void)
   int  offset;
   int  maxoff, maxoff2;
   int  numtextures1, numtextures2;
+  int  numflattex;
   const int *directory;
   int  errors = 0;
 
@@ -189,8 +190,16 @@ static void R_InitTextures (void)
     }
   numtextures = numtextures1 + numtextures2;
 
-  textures      = Z_Malloc(numtextures * sizeof(*textures), PU_STATIC, 0);
-  textureheight = Z_Malloc(numtextures * sizeof(*textureheight), PU_STATIC, 0);
+  /* ZDoom-targeted wads put flats on walls (chex3.wad references its
+   * CJFCOMM* flats from over 800 sidedefs); reserve slots so each flat
+   * name not shadowed by a TEXTUREx entry becomes a 64x64 wall texture */
+  numflattex = 0;
+  for (i = 0; i < numlumps; i++)
+    if (lumpinfo[i].li_namespace == ns_flats && W_LumpLength(i) >= 64 * 64)
+      numflattex++;
+
+  textures      = Z_Malloc((numtextures + numflattex) * sizeof(*textures), PU_STATIC, 0);
+  textureheight = Z_Malloc((numtextures + numflattex) * sizeof(*textureheight), PU_STATIC, 0);
 
   totalwidth = 0;
 
@@ -259,6 +268,41 @@ static void R_InitTextures (void)
 
   if (errors)
     I_Error("R_InitTextures: %d errors", errors);
+
+  /* append the flats as wall textures; TEXTUREx names shadow flats, and
+   * among same-named flats the later lump wins, both as in ZDoom */
+  {
+    int k;
+    for (k = 0; k < numlumps; k++)
+    {
+      int t2;
+      if (lumpinfo[k].li_namespace != ns_flats || W_LumpLength(k) < 64 * 64)
+        continue;
+      for (t2 = 0; t2 < numtextures; t2++)
+        if (!strncasecmp(textures[t2]->name, lumpinfo[k].name, 8))
+          break;
+      if (t2 < numtextures)
+      {
+        /* a later flat of the same name replaces the appended entry */
+        if (t2 >= numtextures1 + numtextures2)
+          textures[t2]->patches[0].patch = k;
+        continue;
+      }
+      texture = textures[numtextures] =
+        Z_Malloc(sizeof(texture_t), PU_STATIC, 0);
+      texture->width = 64;
+      texture->height = 64;
+      texture->patchcount = 1;
+      texture->patches[0].originx = 0;
+      texture->patches[0].originy = 0;
+      texture->patches[0].patch = k;
+      memset(texture->name, 0, sizeof(texture->name));
+      strncpy(texture->name, lumpinfo[k].name, sizeof(texture->name));
+      texture->widthmask = 63;
+      textureheight[numtextures] = 64 << FRACBITS;
+      numtextures++;
+    }
+  }
 
   // Create translation table for global animation.
 
@@ -653,7 +697,7 @@ int R_SafeTextureNumForName(const char *name, int snum)
   int i = R_CheckTextureNumForName(name);
   if (i == -1) {
     i = NO_TEXTURE; // e6y - return "no texture"
-    lprintf(LO_DEBUG,"bad texture '%s' in sidedef %d\n",name,snum);
+    lprintf(LO_DEBUG,"bad texture '%.8s' in sidedef %d\n",name,snum);
   }
   return i;
 }

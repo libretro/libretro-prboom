@@ -2654,7 +2654,11 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     case PCD_SETMOUSEPOINTER:   ZDROP(3); zacs_warn_pcd(pcd); break;
     case PCD_MOVEMOUSEPOINTER:  ZDROP(2); zacs_warn_pcd(pcd); break;
     case PCD_CHANGELEVEL:       ZDROP(4); zacs_warn_pcd(pcd); break;
-    case PCD_DUMMY:             break;
+    case PCD_CONSOLECOMMAND:    ZDROP(3); zacs_warn_pcd(pcd); break;
+    case PCD_CONSOLECOMMANDDIRECT:
+      (void)NEXTWORD; (void)NEXTWORD; (void)NEXTWORD;
+      zacs_warn_pcd(pcd);
+      break;
 
     /* ---- builtin function dispatch (PCD_CALLFUNC) -------------------------- */
     case PCD_CALLFUNC:

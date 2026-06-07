@@ -237,10 +237,25 @@ static void ensure_sfx(int limit)
   while (limit >= num_sfx)
   {
     int old = num_sfx;
+    sfxinfo_t *old_base = S_sfx;
+
     num_sfx *= 2;
 
     S_sfx = realloc(S_sfx, num_sfx * sizeof(*S_sfx));
     memset(S_sfx + old, 0, (num_sfx - old) * sizeof(*S_sfx));
+
+    /* Sound-alias links (chgun -> pistol) are pointers into the table;
+     * a moving realloc leaves them in the old block and the precache's
+     * link arithmetic (link - S_sfx) computes a wild index.  The seed
+     * already covers the DEHEXTRA range, so this realloc first runs
+     * when something grows past it (a ZDoom SNDINFO adding slots). */
+    if (S_sfx != old_base)
+    {
+      int i;
+      for (i = 0; i < old; i++)
+        if (S_sfx[i].link)
+          S_sfx[i].link = S_sfx + (S_sfx[i].link - old_base);
+    }
 
     reset_sfx(old, num_sfx);
   }

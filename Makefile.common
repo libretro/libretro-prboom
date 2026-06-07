@@ -151,6 +151,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
    $(CORE_DIR)/p_slope.c \
    $(CORE_DIR)/p_zacs.c \
    $(CORE_DIR)/u_png.c \
+   $(CORE_DIR)/u_ztextures.c \
 				 $(CORE_DIR)/u_zmapinfo.c \
 				 $(CORE_DIR)/u_zanimdefs.c \
 

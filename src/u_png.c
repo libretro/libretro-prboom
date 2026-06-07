@@ -25,6 +25,7 @@
 #include "w_wad.h"
 #include "z_zone.h"
 #include "u_png.h"
+#include "u_ztextures.h"
 
 #include <formats/rpng.h>
 #include <formats/image.h>
@@ -112,6 +113,10 @@ static void zpng_grab(const unsigned char *d, int len,
   }
 }
 
+/* count of conversions resampled to a TEXTURES-declared world size,
+ * reported by U_PNGMaterializeLumps */
+static int zpng_rescaled;
+
 static unsigned *zpng_decode(const unsigned char *d, int len,
                              unsigned *w, unsigned *h)
 {
@@ -163,7 +168,8 @@ static unsigned *zpng_decode(const unsigned char *d, int len,
 
 /* ---- patch synthesis ----------------------------------------------------- */
 
-void *U_PNGToPatch(const unsigned char *d, int len, int *out_size)
+void *U_PNGToPatchSized(const unsigned char *d, int len,
+                        int tw, int th, int *out_size)
 {
   unsigned w, h;
   unsigned *argb;
@@ -180,6 +186,28 @@ void *U_PNGToPatch(const unsigned char *d, int len, int *out_size)
   if (!argb)
     return NULL;
   zpng_grab(d, len, &leftoffset, &topoffset);
+
+  /* TEXTURES-lump scale: resample to the world size before patch
+   * synthesis (nearest), since the renderer has no per-texture scale.
+   * grAb offsets stay unscaled; wall textures do not consume them. */
+  if (tw > 0 && th > 0 && (tw != (int)w || th != (int)h))
+  {
+    unsigned *rs = malloc((size_t)tw * (size_t)th * 4);
+    int rx, ry;
+    if (!rs)
+    {
+      free(argb);
+      return NULL;
+    }
+    for (ry = 0; ry < th; ry++)
+      for (rx = 0; rx < tw; rx++)
+        rs[(size_t)ry * tw + rx] =
+          argb[((size_t)ry * h / th) * w + ((size_t)rx * w / tw)];
+    free(argb);
+    argb = rs;
+    w = (unsigned)tw;
+    h = (unsigned)th;
+  }
 
   /* worst case per column: every other pixel opaque -> h/2 posts of 1
    * pixel (4 + 1 byte each... pad generously) plus stepping posts */
@@ -293,15 +321,18 @@ void *U_PNGToFlat(const unsigned char *d, int len, int *out_size)
 
 /* ---- lump materialization ------------------------------------------------ */
 
-static void zpng_convert_range(const char *smark, const char *emark,
-                               dbool as_flat, int *count)
+void *U_PNGToPatch(const unsigned char *d, int len, int *out_size)
 {
-  int s = W_CheckNumForName(smark);
-  int e = W_CheckNumForName(emark);
+  return U_PNGToPatchSized(d, len, 0, 0, out_size);
+}
+
+/* one marker pair; inner wads contribute their own SS/FF groups, so
+ * the caller walks every instance */
+static void zpng_convert_one_range(int s, int e, dbool as_flat,
+                                   dbool scaled, int *count)
+{
   int i;
 
-  if (s < 0 || e < 0 || e <= s)
-    return;
   for (i = s + 1; i < e; i++)
   {
     const unsigned char *raw;
@@ -317,8 +348,15 @@ static void zpng_convert_range(const char *smark, const char *emark,
       W_UnlockLumpNum(i);
       continue;
     }
-    conv = as_flat ? U_PNGToFlat(raw, rawlen, &convlen)
-                   : U_PNGToPatch(raw, rawlen, &convlen);
+    if (as_flat)
+      conv = U_PNGToFlat(raw, rawlen, &convlen);
+    else
+    {
+      int tw = 0, th = 0;
+      if (scaled && U_ZTexturesTargetSize(lumpinfo[i].name, &tw, &th))
+        zpng_rescaled++;
+      conv = U_PNGToPatchSized(raw, rawlen, tw, th, &convlen);
+    }
     W_UnlockLumpNum(i);
     if (!conv)
     {
@@ -331,12 +369,37 @@ static void zpng_convert_range(const char *smark, const char *emark,
   }
 }
 
+static void zpng_convert_range(const char *smark, const char *emark,
+                               dbool as_flat, dbool scaled, int *count)
+{
+  /* positional scan: W_FindNumFromName iterates hash chains (latest
+   * first), which cannot pair start/end markers.  Inner wads bring
+   * their own marker groups, so every [smark, emark] pair counts. */
+  int i, s = -1;
+
+  for (i = 0; i < numlumps; i++)
+  {
+    if (!strncasecmp(lumpinfo[i].name, smark, 8))
+      s = i;
+    else if (s >= 0 && !strncasecmp(lumpinfo[i].name, emark, 8))
+    {
+      zpng_convert_one_range(s, i, as_flat, scaled, count);
+      s = -1;
+    }
+  }
+}
+
+static int zpng_rescaled;
+
 void U_PNGMaterializeLumps(void)
 {
   int n = 0;
-  zpng_convert_range("SS_START", "SS_END", false, &n);
-  zpng_convert_range("FF_START", "FF_END", true, &n);
-  zpng_convert_range("TX_START", "TX_END", false, &n);
+
+  zpng_rescaled = 0;
+  zpng_convert_range("SS_START", "SS_END", false, false, &n);
+  zpng_convert_range("FF_START", "FF_END", true, false, &n);
+  zpng_convert_range("TX_START", "TX_END", false, true, &n);
   if (n)
-    lprintf(LO_INFO, "U_PNGMaterializeLumps: %d PNG lumps converted\n", n);
+    lprintf(LO_INFO, "U_PNGMaterializeLumps: %d PNG lumps converted "
+            "(%d rescaled per TEXTURES)\n", n, zpng_rescaled);
 }

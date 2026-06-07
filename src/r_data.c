@@ -36,6 +36,7 @@
 #include "doomstat.h"
 #include "w_wad.h"
 #include "u_png.h"
+#include "u_ztextures.h"
 #include "r_draw.h"
 #include "v_video.h"
 #include "r_main.h"
@@ -200,8 +201,8 @@ static void R_InitTextures (void)
         || (lumpinfo[i].li_namespace == ns_zdoom_tx && W_LumpLength(i) >= 8))
       numflattex++;
 
-  textures      = Z_Malloc((numtextures + numflattex) * sizeof(*textures), PU_STATIC, 0);
-  textureheight = Z_Malloc((numtextures + numflattex) * sizeof(*textureheight), PU_STATIC, 0);
+  textures      = Z_Malloc((numtextures + numflattex + num_ztextures) * sizeof(*textures), PU_STATIC, 0);
+  textureheight = Z_Malloc((numtextures + numflattex + num_ztextures) * sizeof(*textureheight), PU_STATIC, 0);
 
   totalwidth = 0;
 
@@ -367,6 +368,85 @@ static void R_InitTextures (void)
         textureheight[numtextures] = texture->height << FRACBITS;
         numtextures++;
       }
+    }
+  }
+
+  /* TEXTURES-lump definitions whose name is not already a texture: a
+   * definition like CAR05 = { Patch CAR02, XScale 1.24 } scales another
+   * texture's patch under a new name.  Register as a single-patch
+   * texture at the definition's world size (declared dims divided by
+   * scale); the patch itself was resampled to its own world size at
+   * materialization, so matching definitions line up exactly and any
+   * residual mismatch crops or tiles in the composite. */
+  {
+    int k;
+    for (k = 0; k < num_ztextures; k++)
+    {
+      const ztexture_t *zt = &ztextures[k];
+      int t2, j2, plump, ww, wh;
+
+      for (t2 = 0; t2 < numtextures; t2++)
+        if (!strncasecmp(textures[t2]->name, zt->name, 8))
+          break;
+      if (t2 < numtextures)
+        continue;                   /* lump-backed texture wins */
+
+      plump = (W_CheckNumForName)(zt->patch, ns_zdoom_tx);
+      if (plump < 0)
+        plump = (W_CheckNumForName)(zt->patch, ns_global);
+      if (plump < 0 || W_LumpLength(plump) < 8)
+      {
+        lprintf(LO_WARN, "R_InitTextures: TEXTURES def %.8s: patch %.8s "
+                "not found\n", zt->name, zt->patch);
+        continue;
+      }
+
+      ww = (int)(zt->width / zt->xscale + 0.5);
+      wh = (int)(zt->height / zt->yscale + 0.5);
+      if (ww < 1) ww = 1;
+      if (wh < 1) wh = 1;
+      if (ww > 4096 || wh > 4096)
+        continue;
+
+      {
+        const unsigned char *hdr = W_CacheLumpNum(plump);
+        int pw = (short)(hdr[0] | (hdr[1] << 8));
+        int ph = (short)(hdr[2] | (hdr[3] << 8));
+        W_UnlockLumpNum(plump);
+        if (pw <= 0 || ph <= 0 || pw > 4096 || ph > 4096)
+        {
+          /* not a usable patch -- typically an undecoded modern-format
+           * lump; registering it would feed garbage to the composite
+           * generator */
+          lprintf(LO_WARN, "R_InitTextures: TEXTURES def %.8s: patch "
+                  "%.8s is not a patch (skipped)\n", zt->name, zt->patch);
+          continue;
+        }
+        if (pw != ww || ph != wh)
+          lprintf(LO_INFO, "R_InitTextures: TEXTURES def %.8s is %dx%d "
+                  "over a %dx%d patch (%.8s)\n",
+                  zt->name, ww, wh, pw, ph, zt->patch);
+      }
+
+      texture = textures[numtextures] = Z_Malloc(sizeof(texture_t), PU_STATIC, 0);
+      texture->width = (short)ww;
+      texture->height = (short)wh;
+      texture->patchcount = 1;
+      texture->patches[0].originx = (short)(zt->patch_x / zt->xscale + 0.5);
+      texture->patches[0].originy = (short)(zt->patch_y / zt->yscale + 0.5);
+      texture->patches[0].patch = plump;
+      {
+        size_t n = strlen(zt->name);
+        if (n > sizeof(texture->name))
+          n = sizeof(texture->name);
+        memset(texture->name, 0, sizeof(texture->name));
+        memcpy(texture->name, zt->name, n);
+      }
+      for (j2 = 1; j2 * 2 <= texture->width; j2 <<= 1)
+        ;
+      texture->widthmask = j2 - 1;
+      textureheight[numtextures] = texture->height << FRACBITS;
+      numtextures++;
     }
   }
 
@@ -552,6 +632,7 @@ const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
 void R_InitData(void)
 {
   /* decode pk3 PNG assets into patches/flats before anything reads them */
+  U_ZTexturesLoad();              /* scale targets for materialization */
   U_PNGMaterializeLumps();
   lprintf(LO_INFO, "Textures\n");
   R_InitTextures();

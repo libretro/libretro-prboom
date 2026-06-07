@@ -205,7 +205,7 @@ static const map_format_t zdoom_in_doom_map_format =
 {
   true,                       /* zdoom    */
   true,                       /* hexen    */
-  false,                      /* polyobjs */
+  true,                       /* polyobjs */
   false,                      /* acs      */
   false,                      /* sndseq   */
   false,                      /* animdefs */

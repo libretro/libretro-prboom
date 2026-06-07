@@ -53,6 +53,14 @@ typedef struct
 #define PO_SPAWN_TYPE       3001
 #define PO_SPAWNCRUSH_TYPE  3002
 
+/* ZDoom polyobject editor numbers.  In Doom-game maps the 3000s are
+ * monsters (3001 imp, 3002 demon), so ZDoom-namespace maps use these
+ * instead; recognized only under the zdoom map format. */
+#define ZPO_ANCHOR_TYPE     9300
+#define ZPO_SPAWN_TYPE      9301
+#define ZPO_SPAWNCRUSH_TYPE 9302
+#define ZPO_SPAWNHURT_TYPE  9303
+
 void T_PolyDoor(polydoor_t *pd);
 void T_RotatePoly(polyevent_t *pe);
 void T_MovePoly(polyevent_t *pe);

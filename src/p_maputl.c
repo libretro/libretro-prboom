@@ -38,6 +38,7 @@
 #include "m_bbox.h"
 #include "r_main.h"
 #include "p_maputl.h"
+#include "map_format.h"
 #include "p_slope.h"
 #include "p_map.h"
 #include "p_setup.h"
@@ -408,7 +409,7 @@ dbool P_BlockLinesIterator(int x, int y, dbool func(line_t*))
    * vertices move with the poly, so they must be offered to the iterator
    * here (the static line blockmap still holds them at their original
    * anchor position). */
-  if (hexen && PolyBlockMap)
+  if (map_format.polyobjs && PolyBlockMap)
   {
     int i;
     seg_t **tempSeg;

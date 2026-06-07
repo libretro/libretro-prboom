@@ -2701,7 +2701,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
          }
       }
 
-      if (hexen)
+      if (map_format.polyobjs)
          PO_ResetBlockMap(true);
    }
    else
@@ -2719,7 +2719,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    P_LoadLineDefs2 (lumpnum+ML_LINEDEFS);
    P_LoadBlockMap  (lumpnum+ML_BLOCKMAP);
 
-   if (hexen)
+   if (map_format.polyobjs)
       PO_ResetBlockMap(true); /* parallel polyobject collision blockmap */
 
    if (nodes_glbsp > 0)
@@ -2786,8 +2786,10 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    if (heretic)
       P_CloseWeapons();         /* place (at most) one firemace */
 
-   if (hexen && !udmf_level)
-      PO_Init(lumpnum+ML_THINGS); /* spawn and place the polyobjects */
+   if (map_format.polyobjs)
+      /* spawn and place the polyobjects; UDMF maps have no binary THINGS
+       * lump, signalled by a negative lump number */
+      PO_Init(udmf_level ? -1 : lumpnum + ML_THINGS);
 
    // if deathmatch, randomly spawn the active players
    if (deathmatch)

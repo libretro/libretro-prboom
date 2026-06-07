@@ -23,6 +23,8 @@
 #include "m_bbox.h"
 #include "m_swap.h"
 #include "p_tick.h"
+#include "udmf.h"
+#include "map_format.h"
 #include "p_inter.h"
 #include "p_map.h"
 #include "p_maputl.h"
@@ -826,19 +828,47 @@ static void TranslateToStartSpot(int tag, int originX, int originY)
   sub->poly = po;
 }
 
+/* Editor-number classification.  The Hexen game uses 3000-3002; the zdoom
+ * map format uses 9300-9303 (in Doom-game maps the 3000s are monsters). */
+static dbool PO_IsAnchorType(int type)
+{
+  if (hexen && type == PO_ANCHOR_TYPE)
+    return true;
+  if (map_format.zdoom && type == ZPO_ANCHOR_TYPE)
+    return true;
+  return false;
+}
+
+static dbool PO_IsSpawnType(int type, dbool *crush, dbool *hurt)
+{
+  if (hexen && type >= PO_SPAWN_TYPE && type <= PO_SPAWNCRUSH_TYPE)
+  {
+    *crush = (type == PO_SPAWNCRUSH_TYPE);
+    *hurt  = false;
+    return true;
+  }
+  if (map_format.zdoom && type >= ZPO_SPAWN_TYPE && type <= ZPO_SPAWNHURT_TYPE)
+  {
+    *crush = (type == ZPO_SPAWNCRUSH_TYPE);
+    *hurt  = (type == ZPO_SPAWNHURT_TYPE);
+    return true;
+  }
+  return false;
+}
+
 /* Called from P_SpawnMapThing: polyobject anchor and start-spot things are
  * bookkeeping, not world mobjs.  Counts the polyobjects while at it. */
 dbool PO_Detect(int doomednum)
 {
-  if (!hexen)
+  dbool crush, hurt;
+
+  if (!map_format.polyobjs)
     return false;
 
-  if (doomednum == PO_ANCHOR_TYPE)
-  {
+  if (PO_IsAnchorType(doomednum))
     return true;
-  }
 
-  if (doomednum >= PO_SPAWN_TYPE && doomednum <= PO_SPAWNCRUSH_TYPE)
+  if (PO_IsSpawnType(doomednum, &crush, &hurt))
   {
     po_NumPolyobjs++;
     return true;
@@ -871,12 +901,12 @@ static void PO_LoadThings(int lump)
     angle = SHORT(mt->angle);
     type = SHORT(mt->type);
 
-    /* 3001 = no crush, 3002 = crushing */
-    if (type >= PO_SPAWN_TYPE && type <= PO_SPAWNCRUSH_TYPE)
+    dbool crush, hurt;
+    if (PO_IsSpawnType(type, &crush, &hurt))
     { /* Polyobj StartSpot Pt. */
       polyobjs[polyIndex].startSpot.x = x << FRACBITS;
       polyobjs[polyIndex].startSpot.y = y << FRACBITS;
-      SpawnPolyobj(polyIndex, angle, (type == PO_SPAWNCRUSH_TYPE), false);
+      SpawnPolyobj(polyIndex, angle, crush, hurt);
       polyIndex++;
     }
   }
@@ -887,12 +917,43 @@ static void PO_LoadThings(int lump)
     y = SHORT(mt->y);
     angle = SHORT(mt->angle);
     type = SHORT(mt->type);
-    if (type == PO_ANCHOR_TYPE)
+    if (PO_IsAnchorType(type))
     { /* Polyobj Anchor Pt. */
       TranslateToStartSpot(angle, x << FRACBITS, y << FRACBITS);
     }
   }
   W_UnlockLumpNum(lump);
+}
+
+/* UDMF maps carry no binary THINGS lump: walk the parsed udmf.things
+ * instead, same two ordered sweeps (spawn at start spots, then translate
+ * anchors).  Coordinates arrive as text at full fixed-point precision. */
+static void PO_LoadThingsUDMF(void)
+{
+  int i;
+  int polyIndex = 0;
+
+  for (i = 0; i < (int)udmf.num_things; i++)
+  {
+    const udmf_thing_t *t = &udmf.things[i];
+    dbool crush, hurt;
+
+    if (PO_IsSpawnType(t->type, &crush, &hurt))
+    {
+      polyobjs[polyIndex].startSpot.x = udmf_to_fixed(t->x);
+      polyobjs[polyIndex].startSpot.y = udmf_to_fixed(t->y);
+      SpawnPolyobj(polyIndex, t->angle, crush, hurt);
+      polyIndex++;
+    }
+  }
+  for (i = 0; i < (int)udmf.num_things; i++)
+  {
+    const udmf_thing_t *t = &udmf.things[i];
+
+    if (PO_IsAnchorType(t->type))
+      TranslateToStartSpot(t->angle, udmf_to_fixed(t->x),
+                           udmf_to_fixed(t->y));
+  }
 }
 
 void PO_Init(int lump)
@@ -905,7 +966,10 @@ void PO_Init(int lump)
   polyobjs = Z_Malloc(po_NumPolyobjs * sizeof(polyobj_t), PU_LEVEL, 0);
   memset(polyobjs, 0, po_NumPolyobjs * sizeof(polyobj_t));
 
-  PO_LoadThings(lump);
+  if (lump < 0)
+    PO_LoadThingsUDMF();
+  else
+    PO_LoadThings(lump);
 
   /* check for a startspot without an anchor point */
   for (i = 0; i < po_NumPolyobjs; i++)
@@ -917,6 +981,7 @@ void PO_Init(int lump)
     }
   }
   InitBlockMap();
+  lprintf(LO_INFO, "PO_Init: %d polyobjects\n", po_NumPolyobjs);
 }
 
 dbool PO_Busy(int polyobj)

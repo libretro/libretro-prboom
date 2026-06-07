@@ -45,6 +45,7 @@
 #include "i_system.h"
 
 #include "w_wad.h"
+#include "w_pk3.h"
 #include "lprintf.h"
 
 #include <sys/stat.h>
@@ -136,6 +137,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
    filelump_t  *fileinfo = NULL;
    filelump_t *fileinfo2free=NULL; //killough
    filelump_t singleinfo;
+   dbool is_archive = FALSE;
 
    /* Baked-in WAD: the bytes are a const array compiled into the core, not
     * a file.  Treat it exactly like the precached-into-memory path -- parse
@@ -198,16 +200,47 @@ static void W_AddFile(wadfile_info_t *wadfile)
    wadfile->data = malloc(wadfile->length);
    if ( rfread(wadfile->data, wadfile->length, 1, wadfile->handle) != 1)
       I_Error("W_AddFile: couldn't read wad data");
+
+   /* PK3/ZIP archive: translate it into a synthesized PWAD image and let
+    * the normal directory parse below consume that image.  Detected by
+    * magic, not extension, so renamed archives work too. */
+   if (W_IsPK3(wadfile->data, wadfile->length))
+   {
+      int newlen = 0;
+      unsigned char *image = W_TranslatePK3(wadfile->data, wadfile->length,
+                                            &newlen, wadfile->name);
+      if (!image)
+         I_Error("W_AddFile: couldn't translate PK3 archive %s",
+                 wadfile->name);
+      free(wadfile->data);
+      wadfile->data   = image;
+      wadfile->length = newlen;
+      is_archive      = TRUE;
+   }
+#else
+   /* The synthesized-image translation needs the whole archive in memory. */
+   {
+      char magic[4];
+      if (rfread(magic, 4, 1, wadfile->handle) == 1 &&
+          magic[0] == 'P' && magic[1] == 'K' &&
+          magic[2] == 0x03 && magic[3] == 0x04)
+         I_Error("W_AddFile: PK3/ZIP archives are not supported in "
+                 "low-memory builds (%s)", wadfile->name);
+      rfseek(wadfile->handle, 0, SEEK_SET);
+   }
 #endif
 
    //jff 8/3/98 use logical output routine
    lprintf (LO_INFO," adding %s\n",wadfile->name);
    startlump = numlumps;
 
-   if (  wadfile_name_len <=4 ||
+   if (  !is_archive &&
+         (
+          wadfile_name_len <=4 ||
          (
           strcasecmp(wadfile->name + wadfile_name_len - 4,".wad") &&
           strcasecmp(wadfile->name + wadfile_name_len - 4,".gwa")
+         )
          )
       )
    {
@@ -515,6 +548,8 @@ void W_Init(void)
   W_CoalesceMarkedResource("C_START", "C_END", ns_colormaps);
   W_CoalesceMarkedResource("B_START", "B_END", ns_prboom);
   W_CoalesceMarkedResource("HI_START", "HI_END", ns_hires);
+  /* modern-format PK3 members synthesized by W_TranslatePK3 */
+  W_CoalesceMarkedResource("PD_START", "PD_END", ns_pk3_deferred);
 
   // killough 1/31/98: initialize lump hash table
   W_HashLumps();

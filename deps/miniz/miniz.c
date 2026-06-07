@@ -1,7 +1,8 @@
-/* libretro-prboom: only the zlib-style inflate path is used (ZDBSP
- * compressed node lumps).  Disable archive/stdio/writing subsystems to
- * minimise footprint and silence the file-I/O pragma. */
-#define MINIZ_NO_ARCHIVE_APIS
+/* libretro-prboom: the zlib-style inflate path (ZDBSP compressed node
+ * lumps) and the read-only in-memory archive API (PK3/ZIP loading in
+ * w_wad) are used.  Writing/stdio/time subsystems stay disabled to
+ * minimise footprint and silence the file-I/O pragma; the archive
+ * reader is only ever driven through mz_zip_reader_init_mem. */
 #define MINIZ_NO_ARCHIVE_WRITING_APIS
 #define MINIZ_NO_STDIO
 #define MINIZ_NO_TIME

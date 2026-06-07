@@ -78,7 +78,12 @@ typedef enum {
   ns_flats,
   ns_colormaps,
   ns_hires,
-  ns_prboom
+  ns_prboom,
+  /* PK3 members in formats the engine cannot consume yet (PNG, Ogg,
+   * WAV, FLAC).  Quarantined out of ns_global so a modern-format asset
+   * sharing a name with an IWAD lump can never reach the wrong loader;
+   * future consumers (PNG patches, sample decoders) look them up here. */
+  ns_pk3_deferred
 } lumpinfo_namespace_t;
 
 // CPhipps - changed wad init

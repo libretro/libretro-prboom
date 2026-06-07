@@ -6,6 +6,7 @@
 #define MINIZ_NO_ARCHIVE_WRITING_APIS
 #define MINIZ_NO_STDIO
 #define MINIZ_NO_TIME
+#include <limits.h>  /* ULONG_MAX: compile out the mz_ulong>32bit guards */
 #include "miniz.h"
 /**************************************************************************
  *
@@ -330,9 +331,13 @@ int mz_compress2(unsigned char *pDest, mz_ulong *pDest_len, const unsigned char 
     mz_stream stream;
     memset(&stream, 0, sizeof(stream));
 
-    /* In case mz_ulong is 64-bits (argh I hate longs). */
+    /* In case mz_ulong is 64-bits (argh I hate longs).  Guarded at
+     * preprocessing time: where unsigned long is 32 bits (Win64) the
+     * comparison is provably false and -Wtype-limits flags it. */
+#if ULONG_MAX > 0xFFFFFFFFUL
     if ((mz_uint64)(source_len | *pDest_len) > 0xFFFFFFFFU)
         return MZ_PARAM_ERROR;
+#endif
 
     stream.next_in = pSource;
     stream.avail_in = (mz_uint32)source_len;
@@ -573,9 +578,12 @@ int mz_uncompress2(unsigned char *pDest, mz_ulong *pDest_len, const unsigned cha
     int status;
     memset(&stream, 0, sizeof(stream));
 
-    /* In case mz_ulong is 64-bits (argh I hate longs). */
+    /* In case mz_ulong is 64-bits (argh I hate longs).  See the same
+     * ULONG_MAX guard in mz_compress2. */
+#if ULONG_MAX > 0xFFFFFFFFUL
     if ((mz_uint64)(*pSource_len | *pDest_len) > 0xFFFFFFFFU)
         return MZ_PARAM_ERROR;
+#endif
 
     stream.next_in = pSource;
     stream.avail_in = (mz_uint32)*pSource_len;

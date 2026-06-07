@@ -91,8 +91,16 @@ static int pk3_add_lump(pk3_build_t *b, const char *name,
   /* +12: lump data is laid out after the wadinfo_t header */
   fl->filepos = LONG(b->data_len + 12);
   fl->size    = LONG(size);
-  memset(fl->name, 0, 8);
-  strncpy(fl->name, name, 8);
+  /* filelump_t names are 8 bytes, NUL-padded but not NUL-terminated,
+   * which is exactly the case -Wstringop-truncation flags strncpy for;
+   * zero-fill and copy the clamped length instead. */
+  {
+    size_t n = strlen(name);
+    if (n > 8)
+      n = 8;
+    memset(fl->name, 0, 8);
+    memcpy(fl->name, name, n);
+  }
   if (size)
   {
     memcpy(b->data + b->data_len, data, size);

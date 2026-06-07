@@ -199,8 +199,14 @@ static int *map_cluster;
 
 static void zlump_name(char out[9], const char *in)
 {
-  strncpy(out, in, 8);
-  out[8] = 0;
+  /* clamped memcpy rather than strncpy: the source can legitimately be
+   * longer than 8 chars (truncation is the point), which is exactly
+   * what -Wstringop-truncation flags strncpy for */
+  size_t n = strlen(in);
+  if (n > 8)
+    n = 8;
+  memcpy(out, in, n);
+  out[n] = 0;
 }
 
 static mapentry_t *Z_NewMapEntry(const char *mapname)
@@ -539,10 +545,13 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
               /* gzdoom language indirection for the stock tracks:
                * $MUSIC_RUNNIN is D_RUNNIN */
               char dname[10];
+              size_t n = strlen(s.string + 7);
+              if (n > 6)
+                n = 6;
               dname[0] = 'D';
               dname[1] = '_';
-              strncpy(dname + 2, s.string + 7, 6);
-              dname[8] = 0;
+              memcpy(dname + 2, s.string + 7, n);
+              dname[2 + n] = 0;
               zlump_name(map->music, dname);
             }
             else

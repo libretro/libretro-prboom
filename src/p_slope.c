@@ -117,6 +117,14 @@ static void P_AlignPlane(sector_t *sec, const sector_t *refsec,
   {
     nx = -nx; ny = -ny; nz = -nz;
   }
+  /* Reject planes whose c term vanishes at 16.16 precision: a
+   * near-vertical "slope" (huge height delta over a short reach,
+   * which deliberately broken geometry can construct) would store
+   * c == 0 and P_PlaneZatPoint divides by c.  ZDoom maintains the
+   * same invariant -- a plane with no vertical component is not a
+   * floor or ceiling. */
+  if ((fixed_t)(nz * FRACUNIT) <= 0)
+    return;
   d = -(nx * p1x + ny * p1y + nz * refz1);
 
   pl = Z_Malloc(sizeof(*pl), PU_LEVEL, NULL);
@@ -144,6 +152,8 @@ void P_SpawnZDoomSlopes(void)
     l->special = 0;
     if (!l->frontsector || !l->backsector)
       continue;
+    if (!l->dx && !l->dy)
+      continue;                 /* zero-length alignment line */
 
     fa = l->args[0] & 3;        /* floor:   1 front, 2 back */
     ca = l->args[1] & 3;        /* ceiling: 1 front, 2 back */

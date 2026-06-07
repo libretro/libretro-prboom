@@ -14,6 +14,7 @@
 #include "p_spec.h"
 #include "map_format.h"
 #include "hexen/p_spec_hexen.h"
+#include "p_zacs.h"
 #include "g_game.h"
 #include "s_sound.h"
 #include "sounds.h"
@@ -162,27 +163,17 @@ static dbool P_ExecuteZDoomLineSpecial(int special, int *args, line_t *line,
       return ok;
     }
     case 80:                    /* ACS_Execute */
+      return Z_ACSStart(args[0], args[1], &args[2], 3, mo, line, side, false);
+    case 226:                   /* ACS_ExecuteAlways */
+      return Z_ACSStart(args[0], args[1], &args[2], 3, mo, line, side, true);
     case 81:                    /* ACS_Suspend */
+      return Z_ACSSuspend(args[0]);
     case 82:                    /* ACS_Terminate */
+      return Z_ACSTerminate(args[0]);
     case 83:                    /* ACS_LockedExecute */
-      if (!map_format.acs)
-      {
-        /* ZDoom-namespace maps carry enhanced-format (ACSE/ACSe)
-         * bytecode this engine cannot run yet; surface the gap instead
-         * of silently no-opping through an empty script table. */
-        static int acs_warnings;
-        if (acs_warnings < 8)
-        {
-          acs_warnings++;
-          lprintf(LO_WARN,
-                  "P_ExecuteZDoomLineSpecial: ACS special %d "
-                  "(script %d) ignored: ACS not supported on this map%s\n",
-                  special, args[0],
-                  acs_warnings == 8 ? " (further warnings suppressed)" : "");
-        }
+      if (!P_CheckZDoomLock(mo, args[4]))
         return false;
-      }
-      return P_ExecuteHexenLineSpecial(special, args, line, side, mo);
+      return Z_ACSStart(args[0], args[1], &args[2], 2, mo, line, side, false);
     case 243:                   /* Exit_Normal */
       G_ExitLevel();
       return true;
@@ -206,7 +197,7 @@ static const map_format_t zdoom_in_doom_map_format =
   true,                       /* zdoom    */
   true,                       /* hexen    */
   true,                       /* polyobjs */
-  false,                      /* acs      */
+  true,                       /* acs (ZACS VM; active when BEHAVIOR loads) */
   false,                      /* sndseq   */
   false,                      /* animdefs */
   false,                      /* doublesky*/

@@ -42,6 +42,7 @@
 #include "hexen/p_acs.h"
 #include "hexen/p_spec_hexen.h"
 #include "hexen/po_man.h"
+#include "p_zacs.h"
 #include "m_bbox.h"
 #include "m_argv.h"
 #include "g_game.h"
@@ -2790,6 +2791,18 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       /* spawn and place the polyobjects; UDMF maps have no binary THINGS
        * lump, signalled by a negative lump number */
       PO_Init(udmf_level ? -1 : lumpnum + ML_THINGS);
+
+   /* ZDoom-namespace maps carry their ACS bytecode in a BEHAVIOR lump
+    * inside the UDMF block; load it into the ZACS VM and launch the
+    * OPEN scripts now that the world is populated. */
+   if (map_format.zdoom && udmf_level && !raven)
+   {
+      if (Z_ACSLoadBehavior(P_FindUDMFLump(lumpnum, "BEHAVIOR")))
+      {
+         Z_ACSRunOpenScripts();
+         Z_ACSRunEnterScripts(players[consoleplayer].mo);
+      }
+   }
 
    // if deathmatch, randomly spawn the active players
    if (deathmatch)

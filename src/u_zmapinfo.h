@@ -11,4 +11,7 @@ int U_ParseZMapInfo(const char *buffer, size_t length);
 /* LANGUAGE lump string lookup (NULL when absent). */
 const char *U_ZLanguageLookup(const char *key);
 
+/* apply LANGUAGE strings onto the BEX string table (before deh) */
+void U_ZLanguageApplyStrings(void);
+
 #endif

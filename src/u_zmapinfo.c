@@ -31,6 +31,7 @@
 #include "lprintf.h"
 #include "u_scanner.h"
 #include "u_mapinfo.h"
+#include "d_deh.h"
 #include "u_zmapinfo.h"
 
 /* ---- LANGUAGE lump string table ---------------------------------------- */
@@ -97,6 +98,44 @@ static void Z_ParseLanguage(void)
   }
   U_ScanClose(&s);
   W_UnlockLumpNum(lump);
+}
+
+/* Route the LANGUAGE table onto the engine's BEX string slots: pickup
+ * and lock messages, menu prompts, cheat feedback, automap level names,
+ * episode end texts.  Keys ZDoom renamed map onto their BEX mnemonics;
+ * keys with no engine counterpart (OB_* obituaries, LOCKDEFS-only
+ * messages) simply find no slot and are skipped.  Runs before DEHACKED
+ * processing, so a deh patch still overrides, matching ZDoom. */
+void U_ZLanguageApplyStrings(void)
+{
+  static const struct { const char *zname; const char *bex; } alias[] = {
+    { "GOTGOGGLES",    "GOTVISOR"      },
+    { "GOTBLUEFLEM",   "GOTBLUESKUL"   },
+    { "GOTYELLOWFLEM", "GOTYELWSKUL"   },
+    { "GOTREDFLEM",    "GOTREDSKULL"   },
+  };
+  int i, applied = 0;
+
+  if (!zlang_parsed)
+    Z_ParseLanguage();
+
+  for (i = 0; i < zlang_count; i++)
+  {
+    const char *key = zlang[i].key;
+    unsigned k;
+    for (k = 0; k < sizeof(alias) / sizeof(alias[0]); k++)
+      if (!strcasecmp(key, alias[k].zname))
+      {
+        key = alias[k].bex;
+        break;
+      }
+    if (deh_SetStringByMnemonic(key, zlang[i].value))
+      applied++;
+  }
+
+  if (applied)
+    lprintf(LO_INFO, "U_ZLanguageApplyStrings: %d strings from LANGUAGE\n",
+            applied);
 }
 
 const char *U_ZLanguageLookup(const char *key)

@@ -3250,6 +3250,38 @@ static void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
   return;
 }
 
+/* Quiet mnemonic assignment for the ZDoom LANGUAGE layer: the BEX
+ * [STRINGS] substitution minus the log lines.  Tracks orig and converts
+ * embedded \n sequences exactly as deh_procStringSub does. */
+dbool deh_SetStringByMnemonic(const char *key, const char *value)
+{
+  int i;
+
+  for (i = 0; i < deh_numstrlookup; i++)
+  {
+    char *t2;
+    const char *s;
+
+    if (strcasecmp(deh_strlookup[i].lookup, key))
+      continue;
+
+    if (deh_strlookup[i].orig == NULL)
+      deh_strlookup[i].orig = *deh_strlookup[i].ppstr;
+
+    *deh_strlookup[i].ppstr = t2 = strdup(value);
+    for (s = value; *s; ++s, ++t2)
+    {
+      if (*s == '\\' && (s[1] == 'n' || s[1] == 'N'))
+        ++s, *t2 = '\n';
+      else
+        *t2 = *s;
+    }
+    *t2 = '\0';
+    return TRUE;
+  }
+  return FALSE;
+}
+
 // ====================================================================
 // deh_procStringSub
 // Purpose: Common string parsing and handling routine for DEH and BEX

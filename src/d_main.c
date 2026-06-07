@@ -1541,6 +1541,9 @@ bool D_DoomMainSetup(void)
 
   lprintf(LO_INFO,"\n");     // killough 3/6/98: add a newline, by popular demand :)
 
+  /* ZDoom LANGUAGE strings apply first so DEHACKED keeps the last word */
+  U_ZLanguageApplyStrings();
+
   // e6y
   // option to disable automatic loading of dehacked-in-wad lump
   if (!M_CheckParm ("-nodeh"))

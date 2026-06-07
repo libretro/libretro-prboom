@@ -1152,4 +1152,9 @@ extern const char* savegamename;
 void D_BuildBEXTables(void);
 void D_FreeBEXTables(void);
 
+/* Quiet BEX-mnemonic string assignment for the ZDoom LANGUAGE layer
+ * (u_zmapinfo): same table and escape handling as the BEX [STRINGS]
+ * path, without the per-key deh log line. */
+dbool deh_SetStringByMnemonic(const char *key, const char *value);
+
 #endif

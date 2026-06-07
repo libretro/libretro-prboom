@@ -94,6 +94,10 @@ typedef struct
   dbool   no_bottomtextures;
   fixed_t floorheight;
   fixed_t ceilingheight;
+
+  /* sloped planes (ZDoom Plane_Align); NULL = flat.  See p_slope.c. */
+  struct secplane_s *floor_slope;
+  struct secplane_s *ceiling_slope;
   int nexttag,firsttag;  // killough 1/30/98: improves searches for tags.
   int soundtraversed;    // 0 = untraversed, 1,2 = sndlines-1
   mobj_t *soundtarget;   // thing that made a sound (or null)
@@ -447,6 +451,12 @@ typedef struct
 //
 // Go to http://classicgaming.com/doom/editing/ to find out -- killough
 //
+
+/* sloped-plane equation a*x + b*y + c*z + d = 0 (16.16, c > 0) */
+typedef struct secplane_s
+{
+  fixed_t a, b, c, d;
+} secplane_t;
 
 typedef struct visplane
 {

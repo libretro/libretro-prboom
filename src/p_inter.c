@@ -41,6 +41,7 @@
 #include "d_deh.h"  // Ty 03/22/98 - externalized strings
 #include "p_tick.h"
 #include "u_zmapinfo.h"
+#include "map_format.h"
 #include "lprintf.h"
 
 #include "p_inter.h"
@@ -1592,7 +1593,10 @@ static void Hexen_P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
     int  a;
     for (a = 0; a < 5; a++)
       b[a] = (byte) special->special_args[a];
-    P_ExecuteHexenLineSpecial(special->special, b, NULL, 0, toucher);
+    /* route through the format's executor so ZDoom-numbered specials
+     * translate on Doom-in-Hexen maps */
+    if (map_format.execute_line_special)
+      map_format.execute_line_special(special->special, b, NULL, 0, toucher);
     special->special = 0;
   }
   P_RemoveMobj(special);

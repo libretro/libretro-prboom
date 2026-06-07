@@ -2431,8 +2431,16 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   if (mobj->tics > 0)
     mobj->tics = 1 + (P_Random (pr_spawnthing) % mobj->tics);
 
+  /* The MBF friend bit (0x80) is Doom-format only: on hexen-format maps
+   * that bit position is the third character-class visibility flag, which
+   * editors set on every thing -- read raw, every chex3.wad monster
+   * spawned MBF-friendly, allied with the player and excluded from the
+   * kill count, and the friendly look path acquired the player sight-free
+   * at spawn.  ZDoom's hexen-format friendly bit is 0x2000. */
   if (!(mobj->flags & MF_FRIEND) &&
-      options & MTF_FRIEND &&
+      (map_format.hexen ? (map_format.zdoom &&
+                           (options & MTF_ZDOOM_FRIENDLY))
+                        : (options & MTF_FRIEND)) &&
       mbf_features)
   {
     mobj->flags |= MF_FRIEND;            // killough 10/98:

@@ -168,6 +168,7 @@ typedef enum {
 #define MTF_HEXEN_CLERIC       64
 #define MTF_HEXEN_MAGE         128
 #define MTF_HEXEN_GSINGLE      256
+#define MTF_ZDOOM_FRIENDLY 0x2000  /* ZDoom hexen-format MBF-friendly bit */
 #define MTF_HEXEN_GCOOP        512
 #define MTF_HEXEN_GDEATHMATCH  1024
 

@@ -652,8 +652,11 @@ void I_InitSound(void)
   {
     extern dbool hexen;          /* doomstat.h */
     extern void  S_HexenLoadSndInfo(void); /* s_sound.h */
+    extern void  U_ZDoomLoadSndInfo(void); /* u_zsndinfo.h */
     if (hexen)
       S_HexenLoadSndInfo();
+    else
+      U_ZDoomLoadSndInfo();
   }
 
   /* lengths[] tracks the (growable) sfx count; reallocate to cover any

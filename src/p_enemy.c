@@ -1285,7 +1285,11 @@ void A_PosAttack(mobj_t *actor)
   A_FaceTarget(actor);
   angle = actor->angle;
   slope = P_AimLineAttack(actor, angle, MISSILERANGE, 0); /* killough 8/2/98 */
-  S_StartSound(actor, sfx_pistol);
+  /* a SNDINFO binding (grunt/attack) lands in attacksound; vanilla
+   * leaves the field 0 and the enum supplies the pistol */
+  S_StartSound(actor,
+               actor->info->attacksound ? actor->info->attacksound
+                                        : sfx_pistol);
 
   // killough 5/5/98: remove dependence on order of evaluation:
   t = P_Random(pr_posattack);
@@ -1300,7 +1304,9 @@ void A_SPosAttack(mobj_t* actor)
 
   if (!actor->target)
     return;
-  S_StartSound(actor, sfx_shotgn);
+  S_StartSound(actor,
+               actor->info->attacksound ? actor->info->attacksound
+                                        : sfx_shotgn);
   A_FaceTarget(actor);
   bangle = actor->angle;
   slope = P_AimLineAttack(actor, bangle, MISSILERANGE, 0); /* killough 8/2/98 */
@@ -1319,7 +1325,9 @@ void A_CPosAttack(mobj_t *actor)
 
   if (!actor->target)
     return;
-  S_StartSound(actor, sfx_shotgn);
+  S_StartSound(actor,
+               actor->info->attacksound ? actor->info->attacksound
+                                        : sfx_shotgn);
   A_FaceTarget(actor);
   bangle = actor->angle;
   slope = P_AimLineAttack(actor, bangle, MISSILERANGE, 0); /* killough 8/2/98 */
@@ -1392,7 +1400,9 @@ void A_TroopAttack(mobj_t *actor)
   if (P_CheckMeleeRange(actor))
     {
       int damage;
-      S_StartSound(actor, sfx_claw);
+      S_StartSound(actor,
+                   actor->info->attacksound ? actor->info->attacksound
+                                            : sfx_claw);
       damage = (P_Random(pr_troopattack)%8+1)*3;
       P_DamageMobj(actor->target, actor, actor, damage);
       return;

@@ -503,7 +503,6 @@ dbool U_IsInertZDoomThing(int doomednum)
          doomednum == 9026 ||                         /* spark */
          (doomednum >= 9080 && doomednum <= 9082) ||  /* sky viewpoint/picker/silencer */
          (doomednum >= 9800 && doomednum <= 9859) ||  /* GZDoom dynamic lights */
-         (doomednum >= 9982 && doomednum <= 9999) ||  /* sector actions (unimplemented) */
          (doomednum >= 14001 && doomednum <= 14067) ||/* ambient sounds */
          (doomednum >= 1400 && doomednum <= 1410);    /* sound sequence overrides */
 }

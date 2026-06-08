@@ -49,6 +49,7 @@ extern mobjtype_t PuffType;   /* puff actor the next hitscan/melee spawns */
 #include "s_sound.h"
 #include "sounds.h"
 #include "p_inter.h"
+#include "u_zsecact.h"
 #include "m_random.h"
 #include "m_bbox.h"
 #include "lprintf.h"
@@ -325,6 +326,9 @@ dbool P_TeleportMove (mobj_t* thing,fixed_t x,fixed_t y, dbool boss)
   // the move is ok,
   // so unlink from the old position & link into the new position
 
+  {
+    sector_t *zsa_oldsector = thing->subsector->sector;
+
   P_UnsetThingPosition (thing);
 
   thing->floorz = tmfloorz;
@@ -335,6 +339,13 @@ dbool P_TeleportMove (mobj_t* thing,fixed_t x,fixed_t y, dbool boss)
   thing->y = y;
 
   P_SetThingPosition (thing);
+
+  /* ZDoom sector actions: teleport arrivals fire the destination
+   * sector's Enter (silent-teleport chains rely on this) */
+  if (map_format.zdoom && thing->player &&
+      thing->subsector->sector != zsa_oldsector)
+    U_ZSecActTrigger(thing->subsector->sector, ZSECACT_ENTER, thing);
+  }
 
   thing->PrevX = x;
   thing->PrevY = y;
@@ -1434,6 +1445,9 @@ dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
   // the move is ok,
   // so unlink from the old position and link into the new position
 
+  {
+    sector_t *zsa_oldsector = thing->subsector->sector;
+
   P_UnsetThingPosition (thing);
 
   oldx = thing->x;
@@ -1477,6 +1491,14 @@ dbool P_TryMove(mobj_t* thing,fixed_t x,fixed_t y,
         map_format.cross_special_line(spechit[numspechit], oldside, thing);
     }
     }
+
+  /* ZDoom sector actions: a crossed special above may already have
+   * teleported the thing; the sector compared here is wherever it
+   * actually ended up, which is the sector whose Enter should fire. */
+  if (map_format.zdoom && thing->player &&
+      thing->subsector->sector != zsa_oldsector)
+    U_ZSecActTrigger(thing->subsector->sector, ZSECACT_ENTER, thing);
+  }
 
   return TRUE;
   }

@@ -53,6 +53,7 @@
 #include "p_map.h"
 #include "p_setup.h"
 #include "u_zanimdefs.h"
+#include "u_zsecact.h"
 #include "p_spec.h"
 #include "map_format.h"
 #include "udmf.h"
@@ -2569,6 +2570,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    }
 
    P_InitThinkers();
+   U_ZSecActClear();    /* forget the previous level's sector actions */
 
    if (hexen)
       P_InitCreatureCorpseQueue();

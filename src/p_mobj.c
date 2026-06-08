@@ -42,6 +42,7 @@
 #include "p_spec.h"
 #include "map_format.h"
 #include "u_decorate.h"
+#include "u_zsecact.h"
 #include "dsda_hacked.h"
 #include "sounds.h"
 #include "st_stuff.h"
@@ -1171,6 +1172,8 @@ floater:
 
     if (mo->momz < 0)
       {
+  if (map_format.zdoom && mo->player)
+    U_ZSecActTrigger(mo->subsector->sector, ZSECACT_HITFLOOR, mo);
   /* killough 11/98: touchy objects explode on impact */
   if (mo->flags & MF_TOUCHY && mo->intflags & MIF_ARMED && mo->health > 0)
     P_DamageMobj(mo, NULL, NULL, mo->health);
@@ -2439,6 +2442,13 @@ void P_SpawnMapThing (const mapthing_t* mthing)
     if (map_format.zdoom)
     {
       int alias;
+      if (thingtype >= 9982 && thingtype <= 9999)
+      {
+        /* sector action marker: no mobj, just the registry */
+        U_ZSecActRegister(mthing->x << FRACBITS, mthing->y << FRACBITS,
+                          thingtype, hexen_thing_special, hexen_thing_args);
+        return;
+      }
       if (U_IsInertZDoomThing(thingtype))
         return;
       alias = U_DecorateAliasDoomedNum(thingtype);

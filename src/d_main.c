@@ -1680,6 +1680,11 @@ bool D_DoomMainSetup(void)
    * shared mobjinfo table would expose them to Heretic lookups too). */
   if (!hexen && !heretic && W_CheckNumForName("DECORATE") >= 0)
     U_RegisterDecorateThings();
+  /* ZDoom map-spot utility things (MapSpot 9001 etc.) are needed for ACS
+   * SpawnSpot on Doom-game ZDoom maps whether or not a DECORATE lump is
+   * present, but must stay out of Heretic/Hexen, which share the mobjinfo
+   * table and define some of these editor numbers natively. */
+  if (!hexen && !heretic)
     U_RegisterZDoomUtilityThings();
 
   //jff 9/3/98 use logical output routine

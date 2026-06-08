@@ -38,6 +38,7 @@
 #include "m_bbox.h"
 #include "r_main.h"
 #include "p_maputl.h"
+#include "p_ffloor.h"
 #include "map_format.h"
 #include "p_slope.h"
 #include "p_map.h"
@@ -184,6 +185,33 @@ fixed_t lowfloor;
 sector_t *openfrontsector; // made global                    // phares
 sector_t *openbacksector;  // made global
 
+/* Clip the computed opening against solid 3D-floor slabs on both
+ * sides of the line, for the thing currently being moved.  Outside a
+ * movement clip (no tmthing) or off slab-bearing maps this is free. */
+extern mobj_t *ffloor_clip_thing;   /* p_map.c: thing being position-checked */
+
+static void P_FFloorAdjustOpening(void)
+{
+  mobj_t *mo = ffloor_clip_thing;
+
+  if (!mo)
+    return;
+  if (openfrontsector->ffloors)
+  {
+    openbottom = P_FFloorAdjustFloorZ(openfrontsector, mo->z,
+                                      mo->height, openbottom);
+    opentop = P_FFloorAdjustCeilingZ(openfrontsector, mo->z,
+                                     mo->height, opentop);
+  }
+  if (openbacksector->ffloors)
+  {
+    openbottom = P_FFloorAdjustFloorZ(openbacksector, mo->z,
+                                      mo->height, openbottom);
+    opentop = P_FFloorAdjustCeilingZ(openbacksector, mo->z,
+                                     mo->height, opentop);
+  }
+}
+
 void P_LineOpening(const line_t *linedef)
 {
   if (linedef->sidenum[1] == NO_INDEX)      // single sided line
@@ -210,6 +238,9 @@ void P_LineOpening(const line_t *linedef)
       openbottom = openbacksector->floorheight;
       lowfloor = openfrontsector->floorheight;
     }
+
+  P_FFloorAdjustOpening();
+
   openrange = opentop - openbottom;
 }
 
@@ -245,6 +276,9 @@ void P_LineOpeningAt(const line_t *linedef, fixed_t x, fixed_t y)
       openbottom = bf;
       lowfloor = ff;
     }
+
+  P_FFloorAdjustOpening();
+
   openrange = opentop - openbottom;
 }
 

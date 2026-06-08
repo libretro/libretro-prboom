@@ -157,6 +157,10 @@ typedef struct
   short oldspecial;      //jff 2/16/98 remembers if sector WAS secret (automap)
   short tag;
   int   seqType;         /* Hexen: sound-sequence type (SEQTYPE_*) */
+
+  /* ZDoom 3D floors (Sector_Set3DFloor): slabs attached to this
+   * sector, geometry living in their control sectors (p_ffloor.c) */
+  struct ffloor_s *ffloors;
 } sector_t;
 
 //

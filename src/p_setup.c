@@ -54,6 +54,7 @@
 #include "p_setup.h"
 #include "u_zanimdefs.h"
 #include "u_zsecact.h"
+#include "p_ffloor.h"
 #include "p_spec.h"
 #include "map_format.h"
 #include "udmf.h"
@@ -2856,6 +2857,8 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       P_InitHexenTaggedLines();
       P_SpawnLineSpecials();   /* collect the scrolling walls (100-103) */
    }
+
+   P_AttachFFloors();   /* ZDoom 3D floors; no-op off zdoom maps */
 
 
    /* The map's sectors are loaded now, so the lightning storm can scan for

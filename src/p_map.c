@@ -50,6 +50,7 @@ extern mobjtype_t PuffType;   /* puff actor the next hitscan/melee spawns */
 #include "sounds.h"
 #include "p_inter.h"
 #include "u_zsecact.h"
+#include "p_ffloor.h"
 #include "m_random.h"
 #include "m_bbox.h"
 #include "lprintf.h"
@@ -59,6 +60,7 @@ extern mobjtype_t PuffType;   /* puff actor the next hitscan/melee spawns */
 #endif
 
 static mobj_t    *tmthing;
+mobj_t *ffloor_clip_thing;   /* p_maputl's 3D-floor opening clip context */
 
 /* Raven (Hexen/Heretic): the most recent thing that blocked a move -- read
  * by missile-impact codepointers (e.g. the Cleric Flame Strike) to know what
@@ -287,7 +289,7 @@ dbool P_TeleportMove (mobj_t* thing,fixed_t x,fixed_t y, dbool boss)
 
   // kill anything occupying the position
 
-  tmthing = thing;
+  tmthing = ffloor_clip_thing = thing;
 
   tmx = x;
   tmy = y;
@@ -307,6 +309,14 @@ dbool P_TeleportMove (mobj_t* thing,fixed_t x,fixed_t y, dbool boss)
 
   tmfloorz = tmdropoffz = P_FloorZAtPoint(newsubsec->sector, x, y);
   tmceilingz = P_CeilingZAtPoint(newsubsec->sector, x, y);
+  if (newsubsec->sector->ffloors)
+  {
+    tmfloorz = P_FFloorAdjustFloorZ(newsubsec->sector, thing->z,
+                                    thing->height, tmfloorz);
+    tmdropoffz = tmfloorz;
+    tmceilingz = P_FFloorAdjustCeilingZ(newsubsec->sector, thing->z,
+                                        thing->height, tmceilingz);
+  }
 
   validcount++;
   numspechit = 0;
@@ -1182,7 +1192,7 @@ mobj_t *P_CheckOnmobj(mobj_t *thing)
 
   x = thing->x;
   y = thing->y;
-  tmthing = thing;
+  tmthing = ffloor_clip_thing = thing;
   oldmo = *thing;               /* save the old mobj before the fake zmovement */
   P_FakeZMovement(tmthing);
 
@@ -1244,7 +1254,7 @@ dbool P_CheckPosition (mobj_t* thing,fixed_t x,fixed_t y)
   int     by;
   subsector_t*  newsubsec;
 
-  tmthing = thing;
+  tmthing = ffloor_clip_thing = thing;
 
   tmx = x;
   tmy = y;
@@ -1269,6 +1279,14 @@ dbool P_CheckPosition (mobj_t* thing,fixed_t x,fixed_t y)
 
   tmfloorz = tmdropoffz = P_FloorZAtPoint(newsubsec->sector, x, y);
   tmceilingz = P_CeilingZAtPoint(newsubsec->sector, x, y);
+  if (newsubsec->sector->ffloors)
+  {
+    tmfloorz = P_FFloorAdjustFloorZ(newsubsec->sector, thing->z,
+                                    thing->height, tmfloorz);
+    tmdropoffz = tmfloorz;
+    tmceilingz = P_FFloorAdjustCeilingZ(newsubsec->sector, thing->z,
+                                        thing->height, tmceilingz);
+  }
   validcount++;
   numspechit = 0;
 
@@ -1604,7 +1622,7 @@ void P_ApplyTorque(mobj_t *mo)
        mo->y + mo->radius) - bmaporgy) >> MAPBLOCKSHIFT;
   int bx,by,flags = mo->intflags; //Remember the current state, for gear-change
 
-  tmthing = mo;
+  tmthing = ffloor_clip_thing = mo;
   validcount++; /* prevents checking same line twice */
 
   for (bx = xl ; bx <= xh ; bx++)
@@ -3229,7 +3247,7 @@ void P_CreateSecNodeList(mobj_t* thing,fixed_t x,fixed_t y)
     node = node->m_tnext;
     }
 
-  tmthing = thing;
+  tmthing = ffloor_clip_thing = thing;
 
   tmx = x;
   tmy = y;
@@ -3280,7 +3298,7 @@ void P_CreateSecNodeList(mobj_t* thing,fixed_t x,fixed_t y)
    */
   if ((compatibility_level < boom_compatibility_compatibility) ||
       (compatibility_level >= prboom_3_compatibility))
-    tmthing = saved_tmthing;
+    tmthing = ffloor_clip_thing = saved_tmthing;
   /* And, duh, the same for tmx/y - cph 2002/09/22
    * And for tmbbox - cph 2003/08/10 */
   if ((compatibility_level < boom_compatibility_compatibility) /* ||
@@ -3301,7 +3319,7 @@ void P_MapStart(void) {
 	if (tmthing) I_Error("P_MapStart: tmthing set!");
 }
 void P_MapEnd(void) {
-	tmthing = NULL;
+	tmthing = ffloor_clip_thing = NULL;
 }
 
 // e6y

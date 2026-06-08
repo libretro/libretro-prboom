@@ -514,7 +514,7 @@ void R_RenderThickSides(drawseg_t *ds)
          dcvars.colormap     = R_ColourMap(light, spryscale);
          dcvars.nextcolormap = R_ColourMap(light + 1, spryscale);
          dcvars.source    = R_GetTextureColumn(patch, tc);
-         R_DrawCmdEmitColumn(&dcvars, colfunc);
+         colfunc(&dcvars);
       }
 
       R_DrawCmdAdoptTextureLock(texnum);

@@ -451,7 +451,10 @@ void R_RenderThickSides(drawseg_t *ds)
       fixed_t        spryscale;
       int            light;
 
-      if (ff->type != FFLOOR_SOLID)
+      /* Solid and render-only slabs are drawn opaquely; only physics tells
+       * them apart.  Swimmable (translucent) slabs need an alpha path and
+       * are not handled here yet. */
+      if (ff->type != FFLOOR_SOLID && ff->type != FFLOOR_RENDERONLY)
          continue;
       top = ff->model->ceilingheight;
       bot = ff->model->floorheight;

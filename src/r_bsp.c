@@ -532,7 +532,9 @@ static void R_Subsector(int num)
     for (ff = frontsector->ffloors; ff; ff = ff->next)
     {
       fixed_t ftop, fbot;
-      if (ff->type != FFLOOR_SOLID)
+      /* opaque slabs (solid + render-only) get a surface; swimmable
+       * (translucent) slabs are left for a later alpha-aware pass */
+      if (ff->type != FFLOOR_SOLID && ff->type != FFLOOR_RENDERONLY)
         continue;
       ftop = ff->model->ceilingheight;
       fbot = ff->model->floorheight;

@@ -26,6 +26,7 @@
 typedef struct ffloor_s
 {
   sector_t *model;       /* control sector: ceiling = top, floor = bottom */
+  struct line_s *controlline; /* the special-160 line; supplies face texture */
   int       type;        /* FFLOOR_* (arg1 & 3) */
   int       alpha;       /* 0..255 (arg3); opaque rendering may clamp */
   struct ffloor_s *next;

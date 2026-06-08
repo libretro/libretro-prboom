@@ -35,6 +35,7 @@
 #define __R_SEGS__
 
 void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2);
+void R_RenderThickSides(drawseg_t *ds);
 void R_StoreWallRange(const int start, const int stop);
 
 #endif

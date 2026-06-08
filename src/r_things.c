@@ -1465,6 +1465,12 @@ void R_DrawMasked(void)
       if (ds->maskedtexturecol)
          R_RenderMaskedSegRange(ds, ds->x1, ds->x2);
 
+   /* ZDoom 3D-floor slab faces (no-op unless a back sector has slabs) */
+   for (ds=ds_p ; ds-- > drawsegs ; )
+      if (ds->curline && ds->curline->backsector &&
+          ds->curline->backsector->ffloors)
+         R_RenderThickSides(ds);
+
    // draw the psprites on top of everything
    //  but does not draw on side views
    if (!viewangleoffset && !viewpitchoffset)

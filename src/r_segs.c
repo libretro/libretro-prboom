@@ -40,6 +40,7 @@
 #include "r_segs.h"
 #include "r_plane.h"
 #include "r_things.h"
+#include "p_ffloor.h"
 #include "r_draw.h"
 #include "r_drawcmd.h"
 #include "p_slope.h"
@@ -417,6 +418,111 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
    curline = NULL; /* cph 2001/11/18 - must clear curline now we're done with it, so R_ColourMap doesn't try using it for other things */
 }
 
+/* R_RenderThickSides: draw the vertical faces of solid ZDoom 3D-floor
+ * slabs in this drawseg's back sector, clipped to the slab's projected
+ * top/bottom and to the seg's saved column clip bounds.  Modeled on
+ * R_RenderMaskedSegRange (projection) and R_RenderSegLoop (opaque emit).
+ * Gated by the caller on backsector->ffloors, so non-3D maps never
+ * reach here. */
+void R_RenderThickSides(drawseg_t *ds)
+{
+   sector_t        *back;
+   const ffloor_t  *ff;
+   draw_column_vars_t dcvars;
+   R_DrawColumn_f   colfunc;
+   fixed_t          scalestep;
+
+   back = ds->curline ? ds->curline->backsector : NULL;
+   if (!back || !back->ffloors || !ds->sprtopclip || !ds->sprbottomclip)
+      return;
+
+   R_SetDefaultDrawColumnVars(&dcvars);
+   colfunc  = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+                                  drawvars.filterwall, drawvars.filterz);
+   curline   = ds->curline;
+   scalestep = ds->scalestep;
+
+   for (ff = back->ffloors; ff; ff = ff->next)
+   {
+      fixed_t        top, bot;
+      int            texnum, x, texheight;
+      const rpatch_t *patch;
+      side_t         *cs;
+      fixed_t        spryscale;
+      int            light;
+
+      if (ff->type != FFLOOR_SOLID)
+         continue;
+      top = ff->model->ceilingheight;
+      bot = ff->model->floorheight;
+      if (bot >= top)
+         continue;
+
+      cs = (ff->controlline && ff->controlline->sidenum[0] != NO_INDEX)
+         ? &sides[ff->controlline->sidenum[0]] : NULL;
+      texnum = 0;
+      if (cs)
+         texnum = cs->midtexture ? cs->midtexture : cs->toptexture;
+      if (!texnum)
+         texnum = ds->curline->sidedef->midtexture;
+      if (!texnum)
+         continue;
+      texnum    = texturetranslation[texnum];
+      patch     = R_CacheTextureCompositePatchNum(texnum);
+      texheight = textureheight[texnum] >> FRACBITS;
+      light     = ff->model->lightlevel;
+      spryscale = ds->scale1;
+
+      for (x = ds->x1; x <= ds->x2; x++, spryscale += scalestep)
+      {
+         int     yl, yh;
+         int64_t tt, tb;
+         angle_t angle;
+         fixed_t texu;
+         int     tc;
+
+         tt = ((int64_t) centeryfrac) -
+              ((int64_t) FixedMul(top - viewz, spryscale));
+         tb = ((int64_t) centeryfrac) -
+              ((int64_t) FixedMul(bot - viewz, spryscale));
+         yl = (int)(tt >> FRACBITS);
+         yh = (int)(tb >> FRACBITS);
+
+         if (yl < ds->sprtopclip[x] + 1)
+            yl = ds->sprtopclip[x] + 1;
+         if (yh > ds->sprbottomclip[x] - 1)
+            yh = ds->sprbottomclip[x] - 1;
+         if (yl > yh || yl < 0 || yh >= viewheight)
+         {
+            if (yl < 0) yl = 0;
+            if (yh >= viewheight) yh = viewheight - 1;
+            if (yl > yh)
+               continue;
+         }
+
+         angle = (ds->rw_centerangle + xtoviewangle[x]) >> ANGLETOFINESHIFT;
+         texu  = ds->rw_offset - FixedMul(finetangent[angle], ds->rw_distance);
+         tc    = texu >> FRACBITS;
+
+         dcvars.x         = x;
+         dcvars.yl        = yl;
+         dcvars.yh        = yh;
+         dcvars.iscale    = 0xffffffffu / (unsigned) spryscale;
+         dcvars.texturemid = top - viewz;
+         dcvars.texheight = texheight;
+         dcvars.z         = spryscale;
+         dcvars.colormap     = R_ColourMap(light, spryscale);
+         dcvars.nextcolormap = R_ColourMap(light + 1, spryscale);
+         dcvars.source    = R_GetTextureColumn(patch, tc);
+         R_DrawCmdEmitColumn(&dcvars, colfunc);
+      }
+
+      R_DrawCmdAdoptTextureLock(texnum);
+   }
+   curline = NULL;
+}
+
+
 //
 // R_RenderSegLoop
 // Draws zero, one, or two textures (and possibly a masked texture) for walls.
@@ -758,6 +864,7 @@ void R_StoreWallRange(const int start, const int stop)
 {
    fixed_t hyp;
    angle_t offsetangle;
+   int     ffloorseg = 0;
 
    if (ds_p == drawsegs+maxdrawsegs)   // killough 1/98 -- fix 2s line HOM
    {
@@ -894,6 +1001,11 @@ void R_StoreWallRange(const int start, const int stop)
    {
       ds_p->sprtopclip = ds_p->sprbottomclip = NULL;
       ds_p->silhouette = 0;
+
+      /* a 2s line whose back sector carries 3D-floor slabs needs full
+       * clip info kept so the post-pass can draw the slab faces */
+      ffloorseg = (backsector->ffloors != NULL);
+
 
       if (linedef->r_flags & RF_CLOSED) { /* cph - closed 2S line e.g. door */
          // cph - killough's (outdated) comment follows - this deals with both
@@ -1205,13 +1317,13 @@ void R_StoreWallRange(const int start, const int stop)
    }
 
    // save sprite clipping info
-   if ((ds_p->silhouette & SIL_TOP || maskedtexture) && !ds_p->sprtopclip)
+   if ((ds_p->silhouette & SIL_TOP || maskedtexture || ffloorseg) && !ds_p->sprtopclip)
    {
       memcpy (lastopening, ceilingclip+start, sizeof(int)*(rw_stopx-start)); // dropoff overflow
       ds_p->sprtopclip = lastopening - start;
       lastopening += rw_stopx - start;
    }
-   if ((ds_p->silhouette & SIL_BOTTOM || maskedtexture) && !ds_p->sprbottomclip)
+   if ((ds_p->silhouette & SIL_BOTTOM || maskedtexture || ffloorseg) && !ds_p->sprbottomclip)
    {
       memcpy (lastopening, floorclip+start, sizeof(int)*(rw_stopx-start)); // dropoff overflow
       ds_p->sprbottomclip = lastopening - start;

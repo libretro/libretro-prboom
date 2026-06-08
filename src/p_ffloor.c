@@ -49,6 +49,7 @@ void P_AttachFFloors(void)
     {
       ffloor_t *ff = Z_Malloc(sizeof(*ff), PU_LEVEL, 0);
       ff->model = l->frontsector;
+      ff->controlline = l;
       ff->type = type;
       ff->alpha = alpha;
       ff->next = sectors[s].ffloors;

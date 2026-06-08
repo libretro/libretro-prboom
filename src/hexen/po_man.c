@@ -49,6 +49,56 @@ static int PolySegCount;
 static fixed_t PolyStartX;
 static fixed_t PolyStartY;
 
+/* Vertex -> seg-index hash, built once per level so IterFindPolySegs can
+ * follow a polyobject's perimeter in O(1) per vertex instead of scanning all
+ * segs.  Without it, spawning every polyobject is O(polyseg * numsegs), which
+ * on a map with many polyobjects and a large seg count (e.g. MyHouse.pk3, 169
+ * polyobjects) turns level load into a minutes-long stall.  Chains are kept in
+ * ascending seg-index order so the seg chosen at each vertex is exactly the
+ * one the old linear scan picked -- the lowest index with a linedef whose v1
+ * matches -- and the resulting seg lists are therefore identical. */
+static int *po_vtx_head;   /* po_vtx_nbuck entries; head seg index or -1 */
+static int *po_vtx_next;   /* numsegs entries; next-in-chain or -1 */
+static int  po_vtx_nbuck;
+
+static unsigned po_vtx_hash(fixed_t x, fixed_t y)
+{
+  unsigned h = (unsigned)x * 73856093u ^ (unsigned)y * 19349663u;
+  return h % (unsigned)po_vtx_nbuck;
+}
+
+static void PO_BuildSegVertexHash(void)
+{
+  int i;
+
+  po_vtx_nbuck = numsegs > 0 ? numsegs : 1;
+  po_vtx_head  = malloc(po_vtx_nbuck * sizeof(int));
+  po_vtx_next  = malloc((numsegs > 0 ? numsegs : 1) * sizeof(int));
+  for (i = 0; i < po_vtx_nbuck; i++)
+    po_vtx_head[i] = -1;
+  /* iterate descending so the lowest index ends up at the head of its chain
+   * and is found first, reproducing the old forward scan's choice */
+  for (i = numsegs - 1; i >= 0; i--)
+  {
+    unsigned b;
+    if (!segs[i].linedef)
+    {
+      po_vtx_next[i] = -1;
+      continue;
+    }
+    b = po_vtx_hash(segs[i].v1->x, segs[i].v1->y);
+    po_vtx_next[i] = po_vtx_head[b];
+    po_vtx_head[b] = i;
+  }
+}
+
+static void PO_FreeSegVertexHash(void)
+{
+  free(po_vtx_head); po_vtx_head = NULL;
+  free(po_vtx_next); po_vtx_next = NULL;
+  po_vtx_nbuck = 0;
+}
+
 static polyobj_t *GetPolyobj(int polyNum)
 {
   int i;
@@ -590,17 +640,19 @@ static void InitBlockMap(void)
 
 static void IterFindPolySegs(int x, int y, seg_t **segList)
 {
-  int i;
+  int k;
 
   if (x == PolyStartX && y == PolyStartY)
   {
     return;
   }
-  for (i = 0; i < numsegs; i++)
+  /* segs in this chain all have a linedef (the build skipped those without);
+   * pick the first whose v1 matches, which is the lowest index, exactly as
+   * the old full scan did. */
+  for (k = po_vtx_head[po_vtx_hash(x, y)]; k != -1; k = po_vtx_next[k])
   {
-    if (segs[i].linedef &&
-        segs[i].v1->x == x &&
-        segs[i].v1->y == y)
+    if (segs[k].v1->x == x &&
+        segs[k].v1->y == y)
     {
       if (!segList)
       {
@@ -608,9 +660,9 @@ static void IterFindPolySegs(int x, int y, seg_t **segList)
       }
       else
       {
-        *segList++ = &segs[i];
+        *segList++ = &segs[k];
       }
-      IterFindPolySegs(segs[i].v2->x, segs[i].v2->y, segList);
+      IterFindPolySegs(segs[k].v2->x, segs[k].v2->y, segList);
       return;
     }
   }
@@ -623,6 +675,9 @@ static void SpawnPolyobj(int index, int tag, dbool crush, dbool hurt)
   int j;
   int psIndex;
   int psIndexOld;
+  int *cand = NULL;   /* this tag's explicit-polyobj segs, collected once */
+  int ncand = 0;
+  int t;
   seg_t *polySegList[PO_MAXPOLYSEGS];
 
   for (i = 0; i < numsegs; i++)
@@ -662,13 +717,28 @@ static void SpawnPolyobj(int index, int tag, dbool crush, dbool hurt)
   }
   if (!polyobjs[index].segs)
   { /* didn't find a polyobj through PO_LINE_START */
+    /* Collect this tag's explicit-polyobj segs in one pass, then resolve the
+     * order list over that small set.  The original re-scanned every seg for
+     * each of the up-to-PO_MAXPOLYSEGS orders (three times per order), i.e.
+     * O(numsegs * PO_MAXPOLYSEGS) per polyobject -- minutes of level load on
+     * a map with many polyobjects and a large seg count.  The candidate list
+     * is in ascending seg index, and the per-order tests are unchanged, so
+     * the seg list built here is identical. */
+    cand = malloc((numsegs > 0 ? numsegs : 1) * sizeof(int));
+    for (i = 0; i < numsegs; i++)
+      if (segs[i].linedef &&
+          segs[i].linedef->special == PO_LINE_EXPLICIT &&
+          segs[i].linedef->args[0] == tag)
+        cand[ncand++] = i;
+
     psIndex = 0;
     polyobjs[index].numsegs = 0;
     for (j = 1; j < PO_MAXPOLYSEGS; j++)
     {
       psIndexOld = psIndex;
-      for (i = 0; i < numsegs; i++)
+      for (t = 0; t < ncand; t++)
       {
+        i = cand[t];
         if (segs[i].linedef &&
             segs[i].linedef->special == PO_LINE_EXPLICIT &&
             segs[i].linedef->args[0] == tag)
@@ -693,8 +763,9 @@ static void SpawnPolyobj(int index, int tag, dbool crush, dbool hurt)
       /* Clear out any specials for these segs...we cannot clear them out
        * in the above loop, since we aren't guaranteed one seg per
        * linedef. */
-      for (i = 0; i < numsegs; i++)
+      for (t = 0; t < ncand; t++)
       {
+        i = cand[t];
         if (segs[i].linedef &&
             segs[i].linedef->special == PO_LINE_EXPLICIT &&
             segs[i].linedef->args[0] == tag
@@ -708,8 +779,9 @@ static void SpawnPolyobj(int index, int tag, dbool crush, dbool hurt)
       { /* Check if an explicit line order has been skipped.
          * A line has been skipped if there are any more explicit
          * lines with the current tag value. */
-        for (i = 0; i < numsegs; i++)
+        for (t = 0; t < ncand; t++)
         {
+          i = cand[t];
           if (segs[i].linedef &&
               segs[i].linedef->special == PO_LINE_EXPLICIT &&
               segs[i].linedef->args[0] == tag)
@@ -720,6 +792,8 @@ static void SpawnPolyobj(int index, int tag, dbool crush, dbool hurt)
         }
       }
     }
+    free(cand);
+    cand = NULL;
     if (polyobjs[index].numsegs)
     {
       PolySegCount = polyobjs[index].numsegs; /* PolySegCount used globally */
@@ -967,10 +1041,12 @@ void PO_Init(int lump)
   polyobjs = Z_Malloc(po_NumPolyobjs * sizeof(polyobj_t), PU_LEVEL, 0);
   memset(polyobjs, 0, po_NumPolyobjs * sizeof(polyobj_t));
 
+  PO_BuildSegVertexHash();
   if (lump < 0)
     PO_LoadThingsUDMF();
   else
     PO_LoadThings(lump);
+  PO_FreeSegVertexHash();
 
   /* check for a startspot without an anchor point */
   for (i = 0; i < po_NumPolyobjs; i++)

@@ -1428,6 +1428,12 @@ void R_DrawMasked(void)
       }
    }
 
+   // 3D-floor slab faces first, so sprites in front draw over them
+   for (ds=ds_p ; ds-- > drawsegs ; )
+      if (ds->curline && ds->curline->backsector &&
+          ds->curline->backsector->ffloors)
+         R_RenderThickSides(ds);
+
    // draw all vissprites back to front
 
    for (i = num_vissprite ;--i>=0; )
@@ -1465,11 +1471,6 @@ void R_DrawMasked(void)
       if (ds->maskedtexturecol)
          R_RenderMaskedSegRange(ds, ds->x1, ds->x2);
 
-   /* ZDoom 3D-floor slab faces (no-op unless a back sector has slabs) */
-   for (ds=ds_p ; ds-- > drawsegs ; )
-      if (ds->curline && ds->curline->backsector &&
-          ds->curline->backsector->ffloors)
-         R_RenderThickSides(ds);
 
    // draw the psprites on top of everything
    //  but does not draw on side views

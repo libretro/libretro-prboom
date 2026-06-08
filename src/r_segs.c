@@ -98,6 +98,8 @@ static fixed_t  topfrac;
 static fixed_t  topstep;
 static fixed_t  bottomfrac;
 static fixed_t  bottomstep;
+static fixed_t  waterfrac;       // 3D-floor water surface screen-y, per column
+static fixed_t  waterstep;
 static int      *maskedtexturecol; // dropoff overflow
 
 //
@@ -625,6 +627,25 @@ static void R_RenderSegLoop (void)
          }
          // SoM: This should be set here to prevent overdraw
          fc_rwx = top;
+      }
+
+      /* 3D-floor water surface: a translucent span from the surface line down
+       * to the bottom of the visible floor area, covering the submerged wall
+       * and floor (drawn opaque first; the water blends over them).  Uses the
+       * floor's bottom ('bottom', still the pre-update fc_rwx-1) as the lower
+       * bound and the ceiling clip as the upper. */
+      if (waterplane)
+      {
+         int wtop = waterfrac >> heightbits;
+         if (wtop < cc_rwx + 1)
+            wtop = cc_rwx + 1;
+         if (wtop <= bottom)
+         {
+            waterplane->top[rw_x] = wtop;
+            waterplane->bottom[rw_x] = bottom;
+            waterplane->modified = 1;
+         }
+         waterfrac += waterstep;
       }
 
       // texturecolumn and lighting are independent of wall tiers
@@ -1199,6 +1220,15 @@ void R_StoreWallRange(const int start, const int stop)
    bottomstep = -FixedMul (rw_scalestep,worldbottom);
    bottomfrac = (centeryfrac >> invhgtbits) - FixedMul (worldbottom, rw_scale);
 
+   /* 3D-floor (swimmable) water surface: project its height the same way as
+    * the wall edges so R_RenderSegLoop can bound the translucent span. */
+   if (waterplane)
+   {
+      int worldwater = (waterplane->height - viewz) >> invhgtbits;
+      waterstep = -FixedMul (rw_scalestep, worldwater);
+      waterfrac = (centeryfrac >> invhgtbits) - FixedMul (worldwater, rw_scale);
+   }
+
    if (backsector)
    {
       worldhigh >>= invhgtbits;
@@ -1303,6 +1333,11 @@ void R_StoreWallRange(const int start, const int stop)
       else
          markfloor = 0;
    }
+
+   /* The translucent water surface is its own plane; reserve this seg's
+    * column range in it so R_RenderSegLoop can write the spans. */
+   if (waterplane)
+      waterplane = R_CheckPlane (waterplane, rw_x, rw_stopx-1);
 
    didsolidcol = 0;
    R_RenderSegLoop();

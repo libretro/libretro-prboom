@@ -597,6 +597,37 @@ static void R_Subsector(int num)
                 frontsector->ceiling_slope
                 ) : NULL;
 
+  /* ZDoom swimmable 3D floors (water): unlike solid slabs the real floor is
+   * still drawn, and the slab's top is a translucent surface laid over it.
+   * Only the common above-water case is handled (view above the surface);
+   * its span is bounded per-column in R_RenderSegLoop and it is drawn after
+   * the opaque planes.  waterplane is reset every subsector so a stale plane
+   * never leaks into an ordinary one. */
+  waterplane = NULL;
+  if (frontsector->ffloors)
+  {
+    const ffloor_t *ff;
+    fixed_t   bestwater = INT_MIN;
+    const ffloor_t *waterff = NULL;
+
+    for (ff = frontsector->ffloors; ff; ff = ff->next)
+    {
+      fixed_t wtop;
+      if (ff->type != FFLOOR_SWIMMABLE)
+        continue;
+      wtop = ff->model->ceilingheight;        /* water surface height */
+      if (ff->model->floorheight >= wtop)
+        continue;
+      /* topmost water surface at or below the view (nearest from above) */
+      if (wtop <= viewz && wtop > bestwater) { bestwater = wtop; waterff = ff; }
+    }
+
+    if (waterff)
+      waterplane = R_FindWaterPlane(bestwater,
+                                    waterff->model->floorpic,
+                                    waterff->model->lightlevel);
+  }
+
   // killough 9/18/98: Fix underwater slowdown, by passing real sector
   // instead of fake one. Improve sprite lighting by basing sprite
   // lightlevels on floor & ceiling lightlevels in the surrounding area.

@@ -160,6 +160,10 @@ R_DrawSpan_f R_GetDrawSpanFunc(enum draw_filter_type_e filter,
                                enum draw_filter_type_e filterz);
 void R_DrawSpan(draw_span_vars_t *dsvars);
 
+/* When nonzero, R_DrawSpan blends its output 50/50 against the framebuffer
+ * instead of overwriting it; set around a translucent 3D-floor surface. */
+extern int r_span_translucent;
+
 void R_InitBuffer(int width, int height);
 
 // Initialize color translation tables, for player rendering etc.

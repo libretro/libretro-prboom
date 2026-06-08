@@ -6131,6 +6131,141 @@ static void R_DrawSpan16_RoundedUV_LinearZ(draw_span_vars_t *dsvars)
    }
 }
 
+/* Translucent point-sampled span: the opaque PointUV_PointZ kernel with a
+ * 50/50 RGB565 blend against the framebuffer on store, used to lay a
+ * see-through 3D-floor (swimmable) surface over whatever was drawn beneath
+ * it.  Point sampling only -- a translucent water surface does not need the
+ * filtered/dithered variants.  The SSE2/NEON blocks mirror the opaque
+ * kernel's index math exactly (so the texel gather is bit-identical) and add
+ * only the load-blend-store of the destination; the blend folds the masked
+ * half-sum of source and dest, the same arithmetic as TL_BLEND565. */
+static void R_DrawSpan16_TL(draw_span_vars_t *dsvars)
+{
+   unsigned count = dsvars->x2 - dsvars->x1 + 1;
+   fixed_t xfrac = dsvars->xfrac;
+   fixed_t yfrac = dsvars->yfrac;
+   const fixed_t xstep = dsvars->xstep;
+   const fixed_t ystep = dsvars->ystep;
+   const uint8_t *source = dsvars->source;
+   uint16_t *dest = drawvars.short_topleft + dsvars->y * SCREENWIDTH + dsvars->x1;
+   const uint16_t *lut = R_GetComposedColormap(dsvars->colormap);
+
+#if defined(__SSE2__)
+   if (count >= 8)
+   {
+      unsigned blocks = count >> 2;
+      __m128i vx  = _mm_set_epi32(xfrac + 3*xstep, xfrac + 2*xstep,
+                                  xfrac + xstep,   xfrac);
+      __m128i vy  = _mm_set_epi32(yfrac + 3*ystep, yfrac + 2*ystep,
+                                  yfrac + ystep,   yfrac);
+      const __m128i vxs   = _mm_set1_epi32(xstep << 2);
+      const __m128i vys   = _mm_set1_epi32(ystep << 2);
+      const __m128i m63   = _mm_set1_epi32(63);
+      const __m128i m4032 = _mm_set1_epi32(4032);
+      /* 0xF7DE clears each channel's low bit so the >>1 cannot bleed across
+       * the R/G/B field boundaries; halving both operands and adding is the
+       * 50/50 blend, vectorised four pixels at a time. */
+      const __m128i mlow  = _mm_set1_epi16((short)0xF7DE);
+      unsigned consumed   = blocks << 2;
+
+      while (blocks--)
+      {
+         uint32_t idx[4];
+         __m128i xt   = _mm_and_si128(_mm_srai_epi32(vx, 16), m63);
+         __m128i yt   = _mm_and_si128(_mm_srai_epi32(vy, 10), m4032);
+         __m128i spot = _mm_or_si128(xt, yt);
+         __m128i src4, dst4, blended;
+
+         _mm_storeu_si128((__m128i *)idx, spot);
+
+         /* gather the four source texels through the LUT into the low four
+          * lanes of a 16-bit vector, load the four destination pixels, blend */
+         src4 = _mm_set_epi16(0, 0, 0, 0,
+                              (short)lut[source[idx[3]]],
+                              (short)lut[source[idx[2]]],
+                              (short)lut[source[idx[1]]],
+                              (short)lut[source[idx[0]]]);
+         dst4 = _mm_loadl_epi64((const __m128i *)dest);
+         blended = _mm_add_epi16(
+                      _mm_srli_epi16(_mm_and_si128(src4, mlow), 1),
+                      _mm_srli_epi16(_mm_and_si128(dst4, mlow), 1));
+         _mm_storel_epi64((__m128i *)dest, blended);
+         dest += 4;
+
+         vx = _mm_add_epi32(vx, vxs);
+         vy = _mm_add_epi32(vy, vys);
+      }
+
+      xfrac += (fixed_t)consumed * xstep;
+      yfrac += (fixed_t)consumed * ystep;
+      count -= consumed;
+   }
+#elif defined(__ARM_NEON)
+   if (count >= 8)
+   {
+      unsigned blocks = count >> 2;
+      const int32_t xbase[4] = { xfrac, xfrac + xstep,
+                                 xfrac + 2*xstep, xfrac + 3*xstep };
+      const int32_t ybase[4] = { yfrac, yfrac + ystep,
+                                 yfrac + 2*ystep, yfrac + 3*ystep };
+      int32x4_t vx = vld1q_s32(xbase);
+      int32x4_t vy = vld1q_s32(ybase);
+      const int32x4_t vxs   = vdupq_n_s32(xstep << 2);
+      const int32x4_t vys   = vdupq_n_s32(ystep << 2);
+      const int32x4_t m63   = vdupq_n_s32(63);
+      const int32x4_t m4032 = vdupq_n_s32(4032);
+      const uint16x4_t mlow = vdup_n_u16(0xF7DE);
+      unsigned consumed     = blocks << 2;
+
+      while (blocks--)
+      {
+         uint32_t idx[4];
+         uint16_t s4[4];
+         uint16x4_t src4, dst4, blended;
+         int32x4_t xt   = vandq_s32(vshrq_n_s32(vx, 16), m63);
+         int32x4_t yt   = vandq_s32(vshrq_n_s32(vy, 10), m4032);
+         int32x4_t spot = vorrq_s32(xt, yt);
+
+         vst1q_u32(idx, vreinterpretq_u32_s32(spot));
+
+         s4[0] = lut[source[idx[0]]];
+         s4[1] = lut[source[idx[1]]];
+         s4[2] = lut[source[idx[2]]];
+         s4[3] = lut[source[idx[3]]];
+         src4 = vld1_u16(s4);
+         dst4 = vld1_u16(dest);
+         blended = vadd_u16(vshr_n_u16(vand_u16(src4, mlow), 1),
+                            vshr_n_u16(vand_u16(dst4, mlow), 1));
+         vst1_u16(dest, blended);
+         dest += 4;
+
+         vx = vaddq_s32(vx, vxs);
+         vy = vaddq_s32(vy, vys);
+      }
+
+      xfrac += (fixed_t)consumed * xstep;
+      yfrac += (fixed_t)consumed * ystep;
+      count -= consumed;
+   }
+#endif
+
+   while (count)
+   {
+      const fixed_t xtemp = (xfrac >> 16) & 63;
+      const fixed_t ytemp = (yfrac >> 10) & 4032;
+      const fixed_t spot = xtemp | ytemp;
+      uint16_t s = lut[source[spot]];
+      xfrac += xstep;
+      yfrac += ystep;
+      *dest = TL_BLEND565(s, *dest);
+      dest++;
+      count--;
+   }
+}
+
+/* Set by the plane drawer around a translucent 3D-floor surface pass. */
+int r_span_translucent = 0;
+
 static R_DrawSpan_f drawspanfuncs[RDRAW_FILTER_MAXFILTERS][RDRAW_FILTER_MAXFILTERS] = {
     {
       NULL,
@@ -6168,6 +6303,10 @@ R_DrawSpan_f R_GetDrawSpanFunc(enum draw_filter_type_e filter,
 }
 
 void R_DrawSpan(draw_span_vars_t *dsvars) {
+  if (r_span_translucent) {
+    R_DrawSpan16_TL(dsvars);
+    return;
+  }
   R_GetDrawSpanFunc(drawvars.filterfloor, drawvars.filterz)(dsvars);
 }
 

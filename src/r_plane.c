@@ -73,6 +73,11 @@ static visplane_t *visplanes[MAXVISPLANES];   // killough
 static visplane_t *freetail;                  // killough
 static visplane_t **freehead = &freetail;     // killough
 visplane_t *floorplane, *ceilingplane;
+/* Per-subsector translucent 3D-floor (swimmable) surface, set in
+ * R_Subsector, span-filled in R_RenderSegLoop, drawn after the opaque
+ * planes in R_DrawPlanes.  NULL except in a swimmable sector viewed from
+ * above its water surface. */
+visplane_t *waterplane;
 
 // killough -- hash function for visplanes
 // Empirically verified to be fairly uniform:
@@ -450,6 +455,7 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
       new_pl->minx = start;
       new_pl->maxx = stop;
       new_pl->modified = 0;
+      new_pl->translucent = pl->translucent;
       memset(new_pl->top, 0xff, sizeof new_pl->top);
       return new_pl;
 }
@@ -493,6 +499,7 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
             lightlevel == check->lightlevel &&
             xoffs == check->xoffs &&      // killough 2/28/98: Add offset checks
             yoffs == check->yoffs &&
+            !check->translucent &&        /* water planes never merge with opaque */
             slope == check->slope)        /* tilted planes never merge with flat */
          return check;
 
@@ -507,6 +514,34 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
    check->yoffs = yoffs;
    check->slope = slope;
    check->modified = 0;
+   check->translucent = 0;
+
+   memset (check->top, 0xff, sizeof check->top);
+
+   return check;
+}
+
+/*
+ * R_FindWaterPlane -- allocate a dedicated translucent visplane for a
+ * 3D-floor (swimmable) water surface.  Unlike R_FindPlane it never shares
+ * with an opaque plane (its translucent flag would wrongly blend an ordinary
+ * floor), so it is allocated fresh; a swimmable sector has at most one per
+ * subsector, span-extended across that subsector's segs by R_CheckPlane.
+ */
+visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel)
+{
+   visplane_t *check = new_visplane(visplane_hash(picnum, lightlevel, height));
+
+   check->height = height;
+   check->picnum = picnum;
+   check->lightlevel = lightlevel;
+   check->minx = viewwidth;
+   check->maxx = -1;
+   check->xoffs = 0;
+   check->yoffs = 0;
+   check->slope = NULL;
+   check->modified = 0;
+   check->translucent = 1;
 
    memset (check->top, 0xff, sizeof check->top);
 
@@ -813,9 +848,14 @@ static void R_DoDrawPlane(visplane_t *pl)
          else
             tilt_plane = NULL;
 
+         if (pl->translucent)
+            r_span_translucent = 1;
+
          for (x = pl->minx ; x <= stop ; x++)
             R_MakeSpans(x,pl->top[x-1],pl->bottom[x-1],
                   pl->top[x],pl->bottom[x], &dsvars);
+
+         r_span_translucent = 0;
 
          tilt_plane = NULL;
 
@@ -835,9 +875,16 @@ void R_DrawPlanes (void)
   int i;
   visplane_t *pl;
 
+  /* Opaque planes first, then translucent 3D-floor water surfaces, so the
+   * water blends over the floor (and submerged walls) already in the
+   * framebuffer rather than over stale pixels. */
   for (i=0;i<MAXVISPLANES;i++)
-  {
      for (pl=visplanes[i]; pl; pl=pl->next)
-        R_DoDrawPlane(pl);
-  }
+        if (!pl->translucent)
+           R_DoDrawPlane(pl);
+
+  for (i=0;i<MAXVISPLANES;i++)
+     for (pl=visplanes[i]; pl; pl=pl->next)
+        if (pl->translucent)
+           R_DoDrawPlane(pl);
 }

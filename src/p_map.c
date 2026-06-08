@@ -2414,10 +2414,24 @@ mobj_t*   usething;
 dbool PTR_UseTraverse (intercept_t* in)
 {
   int side;
+  line_t *li = in->d.line;
+  dbool use_special;
 
-  if (!in->d.line->special)
+  /* Does the player's "use" activate this line?  Doom activates any special
+   * line; Hexen/ZDoom only SPAC_USE lines.  A line carrying a cross, impact
+   * or static special (scrollers, line/sector portals, Plane_Align,
+   * Sector_Set3DFloor, ...) must NOT swallow the use -- the trace has to pass
+   * through it to reach a real door or switch behind, exactly as it passes
+   * through a plain two-sided line.  Treating every special line as a use
+   * target (the old behaviour) made such lines block use entirely, which is
+   * common in ZDoom UDMF maps (e.g. a portal/scroll line in front of a
+   * remote-tagged door). */
+  use_special = li->special &&
+                (map_format.hexen ? (GET_SPAC(li->flags) == SPAC_USE) : TRUE);
+
+  if (!use_special)
     {
-    P_LineOpeningAt(in->d.line, trace.x + FixedMul(trace.dx, in->frac),
+    P_LineOpeningAt(li, trace.x + FixedMul(trace.dx, in->frac),
                     trace.y + FixedMul(trace.dy, in->frac));
     if (openrange <= 0)
       {
@@ -2455,13 +2469,13 @@ dbool PTR_UseTraverse (intercept_t* in)
       return FALSE;
       }
 
-    // not a special line, but keep checking
+    // not a use-activatable line, but keep checking
 
     return TRUE;
     }
 
   side = 0;
-  if (P_PointOnLineSide (usething->x, usething->y, in->d.line) == 1)
+  if (P_PointOnLineSide (usething->x, usething->y, li) == 1)
     side = 1;
 
   //  return FALSE;   // don't use back side
@@ -2470,19 +2484,19 @@ dbool PTR_UseTraverse (intercept_t* in)
    * Hexen specials layer (also ZDoom Doom-in-Hexen maps); Doom maps use the
    * classic P_UseSpecialLine.  Hexen has no Boom pass-use: bit 9 is
    * repeat-special there, so reading it as ML_PASSUSE would make every
-   * repeatable line use-through.  Stop at the first special line. */
+   * repeatable line use-through.  Stop at the first activated use line. */
   if (map_format.hexen)
     {
-      P_UseHexenSpecialLine (usething, in->d.line, side);
+      P_UseHexenSpecialLine (usething, li, side);
       return FALSE;
     }
 
-  P_UseSpecialLine (usething, in->d.line, side);
+  P_UseSpecialLine (usething, li, side);
 
   //WAS can't use for than one special line in a row
   //jff 3/21/98 NOW multiple use allowed with enabling line flag
 
-  return (!demo_compatibility && (in->d.line->flags&ML_PASSUSE))?
+  return (!demo_compatibility && (li->flags&ML_PASSUSE))?
           TRUE : FALSE;
 }
 

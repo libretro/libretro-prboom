@@ -190,7 +190,7 @@ sector_t *openbacksector;  // made global
  * movement clip (no tmthing) or off slab-bearing maps this is free. */
 extern mobj_t *ffloor_clip_thing;   /* p_map.c: thing being position-checked */
 
-static void P_FFloorAdjustOpening(void)
+static void P_FFloorAdjustOpening(fixed_t x, fixed_t y)
 {
   mobj_t *mo = ffloor_clip_thing;
 
@@ -198,16 +198,16 @@ static void P_FFloorAdjustOpening(void)
     return;
   if (openfrontsector->ffloors)
   {
-    openbottom = P_FFloorAdjustFloorZ(openfrontsector, mo->z,
+    openbottom = P_FFloorAdjustFloorZ(openfrontsector, x, y, mo->z,
                                       mo->height, openbottom);
-    opentop = P_FFloorAdjustCeilingZ(openfrontsector, mo->z,
+    opentop = P_FFloorAdjustCeilingZ(openfrontsector, x, y, mo->z,
                                      mo->height, opentop);
   }
   if (openbacksector->ffloors)
   {
-    openbottom = P_FFloorAdjustFloorZ(openbacksector, mo->z,
+    openbottom = P_FFloorAdjustFloorZ(openbacksector, x, y, mo->z,
                                       mo->height, openbottom);
-    opentop = P_FFloorAdjustCeilingZ(openbacksector, mo->z,
+    opentop = P_FFloorAdjustCeilingZ(openbacksector, x, y, mo->z,
                                      mo->height, opentop);
   }
 }
@@ -239,7 +239,8 @@ void P_LineOpening(const line_t *linedef)
       lowfloor = openfrontsector->floorheight;
     }
 
-  P_FFloorAdjustOpening();
+  P_FFloorAdjustOpening(ffloor_clip_thing ? ffloor_clip_thing->x : 0,
+                        ffloor_clip_thing ? ffloor_clip_thing->y : 0);
 
   openrange = opentop - openbottom;
 }
@@ -277,7 +278,7 @@ void P_LineOpeningAt(const line_t *linedef, fixed_t x, fixed_t y)
       lowfloor = ff;
     }
 
-  P_FFloorAdjustOpening();
+  P_FFloorAdjustOpening(x, y);
 
   openrange = opentop - openbottom;
 }

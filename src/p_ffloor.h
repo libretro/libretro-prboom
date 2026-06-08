@@ -42,9 +42,9 @@ void P_AttachFFloors(void);
  * thing of `height` whose feet are at `z`.  A slab whose midpoint is
  * below the thing's midpoint raises the floor to the slab top;
  * otherwise it lowers the ceiling to the slab bottom. */
-fixed_t P_FFloorAdjustFloorZ(const sector_t *s, fixed_t z, fixed_t height,
-                             fixed_t floorz);
-fixed_t P_FFloorAdjustCeilingZ(const sector_t *s, fixed_t z, fixed_t height,
-                               fixed_t ceilingz);
+fixed_t P_FFloorAdjustFloorZ(const sector_t *s, fixed_t x, fixed_t y,
+                             fixed_t z, fixed_t height, fixed_t floorz);
+fixed_t P_FFloorAdjustCeilingZ(const sector_t *s, fixed_t x, fixed_t y,
+                               fixed_t z, fixed_t height, fixed_t ceilingz);
 
 #endif

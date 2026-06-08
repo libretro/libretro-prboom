@@ -311,10 +311,10 @@ dbool P_TeleportMove (mobj_t* thing,fixed_t x,fixed_t y, dbool boss)
   tmceilingz = P_CeilingZAtPoint(newsubsec->sector, x, y);
   if (newsubsec->sector->ffloors)
   {
-    tmfloorz = P_FFloorAdjustFloorZ(newsubsec->sector, thing->z,
+    tmfloorz = P_FFloorAdjustFloorZ(newsubsec->sector, x, y, thing->z,
                                     thing->height, tmfloorz);
     tmdropoffz = tmfloorz;
-    tmceilingz = P_FFloorAdjustCeilingZ(newsubsec->sector, thing->z,
+    tmceilingz = P_FFloorAdjustCeilingZ(newsubsec->sector, x, y, thing->z,
                                         thing->height, tmceilingz);
   }
 
@@ -1281,10 +1281,10 @@ dbool P_CheckPosition (mobj_t* thing,fixed_t x,fixed_t y)
   tmceilingz = P_CeilingZAtPoint(newsubsec->sector, x, y);
   if (newsubsec->sector->ffloors)
   {
-    tmfloorz = P_FFloorAdjustFloorZ(newsubsec->sector, thing->z,
+    tmfloorz = P_FFloorAdjustFloorZ(newsubsec->sector, x, y, thing->z,
                                     thing->height, tmfloorz);
     tmdropoffz = tmfloorz;
-    tmceilingz = P_FFloorAdjustCeilingZ(newsubsec->sector, thing->z,
+    tmceilingz = P_FFloorAdjustCeilingZ(newsubsec->sector, x, y, thing->z,
                                         thing->height, tmceilingz);
   }
   validcount++;

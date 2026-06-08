@@ -6,6 +6,7 @@
 #include "m_fixed.h"
 #include "map_format.h"
 #include "p_spec.h"
+#include "p_slope.h"
 #include "r_defs.h"
 #include "r_main.h"
 #include "r_state.h"
@@ -62,8 +63,8 @@ void P_AttachFFloors(void)
             attached);
 }
 
-fixed_t P_FFloorAdjustFloorZ(const sector_t *s, fixed_t z, fixed_t height,
-                             fixed_t floorz)
+fixed_t P_FFloorAdjustFloorZ(const sector_t *s, fixed_t x, fixed_t y,
+                             fixed_t z, fixed_t height, fixed_t floorz)
 {
   const ffloor_t *ff;
   fixed_t thingmid = z + (height >> 1);
@@ -73,8 +74,12 @@ fixed_t P_FFloorAdjustFloorZ(const sector_t *s, fixed_t z, fixed_t height,
     fixed_t top, bottom, slabmid;
     if (ff->type != FFLOOR_SOLID)
       continue;
-    top = ff->model->ceilingheight;
-    bottom = ff->model->floorheight;
+    /* slope-aware: the slab top is the control sector's ceiling and its
+     * bottom is the control sector's floor, each evaluated at (x,y) so a
+     * tilted 3D floor is stood on at the right height (these reduce to the
+     * flat sector heights when the model is not sloped) */
+    top = P_CeilingZAtPoint(ff->model, x, y);
+    bottom = P_FloorZAtPoint(ff->model, x, y);
     if (bottom > top)
       continue;
     slabmid = bottom + ((top - bottom) >> 1);
@@ -84,8 +89,8 @@ fixed_t P_FFloorAdjustFloorZ(const sector_t *s, fixed_t z, fixed_t height,
   return floorz;
 }
 
-fixed_t P_FFloorAdjustCeilingZ(const sector_t *s, fixed_t z, fixed_t height,
-                               fixed_t ceilingz)
+fixed_t P_FFloorAdjustCeilingZ(const sector_t *s, fixed_t x, fixed_t y,
+                               fixed_t z, fixed_t height, fixed_t ceilingz)
 {
   const ffloor_t *ff;
   fixed_t thingmid = z + (height >> 1);
@@ -95,8 +100,8 @@ fixed_t P_FFloorAdjustCeilingZ(const sector_t *s, fixed_t z, fixed_t height,
     fixed_t top, bottom, slabmid;
     if (ff->type != FFLOOR_SOLID)
       continue;
-    top = ff->model->ceilingheight;
-    bottom = ff->model->floorheight;
+    top = P_CeilingZAtPoint(ff->model, x, y);
+    bottom = P_FloorZAtPoint(ff->model, x, y);
     if (bottom > top)
       continue;
     slabmid = bottom + ((top - bottom) >> 1);

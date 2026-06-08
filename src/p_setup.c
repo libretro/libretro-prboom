@@ -1341,8 +1341,8 @@ static void P_LoadThings (int lump)
  * out-of-range sidedef fixups.  Factored out of P_LoadLineDefs so the UDMF
  * linedef loader produces byte-identical geometry post-processing.  Operates
  * purely on fields already set on ld; i is used only for warning messages. */
-static void P_FinalizeLineDef(line_t *ld, unsigned short mv1,
-                              unsigned short mv2, int i)
+static void P_FinalizeLineDef(line_t *ld, int mv1,
+                              int mv2, int i)
 {
   vertex_t *v1, *v2;
 
@@ -1468,8 +1468,10 @@ static void P_LoadLineDefs (int lump)
             ld->args[a] = mld->args[a];
           mv1 = (unsigned short)SHORT(mld->v1);
           mv2 = (unsigned short)SHORT(mld->v2);
-          ld->sidenum[0] = SHORT(mld->sidenum[0]);
-          ld->sidenum[1] = SHORT(mld->sidenum[1]);
+          { int s0 = (unsigned short)SHORT(mld->sidenum[0]);
+            int s1 = (unsigned short)SHORT(mld->sidenum[1]);
+            ld->sidenum[0] = (s0 == 0xffff) ? NO_INDEX : s0;
+            ld->sidenum[1] = (s1 == 0xffff) ? NO_INDEX : s1; }
         }
       else
         {
@@ -1479,8 +1481,10 @@ static void P_LoadLineDefs (int lump)
           ld->tag     = SHORT(mld->tag);
           mv1 = (unsigned short)SHORT(mld->v1);
           mv2 = (unsigned short)SHORT(mld->v2);
-          ld->sidenum[0] = SHORT(mld->sidenum[0]);
-          ld->sidenum[1] = SHORT(mld->sidenum[1]);
+          { int s0 = (unsigned short)SHORT(mld->sidenum[0]);
+            int s1 = (unsigned short)SHORT(mld->sidenum[1]);
+            ld->sidenum[0] = (s0 == 0xffff) ? NO_INDEX : s0;
+            ld->sidenum[1] = (s1 == 0xffff) ? NO_INDEX : s1; }
         }
 
       P_FinalizeLineDef(ld, mv1, mv2, i);
@@ -2445,7 +2449,7 @@ static void P_LoadUDMFLineDefs(void)
   {
     line_t *ld = lines + i;
     const udmf_line_t *mld = &udmf.lines[i];
-    unsigned short mv1, mv2;
+    int mv1, mv2;
 
     if (map_format.zdoom)
     {
@@ -2491,11 +2495,10 @@ static void P_LoadUDMFLineDefs(void)
     ld->args[3] = mld->arg3;
     ld->args[4] = mld->arg4;
 
-    mv1 = (unsigned short)mld->v1;
-    mv2 = (unsigned short)mld->v2;
-    ld->sidenum[0] = (unsigned short)mld->sidefront;
-    ld->sidenum[1] = (mld->sideback >= 0) ? (unsigned short)mld->sideback
-                                          : (unsigned short)NO_INDEX;
+    mv1 = mld->v1;
+    mv2 = mld->v2;
+    ld->sidenum[0] = (mld->sidefront >= 0) ? mld->sidefront : NO_INDEX;
+    ld->sidenum[1] = (mld->sideback  >= 0) ? mld->sideback  : NO_INDEX;
 
     P_FinalizeLineDef(ld, mv1, mv2, i);
 

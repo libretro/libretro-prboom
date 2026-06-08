@@ -208,7 +208,10 @@ typedef struct line_s
   /* Widened from unsigned char: ZDoom UDMF args are full ints (line ids,
    * tags and TIDs in large maps exceed 255; heights can be negative). */
   int args[5];
-  unsigned short sidenum[2];        // Visual appearance: SideDefs.
+  /* 32-bit: ZDoom UDMF maps can have far more than 65535 sidedefs (MyHouse
+   * has ~301k), so a 16-bit index silently wraps and points at the wrong
+   * sidedef -> wrong sector. */
+  int sidenum[2];                   // Visual appearance: SideDefs.
   fixed_t bbox[4];       // A bounding box, for the linedef's extent
   slopetype_t slopetype; // To aid move clipping.
   sector_t *frontsector; // Front and back sector.

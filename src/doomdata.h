@@ -109,7 +109,11 @@ typedef struct {
   unsigned short sidenum[2];
 } PACKEDATTR hexen_maplinedef_t;
 
-#define NO_INDEX ((unsigned short)-1)
+/* -1 rather than 0xffff: line_t.sidenum is now a 32-bit int (UDMF maps can
+ * have >65535 sidedefs, so 65535 is a valid index and cannot be the sentinel).
+ * The on-disk binary formats still use 0xffff for "no sidedef"; the loaders
+ * translate that to NO_INDEX. */
+#define NO_INDEX (-1)
 
 //
 // LineDef attributes.

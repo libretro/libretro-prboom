@@ -2023,10 +2023,41 @@ dbool P_IsDoomnumAllowed(int doomnum)
 // the engine's narrow mapthing_t (a raw Doom WAD record) cannot hold them.
 //
 
-#define MAX_TID_COUNT 200
 
-static int     TIDList[MAX_TID_COUNT + 1];  /* +1 for the 0 terminator */
-static mobj_t *TIDMobj[MAX_TID_COUNT];
+static int     *TIDList;  /* zero-terminated; heap, grown on demand */
+static mobj_t **TIDMobj;
+static int      tid_capacity;  /* entries excluding the terminator */
+
+/* Ensure capacity for `need` entries plus the terminator.  Hexen's
+ * fixed 200-entry MAX_TID_COUNT is far below ZDoom-scale maps -- MyHouse
+ * places 428 tid-carrying things -- and this engine's I_Error returns
+ * instead of aborting, so the old bounds check degraded into silent
+ * out-of-bounds writes: TIDMobj's overflow sprayed mobj pointers
+ * across TIDList and every lookup failed. */
+static void P_GrowTIDList(int need)
+{
+  int     nc;
+  int    *nl;
+  mobj_t **nm;
+
+  if (need + 1 <= tid_capacity)
+    return;
+  nc = tid_capacity ? tid_capacity : 256;
+  while (nc < need + 1)
+    nc *= 2;
+  nl = Z_Malloc(nc * sizeof(*nl), PU_STATIC, 0);
+  nm = Z_Malloc(nc * sizeof(*nm), PU_STATIC, 0);
+  if (TIDList)
+  {
+    memcpy(nl, TIDList, (tid_capacity) * sizeof(*nl));
+    memcpy(nm, TIDMobj, (tid_capacity) * sizeof(*nm));
+    Z_Free(TIDList);
+    Z_Free(TIDMobj);
+  }
+  TIDList = nl;
+  TIDMobj = nm;
+  tid_capacity = nc;
+}
 
 short hexen_thing_tid = 0;
 short hexen_thing_height = 0;
@@ -2038,6 +2069,7 @@ void P_CreateTIDList(void)
   int        i = 0;
   thinker_t *t;
 
+  P_GrowTIDList(0);
   for (t = thinkercap.next; t != &thinkercap; t = t->next)
   {
     mobj_t *mobj;
@@ -2046,8 +2078,7 @@ void P_CreateTIDList(void)
     mobj = (mobj_t *) t;
     if (mobj->tid != 0)
     {
-      if (i == MAX_TID_COUNT)
-        I_Error("P_CreateTIDList: MAX_TID_COUNT (%d) exceeded.", MAX_TID_COUNT);
+      P_GrowTIDList(i + 1);
       TIDList[i] = mobj->tid;
       TIDMobj[i++] = mobj;
     }
@@ -2060,6 +2091,7 @@ void P_InsertMobjIntoTIDList(mobj_t *mobj, short tid)
   int i;
   int index = -1;
 
+  P_GrowTIDList(0);
   for (i = 0; TIDList[i] != 0; i++)
     if (TIDList[i] == -1)
     {
@@ -2068,9 +2100,7 @@ void P_InsertMobjIntoTIDList(mobj_t *mobj, short tid)
     }
   if (index == -1)
   {
-    if (i == MAX_TID_COUNT)
-      I_Error("P_InsertMobjIntoTIDList: MAX_TID_COUNT (%d) exceeded.",
-              MAX_TID_COUNT);
+    P_GrowTIDList(i + 1);
     index = i;
     TIDList[index + 1] = 0;
   }
@@ -2083,6 +2113,11 @@ void P_RemoveMobjFromTIDList(mobj_t *mobj)
 {
   int i;
 
+  if (!TIDList)
+  {
+    mobj->tid = 0;
+    return;
+  }
   for (i = 0; TIDList[i] != 0; i++)
     if (TIDMobj[i] == mobj)
     {
@@ -2128,6 +2163,11 @@ mobj_t *P_FindMobjFromTID(short tid, int *searchPosition)
 {
   int i;
 
+  if (!TIDList)
+  {
+    *searchPosition = -1;
+    return NULL;
+  }
   for (i = *searchPosition + 1; TIDList[i] != 0; i++)
     if (TIDList[i] == tid)
     {

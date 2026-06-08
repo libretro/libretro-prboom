@@ -655,7 +655,7 @@ static mobj_t *zacs_aptr(zacs_inst_t *inst, int tid)
   if (tid == 0)
     return inst->activator;
   {
-    int sp = 0;
+    int sp = -1;
     return P_FindMobjFromTID((short)tid, &sp);
   }
 }
@@ -1396,7 +1396,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       int a5 = ZPOP(), a4 = ZPOP(), a3 = ZPOP(), a2 = ZPOP(), a1 = ZPOP();
       int special = ZPOP();
       int tid = ZPOP();
-      int sp = 0;
+      int sp = -1;
       mobj_t *mo;
       while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
       {
@@ -2005,7 +2005,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       int vol = ZPOP();
       int sfx = zacs_sfx_for_name(zacs_string(ZPOP()));
       int tid = ZPOP();
-      int sp = 0;
+      int sp = -1;
       mobj_t *mo;
       (void)vol;
       if (sfx > 0)
@@ -2206,7 +2206,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         }
         if (tid)
         {
-          int sp = 0;
+          int sp = -1;
           while (P_FindMobjFromTID((short)tid, &sp))
             n++;
         }
@@ -2230,7 +2230,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       int n = 0;
       if (tid)
       {
-        int sp = 0;
+        int sp = -1;
         mobj_t *mo;
         while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
           if (type < 0 || mo->type == type)
@@ -2285,7 +2285,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     {
       int ang = ZPOP();
       int tid = ZPOP();
-      int sp = 0;
+      int sp = -1;
       mobj_t *mo;
       if (tid == 0)
       {
@@ -2375,7 +2375,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         int n = 0;
         if (type >= 0)
         {
-          int sp = 0;
+          int sp = -1;
           mobj_t *spot;
           while ((spot = P_FindMobjFromTID((short)spottid, &sp)) != NULL)
           {
@@ -2400,7 +2400,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       const char *dt = zacs_string(ZPOP());
       int amount = ZPOP();
       int tid = ZSTK(1);
-      int sp = 0, n = 0;
+      int sp = -1, n = 0;
       mobj_t *mo;
       (void)dt;
       while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
@@ -2528,7 +2528,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         zacs_give_inventory(inst->activator, nm, n);
       else
       {
-        int sp = 0;
+        int sp = -1;
         mobj_t *mo;
         while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
           zacs_give_inventory(mo, nm, n);
@@ -2556,7 +2556,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         zacs_take_inventory(inst->activator, nm, n);
       else
       {
-        int sp = 0;
+        int sp = -1;
         mobj_t *mo;
         while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
           zacs_take_inventory(mo, nm, n);
@@ -2569,7 +2569,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     case PCD_CLEARACTORINVENTORY:
     {
       int tid = ZPOP();
-      int sp = 0;
+      int sp = -1;
       mobj_t *mo;
       if (tid == 0)
         zacs_clear_inventory(inst->activator);

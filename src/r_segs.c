@@ -433,6 +433,7 @@ void R_RenderThickSides(drawseg_t *ds)
    draw_column_vars_t dcvars;
    R_DrawColumn_f   colfunc;
    fixed_t          scalestep;
+   int              used_translucent = 0;
 
    back = ds->curline ? ds->curline->backsector : NULL;
    if (!back || !back->ffloors || !ds->sprtopclip || !ds->sprbottomclip)
@@ -452,12 +453,15 @@ void R_RenderThickSides(drawseg_t *ds)
       side_t         *cs;
       fixed_t        spryscale;
       int            light;
+      int            translucent;
 
-      /* Solid and render-only slabs are drawn opaquely; only physics tells
-       * them apart.  Swimmable (translucent) slabs need an alpha path and
-       * are not handled here yet. */
-      if (ff->type != FFLOOR_SOLID && ff->type != FFLOOR_RENDERONLY)
+      /* Solid and render-only slabs draw opaquely; swimmable (water) slabs
+       * draw their sides translucently.  Only physics tells solid and
+       * render-only apart, so they share the opaque path here. */
+      if (ff->type != FFLOOR_SOLID && ff->type != FFLOOR_RENDERONLY &&
+          ff->type != FFLOOR_SWIMMABLE)
          continue;
+      translucent = (ff->type == FFLOOR_SWIMMABLE);
       top = ff->model->ceilingheight;
       bot = ff->model->floorheight;
       if (bot >= top)
@@ -477,6 +481,15 @@ void R_RenderThickSides(drawseg_t *ds)
       texheight = textureheight[texnum] >> FRACBITS;
       light     = ff->model->lightlevel;
       spryscale = ds->scale1;
+
+      /* The standard column drawer batches through the run kernel and honours
+       * the translucency mode set here; a water slab's columns blend 50/50,
+       * an opaque slab's overwrite.  Switching the mode between slabs flushes
+       * the pending batch on the next column (type change), so mixed stacks
+       * stay correct. */
+      R_SetSpriteTranslucency(translucent ? 1 : 0);
+      if (translucent)
+         used_translucent = 1;
 
       for (x = ds->x1; x <= ds->x2; x++, spryscale += scalestep)
       {
@@ -524,6 +537,17 @@ void R_RenderThickSides(drawseg_t *ds)
 
       R_DrawCmdAdoptTextureLock(texnum);
    }
+
+   /* If any slab drew translucent, the last batch may still be pending in TL
+    * mode; flush it and restore opaque so the following sprite pass is not
+    * blended.  Skipped when all slabs were opaque, leaving that path's flush
+    * timing (and output) unchanged. */
+   if (used_translucent)
+   {
+      R_ResetColumnBuffer();
+      R_SetSpriteTranslucency(0);
+   }
+
    curline = NULL;
 }
 

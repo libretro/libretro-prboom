@@ -147,6 +147,15 @@ static void R_RecalcLineFlags(void)
     // identical light levels on both sides,
     // and no middle texture.
     // CPhipps - recode for speed, not certain if this is portable though
+    //
+    // A 3D-floor (ZDoom Sector_Set3DFloor) sector is most often the same
+    // floor/ceiling/light as the sector beside it -- a platform you can walk
+    // onto -- and differs only by the slab inside it.  Such a line must NOT be
+    // treated as an empty trigger line: the slab's faces (and surfaces) are
+    // rendered from the drawseg this line produces, so force it to render.
+    if (backsector->ffloors || frontsector->ffloors) {
+      linedef->r_flags = 0; return;
+    }
     if (backsector->ceilingheight != frontsector->ceilingheight
   || backsector->floorheight != frontsector->floorheight
   || curline->sidedef->midtexture

@@ -154,13 +154,39 @@ int R_PointOnSide(fixed_t x, fixed_t y, const node_t *node)
      return node->dx > 0;
   }
 
-  x -= node->x;
-  y -= node->y;
+  /* Offset the point from the partition in 64-bit.  ZDoom XGL3 extended GL
+   * nodes store the partition line in 16.16 fixed point, so on a large map
+   * node->x/y reach ~10^9 and the vanilla 32-bit "x -= node->x" overflows
+   * when the point and partition straddle the origin -- the wrong child is
+   * taken and the traversal ends in the wrong subsector. */
+  {
+    int64_t dx64 = (int64_t)x - node->x;
+    int64_t dy64 = (int64_t)y - node->y;
 
-  // Try to quickly decide by looking at sign bits.
-  if ((node->dy ^ node->dx ^ x ^ y) < 0)
-    return (node->dy ^ x) < 0;  // (left is negative)
-  return FixedMul(y, node->dx>>FRACBITS) >= FixedMul(node->dy>>FRACBITS, x);
+    /* Classic nodes (and any point near the partition) stay within 32 bits:
+     * run the exact vanilla computation so demo-compatible maps are
+     * bit-for-bit unchanged. */
+    if (dx64 == (fixed_t)dx64 && dy64 == (fixed_t)dy64)
+    {
+      fixed_t dx = (fixed_t)dx64;
+      fixed_t dy = (fixed_t)dy64;
+
+      // Try to quickly decide by looking at sign bits.
+      if ((node->dy ^ node->dx ^ dx ^ dy) < 0)
+        return (node->dy ^ dx) < 0;  // (left is negative)
+      return FixedMul(dy, node->dx>>FRACBITS) >= FixedMul(node->dy>>FRACBITS, dx);
+    }
+
+    /* Large coordinates: evaluate the same half-plane test in 64-bit, with
+     * the partition delta reduced to whole units exactly as the vanilla path
+     * does via >>FRACBITS, so the cross-product sign is preserved without
+     * overflow. */
+    {
+      int64_t left  = (dy64 >> FRACBITS) * (int64_t)(node->dx >> FRACBITS);
+      int64_t right = (int64_t)(node->dy >> FRACBITS) * (dx64 >> FRACBITS);
+      return left >= right ? 1 : 0;
+    }
+  }
 }
 
 // killough 5/2/98: reformatted

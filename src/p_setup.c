@@ -1596,6 +1596,56 @@ typedef struct linelist_t        // type used to list lines in each block
   struct linelist_t *next;
 } linelist_t;
 
+/*
+ * Pool allocator for the temporary per-block line lists below.  The jff
+ * blockmap builder otherwise malloc()s and free()s one linelist_t per
+ * (block, line) incidence.  On a map large enough to force a blockmap
+ * rebuild -- e.g. a ZDoom map whose extent overflows the 16-bit on-disk
+ * BLOCKMAP format, like MyHouse.pk3's MAP01 -- that is several million tiny
+ * heap operations, which on some allocators (notably the Windows msvcrt
+ * heap) dominate level load badly enough to look like a hang.  Every node
+ * lives until the lump is built and is then discarded together, so hand the
+ * nodes out of large slabs and release the slabs wholesale: millions of
+ * malloc/free pairs collapse to a few hundred.
+ */
+#define BMAP_NODES_PER_SLAB 8192
+typedef struct bmap_slab_s
+{
+  struct bmap_slab_s *next;
+  linelist_t          nodes[BMAP_NODES_PER_SLAB];
+} bmap_slab_t;
+static bmap_slab_t *bmap_slabs;
+static int          bmap_slab_used;
+/* Generation stamp for the per-line "already added to this block" test, so
+ * each linedef's pass needs only a single stamp bump instead of clearing the
+ * whole done[] array.  See P_CreateBlockMap. */
+static int          bmap_stamp;
+
+static linelist_t *bmap_node_alloc(void)
+{
+  if (!bmap_slabs || bmap_slab_used == BMAP_NODES_PER_SLAB)
+  {
+    bmap_slab_t *s = malloc(sizeof(bmap_slab_t));
+    s->next = bmap_slabs;
+    bmap_slabs = s;
+    bmap_slab_used = 0;
+  }
+  return &bmap_slabs->nodes[bmap_slab_used++];
+}
+
+static void bmap_pool_free(void)
+{
+  bmap_slab_t *s = bmap_slabs;
+  while (s)
+  {
+    bmap_slab_t *n = s->next;
+    free(s);
+    s = n;
+  }
+  bmap_slabs = NULL;
+  bmap_slab_used = 0;
+}
+
 //
 // Subroutine to add a line number to a block list
 // It simply returns if the line is already in the block
@@ -1612,15 +1662,15 @@ static void AddBlockLine
 {
   linelist_t *l;
 
-  if (done[blockno])
+  if (done[blockno] == bmap_stamp)
     return;
 
-  l = malloc(sizeof(linelist_t));
+  l = bmap_node_alloc();
   l->num = lineno;
   l->next = lists[blockno];
   lists[blockno] = l;
   count[blockno]++;
-  done[blockno] = 1;
+  done[blockno] = bmap_stamp;
 }
 
 //
@@ -1686,9 +1736,17 @@ static void P_CreateBlockMap(void)
   // initialize each blocklist, and enter the trailing -1 in all blocklists
   // note the linked list of lines grows backwards
 
+  bmap_slabs = NULL;       /* start the node pool fresh for this build */
+  bmap_slab_used = 0;
+  /* done[] holds the stamp (line index + 1) of the last linedef added to
+   * each block; 0 means none.  Cleared once here, then each linedef just
+   * bumps bmap_stamp instead of re-clearing NBlocks ints -- the per-line
+   * memset was O(numlines * NBlocks) and dominated load on very large maps
+   * (e.g. MyHouse.pk3, NBlocks ~173k x tens of thousands of lines). */
+  memset(blockdone, 0, NBlocks * sizeof(int));
   for (i=0;i<NBlocks;i++)
   {
-    blocklists[i] = malloc(sizeof(linelist_t));
+    blocklists[i] = bmap_node_alloc();
     blocklists[i]->num = -1;
     blocklists[i]->next = NULL;
     blockcount[i]++;
@@ -1715,9 +1773,10 @@ static void P_CreateBlockMap(void)
     int miny = y1>y2? y2 : y1;
     int maxy = y1>y2? y1 : y2;
 
-    // no blocks done for this linedef yet
+    // no blocks done for this linedef yet (bump the generation stamp; an
+    // index+1 so it is never 0, the cleared/never-touched value)
 
-    memset(blockdone,0,NBlocks*sizeof(int));
+    bmap_stamp = i + 1;
 
     // The line always belongs to the blocks containing its endpoints
 
@@ -1844,8 +1903,9 @@ static void P_CreateBlockMap(void)
 
   // Add initial 0 to all blocklists
   // count the total number of lines (and 0's and -1's)
+  // (stamp above every line's index+1 so each block is touched exactly once)
 
-  memset(blockdone,0,NBlocks*sizeof(int));
+  bmap_stamp = numlines + 1;
   for (i=0,linetotal=0;i<NBlocks;i++)
   {
     AddBlockLine(blocklists,blockcount,blockdone,i,0);
@@ -1872,19 +1932,18 @@ static void P_CreateBlockMap(void)
       (i? blockmaplump[4+i-1] : 4+NBlocks) + (i? blockcount[i-1] : 0);
 
     // add the lines in each block's list to the blockmaplump
-    // delete each list node as we go
+    // (the nodes are owned by the slab pool, freed wholesale below)
 
     while (bl)
     {
-      linelist_t *tmp = bl->next;
       blockmaplump[offs++] = bl->num;
-      free(bl);
-      bl = tmp;
+      bl = bl->next;
     }
   }
 
   // free all temporary storage
 
+  bmap_pool_free();
   free (blocklists);
   free (blockcount);
   free (blockdone);

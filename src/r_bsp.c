@@ -38,6 +38,7 @@
 #include "r_plane.h"
 #include "r_things.h"
 #include "r_bsp.h" // cph - sanity checking
+#include "p_ffloor.h"
 #include "v_video.h"
 #include "lprintf.h"
 
@@ -510,6 +511,56 @@ static void R_Subsector(int num)
   // killough 3/8/98, 4/4/98: Deep water / fake ceiling effect
   frontsector = R_FakeFlat(frontsector, &tempsec, &floorlightlevel,
                            &ceilinglightlevel, FALSE);   // killough 4/11/98
+
+  /* ZDoom solid 3D floors: a Sector_Set3DFloor slab fills this sector's
+   * whole footprint, so within the sector the slab's top is the effective
+   * floor whenever the view is above it, and the slab's bottom is the
+   * effective ceiling whenever the view is below it.  Swap the height and
+   * flat used for both the wall extents (frontsector drives R_AddLine) and
+   * the visplane, reusing the ordinary floor/ceiling path; the slab's other
+   * face is drawn separately by the thickside pass.  Pick the topmost slab
+   * below the view for the floor and the lowest slab above it for the
+   * ceiling so a stack resolves to the nearest surfaces. */
+  if (frontsector->ffloors)
+  {
+    const ffloor_t *ff;
+    fixed_t   bestfloor = frontsector->floorheight;
+    fixed_t   bestceil  = frontsector->ceilingheight;
+    const ffloor_t *floorff = NULL;
+    const ffloor_t *ceilff  = NULL;
+
+    for (ff = frontsector->ffloors; ff; ff = ff->next)
+    {
+      fixed_t ftop, fbot;
+      if (ff->type != FFLOOR_SOLID)
+        continue;
+      ftop = ff->model->ceilingheight;
+      fbot = ff->model->floorheight;
+      if (fbot >= ftop)
+        continue;
+      if (ftop <= viewz && ftop > bestfloor) { bestfloor = ftop; floorff = ff; }
+      if (fbot >= viewz && fbot < bestceil)  { bestceil  = fbot; ceilff  = ff; }
+    }
+
+    if (floorff || ceilff)
+    {
+      if (frontsector != &tempsec)
+      {
+        tempsec = *frontsector;
+        frontsector = &tempsec;
+      }
+      if (floorff)
+      {
+        tempsec.floorheight = bestfloor;
+        tempsec.floorpic    = floorff->model->floorpic;
+      }
+      if (ceilff)
+      {
+        tempsec.ceilingheight = bestceil;
+        tempsec.ceilingpic    = ceilff->model->ceilingpic;
+      }
+    }
+  }
 
   // killough 3/7/98: Add (x,y) offsets to flats, add deep water check
   // killough 3/16/98: add floorlightlevel

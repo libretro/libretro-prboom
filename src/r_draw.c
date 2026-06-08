@@ -6310,6 +6310,96 @@ void R_DrawSpan(draw_span_vars_t *dsvars) {
   R_GetDrawSpanFunc(drawvars.filterfloor, drawvars.filterz)(dsvars);
 }
 
+/*
+ * R_FlatAverageColor565 -- the mean RGB565 colour of a flat, used to tint
+ * the view when the camera is submerged in a 3D-floor water volume so the
+ * tint matches the water surface the player sees.  Strided sample (the flat
+ * is flat-shaded enough that every 7th texel is representative) averaged per
+ * channel; cached on (picnum, palette) since it only changes on a palette
+ * swap.
+ */
+uint16_t R_FlatAverageColor565(int picnum)
+{
+   static int       lastpic = -1;
+   static uint16_t *lastpal = NULL;
+   static uint16_t  lastcol = 0;
+   const uint8_t   *flat;
+   unsigned long    sr = 0, sg = 0, sb = 0, n = 0;
+   int              i, synthetic;
+   int              lump = firstflat + flattranslation[picnum];
+
+   if (picnum == lastpic && V_Palette16 == lastpal)
+      return lastcol;
+
+   synthetic = R_IsSyntheticFlat(picnum);
+   flat = synthetic ? R_GetSyntheticFlat(picnum)
+                    : (const uint8_t *)W_CacheLumpNum(lump);
+
+   for (i = 0; i < 4096; i += 7)
+   {
+      uint16_t c = VID_PAL16(flat[i], VID_NUMCOLORWEIGHTS - 1);
+      sr += (c >> 11) & 0x1F;
+      sg += (c >> 5)  & 0x3F;
+      sb +=  c        & 0x1F;
+      n++;
+   }
+
+   if (!synthetic)
+      W_UnlockLumpNum(lump);
+
+   if (!n)
+      n = 1;
+   lastcol = (uint16_t)(((sr / n) << 11) | ((sg / n) << 5) | (sb / n));
+   lastpic = picnum;
+   lastpal = V_Palette16;
+   return lastcol;
+}
+
+/*
+ * R_TintView -- blend the 3D view 50/50 toward a constant colour, the
+ * underwater tint applied after the scene is drawn.  Scalar, SSE2 and NEON;
+ * the SSE2/NEON paths fold eight RGB565 pixels per step with the same masked
+ * half-sum as TL_BLEND565 and fall back to the scalar tail for the < 8
+ * remainder of each row.
+ */
+void R_TintView(uint16_t color)
+{
+   uint16_t *base = drawvars.short_topleft;
+   int y;
+#if defined(__SSE2__)
+   const __m128i vcol = _mm_set1_epi16((short)color);
+   const __m128i mlow = _mm_set1_epi16((short)0xF7DE);
+   const __m128i vch  = _mm_srli_epi16(_mm_and_si128(vcol, mlow), 1);
+#elif defined(__ARM_NEON)
+   const uint16x8_t vcol = vdupq_n_u16(color);
+   const uint16x8_t mlow = vdupq_n_u16(0xF7DE);
+   const uint16x8_t vch  = vshrq_n_u16(vandq_u16(vcol, mlow), 1);
+#endif
+
+   for (y = 0; y < viewheight; y++)
+   {
+      uint16_t *row = base + y * SCREENWIDTH;
+      int x = 0;
+#if defined(__SSE2__)
+      for (; x + 8 <= viewwidth; x += 8)
+      {
+         __m128i px = _mm_loadu_si128((const __m128i *)(row + x));
+         __m128i bl = _mm_add_epi16(vch, _mm_srli_epi16(_mm_and_si128(px, mlow), 1));
+         _mm_storeu_si128((__m128i *)(row + x), bl);
+      }
+#elif defined(__ARM_NEON)
+      for (; x + 8 <= viewwidth; x += 8)
+      {
+         uint16x8_t px = vld1q_u16(row + x);
+         uint16x8_t bl = vaddq_u16(vch, vshrq_n_u16(vandq_u16(px, mlow), 1));
+         vst1q_u16(row + x, bl);
+      }
+#endif
+      for (; x < viewwidth; x++)
+         row[x] = TL_BLEND565(color, row[x]);
+   }
+}
+
 //
 // R_InitBuffer
 // Creats lookup tables that avoid

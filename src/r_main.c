@@ -46,6 +46,7 @@
 #include "r_plane.h"
 #include "r_bsp.h"
 #include "r_draw.h"
+#include "p_ffloor.h"
 #include "m_bbox.h"
 #include "r_sky.h"
 #include "v_video.h"
@@ -746,6 +747,9 @@ void R_SetupFreelook(void)
 //
 // R_SetupFrame
 //
+static int      view_underwater;
+static uint16_t view_underwater_color;
+
 static void R_SetupFrame (player_t *player)
 {
   int cm;
@@ -806,6 +810,27 @@ static void R_SetupFrame (player_t *player)
     }
   else
     fixedcolormap = 0;
+
+  /* Underwater: if the eye is inside a swimmable 3D-floor volume in the view
+   * sector, tint the whole view toward the water's colour after the scene is
+   * drawn (R_RenderPlayerView).  The tint is taken from the water surface
+   * flat so it matches the surface seen from above. */
+  view_underwater = 0;
+  {
+    const sector_t *vs = player->mo->subsector->sector;
+    const ffloor_t *ff;
+    for (ff = vs->ffloors; ff; ff = ff->next)
+    {
+      if (ff->type != FFLOOR_SWIMMABLE)
+        continue;
+      if (viewz >= ff->model->floorheight && viewz <= ff->model->ceilingheight)
+      {
+        view_underwater = 1;
+        view_underwater_color = R_FlatAverageColor565(ff->model->floorpic);
+        break;
+      }
+    }
+  }
 
   validcount++;
 }
@@ -892,6 +917,10 @@ void R_RenderPlayerView (player_t* player)
 
     R_DrawMasked ();
     R_ResetColumnBuffer();
+
+    /* Underwater: blend the finished view toward the water colour. */
+    if (view_underwater)
+      R_TintView(view_underwater_color);
 
 #ifdef PRBOOM_RENDER_PROFILE
   t4 = I_RenderProfileUsec();

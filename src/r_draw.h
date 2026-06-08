@@ -164,6 +164,12 @@ void R_DrawSpan(draw_span_vars_t *dsvars);
  * instead of overwriting it; set around a translucent 3D-floor surface. */
 extern int r_span_translucent;
 
+/* Underwater tint: mean colour of a flat, and a 50/50 blend of the whole 3D
+ * view toward a colour (applied when the camera is inside a 3D-floor water
+ * volume). */
+uint16_t R_FlatAverageColor565(int picnum);
+void R_TintView(uint16_t color);
+
 void R_InitBuffer(int width, int height);
 
 // Initialize color translation tables, for player rendering etc.

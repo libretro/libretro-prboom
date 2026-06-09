@@ -50,6 +50,7 @@
 #define ZACS_LOCALS    64        /* args + locals per frame */
 #define ZACS_CALLDEPTH 16
 #define ZACS_MAP_VARS  128
+#define ZACS_MAX_MODULES 8       /* module 0 = map BEHAVIOR, 1.. = libraries */
 #define ZACS_WORLD_VARS  256
 #define ZACS_GLOBAL_VARS 64
 #define ZACS_WORLD_ARRAYS  256
@@ -80,6 +81,7 @@ typedef struct
   int locals;
   int hasreturn;
   int address;
+  int module;            /* which module owns the body (0 = map; see below) */
 } zacs_func_t;
 
 static const byte   *zacs_data;      /* behavior lump bytes (PU_LEVEL copy) */
@@ -94,6 +96,8 @@ static char         **zacs_strings;
 static int            zacs_numstrings;
 static char         **zacs_snames;       /* named-script names */
 static int            zacs_numsnames;
+static char         **zacs_fnames;       /* FNAM: function names (for linking) */
+static int            zacs_numfnames;
 
 /* ---- VM variable storage ------------------------------------------------ */
 
@@ -103,9 +107,35 @@ typedef struct
   int  size;
 } zacs_array_t;
 
-static int           zacs_mapvars[ZACS_MAP_VARS];
+static int          *zacs_mapvars;       /* -> active module's map-var store */
 static zacs_array_t *zacs_maparrays;     /* per ARAY chunk entry */
 static int           zacs_nummaparrays;
+
+/* ---- ACS module table --------------------------------------------------- */
+/* A ZDoom map BEHAVIOR may #import library objects named by its LOAD chunk
+ * (e.g. ZDCMP2's BEHAVIOR imports the acs/zdcmp2.o library).  Each object is
+ * loaded as a separate module; module 0 is always the map.  At a cross-module
+ * function call the interpreter's "active view" globals above are repointed at
+ * the callee's module for the duration of the (synchronous) call, then
+ * restored.  Maps with no LOAD chunk produce exactly one module and the active
+ * view never changes -- behaviour identical to the single-module path. */
+typedef struct
+{
+  const byte   *data;
+  int           len;
+  int           fmt;
+  zacs_func_t  *funcs;       int numfuncs;
+  char        **strings;     int numstrings;
+  char        **fnames;      int numfnames;
+  zacs_array_t *maparrays;   int nummaparrays;
+  int           mapvars[ZACS_MAP_VARS];
+} zacs_module_t;
+
+static zacs_module_t zacs_modules[ZACS_MAX_MODULES];
+static int           zacs_nummodules;
+static int           zacs_active;        /* index of the active module */
+static char         *zacs_load_list[ZACS_MAX_MODULES]; /* lib names from LOAD */
+static int           zacs_load_count;
 
 /* world / global state persists across maps within a session */
 static int          zacs_worldvars[ZACS_WORLD_VARS];
@@ -155,6 +185,7 @@ typedef struct zacs_frame_s
   int   return_ip;
   int   locals[ZACS_LOCALS];
   dbool discard;          /* PCD_CALLDISCARD: drop the return value */
+  int   caller_module;    /* module active before this call (restore on RET) */
 } zacs_frame_t;
 
 typedef struct zacs_inst_s
@@ -475,19 +506,70 @@ static dbool zacs_load_enhanced(int chunk_start, int chunk_end)
     }
   }
 
-  if (zacs_find_chunk(chunk_start, chunk_end, "LOAD", &co, &cl) && cl > 1)
-    lprintf(LO_WARN, "ZACS: library imports (LOAD) are not supported\n");
+  /* FNAM: function names, parallel to FUNC (needed to link library imports) */
+  if (zacs_find_chunk(chunk_start, chunk_end, "FNAM", &co, &cl))
+  {
+    int count = zacs_rd32(co);
+    if (count > 0 && count <= 4096)
+    {
+      zacs_numfnames = count;
+      zacs_fnames = Z_Calloc(count, sizeof(char *), PU_LEVEL, 0);
+      for (i = 0; i < count; i++)
+      {
+        int sofs = co + zacs_rd32(co + 4 + 4 * i);
+        int maxn = zacs_len - sofs, n = 0;
+        char *s;
+        if (sofs < co || maxn <= 0)
+        {
+          zacs_fnames[i] = (char *)"";
+          continue;
+        }
+        while (n < maxn && zacs_data[sofs + n])
+          n++;
+        s = Z_Malloc(n + 1, PU_LEVEL, 0);
+        memcpy(s, zacs_data + sofs, n);
+        s[n] = 0;
+        zacs_fnames[i] = s;
+      }
+    }
+  }
+
+  /* LOAD: names of library objects to import (resolved by the caller).  The
+   * chunk is a sequence of NUL-terminated names. */
+  if (zacs_find_chunk(chunk_start, chunk_end, "LOAD", &co, &cl) && cl > 0)
+  {
+    int p = 0;
+    while (p < cl && zacs_load_count < ZACS_MAX_MODULES)
+    {
+      const char *nm = (const char *)zacs_data + co + p;
+      int nl = 0;
+      while (p + nl < cl && nm[nl])
+        nl++;
+      if (nl > 0)
+      {
+        char *s = Z_Malloc(nl + 1, PU_LEVEL, 0);
+        memcpy(s, nm, nl);
+        s[nl] = 0;
+        zacs_load_list[zacs_load_count++] = s;
+      }
+      p += nl + 1;
+    }
+  }
 
   return zacs_numscripts > 0;
 }
 
-dbool Z_ACSLoadBehavior(int lump)
+/* Load a single ACS object (map BEHAVIOR or a library) into the active-view
+ * globals.  The caller is responsible for pointing zacs_mapvars at the target
+ * module's store (and zeroing it) beforehand. */
+static dbool zacs_load_one(int lump)
 {
   int len, dirofs;
   const byte *raw;
 
   zacs_data = NULL;
   zacs_len = 0;
+  zacs_fmt = ZFMT_ACS0;
   zacs_scripts = NULL;
   zacs_numscripts = 0;
   zacs_funcs = NULL;
@@ -496,12 +578,10 @@ dbool Z_ACSLoadBehavior(int lump)
   zacs_numstrings = 0;
   zacs_snames = NULL;
   zacs_numsnames = 0;
+  zacs_fnames = NULL;
+  zacs_numfnames = 0;
   zacs_maparrays = NULL;
   zacs_nummaparrays = 0;
-  zacs_running = NULL;
-  memset(zacs_mapvars, 0, sizeof(zacs_mapvars));
-  memset(zacs_warned, 0, sizeof(zacs_warned));
-  memset(zacs_cf_warned, 0, sizeof(zacs_cf_warned));
 
   if (lump < 0)
     return false;
@@ -589,6 +669,179 @@ dbool Z_ACSLoadBehavior(int lump)
   }
   else
     return false;
+
+  return true;
+}
+
+/* Snapshot the just-loaded active view into module slot idx, tagging every
+ * function with its owning module so library-internal calls stay local. */
+static void zacs_snapshot_module(int idx)
+{
+  zacs_module_t *m = &zacs_modules[idx];
+  int i;
+  for (i = 0; i < zacs_numfuncs; i++)
+    zacs_funcs[i].module = idx;
+  m->data          = zacs_data;
+  m->len           = zacs_len;
+  m->fmt           = zacs_fmt;
+  m->funcs         = zacs_funcs;
+  m->numfuncs      = zacs_numfuncs;
+  m->strings       = zacs_strings;
+  m->numstrings    = zacs_numstrings;
+  m->fnames        = zacs_fnames;
+  m->numfnames     = zacs_numfnames;
+  m->maparrays     = zacs_maparrays;
+  m->nummaparrays  = zacs_nummaparrays;
+  /* m->mapvars was written in place via the zacs_mapvars pointer */
+}
+
+/* Repoint the interpreter's active view at module idx. */
+static void zacs_activate(int idx)
+{
+  zacs_module_t *m = &zacs_modules[idx];
+  zacs_data         = m->data;
+  zacs_len          = m->len;
+  zacs_fmt          = m->fmt;
+  zacs_funcs        = m->funcs;
+  zacs_numfuncs     = m->numfuncs;
+  zacs_strings      = m->strings;
+  zacs_numstrings   = m->numstrings;
+  zacs_maparrays    = m->maparrays;
+  zacs_nummaparrays = m->nummaparrays;
+  zacs_mapvars      = m->mapvars;
+  zacs_active       = idx;
+}
+
+static dbool zacs_name_eq(const char *a, const char *b)
+{
+  while (*a && *b)
+  {
+    int ca = *a++, cb = *b++;
+    if (ca >= 'a' && ca <= 'z') ca -= 32;
+    if (cb >= 'a' && cb <= 'z') cb -= 32;
+    if (ca != cb)
+      return false;
+  }
+  return *a == *b;
+}
+
+/* Find the lump that is the compiled ACS object for a LOAD name.  Several
+ * lumps can share the 8-char name (map marker, .acs source, .o object); pick
+ * the one whose bytes begin with the "ACS" object signature. */
+static int zacs_find_acs_object_lump(const char *name)
+{
+  char up[9];
+  int i, k, nl = (int)strlen(name);
+  if (nl > 8) nl = 8;
+  for (k = 0; k < nl; k++)
+  {
+    char c = name[k];
+    up[k] = (c >= 'a' && c <= 'z') ? (char)(c - 32) : c;
+  }
+  for (; k < 9; k++)
+    up[k] = 0;
+  for (i = numlumps - 1; i >= 0; i--)
+  {
+    if (strncmp(lumpinfo[i].name, up, 8) != 0)
+      continue;
+    if (W_LumpLength(i) >= 4)
+    {
+      const byte *d = W_CacheLumpNum(i);
+      dbool isacs = (d[0] == 'A' && d[1] == 'C' && d[2] == 'S');
+      W_UnlockLumpNum(i);
+      if (isacs)
+        return i;
+    }
+  }
+  return -1;
+}
+
+/* Resolve module-0 function imports (address 0) against library exports. */
+static void zacs_link_imports(void)
+{
+  zacs_module_t *m0 = &zacs_modules[0];
+  int i, mi, j, linked = 0;
+  for (i = 0; i < m0->numfuncs; i++)
+  {
+    if (m0->funcs[i].address != 0)
+      continue;
+    if (i >= m0->numfnames || !m0->fnames[i] || !m0->fnames[i][0])
+      continue;
+    for (mi = 1; mi < zacs_nummodules; mi++)
+    {
+      zacs_module_t *ml = &zacs_modules[mi];
+      for (j = 0; j < ml->numfuncs; j++)
+      {
+        if (ml->funcs[j].address == 0)
+          continue;
+        if (j >= ml->numfnames || !ml->fnames[j])
+          continue;
+        if (zacs_name_eq(m0->fnames[i], ml->fnames[j]))
+        {
+          m0->funcs[i].address   = ml->funcs[j].address;
+          m0->funcs[i].argc      = ml->funcs[j].argc;
+          m0->funcs[i].locals    = ml->funcs[j].locals;
+          m0->funcs[i].hasreturn = ml->funcs[j].hasreturn;
+          m0->funcs[i].module    = mi;
+          linked++;
+          mi = zacs_nummodules;      /* break outer */
+          break;
+        }
+      }
+    }
+  }
+  lprintf(LO_INFO, "ZACS: linked %d/%d library function import(s) across "
+          "%d module(s)\n", linked, m0->numfuncs, zacs_nummodules - 1);
+}
+
+dbool Z_ACSLoadBehavior(int lump)
+{
+  int liblist[ZACS_MAX_MODULES];
+  int nlibs = 0, i;
+
+  memset(zacs_warned, 0, sizeof(zacs_warned));
+  memset(zacs_cf_warned, 0, sizeof(zacs_cf_warned));
+  zacs_running = NULL;
+  zacs_nummodules = 0;
+  zacs_active = 0;
+  zacs_load_count = 0;
+
+  /* ---- module 0: the map's BEHAVIOR ------------------------------------- */
+  zacs_mapvars = zacs_modules[0].mapvars;
+  memset(zacs_mapvars, 0, ZACS_MAP_VARS * sizeof(int));
+  if (!zacs_load_one(lump))
+    return false;
+  zacs_snapshot_module(0);
+  zacs_nummodules = 1;
+
+  /* capture the LOAD names before loading libraries clobbers the list */
+  for (i = 0; i < zacs_load_count && nlibs < ZACS_MAX_MODULES; i++)
+  {
+    int libl = zacs_find_acs_object_lump(zacs_load_list[i]);
+    if (libl >= 0)
+      liblist[nlibs++] = libl;
+    else
+      lprintf(LO_WARN, "ZACS: LOAD library '%s' not found\n",
+              zacs_load_list[i]);
+  }
+
+  /* ---- libraries -------------------------------------------------------- */
+  for (i = 0; i < nlibs && zacs_nummodules < ZACS_MAX_MODULES; i++)
+  {
+    int k = zacs_nummodules;
+    zacs_mapvars = zacs_modules[k].mapvars;
+    memset(zacs_mapvars, 0, ZACS_MAP_VARS * sizeof(int));
+    if (zacs_load_one(liblist[i]))
+    {
+      zacs_snapshot_module(k);
+      zacs_nummodules++;
+    }
+  }
+
+  /* ---- activate the map and link imports -------------------------------- */
+  zacs_activate(0);
+  if (zacs_nummodules > 1)
+    zacs_link_imports();
 
   zacs_running = Z_Calloc(zacs_numscripts, 1, PU_LEVEL, 0);
   lprintf(LO_INFO, "Z_ACSLoadBehavior: %d scripts, %d strings, "
@@ -1218,6 +1471,12 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       break;
   }
 
+  /* Map script bodies always execute in module 0; cross-module calls restore
+   * the caller's module before any yield, so the active module is module 0 at
+   * every instance boundary.  Pin it defensively in case of an early-out. */
+  if (zacs_active != 0 && zacs_nummodules > 1)
+    zacs_activate(0);
+
   ip = inst->ip;
   locals = inst->fp ? inst->frames[inst->fp - 1].locals : inst->locals;
 
@@ -1526,7 +1785,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       }
       f = &zacs_funcs[fi];
       /* An imported function (ACS library import) has address 0 because its
-       * body lives in another module.  Until library linking resolves it,
+       * body lives in another module.  If library linking did not resolve it,
        * do not jump to offset 0 -- that runs the object header as pcode and
        * sprays garbage (bad calls, bogus R_FlatNumForName lookups).  Treat
        * it as a clean no-op: consume the arguments and yield 0. */
@@ -1538,14 +1797,24 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           ZPUSH(0);
         break;
       }
-      fr = &inst->frames[inst->fp++];
-      memset(fr->locals, 0, sizeof(fr->locals));
-      fr->return_ip = ip;
-      fr->discard = (pcd == PCD_CALLDISCARD);
-      for (k = f->argc - 1; k >= 0; k--)
-        fr->locals[k] = ZPOP();
-      locals = fr->locals;
-      ip = f->address;
+      {
+        /* Capture target before activating: zacs_activate() repoints
+         * zacs_funcs, which would invalidate f. */
+        int tgt_module = f->module;
+        int tgt_addr   = f->address;
+        int tgt_argc   = f->argc;
+        fr = &inst->frames[inst->fp++];
+        memset(fr->locals, 0, sizeof(fr->locals));
+        fr->return_ip = ip;
+        fr->discard = (pcd == PCD_CALLDISCARD);
+        fr->caller_module = zacs_active;
+        for (k = tgt_argc - 1; k >= 0; k--)
+          fr->locals[k] = ZPOP();
+        locals = fr->locals;
+        if (tgt_module != zacs_active)
+          zacs_activate(tgt_module);
+        ip = tgt_addr;
+      }
       break;
     }
     case PCD_RETURNVOID:
@@ -1559,6 +1828,8 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         return;
       }
       fr = &inst->frames[--inst->fp];
+      if (fr->caller_module != zacs_active)
+        zacs_activate(fr->caller_module);
       ip = fr->return_ip;
       locals = inst->fp ? inst->frames[inst->fp - 1].locals : inst->locals;
       if (!fr->discard)

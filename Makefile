@@ -762,3 +762,9 @@ endif
 # (free) for the same reason.
 libretro/libretro-common/formats/png/rpng.o: libretro/libretro-common/formats/png/rpng.c
 	$(CC) $(filter-out -include z_zone.h,$(CFLAGS)) -c $(OBJOUT)$@ $<
+
+# rjpeg, like rpng, is vendored verbatim and allocates with raw libc;
+# keep it out of the z_zone malloc-macro regime (u_png.c frees its buffers
+# with (free) at the single zone-crossing point).
+libretro/libretro-common/formats/jpeg/rjpeg.o: libretro/libretro-common/formats/jpeg/rjpeg.c
+	$(CC) $(filter-out -include z_zone.h,$(CFLAGS)) -c $(OBJOUT)$@ $<

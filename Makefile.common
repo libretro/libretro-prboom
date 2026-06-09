@@ -32,6 +32,7 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/file/file_path_io.c \
 				 $(LIBRETRO_COMM_DIR)/time/rtime.c \
 				 $(LIBRETRO_COMM_DIR)/formats/png/rpng.c \
+				 $(LIBRETRO_COMM_DIR)/formats/jpeg/rjpeg.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_zlib.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c
@@ -49,6 +50,7 @@ SOURCES_C += $(DEPS_DIR)/miniz/miniz.c \
 				 $(DEPS_DIR)/libmad/timer.c
 
 SOURCES_C += $(CORE_DIR)/am_map.c \
+				 $(CORE_DIR)/i_cpu_features.c \
 				 $(CORE_DIR)/d_deh.c \
 				 $(CORE_DIR)/dsda_hacked.c \
 				 $(CORE_DIR)/d_items.c \

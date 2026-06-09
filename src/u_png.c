@@ -28,6 +28,7 @@
 #include "u_ztextures.h"
 
 #include <formats/rpng.h>
+#include <formats/rjpeg.h>
 #include <formats/image.h>
 
 dbool U_PNGIsPNG(const unsigned char *d, int len)
@@ -166,6 +167,64 @@ static unsigned *zpng_decode(const unsigned char *d, int len,
   }
 }
 
+/* JPEG sibling of zpng_decode: rjpeg (libretro-common) emits the same
+ * 0xAABBGGRR words with supports_rgba=true, so the patch/flat synthesis
+ * below is shared.  Used for the JPEG skybox/texture members ZDoom packs
+ * ship (e.g. ZDCMP2's SKYB_*.jpg). */
+static unsigned *zjpeg_decode(const unsigned char *d, int len,
+                              unsigned *w, unsigned *h)
+{
+  rjpeg_t *rjpeg = rjpeg_alloc();
+  unsigned *out = NULL;
+  int r;
+
+  if (!rjpeg)
+    return NULL;
+  if (!rjpeg_set_buf_ptr(rjpeg, (void *)d, (size_t)len) ||
+      !rjpeg_start(rjpeg))
+  {
+    rjpeg_free(rjpeg);
+    return NULL;
+  }
+  while (rjpeg_iterate_image(rjpeg))
+    ;
+  if (!rjpeg_is_valid(rjpeg))
+  {
+    rjpeg_free(rjpeg);
+    return NULL;
+  }
+  do
+  {
+    r = rjpeg_process_image(rjpeg, (void **)&out, (size_t)len, w, h, true);
+  } while (r == IMAGE_PROCESS_NEXT);
+  rjpeg_free(rjpeg);
+  if (r != IMAGE_PROCESS_END || !out || !*w || !*h ||
+      *w > 4096 || *h > 4096)
+  {
+    (free)(out);
+    return NULL;
+  }
+
+  /* Same allocator-boundary copy as zpng_decode: rjpeg is vendored verbatim
+   * and allocates with raw libc, so cross into zone memory here. */
+  {
+    unsigned *zoned = malloc((size_t)*w * (size_t)*h * 4);
+    if (zoned)
+      memcpy(zoned, out, (size_t)*w * (size_t)*h * 4);
+    (free)(out);
+    return zoned;
+  }
+}
+
+/* Decode a PNG or JPEG lump to 0xAABBGGRR pixels, dispatching on signature. */
+static unsigned *zimg_decode(const unsigned char *d, int len,
+                             unsigned *w, unsigned *h)
+{
+  if (len >= 3 && d[0] == 0xFF && d[1] == 0xD8 && d[2] == 0xFF)
+    return zjpeg_decode(d, len, w, h);
+  return zpng_decode(d, len, w, h);
+}
+
 /* ---- patch synthesis ----------------------------------------------------- */
 
 void *U_PNGToPatchSized(const unsigned char *d, int len,
@@ -182,7 +241,7 @@ void *U_PNGToPatchSized(const unsigned char *d, int len,
 
   if (!zpng_lut_built)
     zpng_build_lut();
-  argb = zpng_decode(d, len, &w, &h);
+  argb = zimg_decode(d, len, &w, &h);
   if (!argb)
     return NULL;
   zpng_grab(d, len, &leftoffset, &topoffset);
@@ -297,7 +356,7 @@ void *U_PNGToFlat(const unsigned char *d, int len, int *out_size)
 
   if (!zpng_lut_built)
     zpng_build_lut();
-  argb = zpng_decode(d, len, &w, &h);
+  argb = zimg_decode(d, len, &w, &h);
   if (!argb)
     return NULL;
   flat = malloc(64 * 64);
@@ -343,7 +402,8 @@ static void zpng_convert_one_range(int s, int e, dbool as_flat,
     if (rawlen < 8)
       continue;
     raw = W_CacheLumpNum(i);
-    if (!U_PNGIsPNG(raw, rawlen))
+    if (!U_PNGIsPNG(raw, rawlen) &&
+        !(rawlen >= 3 && raw[0] == 0xFF && raw[1] == 0xD8 && raw[2] == 0xFF))
     {
       W_UnlockLumpNum(i);
       continue;
@@ -400,6 +460,6 @@ void U_PNGMaterializeLumps(void)
   zpng_convert_range("FF_START", "FF_END", true, false, &n);
   zpng_convert_range("TX_START", "TX_END", false, true, &n);
   if (n)
-    lprintf(LO_INFO, "U_PNGMaterializeLumps: %d PNG lumps converted "
+    lprintf(LO_INFO, "U_PNGMaterializeLumps: %d PNG/JPEG lumps converted "
             "(%d rescaled per TEXTURES)\n", n, zpng_rescaled);
 }

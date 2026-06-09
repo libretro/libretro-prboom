@@ -1525,6 +1525,19 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         return;
       }
       f = &zacs_funcs[fi];
+      /* An imported function (ACS library import) has address 0 because its
+       * body lives in another module.  Until library linking resolves it,
+       * do not jump to offset 0 -- that runs the object header as pcode and
+       * sprays garbage (bad calls, bogus R_FlatNumForName lookups).  Treat
+       * it as a clean no-op: consume the arguments and yield 0. */
+      if (f->address == 0)
+      {
+        for (k = f->argc - 1; k >= 0; k--)
+          (void)ZPOP();
+        if (pcd != PCD_CALLDISCARD)
+          ZPUSH(0);
+        break;
+      }
       fr = &inst->frames[inst->fp++];
       memset(fr->locals, 0, sizeof(fr->locals));
       fr->return_ip = ip;

@@ -125,6 +125,7 @@ typedef struct {
   int sidefront;
   int sideback;
   float alpha;
+  char renderstyle[16];
   int locknumber;
   int automapstyle;
   int health;

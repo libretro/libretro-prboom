@@ -2513,6 +2513,23 @@ static void P_LoadUDMFLineDefs(void)
     ld->args[3] = mld->arg3;
     ld->args[4] = mld->arg4;
 
+    /* ZDoom translucent surfaces: a two-sided line with alpha < 1 (or the
+     * Boom/ZDoom Translucent flag) blends its mid-texture against the scene.
+     * This renderer's 2s translucency is a fixed 50/50 blend, so any
+     * sub-opaque, non-additive line is routed through it -- glass panes etc.
+     * become see-through instead of drawing the mid-texture opaque.  Additive
+     * (renderstyle "Add") surfaces are left opaque: a 50/50 blend would dim
+     * rather than brighten them and no additive software path exists yet. */
+    {
+      const char *rs = mld->renderstyle;
+      int additive = (rs[0] == 'a' || rs[0] == 'A') &&
+                     (rs[1] == 'd' || rs[1] == 'D') &&
+                     (rs[2] == 'd' || rs[2] == 'D');
+      if (!additive &&
+          (mld->alpha < 1.0f || (mld->flags & UDMF_ML_TRANSLUCENT)))
+        ld->translucent = 1;
+    }
+
     mv1 = mld->v1;
     mv2 = mld->v2;
     ld->sidenum[0] = (mld->sidefront >= 0) ? mld->sidefront : NO_INDEX;

@@ -260,6 +260,7 @@ static void dsda_ParseUDMFLineDef(scanner_t *s)
     else if (scanner_string_match(s, "health"))       SCAN_INT(line.health);
     else if (scanner_string_match(s, "healthgroup"))  SCAN_INT(line.healthgroup);
     else if (scanner_string_match(s, "alpha"))        SCAN_FLOAT(line.alpha);
+    else if (scanner_string_match(s, "renderstyle"))  SCAN_STRING_N(line.renderstyle, 15);
     else if (scanner_string_match(s, "blocking"))           SCAN_FLAG(line.flags, UDMF_ML_BLOCKING);
     else if (scanner_string_match(s, "blockmonsters"))      SCAN_FLAG(line.flags, UDMF_ML_BLOCKMONSTERS);
     else if (scanner_string_match(s, "twosided"))           SCAN_FLAG(line.flags, UDMF_ML_TWOSIDED);

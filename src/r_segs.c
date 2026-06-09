@@ -453,15 +453,28 @@ void R_RenderThickSides(drawseg_t *ds)
       side_t         *cs;
       fixed_t        spryscale;
       int            light;
-      int            translucent;
+      int            translucent, tlmode;
 
-      /* Solid and render-only slabs draw opaquely; swimmable (water) slabs
-       * draw their sides translucently.  Only physics tells solid and
-       * render-only apart, so they share the opaque path here. */
+      /* Slab visibility: solid, render-only, and swimmable slabs all draw.
+       * Translucency follows ZDoom -- a swimmable (water) slab blends, and so
+       * does any slab the mapper made see-through with reduced alpha (a glass
+       * pane is a solid or render-only slab with alpha < 255).  This renderer
+       * has two blend weights, so the continuous alpha is bucketed: the
+       * fainter 25/75 blend below 128, the 50/50 blend up to 224.  At/above
+       * 224 the slab is within ~12%% of opaque, which neither blend can
+       * approximate without looking far too transparent, so it stays opaque. */
       if (ff->type != FFLOOR_SOLID && ff->type != FFLOOR_RENDERONLY &&
           ff->type != FFLOOR_SWIMMABLE)
          continue;
-      translucent = (ff->type == FFLOOR_SWIMMABLE);
+      if (ff->type == FFLOOR_SWIMMABLE)
+         tlmode = 1;
+      else if (ff->alpha < 128)
+         tlmode = 2;
+      else if (ff->alpha < 224)
+         tlmode = 1;
+      else
+         tlmode = 0;
+      translucent = (tlmode != 0);
       top = ff->model->ceilingheight;
       bot = ff->model->floorheight;
       if (bot >= top)
@@ -487,7 +500,7 @@ void R_RenderThickSides(drawseg_t *ds)
        * an opaque slab's overwrite.  Switching the mode between slabs flushes
        * the pending batch on the next column (type change), so mixed stacks
        * stay correct. */
-      R_SetSpriteTranslucency(translucent ? 1 : 0);
+      R_SetSpriteTranslucency(tlmode);
       if (translucent)
          used_translucent = 1;
 

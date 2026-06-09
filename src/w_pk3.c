@@ -209,6 +209,15 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
 
   if (!slash)
     return PK3_PASS_ROOT;
+  /* A nested .wad member -- most commonly ZDoom's maps/<name>.wad -- is a
+   * complete PWAD/IWAD image.  Route it to the inner-wad pass so its lumps
+   * (the map marker, TEXTMAP, named ZNODES, BEHAVIOR, ...) are expanded
+   * verbatim and in order, exactly like a root-level wad.  Without this the
+   * member was emitted as one opaque lump named after the file, leaving the
+   * map's TEXTMAP absent: UDMF detection failed and the binary loader read
+   * the text map as binary records (garbage sidedefs, huge bogus allocs). */
+  if (d && len >= 4 && (!memcmp(d, "PWAD", 4) || !memcmp(d, "IWAD", 4)))
+    return PK3_PASS_ROOT;
   /* PNG members of the renderable namespaces stay in their groups:
    * U_PNGMaterializeLumps converts them to patches/flats in place
    * before the renderer reads them.  Other modern formats (Ogg, WAV,

@@ -387,46 +387,68 @@ void *U_PNGToPatch(const unsigned char *d, int len, int *out_size)
 
 /* one marker pair; inner wads contribute their own SS/FF groups, so
  * the caller walks every instance */
+/* Convert a single lump in place if it carries PNG or JPEG data; lumps that
+ * are already patch/flat data (or too short) are left untouched, so this is
+ * safe to call on a lump more than once. */
+static void zpng_convert_one(int i, dbool as_flat, dbool scaled, int *count)
+{
+  const unsigned char *raw;
+  int rawlen = W_LumpLength(i);
+  void *conv;
+  int convlen;
+
+  if (rawlen < 8)
+    return;
+  raw = W_CacheLumpNum(i);
+  if (!U_PNGIsPNG(raw, rawlen) &&
+      !(rawlen >= 3 && raw[0] == 0xFF && raw[1] == 0xD8 && raw[2] == 0xFF))
+  {
+    W_UnlockLumpNum(i);
+    return;
+  }
+  if (as_flat)
+    conv = U_PNGToFlat(raw, rawlen, &convlen);
+  else
+  {
+    int tw = 0, th = 0;
+    if (scaled && U_ZTexturesTargetSize(lumpinfo[i].name, &tw, &th))
+      zpng_rescaled++;
+    conv = U_PNGToPatchSized(raw, rawlen, tw, th, &convlen);
+  }
+  W_UnlockLumpNum(i);
+  if (!conv)
+  {
+    lprintf(LO_WARN, "U_PNGMaterializeLumps: %.8s failed to decode\n",
+            lumpinfo[i].name);
+    return;
+  }
+  W_ReplaceLumpData(i, conv, convlen);
+  (*count)++;
+}
+
 static void zpng_convert_one_range(int s, int e, dbool as_flat,
                                    dbool scaled, int *count)
 {
   int i;
 
   for (i = s + 1; i < e; i++)
-  {
-    const unsigned char *raw;
-    int rawlen = W_LumpLength(i);
-    void *conv;
-    int convlen;
+    zpng_convert_one(i, as_flat, scaled, count);
+}
 
-    if (rawlen < 8)
-      continue;
-    raw = W_CacheLumpNum(i);
-    if (!U_PNGIsPNG(raw, rawlen) &&
-        !(rawlen >= 3 && raw[0] == 0xFF && raw[1] == 0xD8 && raw[2] == 0xFF))
-    {
-      W_UnlockLumpNum(i);
-      continue;
-    }
-    if (as_flat)
-      conv = U_PNGToFlat(raw, rawlen, &convlen);
-    else
-    {
-      int tw = 0, th = 0;
-      if (scaled && U_ZTexturesTargetSize(lumpinfo[i].name, &tw, &th))
-        zpng_rescaled++;
-      conv = U_PNGToPatchSized(raw, rawlen, tw, th, &convlen);
-    }
-    W_UnlockLumpNum(i);
-    if (!conv)
-    {
-      lprintf(LO_WARN, "U_PNGMaterializeLumps: %.8s failed to decode\n",
-              lumpinfo[i].name);
-      continue;
-    }
-    W_ReplaceLumpData(i, conv, convlen);
-    (*count)++;
-  }
+/* Convert every PNG/JPEG lump that the archive assigned to a namespace by
+ * folder (pk3) rather than by SS_/FF_/TX_ markers (wad).  ZDoom packs keep
+ * their sprites under sprites/... with no marker lumps, so the marker scan
+ * above misses them and they reach the patch renderer as raw PNG -- the
+ * thing that draws them then parses PNG bytes as a Doom patch and crashes.
+ * Already-converted lumps are skipped (no longer PNG), so running this after
+ * the marker scan double-covers nothing. */
+static void zpng_convert_namespace(lumpinfo_namespace_t ns, dbool as_flat,
+                                   dbool scaled, int *count)
+{
+  int i;
+  for (i = 0; i < numlumps; i++)
+    if (lumpinfo[i].li_namespace == ns)
+      zpng_convert_one(i, as_flat, scaled, count);
 }
 
 static void zpng_convert_range(const char *smark, const char *emark,
@@ -459,6 +481,10 @@ void U_PNGMaterializeLumps(void)
   zpng_convert_range("SS_START", "SS_END", false, false, &n);
   zpng_convert_range("FF_START", "FF_END", true, false, &n);
   zpng_convert_range("TX_START", "TX_END", false, true, &n);
+  /* pk3 namespace-assigned members (subfolders, no marker lumps) */
+  zpng_convert_namespace(ns_sprites, false, false, &n);
+  zpng_convert_namespace(ns_flats, true, false, &n);
+  zpng_convert_namespace(ns_zdoom_tx, false, true, &n);
   if (n)
     lprintf(LO_INFO, "U_PNGMaterializeLumps: %d PNG/JPEG lumps converted "
             "(%d rescaled per TEXTURES)\n", n, zpng_rescaled);

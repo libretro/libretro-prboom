@@ -119,6 +119,30 @@ const uint8_t *R_GetTextureColumn(const rpatch_t *texpatch, int col)
 //  with the textures from the world map.
 //
 
+/* Resolve a ZDoom TEXTURES patch name to a lump that is a usable Doom patch,
+ * preferring the TX namespace then the global one.  Fills the pw and ph
+ * outputs with the patch's pixel dimensions when non-NULL.  Returns -1 if the
+ * name does not resolve to a valid patch (e.g. an undecoded modern lump). */
+static int zt_resolve_patch(const char *name, int *pw, int *ph)
+{
+  int lp = (W_CheckNumForName)(name, ns_zdoom_tx);
+  if (lp < 0)
+    lp = (W_CheckNumForName)(name, ns_global);
+  if (lp < 0 || W_LumpLength(lp) < 8)
+    return -1;
+  {
+    const unsigned char *hdr = W_CacheLumpNum(lp);
+    int w = (short)(hdr[0] | (hdr[1] << 8));
+    int h = (short)(hdr[2] | (hdr[3] << 8));
+    W_UnlockLumpNum(lp);
+    if (w <= 0 || h <= 0 || w > 4096 || h > 4096)
+      return -1;
+    if (pw) *pw = w;
+    if (ph) *ph = h;
+  }
+  return lp;
+}
+
 static void R_InitTextures (void)
 {
   const maptexture_t *mtexture;
@@ -383,7 +407,7 @@ static void R_InitTextures (void)
     for (k = 0; k < num_ztextures; k++)
     {
       const ztexture_t *zt = &ztextures[k];
-      int t2, j2, plump, ww, wh;
+      int t2, j2, ww, wh, pc, vi, vc, fill, pw = 0, ph = 0;
 
       for (t2 = 0; t2 < numtextures; t2++)
         if (!strncasecmp(textures[t2]->name, zt->name, 8))
@@ -391,15 +415,9 @@ static void R_InitTextures (void)
       if (t2 < numtextures)
         continue;                   /* lump-backed texture wins */
 
-      plump = (W_CheckNumForName)(zt->patch, ns_zdoom_tx);
-      if (plump < 0)
-        plump = (W_CheckNumForName)(zt->patch, ns_global);
-      if (plump < 0 || W_LumpLength(plump) < 8)
-      {
-        lprintf(LO_WARN, "R_InitTextures: TEXTURES def %.8s: patch %.8s "
-                "not found\n", zt->name, zt->patch);
+      pc = zt->patchcount;
+      if (pc < 1 || !zt->plist)
         continue;
-      }
 
       ww = (int)(zt->width / zt->xscale + 0.5);
       wh = (int)(zt->height / zt->yscale + 0.5);
@@ -408,33 +426,24 @@ static void R_InitTextures (void)
       if (ww > 4096 || wh > 4096)
         continue;
 
+      /* count the patches that resolve to a usable Doom patch */
+      vc = 0;
+      for (vi = 0; vi < pc; vi++)
+        if (zt_resolve_patch(zt->plist[vi].name, NULL, NULL) >= 0)
+          vc++;
+      if (vc == 0)
       {
-        const unsigned char *hdr = W_CacheLumpNum(plump);
-        int pw = (short)(hdr[0] | (hdr[1] << 8));
-        int ph = (short)(hdr[2] | (hdr[3] << 8));
-        W_UnlockLumpNum(plump);
-        if (pw <= 0 || ph <= 0 || pw > 4096 || ph > 4096)
-        {
-          /* not a usable patch -- typically an undecoded modern-format
-           * lump; registering it would feed garbage to the composite
-           * generator */
-          lprintf(LO_WARN, "R_InitTextures: TEXTURES def %.8s: patch "
-                  "%.8s is not a patch (skipped)\n", zt->name, zt->patch);
-          continue;
-        }
-        if (pw != ww || ph != wh)
-          lprintf(LO_INFO, "R_InitTextures: TEXTURES def %.8s is %dx%d "
-                  "over a %dx%d patch (%.8s)\n",
-                  zt->name, ww, wh, pw, ph, zt->patch);
+        lprintf(LO_WARN, "R_InitTextures: TEXTURES def %.8s: no usable "
+                "patches (first %.8s)\n", zt->name, zt->patch);
+        continue;
       }
 
-      texture = textures[numtextures] = Z_Malloc(sizeof(texture_t), PU_STATIC, 0);
+      texture = textures[numtextures] =
+        Z_Malloc(sizeof(texture_t) + sizeof(texpatch_t) * (vc - 1),
+                 PU_STATIC, 0);
       texture->width = (short)ww;
       texture->height = (short)wh;
-      texture->patchcount = 1;
-      texture->patches[0].originx = (short)(zt->patch_x / zt->xscale + 0.5);
-      texture->patches[0].originy = (short)(zt->patch_y / zt->yscale + 0.5);
-      texture->patches[0].patch = plump;
+      texture->patchcount = (short)vc;
       {
         size_t n = strlen(zt->name);
         if (n > sizeof(texture->name))
@@ -442,6 +451,31 @@ static void R_InitTextures (void)
         memset(texture->name, 0, sizeof(texture->name));
         memcpy(texture->name, zt->name, n);
       }
+
+      /* fill the composite, mapping ZDoom canvas offsets through the scale */
+      fill = 0;
+      for (vi = 0; vi < pc; vi++)
+      {
+        int lp = zt_resolve_patch(zt->plist[vi].name, &pw, &ph);
+        if (lp < 0)
+        {
+          lprintf(LO_WARN, "R_InitTextures: TEXTURES def %.8s: patch %.8s "
+                  "not a usable patch (skipped)\n", zt->name,
+                  zt->plist[vi].name);
+          continue;
+        }
+        if (fill == 0 && pc == 1 && (pw != ww || ph != wh))
+          lprintf(LO_INFO, "R_InitTextures: TEXTURES def %.8s is %dx%d "
+                  "over a %dx%d patch (%.8s)\n",
+                  zt->name, ww, wh, pw, ph, zt->plist[vi].name);
+        texture->patches[fill].originx =
+          (short)(zt->plist[vi].x / zt->xscale + 0.5);
+        texture->patches[fill].originy =
+          (short)(zt->plist[vi].y / zt->yscale + 0.5);
+        texture->patches[fill].patch = lp;
+        fill++;
+      }
+
       for (j2 = 1; j2 * 2 <= texture->width; j2 <<= 1)
         ;
       texture->widthmask = j2 - 1;

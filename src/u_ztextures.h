@@ -19,11 +19,19 @@
 
 typedef struct
 {
+  char name[9];
+  int  x, y;
+} ztpatch_t;
+
+typedef struct
+{
   char   name[9];
   int    width, height;          /* declared texel dimensions */
   double xscale, yscale;         /* world size = dims / scale */
-  char   patch[9];               /* single source patch lump */
-  int    patch_x, patch_y;       /* placement on the texel canvas */
+  char   patch[9];               /* first source patch lump (see plist) */
+  int    patch_x, patch_y;       /* placement of the first patch */
+  int    patchcount;             /* number of composite patches */
+  ztpatch_t *plist;              /* patchcount entries */
 } ztexture_t;
 
 extern ztexture_t *ztextures;

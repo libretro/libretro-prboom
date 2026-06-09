@@ -11,6 +11,8 @@
 #include "u_scanner.h"
 #include "u_ztextures.h"
 
+#define ZT_MAXPATCH 256          /* max composite patches per TEXTURES def */
+
 ztexture_t *ztextures;
 int num_ztextures;
 static int cap_ztextures;
@@ -97,6 +99,7 @@ static void zt_parse_lump(int lump)
       double w = 0, h = 0;
       int patches = 0;
       dbool bad = false;
+      ztpatch_t pl[ZT_MAXPATCH];   /* collected composite patches */
 
       memset(&def, 0, sizeof(def));
       def.xscale = 1.0;
@@ -144,12 +147,14 @@ static void zt_parse_lump(int lump)
                  !strcasecmp(s.string, "Graphic"))
         {
           double px = 0, py = 0;
+          char pname[9];
           if (!U_GetNextToken(&s, TRUE) ||
               (s.token != TK_StringConst && s.token != TK_Identifier))
           {
             bad = true;
             break;
           }
+          zt_copy_name(pname, s.string);
           if (patches == 0)
             zt_copy_name(def.patch, s.string);
           patches++;
@@ -167,6 +172,12 @@ static void zt_parse_lump(int lump)
             def.patch_x = (int)px;
             def.patch_y = (int)py;
           }
+          if (patches <= ZT_MAXPATCH)
+          {
+            zt_copy_name(pl[patches - 1].name, pname);
+            pl[patches - 1].x = (int)px;
+            pl[patches - 1].y = (int)py;
+          }
           /* per-patch property sub-block (translations etc.): skip */
           if (U_CheckToken(&s, '{'))
             zt_skip_block(&s);
@@ -177,12 +188,15 @@ static void zt_parse_lump(int lump)
       if (bad || def.width <= 0 || def.height <= 0 ||
           def.width > 4096 || def.height > 4096 || !def.patch[0])
         continue;
-      if (patches > 1)
+      def.patchcount = (patches > ZT_MAXPATCH) ? ZT_MAXPATCH : patches;
+      if (def.patchcount > 0)
       {
-        lprintf(LO_WARN, "U_ZTexturesLoad: %.8s uses %d patches; "
-                "multi-patch composites are not supported (first kept)\n",
-                def.name, patches);
+        def.plist = Z_Malloc(def.patchcount * sizeof(ztpatch_t), PU_STATIC, 0);
+        memcpy(def.plist, pl, def.patchcount * sizeof(ztpatch_t));
       }
+      if (patches > ZT_MAXPATCH)
+        lprintf(LO_WARN, "U_ZTexturesLoad: %.8s uses %d patches; capped at "
+                "%d\n", def.name, patches, ZT_MAXPATCH);
       *zt_add() = def;
       num_ztextures++;
     }

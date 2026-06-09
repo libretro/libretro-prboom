@@ -33,7 +33,7 @@
 #include "dsda_hacked.h"
 #include "u_decorate.h"
 
-#define MAX_DECORATE_ACTORS 1024
+#define MAX_DECORATE_ACTORS 512
 #define MAX_NAME 64
 
 typedef struct
@@ -57,7 +57,7 @@ static int num_actors;
 /* every 4-char sprite name appearing on a state line anywhere in the
  * DECORATE lump; R_InitSpriteDefs only unifies a sprite's art when the
  * lump actually redefines that sprite's sequence */
-#define MAX_DECORATE_SPRITES 1024
+#define MAX_DECORATE_SPRITES 512
 static char sprite_names[MAX_DECORATE_SPRITES][5];
 static int num_sprite_names;
 static int parsed;              /* one-shot lazy parse */
@@ -160,48 +160,17 @@ static void parse_header(const char *p, const char *end)
   num_actors++;
 }
 
-/* Lump name a pk3 gives an included file: basename after the last slash, up
- * to the first '.', uppercased, max 8 chars (mirrors pk3_lump_name). */
-static void decorate_include_name(char out[9], const char *path, size_t plen)
+static void parse_decorate(void)
 {
-  const char *base = path;
-  size_t i, n = 0;
-  for (i = 0; i < plen; i++)
-    if (path[i] == '/' || path[i] == '\\')
-      base = path + i + 1;
-  for (i = (size_t)(base - path); i < plen && path[i] != '.' && n < 8; i++)
-  {
-    char c = path[i];
-    out[n++] = (c >= 'a' && c <= 'z') ? (char)(c - 32) : c;
-  }
-  out[n] = '\0';
-}
+  int            lump;
+  size_t         len, i;
+  const char    *txt;
+  int            depth = 0;
 
-#define DECORATE_MAX_LUMPS 128
-static int parsed_lumps[DECORATE_MAX_LUMPS];
-static int num_parsed_lumps;
-
-/* Parse one DECORATE lump's actor definitions, following any #include
- * directives to the lumps the archive synthesised for them.  ZDoom packs
- * (ZDCMP2 etc.) keep a near-empty top-level DECORATE that only #includes the
- * real actor files under actors/..., so without this every custom prop --
- * palms, lamps, corpses, glass -- reads as an unknown thing and never spawns. */
-static void parse_decorate_lump(int lump, int incdepth)
-{
-  size_t      len, i;
-  const char *txt;
-  int         depth = 0, k;
-  int         incs[DECORATE_MAX_LUMPS];
-  int         ninc = 0;
-
-  if (lump < 0 || incdepth > 16)
+  parsed = 1;
+  lump = (W_CheckNumForName)("DECORATE", ns_global);
+  if (lump < 0)
     return;
-  for (k = 0; k < num_parsed_lumps; k++)
-    if (parsed_lumps[k] == lump)
-      return;                         /* already parsed (cycle or dup) */
-  if (num_parsed_lumps < DECORATE_MAX_LUMPS)
-    parsed_lumps[num_parsed_lumps++] = lump;
-
   len = W_LumpLength(lump);
   txt = W_CacheLumpNum(lump);
 
@@ -214,32 +183,6 @@ static void parse_decorate_lump(int lump, int incdepth)
     {
       if (depth > 0)
         depth--;
-    }
-    else if (depth == 0 && c == '#' && i + 8 < len &&
-             !strncasecmp(txt + i, "#include", 8) &&
-             (i == 0 || txt[i - 1] == '\n' || txt[i - 1] == '\r'))
-    {
-      size_t j = i + 8;
-      while (j < len && txt[j] != '"' && txt[j] != '\n')
-        j++;
-      if (j < len && txt[j] == '"')
-      {
-        size_t s = j + 1, e = j + 1;
-        while (e < len && txt[e] != '"' && txt[e] != '\n')
-          e++;
-        if (e < len && txt[e] == '"')
-        {
-          char nm[9];
-          int  inc;
-          decorate_include_name(nm, txt + s, e - s);
-          inc = (W_CheckNumForName)(nm, ns_global);
-          if (inc >= 0 && ninc < DECORATE_MAX_LUMPS)
-            incs[ninc++] = inc;
-          j = e;
-        }
-      }
-      i = j;
-      continue;
     }
     else if (depth == 0 && (c == 'a' || c == 'A') && i + 6 < len &&
              !strncasecmp(txt + i, "actor", 5) &&
@@ -273,22 +216,6 @@ static void parse_decorate_lump(int lump, int incdepth)
     }
   }
   W_UnlockLumpNum(lump);
-
-  /* recurse after unlocking, so at most incdepth lumps are cached at once */
-  for (k = 0; k < ninc; k++)
-    parse_decorate_lump(incs[k], incdepth + 1);
-}
-
-static void parse_decorate(void)
-{
-  int lump;
-
-  parsed = 1;
-  lump = (W_CheckNumForName)("DECORATE", ns_global);
-  if (lump < 0)
-    return;
-  num_parsed_lumps = 0;
-  parse_decorate_lump(lump, 0);
 
   if (num_actors)
     lprintf(LO_INFO, "U_ParseDecorate: %d actor headers\n", num_actors);

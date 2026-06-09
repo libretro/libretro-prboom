@@ -598,6 +598,11 @@ menu_t EpiDef =
 // This is for customized episode menus
 int EpiCustom;
 short EpiMenuEpi[8], EpiMenuMap[8];
+/* Start-map lump name for each episode entry.  ZDoom MAPINFO allows an
+ * episode to point at an arbitrarily named map (e.g. ZDCMP2) that does not
+ * fit the MAPnn/ExMy pattern G_ValidateMapName understands; keep the raw
+ * name so the episode can be launched by name via G_DeferedInitNewName. */
+char EpiMenuName[8][9];
 
 //
 //    M_Episode
@@ -665,7 +670,15 @@ void M_AddEpisode(const char *map, char *def)
     }
     if (EpiDef.numitems >= 8)
        return;
+    /* G_ValidateMapName returns 0 and leaves episodenum/mapnum UNSET for a
+     * non-standard ZDoom map name (e.g. ZDCMP2).  Initialise them so the
+     * uninitialised stack values never reach EpiMenuEpi/Map (which caused a
+     * crash on skill select), and keep the raw name for a by-name launch. */
+    episodenum = 0;
+    mapnum     = 0;
     G_ValidateMapName(map, &episodenum, &mapnum);
+    strncpy(EpiMenuName[EpiDef.numitems], map, 8);
+    EpiMenuName[EpiDef.numitems][8] = 0;
     EpiMenuEpi[EpiDef.numitems] = episodenum;
     EpiMenuMap[EpiDef.numitems] = mapnum;
     strncpy(EpisodeMenu[EpiDef.numitems].name, gfx, 8);
@@ -889,7 +902,7 @@ static void M_VerifyNightmare(int ch)
   if (!EpiCustom)
     G_DeferedInitNew(sk_nightmare,epi+1,1);
   else
-    G_DeferedInitNew(sk_nightmare, EpiMenuEpi[epi], EpiMenuMap[epi]);
+    G_DeferedInitNewName(sk_nightmare, EpiMenuName[epi]);
   M_ClearMenus ();
 }
 
@@ -902,7 +915,7 @@ void M_ChooseSkill(int choice)
     }
 
   if (!EpiCustom) G_DeferedInitNew(choice,epi+1,1);
-  else G_DeferedInitNew(choice, EpiMenuEpi[epi], EpiMenuMap[epi]);
+  else G_DeferedInitNewName(choice, EpiMenuName[epi]);
   M_ClearMenus ();
 }
 

@@ -273,6 +273,13 @@ mobj_t **bodyque = 0;                   // phares 8/10/98
 static void G_DoSaveGame (dbool   menu);
 static const uint8_t* G_ReadDemoHeader(const uint8_t* demo_p, size_t size, dbool   failonerror);
 static mapentry_t *G_LookupMapinfo(int episode, int map);
+mapentry_t *G_LookupMapinfoByName(const char *lumpname);
+
+/* Named next-map carried from G_DoCompleted to G_DoWorldDone when a ZDoom
+ * MAPINFO next/nextsecret target is an arbitrary lump name that does not fit
+ * MAPnn/ExMy (e.g. ZDCMP2 looping to itself).  Empty == numeric next map.
+ * Declared here (ahead of G_DoCompleted) so it is in scope at every use. */
+static char g_nextmapname[9];
 
 //
 // G_BuildTiccmd
@@ -1665,6 +1672,7 @@ void G_DoCompleted (void)
 
   wminfo.lastmapinfo = gamemapinfo;
   wminfo.nextmapinfo = NULL;
+  g_nextmapname[0] = 0;
   if (gamemapinfo)
   {
     const char *next = "";
@@ -1679,9 +1687,21 @@ void G_DoCompleted (void)
        next = gamemapinfo->nextmap;
     if (next[0])
     {
-      G_ValidateMapName(next, &wminfo.nextep, &wminfo.next);
-      wminfo.nextep--;
-      wminfo.next--;
+      if (!G_ValidateMapName(next, &wminfo.nextep, &wminfo.next))
+      {
+        /* Arbitrary ZDoom next-map name (e.g. ZDCMP2 looping to itself):
+         * carry the name for G_DoWorldDone and use placeholder 0-based
+         * ints so the numeric intermission machinery stays in range. */
+        strncpy(g_nextmapname, next, 8);
+        g_nextmapname[8] = 0;
+        wminfo.nextep = 0;
+        wminfo.next   = 0;
+      }
+      else
+      {
+        wminfo.nextep--;
+        wminfo.next--;
+      }
       wminfo.didsecret = players[consoleplayer].didsecret;
       wminfo.partime = gamemapinfo->partime;
       goto frommapinfo;	// skip past the default setup.
@@ -1782,7 +1802,9 @@ void G_DoCompleted (void)
     wminfo.partime = TICRATE*pars[gameepisode][gamemap];
 
 frommapinfo:
-  wminfo.nextmapinfo = G_LookupMapinfo(wminfo.nextep+1, wminfo.next+1);
+  wminfo.nextmapinfo = g_nextmapname[0]
+                       ? G_LookupMapinfoByName(g_nextmapname)
+                       : G_LookupMapinfo(wminfo.nextep+1, wminfo.next+1);
   wminfo.maxkills = totalkills;
   wminfo.maxitems = totalitems;
   wminfo.maxsecret = totalsecret;
@@ -1892,7 +1914,16 @@ void G_DoWorldDone (void)
   }
 
   gamemap = wminfo.next + 1;
-  gamemapinfo = G_LookupMapinfo(gameepisode, gamemap);
+  if (g_nextmapname[0])
+  {
+    /* Named next map (ZDoom MAPINFO): resolve by name so P_SetupLevel loads
+     * the right lump; the numeric gameepisode/gamemap are placeholders. */
+    mapentry_t *me = G_LookupMapinfoByName(g_nextmapname);
+    gamemapinfo = me ? me : G_LookupMapinfo(gameepisode, gamemap);
+    g_nextmapname[0] = 0;
+  }
+  else
+    gamemapinfo = G_LookupMapinfo(gameepisode, gamemap);
   G_DoLoadLevel();
   gameaction = ga_nothing;
   AM_clearMarks();           //jff 4/12/98 clear any marks on the automap
@@ -2470,12 +2501,43 @@ bool G_DoSaveGameToBuffer(void *buf, size_t size) {
 static skill_t d_skill;
 static int     d_episode;
 static int     d_map;
+/* Deferred start-map lump name for ZDoom MAPINFO episodes whose start map
+ * is not a MAPnn/ExMy lump (e.g. ZDCMP2).  Empty == use the d_episode/d_map
+ * numeric path. */
+static char    d_mapname[9];
 
 void G_DeferedInitNew(skill_t skill, int episode, int map)
 {
   d_skill = skill;
   d_episode = episode;
   d_map = map;
+  d_mapname[0] = 0;
+  gameaction = ga_newgame;
+}
+
+/* G_DeferedInitNewName -- start a new game on a map identified by lump name.
+ * ZDoom MAPINFO episodes may point at a map whose lump name is arbitrary
+ * (e.g. ZDCMP2) rather than MAPnn/ExMy.  When the name resolves to a
+ * standard MAPnn/ExMy we feed the usual numeric path; otherwise the raw
+ * name is carried through to G_InitNew, which looks the map up by name. */
+void G_DeferedInitNewName(skill_t skill, const char *mapname)
+{
+  int e = 1, m = 1;
+
+  d_skill = skill;
+  if (mapname && mapname[0] && !G_ValidateMapName(mapname, &e, &m))
+  {
+    strncpy(d_mapname, mapname, 8);
+    d_mapname[8] = 0;
+    d_episode = 1;
+    d_map = 1;
+  }
+  else
+  {
+    d_mapname[0] = 0;
+    d_episode = e;
+    d_map = m;
+  }
   gameaction = ga_newgame;
 }
 
@@ -2907,10 +2969,21 @@ void G_InitNew(skill_t skill, int episode, int map)
   usergame = TRUE;                // will be set FALSE if a demo
   paused = FALSE;
   automapmode &= ~am_active;
+  g_nextmapname[0] = 0;           // a fresh game has no carried next map
   gameepisode = episode;
   gamemap = map;
   gameskill = skill;
-  gamemapinfo = G_LookupMapinfo(gameepisode, gamemap);
+  /* A ZDoom MAPINFO episode may start on an arbitrarily named map; when a
+   * deferred name is pending, resolve the map info by name (the numeric
+   * episode/map are placeholders).  P_SetupLevel then loads the named lump. */
+  if (d_mapname[0])
+  {
+    mapentry_t *me = G_LookupMapinfoByName(d_mapname);
+    gamemapinfo = me ? me : G_LookupMapinfo(gameepisode, gamemap);
+    d_mapname[0] = 0;
+  }
+  else
+    gamemapinfo = G_LookupMapinfo(gameepisode, gamemap);
 
   totalleveltimes = 0; // cph
 

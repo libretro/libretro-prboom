@@ -2329,6 +2329,24 @@ static int P_FindUDMFLump(int lumpnum, const char *name)
   return -1;
 }
 
+/* Resolve a map lump by its marker.  A pk3 may carry several lumps that
+ * share the map's name -- ZDoom community packs routinely ship an ACS
+ * library acs/<name>.o and source acs/<name>.acs beside maps/<name>.wad,
+ * all of which flatten to the same 8-char lump name.  W_GetNumForName
+ * returns the last (the ACS object), so prefer the occurrence that is a
+ * real map header: the one immediately followed by TEXTMAP (UDMF) or
+ * THINGS (binary).  Falls back to the plain lookup when none qualifies. */
+static int P_FindMapMarker(const char *name)
+{
+  int i, found = -1;
+  for (i = 0; i + 1 < numlumps; i++)
+    if (!strncasecmp(lumpinfo[i].name, name, 8) &&
+        (!strncasecmp(lumpinfo[i + 1].name, "TEXTMAP", 8) ||
+         !strncasecmp(lumpinfo[i + 1].name, "THINGS", 8)))
+      found = i;            /* last real marker wins (PWAD override order) */
+  return (found >= 0) ? found : W_GetNumForName(name);
+}
+
 /* ====================================================================
  * UDMF runtime consumers (text map format).  Mirror the binary P_Load*
  * loaders against the udmf parser output; only engine-carried fields are
@@ -2642,7 +2660,18 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    //    W_Reload ();     killough 1/31/98: W_Reload obsolete
 
    // find map name
-   if (gamemode == commercial)
+   if (gamemapinfo && gamemapinfo->mapname && gamemapinfo->mapname[0] &&
+       !G_ValidateMapName(gamemapinfo->mapname, NULL, NULL))
+   {
+      /* ZDoom MAPINFO map with an arbitrary lump name (e.g. ZDCMP2) that the
+       * MAPnn/ExMy derivation below cannot express -- load it by name.  Such
+       * maps are UDMF and carry their nodes inline (ZNODES), so no separate
+       * GL_ lump applies; point gl_lumpname at a name that cannot resolve. */
+      strncpy(lumpname, gamemapinfo->mapname, 8);
+      lumpname[8] = 0;
+      snprintf(gl_lumpname, sizeof(gl_lumpname), "GL_%.5s", lumpname);
+   }
+   else if (gamemode == commercial)
    {
       sprintf(lumpname, "map%02d", map);           // killough 1/24/98: simplify
       sprintf(gl_lumpname, "gl_map%02d", map);    // figgi
@@ -2653,7 +2682,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       sprintf(gl_lumpname, "GL_E%iM%i", episode, map); // figgi
    }
 
-   lumpnum = W_GetNumForName(lumpname);
+   lumpnum = P_FindMapMarker(lumpname);
    gl_lumpnum = W_CheckNumForName(gl_lumpname); // figgi
 
    leveltime = 0; totallive = 0;

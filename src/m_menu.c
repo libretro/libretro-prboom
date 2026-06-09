@@ -5442,10 +5442,17 @@ void M_Drawer (void)
   y = currentMenu->y;
   max = currentMenu->numitems;
 
+  /* An item that has a text label (alttext) but no drawable patch -- either
+   * an empty patch name or a name whose lump is absent -- forces the whole
+   * menu onto the text path.  ZDoom episodes/skills defined with `name` but
+   * no `picname` (e.g. ZDCMP2's `episode ZDCMP2 { name = "ZDCMP2" }`) reach
+   * M_AddEpisode with an empty patch name; without this they were neither
+   * counted as missing nor drawn as a patch, so the entry rendered blank. */
   for (i = 0; i < max; i++)
-    if (currentMenu->menuitems[i].name[0])
-      if (W_CheckNumForName(currentMenu->menuitems[i].name) < 0)
-        lumps_missing++;
+    if (currentMenu->menuitems[i].alttext &&
+        (!currentMenu->menuitems[i].name[0] ||
+         W_CheckNumForName(currentMenu->menuitems[i].name) < 0))
+      lumps_missing++;
 
   if (lumps_missing == 0)
     for (i=0;i<max;i++)

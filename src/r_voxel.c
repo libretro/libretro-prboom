@@ -72,13 +72,21 @@ void R_DrawVoxel(vissprite_t *vis)
   lut = R_ComposedColormap(vis->colormap ? vis->colormap : fullcolormap);
   vox_zbuf_stamp++;
 
+  /* model-yaw rotation of the horizontal cells into world space */
+  {
+  fixed_t rcos = finecosine[vis->voxangle >> ANGLETOFINESHIFT];
+  fixed_t rsin = finesine[vis->voxangle >> ANGLETOFINESHIFT];
+
   for (x = 0; x < vox->xsiz; x++)
   {
     for (y = 0; y < vox->ysiz; y++)
     {
       const voxcolumn_t *c = &vox->columns[x * vox->ysiz + y];
-      fixed_t ox = FixedMul(((x << FRACBITS) - vox->xpiv), scale);
-      fixed_t oy = FixedMul(((y << FRACBITS) - vox->ypiv), scale);
+      fixed_t lx = FixedMul(((x << FRACBITS) - vox->xpiv), scale);
+      fixed_t ly = FixedMul(((y << FRACBITS) - vox->ypiv), scale);
+      /* rotate local (lx,ly) by the actor yaw, then offset by the origin */
+      fixed_t ox = FixedMul(lx, rcos) - FixedMul(ly, rsin);
+      fixed_t oy = FixedMul(lx, rsin) + FixedMul(ly, rcos);
       fixed_t wx = vis->gx + ox;
       fixed_t wy = vis->gy + oy;
       fixed_t tr_x = wx - viewx;
@@ -142,5 +150,6 @@ void R_DrawVoxel(vissprite_t *vis)
           }
       }
     }
+  }
   }
 }

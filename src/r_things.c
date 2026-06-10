@@ -877,8 +877,11 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
          vis->xiscale   = 0;
          vis->patch     = -1;
          vis->voxel     = vox;
-         /* model yaw relative to view: actor angle vs viewangle */
-         vis->voxangle  = thing->angle - viewangle;
+         /* model yaw in world space; the rasteriser rotates the model's
+          * horizontal cells by it, then the view transform handles the
+          * camera.  Offset by ANG90 so the KVX +x axis points along the
+          * actor's facing. */
+         vis->voxangle  = thing->angle;
 
          if (!raven && (thing->flags & MF_SHADOW))
             vis->colormap = NULL;

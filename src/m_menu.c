@@ -5891,8 +5891,11 @@ void M_Init(void)
    * HERETIC.WAD, so M_Drawer falls back to drawing the Doom alttext
    * through the big FONTB font -- showing "episode 1" and the Doom
    * skill names.  Substitute the real Heretic episode and skill names,
-   * matching vanilla Heretic, and cap the episode list at the five
-   * named episodes (E6 is the hidden deathmatch set, not a menu entry). */
+   * matching vanilla Heretic.  E6 (the SoSR "Fate's Path" deathmatch
+   * set) is kept selectable with its widely-used name; any further
+   * episodes detected (e.g. via add-on wads) keep a lowercase
+   * "episode N" label so they render sanely in FONTB rather than the
+   * Doom-style capitalised alttext. */
   if (heretic)
     {
       static const char *const heretic_episodes[] =
@@ -5901,8 +5904,10 @@ void M_Init(void)
           "hell's maw",
           "the dome of d'sparil",
           "the ossuary",
-          "the stagnant demesne"
+          "the stagnant demesne",
+          "fate's path"
         };
+      static char heretic_epi_fallback[MAX_EPISODE_NUM][16];
       static const char *const heretic_skills[] =
         {
           "thou needeth a wet-nurse",
@@ -5911,12 +5916,21 @@ void M_Init(void)
           "thou art a smite-meister",
           "black plague possesses thee"
         };
+      const int num_named = (int)(sizeof(heretic_episodes) /
+                                  sizeof(heretic_episodes[0]));
       int i;
 
-      if (EpiDef.numitems > 5)
-        EpiDef.numitems = 5;
-      for (i = 0; i < EpiDef.numitems && i < 5; i++)
-        EpisodeMenu[i].alttext = (char *)heretic_episodes[i];
+      for (i = 0; i < EpiDef.numitems; i++)
+        {
+          if (i < num_named)
+            EpisodeMenu[i].alttext = (char *)heretic_episodes[i];
+          else if (i < MAX_EPISODE_NUM)
+            {
+              snprintf(heretic_epi_fallback[i],
+                       sizeof(heretic_epi_fallback[i]), "episode %d", i + 1);
+              EpisodeMenu[i].alttext = heretic_epi_fallback[i];
+            }
+        }
 
       for (i = 0; i < newg_end && i < 5; i++)
         NewGameMenu[i].alttext = (char *)heretic_skills[i];

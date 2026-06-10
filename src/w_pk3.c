@@ -155,6 +155,32 @@ static dbool pk3_is_wav(const unsigned char *d, int len)
   return len >= 4 && !memcmp(d, "RIFF", 4);
 }
 
+/* True only for a byte buffer that is actually a WAD image: the IWAD/PWAD
+ * magic AND a directory header (numlumps, infotableofs) that fits inside
+ * the buffer.  The bare 4-byte magic is not enough -- ZDoom packs ship
+ * text lumps that legitimately begin with the word "IWAD", e.g. a
+ * gameinfo.txt whose first line is  IWAD = "DOOM2.WAD"  -- and routing
+ * those to the inner-wad expander made the translator read ` = "D...` as
+ * a lump count and drop the lump as a "corrupt directory".  Validating
+ * the header here keeps such text lumps on the normal global path. */
+static dbool pk3_is_wad_image(const unsigned char *d, int len)
+{
+  wadinfo_t header;
+  int       numlumps, infotableofs;
+
+  if (len < (int)sizeof(wadinfo_t))
+    return FALSE;
+  if (memcmp(d, "IWAD", 4) && memcmp(d, "PWAD", 4))
+    return FALSE;
+  memcpy(&header, d, sizeof(header));
+  numlumps     = LONG(header.numlumps);
+  infotableofs = LONG(header.infotableofs);
+  if (numlumps < 0 || infotableofs < 0 ||
+      (int64_t)infotableofs + (int64_t)numlumps * 16 > (int64_t)len)
+    return FALSE;
+  return TRUE;
+}
+
 /* Expand a root-level .wad member: append its lumps verbatim. */
 static int pk3_add_inner_wad(pk3_build_t *b, const char *member,
                              const unsigned char *wad, int len)
@@ -227,7 +253,7 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
    * member was emitted as one opaque lump named after the file, leaving the
    * map's TEXTMAP absent: UDMF detection failed and the binary loader read
    * the text map as binary records (garbage sidedefs, huge bogus allocs). */
-  if (d && len >= 4 && (!memcmp(d, "PWAD", 4) || !memcmp(d, "IWAD", 4)))
+  if (pk3_is_wad_image(d, len))
     return PK3_PASS_ROOT;
   /* PNG members of the renderable namespaces stay in their groups:
    * U_PNGMaterializeLumps converts them to patches/flats in place
@@ -331,8 +357,7 @@ unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
         continue;
       }
 
-      if (pass == PK3_PASS_ROOT && size >= 4 &&
-          (!memcmp(data, "PWAD", 4) || !memcmp(data, "IWAD", 4)))
+      if (pass == PK3_PASS_ROOT && pk3_is_wad_image(data, (int)size))
       {
         if (!pk3_add_inner_wad(&b, st.m_filename, data, (int)size))
           goto oom;

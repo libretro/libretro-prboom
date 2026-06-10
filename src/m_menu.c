@@ -420,6 +420,25 @@ void M_DrawMainMenu(void)
 {
   // CPhipps - patch drawing updated
   /* M_DOOM is Doom's main-menu title; Heretic uses M_HTIC instead. */
+  if (hexen)
+  {
+    /* Hexen's main menu: the HEXEN title (M_HTIC in HEXEN.WAD) plus two
+     * animated flaming bulls flanking the menu.  The bulls are the FBUL
+     * sprite frames (FBULA0..); vanilla cycles frame = (gametic/5) % 7 and
+     * draws the left bull at +2 frames out of phase from the right. */
+    static int maulobase = -2;   /* -2 = unlooked-up, -1 = absent */
+    if (maulobase == -2)
+      maulobase = W_CheckNumForName("FBULA0");
+    if (W_CheckNumForName("M_HTIC") >= 0)
+      V_DrawNamePatch(88, 0, 0, "M_HTIC", CR_DEFAULT, VPT_STRETCH);
+    if (maulobase >= 0)
+    {
+      int frame = (gametic / 5) % 7;
+      V_DrawNumPatch(37,  80, 0, maulobase + (frame + 2) % 7, CR_DEFAULT, VPT_STRETCH);
+      V_DrawNumPatch(278, 80, 0, maulobase + frame,           CR_DEFAULT, VPT_STRETCH);
+    }
+    return;
+  }
   if (heretic)
   {
     if (W_CheckNumForName("M_HTIC") >= 0)
@@ -428,6 +447,82 @@ void M_DrawMainMenu(void)
   else if (W_CheckNumForName("M_DOOM") >= 0)
     V_DrawNamePatch(94, 2, 0, "M_DOOM", CR_DEFAULT, VPT_STRETCH);
 }
+
+/////////////////////////////
+//
+// HEXEN MAIN MENU
+//
+// Hexen's main menu differs from Doom's: "new game / options / game files /
+// info / quit game", with load/save tucked under a "game files" submenu.
+// These items have no patch lumps, so M_Drawer renders their alttext through
+// the big FONTB font (the raven path).
+//
+
+void M_HexenFiles(int choice);
+
+enum
+{
+  hx_newgame,
+  hx_options,
+  hx_files,
+  hx_info,
+  hx_quit,
+  hx_main_end
+} hexen_main_e;
+
+menuitem_t HexenMainMenu[] =
+{
+  {1, "", M_NewGame,    'n', "new game"},
+  {1, "", M_Options,    'o', "options"},
+  {1, "", M_HexenFiles, 'g', "game files"},
+  {1, "", M_ReadThis,   'i', "info"},
+  {1, "", M_QuitDOOM,   'q', "quit game"}
+};
+
+menu_t HexenMainDef =
+{
+  hx_main_end,
+  NULL,
+  HexenMainMenu,
+  M_DrawMainMenu,
+  110, 56,
+  0
+};
+
+enum
+{
+  hx_loadgame,
+  hx_savegame,
+  hx_files_end
+} hexen_files_e;
+
+menuitem_t HexenFilesMenu[] =
+{
+  {1, "", M_LoadGame, 'l', "load game"},
+  {1, "", M_SaveGame, 's', "save game"}
+};
+
+menu_t HexenFilesDef =
+{
+  hx_files_end,
+  &HexenMainDef,
+  HexenFilesMenu,
+  NULL,
+  110, 60,
+  0
+};
+
+void M_HexenFiles(int choice)
+{
+  M_SetupNextMenu(&HexenFilesDef);
+}
+
+/* The active main menu: Hexen has its own; Doom and Heretic share MainDef. */
+static menu_t *M_MainMenuDef(void)
+{
+  return hexen ? &HexenMainDef : &MainDef;
+}
+
 
 /////////////////////////////
 //
@@ -520,12 +615,12 @@ void M_ReadThis2(int choice)
 
 void M_FinishReadThis(int choice)
 {
-  M_SetupNextMenu(&MainDef);
+  M_SetupNextMenu(M_MainMenuDef());
 }
 
 void M_FinishHelp(int choice)        // killough 10/98
 {
-  M_SetupNextMenu(&MainDef);
+  M_SetupNextMenu(M_MainMenuDef());
 }
 
 //
@@ -3974,7 +4069,7 @@ void M_ExtHelpNextScreen(int choice)
       // when finished with extended help screens, return to Main Menu
 
       extended_help_index = 1;
-      M_SetupNextMenu(&MainDef);
+      M_SetupNextMenu(M_MainMenuDef());
     }
 }
 
@@ -5364,7 +5459,7 @@ void M_StartControlPanel (void)
 
   default_verify = 0;                  // killough 10/98
   menuactive = mnact_float;
-  currentMenu = &MainDef;         // JDC
+  currentMenu = M_MainMenuDef();  // JDC (Hexen uses its own main menu)
   itemOn = currentMenu->lastOn;   // JDC
   print_warning_about_changes = FALSE;   // killough 11/98
 }
@@ -5848,7 +5943,7 @@ void M_Init(void)
   }
 
   M_InitDefaults();                // killough 11/98
-  currentMenu = &MainDef;
+  currentMenu = M_MainMenuDef();   /* Hexen uses its own main menu */
   menuactive = mnact_inactive;
   itemOn = currentMenu->lastOn;
   whichSkull = 0;

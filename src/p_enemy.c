@@ -1426,6 +1426,77 @@ void A_HeadAttack(mobj_t *actor)
 {
   if (!actor->target)
     return;
+
+  if (raven)
+    {
+      /* Heretic Iron Lich.  The Doom cacodemon path below fires
+       * MT_HEADSHOT, whose enum value indexes a non-missile slot in
+       * Heretic's mobjinfo table (speed 0) -- P_SpawnMissile would then
+       * divide the range by that zero speed and raise SIGFPE.  Use the
+       * actual Iron Lich attack (ice ball / fire column / whirlwind),
+       * matching vanilla Heretic. */
+      static const int atkResolve1[] = { 50, 150 };
+      static const int atkResolve2[] = { 150, 200 };
+      mobj_t *target = actor->target;
+      mobj_t *fire, *baseFire, *mo;
+      int randAttack, dist, i;
+
+      A_FaceTarget(actor);
+      if (P_CheckMeleeRange(actor))
+        {
+          int damage = (1 + (P_Random(pr_heretic) & 7)) * 6;  /* HITDICE(6) */
+          P_DamageMobj(target, actor, actor, damage);
+          return;
+        }
+
+      /* far = beyond 8 sectors (512 map units) */
+      dist = (P_AproxDistance(actor->x - target->x, actor->y - target->y)
+              > 8 * 64 * FRACUNIT);
+      randAttack = P_Random(pr_headattack);
+      if (randAttack < atkResolve1[dist])
+        {                       /* ice ball */
+          P_SpawnMissile(actor, target, HERETIC_MT_HEADFX1);
+          S_StartSound(actor, heretic_sfx_hedat2);
+        }
+      else if (randAttack < atkResolve2[dist])
+        {                       /* fire column */
+          fire = baseFire = P_SpawnMissile(actor, target, HERETIC_MT_HEADFX3);
+          if (fire)
+            {
+              S_StartSound(actor, heretic_sfx_hedat1);
+              P_SetMobjState(fire, HERETIC_S_HEADFX3_4);  /* don't grow */
+              for (i = 0; i < 5; i++)
+                {
+                  fire = P_SpawnMobj(baseFire->x, baseFire->y, baseFire->z,
+                                     HERETIC_MT_HEADFX3);
+                  if (i == 0)
+                    S_StartSound(actor, heretic_sfx_hedat1);
+                  P_SetTarget(&fire->target, baseFire->target);
+                  fire->angle = baseFire->angle;
+                  fire->momx = baseFire->momx;
+                  fire->momy = baseFire->momy;
+                  fire->momz = baseFire->momz;
+                  fire->damage = 0;
+                  fire->health = (i + 1) * 2;
+                  P_CheckMissileSpawn(fire);
+                }
+            }
+        }
+      else
+        {                       /* whirlwind */
+          mo = P_SpawnMissile(actor, target, HERETIC_MT_WHIRLWIND);
+          if (mo)
+            {
+              mo->z -= 32 * FRACUNIT;
+              P_SetTarget(&mo->special1.m, target);
+              mo->special2.i = 50;        /* active sound timer */
+              mo->health = 20 * TICRATE;  /* duration */
+              S_StartSound(actor, heretic_sfx_hedat3);
+            }
+        }
+      return;
+    }
+
   A_FaceTarget (actor);
   if (P_CheckMeleeRange(actor))
     {

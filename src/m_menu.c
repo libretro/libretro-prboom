@@ -463,7 +463,15 @@ void M_DrawMainMenu(void)
     return;
   }
   else if (W_CheckNumForName("M_DOOM") >= 0)
-    V_DrawNamePatch(94, 2, 0, "M_DOOM", CR_DEFAULT, VPT_STRETCH);
+    /* Center the title horizontally rather than using vanilla's fixed
+     * x=94 (which assumes the ~124-wide stock M_DOOM).  ZDoom packs ship
+     * much larger title graphics -- ZDCMP2's M_DOOM is 260 wide -- which
+     * at the fixed offset ran off the right of the 320-virtual page and,
+     * once VPT_STRETCH scaled it by SCREENWIDTH/320, blew up far past the
+     * screen.  Centering matches GZDoom and leaves the stock logo within
+     * ~4px of its original spot. */
+    V_DrawNamePatch((320 - V_NamePatchWidth("M_DOOM")) / 2, 2, 0,
+                    "M_DOOM", CR_DEFAULT, VPT_STRETCH);
 }
 
 /////////////////////////////

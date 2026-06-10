@@ -201,6 +201,14 @@ static int             bm_built;
 static unsigned char **bm_spr_masks;
 static int             bm_num_spr;
 
+/* Per-flat masks, indexed by flat number (picnum into the flats range).
+ * A flat is a fixed 64x64 tile drawn by the span functions whose texel
+ * index is row-major (spot = ytexel*64 + xtexel), so unlike the column
+ * masks these are stored row-major to match that indexing directly. */
+static unsigned char **bm_flat_masks;
+static int             bm_num_flat;
+#define BM_FLATDIM 64
+
 /* PLAYPAL luminance >= this (0..255) counts as a "bright" mask texel.  A
  * brightmap is authored white-on-black, so the glowing texels land near
  * full white and the rest near black; the midpoint cleanly separates
@@ -267,6 +275,46 @@ static unsigned char *bm_mask_from_patch(int maplump, int tw, int th)
       unsigned char texel = col[sy];
       if (texel != 0xff && bm_bright_index[texel])
         m[(size_t)x * th + y] = 1;
+    }
+  }
+  R_UnlockPatchNum(maplump);
+  return m;
+}
+
+/* Build a 64x64 ROW-major bright mask (mask[y*64 + x]) from a materialised
+ * mask patch, for the span drawers' spot = ytexel*64 + xtexel indexing.
+ * The source patch is column-major (pixels[col*height + row], 0xff
+ * transparent); nearest-resampled from its dimensions to 64x64. */
+static unsigned char *bm_flatmask_from_patch(int maplump)
+{
+  const rpatch_t *p = R_CachePatchNum(maplump);
+  unsigned char  *m;
+  int             x, y, pw, ph;
+
+  if (!p || p->width <= 0 || p->height <= 0)
+  {
+    if (p)
+      R_UnlockPatchNum(maplump);
+    return NULL;
+  }
+  pw = p->width;
+  ph = p->height;
+  m  = calloc((size_t)BM_FLATDIM * BM_FLATDIM, 1);
+  if (!m)
+  {
+    R_UnlockPatchNum(maplump);
+    return NULL;
+  }
+
+  for (y = 0; y < BM_FLATDIM; y++)
+  {
+    int sy = y * ph / BM_FLATDIM;
+    for (x = 0; x < BM_FLATDIM; x++)
+    {
+      int sx = x * pw / BM_FLATDIM;
+      unsigned char texel = p->pixels[(size_t)sx * ph + sy];
+      if (texel != 0xff && bm_bright_index[texel])
+        m[(size_t)y * BM_FLATDIM + x] = 1;
     }
   }
   R_UnlockPatchNum(maplump);
@@ -366,6 +414,42 @@ void U_BuildBrightmasks(void)
     if (sbuilt)
       lprintf(LO_INFO, "U_BuildBrightmasks: %d sprite masks\n", sbuilt);
   }
+
+  /* Flat masks: keyed by flat number, fixed 64x64 row-major. */
+  if (numflats > 0)
+  {
+    int fbuilt = 0;
+    bm_num_flat   = numflats;
+    bm_flat_masks = calloc((size_t)bm_num_flat, sizeof(*bm_flat_masks));
+    if (!bm_flat_masks)
+    {
+      bm_num_flat = 0;
+      return;
+    }
+    for (i = 0; i < num_bmaps; i++)
+    {
+      const brightmap_def_t *d = &bmaps[i];
+      int flatlump, flatnum;
+
+      if (d->kind != BM_FLAT)
+        continue;
+      /* Resolve directly in the flats namespace: R_FlatNumForName
+       * synthesises/falls back for missing flats, which would attach the
+       * mask to the wrong tile.  A brightmap for an absent flat is simply
+       * skipped. */
+      flatlump = (W_CheckNumForName)(d->name, ns_flats);
+      if (flatlump < firstflat || flatlump > firstflat + numflats - 1)
+        continue;
+      flatnum = flatlump - firstflat;
+      if (flatnum < 0 || flatnum >= bm_num_flat || bm_flat_masks[flatnum])
+        continue;
+      bm_flat_masks[flatnum] = bm_flatmask_from_patch(d->maplump);
+      if (bm_flat_masks[flatnum])
+        fbuilt++;
+    }
+    if (fbuilt)
+      lprintf(LO_INFO, "U_BuildBrightmasks: %d flat masks\n", fbuilt);
+  }
 }
 
 const unsigned char *U_BrightmaskForTexture(int texnum)
@@ -381,6 +465,15 @@ const unsigned char *U_BrightmaskForSprite(int spritelump)
   if (!bm_spr_masks || spritelump < 0 || spritelump >= bm_num_spr)
     return NULL;
   return bm_spr_masks[spritelump];
+}
+
+const unsigned char *U_BrightmaskForFlat(int flatnum)
+{
+  /* flatnum is relative to firstflat (a picnum into the flats range);
+   * returns a 64x64 row-major mask or NULL. */
+  if (!bm_flat_masks || flatnum < 0 || flatnum >= bm_num_flat)
+    return NULL;
+  return bm_flat_masks[flatnum];
 }
 
 void U_FreeBrightmaps(void)
@@ -400,8 +493,16 @@ void U_FreeBrightmaps(void)
     free(bm_spr_masks);
     bm_spr_masks = NULL;
   }
+  if (bm_flat_masks)
+  {
+    for (i = 0; i < bm_num_flat; i++)
+      free(bm_flat_masks[i]);
+    free(bm_flat_masks);
+    bm_flat_masks = NULL;
+  }
   bm_num_tex = 0;
   bm_num_spr = 0;
+  bm_num_flat = 0;
   bm_built   = 0;
   free(bmaps);
   bmaps = NULL;

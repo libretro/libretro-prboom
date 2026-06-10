@@ -6200,6 +6200,36 @@ static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
     * only when the colormap pointer or V_Palette16 changes. */
    const uint16_t *lut = R_GetComposedColormap(dsvars->colormap);
 
+   /* Brightmap path: where the 64x64 row-major mask is set, the texel is
+    * drawn through the undimmed base map (fullcolormap) instead of the
+    * distance-lit table.  fullcolormap's composed table is snapshot into
+    * a local first (the shared composed_lut cache is single-entry, so
+    * fetching the distance `lut` would evict it).  Kept scalar; the SIMD
+    * select lands in a later step.  NULL mask -> the vectorised path
+    * below runs unchanged. */
+   if (dsvars->brightmask)
+   {
+      const uint8_t  *mask = dsvars->brightmask;
+      uint16_t        lut_bright[256];
+      const uint16_t *bsrc = R_GetComposedColormap(fullcolormap
+                                                   ? fullcolormap
+                                                   : dsvars->colormap);
+      memcpy(lut_bright, bsrc, sizeof(lut_bright));
+      lut = R_GetComposedColormap(dsvars->colormap);
+
+      while (count)
+      {
+         const fixed_t xtemp = (xfrac >> 16) & 63;
+         const fixed_t ytemp = (yfrac >> 10) & 4032;
+         const fixed_t spot  = xtemp | ytemp;
+         xfrac += xstep;
+         yfrac += ystep;
+         *dest++ = (mask[spot] ? lut_bright : lut)[ source[spot] ];
+         count--;
+      }
+      return;
+   }
+
 #if defined(__SSE2__)
    /* The per-pixel index math (two arithmetic shifts, two masks, an OR,
     * and the two fixed-point accumulator adds) is the bulk of this loop;

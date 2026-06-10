@@ -99,6 +99,9 @@ typedef struct {
   fixed_t             xstep;
   fixed_t             ystep;
   const uint8_t       *source; // start of a 64*64 tile image
+  /* 64x64 row-major fullbright mask (1 = bright) for this flat, aligned to
+   * the span `spot` index, or NULL when the flat has no brightmap. */
+  const uint8_t       *brightmask;
   const lighttable_t  *colormap;
   const lighttable_t  *nextcolormap;
 } draw_span_vars_t;

@@ -55,6 +55,10 @@ const unsigned char *U_BrightmaskForTexture(int texnum);
  * relative to firstspritelump (the value held in vissprite_t.patch). */
 const unsigned char *U_BrightmaskForSprite(int spritelump);
 
+/* 64x64 ROW-major (mask[ytexel*64 + xtexel]) fullbright mask for a flat,
+ * keyed by flat number (picnum relative to firstflat), or NULL. */
+const unsigned char *U_BrightmaskForFlat(int flatnum);
+
 /* Number of definitions parsed (diagnostics / tests). */
 int U_BrightmapCount(void);
 

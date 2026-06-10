@@ -52,6 +52,7 @@
 #include "w_wad.h"
 #include "r_main.h"
 #include "r_draw.h"
+#include "u_brightmap.h"
 #include "r_things.h"
 #include "r_sky.h"
 #include "r_plane.h"
@@ -825,9 +826,16 @@ static void R_DoDrawPlane(visplane_t *pl)
          /* Synthetic flats (textures on floors) live outside the lump
           * range and the animation translation table. */
          if (R_IsSyntheticFlat(pl->picnum))
+         {
             dsvars.source = R_GetSyntheticFlat(pl->picnum);
+            dsvars.brightmask = NULL;     /* synthetic flats: no brightmap */
+         }
          else
-            dsvars.source = W_CacheLumpNum(firstflat + flattranslation[pl->picnum]);
+         {
+            int fnum = flattranslation[pl->picnum];
+            dsvars.source = W_CacheLumpNum(firstflat + fnum);
+            dsvars.brightmask = U_BrightmaskForFlat(fnum);
+         }
 
          xoffs = pl->xoffs;  // killough 2/28/98: Add offsets
          yoffs = pl->yoffs;

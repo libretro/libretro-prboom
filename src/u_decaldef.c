@@ -237,6 +237,54 @@ static void dd_parse_lump(int lump)
   U_ScanClose(&s);
 }
 
+/* Lightweight pre-scan of every DECALDEF lump for the "pic NAME" tokens,
+ * with no dependency on the texture tables, so it can run before PNG
+ * materialisation.  The result lets the materialiser cut the black field
+ * out of grayscale decal-mask graphics (see U_PNGToPatchDecal). */
+static char (*dd_pic_names)[16];
+static int   dd_pic_count;
+
+static void dd_scan_pics_lump(int lump)
+{
+  u_scanner_t s = U_ScanOpen(W_CacheLumpNum(lump), W_LumpLength(lump),
+                             "DECALDEF");
+  while (U_GetNextToken(&s, TRUE))
+  {
+    if (s.token == TK_Identifier && !strcasecmp(s.string, "pic"))
+    {
+      if (U_GetNextToken(&s, TRUE) &&
+          (s.token == TK_Identifier || s.token == TK_StringConst))
+      {
+        dd_pic_names = realloc(dd_pic_names,
+                               (size_t)(dd_pic_count + 1) * sizeof(*dd_pic_names));
+        strncpy(dd_pic_names[dd_pic_count], s.string,
+                sizeof(dd_pic_names[0]) - 1);
+        dd_pic_names[dd_pic_count][sizeof(dd_pic_names[0]) - 1] = '\0';
+        dd_pic_count++;
+      }
+    }
+  }
+  U_ScanClose(&s);
+}
+
+void U_ScanDecalPics(void)
+{
+  int lump = -1;
+  if (dd_pic_names)
+    return;
+  while ((lump = (W_ListNumFromName)("DECALDEF", lump)) >= 0)
+    dd_scan_pics_lump(lump);
+}
+
+int U_IsDecalPic(const char *name)
+{
+  int i;
+  for (i = 0; i < dd_pic_count; i++)
+    if (!strncasecmp(dd_pic_names[i], name, 8))
+      return 1;
+  return 0;
+}
+
 void U_LoadDecalDefs(void)
 {
   int lump = -1;

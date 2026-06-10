@@ -24,6 +24,7 @@
 #include "lprintf.h"
 #include "w_wad.h"
 #include "z_zone.h"
+#include "u_decaldef.h"
 #include "u_png.h"
 #include "u_ztextures.h"
 
@@ -74,6 +75,13 @@ static void zpng_build_lut(void)
   zpng_lut_built = true;
 }
 
+/* When set, treat a near-black texel as transparent in addition to the
+ * alpha test.  ZDoom decal graphics are grayscale coverage masks (white
+ * splat on a black field, no alpha channel), so without this the black
+ * field materialises as an opaque rectangle around the mark.  Only the
+ * decal patch builder sets this; ordinary graphics keep black opaque. */
+static int zpng_luma_cut;
+
 /* map one 0xAABBGGRR pixel; returns -1 for transparent */
 static int zpng_map(unsigned px)
 {
@@ -83,6 +91,8 @@ static int zpng_map(unsigned px)
   r = px & 0xFF;
   g = (px >> 8) & 0xFF;
   b = (px >> 16) & 0xFF;
+  if (zpng_luma_cut && (r * 77 + g * 150 + b * 29) < (16 << 8))
+    return -1;                      /* luminance < ~16: transparent       */
   return zpng_lut[((r >> 3) << 10) | ((g >> 3) << 5) | (b >> 3)];
 }
 
@@ -385,6 +395,18 @@ void *U_PNGToPatch(const unsigned char *d, int len, int *out_size)
   return U_PNGToPatchSized(d, len, 0, 0, out_size);
 }
 
+/* As U_PNGToPatch, but treats a near-black texel as transparent: ZDoom
+ * decal graphics are grayscale coverage masks with no alpha, so the black
+ * field must be cut or it materialises as an opaque box around the mark. */
+void *U_PNGToPatchDecal(const unsigned char *d, int len, int *out_size)
+{
+  void *patch;
+  zpng_luma_cut = 1;
+  patch = U_PNGToPatchSized(d, len, 0, 0, out_size);
+  zpng_luma_cut = 0;
+  return patch;
+}
+
 /* one marker pair; inner wads contribute their own SS/FF groups, so
  * the caller walks every instance */
 /* Convert a single lump in place if it carries PNG or JPEG data; lumps that
@@ -408,6 +430,9 @@ static void zpng_convert_one(int i, dbool as_flat, dbool scaled, int *count)
   }
   if (as_flat)
     conv = U_PNGToFlat(raw, rawlen, &convlen);
+  else if (!scaled && U_IsDecalPic(lumpinfo[i].name))
+    /* a grayscale decal mask: cut the black field so only the mark draws */
+    conv = U_PNGToPatchDecal(raw, rawlen, &convlen);
   else
   {
     int tw = 0, th = 0;

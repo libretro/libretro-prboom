@@ -66,6 +66,8 @@ typedef struct
 
 /* Parse the DECALDEF lump(s).  Safe to call once after the wad and the
  * texture list are ready; a second call is a no-op. */
+void U_ScanDecalPics(void);  /* pre-scan pic names (before PNG materialise) */
+int  U_IsDecalPic(const char *name);
 void U_LoadDecalDefs(void);
 
 /* Look up a decal or group by name (case-insensitive).  Returns an index

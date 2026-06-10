@@ -669,6 +669,7 @@ void R_InitData(void)
 {
   /* decode pk3 PNG assets into patches/flats before anything reads them */
   U_ZTexturesLoad();              /* scale targets for materialization */
+  U_ScanDecalPics();              /* know decal pics before materialising */
   U_PNGMaterializeLumps();
   lprintf(LO_INFO, "Textures\n");
   R_InitTextures();

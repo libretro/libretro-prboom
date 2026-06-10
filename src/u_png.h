@@ -16,6 +16,7 @@ dbool U_PNGIsPNG(const unsigned char *d, int len);
 
 /* Decode into a Doom patch.  malloc()d; caller owns.  NULL on failure. */
 void *U_PNGToPatch(const unsigned char *d, int len, int *out_size);
+void *U_PNGToPatchDecal(const unsigned char *d, int len, int *out_size);
 
 /* as U_PNGToPatch, resampled to tw x th first (0,0 = native); used to
  * apply TEXTURES-lump scale at materialization time */

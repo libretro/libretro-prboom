@@ -51,6 +51,10 @@ void U_BuildBrightmasks(void);
  * mask for a wall texture, or NULL if it has none.  1 = fullbright texel. */
 const unsigned char *U_BrightmaskForTexture(int texnum);
 
+/* As U_BrightmaskForTexture but for a sprite, keyed by the sprite lump
+ * relative to firstspritelump (the value held in vissprite_t.patch). */
+const unsigned char *U_BrightmaskForSprite(int spritelump);
+
 /* Number of definitions parsed (diagnostics / tests). */
 int U_BrightmapCount(void);
 

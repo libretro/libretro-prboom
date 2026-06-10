@@ -43,6 +43,7 @@
 #include "r_fps.h"
 #include "v_video.h"
 #include "lprintf.h"
+#include "u_brightmap.h"
 
 #define MINZ        (FRACUNIT*4)
 #define BASEYCENTER 100
@@ -444,6 +445,13 @@ int   *mceilingclip; // dropoff overflow
 fixed_t spryscale;
 fixed_t sprtopscreen;
 
+/* Per-column fullbright mask base for the sprite currently being drawn by
+ * R_DrawVisSprite (column-major, aligned to the sprite patch column the
+ * posts index into), or NULL.  Set per column before R_DrawMaskedColumn
+ * and consumed there; only the sprite path uses it, so the masked
+ * midtexture caller in r_segs.c leaves it NULL. */
+static const uint8_t *sprite_brightcol;
+
 void R_DrawMaskedColumn(
       const rpatch_t *patch,
       R_DrawColumn_f colfunc,
@@ -481,6 +489,8 @@ void R_DrawMaskedColumn(
       dcvars->source = column->pixels + post->topdelta;
       dcvars->prevsource = prevcolumn->pixels + post->topdelta;
       dcvars->nextsource = nextcolumn->pixels + post->topdelta;
+      dcvars->brightmask = sprite_brightcol
+                           ? sprite_brightcol + post->topdelta : NULL;
 
       dcvars->texturemid = basetexturemid - (post->topdelta<<FRACBITS);
 
@@ -568,6 +578,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
   int      texturecolumn;
   fixed_t  frac;
   const rpatch_t *patch = R_CachePatchNum(vis->patch+firstspritelump);
+  const uint8_t  *sprmask = U_BrightmaskForSprite(vis->patch);
   R_DrawColumn_f colfunc;
   draw_column_vars_t dcvars;
   enum draw_filter_type_e filter;
@@ -632,6 +643,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
     int run_cls = R_WallColumnKernelClass(colfunc);
 
     if ((run_cls == 1 || run_cls == 2) &&
+        !sprmask &&
         dcvars.edgetype != RDRAW_MASKEDCOLUMNEDGE_SLOPED &&
         !(raven && (vis->mobjflags & (MF_SHADOW | MF_ALTSHADOW)) &&
           vis->colormap))
@@ -683,6 +695,14 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
         texturecolumn = frac>>FRACBITS;
         dcvars.texu = frac;
 
+        if (sprmask)
+        {
+          int c = texturecolumn;
+          if (c < 0) c = 0;
+          else if (c >= patch->width) c = patch->width - 1;
+          sprite_brightcol = sprmask + (size_t)c * patch->height;
+        }
+
         R_DrawMaskedColumn(
           patch,
           colfunc,
@@ -692,6 +712,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
           R_GetPatchColumnClamped(patch, texturecolumn+1)
         );
       }
+      sprite_brightcol = NULL;
     }
   }
   R_UnlockPatchNum(vis->patch+firstspritelump); // cph - release lump

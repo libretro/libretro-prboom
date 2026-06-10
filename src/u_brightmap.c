@@ -11,6 +11,7 @@
 #include "u_scanner.h"
 #include "r_data.h"
 #include "r_patch.h"
+#include "r_state.h"
 #include "u_brightmap.h"
 
 static brightmap_def_t *bmaps;
@@ -195,6 +196,11 @@ static unsigned char **bm_tex_masks;    /* [numtextures], NULL if none      */
 static int             bm_num_tex;
 static int             bm_built;
 
+/* Per-sprite-lump masks, indexed by (lump - firstspritelump), same
+ * column-major layout as the texture masks. */
+static unsigned char **bm_spr_masks;
+static int             bm_num_spr;
+
 /* PLAYPAL luminance >= this (0..255) counts as a "bright" mask texel.  A
  * brightmap is authored white-on-black, so the glowing texels land near
  * full white and the rest near black; the midpoint cleanly separates
@@ -312,6 +318,54 @@ void U_BuildBrightmasks(void)
 
   if (built)
     lprintf(LO_INFO, "U_BuildBrightmasks: %d texture masks\n", built);
+
+  /* Sprite masks: keyed by absolute sprite lump, stored by
+   * (lump - firstspritelump).  The sprite frame is itself a patch, so the
+   * mask is sized to its dimensions and indexed exactly like the sprite's
+   * own column pixels at render time. */
+  if (numspritelumps > 0)
+  {
+    int sbuilt = 0;
+    bm_num_spr   = numspritelumps;
+    bm_spr_masks = calloc((size_t)bm_num_spr, sizeof(*bm_spr_masks));
+    if (!bm_spr_masks)
+    {
+      bm_num_spr = 0;
+      return;
+    }
+    for (i = 0; i < num_bmaps; i++)
+    {
+      const brightmap_def_t *d = &bmaps[i];
+      int lump, idx, sw, sh;
+      const rpatch_t *sp;
+
+      if (d->kind != BM_SPRITE)
+        continue;
+      lump = (W_CheckNumForName)(d->name, ns_sprites);
+      if (lump < 0)
+        lump = (W_CheckNumForName)(d->name, ns_global);
+      if (lump < firstspritelump || lump > lastspritelump)
+        continue;
+      idx = lump - firstspritelump;
+      if (bm_spr_masks[idx])
+        continue;                       /* already built */
+
+      sp = R_CachePatchNum(lump);
+      if (!sp)
+        continue;
+      sw = sp->width;
+      sh = sp->height;
+      R_UnlockPatchNum(lump);
+      if (sw <= 0 || sh <= 0)
+        continue;
+
+      bm_spr_masks[idx] = bm_mask_from_patch(d->maplump, sw, sh);
+      if (bm_spr_masks[idx])
+        sbuilt++;
+    }
+    if (sbuilt)
+      lprintf(LO_INFO, "U_BuildBrightmasks: %d sprite masks\n", sbuilt);
+  }
 }
 
 const unsigned char *U_BrightmaskForTexture(int texnum)
@@ -319,6 +373,14 @@ const unsigned char *U_BrightmaskForTexture(int texnum)
   if (!bm_tex_masks || texnum < 0 || texnum >= bm_num_tex)
     return NULL;
   return bm_tex_masks[texnum];
+}
+
+const unsigned char *U_BrightmaskForSprite(int spritelump)
+{
+  /* spritelump is relative to firstspritelump, as stored in vissprite.patch */
+  if (!bm_spr_masks || spritelump < 0 || spritelump >= bm_num_spr)
+    return NULL;
+  return bm_spr_masks[spritelump];
 }
 
 void U_FreeBrightmaps(void)
@@ -331,7 +393,15 @@ void U_FreeBrightmaps(void)
     free(bm_tex_masks);
     bm_tex_masks = NULL;
   }
+  if (bm_spr_masks)
+  {
+    for (i = 0; i < bm_num_spr; i++)
+      free(bm_spr_masks[i]);
+    free(bm_spr_masks);
+    bm_spr_masks = NULL;
+  }
   bm_num_tex = 0;
+  bm_num_spr = 0;
   bm_built   = 0;
   free(bmaps);
   bmaps = NULL;

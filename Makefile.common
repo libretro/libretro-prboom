@@ -163,6 +163,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/u_brightmap.c \
 				 $(CORE_DIR)/u_voxel.c \
 				 $(CORE_DIR)/r_voxel.c \
+				 $(CORE_DIR)/u_decaldef.c \
 
 
 ifeq ($(WANT_FLUIDSYNTH), 1)

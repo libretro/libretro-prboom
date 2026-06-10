@@ -38,6 +38,7 @@
 #include "u_png.h"
 #include "u_ztextures.h"
 #include "u_brightmap.h"
+#include "u_decaldef.h"
 #include "r_draw.h"
 #include "v_video.h"
 #include "r_main.h"
@@ -681,6 +682,9 @@ void R_InitData(void)
    * parse them once those name tables exist.  The per-texture masks are
    * baked later, from R_Init after the patch cache is initialised. */
   U_LoadBrightmaps();
+  /* DECALDEF references textures by name too; parse it here for the same
+   * reason.  Placement and rendering of decals are separate stages. */
+  U_LoadDecalDefs();
 }
 
 //

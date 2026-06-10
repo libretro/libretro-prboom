@@ -337,6 +337,7 @@ void M_DrawWeapons(void);
 static void M_DrawMenuString(int,int,int);
 static void M_DrawTextB(int x, int y, const char *text);
 static void M_DrawTextBColor(int x, int y, const char *text, int color);
+static int M_TextBWidth(const char *text);
 static void M_DrawStringCentered(int,int,int,const char*);
 void M_DrawStatusHUD(void);
 void M_DrawExtHelp(void);
@@ -1383,6 +1384,26 @@ char msgNames[2][9]  = {"M_MSGOFF","M_MSGON"};
 
 void M_DrawOptions(void)
 {
+  /* Heretic and Hexen have none of Doom's option-screen graphics
+   * (M_OPTTTL, M_MSGON/M_MSGOFF, M_GDHIGH/M_GDLOW).  Drawing a missing
+   * lump is not free: the name lookup and the patch drawer each log an
+   * error line through the frontend every call, so this routine alone
+   * produced six error-log lines per displayed frame under the Raven
+   * games -- enough to drag the whole frame down on frontends whose log
+   * output goes to a console.  Draw the same information in the big
+   * Raven font instead, like the other Raven menu screens do. */
+  if (raven)
+  {
+    M_DrawTextB(160 - M_TextBWidth("OPTIONS") / 2, 15, "OPTIONS");
+
+    M_DrawTextB(OptionsDef.x + 120, OptionsDef.y + LINEHEIGHT*messages,
+                showMessages ? "ON" : "OFF");
+
+    M_DrawTextB(OptionsDef.x + 150, OptionsDef.y + LINEHEIGHT*4,
+                screenblocks ? "HIGH" : "LOW");
+    return;
+  }
+
   // CPhipps - patch drawing updated
   // proff/nicolas 09/20/98 -- changed for hi-res
   V_DrawNamePatch(108, 15, 0, "M_OPTTTL", CR_DEFAULT, VPT_STRETCH);
@@ -1488,8 +1509,13 @@ menu_t SoundDef =
 
 void M_DrawSound(void)
 {
-  // CPhipps - patch drawing updated
-  V_DrawNamePatch(60, 38, 0, "M_SVOL", CR_DEFAULT, VPT_STRETCH);
+  /* M_SVOL is Doom-only; under the Raven games draw the title in the big
+   * font instead of logging two missing-lump errors per frame. */
+  if (raven)
+    M_DrawTextB(160 - M_TextBWidth("SOUND VOLUME") / 2, 38, "SOUND VOLUME");
+  else
+    // CPhipps - patch drawing updated
+    V_DrawNamePatch(60, 38, 0, "M_SVOL", CR_DEFAULT, VPT_STRETCH);
 
   M_DrawThermo(SoundDef.x,SoundDef.y+LINEHEIGHT*(sfx_vol+1),16,snd_SfxVolume);
 
@@ -1585,8 +1611,14 @@ void M_DrawMouse(void)
 {
   int mhmx,mvmx; /* jff 4/3/98 clamp drawn position    99max mead */
 
-  // CPhipps - patch drawing updated
-  V_DrawNamePatch(60, 38, 0, "M_MSENS", CR_DEFAULT, VPT_STRETCH);
+  /* M_MSENS is Doom-only; under the Raven games draw the title in the big
+   * font instead of logging two missing-lump errors per frame. */
+  if (raven)
+    M_DrawTextB(160 - M_TextBWidth("MOUSE SENSITIVITY") / 2, 38,
+                "MOUSE SENSITIVITY");
+  else
+    // CPhipps - patch drawing updated
+    V_DrawNamePatch(60, 38, 0, "M_MSENS", CR_DEFAULT, VPT_STRETCH);
 
   //jff 4/3/98 clamp horizontal sensitivity display
   mhmx = mouseSensitivity_horiz>99? 99 : mouseSensitivity_horiz; /*mead*/
@@ -2242,7 +2274,7 @@ static void M_DrawSetting(const setup_menu_t* s)
                         6*SCREENWIDTH/320, 6*SCREENHEIGHT/200,
                  (uint8_t)ch);
 
-      if (!ch) // don't show this item in automap mode
+      if (!ch && W_CheckNumForName("M_PALNO") >= 0) // don't show this item in automap mode
   V_DrawNamePatch(x+1,y,0,"M_PALNO", CR_DEFAULT, VPT_STRETCH);
       return;
     }
@@ -3023,7 +3055,10 @@ static void M_DrawColPal(void)
 
   // proff/nicolas 09/20/98 -- changed for hi-res
   // CPhipps - patch drawing updated
-  V_DrawNamePatch(COLORPALXORIG-5, COLORPALYORIG-5, 0, "M_COLORS", CR_DEFAULT, VPT_STRETCH);
+  /* Doom-only graphics; absent under Heretic/Hexen, where drawing them
+   * would log two missing-lump errors per patch per frame. */
+  if (W_CheckNumForName("M_COLORS") >= 0)
+    V_DrawNamePatch(COLORPALXORIG-5, COLORPALYORIG-5, 0, "M_COLORS", CR_DEFAULT, VPT_STRETCH);
 
   // Draw the cursor around the paint chip
   // (cpx,cpy) is the upper left-hand corner of the paint chip
@@ -3031,7 +3066,8 @@ static void M_DrawColPal(void)
   cpx = COLORPALXORIG+color_palette_x*(CHIP_SIZE+1)-1;
   cpy = COLORPALYORIG+color_palette_y*(CHIP_SIZE+1)-1;
   // proff 12/6/98: Drawing of colorchips completly changed for hi-res, it now uses a patch
-  V_DrawNamePatch(cpx,cpy,0,"M_PALSEL",CR_DEFAULT,VPT_STRETCH);
+  if (W_CheckNumForName("M_PALSEL") >= 0)
+    V_DrawNamePatch(cpx,cpy,0,"M_PALSEL",CR_DEFAULT,VPT_STRETCH);
 }
 
 // The drawing part of the Automap Setup initialization. Draw the
@@ -5498,16 +5534,48 @@ void M_StartControlPanel (void)
 /* Draw a string in Heretic's big FONTB menu font. FONTB_S+1 is glyph '!'
  * (ASCII 33); characters below 33 (space) advance a fixed width. Used for
  * Heretic menu items, which have no per-item graphic lumps. */
-static void M_DrawTextBColor(int x, int y, const char *text, int color)
+/* Shared FONTB lookup: -1 when the big Raven font is absent, else the
+ * lump index of the first glyph ('!').  Cached after the first call. */
+static int M_FontBBase(void)
 {
   static int fontb_base = -2;   /* -2 = not looked up, -1 = absent */
-  char c;
 
   if (fontb_base == -2)
   {
     int s = W_CheckNumForName("FONTB_S");
     fontb_base = (s >= 0) ? s + 1 : -1;
   }
+  return fontb_base;
+}
+
+/* Pixel width of a string as M_DrawTextBColor will render it, for
+ * centring FONTB text the way Doom's pre-positioned title patches are. */
+static int M_TextBWidth(const char *text)
+{
+  int   base = M_FontBBase();
+  int   w    = 0;
+  char  c;
+
+  if (base < 0)
+    return M_StringWidth(text);
+
+  while ((c = *text++) != 0)
+  {
+    if (c >= 'a' && c <= 'z')
+      c -= 'a' - 'A';
+    if (c < 33 || c > 90)
+      w += 8;
+    else
+      w += R_NumPatchWidth(base + c - 33) - 1;
+  }
+  return w;
+}
+
+static void M_DrawTextBColor(int x, int y, const char *text, int color)
+{
+  int  fontb_base = M_FontBBase();
+  char c;
+
   if (fontb_base < 0)
   {
     M_WriteText(x, y, text, color);   /* fall back to the small font */
@@ -5734,6 +5802,31 @@ void M_DrawThermo(int x,int y,int thermWidth,int thermDot )
   int horizScaler; //Used to allow more thermo range for mouse sensitivity.
   thermWidth = (thermWidth > 200) ? 200 : thermWidth; //Clamp to 200 max
   horizScaler = (thermWidth > 23) ? (200 / thermWidth) : 8; //Dynamic range
+
+  /* Heretic and Hexen have none of Doom's M_THERM* graphics but ship
+   * their own slider set (M_SLDLT/M_SLDMD1/M_SLDMD2/M_SLDRT/M_SLDKB).
+   * Drawing the missing Doom lumps logged two error lines through the
+   * frontend per draw -- a 100-step sensitivity slider is over 200 such
+   * draws, more than 400 log lines per displayed frame.  Build the
+   * slider from the native lumps instead, using the vanilla Raven
+   * layout: 8px trough cells between two end caps, with the knob riding
+   * the trough (the lumps' own draw offsets do the fine alignment). */
+  if (raven)
+  {
+    int track = x + 8;                        /* trough interior start */
+    int cells = (thermWidth * horizScaler + 7) / 8;
+
+    V_DrawNamePatch(track - 32, y, 0, "M_SLDLT", CR_DEFAULT, VPT_STRETCH);
+    for (i = 0, xx = track; i < cells; i++, xx += 8)
+      V_DrawNamePatch(xx, y, 0, (i & 1) ? "M_SLDMD2" : "M_SLDMD1",
+                      CR_DEFAULT, VPT_STRETCH);
+    V_DrawNamePatch(xx, y, 0, "M_SLDRT", CR_DEFAULT, VPT_STRETCH);
+
+    V_DrawNamePatch(track + 4 + thermDot * horizScaler, y + 7, 0,
+                    "M_SLDKB", CR_DEFAULT, VPT_STRETCH);
+    return;
+  }
+
   xx = x;
   V_DrawNamePatch(xx, y, 0, "M_THERML", CR_DEFAULT, VPT_STRETCH);
   xx += 8;

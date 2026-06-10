@@ -44,6 +44,8 @@
 #include "v_video.h"
 #include "lprintf.h"
 #include "u_brightmap.h"
+#include "u_voxel.h"
+#include "r_voxel.h"
 
 #define MINZ        (FRACUNIT*4)
 #define BASEYCENTER 100
@@ -577,13 +579,22 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 {
   int      texturecolumn;
   fixed_t  frac;
-  const rpatch_t *patch = R_CachePatchNum(vis->patch+firstspritelump);
-  const uint8_t  *sprmask = U_BrightmaskForSprite(vis->patch);
+  const rpatch_t *patch;
+  const uint8_t  *sprmask;
   R_DrawColumn_f colfunc;
   draw_column_vars_t dcvars;
   enum draw_filter_type_e filter;
   enum draw_filter_type_e filterz;
 
+  /* Voxel models take a separate rasteriser; they carry no patch. */
+  if (vis->voxel)
+  {
+    R_DrawVoxel(vis);
+    return;
+  }
+
+  patch   = R_CachePatchNum(vis->patch+firstspritelump);
+  sprmask = U_BrightmaskForSprite(vis->patch);
   R_SetDefaultDrawColumnVars(&dcvars);
   if (vis->mobjflags & MF_PLAYERSPRITE) {
     dcvars.edgetype = drawvars.patch_edges;
@@ -826,6 +837,61 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    if (!sprdef->numframes || !sprdef->spriteframes)
       return;
 
+   /* Voxel sprites: if this thing's sprite is bound to a KVX model, emit a
+    * voxel vissprite (a 3D box footprint) instead of the flat billboard.
+    * The model is centred on the thing via its pivot; its screen extent
+    * comes from the horizontal radius (max of the two ground dimensions,
+    * since the model yaws) and the vertical span, both 1 map unit per
+    * voxel.  The rasteriser (a later stage) draws it; here we only place
+    * and bound it so it sorts among the other vissprites. */
+   {
+      const voxel_model_t *vox = U_VoxelForSprite(thing->sprite);
+      if (vox)
+      {
+         fixed_t rad  = ((vox->xsiz > vox->ysiz ? vox->xsiz : vox->ysiz)
+                         << FRACBITS) / 2;
+         fixed_t half = FixedMul(rad, xscale);
+         int vx1 = (centerxfrac - half) >> FRACBITS;
+         int vx2 = ((centerxfrac + half) >> FRACBITS) - 1;
+         fixed_t vgzt;
+
+         if (vx1 > viewwidth || vx2 < 0)
+            return;
+
+         /* top of the model in world z: thing origin plus the full vertical
+          * span (1 map unit per voxel).  The rasteriser refines per column. */
+         vgzt = fz + ((fixed_t)vox->zsiz << FRACBITS);
+
+         vis = R_NewVisSprite();
+         vis->heightsec = thing->subsector->sector->heightsec;
+         vis->mobjflags = thing->flags;
+         vis->scale     = FixedDiv(projectiony, tz);
+         vis->gx        = fx;
+         vis->gy        = fy;
+         vis->gz        = fz;
+         vis->gzt       = vgzt;
+         vis->texturemid = vis->gzt - viewz;
+         vis->x1 = vx1 < 0 ? 0 : vx1;
+         vis->x2 = vx2 >= viewwidth ? viewwidth - 1 : vx2;
+         vis->startfrac = 0;
+         vis->xiscale   = 0;
+         vis->patch     = -1;
+         vis->voxel     = vox;
+         /* model yaw relative to view: actor angle vs viewangle */
+         vis->voxangle  = thing->angle - viewangle;
+
+         if (!raven && (thing->flags & MF_SHADOW))
+            vis->colormap = NULL;
+         else if (fixedcolormap)
+            vis->colormap = fixedcolormap;
+         else if (thing->frame & FF_FULLBRIGHT)
+            vis->colormap = fullcolormap;
+         else
+            vis->colormap = R_ColourMap(lightlevel, xscale);
+         return;
+      }
+   }
+
    sprframe = &sprdef->spriteframes[thing->frame & FF_FRAMEMASK];
 
    if (sprframe->rotate)
@@ -935,6 +1001,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    if (vis->x1 > x1)
       vis->startfrac += vis->xiscale*(vis->x1-x1);
    vis->patch = lump;
+   vis->voxel = NULL;   /* this vissprite is a billboard, not a voxel */
 
    // get light level
    if (!raven && (thing->flags & MF_SHADOW))
@@ -1128,6 +1195,7 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
       vis->startfrac += vis->xiscale*(vis->x1-x1);
 
    vis->patch = lump;
+   vis->voxel = NULL;
 
    if (raven && (viewplayer->mo->flags & MF_SHADOW ||
                  viewplayer->mo->flags2 & MF2_DONTDRAW ||

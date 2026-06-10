@@ -412,6 +412,13 @@ typedef struct vissprite_s
   int patch;
   uint64_t mobjflags;
 
+  /* When non-NULL this vissprite is a voxel model rather than a sprite
+   * billboard; voxangle is the model's yaw relative to the view (the
+   * rasteriser rotates the voxel grid by it).  patch/startfrac/xiscale
+   * are unused for voxels. */
+  const void *voxel;
+  angle_t     voxangle;
+
   // for color translation and shadow draw, maxbright frames as well
   const lighttable_t *colormap;
 

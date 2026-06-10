@@ -425,10 +425,13 @@ void M_DrawMainMenu(void)
     /* Hexen's main menu: the HEXEN title (M_HTIC in HEXEN.WAD) plus two
      * animated flaming bulls flanking the menu.  The bulls are the FBUL
      * sprite frames (FBULA0..); vanilla cycles frame = (gametic/5) % 7 and
-     * draws the left bull at +2 frames out of phase from the right. */
+     * draws the left bull at +2 frames out of phase from the right.
+     * FBUL* live in the sprite namespace, so they must be looked up with
+     * ns_sprites -- W_CheckNumForName()'s ns_global default never finds
+     * them. */
     static int maulobase = -2;   /* -2 = unlooked-up, -1 = absent */
     if (maulobase == -2)
-      maulobase = W_CheckNumForName("FBULA0");
+      maulobase = (W_CheckNumForName)("FBULA0", ns_sprites);
     if (W_CheckNumForName("M_HTIC") >= 0)
       V_DrawNamePatch(88, 0, 0, "M_HTIC", CR_DEFAULT, VPT_STRETCH);
     if (maulobase >= 0)

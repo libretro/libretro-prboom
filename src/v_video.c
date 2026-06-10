@@ -597,6 +597,26 @@ static void V_DrawMemPatch(int x, int y, int scrn, const rpatch_t *patch,
    int DYI = (200<<16) / SCREENHEIGHT;
    const uint8_t *trans = translationtables + 256*((cm-CR_LIMIT)-1);
 
+   /* Full-screen page art that is not the vanilla 320x200 size (ZDoom
+    * hi-res title cards, etc.): scale by the patch's own dimensions so
+    * the whole image maps onto the whole screen, instead of the 320x200
+    * virtual page that would blow a 640x480 card up to ~2x screen size.
+    * Falls back to the regular factors for 320-wide / 200-tall art, so
+    * vanilla and widescreen-but-200-tall patches are unchanged. */
+   if ((flags & VPT_FITSCREEN) && patch->width > 0 && patch->height > 0)
+   {
+      if (patch->width != 320)
+      {
+         DX  = (SCREENWIDTH << 16) / patch->width;
+         DXI = (patch->width << 16) / SCREENWIDTH;
+      }
+      if (patch->height != 200)
+      {
+         DY  = (SCREENHEIGHT << 16) / patch->height;
+         DYI = (patch->height << 16) / SCREENHEIGHT;
+      }
+   }
+
    if (cm<CR_LIMIT)
       trans=colrngs[cm];
 
@@ -775,7 +795,16 @@ void V_DrawNumPatchFS(int x, int y, int scrn, int lump,
   }
 
   patch = R_CachePatchNum(lump);
-  V_DrawMemPatch(V_WidePatchCenter(patch, x), y, scrn, patch, cm, flags);
+  /* A full-screen page taller than the vanilla 200 is ZDoom-style hi-res
+   * art (e.g. a 640x480 TITLEPIC); fit it to the screen by its own size
+   * rather than the 320x200 virtual page, which would scale it well past
+   * the screen edges.  The fit fills the whole frame, so the 320-based
+   * wide-centering used for 200-tall widescreen cards does not apply. */
+  if ((flags & VPT_STRETCH) && patch->height > 200)
+    V_DrawMemPatch(0, 0, scrn, patch, cm,
+                   (enum patch_translation_e)(flags | VPT_FITSCREEN));
+  else
+    V_DrawMemPatch(V_WidePatchCenter(patch, x), y, scrn, patch, cm, flags);
   R_UnlockPatchNum(lump);
 }
 
@@ -823,8 +852,12 @@ void V_DrawNumPatchFullScreenCached(int scrn, int lump, int cm)
    * Wide offset-less patches are centered like every full-screen draw. */
   {
     const rpatch_t *patch = R_CachePatchNum(lump);
-    V_DrawMemPatch(V_WidePatchCenter(patch, 0), 0, scrn, patch, cm,
-                   VPT_STRETCH);
+    if (patch->height > 200)
+      V_DrawMemPatch(0, 0, scrn, patch, cm,
+                     (enum patch_translation_e)(VPT_STRETCH | VPT_FITSCREEN));
+    else
+      V_DrawMemPatch(V_WidePatchCenter(patch, 0), 0, scrn, patch, cm,
+                     VPT_STRETCH);
     R_UnlockPatchNum(lump);
   }
 

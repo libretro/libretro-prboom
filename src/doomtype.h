@@ -121,6 +121,14 @@ enum patch_translation_e {
   VPT_FLIP    = 1, // Flip image horizontally
   VPT_TRANS   = 2, // Translate image via a translation table
   VPT_STRETCH = 4, // Stretch to compensate for high-res
+  /* Full-screen page art (TITLEPIC, finale/help/intermission backdrops):
+   * stretch the patch to fill the screen using the patch's own width and
+   * height rather than the fixed 320x200 virtual page.  Vanilla art is
+   * 320x200 so this is identical to VPT_STRETCH for it, but ZDoom packs
+   * ship hi-res title cards (e.g. 640x480) that VPT_STRETCH would scale
+   * by SCREENWIDTH/320 and blow up well past the screen.  Implies the
+   * stretch path; only meaningful for full-screen draws. */
+  VPT_FITSCREEN = 8,
 };
 
 #endif

@@ -6114,6 +6114,41 @@ void M_Init(void)
       break;
     }
 
+  /* Back-navigation: the shared menu_t structs name Doom's menus as their
+   * previous menu, so backing out of Options (and the other screens) under
+   * Heretic/Hexen landed on Doom's main menu -- five Doom items rendered in
+   * the Raven font, missing the "game files" entry.  Point the previous-menu
+   * links at the Raven menus instead: Load and Save are entered through the
+   * Game Files submenu, so they back out to it; the skill menu backs out to
+   * the class menu under Hexen (the commercial-mode block above just pointed
+   * it at Doom's MainDef, since Hexen identifies as commercial) and to the
+   * episode menu under Heretic.  The non-Raven branch restores the Doom
+   * wiring so a Doom session after a Raven one in the same process (libretro
+   * content reload) is not left with Raven links. */
+  if (raven)
+  {
+    OptionsDef.prevMenu = &RavenMainDef;
+    EpiDef.prevMenu     = &RavenMainDef;
+    ReadDef1.prevMenu   = &RavenMainDef;
+    ClassDef.prevMenu   = &RavenMainDef;
+    LoadDef.prevMenu    = &RavenFilesDef;
+    SaveDef.prevMenu    = &RavenFilesDef;
+    NewDef.prevMenu     = hexen ? &ClassDef : &EpiDef;
+  }
+  else
+  {
+    OptionsDef.prevMenu = &MainDef;
+    EpiDef.prevMenu     = &MainDef;
+    ReadDef1.prevMenu   = &MainDef;
+    ClassDef.prevMenu   = &MainDef;
+    LoadDef.prevMenu    = &MainDef;
+    SaveDef.prevMenu    = &MainDef;
+    /* The commercial case above owns NewDef.prevMenu (Doom II has no
+     * episode menu); restore the episode link only when it did not. */
+    if (gamemode != commercial)
+      NewDef.prevMenu = &EpiDef;
+  }
+
   /* Heretic's menus reuse Doom's menuitem tables, whose patch lumps
    * (M_EPI1.., M_JKILL..) and English alttext ("Episode 1", "Ultra-
    * Violence.") do not belong to Heretic.  The lumps are absent from

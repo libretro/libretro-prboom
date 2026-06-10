@@ -1580,6 +1580,63 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
             fixed_t fmask = dcvars->texheight
                             ? ((heightmask << 16) | 0xffff)
                             : 0xffffffffu;
+#if defined(__SSE2__)
+            /* Vectorise the per-pixel frac->texel index for four pixels at
+             * once (packed add, mask, logical shift), matching the scalar
+             * (frac & fmask) >> 16 exactly.  The gather and the stride-4
+             * transpose-buffer stores stay scalar -- there is no SSE2
+             * gather and dest is column-interleaved (dest[0], dest[4], ...)
+             * -- with a per-lane select on the mask bit.  Tail is scalar. */
+            if (count >= 4)
+            {
+               unsigned blocks = (unsigned)count >> 2;
+               __m128i vf  = _mm_set_epi32(frac + 3*fracstep, frac + 2*fracstep,
+                                           frac + fracstep,   frac);
+               const __m128i vfs = _mm_set1_epi32(fracstep << 2);
+               const __m128i vm  = _mm_set1_epi32((int)fmask);
+               unsigned consumed = blocks << 2;
+               while (blocks--)
+               {
+                  uint32_t t[4];
+                  __m128i vt = _mm_srli_epi32(_mm_and_si128(vf, vm), 16);
+                  _mm_storeu_si128((__m128i *)t, vt);
+                  dest[0]  = (mask[t[0]] ? lut_bright : lut)[ source[t[0]] ];
+                  dest[4]  = (mask[t[1]] ? lut_bright : lut)[ source[t[1]] ];
+                  dest[8]  = (mask[t[2]] ? lut_bright : lut)[ source[t[2]] ];
+                  dest[12] = (mask[t[3]] ? lut_bright : lut)[ source[t[3]] ];
+                  dest += 16;
+                  vf = _mm_add_epi32(vf, vfs);
+               }
+               frac += (fixed_t)consumed * fracstep;
+               count -= consumed;
+            }
+#elif defined(__ARM_NEON)
+            if (count >= 4)
+            {
+               unsigned blocks = (unsigned)count >> 2;
+               const int32_t fb4[4] = { frac, frac + fracstep,
+                                        frac + 2*fracstep, frac + 3*fracstep };
+               int32x4_t vf = vld1q_s32(fb4);
+               const int32x4_t vfs = vdupq_n_s32(fracstep << 2);
+               const int32x4_t vm  = vdupq_n_s32((int)fmask);
+               unsigned consumed = blocks << 2;
+               while (blocks--)
+               {
+                  uint32_t t[4];
+                  uint32x4_t vt = vshrq_n_u32(
+                     vreinterpretq_u32_s32(vandq_s32(vf, vm)), 16);
+                  vst1q_u32(t, vt);
+                  dest[0]  = (mask[t[0]] ? lut_bright : lut)[ source[t[0]] ];
+                  dest[4]  = (mask[t[1]] ? lut_bright : lut)[ source[t[1]] ];
+                  dest[8]  = (mask[t[2]] ? lut_bright : lut)[ source[t[2]] ];
+                  dest[12] = (mask[t[3]] ? lut_bright : lut)[ source[t[3]] ];
+                  dest += 16;
+                  vf = vaddq_s32(vf, vfs);
+               }
+               frac += (fixed_t)consumed * fracstep;
+               count -= consumed;
+            }
+#endif
             while (count--)
             {
                unsigned t = (frac & fmask) >> 16;

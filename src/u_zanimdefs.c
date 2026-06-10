@@ -32,6 +32,7 @@ typedef struct
 {
   int   istexture;
   int   speed;                       /* tics per frame */
+  int   base;                        /* texture/flat number of the block head */
   int   numframes;
   int   frames[MAX_ZANIM_FRAMES];    /* texture numbers or flat numbers */
 } zanim_t;
@@ -96,26 +97,64 @@ void U_LoadAnimDefs(void)
         }
         building = 0;
         memset(&cur, 0, sizeof(cur));
-        if ((tok = za_arg(&s, line)) > 0 &&
-            Z_LookupPic(s.string, istex) >= 0)
+        if ((tok = za_arg(&s, line)) > 0)
         {
-          cur.istexture = istex;
-          building = 1;
+          int basepic = Z_LookupPic(s.string, istex);
+          if (basepic >= 0)
+          {
+            cur.istexture = istex;
+            cur.base      = basepic;
+            building      = 1;
+          }
         }
+      }
+      else if (building &&
+               (!strcasecmp(s.string, "allowdecals") ||
+                !strcasecmp(s.string, "oscillate")   ||
+                !strcasecmp(s.string, "random")      ||
+                !strcasecmp(s.string, "notrim")))
+      {
+        /* In-block modifiers that decorate a texture/flat animation
+         * without ending its frame list.  ZDCMP2 puts "allowdecals" on a
+         * line of its own right after "texture NAME", before the pic
+         * lines; treating it (like any unrecognised token) as a block
+         * terminator dropped those animations entirely.  Skip the
+         * modifier and any same-line arguments, keeping building set. */
+        while ((tok = za_arg(&s, line)) > 0)
+          ;
       }
       else if (building && !strcasecmp(s.string, "pic"))
       {
         if ((tok = za_arg(&s, line)) > 0)
         {
-          int pic = Z_LookupPic(s.string, cur.istexture);
+          /* "pic NAME" gives an absolute texture/flat; "pic N" is a
+           * 1-based offset from the block's base texture (ZDoom's
+           * relative form, used here by ffieldb1's "pic 1".."pic 9"). */
+          int pic;
+          if (s.token == TK_IntConst)
+            pic = cur.base + (s.number - 1);
+          else
+            pic = Z_LookupPic(s.string, cur.istexture);
           if (pic >= 0 && cur.numframes < MAX_ZANIM_FRAMES)
             cur.frames[cur.numframes++] = pic;
           else
             building = 0;          /* missing frame: drop the sequence */
           /* "tics N" or "rand MIN MAX": first count is the speed */
           while ((tok = za_arg(&s, line)) > 0)
-            if (s.token == TK_IntConst && !cur.speed)
-              cur.speed = s.number;
+            if (!cur.speed)
+            {
+              if (s.token == TK_IntConst)
+                cur.speed = s.number;
+              else if (s.token == TK_FloatConst)
+              {
+                /* ZDCMP2 uses fractional "tics 1.5"; round to the nearest
+                 * whole tic, floored at 1, since the animation loop steps
+                 * in integer tics. */
+                cur.speed = (int)(s.decimal + 0.5);
+                if (cur.speed < 1)
+                  cur.speed = 1;
+              }
+            }
         }
       }
       else

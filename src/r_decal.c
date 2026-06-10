@@ -178,6 +178,26 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_)
     dwidth  = FixedMul(patch->width  << FRACBITS, def->xscale);
     dheight = FixedMul(patch->height << FRACBITS, def->yscale);
 
+    /* Blend mode: additive ("add") or alpha-translucent decals route the
+     * column writes through the blending batch, at the decal's alpha (as a
+     * 0..32 weight); fully opaque decals keep the plain pipeline.  Reset to
+     * opaque after this decal so nothing else inherits the mode. */
+    {
+      int a32 = (int)((int64_t)def->alpha * 32 / FRACUNIT);
+      if (a32 < 0)  a32 = 0;
+      if (a32 > 32) a32 = 32;
+      if (def->flags & DECAL_ADD)
+      {
+        R_SetTransAlpha(a32);
+        R_SetSpriteTranslucency(3);          /* additive            */
+      }
+      else if (def->alpha < FRACUNIT)
+      {
+        R_SetTransAlpha(a32);
+        R_SetSpriteTranslucency(4);          /* per-alpha lerp      */
+      }
+    }
+
     /* Decal u-range relative to this seg's start.  pd->offset is measured
      * from the linedef v1; the seg starts seg->offset further along, so
      * subtract it to get seg-relative along-wall coordinates, matching the
@@ -248,5 +268,9 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_)
       R_UnlockPatchNum(def->texnum);
     else
       R_UnlockTextureCompositePatchNum(def->texnum);
+
+    /* restore opaque pipeline for the next decal / caller */
+    if ((def->flags & DECAL_ADD) || def->alpha < FRACUNIT)
+      R_SetSpriteTranslucency(0);
   }
 }

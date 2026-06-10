@@ -255,6 +255,17 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
    * the text map as binary records (garbage sidedefs, huge bogus allocs). */
   if (pk3_is_wad_image(d, len))
     return PK3_PASS_ROOT;
+  /* ZScript is ZDoom's compiled scripting language, which this engine does
+   * not run.  Its files live under zscript/ (with an entry zscript.txt at
+   * the root) and must never become engine-consumable lumps: gzdoom.pk3
+   * ships zscript/actors/doom/dehacked.zs, whose basename maps to the lump
+   * name DEHACKED, and the in-wad Dehacked loader would then try to parse
+   * 54 KB of class definitions as a Dehacked patch (a flood of "Unmatched
+   * Block").  Quarantine the whole tree so it is present but invisible to
+   * ns_global lookups. */
+  if (!strncasecmp(path, "zscript/", 8) ||
+      !strncasecmp(path, "zscript.", 8))
+    return PK3_PASS_DEFERRED;
   /* PNG members of the renderable namespaces stay in their groups:
    * U_PNGMaterializeLumps converts them to patches/flats in place
    * before the renderer reads them.  Other modern formats (Ogg, WAV,

@@ -277,9 +277,11 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
    colfunc     = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, drawvars.filterwall, drawvars.filterz);
 
    /* Boom 260 / ZDoom TranslucentLine: route this line's midtexture columns
-    * through the blending batch type (restored before returning). */
+    * through the blending batch type (restored before returning).  translucent
+    * == 2 marks an additive ("Add" renderstyle) line -- a fake light beam --
+    * which takes the additive mode instead of the 50/50 blend. */
    if (curline->linedef->translucent)
-      R_SetSpriteTranslucency(1);
+      R_SetSpriteTranslucency(curline->linedef->translucent == 2 ? 3 : 1);
    frontsector = curline->frontsector;
    backsector  = curline->backsector;
    texnum      = curline->sidedef->midtexture;

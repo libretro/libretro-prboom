@@ -366,6 +366,9 @@ static void R_FlushQuad16(void);
 static void R_FlushWholeTL16(void);
 static void R_FlushHTTL16(void);
 static void R_FlushQuadTL16(void);
+static void R_FlushWholeADD16(void);
+static void R_FlushHTADD16(void);
+static void R_FlushQuadADD16(void);
 
 static int  tl_temptype = COL_OPAQUE;
 static void (*tl_flush_whole)(void) = R_FlushWhole16;
@@ -386,7 +389,15 @@ const uint16_t *R_ComposedPalette(void)
 
 void R_SetSpriteTranslucency(int mode)
 {
-  if (mode)
+  if (mode == 3)
+  {
+    /* additive: dst += src/2 per channel, saturating (a light beam) */
+    tl_temptype    = COL_FLEXADD;
+    tl_flush_whole = R_FlushWholeADD16;
+    tl_flush_ht    = R_FlushHTADD16;
+    tl_flush_quad  = R_FlushQuadADD16;
+  }
+  else if (mode)
   {
     tl_temptype    = (mode == 2) ? COL_ALTTRANS : COL_TRANS;
     tl_flush_whole = R_FlushWholeTL16;
@@ -405,6 +416,23 @@ void R_SetSpriteTranslucency(int mode)
 /* 50/50 RGB565 blend: mask off each channel's low bit, halve, add. */
 #define TL_BLEND565(s, d) \
   ((uint16_t)((((s) & 0xF7DEu) >> 1) + (((d) & 0xF7DEu) >> 1)))
+
+/* Additive RGB565: dst += src/2 per channel, clamped to the channel maxima.
+ * Half the source approximates the ~0.3 alpha the map's additive ("Add"
+ * renderstyle) light beams use without blowing out, and -- unlike a 50/50
+ * blend, which would darken -- it brightens, so a fake light source reads as
+ * a glow rather than a grey smear. */
+static INLINE uint16_t ADD_BLEND565(uint16_t s, uint16_t d)
+{
+  unsigned r = ((d >> 11) & 0x1Fu) + ((s >> 12) & 0x0Fu);
+  unsigned g = ((d >>  5) & 0x3Fu) + ((s >>  6) & 0x1Fu);
+  unsigned b =  (d        & 0x1Fu) + ((s >>  1) & 0x0Fu);
+  if (r > 0x1Fu) r = 0x1Fu;
+  if (g > 0x3Fu) g = 0x3Fu;
+  if (b > 0x1Fu) b = 0x1Fu;
+  return (uint16_t)((r << 11) | (g << 5) | b);
+}
+
 static int    temptype = COL_NONE;
 static int    commontop, commonbot;
 // SoM 7-28-04: Fix the fuzz problem.
@@ -807,6 +835,87 @@ static void R_FlushQuadTL16(void)
             px = TL_BLEND565(px, dest[i]);
          dest[i] = px;
       }
+      source += 4;
+      dest += SURFACE_SHORT_PITCH;
+   }
+}
+
+/* Additive flushers: the translucent trio's structure with ADD_BLEND565 in
+ * place of the 50/50 blend and no alt double-blend (additive is one weight).
+ * Kept scalar -- additive runs only on the map's light-beam columns, a tiny
+ * fraction of the fill, so duplicating the SIMD quad path is not worth it. */
+static void R_FlushWholeADD16(void)
+{
+   while(--temp_x >= 0)
+   {
+      int yl           = tempyl[temp_x];
+      uint16_t *source = &short_tempbuf[temp_x + (yl << 2)];
+      uint16_t *dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + temp_x;
+      int   count      = tempyh[temp_x] - yl + 1;
+
+      while(--count >= 0)
+      {
+         *dest   = ADD_BLEND565(*source, *dest);
+         source += 4;
+         dest   += SURFACE_SHORT_PITCH;
+      }
+   }
+}
+
+static void R_FlushHTADD16(void)
+{
+   uint16_t *source;
+   uint16_t *dest;
+   int count, colnum = 0;
+   int yl, yh;
+
+   while(colnum < 4)
+   {
+      yl = tempyl[colnum];
+      yh = tempyh[colnum];
+
+      if(yl < commontop)
+      {
+         source = &short_tempbuf[colnum + (yl << 2)];
+         dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = commontop - yl;
+
+         while(--count >= 0)
+         {
+            *dest   = ADD_BLEND565(*source, *dest);
+            source += 4;
+            dest   += SURFACE_SHORT_PITCH;
+         }
+      }
+
+      if(yh > commonbot)
+      {
+         source = &short_tempbuf[colnum + ((commonbot + 1) << 2)];
+         dest   = drawvars.short_topleft + (commonbot + 1) * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = yh - commonbot;
+
+         while(--count >= 0)
+         {
+            *dest   = ADD_BLEND565(*source, *dest);
+            source += 4;
+            dest   += SURFACE_SHORT_PITCH;
+         }
+      }
+      ++colnum;
+   }
+}
+
+static void R_FlushQuadADD16(void)
+{
+   uint16_t *source = &short_tempbuf[commontop << 2];
+   uint16_t *dest   = drawvars.short_topleft + commontop * SURFACE_SHORT_PITCH + startx;
+   int        count = commonbot - commontop + 1;
+
+   while(--count >= 0)
+   {
+      int i;
+      for (i = 0; i < 4; i++)
+         dest[i] = ADD_BLEND565(source[i], dest[i]);
       source += 4;
       dest += SURFACE_SHORT_PITCH;
    }

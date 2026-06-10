@@ -1618,6 +1618,44 @@ done:
    return hit;
 }
 
+/* Look for a ZDoom base-resource archive (gzdoom.pk3, then zdoom.pk3) in
+ * the same places find_iwad_for_kind searches: next to the loaded content,
+ * then system_dir/prboom, then system_dir.  ZDoom-targeted pk3s name stock
+ * assets (decal graphics, sounds, the TEXTURES base, ...) that live in this
+ * archive; pairing it in lets those resolve without the user wiring up an
+ * autoload slot.  Returns a heap path (caller frees) or NULL if none found. */
+static char *find_base_resource(void)
+{
+   static const char *const candidates[] = { "gzdoom.pk3", "zdoom.pk3" };
+   size_t i;
+   char *system_dir = NULL;
+   char *prboom_subdir = NULL;
+   char *hit;
+
+   environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir);
+   if (system_dir && *system_dir)
+   {
+      prboom_subdir = malloc(strlen(system_dir) + 8);
+      if (prboom_subdir)
+         sprintf(prboom_subdir, "%s%c%s", system_dir, DIR_SLASH, "prboom");
+   }
+
+   for (i = 0; i < sizeof(candidates)/sizeof(candidates[0]); i++)
+   {
+      if ((hit = FindFileInDir(g_wad_dir, candidates[i], NULL)))
+         goto done;
+      if (prboom_subdir &&
+          (hit = FindFileInDir(prboom_subdir, candidates[i], NULL)))
+         goto done;
+      if (system_dir && *system_dir &&
+          (hit = FindFileInDir(system_dir, candidates[i], NULL)))
+         goto done;
+   }
+   hit = NULL;
+done:
+   free(prboom_subdir);
+   return hit;
+}
 
 
 /* Classification of a single playlist entry.  Used by the m3u
@@ -2030,6 +2068,21 @@ bool retro_load_game(const struct retro_game_info *info)
                argv[argc++] = strdup("-iwad");
                argv[argc++] = iwad_match;  /* heap from FindFileInDir */
                argv[argc++] = strdup("-file");
+               /* A ZDoom base resource (gzdoom.pk3 / zdoom.pk3), if present
+                * nearby, loads BEFORE the mod so its stock assets resolve;
+                * the mod follows and overrides any it redefines (Doom load
+                * order: later wins). */
+               {
+                  char *base = find_base_resource();
+                  if (base)
+                  {
+                     if (log_cb)
+                        log_cb(RETRO_LOG_INFO,
+                               "retro_load_game: pairing base resource "
+                               "'%s' with archive '%s'\n", base, g_basename);
+                     argv[argc++] = base;  /* heap from FindFileInDir */
+                  }
+               }
                argv[argc++] = strdup(info->path);
             }
             else
@@ -2041,6 +2094,17 @@ bool retro_load_game(const struct retro_game_info *info)
                          "will try, but a doom2.wad next to the archive "
                          "is the expected setup.\n", g_basename);
                argv[argc++] = strdup("-file");
+               {
+                  char *base = find_base_resource();
+                  if (base)
+                  {
+                     if (log_cb)
+                        log_cb(RETRO_LOG_INFO,
+                               "retro_load_game: pairing base resource "
+                               "'%s' with archive '%s'\n", base, g_basename);
+                     argv[argc++] = base;  /* heap from FindFileInDir */
+                  }
+               }
                argv[argc++] = strdup(info->path);
             }
          }

@@ -10,6 +10,8 @@
 
 #include "libretro.h"
 
+#include <formats/rwav.h>
+
 #include "../src/i_sound.h"
 #include "../src/doomstat.h"
 #include "../src/dsda_hacked.h"
@@ -168,6 +170,84 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
         return 0;
 
     sfxlump_data    = W_CacheLumpNum (sfxlump_num);
+
+    /* Some ZDoom-based mods ship sound effects as RIFF/WAVE lumps rather
+     * than the vanilla DMX format.  Detect the "RIFF" magic and decode
+     * with RWAV (libretro-common formats/wav); everything else falls
+     * through to the DMX path below unchanged.  Both paths produce the
+     * same output contract: native-rate signed-16-bit mono PCM with one
+     * extra trailing sample duplicated for the mixer's cur[1] fetch, and
+     * a 16.16 *step computed from the source rate. */
+    if (   sfxlump_len >= 12
+        && sfxlump_data[0] == 'R' && sfxlump_data[1] == 'I'
+        && sfxlump_data[2] == 'F' && sfxlump_data[3] == 'F')
+    {
+        rwav_t    wav;
+        size_t    n;
+        uint32_t  wav_rate;
+
+        if (rwav_load(&wav, sfxlump_data, (size_t)sfxlump_len) != RWAV_ITERATE_DONE)
+        {
+            W_UnlockLumpNum (sfxlump_num);
+            return 0;
+        }
+
+        if (wav.numsamples == 0 || wav.numchannels == 0)
+        {
+            rwav_free(&wav);
+            W_UnlockLumpNum (sfxlump_num);
+            return 0;
+        }
+
+        out_data = (int16_t*)malloc((wav.numsamples + 1) * sizeof(int16_t));
+        if (!out_data)
+        {
+            rwav_free(&wav);
+            W_UnlockLumpNum (sfxlump_num);
+            return 0;
+        }
+
+        /* RWAV gives 8-bit unsigned or 16-bit signed PCM, interleaved per
+         * channel.  Convert to signed-16-bit mono: 8-bit is centre-128
+         * like DMX ((s - 128) << 8); multi-channel is averaged down. */
+        if (wav.bitspersample == 8)
+        {
+            const uint8_t *src = (const uint8_t*)wav.samples;
+            unsigned       ch  = wav.numchannels;
+            for (n = 0; n < wav.numsamples; n++)
+            {
+                int acc = 0;
+                unsigned c;
+                for (c = 0; c < ch; c++)
+                    acc += ((int)src[n * ch + c] - 128) << 8;
+                out_data[n] = (int16_t)(acc / (int)ch);
+            }
+        }
+        else /* 16-bit (rwav only ever yields 8 or 16) */
+        {
+            const int16_t *src = (const int16_t*)wav.samples;
+            unsigned        ch = wav.numchannels;
+            for (n = 0; n < wav.numsamples; n++)
+            {
+                int acc = 0;
+                unsigned c;
+                for (c = 0; c < ch; c++)
+                    acc += src[n * ch + c];
+                out_data[n] = (int16_t)(acc / (int)ch);
+            }
+        }
+        out_data[wav.numsamples] = out_data[wav.numsamples - 1];
+
+        wav_rate = wav.samplerate ? wav.samplerate : 11025;
+        *step = (unsigned int)(((uint64_t)wav_rate << 16) / (uint64_t)SAMPLERATE);
+
+        *len = (int)wav.numsamples;
+
+        rwav_free(&wav);
+        W_UnlockLumpNum (sfxlump_num);
+        return (void *)(out_data);
+    }
+
     sfxlump_sound   = sfxlump_data + 8;
     sfxlump_len    -= 8;
 

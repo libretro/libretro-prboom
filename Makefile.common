@@ -33,6 +33,7 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/time/rtime.c \
 				 $(LIBRETRO_COMM_DIR)/formats/png/rpng.c \
 				 $(LIBRETRO_COMM_DIR)/formats/jpeg/rjpeg.c \
+				 $(LIBRETRO_COMM_DIR)/formats/wav/rwav.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_zlib.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c

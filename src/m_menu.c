@@ -444,8 +444,22 @@ void M_DrawMainMenu(void)
   }
   if (heretic)
   {
+    /* Heretic's main menu: the HERETIC title (M_HTIC) flanked by two skulls
+     * that spin in opposite directions.  The skull frames are M_SKL00..17
+     * (18 frames, in the global namespace); vanilla advances at
+     * frame = (gametic/3) % 18 and mirrors the left skull (17 - frame). */
+    static int skullbase = -2;   /* -2 = unlooked-up, -1 = absent */
+    if (skullbase == -2)
+      skullbase = W_CheckNumForName("M_SKL00");
     if (W_CheckNumForName("M_HTIC") >= 0)
       V_DrawNamePatch(88, 0, 0, "M_HTIC", CR_DEFAULT, VPT_STRETCH);
+    if (skullbase >= 0)
+    {
+      int frame = (gametic / 3) % 18;
+      V_DrawNumPatch(40,  10, 0, skullbase + (17 - frame), CR_DEFAULT, VPT_STRETCH);
+      V_DrawNumPatch(232, 10, 0, skullbase + frame,        CR_DEFAULT, VPT_STRETCH);
+    }
+    return;
   }
   else if (W_CheckNumForName("M_DOOM") >= 0)
     V_DrawNamePatch(94, 2, 0, "M_DOOM", CR_DEFAULT, VPT_STRETCH);
@@ -453,40 +467,40 @@ void M_DrawMainMenu(void)
 
 /////////////////////////////
 //
-// HEXEN MAIN MENU
+// RAVEN (HERETIC / HEXEN) MAIN MENU
 //
-// Hexen's main menu differs from Doom's: "new game / options / game files /
-// info / quit game", with load/save tucked under a "game files" submenu.
-// These items have no patch lumps, so M_Drawer renders their alttext through
-// the big FONTB font (the raven path).
+// Heretic and Hexen share a main menu that differs from Doom's: "new game /
+// options / game files / info / quit game", with load/save tucked under a
+// "game files" submenu.  These items have no patch lumps, so M_Drawer renders
+// their alttext through the big FONTB font (the raven path).
 //
 
-void M_HexenFiles(int choice);
+void M_RavenFiles(int choice);
 
 enum
 {
-  hx_newgame,
-  hx_options,
-  hx_files,
-  hx_info,
-  hx_quit,
-  hx_main_end
-} hexen_main_e;
+  rv_newgame,
+  rv_options,
+  rv_files,
+  rv_info,
+  rv_quit,
+  rv_main_end
+} raven_main_e;
 
-menuitem_t HexenMainMenu[] =
+menuitem_t RavenMainMenu[] =
 {
   {1, "", M_NewGame,    'n', "new game"},
   {1, "", M_Options,    'o', "options"},
-  {1, "", M_HexenFiles, 'g', "game files"},
+  {1, "", M_RavenFiles, 'g', "game files"},
   {1, "", M_ReadThis,   'i', "info"},
   {1, "", M_QuitDOOM,   'q', "quit game"}
 };
 
-menu_t HexenMainDef =
+menu_t RavenMainDef =
 {
-  hx_main_end,
+  rv_main_end,
   NULL,
-  HexenMainMenu,
+  RavenMainMenu,
   M_DrawMainMenu,
   110, 56,
   0
@@ -494,36 +508,37 @@ menu_t HexenMainDef =
 
 enum
 {
-  hx_loadgame,
-  hx_savegame,
-  hx_files_end
-} hexen_files_e;
+  rv_loadgame,
+  rv_savegame,
+  rv_files_end
+} raven_files_e;
 
-menuitem_t HexenFilesMenu[] =
+menuitem_t RavenFilesMenu[] =
 {
   {1, "", M_LoadGame, 'l', "load game"},
   {1, "", M_SaveGame, 's', "save game"}
 };
 
-menu_t HexenFilesDef =
+menu_t RavenFilesDef =
 {
-  hx_files_end,
-  &HexenMainDef,
-  HexenFilesMenu,
+  rv_files_end,
+  &RavenMainDef,
+  RavenFilesMenu,
   NULL,
   110, 60,
   0
 };
 
-void M_HexenFiles(int choice)
+void M_RavenFiles(int choice)
 {
-  M_SetupNextMenu(&HexenFilesDef);
+  M_SetupNextMenu(&RavenFilesDef);
 }
 
-/* The active main menu: Hexen has its own; Doom and Heretic share MainDef. */
+/* The active main menu: Heretic and Hexen share the Raven menu; Doom uses
+ * MainDef. */
 static menu_t *M_MainMenuDef(void)
 {
-  return hexen ? &HexenMainDef : &MainDef;
+  return raven ? &RavenMainDef : &MainDef;
 }
 
 
@@ -5462,7 +5477,7 @@ void M_StartControlPanel (void)
 
   default_verify = 0;                  // killough 10/98
   menuactive = mnact_float;
-  currentMenu = M_MainMenuDef();  // JDC (Hexen uses its own main menu)
+  currentMenu = M_MainMenuDef();  // JDC (Heretic/Hexen use the Raven menu)
   itemOn = currentMenu->lastOn;   // JDC
   print_warning_about_changes = FALSE;   // killough 11/98
 }
@@ -5946,7 +5961,7 @@ void M_Init(void)
   }
 
   M_InitDefaults();                // killough 11/98
-  currentMenu = M_MainMenuDef();   /* Hexen uses its own main menu */
+  currentMenu = M_MainMenuDef();   /* Heretic/Hexen use the Raven menu */
   menuactive = mnact_inactive;
   itemOn = currentMenu->lastOn;
   whichSkull = 0;

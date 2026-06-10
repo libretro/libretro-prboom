@@ -266,6 +266,23 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
   if (!strncasecmp(path, "zscript/", 8) ||
       !strncasecmp(path, "zscript.", 8))
     return PK3_PASS_DEFERRED;
+  /* Other GZDoom engine-internal trees that a software Boom engine cannot
+   * consume, and whose files collide with magic lump names if exposed:
+   *   - shaders/ and shaders_gles/ (and glstuff/) are GLSL/hardware-only;
+   *     gzdoom.pk3 ships shaders/pp/colormap.fp, whose basename maps to the
+   *     lump name COLORMAP -- the renderer then reads 504 bytes of shader
+   *     source as the light/shading table and the whole frame is garbage.
+   *   - filter/ holds GZDoom's per-game conditional assets
+   *     (filter/game-<name>/...); this engine has no filter mechanism, so
+   *     e.g. filter/game-heretic/animated.lmp must not surface as a global
+   *     ANIMATED lump and apply the wrong animations.
+   * Quarantine these the same way as zscript/: present but invisible to
+   * ns_global lookups. */
+  if (!strncasecmp(path, "shaders/", 8) ||
+      !strncasecmp(path, "shaders_gles/", 13) ||
+      !strncasecmp(path, "glstuff/", 8) ||
+      !strncasecmp(path, "filter/", 7))
+    return PK3_PASS_DEFERRED;
   /* PNG members of the renderable namespaces stay in their groups:
    * U_PNGMaterializeLumps converts them to patches/flats in place
    * before the renderer reads them.  Other modern formats (Ogg, WAV,

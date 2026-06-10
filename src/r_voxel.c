@@ -25,6 +25,7 @@
 #include "r_draw.h"
 #include "v_video.h"
 #include "u_voxel.h"
+#include "r_things.h"
 #include "r_voxel.h"
 
 /* exported from r_draw.c: palette index + light colormap -> screen pixel */
@@ -144,7 +145,15 @@ void R_DrawVoxel(vissprite_t *vis)
             if (syb > viewheight) syb = viewheight;
 
             for (xx = sxl; xx <= sxr; xx++)
-              for (yy = syt; yy < syb; yy++)
+            {
+              /* Clip the band to the scene: mceilingclip/mfloorclip carry,
+               * per screen column, the bounds set by R_DrawSprite from the
+               * obscuring drawsegs and sector heights, so the voxel hides
+               * behind walls and floors exactly as a sprite does. */
+              int cyt = syt, cyb = syb;
+              if (cyt <= mceilingclip[xx]) cyt = mceilingclip[xx] + 1;
+              if (cyb >  mfloorclip[xx])   cyb = mfloorclip[xx];
+              for (yy = cyt; yy < cyb; yy++)
               {
                 int off = yy * SCREENWIDTH + xx;
                 if (vox_zbuf_seen[off] == vox_zbuf_stamp &&
@@ -154,6 +163,7 @@ void R_DrawVoxel(vissprite_t *vis)
                 vox_zbuf[off]      = tz;
                 fb[yy * SURFACE_SHORT_PITCH + xx] = px;
               }
+            }
           }
         }
       }

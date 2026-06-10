@@ -485,6 +485,14 @@ void U_PNGMaterializeLumps(void)
   zpng_convert_namespace(ns_sprites, false, false, &n);
   zpng_convert_namespace(ns_flats, true, false, &n);
   zpng_convert_namespace(ns_zdoom_tx, false, true, &n);
+  /* Global-namespace PNG/JPEG lumps -- ZDoom packs put menu/HUD/status-bar
+   * art and other patches under graphics/ (and sometimes at the archive
+   * root), which the pk3 translator now routes to ns_global rather than
+   * the deferred quarantine.  Convert them to Doom patches here, before
+   * any patch-cache code reads them, so the patch renderer never sees raw
+   * PNG bytes.  zpng_convert_one sniffs each lump and skips non-PNG/JPEG
+   * data, so walking the large global namespace only touches real images. */
+  zpng_convert_namespace(ns_global, false, false, &n);
   if (n)
     lprintf(LO_INFO, "U_PNGMaterializeLumps: %d PNG/JPEG lumps converted "
             "(%d rescaled per TEXTURES)\n", n, zpng_rescaled);

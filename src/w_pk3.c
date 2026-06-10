@@ -231,6 +231,17 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
   if (!strncasecmp(path, "textures/", 9))
     return (!pk3_is_png(d, len) && pk3_is_deferred_format(d, len))
            ? PK3_PASS_DEFERRED : PK3_PASS_TEXTURES;
+  /* A PNG outside the renderable namespaces -- typically a ZDoom pack's
+   * graphics/ patch (menu/HUD/status-bar art, fonts, TITLEPIC, ...) --
+   * goes to the global namespace, not the deferred quarantine.  It is
+   * safe there because U_PNGMaterializeLumps now also converts global
+   * PNG/JPEG lumps to Doom patches before any renderer code reads them,
+   * so a global PNG sharing a name with an IWAD patch is materialised
+   * rather than fed to the patch parser as raw PNG bytes.  Ogg/FLAC/WAV
+   * have no such in-place consumer for the patch path and stay deferred
+   * (WAV is resolved separately by the sfx loader on a RIFF sniff). */
+  if (pk3_is_png(d, len))
+    return PK3_PASS_GLOBAL;
   if (pk3_is_deferred_format(d, len))
     return PK3_PASS_DEFERRED;
   return PK3_PASS_GLOBAL;

@@ -5885,6 +5885,43 @@ void M_Init(void)
       break;
     }
 
+  /* Heretic's menus reuse Doom's menuitem tables, whose patch lumps
+   * (M_EPI1.., M_JKILL..) and English alttext ("Episode 1", "Ultra-
+   * Violence.") do not belong to Heretic.  The lumps are absent from
+   * HERETIC.WAD, so M_Drawer falls back to drawing the Doom alttext
+   * through the big FONTB font -- showing "episode 1" and the Doom
+   * skill names.  Substitute the real Heretic episode and skill names,
+   * matching vanilla Heretic, and cap the episode list at the five
+   * named episodes (E6 is the hidden deathmatch set, not a menu entry). */
+  if (heretic)
+    {
+      static const char *const heretic_episodes[] =
+        {
+          "city of the damned",
+          "hell's maw",
+          "the dome of d'sparil",
+          "the ossuary",
+          "the stagnant demesne"
+        };
+      static const char *const heretic_skills[] =
+        {
+          "thou needeth a wet-nurse",
+          "yellowbellies-r-us",
+          "bringest them oneth",
+          "thou art a smite-meister",
+          "black plague possesses thee"
+        };
+      int i;
+
+      if (EpiDef.numitems > 5)
+        EpiDef.numitems = 5;
+      for (i = 0; i < EpiDef.numitems && i < 5; i++)
+        EpisodeMenu[i].alttext = (char *)heretic_episodes[i];
+
+      for (i = 0; i < newg_end && i < 5; i++)
+        NewGameMenu[i].alttext = (char *)heretic_skills[i];
+    }
+
   M_InitHelpScreen();   // init the help screen       // phares 4/08/98
   M_InitExtendedHelp(); // init extended help screens // phares 3/30/98
 

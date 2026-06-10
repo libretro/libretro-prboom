@@ -54,6 +54,7 @@ extern mobjtype_t PuffType;   /* puff actor the next hitscan/melee spawns */
 #include "m_random.h"
 #include "m_bbox.h"
 #include "lprintf.h"
+#include "r_decal.h"
 
 #ifdef PSX
 #include <stddef.h>
@@ -2268,6 +2269,11 @@ dbool PTR_ShootTraverse (intercept_t* in)
       // Spawn bullet puffs.
 
       P_SpawnPuff (x,y,z);
+
+      /* Stamp a wall decal at the impact point.  The DECALDEF "BulletChip"
+       * is ZDoom's default scuff mark for hitscan hits; if the loaded wad
+       * defines no such decal (or its pic is absent) this is a no-op. */
+      R_SpawnDecalByName (li, x, y, z, "BulletChip");
 
       // don't go any farther
 

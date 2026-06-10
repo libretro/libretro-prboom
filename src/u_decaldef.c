@@ -9,7 +9,6 @@
 #include "m_fixed.h"
 #include "w_wad.h"
 #include "lprintf.h"
-#include "m_random.h"
 #include "u_scanner.h"
 #include "r_data.h"          /* R_CheckTextureNumForName */
 #include "u_decaldef.h"
@@ -251,8 +250,12 @@ int U_DecalNumForName(const char *name)
     if (!strcasecmp(groups[i].name, name))
     {
       decalgroup_t *g = &groups[i];
-      int r = P_Random(pr_misc) * g->total_weight / 256;
-      int j;
+      /* Cosmetic-only: a private generator, never the game RNG (pr_misc),
+       * so resolving a group during play cannot desync demos. */
+      static unsigned grp_rng = 0x9e3779b9u;
+      int r, j;
+      grp_rng = grp_rng * 1103515245u + 12345u;
+      r = (int)((grp_rng >> 16) % (unsigned)g->total_weight);
       for (j = 0; j < g->count; j++)
       {
         r -= g->weights[j];

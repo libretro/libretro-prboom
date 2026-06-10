@@ -52,6 +52,7 @@
 #include "p_maputl.h"
 #include "p_map.h"
 #include "p_setup.h"
+#include "r_decal.h"
 #include "u_zanimdefs.h"
 #include "u_voxel.h"
 #include "u_zsecact.h"
@@ -2676,6 +2677,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    P_InitThinkers();
    U_ZSecActClear();    /* forget the previous level's sector actions */
+   R_ClearDecals();     /* drop the previous level's wall decals */
 
    if (hexen)
       P_InitCreatureCorpseQueue();

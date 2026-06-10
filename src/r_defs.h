@@ -220,8 +220,10 @@ typedef struct line_s
   void *specialdata;     // thinker_t for reversable actions
   int firsttag,nexttag;  // killough 4/17/98: improves searches for tags.
   int r_validcount;      // cph: if == gametic, r_flags already done
-  int translucent;       /* Boom 260 / ZDoom TranslucentLine: blend the 2s
-                            midtexture against the scene (50/50 RGB565) */
+  int translucent;       /* 0 opaque; 1 = ZDoom/Boom translucent (alpha blend
+                            of the 2s midtexture); 2 = additive ("Add"
+                            renderstyle) light beam.  Weight is `alpha`. */
+  unsigned char alpha;   /* blend weight 0..32 (=alpha*32) for translucent != 0 */
   enum {                 // cph:
     RF_TOP_TILE  = 1,     // Upper texture needs tiling
     RF_MID_TILE = 2,     // Mid texture needs tiling

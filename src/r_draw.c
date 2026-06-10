@@ -369,7 +369,14 @@ static void R_FlushQuadTL16(void);
 static void R_FlushWholeADD16(void);
 static void R_FlushHTADD16(void);
 static void R_FlushQuadADD16(void);
+static void R_FlushWholeLERP16(void);
+static void R_FlushHTLERP16(void);
+static void R_FlushQuadLERP16(void);
 
+/* Per-line/-surface blend weight, alpha*32 in 0..32, consumed by the LERP and
+ * ADD flushers.  Set via R_SetTransAlpha before the masked draw; the fixed
+ * TL/ALTTRANS paths ignore it. */
+static int  tl_alpha = 16;
 static int  tl_temptype = COL_OPAQUE;
 static void (*tl_flush_whole)(void) = R_FlushWhole16;
 static void (*tl_flush_ht)(void)    = R_FlushHT16;
@@ -387,11 +394,24 @@ const uint16_t *R_ComposedPalette(void)
   return R_GetComposedPalette();
 }
 
+void R_SetTransAlpha(int a32)
+{
+  tl_alpha = a32 < 0 ? 0 : (a32 > 32 ? 32 : a32);
+}
+
 void R_SetSpriteTranslucency(int mode)
 {
-  if (mode == 3)
+  if (mode == 4)
   {
-    /* additive: dst += src/2 per channel, saturating (a light beam) */
+    /* per-alpha lerp: dst + (src-dst)*tl_alpha/32 (ZDoom alpha glass) */
+    tl_temptype    = COL_FLEXTRANS;
+    tl_flush_whole = R_FlushWholeLERP16;
+    tl_flush_ht    = R_FlushHTLERP16;
+    tl_flush_quad  = R_FlushQuadLERP16;
+  }
+  else if (mode == 3)
+  {
+    /* per-alpha additive: dst += src*tl_alpha/32, saturating (light beam) */
     tl_temptype    = COL_FLEXADD;
     tl_flush_whole = R_FlushWholeADD16;
     tl_flush_ht    = R_FlushHTADD16;
@@ -417,19 +437,27 @@ void R_SetSpriteTranslucency(int mode)
 #define TL_BLEND565(s, d) \
   ((uint16_t)((((s) & 0xF7DEu) >> 1) + (((d) & 0xF7DEu) >> 1)))
 
-/* Additive RGB565: dst += src/2 per channel, clamped to the channel maxima.
- * Half the source approximates the ~0.3 alpha the map's additive ("Add"
- * renderstyle) light beams use without blowing out, and -- unlike a 50/50
- * blend, which would darken -- it brightens, so a fake light source reads as
- * a glow rather than a grey smear. */
-static INLINE uint16_t ADD_BLEND565(uint16_t s, uint16_t d)
+/* Per-channel RGB565 blends parameterised by a 0..32 weight (= alpha*32).
+ * Channels are kept separate so each value is <= 0x3F and value*a fits in the
+ * 16-bit lane the SSE2/NEON kernels use, making these scalar references and
+ * those vector kernels bit-identical.  LERP565A interpolates dst->src (glass);
+ * ADD565A adds a fraction of src to dst, clamped (additive light beam). */
+static INLINE uint16_t LERP565A(uint16_t s, uint16_t d, int a)
 {
-  unsigned r = ((d >> 11) & 0x1Fu) + ((s >> 12) & 0x0Fu);
-  unsigned g = ((d >>  5) & 0x3Fu) + ((s >>  6) & 0x1Fu);
-  unsigned b =  (d        & 0x1Fu) + ((s >>  1) & 0x0Fu);
-  if (r > 0x1Fu) r = 0x1Fu;
-  if (g > 0x3Fu) g = 0x3Fu;
-  if (b > 0x1Fu) b = 0x1Fu;
+  int r = ((d >> 11) & 0x1F) + ((((int)((s >> 11) & 0x1F) - (int)((d >> 11) & 0x1F)) * a) >> 5);
+  int g = ((d >>  5) & 0x3F) + ((((int)((s >>  5) & 0x3F) - (int)((d >>  5) & 0x3F)) * a) >> 5);
+  int b =  ((d)      & 0x1F) + ((((int)((s)       & 0x1F) - (int)((d)       & 0x1F)) * a) >> 5);
+  return (uint16_t)((r << 11) | (g << 5) | b);
+}
+
+static INLINE uint16_t ADD565A(uint16_t s, uint16_t d, int a)
+{
+  int r = ((d >> 11) & 0x1F) + (((int)((s >> 11) & 0x1F) * a) >> 5);
+  int g = ((d >>  5) & 0x3F) + (((int)((s >>  5) & 0x3F) * a) >> 5);
+  int b =  ((d)      & 0x1F) + (((int)((s)       & 0x1F) * a) >> 5);
+  if (r > 0x1F) r = 0x1F;
+  if (g > 0x3F) g = 0x3F;
+  if (b > 0x1F) b = 0x1F;
   return (uint16_t)((r << 11) | (g << 5) | b);
 }
 
@@ -840,10 +868,24 @@ static void R_FlushQuadTL16(void)
    }
 }
 
-/* Additive flushers: the translucent trio's structure with ADD_BLEND565 in
- * place of the 50/50 blend and no alt double-blend (additive is one weight).
- * Kept scalar -- additive runs only on the map's light-beam columns, a tiny
- * fraction of the fill, so duplicating the SIMD quad path is not worth it. */
+/* Channel split/pack helpers for the vector blend kernels: R/G/B in separate
+ * 16-bit lanes so channel*alpha (<= 0x3F*32) stays inside the lane and the
+ * result is bit-identical to the LERP565A / ADD565A scalar references. */
+#if defined(WALL_RUN_SSE2)
+#define SR(v) _mm_and_si128(_mm_srli_epi16(v,11),_mm_set1_epi16(0x1F))
+#define SG(v) _mm_and_si128(_mm_srli_epi16(v, 5),_mm_set1_epi16(0x3F))
+#define SB(v) _mm_and_si128(v,                   _mm_set1_epi16(0x1F))
+#define SPACK(r,g,b) _mm_or_si128(_mm_or_si128(_mm_slli_epi16(r,11),_mm_slli_epi16(g,5)),b)
+#elif defined(WALL_RUN_NEON)
+#define NR(v) vandq_u16(vshrq_n_u16(v,11),vdupq_n_u16(0x1F))
+#define NG(v) vandq_u16(vshrq_n_u16(v, 5),vdupq_n_u16(0x3F))
+#define NB(v) vandq_u16(v,                vdupq_n_u16(0x1F))
+#define NPACK(r,g,b) vorrq_u16(vorrq_u16(vshlq_n_u16(r,11),vshlq_n_u16(g,5)),b)
+#endif
+
+/* Additive flushers: dst += src*tl_alpha/32 per channel, saturating -- the map's
+ * "Add" renderstyle light beams.  Whole/HT scalar; the quad path vectorises the
+ * common run. */
 static void R_FlushWholeADD16(void)
 {
    while(--temp_x >= 0)
@@ -855,7 +897,7 @@ static void R_FlushWholeADD16(void)
 
       while(--count >= 0)
       {
-         *dest   = ADD_BLEND565(*source, *dest);
+         *dest   = ADD565A(*source, *dest, tl_alpha);
          source += 4;
          dest   += SURFACE_SHORT_PITCH;
       }
@@ -882,7 +924,7 @@ static void R_FlushHTADD16(void)
 
          while(--count >= 0)
          {
-            *dest   = ADD_BLEND565(*source, *dest);
+            *dest   = ADD565A(*source, *dest, tl_alpha);
             source += 4;
             dest   += SURFACE_SHORT_PITCH;
          }
@@ -896,7 +938,7 @@ static void R_FlushHTADD16(void)
 
          while(--count >= 0)
          {
-            *dest   = ADD_BLEND565(*source, *dest);
+            *dest   = ADD565A(*source, *dest, tl_alpha);
             source += 4;
             dest   += SURFACE_SHORT_PITCH;
          }
@@ -911,11 +953,177 @@ static void R_FlushQuadADD16(void)
    uint16_t *dest   = drawvars.short_topleft + commontop * SURFACE_SHORT_PITCH + startx;
    int        count = commonbot - commontop + 1;
 
+#if defined(WALL_RUN_SSE2)
+   {
+      __m128i va = _mm_set1_epi16((short)tl_alpha);
+      __m128i rm = _mm_set1_epi16(0x1F), gm = _mm_set1_epi16(0x3F);
+      while (count >= 2)
+      {
+         __m128i s  = _mm_loadu_si128((const __m128i *)source);
+         __m128i d0 = _mm_loadl_epi64((const __m128i *)dest);
+         __m128i d1 = _mm_loadl_epi64((const __m128i *)(dest + SURFACE_SHORT_PITCH));
+         __m128i d  = _mm_unpacklo_epi64(d0, d1);
+         __m128i r  = _mm_min_epi16(_mm_add_epi16(SR(d), _mm_srli_epi16(_mm_mullo_epi16(SR(s), va), 5)), rm);
+         __m128i g  = _mm_min_epi16(_mm_add_epi16(SG(d), _mm_srli_epi16(_mm_mullo_epi16(SG(s), va), 5)), gm);
+         __m128i b  = _mm_min_epi16(_mm_add_epi16(SB(d), _mm_srli_epi16(_mm_mullo_epi16(SB(s), va), 5)), rm);
+         __m128i px = SPACK(r, g, b);
+         _mm_storel_epi64((__m128i *)dest, px);
+         _mm_storel_epi64((__m128i *)(dest + SURFACE_SHORT_PITCH), _mm_unpackhi_epi64(px, px));
+         source += 8;
+         dest   += 2 * SURFACE_SHORT_PITCH;
+         count  -= 2;
+      }
+   }
+#elif defined(WALL_RUN_NEON)
+   {
+      uint16x8_t va = vdupq_n_u16((uint16_t)tl_alpha);
+      uint16x8_t rm = vdupq_n_u16(0x1F), gm = vdupq_n_u16(0x3F);
+      while (count >= 2)
+      {
+         uint16x8_t s = vld1q_u16(source);
+         uint16x8_t d = vcombine_u16(vld1_u16(dest), vld1_u16(dest + SURFACE_SHORT_PITCH));
+         uint16x8_t r = vminq_u16(vaddq_u16(NR(d), vshrq_n_u16(vmulq_u16(NR(s), va), 5)), rm);
+         uint16x8_t g = vminq_u16(vaddq_u16(NG(d), vshrq_n_u16(vmulq_u16(NG(s), va), 5)), gm);
+         uint16x8_t b = vminq_u16(vaddq_u16(NB(d), vshrq_n_u16(vmulq_u16(NB(s), va), 5)), rm);
+         uint16x8_t px = NPACK(r, g, b);
+         vst1_u16(dest, vget_low_u16(px));
+         vst1_u16(dest + SURFACE_SHORT_PITCH, vget_high_u16(px));
+         source += 8;
+         dest   += 2 * SURFACE_SHORT_PITCH;
+         count  -= 2;
+      }
+   }
+#endif
+
    while(--count >= 0)
    {
       int i;
       for (i = 0; i < 4; i++)
-         dest[i] = ADD_BLEND565(source[i], dest[i]);
+         dest[i] = ADD565A(source[i], dest[i], tl_alpha);
+      source += 4;
+      dest += SURFACE_SHORT_PITCH;
+   }
+}
+
+/* Per-alpha lerp flushers: dst + (src-dst)*tl_alpha/32 per channel -- ZDoom
+ * alpha glass at its true alpha rather than the bucketed 50/50.  Same shape as
+ * the additive trio; the diff is signed so the quad uses an arithmetic shift. */
+static void R_FlushWholeLERP16(void)
+{
+   while(--temp_x >= 0)
+   {
+      int yl           = tempyl[temp_x];
+      uint16_t *source = &short_tempbuf[temp_x + (yl << 2)];
+      uint16_t *dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + temp_x;
+      int   count      = tempyh[temp_x] - yl + 1;
+
+      while(--count >= 0)
+      {
+         *dest   = LERP565A(*source, *dest, tl_alpha);
+         source += 4;
+         dest   += SURFACE_SHORT_PITCH;
+      }
+   }
+}
+
+static void R_FlushHTLERP16(void)
+{
+   uint16_t *source;
+   uint16_t *dest;
+   int count, colnum = 0;
+   int yl, yh;
+
+   while(colnum < 4)
+   {
+      yl = tempyl[colnum];
+      yh = tempyh[colnum];
+
+      if(yl < commontop)
+      {
+         source = &short_tempbuf[colnum + (yl << 2)];
+         dest   = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = commontop - yl;
+
+         while(--count >= 0)
+         {
+            *dest   = LERP565A(*source, *dest, tl_alpha);
+            source += 4;
+            dest   += SURFACE_SHORT_PITCH;
+         }
+      }
+
+      if(yh > commonbot)
+      {
+         source = &short_tempbuf[colnum + ((commonbot + 1) << 2)];
+         dest   = drawvars.short_topleft + (commonbot + 1) * SURFACE_SHORT_PITCH + startx + colnum;
+         count  = yh - commonbot;
+
+         while(--count >= 0)
+         {
+            *dest   = LERP565A(*source, *dest, tl_alpha);
+            source += 4;
+            dest   += SURFACE_SHORT_PITCH;
+         }
+      }
+      ++colnum;
+   }
+}
+
+static void R_FlushQuadLERP16(void)
+{
+   uint16_t *source = &short_tempbuf[commontop << 2];
+   uint16_t *dest   = drawvars.short_topleft + commontop * SURFACE_SHORT_PITCH + startx;
+   int        count = commonbot - commontop + 1;
+
+#if defined(WALL_RUN_SSE2)
+   {
+      __m128i va = _mm_set1_epi16((short)tl_alpha);
+      while (count >= 2)
+      {
+         __m128i s  = _mm_loadu_si128((const __m128i *)source);
+         __m128i d0 = _mm_loadl_epi64((const __m128i *)dest);
+         __m128i d1 = _mm_loadl_epi64((const __m128i *)(dest + SURFACE_SHORT_PITCH));
+         __m128i d  = _mm_unpacklo_epi64(d0, d1);
+         __m128i r  = _mm_add_epi16(SR(d), _mm_srai_epi16(_mm_mullo_epi16(_mm_sub_epi16(SR(s), SR(d)), va), 5));
+         __m128i g  = _mm_add_epi16(SG(d), _mm_srai_epi16(_mm_mullo_epi16(_mm_sub_epi16(SG(s), SG(d)), va), 5));
+         __m128i b  = _mm_add_epi16(SB(d), _mm_srai_epi16(_mm_mullo_epi16(_mm_sub_epi16(SB(s), SB(d)), va), 5));
+         __m128i px = SPACK(r, g, b);
+         _mm_storel_epi64((__m128i *)dest, px);
+         _mm_storel_epi64((__m128i *)(dest + SURFACE_SHORT_PITCH), _mm_unpackhi_epi64(px, px));
+         source += 8;
+         dest   += 2 * SURFACE_SHORT_PITCH;
+         count  -= 2;
+      }
+   }
+#elif defined(WALL_RUN_NEON)
+   {
+      int16x8_t va = vdupq_n_s16((int16_t)tl_alpha);
+      while (count >= 2)
+      {
+         uint16x8_t s = vld1q_u16(source);
+         uint16x8_t d = vcombine_u16(vld1_u16(dest), vld1_u16(dest + SURFACE_SHORT_PITCH));
+         int16x8_t  dr = vreinterpretq_s16_u16(NR(d)), dg = vreinterpretq_s16_u16(NG(d)), db = vreinterpretq_s16_u16(NB(d));
+         int16x8_t  pr = vshrq_n_s16(vmulq_s16(vsubq_s16(vreinterpretq_s16_u16(NR(s)), dr), va), 5);
+         int16x8_t  pg = vshrq_n_s16(vmulq_s16(vsubq_s16(vreinterpretq_s16_u16(NG(s)), dg), va), 5);
+         int16x8_t  pb = vshrq_n_s16(vmulq_s16(vsubq_s16(vreinterpretq_s16_u16(NB(s)), db), va), 5);
+         uint16x8_t r = vreinterpretq_u16_s16(vaddq_s16(dr, pr));
+         uint16x8_t g = vreinterpretq_u16_s16(vaddq_s16(dg, pg));
+         uint16x8_t b = vreinterpretq_u16_s16(vaddq_s16(db, pb));
+         uint16x8_t px = NPACK(r, g, b);
+         vst1_u16(dest, vget_low_u16(px));
+         vst1_u16(dest + SURFACE_SHORT_PITCH, vget_high_u16(px));
+         source += 8;
+         dest   += 2 * SURFACE_SHORT_PITCH;
+         count  -= 2;
+      }
+   }
+#endif
+
+   while(--count >= 0)
+   {
+      int i;
+      for (i = 0; i < 4; i++)
+         dest[i] = LERP565A(source[i], dest[i], tl_alpha);
       source += 4;
       dest += SURFACE_SHORT_PITCH;
    }

@@ -277,11 +277,26 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
    colfunc     = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD, drawvars.filterwall, drawvars.filterz);
 
    /* Boom 260 / ZDoom TranslucentLine: route this line's midtexture columns
-    * through the blending batch type (restored before returning).  translucent
-    * == 2 marks an additive ("Add" renderstyle) line -- a fake light beam --
-    * which takes the additive mode instead of the 50/50 blend. */
+    * through the blending batch type (restored before returning), at the line's
+    * own alpha.  translucent == 2 is an additive ("Add" renderstyle) light beam
+    * (mode 3).  translucent == 1 is alpha glass: the two weights the renderer
+    * has always had -- 50/50 (a 16) and 25/75 (a 8) -- keep their cheap
+    * shift-only kernels (modes 1/2), so existing glass is no slower; only other
+    * alphas pay for the per-channel multiply (mode 4).  Boom/Hexen lines that
+    * carry no alpha default to 16 (the old 50/50). */
    if (curline->linedef->translucent)
-      R_SetSpriteTranslucency(curline->linedef->translucent == 2 ? 3 : 1);
+   {
+      int a = curline->linedef->alpha ? curline->linedef->alpha : 16;
+      R_SetTransAlpha(a);
+      if (curline->linedef->translucent == 2)
+         R_SetSpriteTranslucency(3);
+      else if (a == 16)
+         R_SetSpriteTranslucency(1);
+      else if (a == 8)
+         R_SetSpriteTranslucency(2);
+      else
+         R_SetSpriteTranslucency(4);
+   }
    frontsector = curline->frontsector;
    backsector  = curline->backsector;
    texnum      = curline->sidedef->midtexture;

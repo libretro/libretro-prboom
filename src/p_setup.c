@@ -2515,17 +2515,25 @@ static void P_LoadUDMFLineDefs(void)
 
     /* ZDoom translucent surfaces: a two-sided line with alpha < 1 (or the
      * Boom/ZDoom Translucent flag) blends its mid-texture against the scene.
-     * Non-additive lines take the fixed 50/50 blend (translucent = 1) -- glass
-     * panes etc. become see-through.  Additive ("Add" renderstyle) lines, the
-     * map's fake light beams, take the additive path instead (translucent = 2):
-     * a 50/50 blend would dim them, additive brightens so they read as a glow. */
+     * Non-additive lines take an alpha blend (translucent = 1); additive
+     * ("Add" renderstyle) lines, the map's fake light beams, take the additive
+     * path (translucent = 2).  Either way the weight is the line's own alpha,
+     * quantised to 0..32, so glass blends and beams glow at their true alpha
+     * instead of a fixed bucket.  A 50/50 blend would dim an additive beam;
+     * additive brightens, so it reads as a glow. */
     {
       const char *rs = mld->renderstyle;
       int additive = (rs[0] == 'a' || rs[0] == 'A') &&
                      (rs[1] == 'd' || rs[1] == 'D') &&
                      (rs[2] == 'd' || rs[2] == 'D');
       if (mld->alpha < 1.0f || (mld->flags & UDMF_ML_TRANSLUCENT))
+      {
+        int a32 = (int)(mld->alpha * 32.0f + 0.5f);
+        if (a32 < 1)  a32 = 1;     /* a fully-transparent 2s line still draws */
+        if (a32 > 32) a32 = 32;
         ld->translucent = additive ? 2 : 1;
+        ld->alpha       = (unsigned char)a32;
+      }
     }
 
     mv1 = mld->v1;

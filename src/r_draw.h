@@ -182,5 +182,6 @@ void R_ResetColumnBuffer(void);
 
 /* Raven translucent sprite mode: 0 opaque, 1 MF_SHADOW (50%), 2 MF_ALTSHADOW (25%) */
 void R_SetSpriteTranslucency(int mode);
+void R_SetTransAlpha(int a32);   /* blend weight alpha*32 (0..32) for modes 3/4 */
 
 #endif

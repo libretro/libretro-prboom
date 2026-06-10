@@ -611,11 +611,17 @@ static void R_Subsector(int num)
    * R_RenderSegLoop and it is drawn after the opaque planes.  waterplane is
    * reset every subsector so a stale plane never leaks into an ordinary one. */
   waterplane = NULL;
+  nmorewater = 0;
   if (frontsector->ffloors)
   {
     const ffloor_t *ff;
-    fixed_t   bestwater = INT_MIN;
-    const ffloor_t *waterff = NULL;
+    /* gather every see-through surface at or below the view, then sort
+     * top-down: the highest becomes waterplane (the existing nearest-surface
+     * path, unchanged for a lone slab) and the rest become stacked planes. */
+    const ffloor_t *cand[MAXMOREWATER + 1];
+    fixed_t         candh[MAXMOREWATER + 1];
+    int             ncand = 0;
+    int             i, j;
 
     for (ff = frontsector->ffloors; ff; ff = ff->next)
     {
@@ -627,14 +633,31 @@ static void R_Subsector(int num)
       wtop = ff->model->ceilingheight;        /* slab/water surface height */
       if (ff->model->floorheight >= wtop)
         continue;
-      /* topmost surface at or below the view (nearest from above) */
-      if (wtop <= viewz && wtop > bestwater) { bestwater = wtop; waterff = ff; }
+      if (wtop > viewz)                        /* only above-surface case */
+        continue;
+      if (ncand < MAXMOREWATER + 1)
+      {
+        for (i = ncand; i > 0 && candh[i - 1] < wtop; i--)
+        {
+          candh[i] = candh[i - 1];
+          cand[i]  = cand[i - 1];
+        }
+        candh[i] = wtop;
+        cand[i]  = ff;
+        ncand++;
+      }
     }
 
-    if (waterff)
-      waterplane = R_FindWaterPlane(bestwater,
-                                    waterff->model->floorpic,
-                                    waterff->model->lightlevel);
+    if (ncand > 0)
+    {
+      waterplane = R_FindWaterPlane(candh[0],
+                                    cand[0]->model->floorpic,
+                                    cand[0]->model->lightlevel);
+      for (j = 1; j < ncand; j++)
+        morewater[nmorewater++] = R_FindWaterPlane(candh[j],
+                                    cand[j]->model->floorpic,
+                                    cand[j]->model->lightlevel);
+    }
   }
 
   // killough 9/18/98: Fix underwater slowdown, by passing real sector

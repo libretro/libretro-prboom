@@ -100,6 +100,8 @@ static fixed_t  bottomfrac;
 static fixed_t  bottomstep;
 static fixed_t  waterfrac;       // 3D-floor water surface screen-y, per column
 static fixed_t  waterstep;
+static fixed_t  mwfrac[MAXMOREWATER];   // stacked see-through surfaces, per column
+static fixed_t  mwstep[MAXMOREWATER];
 static int      *maskedtexturecol; // dropoff overflow
 
 //
@@ -702,6 +704,35 @@ static void R_RenderSegLoop (void)
          waterfrac += waterstep;
       }
 
+      /* stacked see-through surfaces: each spans from its own projected
+       * surface down to the floor area, but its top is clamped below the
+       * surface above it so two blended layers do not double over the same
+       * pixels.  Surfaces are ordered top-down, so the running 'above'
+       * y rises as we descend the stack. */
+      if (nmorewater)
+      {
+         int w;
+         int above = (waterplane ? (waterfrac - waterstep) >> heightbits
+                                 : cc_rwx) ;
+         if (above < cc_rwx)
+            above = cc_rwx;
+         for (w = 0; w < nmorewater; w++)
+         {
+            int wtop = mwfrac[w] >> heightbits;
+            if (wtop < above + 1)
+               wtop = above + 1;
+            if (wtop <= bottom)
+            {
+               morewater[w]->top[rw_x] = wtop;
+               morewater[w]->bottom[rw_x] = bottom;
+               morewater[w]->modified = 1;
+            }
+            if ((mwfrac[w] >> heightbits) > above)
+               above = mwfrac[w] >> heightbits;
+            mwfrac[w] += mwstep[w];
+         }
+      }
+
       // texturecolumn and lighting are independent of wall tiers
       if (segtextured)
       {
@@ -1283,6 +1314,17 @@ void R_StoreWallRange(const int start, const int stop)
       waterfrac = (centeryfrac >> invhgtbits) - FixedMul (worldwater, rw_scale);
    }
 
+   /* same projection for each stacked see-through surface below the topmost */
+   {
+      int w;
+      for (w = 0; w < nmorewater; w++)
+      {
+         int worldw = (morewater[w]->height - viewz) >> invhgtbits;
+         mwstep[w] = -FixedMul (rw_scalestep, worldw);
+         mwfrac[w] = (centeryfrac >> invhgtbits) - FixedMul (worldw, rw_scale);
+      }
+   }
+
    if (backsector)
    {
       worldhigh >>= invhgtbits;
@@ -1392,6 +1434,11 @@ void R_StoreWallRange(const int start, const int stop)
     * column range in it so R_RenderSegLoop can write the spans. */
    if (waterplane)
       waterplane = R_CheckPlane (waterplane, rw_x, rw_stopx-1);
+   {
+      int w;
+      for (w = 0; w < nmorewater; w++)
+         morewater[w] = R_CheckPlane (morewater[w], rw_x, rw_stopx-1);
+   }
 
    didsolidcol = 0;
    R_RenderSegLoop();

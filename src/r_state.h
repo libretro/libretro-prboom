@@ -111,4 +111,14 @@ extern visplane_t       *floorplane;
 extern visplane_t       *ceilingplane;
 extern visplane_t       *waterplane;
 
+/* Stacked see-through 3D-floor surfaces below the topmost (waterplane).  A
+ * single subsector can hold several translucent slabs (a pile of gratings or
+ * glass walkways); waterplane renders only the nearest, so the rest are laid
+ * out here as additional translucent planes, span-filled in R_RenderSegLoop.
+ * Empty (nmorewater==0) in every ordinary sector, so the vanilla path is
+ * untouched. */
+#define MAXMOREWATER 7
+extern visplane_t       *morewater[MAXMOREWATER];
+extern int               nmorewater;
+
 #endif

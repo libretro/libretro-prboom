@@ -116,38 +116,46 @@ void R_DrawVoxel(vissprite_t *vis)
       if (c->count <= 0)
         continue;
 
-      /* Draw the whole column as one solid vertical span: project the top
-       * of its first slab and the bottom of its last, fill between.  This
-       * yields a solid silhouette without per-voxel gaps; proper rotation
-       * and front/back occlusion refine it in the next sub-stage. */
+      /* Draw each slab as a stack of per-voxel coloured bands.  A voxel at
+       * model z occupies world z [zsiz-(z+1) .. zsiz-z]; project both edges
+       * to screen y and fill that band with the voxel's own colour, so the
+       * model shows its real surface detail instead of one silhouette
+       * colour.  The per-pixel depth buffer keeps nearer columns in front. */
       {
-        const voxslab_t *st = &vox->slabs[c->first];
-        const voxslab_t *sb = &vox->slabs[c->first + c->count - 1];
-        int ztop = st->ztop;
-        int zbot = sb->ztop + sb->zleng;
-        fixed_t wz_top = vis->gz + FixedMul(((vox->zsiz - ztop) << FRACBITS),
-                                            scale);
-        fixed_t wz_bot = vis->gz + FixedMul(((vox->zsiz - zbot) << FRACBITS),
-                                            scale);
-        int syt = (centeryfrac - FixedMul(wz_top - viewz, xscale)) >> FRACBITS;
-        int syb = (centeryfrac - FixedMul(wz_bot - viewz, xscale)) >> FRACBITS;
-        uint16_t px = lut[vox->pal_remap[st->col[0]]];
-        int yy, xx;
-
-        if (syt > syb) { int t = syt; syt = syb; syb = t; }
-        if (syt < 0) syt = 0;
-        if (syb >= viewheight) syb = viewheight - 1;
-
-        for (xx = sxl; xx <= sxr; xx++)
-          for (yy = syt; yy <= syb; yy++)
+        int si, yy, xx;
+        for (si = 0; si < c->count; si++)
+        {
+          const voxslab_t *sl = &vox->slabs[c->first + si];
+          int k;
+          for (k = 0; k < sl->zleng; k++)
           {
-            int off = yy * SCREENWIDTH + xx;
-            if (vox_zbuf_seen[off] == vox_zbuf_stamp && vox_zbuf[off] <= tz)
-              continue;
-            vox_zbuf_seen[off] = vox_zbuf_stamp;
-            vox_zbuf[off]      = tz;
-            fb[yy * SURFACE_SHORT_PITCH + xx] = px;
+            int zc = sl->ztop + k;
+            fixed_t wz_hi = vis->gz +
+              FixedMul(((vox->zsiz - zc) << FRACBITS), scale);
+            fixed_t wz_lo = vis->gz +
+              FixedMul(((vox->zsiz - (zc + 1)) << FRACBITS), scale);
+            int syt = (centeryfrac - FixedMul(wz_hi - viewz, xscale)) >> FRACBITS;
+            int syb = (centeryfrac - FixedMul(wz_lo - viewz, xscale)) >> FRACBITS;
+            uint16_t px = lut[vox->pal_remap[sl->col[k]]];
+
+            if (syt > syb) { int t = syt; syt = syb; syb = t; }
+            if (syb == syt) syb++;          /* at least one row per voxel */
+            if (syt < 0) syt = 0;
+            if (syb > viewheight) syb = viewheight;
+
+            for (xx = sxl; xx <= sxr; xx++)
+              for (yy = syt; yy < syb; yy++)
+              {
+                int off = yy * SCREENWIDTH + xx;
+                if (vox_zbuf_seen[off] == vox_zbuf_stamp &&
+                    vox_zbuf[off] <= tz)
+                  continue;
+                vox_zbuf_seen[off] = vox_zbuf_stamp;
+                vox_zbuf[off]      = tz;
+                fb[yy * SURFACE_SHORT_PITCH + xx] = px;
+              }
           }
+        }
       }
     }
   }

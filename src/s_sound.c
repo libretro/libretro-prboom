@@ -961,6 +961,31 @@ void S_RestartMusic(void)
   mus_playing_looping = looping;
 }
 
+/* Retry a music registration that was deferred because the libretro
+ * MIDI player declined while the frontend's MIDI output was not yet
+ * available.  In that case S_ChangeMusic still latched mus_playing but
+ * mus_playing->handle is NULL, so the track is silent and will never
+ * retry on its own.  Called every frame from the sound update; cheap
+ * and a no-op except in the exact deferred state.  Once MIDI output is
+ * up, re-register and play the same track from its start. */
+void S_RetryDeferredMusic(void)
+{
+  if (nomusicparm)
+    return;
+  if (!mus_playing)
+    return;
+  if (mus_playing->handle)        /* already registered: nothing to do */
+    return;
+  if (mus_playing->lumpnum <= 0)  /* external/never-cached: not retryable here */
+    return;
+  if (!I_MidiLibretroReady())     /* only the libretro MIDI deferral applies */
+    return;
+
+  /* S_RestartMusic re-caches the lump on the same slot, re-registers,
+   * and replays with the captured looping flag. */
+  S_RestartMusic();
+}
+
 
 
 void S_StopChannel(int cnum)

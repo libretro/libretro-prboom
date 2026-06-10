@@ -130,6 +130,15 @@ void I_UnRegisterSong(int handle);
  * restarts on MP3 streams. */
 int I_MusicIsMP3(void);
 
+/* libretro raw-MIDI bridge (implemented in libretro.c) and the
+ * deferred-registration readiness check (implemented in
+ * libretro_sound.c).  I_MidiLibretroReady returns nonzero when the
+ * libretro MIDI player is the selected backend and the frontend's MIDI
+ * output is available, so a track that was deferred at boot (title
+ * music) can be re-registered. */
+int I_LibretroMidiAvailable(void);
+int I_MidiLibretroReady(void);
+
 /* Save-state support for music.  These dispatch to the active music
  * backend's optional serialize/unserialize callbacks; backends that
  * don't implement them produce zero-byte saves, which the caller

@@ -93,6 +93,11 @@ void S_StopMusic(void);
  * current track is an MP3 stream. */
 void S_RestartMusic(void);
 
+/* Retry a music registration deferred by the libretro MIDI player while
+ * the frontend MIDI output was not yet available (title music at boot).
+ * No-op unless in that exact deferred state.  Called every frame. */
+void S_RetryDeferredMusic(void);
+
 // Stop and resume music, during game PAUSE.
 void S_PauseSound(void);
 void S_ResumeSound(void);

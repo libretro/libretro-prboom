@@ -1092,6 +1092,32 @@ int I_MusicIsMP3(void)
 #endif
 }
 
+/* The libretro raw-MIDI player declines to register a song while the
+ * frontend's MIDI output is not yet available (e.g. the MIDI driver is
+ * still coming up during the first frames after load).  That is exactly
+ * when the very first track -- the title music -- is registered, so it
+ * would stay silent forever: S_ChangeMusic latches mus_playing and never
+ * retries.  This reports whether the user has the libretro MIDI player
+ * selected and that output is now available, so the per-frame music
+ * update can re-register a track that was deferred.  Returns 0 unless
+ * the libretro player is the chosen MIDI backend and it is ready now. */
+int I_MidiLibretroReady(void)
+{
+#if defined(MUSIC_SUPPORT)
+   int is_libretro_selected;
+#ifdef HAVE_LIBFLUIDSYNTH
+   is_libretro_selected = (midi_player == 3);
+#else
+   is_libretro_selected = (midi_player == 2);
+#endif
+   if (!is_libretro_selected)
+      return 0;
+   return I_LibretroMidiAvailable();
+#else
+   return 0;
+#endif
+}
+
 // try register external music file (not in WAD)
 int I_RegisterMusicFile( const char* filename, musicinfo_t *song )
 {

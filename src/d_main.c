@@ -223,6 +223,13 @@ void D_Display (void)
   dbool wipe, viewactive;
   static gamestate_t oldgamestate = -1;
 
+  /* If the libretro MIDI player declined to register a track because the
+   * frontend's MIDI output was not yet up (the title music registers on
+   * the first frames after load, before RetroArch's MIDI driver is
+   * ready), re-register it now that output is available.  No-op in every
+   * other case. */
+  S_RetryDeferredMusic();
+
   /* Wipe re-entry path: while a wipe is in progress, every
    * subsequent retro_run goes here so the wipe blend can advance
    * one step per display frame without the rest of the draw

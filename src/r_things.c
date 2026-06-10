@@ -1386,6 +1386,12 @@ static void R_DrawSprite (vissprite_t* spr)
          {
             if (ds->maskedtexturecol)       // masked mid texture?
                R_RenderMaskedSegRange(ds, r1, r2);
+            /* This seg's wall is behind the sprite, so any decal on it in
+             * this x-range must be drawn now and then overdrawn by the
+             * sprite -- otherwise the final decal pass would paint it on
+             * top of the sprite.  The per-column guard keeps the final
+             * pass from redrawing these columns. */
+            R_DrawDecalsForSeg(ds, r1, r2);
             continue;               // seg is behind sprite
          }
 
@@ -1476,6 +1482,10 @@ void R_DrawMasked(void)
 
    R_SortVisSprites();
 
+   /* reset the per-column decal guard before any decals are emitted (the
+    * interleaved per-sprite passes below are the first to draw them) */
+   R_DecalsBeginFrame();
+
    // e6y: build the per-frame drawseg X-range lists used by R_DrawSprite.
    // Only silhouette/masked drawsegs can clip sprites, so collect those into
    // range 0 (all), range 1 (touches left half), range 2 (touches right
@@ -1564,10 +1574,13 @@ void R_DrawMasked(void)
       if (ds->maskedtexturecol)
          R_RenderMaskedSegRange(ds, ds->x1, ds->x2);
 
-   /* wall decals: stamped textures on walls, drawn over the wall and any
-    * masked midtexture, clipped by the seg's sprite clip arrays */
+   /* wall decals: the interleaved passes in R_DrawSprite already drew the
+    * columns of each seg that sat behind a sprite (and the sprite drew over
+    * them); this final sweep covers the remaining columns -- those no
+    * sprite occluded.  The per-column guard makes that a no-op where the
+    * interleave already ran, so there is no overdraw. */
    for (ds=ds_p ; ds-- > drawsegs ; )
-      R_DrawDecalsForSeg(ds);
+      R_DrawDecalsForSeg(ds, ds->x1, ds->x2);
 
 
    // draw the psprites on top of everything

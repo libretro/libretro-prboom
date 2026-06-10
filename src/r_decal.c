@@ -136,22 +136,48 @@ const placed_decal_t *R_DecalListEntry(int i)
 
 extern angle_t xtoviewangle[];
 
-void R_DrawDecalsForSeg(struct drawseg_s *ds_)
+/* Per-column frame guard: for each screen x, the drawseg index whose decals
+ * have already been emitted there this frame.  -1 means "free".  Lets the
+ * interleaved (per-sprite) and final decal passes for a seg cooperate without
+ * drawing any column twice. */
+static int  decal_col_owner[MAX_SCREENWIDTH];
+static int  decal_owner_valid;   /* has the array been reset this frame?    */
+
+void R_DecalsBeginFrame(void)
+{
+  int x;
+  for (x = 0; x < MAX_SCREENWIDTH; x++)
+    decal_col_owner[x] = -1;
+  decal_owner_valid = 1;
+}
+
+void R_DrawDecalsForSeg(struct drawseg_s *ds_, int rx1, int rx2)
 {
   drawseg_t       *ds  = (drawseg_t *)ds_;
   seg_t           *seg = ds->curline;
   const line_t    *ld;
-  int              lineidx, segside;
+  int              lineidx, segside, dsindex;
   int              i;
   R_DrawColumn_f   colfunc;
   draw_column_vars_t dcvars;
 
   if (!seg || !seg->linedef || !seg->sidedef)
     return;
+  if (decal_count <= 0)
+    return;                 /* no decals anywhere: nothing to do        */
+  if (!decal_owner_valid)
+    R_DecalsBeginFrame();
   ld      = seg->linedef;
   lineidx = (int)(ld - lines);
+  dsindex = (int)(ds - drawsegs);
   /* seg side: 0 if this seg runs along the front side, else 1 */
   segside = seg->sidedef == &sides[ld->sidenum[0]] ? 0 : 1;
+
+  /* clamp the requested span to this seg */
+  if (rx1 < ds->x1) rx1 = ds->x1;
+  if (rx2 > ds->x2) rx2 = ds->x2;
+  if (rx1 > rx2)
+    return;
 
   colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
                                 drawvars.filterwall, drawvars.filterz);
@@ -207,15 +233,21 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_)
     u_right = segu0 + (dwidth >> 1);
 
     rw_scalestep = ds->scalestep;
-    colscale     = ds->scale1;
+    colscale     = ds->scale1 + (rx1 - ds->x1) * rw_scalestep;
 
-    for (x = ds->x1; x <= ds->x2; x++, colscale += rw_scalestep)
+    for (x = rx1; x <= rx2; x++, colscale += rw_scalestep)
     {
       angle_t angle = (ds->rw_centerangle + xtoviewangle[x]) >> ANGLETOFINESHIFT;
       fixed_t texu  = ds->rw_offset - FixedMul(finetangent[angle], ds->rw_distance);
       fixed_t tx;
       int     col;
       int64_t t;
+
+      /* already emitted for this seg this frame (a nearer sprite's
+       * interleaved pass got here first): the sprite has since overdrawn
+       * it, so skip to avoid both overdraw and double-blend. */
+      if (decal_col_owner[x] == dsindex)
+        continue;
 
       if (texu < u_left || texu >= u_right)
         continue;                              /* column not under decal   */
@@ -272,5 +304,16 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_)
     /* restore opaque pipeline for the next decal / caller */
     if ((def->flags & DECAL_ADD) || def->alpha < FRACUNIT)
       R_SetSpriteTranslucency(0);
+  }
+
+  /* Claim this pass's columns for the seg so a later pass (the final
+   * sweep, or a farther sprite's interleave) does not redraw them.  Only
+   * columns this seg actually owns are marked; columns owned by another
+   * seg are left alone. */
+  {
+    int x;
+    for (x = rx1; x <= rx2; x++)
+      if (decal_col_owner[x] == -1)
+        decal_col_owner[x] = dsindex;
   }
 }

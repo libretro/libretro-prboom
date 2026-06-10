@@ -45,7 +45,15 @@ const placed_decal_t  *R_DecalListEntry(int i);
 
 #endif
 
-/* Render all placed decals that fall on this drawseg's wall.  Called from
- * the masked pass, after sprites and masked midtextures. */
+/* Render all placed decals that fall on this drawseg's wall, for screen
+ * columns in [x1, x2].  Called both interleaved from R_DrawSprite (when the
+ * seg is behind a sprite, so the sprite then overdraws the decal -> correct
+ * occlusion) and from the final masked pass for whatever columns no sprite
+ * covered.  A per-column frame guard ensures each column is drawn at most
+ * once, so the interleave adds no overdraw. */
 struct drawseg_s;
-void R_DrawDecalsForSeg(struct drawseg_s *ds);
+void R_DrawDecalsForSeg(struct drawseg_s *ds, int x1, int x2);
+
+/* Reset the per-column decal draw guard at the start of a frame's masked
+ * pass, before any decals are rendered. */
+void R_DecalsBeginFrame(void);

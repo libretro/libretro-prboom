@@ -6264,6 +6264,90 @@ static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
       memcpy(lut_bright, bsrc, sizeof(lut_bright));
       lut = R_GetComposedColormap(dsvars->colormap);
 
+#if defined(__SSE2__)
+      /* Same spot-index vectorisation as the non-brightmap path: four
+       * (xtemp|ytemp) indices per iteration with packed arithmetic
+       * shifts/masks, then a scalar gather -- here a per-lane select
+       * between the distance and fullbright tables on the mask bit.  The
+       * spot math is identical to the scalar loop below (srai matches the
+       * signed >> on fixed_t), so the output is bit-identical. */
+      if (count >= 8)
+      {
+         unsigned blocks = count >> 2;
+         __m128i vx  = _mm_set_epi32(xfrac + 3*xstep, xfrac + 2*xstep,
+                                     xfrac + xstep,   xfrac);
+         __m128i vy  = _mm_set_epi32(yfrac + 3*ystep, yfrac + 2*ystep,
+                                     yfrac + ystep,   yfrac);
+         const __m128i vxs   = _mm_set1_epi32(xstep << 2);
+         const __m128i vys   = _mm_set1_epi32(ystep << 2);
+         const __m128i m63   = _mm_set1_epi32(63);
+         const __m128i m4032 = _mm_set1_epi32(4032);
+         unsigned consumed   = blocks << 2;
+
+         while (blocks--)
+         {
+            uint32_t idx[4];
+            __m128i xt   = _mm_and_si128(_mm_srai_epi32(vx, 16), m63);
+            __m128i yt   = _mm_and_si128(_mm_srai_epi32(vy, 10), m4032);
+            __m128i spot = _mm_or_si128(xt, yt);
+
+            _mm_storeu_si128((__m128i *)idx, spot);
+
+            dest[0] = (mask[idx[0]] ? lut_bright : lut)[ source[idx[0]] ];
+            dest[1] = (mask[idx[1]] ? lut_bright : lut)[ source[idx[1]] ];
+            dest[2] = (mask[idx[2]] ? lut_bright : lut)[ source[idx[2]] ];
+            dest[3] = (mask[idx[3]] ? lut_bright : lut)[ source[idx[3]] ];
+            dest += 4;
+
+            vx = _mm_add_epi32(vx, vxs);
+            vy = _mm_add_epi32(vy, vys);
+         }
+
+         xfrac += (fixed_t)consumed * xstep;
+         yfrac += (fixed_t)consumed * ystep;
+         count -= consumed;
+      }
+#elif defined(__ARM_NEON)
+      if (count >= 8)
+      {
+         unsigned blocks = count >> 2;
+         const int32_t xbase[4] = { xfrac, xfrac + xstep,
+                                    xfrac + 2*xstep, xfrac + 3*xstep };
+         const int32_t ybase[4] = { yfrac, yfrac + ystep,
+                                    yfrac + 2*ystep, yfrac + 3*ystep };
+         int32x4_t vx = vld1q_s32(xbase);
+         int32x4_t vy = vld1q_s32(ybase);
+         const int32x4_t vxs   = vdupq_n_s32(xstep << 2);
+         const int32x4_t vys   = vdupq_n_s32(ystep << 2);
+         const int32x4_t m63   = vdupq_n_s32(63);
+         const int32x4_t m4032 = vdupq_n_s32(4032);
+         unsigned consumed     = blocks << 2;
+
+         while (blocks--)
+         {
+            uint32_t idx[4];
+            int32x4_t xt   = vandq_s32(vshrq_n_s32(vx, 16), m63);
+            int32x4_t yt   = vandq_s32(vshrq_n_s32(vy, 10), m4032);
+            int32x4_t spot = vorrq_s32(xt, yt);
+
+            vst1q_u32(idx, vreinterpretq_u32_s32(spot));
+
+            dest[0] = (mask[idx[0]] ? lut_bright : lut)[ source[idx[0]] ];
+            dest[1] = (mask[idx[1]] ? lut_bright : lut)[ source[idx[1]] ];
+            dest[2] = (mask[idx[2]] ? lut_bright : lut)[ source[idx[2]] ];
+            dest[3] = (mask[idx[3]] ? lut_bright : lut)[ source[idx[3]] ];
+            dest += 4;
+
+            vx = vaddq_s32(vx, vxs);
+            vy = vaddq_s32(vy, vys);
+         }
+
+         xfrac += (fixed_t)consumed * xstep;
+         yfrac += (fixed_t)consumed * ystep;
+         count -= consumed;
+      }
+#endif
+
       while (count)
       {
          const fixed_t xtemp = (xfrac >> 16) & 63;

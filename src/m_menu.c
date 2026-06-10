@@ -858,6 +858,24 @@ void M_ChooseClass(int choice)
   for (i = 0; i < MAXPLAYERS; i++)
     PlayerClass[i] = pc;
 
+  /* Hexen's skill names are per class.  The skill menu (NewGameMenu)
+   * still carries Doom's alttext, which M_Drawer would otherwise draw
+   * through the big FONTB font ("i'm too young to die", ...).  Now that
+   * the class is known, substitute the matching Hexen skill titles. */
+  {
+    static const char *const fighter_skills[5] =
+      { "squire", "knight", "warrior", "berserker", "titan" };
+    static const char *const cleric_skills[5] =
+      { "altar boy", "acolyte", "priest", "cardinal", "pope" };
+    static const char *const mage_skills[5] =
+      { "apprentice", "enchanter", "sorcerer", "warlock", "archmage" };
+    const char *const *skills = (pc == PCLASS_CLERIC) ? cleric_skills :
+                                (pc == PCLASS_MAGE)   ? mage_skills :
+                                                        fighter_skills;
+    for (i = 0; i < newg_end && i < 5; i++)
+      NewGameMenu[i].alttext = (char *)skills[i];
+  }
+
   /* Proceed to skill selection, exactly as the non-Hexen New Game path. */
   M_SetupNextMenu(&NewDef);
 }

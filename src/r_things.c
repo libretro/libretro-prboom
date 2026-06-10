@@ -39,6 +39,7 @@
 #include "r_segs.h"
 #include "r_draw.h"
 #include "r_things.h"
+#include "r_decal.h"
 #include "u_decorate.h"
 #include "r_fps.h"
 #include "v_video.h"
@@ -1562,6 +1563,11 @@ void R_DrawMasked(void)
    for (ds=ds_p ; ds-- > drawsegs ; )  // new -- killough
       if (ds->maskedtexturecol)
          R_RenderMaskedSegRange(ds, ds->x1, ds->x2);
+
+   /* wall decals: stamped textures on walls, drawn over the wall and any
+    * masked midtexture, clipped by the seg's sprite clip arrays */
+   for (ds=ds_p ; ds-- > drawsegs ; )
+      R_DrawDecalsForSeg(ds);
 
 
    // draw the psprites on top of everything

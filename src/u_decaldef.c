@@ -63,7 +63,23 @@ static void dd_parse_decal(u_scanner_t *s)
     if (!strcasecmp(s->string, "pic"))
     {
       if (U_GetNextToken(s, TRUE))
+      {
+        /* A decal pic is usually a graphic/patch (ZDoom keeps BSPLAT etc.
+         * in graphics/), but may also be a wall texture.  Prefer a wall
+         * texture; fall back to a patch lump in the global namespace. */
         d.texnum = R_CheckTextureNumForName(s->string);
+        if (d.texnum >= 0)
+          d.pic_is_patch = 0;
+        else
+        {
+          int lump = (W_CheckNumForName)(s->string, ns_global);
+          if (lump >= 0)
+          {
+            d.texnum = lump;
+            d.pic_is_patch = 1;
+          }
+        }
+      }
     }
     else if (!strcasecmp(s->string, "x") || !strcasecmp(s->string, "y"))
     {

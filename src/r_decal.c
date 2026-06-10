@@ -117,3 +117,136 @@ const placed_decal_t *R_DecalListEntry(int i)
     return NULL;
   return &decal_list[i];
 }
+
+/* ---- rendering ---------------------------------------------------------
+ * Project placed decals onto their wall during the masked pass.  Modelled
+ * on R_RenderMaskedSegRange: walk the drawseg's screen columns, and for
+ * the columns the decal covers, draw its texture column at the decal's
+ * height and scale, clipped to the wall's sprite clip arrays. */
+
+#include <limits.h>
+#include "tables.h"
+#include "r_main.h"
+#include "r_things.h"
+#include "r_draw.h"
+#include "r_patch.h"
+#include "r_data.h"
+#include "r_bsp.h"
+#include "w_wad.h"
+
+extern angle_t xtoviewangle[];
+
+void R_DrawDecalsForSeg(struct drawseg_s *ds_)
+{
+  drawseg_t       *ds  = (drawseg_t *)ds_;
+  seg_t           *seg = ds->curline;
+  const line_t    *ld;
+  int              lineidx, segside;
+  int              i;
+  R_DrawColumn_f   colfunc;
+  draw_column_vars_t dcvars;
+
+  if (!seg || !seg->linedef || !seg->sidedef)
+    return;
+  ld      = seg->linedef;
+  lineidx = (int)(ld - lines);
+  /* seg side: 0 if this seg runs along the front side, else 1 */
+  segside = seg->sidedef == &sides[ld->sidenum[0]] ? 0 : 1;
+
+  colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+                                drawvars.filterwall, drawvars.filterz);
+  R_SetDefaultDrawColumnVars(&dcvars);
+
+  for (i = 0; i < decal_count; i++)
+  {
+    const placed_decal_t *pd = &decal_list[i];
+    const decaldef_t     *def;
+    const rpatch_t       *patch;
+    fixed_t  segu0, u_left, u_right, dwidth, dheight;
+    fixed_t  colscale, rw_scalestep;
+    int      x;
+
+    if (pd->line != lineidx || pd->side != segside)
+      continue;
+    def = U_DecalDef(pd->decal);
+    if (!def || def->texnum < 0)
+      continue;
+
+    patch   = def->pic_is_patch
+                ? R_CachePatchNum(def->texnum)
+                : R_CacheTextureCompositePatchNum(def->texnum);
+    dwidth  = FixedMul(patch->width  << FRACBITS, def->xscale);
+    dheight = FixedMul(patch->height << FRACBITS, def->yscale);
+
+    /* Decal u-range relative to this seg's start.  pd->offset is measured
+     * from the linedef v1; the seg starts seg->offset further along, so
+     * subtract it to get seg-relative along-wall coordinates, matching the
+     * column texu (which also carries the sidedef textureoffset). */
+    segu0   = pd->offset - seg->offset + seg->sidedef->textureoffset;
+    u_left  = segu0 - (dwidth >> 1);
+    u_right = segu0 + (dwidth >> 1);
+
+    rw_scalestep = ds->scalestep;
+    colscale     = ds->scale1;
+
+    for (x = ds->x1; x <= ds->x2; x++, colscale += rw_scalestep)
+    {
+      angle_t angle = (ds->rw_centerangle + xtoviewangle[x]) >> ANGLETOFINESHIFT;
+      fixed_t texu  = ds->rw_offset - FixedMul(finetangent[angle], ds->rw_distance);
+      fixed_t tx;
+      int     col;
+      int64_t t;
+
+      if (texu < u_left || texu >= u_right)
+        continue;                              /* column not under decal   */
+
+      /* texture column within the decal */
+      tx  = FixedDiv(texu - u_left, def->xscale);
+      col = (tx >> FRACBITS);
+      if (def->flags & DECAL_FLIPX)
+        col = patch->width - 1 - col;
+      if (col < 0 || col >= patch->width)
+        continue;
+
+      /* vertical placement: decal centre at pd->z, half-height up/down */
+      {
+        fixed_t vscale = FixedMul(colscale, def->yscale);
+        if (vscale <= 0)
+          continue;
+        dcvars.texturemid = (pd->z + (dheight >> 1)) - viewz;
+        dcvars.iscale     = 0xffffffffu / (unsigned)vscale;
+
+        t = ((int64_t)centeryfrac << FRACBITS)
+            - (int64_t)dcvars.texturemid * vscale;
+        if (t > ((int64_t)MAX_SCREENHEIGHT << (FRACBITS * 2)))
+          continue;
+        sprtopscreen = (long)(t >> FRACBITS);
+        /* R_DrawMaskedColumn positions posts with the global spryscale, so
+         * it must carry the decal's vertical scale for this column. */
+        spryscale = vscale;
+      }
+
+      dcvars.x        = x;
+      dcvars.colormap = (def->flags & DECAL_FULLBRIGHT)
+                          ? fullcolormap
+                          : R_ColourMap(seg->frontsector
+                                          ? seg->frontsector->lightlevel : 0,
+                                        colscale);
+      dcvars.nextcolormap = dcvars.colormap;
+      dcvars.z        = colscale;
+
+      mfloorclip   = screenheightarray;
+      mceilingclip = negonearray;
+
+      R_DrawMaskedColumn(patch, colfunc, &dcvars,
+                         R_GetPatchColumnClamped(patch, col),
+                         R_GetPatchColumnClamped(patch, col - 1),
+                         R_GetPatchColumnClamped(patch, col + 1));
+    }
+
+    if (def->pic_is_patch)
+      R_UnlockPatchNum(def->texnum);
+    else
+      R_UnlockTextureCompositePatchNum(def->texnum);
+  }
+}

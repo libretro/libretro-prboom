@@ -44,3 +44,8 @@ int                    R_DecalListCount(void);
 const placed_decal_t  *R_DecalListEntry(int i);
 
 #endif
+
+/* Render all placed decals that fall on this drawseg's wall.  Called from
+ * the masked pass, after sprites and masked midtextures. */
+struct drawseg_s;
+void R_DrawDecalsForSeg(struct drawseg_s *ds);

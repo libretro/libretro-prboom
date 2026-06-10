@@ -46,7 +46,8 @@ enum
 typedef struct
 {
   char    name[64];          /* decal name (binding key)           */
-  int     texnum;            /* resolved pic texture, or -1        */
+  int     texnum;            /* resolved pic; texture# or patch lump */
+  int     pic_is_patch;      /* 0: texnum is a wall texture; 1: a patch lump */
   fixed_t xscale, yscale;    /* 16.16; default 1.0                 */
   fixed_t alpha;             /* 16.16; default 1.0                 */
   unsigned flags;

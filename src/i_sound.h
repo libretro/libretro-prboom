@@ -50,7 +50,14 @@ extern int mus_opl_gain; // NSM  fine tune OPL output level
  *   0 = Off (no MIDI playback at all)
  *   1 = Adlib (OPL2/OPL3 emulation, opl_synth_player)
  *   2 = Fluidsynth (only valid if HAVE_LIBFLUIDSYNTH; falls back
- *       to silence if the build doesn't include fluidsynth) */
+ *       to silence if the build doesn't include fluidsynth)
+ *   last = libretro raw MIDI output (libretro_midi_player): streams
+ *       MIDI events to the frontend's MIDI interface for host-side
+ *       synthesis; declines (silence) if the frontend exposes none.
+ *       The numeric value is 3 when fluidsynth is built, 2 otherwise,
+ *       since the Fluidsynth entry is compiled in conditionally -- see
+ *       midi_player_opts[] in m_menu.c and the dispatch in
+ *       libretro_sound.c, which use matching #ifdefs. */
 extern int midi_player;
 
 // Init at program start...

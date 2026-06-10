@@ -126,6 +126,12 @@ void M_EndGame(int choice);
 
 retro_log_printf_t log_cb;
 static retro_perf_get_time_usec_t perf_get_time_usec_cb = NULL;
+/* Optional raw-MIDI output interface from the frontend, used by the
+ * "libretro" MIDI Hardware option (see I_LibretroMidi* in libretro_midiout.c).
+ * NULL when the frontend exposes no MIDI interface or MIDI output is
+ * disabled, in which case that music player declines to register. */
+static struct retro_midi_interface midi_iface;
+static bool                        midi_iface_valid = false;
 static retro_video_refresh_t video_cb;
 retro_audio_sample_batch_t audio_batch_cb;
 static retro_environment_t environ_cb;
@@ -789,6 +795,41 @@ double I_RenderProfileUsec(void)
    return 0.0;
 }
 
+/* Raw-MIDI output bridge for the "libretro" MIDI Hardware player
+ * (libretro_midiout.c).  These thin wrappers hide the frontend
+ * retro_midi_interface so the player TU does not need libretro.h
+ * globals.  I_LibretroMidiAvailable reports whether the frontend
+ * gave us a usable, output-enabled MIDI interface; the player's
+ * init/registersong decline when it returns 0. */
+int I_LibretroMidiAvailable(void)
+{
+   if (!midi_iface_valid)
+      return 0;
+   /* output_enabled may be NULL on a partial interface, and may
+    * toggle at runtime; treat a missing query as "no". */
+   if (!midi_iface.write || !midi_iface.output_enabled)
+      return 0;
+   return midi_iface.output_enabled() ? 1 : 0;
+}
+
+/* Write one MIDI byte to the frontend.  delta_us is microseconds since
+ * the previous write (the frontend uses it for output scheduling).
+ * Returns 1 on success. */
+int I_LibretroMidiWrite(unsigned char byte, unsigned delta_us)
+{
+   if (!midi_iface_valid || !midi_iface.write)
+      return 0;
+   return midi_iface.write(byte, (uint32_t)delta_us) ? 1 : 0;
+}
+
+/* Flush any buffered MIDI output.  Called once per rendered music
+ * chunk after the player has emitted that chunk's events. */
+void I_LibretroMidiFlush(void)
+{
+   if (midi_iface_valid && midi_iface.flush)
+      midi_iface.flush();
+}
+
 void retro_init(void)
 {
    struct retro_log_callback log;
@@ -810,6 +851,18 @@ void retro_init(void)
          perf_get_time_usec_cb = perf.get_time_usec;
       else
          perf_get_time_usec_cb = NULL;
+   }
+
+   {
+      /* Optional: raw-MIDI output interface for the "libretro" MIDI
+       * Hardware option.  The frontend routes the bytes we write to a
+       * real or virtual MIDI device.  Absent on most setups, in which
+       * case the libretro MIDI player simply declines and the user
+       * gets Adlib/Fluidsynth as before. */
+      if (environ_cb(RETRO_ENVIRONMENT_GET_MIDI_INTERFACE, &midi_iface))
+         midi_iface_valid = true;
+      else
+         midi_iface_valid = false;
    }
 
    /* Negotiate pixel format with the frontend.  The renderer is

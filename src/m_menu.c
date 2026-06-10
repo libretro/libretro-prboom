@@ -3255,6 +3255,7 @@ static const char *midi_player_opts[] = {
 #ifdef HAVE_LIBFLUIDSYNTH
   "Fluidsynth",
 #endif
+  "libretro",
   NULL
 };
 

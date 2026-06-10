@@ -299,11 +299,11 @@ default_t defaults[] =
     def_int,ss_gen, NULL, NULL}, // 0 = never load external music files, 1 = always load it, 2 = only from iwads
   {"midi_player", {&midi_player, NULL}, {1, NULL}, 0,
 #ifdef HAVE_LIBFLUIDSYNTH
-   2,
+   3,
 #else
-   1,
+   2,
 #endif
-   def_int, ss_gen, NULL, NULL}, // 0 = off, 1 = Adlib (OPL), 2 = Fluidsynth
+   def_int, ss_gen, NULL, NULL}, // 0 = off, 1 = Adlib (OPL), [2 = Fluidsynth if built], last = libretro raw MIDI
   {"snd_channels",{&default_numChannels, NULL},{0, NULL},0,2,
    def_int,ss_gen, NULL, NULL}, // number of audio events simultaneously // killough
 

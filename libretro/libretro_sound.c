@@ -17,6 +17,7 @@
 #include "../src/flplayer.h"
 #include "../src/oplplayer.h"
 #include "../src/madplayer.h"
+#include "../src/libretro_midiout.h"
 
 #include "../src/lprintf.h"
 #include "../src/doomdef.h"
@@ -102,6 +103,7 @@ static const music_player_t *music_players[] =
   &fl_player, // flplayer.h
 #endif
   &opl_synth_player, // oplplayer.h
+  &libretro_midi_player, // libretro_midiout.h (raw MIDI to the frontend)
 #ifdef HAVE_LIBMAD
   &mp_player, // madplayer.h
 #endif
@@ -957,6 +959,13 @@ int I_RegisterSong(const void* data, size_t len)
      case 2: /* Fluidsynth */
         chosen_midi = (music_player_t *)&fl_player;
         break;
+     case 3: /* libretro raw MIDI out */
+        chosen_midi = (music_player_t *)&libretro_midi_player;
+        break;
+#else
+     case 2: /* libretro raw MIDI out (Fluidsynth not built) */
+        chosen_midi = (music_player_t *)&libretro_midi_player;
+        break;
 #endif
      default:
         chosen_midi = (music_player_t *)&opl_synth_player;
@@ -986,6 +995,8 @@ int I_RegisterSong(const void* data, size_t len)
         if (p == &fl_player && chosen_midi != (music_player_t *)&fl_player)
            continue;
 #endif
+        if (p == &libretro_midi_player && chosen_midi != (music_player_t *)&libretro_midi_player)
+           continue;
 
         music_handle = p->registersong(data, len);
         if (music_handle)

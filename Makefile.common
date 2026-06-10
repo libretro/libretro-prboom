@@ -160,6 +160,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
    $(CORE_DIR)/p_ffloor.c \
 				 $(CORE_DIR)/u_zmapinfo.c \
 				 $(CORE_DIR)/u_zanimdefs.c \
+				 $(CORE_DIR)/u_brightmap.c \
 
 
 ifeq ($(WANT_FLUIDSYNTH), 1)

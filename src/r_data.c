@@ -37,6 +37,7 @@
 #include "w_wad.h"
 #include "u_png.h"
 #include "u_ztextures.h"
+#include "u_brightmap.h"
 #include "r_draw.h"
 #include "v_video.h"
 #include "r_main.h"
@@ -676,6 +677,9 @@ void R_InitData(void)
   R_InitSpriteLumps();
   lprintf(LO_INFO, "Colormaps\n");
   R_InitColormaps();                    // killough 3/20/98
+  /* Brightmap definitions reference textures/flats/sprites by name, so
+   * parse them once those name tables exist. */
+  U_LoadBrightmaps();
 }
 
 //

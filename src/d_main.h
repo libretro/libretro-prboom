@@ -64,6 +64,7 @@ void D_DoAdvanceDemo (void);
 //
 
 void D_Display(void);
+void D_InvalidateFrozenView(void);
 void D_PageTicker(void);
 void D_StartTitle(void);
 void D_DoomMain(void);

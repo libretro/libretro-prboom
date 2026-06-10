@@ -811,7 +811,17 @@ static void R_SetupFrame (player_t *player)
 
   R_SetupFreelook();
 
-  R_DoInterpolations(tic_vars.frac);
+  /* Use the same frozen-view test as R_InterpolateView: when a menu or
+   * pause holds the world still (single-player, non-demo), the camera is
+   * pinned to FRACUNIT, so the world interpolations must be too -- otherwise
+   * scrolling skies/textures and mid-motion sectors keep being lerped by the
+   * free-running tic fraction and the "still" frame micro-jitters every
+   * display frame (and is not cacheable). */
+  {
+    const fixed_t interp_frac =
+      (paused || (menuactive && !demoplayback)) ? FRACUNIT : tic_vars.frac;
+    R_DoInterpolations(interp_frac);
+  }
 
   // killough 3/20/98, 4/4/98: select colormap based on player status
 

@@ -4498,6 +4498,11 @@ dbool M_Responder (event_t* ev) {
   if (ch == -1)
     return FALSE; // we can't use the event here
 
+  /* A usable menu key may change something drawn behind the floating menu
+   * (e.g. the screen-size slider, or toggling on-screen messages), so drop
+   * the frozen-view cache and let the next frame recompose once. */
+  D_InvalidateFrozenView();
+
   // Save Game string input
 
    if (saveStringEnter) {

@@ -202,6 +202,22 @@ gamestate_t    wipegamestate = GS_DEMOSCREEN;
 extern dbool setsizeneeded;
 extern int     showMessages;
 
+/* Frozen-view cache: while a menu (or pause) holds the world still in a
+ * non-demo single-player game, P_Ticker does not advance and interpolation
+ * is disabled (see p_tick.c / r_fps.c), so the composed level frame -- 3D
+ * view, automap, status bar and HUD -- is identical every display frame.
+ * R_RenderPlayerView nonetheless re-renders the whole scene each frame,
+ * which at high internal resolution costs several ms (~14 ms at 4K) for a
+ * picture that never changes.  Cache the finished frame once and memcpy it
+ * back on subsequent frozen frames, the same way the static title/page and
+ * intermission backgrounds are cached.  The menu and pause overlays are
+ * drawn afterwards every frame, so they stay live. */
+static uint16_t   *frozen_cache       = NULL;
+static int         frozen_cache_w     = -1;
+static int         frozen_cache_h     = -1;
+static const uint16_t *frozen_cache_pal = NULL;
+static dbool       frozen_cache_valid = FALSE;
+
 void D_Display (void)
 {
   dbool wipe, viewactive;
@@ -284,6 +300,7 @@ void D_Display (void)
     if (setsizeneeded) {               // change the view size if needed
       R_ExecuteSetViewSize();
       oldgamestate = -1;            // force background redraw
+      frozen_cache_valid = FALSE;   // a resized view must be recomposed
     }
 
     // Work out if the player view is visible
@@ -305,16 +322,66 @@ void D_Display (void)
      * we cannot decode) can leave the player with no mobj.  R_SetupFrame
      * dereferences player->mo immediately, so guard the 3D view here rather
      * than crash; the frame just renders empty. */
-    if (viewactive && players[displayplayer].mo)
-      R_RenderPlayerView (&players[displayplayer]);
-    if (automapmode & am_active)
-      AM_Drawer();
-    ST_Drawer(
-        ((viewheight != SCREENHEIGHT)
-         || ((automapmode & am_active) && !(automapmode & am_overlay))),
-        TRUE,
-        (menuactive == mnact_full));
-    HU_Drawer();
+    {
+      /* Is the world frozen behind a menu/pause?  This mirrors the gate in
+       * P_Ticker exactly: a single-player, non-demo game with a menu up (or
+       * an explicit pause) advances no tics, so every layer below renders
+       * the same pixels each frame.  viewz==1 is the level-load sentinel
+       * P_Ticker also excludes. */
+      const dbool frozen =
+        (paused
+         || (menuactive && !demoplayback && !netgame
+             && players[consoleplayer].viewz != 1))
+        && !(automapmode & am_active);  /* the automap can still pan/zoom */
+
+      const size_t fb_bytes = (size_t)SCREENWIDTH * SCREENHEIGHT
+                              * SURFACE_PIXEL_DEPTH;
+
+      if (frozen
+          && frozen_cache_valid
+          && frozen_cache
+          && frozen_cache_w   == SCREENWIDTH
+          && frozen_cache_h   == SCREENHEIGHT
+          && frozen_cache_pal == V_Palette16)
+      {
+        /* Fast path: copy the previously composed frozen frame back. */
+        memcpy(screens[0].data, frozen_cache, fb_bytes);
+      }
+      else
+      {
+        if (viewactive && players[displayplayer].mo)
+          R_RenderPlayerView (&players[displayplayer]);
+        if (automapmode & am_active)
+          AM_Drawer();
+        ST_Drawer(
+            ((viewheight != SCREENHEIGHT)
+             || ((automapmode & am_active) && !(automapmode & am_overlay))),
+            TRUE,
+            (menuactive == mnact_full));
+        HU_Drawer();
+
+        /* If the world is frozen, snapshot the finished frame so the next
+         * frozen display frames can skip the whole compose.  Allocated
+         * lazily; on malloc failure we simply never take the fast path. */
+        if (frozen)
+        {
+          if (!frozen_cache)
+            frozen_cache = (uint16_t*)malloc((size_t)MAX_SCREENWIDTH
+                                             * MAX_SCREENHEIGHT
+                                             * SURFACE_PIXEL_DEPTH);
+          if (frozen_cache)
+          {
+            memcpy(frozen_cache, screens[0].data, fb_bytes);
+            frozen_cache_w     = SCREENWIDTH;
+            frozen_cache_h     = SCREENHEIGHT;
+            frozen_cache_pal   = V_Palette16;
+            frozen_cache_valid = TRUE;
+          }
+        }
+        else
+          frozen_cache_valid = FALSE;
+      }
+    }
   }
 
   oldgamestate = wipegamestate = gamestate;
@@ -415,6 +482,11 @@ static int         page_cache_w     = -1;
 static int         page_cache_h     = -1;
 static const uint16_t *page_cache_pal = NULL;
 
+void D_InvalidateFrozenView(void)
+{
+  frozen_cache_valid = FALSE;
+}
+
 void D_FreePageCache(void)
 {
   free(page_cache);
@@ -423,6 +495,13 @@ void D_FreePageCache(void)
   page_cache_w    = -1;
   page_cache_h    = -1;
   page_cache_pal  = NULL;
+
+  free(frozen_cache);
+  frozen_cache       = NULL;
+  frozen_cache_w     = -1;
+  frozen_cache_h     = -1;
+  frozen_cache_pal   = NULL;
+  frozen_cache_valid = FALSE;
 }
 
 static void D_PageDrawer(void)

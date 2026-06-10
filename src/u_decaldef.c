@@ -250,8 +250,24 @@ void U_LoadDecalDefs(void)
     dd_parse_lump(lump);
 
   if (num_decals)
-    lprintf(LO_INFO, "U_LoadDecalDefs: %d decal(s), %d group(s)\n",
-            num_decals, num_groups);
+  {
+    int i, resolved = 0;
+    for (i = 0; i < num_decals; i++)
+      if (decals[i].texnum >= 0)
+        resolved++;
+    lprintf(LO_INFO, "U_LoadDecalDefs: %d decal(s), %d group(s), "
+            "%d/%d pic(s) resolved\n",
+            num_decals, num_groups, resolved, num_decals);
+    /* A ZDoom pack typically names stock decal graphics (BSPLAT, BLAST,
+     * ...) that live in the engine's base resource (gzdoom.pk3), which this
+     * core does not ship.  If nothing resolved, the decals parsed fine but
+     * have no art to draw -- flag it so a missing resource is diagnosable
+     * rather than silently producing invisible decals. */
+    if (resolved == 0)
+      lprintf(LO_WARN, "U_LoadDecalDefs: no decal pics found; their "
+              "graphics are probably in a base resource that is not "
+              "loaded\n");
+  }
 }
 
 int U_DecalNumForName(const char *name)

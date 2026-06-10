@@ -73,6 +73,11 @@ typedef struct {
   const uint8_t       *source; // first pixel in a column
   const uint8_t       *prevsource; // first pixel in previous column
   const uint8_t       *nextsource; // first pixel in next column
+  /* Per-texel fullbright mask aligned to `source` (same column height and
+   * row index): where mask[texel] != 0 the texel ignores the distance
+   * light and draws at full brightness.  NULL when the texture has no
+   * brightmap. */
+  const uint8_t       *brightmask;
   const lighttable_t  *colormap;
   const lighttable_t  *nextcolormap;
   const uint8_t       *translation;

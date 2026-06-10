@@ -96,6 +96,13 @@ static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
   int cls = R_WallColumnKernelClass(cmd->fn);
   int th  = cmd->dc.texheight;
 
+  /* A brightmap column needs the per-texel fullbright select, which lives
+   * in the column drawers, not the wall-run quad kernel; route it through
+   * its fn() by declaring it unclassed.  Brightmap columns are rare, so
+   * the common wall path keeps its quad-flush optimization untouched. */
+  if (cmd->dc.brightmask)
+    return 0;
+
   /* The LinearUV drawers are deliberately not kernel-classed.  A
    * row-major run kernel for them was built and proven bit-identical
    * (it needs the drawers' half-texel frac seed, a signed shift for

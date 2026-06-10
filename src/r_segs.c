@@ -40,6 +40,7 @@
 #include "r_segs.h"
 #include "r_plane.h"
 #include "r_things.h"
+#include "u_brightmap.h"
 #include "p_ffloor.h"
 #include "r_draw.h"
 #include "r_drawcmd.h"
@@ -624,6 +625,12 @@ static void R_RenderSegLoop (void)
    const rpatch_t *midpatch = midtexture    ? R_CacheTextureCompositePatchNum(midtexture)    : NULL;
    const rpatch_t *toppatch = toptexture    ? R_CacheTextureCompositePatchNum(toptexture)    : NULL;
    const rpatch_t *botpatch = bottomtexture ? R_CacheTextureCompositePatchNum(bottomtexture) : NULL;
+   /* Per-tier fullbright mask bases (column-major width*height, 1 = bright),
+    * NULL when the texture has no brightmap.  Indexed per column exactly as
+    * R_GetTextureColumn indexes the texture's own pixels. */
+   const uint8_t  *midmask = midtexture    ? U_BrightmaskForTexture(midtexture)    : NULL;
+   const uint8_t  *topmask = toptexture    ? U_BrightmaskForTexture(toptexture)    : NULL;
+   const uint8_t  *botmask = bottomtexture ? U_BrightmaskForTexture(bottomtexture) : NULL;
 
    R_SetDefaultDrawColumnVars(&dcvars);
 
@@ -790,6 +797,9 @@ static void R_RenderSegLoop (void)
          dcvars.texturemid = rw_midtexturemid;
          tex_patch = midpatch;
          dcvars.source = R_GetTextureColumn(tex_patch, texturecolumn);
+         dcvars.brightmask = midmask
+            ? midmask + (texturecolumn & tex_patch->widthmask) * tex_patch->height
+            : NULL;
          if (uv_filter)
          {
             dcvars.prevsource = R_GetTextureColumn(tex_patch, texturecolumn-1);
@@ -821,6 +831,9 @@ static void R_RenderSegLoop (void)
                dcvars.texturemid = rw_toptexturemid;
                tex_patch = toppatch;
                dcvars.source = R_GetTextureColumn(tex_patch,texturecolumn);
+               dcvars.brightmask = topmask
+                  ? topmask + (texturecolumn & tex_patch->widthmask) * tex_patch->height
+                  : NULL;
                if (uv_filter)
                {
                   dcvars.prevsource = R_GetTextureColumn(tex_patch,texturecolumn-1);
@@ -857,6 +870,9 @@ static void R_RenderSegLoop (void)
                dcvars.texturemid = rw_bottomtexturemid;
                tex_patch = botpatch;
                dcvars.source = R_GetTextureColumn(tex_patch, texturecolumn);
+               dcvars.brightmask = botmask
+                  ? botmask + (texturecolumn & tex_patch->widthmask) * tex_patch->height
+                  : NULL;
                if (uv_filter)
                {
                   dcvars.prevsource = R_GetTextureColumn(tex_patch, texturecolumn-1);

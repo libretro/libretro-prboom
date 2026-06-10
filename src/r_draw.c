@@ -1536,6 +1536,61 @@ static void R_DrawColumn16_PointUV_PointZ(draw_column_vars_t *dcvars)
       const uint16_t *lut = R_GetComposedColormap(dcvars->colormap);
       count++;
 
+      /* Brightmap path: where the per-texel mask is set the texel ignores
+       * the distance light and is drawn through the undimmed base map
+       * (fullcolormap, band 0).  fullcolormap's composed table is snapshot
+       * into a column-local array first, because the shared composed_lut
+       * cache holds a single entry -- fetching the distance `lut` would
+       * otherwise evict it.  Kept as one general loop (handles every
+       * texheight); the SIMD select lands in a later step. */
+      if (dcvars->brightmask)
+      {
+         const uint8_t *mask = dcvars->brightmask;
+         uint16_t lut_bright[256];
+         const uint16_t *bsrc = R_GetComposedColormap(fullcolormap
+                                                      ? fullcolormap
+                                                      : dcvars->colormap);
+         unsigned heightmask = dcvars->texheight ? dcvars->texheight - 1 : 0;
+         int npot = (dcvars->texheight &&
+                     (dcvars->texheight & heightmask)) ? 1 : 0;
+         memcpy(lut_bright, bsrc, sizeof(lut_bright));
+         /* re-fetch the distance table: the snapshot above may have
+          * replaced it in the shared cache */
+         lut = R_GetComposedColormap(dcvars->colormap);
+
+         if (npot)
+         {
+            unsigned h = dcvars->texheight;
+            unsigned hs = h << 16;
+            if (frac < 0)
+               while ((frac += hs) < 0);
+            else
+               while (frac >= (int)hs)
+                  frac -= hs;
+            while (count--)
+            {
+               unsigned t = (frac >> 16);
+               *dest = (mask[t] ? lut_bright : lut)[ source[t] ];
+               dest += 4;
+               if ((frac += fracstep) >= (int)hs) frac -= hs;
+            }
+         }
+         else
+         {
+            fixed_t fmask = dcvars->texheight
+                            ? ((heightmask << 16) | 0xffff)
+                            : 0xffffffffu;
+            while (count--)
+            {
+               unsigned t = (frac & fmask) >> 16;
+               *dest = (mask[t] ? lut_bright : lut)[ source[t] ];
+               dest += 4;
+               frac += fracstep;
+            }
+         }
+         return;
+      }
+
       if (dcvars->texheight == 128)
       {
 
@@ -6046,6 +6101,7 @@ void R_SetDefaultDrawColumnVars(draw_column_vars_t *dcvars)
    dcvars->source        = NULL;
    dcvars->prevsource    = NULL;
    dcvars->nextsource    = NULL;
+   dcvars->brightmask    = NULL;
    dcvars->colormap      = colormaps[0];
    dcvars->nextcolormap  = colormaps[0];
    dcvars->translation   = NULL;

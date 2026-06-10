@@ -536,6 +536,12 @@ static void R_Subsector(int num)
        * (translucent) slabs are left for a later alpha-aware pass */
       if (ff->type != FFLOOR_SOLID && ff->type != FFLOOR_RENDERONLY)
         continue;
+      /* a translucent slab (alpha < 224, the same cutoff the thickside pass
+       * uses to keep near-opaque slabs solid) is not an opaque surface: the
+       * real floor below must stay visible through it, so it is not chosen as
+       * the floor/ceiling here but laid over as a translucent plane below. */
+      if (ff->alpha < 224)
+        continue;
       ftop = ff->model->ceilingheight;
       fbot = ff->model->floorheight;
       if (fbot >= ftop)
@@ -597,12 +603,13 @@ static void R_Subsector(int num)
                 frontsector->ceiling_slope
                 ) : NULL;
 
-  /* ZDoom swimmable 3D floors (water): unlike solid slabs the real floor is
-   * still drawn, and the slab's top is a translucent surface laid over it.
-   * Only the common above-water case is handled (view above the surface);
-   * its span is bounded per-column in R_RenderSegLoop and it is drawn after
-   * the opaque planes.  waterplane is reset every subsector so a stale plane
-   * never leaks into an ordinary one. */
+  /* ZDoom swimmable 3D floors (water) AND translucent solid/render-only
+   * slabs (a see-through grating or glass walkway, alpha 1..223): unlike an
+   * opaque slab the real floor is still drawn, and the slab's top is a
+   * translucent surface laid over it.  Only the common above-surface case is
+   * handled (view above the top); its span is bounded per-column in
+   * R_RenderSegLoop and it is drawn after the opaque planes.  waterplane is
+   * reset every subsector so a stale plane never leaks into an ordinary one. */
   waterplane = NULL;
   if (frontsector->ffloors)
   {
@@ -613,12 +620,14 @@ static void R_Subsector(int num)
     for (ff = frontsector->ffloors; ff; ff = ff->next)
     {
       fixed_t wtop;
-      if (ff->type != FFLOOR_SWIMMABLE)
+      if (ff->type != FFLOOR_SWIMMABLE &&
+          !((ff->type == FFLOOR_SOLID || ff->type == FFLOOR_RENDERONLY) &&
+            ff->alpha > 0 && ff->alpha < 224))
         continue;
-      wtop = ff->model->ceilingheight;        /* water surface height */
+      wtop = ff->model->ceilingheight;        /* slab/water surface height */
       if (ff->model->floorheight >= wtop)
         continue;
-      /* topmost water surface at or below the view (nearest from above) */
+      /* topmost surface at or below the view (nearest from above) */
       if (wtop <= viewz && wtop > bestwater) { bestwater = wtop; waterff = ff; }
     }
 

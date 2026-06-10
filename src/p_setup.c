@@ -53,6 +53,7 @@
 #include "p_map.h"
 #include "p_setup.h"
 #include "u_zanimdefs.h"
+#include "u_voxel.h"
 #include "u_zsecact.h"
 #include "p_ffloor.h"
 #include "p_spec.h"
@@ -3027,6 +3028,7 @@ void P_Init (void)
    P_InitLava();     /* raven fire inflictor (no-op otherwise) */
    P_InitTerrainTypes();
    R_InitSprites(sprnames);
+   U_LoadVoxels();   /* parse VOXELDEF / KVX models (needs sprnames) */
 }
 /*
  * 

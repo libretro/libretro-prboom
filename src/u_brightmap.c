@@ -9,6 +9,8 @@
 #include "w_wad.h"
 #include "lprintf.h"
 #include "u_scanner.h"
+#include "r_data.h"
+#include "r_patch.h"
 #include "u_brightmap.h"
 
 static brightmap_def_t *bmaps;
@@ -185,8 +187,152 @@ int U_BrightmapCount(void)
   return num_bmaps;
 }
 
+/* ---- per-texture mask build (stage 2) ---------------------------------- */
+
+/* One built mask, column-major (mask[col*height + row]), 1 = fullbright.
+ * Indexed for O(1) render lookup by texture number through bm_tex_index. */
+static unsigned char **bm_tex_masks;    /* [numtextures], NULL if none      */
+static int             bm_num_tex;
+static int             bm_built;
+
+/* PLAYPAL luminance >= this (0..255) counts as a "bright" mask texel.  A
+ * brightmap is authored white-on-black, so the glowing texels land near
+ * full white and the rest near black; the midpoint cleanly separates
+ * them and tolerates the palette-nearest snap the mask PNG went through
+ * when it was materialised. */
+#define BM_LUMA_THRESHOLD 96
+
+static unsigned char bm_bright_index[256];   /* palette index -> is-bright */
+
+static void bm_build_luma_table(void)
+{
+  int        plump = (W_CheckNumForName)("PLAYPAL", ns_global);
+  const unsigned char *pal;
+  int        i;
+
+  memset(bm_bright_index, 0, sizeof(bm_bright_index));
+  if (plump < 0)
+    return;
+  pal = (const unsigned char *)W_CacheLumpNum(plump);
+  for (i = 0; i < 256; i++)
+  {
+    int r = pal[i * 3 + 0];
+    int g = pal[i * 3 + 1];
+    int b = pal[i * 3 + 2];
+    /* Rec.601 luma, integer */
+    int y = (77 * r + 150 * g + 29 * b) >> 8;
+    bm_bright_index[i] = (unsigned char)(y >= BM_LUMA_THRESHOLD);
+  }
+  W_UnlockLumpNum(plump);
+}
+
+/* Build a tw x th column-major bright mask from a materialised mask
+ * patch.  The cached rpatch stores pixels column-major full height with
+ * 0xff for transparent; a texel is bright when it is opaque and its
+ * palette colour is luminous.  Nearest-resampled to the target size. */
+static unsigned char *bm_mask_from_patch(int maplump, int tw, int th)
+{
+  const rpatch_t *p = R_CachePatchNum(maplump);
+  unsigned char  *m;
+  int             x, y, pw, ph;
+
+  if (!p || p->width <= 0 || p->height <= 0)
+  {
+    if (p)
+      R_UnlockPatchNum(maplump);
+    return NULL;
+  }
+  pw = p->width;
+  ph = p->height;
+  m  = calloc((size_t)tw * (size_t)th, 1);
+  if (!m)
+  {
+    R_UnlockPatchNum(maplump);
+    return NULL;
+  }
+
+  for (x = 0; x < tw; x++)
+  {
+    int sx = x * pw / tw;
+    const unsigned char *col = p->pixels + (size_t)sx * ph;
+    for (y = 0; y < th; y++)
+    {
+      int sy = y * ph / th;
+      unsigned char texel = col[sy];
+      if (texel != 0xff && bm_bright_index[texel])
+        m[(size_t)x * th + y] = 1;
+    }
+  }
+  R_UnlockPatchNum(maplump);
+  return m;
+}
+
+void U_BuildBrightmasks(void)
+{
+  int i, built = 0;
+
+  if (bm_built)
+    return;
+  bm_built = true;
+  if (!num_bmaps)
+    return;
+
+  bm_num_tex   = numtextures;
+  bm_tex_masks = calloc((size_t)bm_num_tex, sizeof(*bm_tex_masks));
+  if (!bm_tex_masks)
+  {
+    bm_num_tex = 0;
+    return;
+  }
+
+  bm_build_luma_table();
+
+  for (i = 0; i < num_bmaps; i++)
+  {
+    const brightmap_def_t *d = &bmaps[i];
+    int texnum;
+
+    int tw, th;
+
+    if (d->kind != BM_TEXTURE)
+      continue;                         /* flats/sprites: later stages */
+    texnum = R_CheckTextureNumForName(d->name);
+    if (texnum < 0 || texnum >= bm_num_tex || bm_tex_masks[texnum])
+      continue;                         /* unknown, or already built */
+
+    tw = textures[texnum]->width;
+    th = textures[texnum]->height;
+    if (tw <= 0 || th <= 0)
+      continue;
+
+    bm_tex_masks[texnum] = bm_mask_from_patch(d->maplump, tw, th);
+    if (bm_tex_masks[texnum])
+      built++;
+  }
+
+  if (built)
+    lprintf(LO_INFO, "U_BuildBrightmasks: %d texture masks\n", built);
+}
+
+const unsigned char *U_BrightmaskForTexture(int texnum)
+{
+  if (!bm_tex_masks || texnum < 0 || texnum >= bm_num_tex)
+    return NULL;
+  return bm_tex_masks[texnum];
+}
+
 void U_FreeBrightmaps(void)
 {
+  int i;
+  if (bm_tex_masks)
+  {
+    for (i = 0; i < bm_num_tex; i++)
+      free(bm_tex_masks[i]);
+    free(bm_tex_masks);
+    bm_tex_masks = NULL;
+  }
+  bm_num_tex = 0;
+  bm_built   = 0;
   free(bmaps);
   bmaps = NULL;
   num_bmaps = cap_bmaps = 0;

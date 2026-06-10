@@ -42,6 +42,15 @@ void U_LoadBrightmaps(void);
 /* Look up a brightmap definition by target name and kind, or NULL. */
 const brightmap_def_t *U_BrightmapFor(const char *name, brightmap_kind_t kind);
 
+/* Build the per-texture bright masks from the parsed definitions.  Call
+ * after R_InitTextures so texture numbers and composite dimensions are
+ * available; a second call is a no-op. */
+void U_BuildBrightmasks(void);
+
+/* O(1) render-time lookup: the column-major (mask[col*height + row]) bright
+ * mask for a wall texture, or NULL if it has none.  1 = fullbright texel. */
+const unsigned char *U_BrightmaskForTexture(int texnum);
+
 /* Number of definitions parsed (diagnostics / tests). */
 int U_BrightmapCount(void);
 

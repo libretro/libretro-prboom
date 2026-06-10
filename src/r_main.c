@@ -41,6 +41,7 @@
 #include "r_main.h"
 #include "r_drawcmd.h"
 #include "r_data.h"
+#include "u_brightmap.h"
 #include "r_state.h"
 #include "r_things.h"
 #include "r_plane.h"
@@ -609,6 +610,9 @@ void R_Init (void)
   R_InitTranslationTables();
   lprintf(LO_INFO, "R_InitPatches\n");
   R_InitPatches();
+  /* Patch cache is live now, so the brightmap masks (which read both the
+   * mask patches and the composite texture dimensions) can be baked. */
+  U_BuildBrightmasks();
   R_ApplyDiminishedLighting(); /* sync General>Video setting into filterz */
 }
 

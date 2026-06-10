@@ -678,7 +678,8 @@ void R_InitData(void)
   lprintf(LO_INFO, "Colormaps\n");
   R_InitColormaps();                    // killough 3/20/98
   /* Brightmap definitions reference textures/flats/sprites by name, so
-   * parse them once those name tables exist. */
+   * parse them once those name tables exist.  The per-texture masks are
+   * baked later, from R_Init after the patch cache is initialised. */
   U_LoadBrightmaps();
 }
 

@@ -803,12 +803,12 @@ menu_t ClassDef =
 
 void M_DrawClass(void)
 {
-  /* The authentic Hexen class screen: a green "CHOOSE CLASS" heading with
-   * the three classes listed in green, and a framed player model of the
-   * highlighted class on the right.  The heading and list are drawn in the
-   * small translatable font (FONTA via hu_font) so they can render green;
-   * the menu items' alttext is left blank so the generic (red) item loop in
-   * M_Drawer does not draw over them. */
+  /* The authentic Hexen class screen draws the "choose class:" heading and
+   * the three class names in the big FONTB font (rendered red, like the
+   * skill menu), with a framed player model of the highlighted class on the
+   * right.  An earlier version drew the heading/list in the small FONTA font
+   * in green; that does not match Hexen, which uses FONTB here just like
+   * every other big-font menu. */
   static const char *const boxlump[3]  = { "M_FBOX",  "M_CBOX",  "M_MBOX"  };
   static const char *const walkfmt[3]  = { "M_FWALK%d", "M_CWALK%d", "M_MWALK%d" };
   int sel = (itemOn >= 0 && itemOn < class_end) ? itemOn : 0;
@@ -819,13 +819,13 @@ void M_DrawClass(void)
    * walk, giving roughly seven frames a second. */
   snprintf(walkname, sizeof(walkname), walkfmt[sel], 1 + ((gametic >> 2) & 3));
 
-  /* The class list and heading are drawn in the small translatable font
-   * (FONTA via hu_font) in green.  The big FONTB glyphs are baked red and do
-   * not translate, so they cannot render green; FONTA does. */
-  M_WriteText(34, 24, "CHOOSE CLASS:", CR_GREEN);
-  M_WriteText(ClassDef.x, ClassDef.y + 0 * LINEHEIGHT, "FIGHTER", CR_GREEN);
-  M_WriteText(ClassDef.x, ClassDef.y + 1 * LINEHEIGHT, "CLERIC",  CR_GREEN);
-  M_WriteText(ClassDef.x, ClassDef.y + 2 * LINEHEIGHT, "MAGE",    CR_GREEN);
+  /* Heading and class list in the big FONTB font (M_DrawTextB uppercases
+   * and renders through FONTB; the alttext for the ClassMenu items is left
+   * NULL so the generic item loop in M_Drawer does not draw over them). */
+  M_DrawTextB(34, 24, "CHOOSE CLASS:");
+  M_DrawTextB(ClassDef.x, ClassDef.y + 0 * LINEHEIGHT, "FIGHTER");
+  M_DrawTextB(ClassDef.x, ClassDef.y + 1 * LINEHEIGHT, "CLERIC");
+  M_DrawTextB(ClassDef.x, ClassDef.y + 2 * LINEHEIGHT, "MAGE");
 
   /* Framed model of the highlighted class (box behind, walking model on
    * top).  The box is 112x136 at (174,8); its black model window sits in the

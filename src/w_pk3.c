@@ -144,6 +144,17 @@ static dbool pk3_is_deferred_format(const unsigned char *d, int len)
   return FALSE;
 }
 
+/* RIFF/WAVE sniff.  WAV used to be quarantined alongside PNG/Ogg/FLAC,
+ * but the sfx loader (I_SndLoadSample) now decodes RIFF/WAVE lumps via
+ * RWAV, so a WAV that lands in a sound-bearing (global) namespace must
+ * stay visible to ns_global lookups instead of being deferred.  It is
+ * still deferred inside the renderable namespaces (sprites/flats/
+ * textures), where a waveform lump can never be a valid graphic. */
+static dbool pk3_is_wav(const unsigned char *d, int len)
+{
+  return len >= 4 && !memcmp(d, "RIFF", 4);
+}
+
 /* Expand a root-level .wad member: append its lumps verbatim. */
 static int pk3_add_inner_wad(pk3_build_t *b, const char *member,
                              const unsigned char *wad, int len)
@@ -243,7 +254,15 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
   if (pk3_is_png(d, len))
     return PK3_PASS_GLOBAL;
   if (pk3_is_deferred_format(d, len))
+  {
+    /* WAV is now consumable by the sfx loader, so unlike the other
+     * deferred formats it stays in the global namespace where
+     * I_SndLoadSample can resolve it (e.g. a ZDoom mod shipping
+     * sounds/DSPISTOL.wav).  PNG/Ogg/FLAC remain quarantined. */
+    if (pk3_is_wav(d, len))
+      return PK3_PASS_GLOBAL;
     return PK3_PASS_DEFERRED;
+  }
   return PK3_PASS_GLOBAL;
 }
 

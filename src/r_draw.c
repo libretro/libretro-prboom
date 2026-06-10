@@ -1675,6 +1675,17 @@ static void R_DrawColumn16_PointUV_LinearZ(draw_column_vars_t *dcvars)
    const fixed_t slope_texu = dcvars->texu;
    int count = dcvars->yh - dcvars->yl;
 
+   /* Brightmapped columns take the point/point drawer, the only one
+    * carrying the fullbright select.  The filtered/dithered variants blend
+    * several colormap lookups per pixel with no single table to redirect,
+    * so a masked surface trades that smoothing for correct fullbright --
+    * the same trade R_DrawColumn16_LinearUV already makes when minified. */
+   if (dcvars->brightmask)
+   {
+      R_DrawColumn16_PointUV_PointZ(dcvars);
+      return;
+   }
+
    if (count < 0)
       return;
 
@@ -1855,6 +1866,12 @@ static void R_DrawColumn16_LinearUV(draw_column_vars_t *dcvars)
    const fixed_t fracstep = dcvars->iscale;
 
    const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+   if (dcvars->brightmask)
+   {
+      R_DrawColumn16_PointUV_PointZ(dcvars);
+      return;
+   }
 
    if (dcvars->iscale > drawvars.mag_threshold)
    {
@@ -2066,6 +2083,12 @@ static void R_DrawColumn16_LinearUV_PointZ(draw_column_vars_t *dcvars)
 
    const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
 
+   if (dcvars->brightmask)
+   {
+      R_DrawColumn16_PointUV_PointZ(dcvars);
+      return;
+   }
+
    if (dcvars->iscale > drawvars.mag_threshold)
    {
       R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
@@ -2254,6 +2277,12 @@ static void R_DrawColumn16_LinearUV_LinearZ(draw_column_vars_t *dcvars)
    const fixed_t fracstep = dcvars->iscale;
 
    const fixed_t slope_texu = (dcvars->source == dcvars->nextsource) ? 0 : dcvars->texu & 0xffff;
+
+   if (dcvars->brightmask)
+   {
+      R_DrawColumn16_PointUV_PointZ(dcvars);
+      return;
+   }
 
    if (dcvars->iscale > drawvars.mag_threshold)
    {
@@ -2456,6 +2485,12 @@ static void R_DrawColumn16_RoundedUV(draw_column_vars_t *dcvars)
   fixed_t frac;
   const fixed_t fracstep = dcvars->iscale;
   const fixed_t slope_texu = dcvars->texu;
+
+  if (dcvars->brightmask)
+  {
+     R_DrawColumn16_PointUV_PointZ(dcvars);
+     return;
+  }
 
   if (dcvars->iscale > drawvars.mag_threshold)
   {
@@ -2663,6 +2698,12 @@ static void R_DrawColumn16_RoundedUV_PointZ(draw_column_vars_t *dcvars)
    fixed_t frac;
    const fixed_t fracstep = dcvars->iscale;
    const fixed_t slope_texu = dcvars->texu;
+
+   if (dcvars->brightmask)
+   {
+      R_DrawColumn16_PointUV_PointZ(dcvars);
+      return;
+   }
 
    if (dcvars->iscale > drawvars.mag_threshold)
    {
@@ -2874,6 +2915,12 @@ static void R_DrawColumn16_RoundedUV_LinearZ(draw_column_vars_t *dcvars)
    fixed_t frac;
    const fixed_t fracstep = dcvars->iscale;
    const fixed_t slope_texu = dcvars->texu;
+
+   if (dcvars->brightmask)
+   {
+      R_DrawColumn16_PointUV_PointZ(dcvars);
+      return;
+   }
 
    if (dcvars->iscale > drawvars.mag_threshold)
    {
@@ -6347,6 +6394,15 @@ static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
 
 static void R_DrawSpan16_PointUV_LinearZ(draw_span_vars_t *dsvars)
 {
+   /* Brightmapped flats take the point/point span drawer, the only
+    * one with the fullbright select; filtered spans blend several
+    * lookups per pixel with no single table to redirect, so a masked
+    * flat trades that smoothing for correct fullbright. */
+   if (dsvars->brightmask)
+   {
+      R_DrawSpan16_PointUV_PointZ(dsvars);
+      return;
+   }
    unsigned count = dsvars->x2 - dsvars->x1 + 1;
    fixed_t xfrac = dsvars->xfrac;
    fixed_t yfrac = dsvars->yfrac;
@@ -6385,6 +6441,15 @@ static void R_DrawSpan16_PointUV_LinearZ(draw_span_vars_t *dsvars)
 
 static void R_DrawSpan16_LinearUV_PointZ(draw_span_vars_t *dsvars)
 {
+   /* Brightmapped flats take the point/point span drawer, the only
+    * one with the fullbright select; filtered spans blend several
+    * lookups per pixel with no single table to redirect, so a masked
+    * flat trades that smoothing for correct fullbright. */
+   if (dsvars->brightmask)
+   {
+      R_DrawSpan16_PointUV_PointZ(dsvars);
+      return;
+   }
    if ((D_abs(dsvars->xstep) > drawvars.mag_threshold)
          || (D_abs(dsvars->ystep) > drawvars.mag_threshold))
    {
@@ -6419,6 +6484,15 @@ static void R_DrawSpan16_LinearUV_PointZ(draw_span_vars_t *dsvars)
 
 static void R_DrawSpan16_LinearUV_LinearZ(draw_span_vars_t *dsvars)
 {
+   /* Brightmapped flats take the point/point span drawer, the only
+    * one with the fullbright select; filtered spans blend several
+    * lookups per pixel with no single table to redirect, so a masked
+    * flat trades that smoothing for correct fullbright. */
+   if (dsvars->brightmask)
+   {
+      R_DrawSpan16_PointUV_PointZ(dsvars);
+      return;
+   }
    if ((D_abs(dsvars->xstep) > drawvars.mag_threshold)
          || (D_abs(dsvars->ystep) > drawvars.mag_threshold))
    {
@@ -6463,6 +6537,15 @@ static void R_DrawSpan16_LinearUV_LinearZ(draw_span_vars_t *dsvars)
 
 static void R_DrawSpan16_RoundedUV_PointZ(draw_span_vars_t *dsvars)
 {
+   /* Brightmapped flats take the point/point span drawer, the only
+    * one with the fullbright select; filtered spans blend several
+    * lookups per pixel with no single table to redirect, so a masked
+    * flat trades that smoothing for correct fullbright. */
+   if (dsvars->brightmask)
+   {
+      R_DrawSpan16_PointUV_PointZ(dsvars);
+      return;
+   }
    if ((D_abs(dsvars->xstep) > drawvars.mag_threshold)
          || (D_abs(dsvars->ystep) > drawvars.mag_threshold))
    {
@@ -6494,6 +6577,15 @@ static void R_DrawSpan16_RoundedUV_PointZ(draw_span_vars_t *dsvars)
 
 static void R_DrawSpan16_RoundedUV_LinearZ(draw_span_vars_t *dsvars)
 {
+   /* Brightmapped flats take the point/point span drawer, the only
+    * one with the fullbright select; filtered spans blend several
+    * lookups per pixel with no single table to redirect, so a masked
+    * flat trades that smoothing for correct fullbright. */
+   if (dsvars->brightmask)
+   {
+      R_DrawSpan16_PointUV_PointZ(dsvars);
+      return;
+   }
    if ((D_abs(dsvars->xstep) > drawvars.mag_threshold)
          || (D_abs(dsvars->ystep) > drawvars.mag_threshold))
    {

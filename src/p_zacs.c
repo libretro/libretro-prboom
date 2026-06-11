@@ -1968,7 +1968,16 @@ static void T_ZACSThinker(zacs_inst_t *inst)
   int ip;
   int *locals;
   int tmp;
-  int budget = 500000;
+  /* Per-slice instruction budget: the number of pcodes one script may run in
+   * a single tic before the engine assumes it has hung and terminates it.
+   * The guard is meant to catch a non-yielding infinite loop, not to cap
+   * legitimate work -- a script that does heavy one-time setup and then
+   * yields with Delay() resumes with a fresh budget next tic.  Compiled
+   * library code (e.g. a GDCC translation unit building its data tables on
+   * load) can legitimately run on the order of a million pcodes in one slice,
+   * so the ceiling matches ZDoom's traditional runaway limit rather than a
+   * tighter value that would abort such initialisation midway. */
+  int budget = 2000000;
 
   switch (inst->state)
   {

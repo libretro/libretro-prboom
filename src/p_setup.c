@@ -2689,26 +2689,35 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    //    W_Reload ();     killough 1/31/98: W_Reload obsolete
 
    // find map name
-   if (gamemapinfo && gamemapinfo->mapname && gamemapinfo->mapname[0] &&
-       !G_ValidateMapName(gamemapinfo->mapname, NULL, NULL))
    {
-      /* ZDoom MAPINFO map with an arbitrary lump name (e.g. ZDCMP2) that the
-       * MAPnn/ExMy derivation below cannot express -- load it by name.  Such
-       * maps are UDMF and carry their nodes inline (ZNODES), so no separate
-       * GL_ lump applies; point gl_lumpname at a name that cannot resolve. */
-      strncpy(lumpname, gamemapinfo->mapname, 8);
-      lumpname[8] = 0;
-      snprintf(gl_lumpname, sizeof(gl_lumpname), "GL_%.5s", lumpname);
-   }
-   else if (gamemode == commercial)
-   {
-      sprintf(lumpname, "map%02d", map);           // killough 1/24/98: simplify
-      sprintf(gl_lumpname, "gl_map%02d", map);    // figgi
-   }
-   else
-   {
-      sprintf(lumpname, "E%dM%d", episode, map);   // killough 1/24/98: simplify
-      sprintf(gl_lumpname, "GL_E%iM%i", episode, map); // figgi
+      int mi_epi = -1, mi_map = -1;
+      int mi_named = gamemapinfo && gamemapinfo->mapname && gamemapinfo->mapname[0];
+      int mi_standard = mi_named &&
+         G_ValidateMapName(gamemapinfo->mapname, &mi_epi, &mi_map);
+      /* Load straight from the MAPINFO lump name when it is either a
+       * non-standard name the MAPnn/ExMy derivation cannot express (e.g.
+       * ZDCMP2), or a standard name whose map number is not launchable by
+       * the numeric path (MAP00 -- which G_InitNew clamps up to map 1, so
+       * the derivation below would wrongly pick MAP01). */
+      if (mi_named && (!mi_standard || mi_map < 1))
+      {
+         /* Such maps may be UDMF carrying nodes inline (ZNODES), so no
+          * separate GL_ lump applies; point gl_lumpname at a name that
+          * cannot resolve. */
+         strncpy(lumpname, gamemapinfo->mapname, 8);
+         lumpname[8] = 0;
+         snprintf(gl_lumpname, sizeof(gl_lumpname), "GL_%.5s", lumpname);
+      }
+      else if (gamemode == commercial)
+      {
+         sprintf(lumpname, "map%02d", map);           // killough 1/24/98: simplify
+         sprintf(gl_lumpname, "gl_map%02d", map);    // figgi
+      }
+      else
+      {
+         sprintf(lumpname, "E%dM%d", episode, map);   // killough 1/24/98: simplify
+         sprintf(gl_lumpname, "GL_E%iM%i", episode, map); // figgi
+      }
    }
 
    lumpnum = P_FindMapMarker(lumpname);

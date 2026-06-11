@@ -2525,7 +2525,14 @@ void G_DeferedInitNewName(skill_t skill, const char *mapname)
   int e = 1, m = 1;
 
   d_skill = skill;
-  if (mapname && mapname[0] && !G_ValidateMapName(mapname, &e, &m))
+  /* Launch by lump name when the name is non-standard (e.g. ZDCMP2), OR when
+   * it parses as MAPnn/ExMy but the map number cannot be launched numerically.
+   * MAP00 is the case in point: it validates (lump "MAP00" round-trips) yet
+   * G_InitNew clamps any map < 1 up to 1, which would silently start MAP01
+   * instead of the named lump.  Carrying the name through makes G_InitNew
+   * resolve the real MAP00 lump by name. */
+  if (mapname && mapname[0] &&
+      (!G_ValidateMapName(mapname, &e, &m) || m < 1))
   {
     strncpy(d_mapname, mapname, 8);
     d_mapname[8] = 0;

@@ -764,6 +764,25 @@ void M_AddEpisode(const char *map, char *def)
         EpiMenuEpi[k] = k + 1;
         EpiMenuMap[k] = 1;
      }
+     /* Doom II (and the other commercial IWADs) has no episode menu of its
+      * own -- M_Init leaves EpiDef.numitems at 0 and New Game jumps straight
+      * to the skill screen.  When a mod adds its own episode without first
+      * clearing, the base game's single implicit episode should remain, the
+      * way other source ports keep the IWAD's default "Hell on Earth" entry
+      * and append the mod's episode after it.  Seed that base entry now so the
+      * menu shows both; a subsequent 'clearepisodes' (def == "-") still wipes
+      * it by resetting numitems to 0 below. */
+     if (gamemode == commercial && EpiDef.numitems == 0)
+     {
+        strncpy(EpiMenuName[0], "MAP01", 8);
+        EpiMenuName[0][8] = 0;
+        EpiMenuEpi[0]  = 1;
+        EpiMenuMap[0]  = 1;
+        EpisodeMenu[0].name[0]  = 0;        /* no graphic; drawn as alttext */
+        EpisodeMenu[0].alttext  = "Hell on Earth";
+        EpisodeMenu[0].alphaKey = 'h';
+        EpiDef.numitems = 1;
+     }
   }
   if (*def == '-')	// means 'clear'
   {

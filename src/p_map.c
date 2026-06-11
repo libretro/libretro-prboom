@@ -38,6 +38,7 @@
 #include "p_maputl.h"
 #include "p_map.h"
 #include "u_decorate.h"
+#include "p_conversation.h"
 #include "p_slope.h"
 #include "p_setup.h"
 #include "p_tick.h"
@@ -2542,23 +2543,25 @@ dbool PTR_NoWayTraverse(intercept_t* in)
  * does not also trigger a line behind it. */
 static mobj_t *use_thing_hit;
 
-/* Native conversation dispatch seam.
+/* A used thing leads to one of two things: an in-script reaction via the
+ * thing's DECORATE Active state (how ACS-driven dialogue such as a visual-
+ * novel actor starts), or a native conversation owned by the engine (the
+ * Strife-style dialogue loaded from a DIALOGUE/SCRIPT lump).  The two are
+ * distinct subsystems, so the use handler asks here whether the thing has a
+ * native conversation before falling back to the Active state.
  *
- * A used thing can lead to one of two things: an in-script reaction (the
- * thing's DECORATE Active state, which is how ACS-driven dialogue such as a
- * visual-novel actor starts), or a native conversation owned by the engine
- * (the Strife-style dialogue a future track will load from a DIALOGUE lump).
- * The two are distinct subsystems, so the use handler asks here whether the
- * thing has a native conversation before falling back to the Active state.
- *
- * No content registers a native conversation yet, so this always reports
- * "none" and every used thing takes the unchanged Active-state path.  The
- * conversation track will populate the lookup and flesh out the handler; until
- * then both functions are inert by construction. */
+ * A thing's conversation is keyed by its type id (the conversation id / editor
+ * number); P_ThingConversation reports that id when a conversation node exists
+ * for it, else -1.  When no conversation lump is loaded (every ordinary Doom,
+ * Heretic, Hexen or ACS map) the table is empty and this always reports -1, so
+ * the use handler takes the unchanged Active-state path.  The on-screen
+ * conversation engine is a later step, so P_StartConversation still declines
+ * and nothing visibly changes yet. */
 static int P_ThingConversation(mobj_t *th)
 {
-  (void)th;
-  return -1;                              /* no native conversation (none registered) */
+  if (th && P_ConversationForSpeaker(th->type))
+    return th->type;
+  return -1;
 }
 
 static dbool P_StartConversation(mobj_t *th, mobj_t *talker, int conv)
@@ -2575,8 +2578,8 @@ static dbool PTR_UseThingTraverse(intercept_t *in)
   th = in->d.thing;
   if (th == usething)
     return TRUE;                          /* not the user itself */
-  if (U_DecorateActiveState(th->type) < 0)
-    return TRUE;                          /* not use-activatable; keep going */
+  if (U_DecorateActiveState(th->type) < 0 && P_ThingConversation(th) < 0)
+    return TRUE;                          /* neither use-activatable nor a talker */
   if (FixedMul(USERANGE, in->frac) > USERANGE)
     return FALSE;                         /* out of reach: stop the trace */
   use_thing_hit = th;

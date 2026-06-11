@@ -28,11 +28,19 @@
  * is copied into a buffer one larger and terminated. */
 
 #include <stdlib.h>
+#include <stdio.h>
 #include <string.h>
 
 #include "doomtype.h"
 #include "lprintf.h"
 #include "z_zone.h"
+#include "d_event.h"
+#include "d_player.h"
+#include "p_mobj.h"
+#include "doomstat.h"
+#include "hu_lib.h"
+#include "hu_stuff.h"
+#include "v_video.h"
 #include "p_conversation.h"
 
 static conv_node_t *conv_nodes;
@@ -131,4 +139,153 @@ const conv_node_t *P_ConversationForSpeaker(int speaker)
     if (conv_nodes[i].speaker == speaker)
       return &conv_nodes[i];
   return NULL;
+}
+
+/* ------------------------------------------------------------------------- *
+ * On-screen conversation runtime
+ *
+ * A conversation is modal-ish: while one is up it renders over the view and
+ * the talker-player's use/fire buttons drive it, but it does not seize the
+ * input system -- selection is edge-triggered off the player's command
+ * buttons so ordinary play resumes untouched the moment it closes.  This layer
+ * navigates the dialogue tree (text, choices, links) and does not yet apply a
+ * choice's side effects.
+ * ------------------------------------------------------------------------- */
+
+extern patchnum_t hu_font[HU_FONTSIZE];
+
+static int                conv_active;
+static const conv_node_t *conv_cur;       /* current page                 */
+static struct mobj_s     *conv_talker;    /* the other party (the user)   */
+static int                conv_speaker;    /* speaker type id              */
+static int                conv_sel;        /* highlighted choice index     */
+static int                conv_oldbtn;     /* previous tic's buttons       */
+
+/* The choices actually offered: a choice with neither text nor link is unused
+ * (the trailing "Bye" option is implicit).  Returns the count and fills idx[]
+ * with the offered choice slots in order. */
+static int conv_offered(const conv_node_t *n, int *idx)
+{
+  int i, c = 0;
+  for (i = 0; i < CONV_NUM_CHOICES; i++)
+    if (n->choices[i].text[0] || n->choices[i].link)
+      idx[c++] = i;
+  return c;
+}
+
+int P_ConversationStart(int speaker, struct mobj_s *talker)
+{
+  const conv_node_t *n = P_ConversationForSpeaker(speaker);
+  if (!n)
+    return 0;
+  conv_active  = 1;
+  conv_cur     = n;
+  conv_talker  = talker;
+  conv_speaker = speaker;
+  conv_sel     = 0;
+  conv_oldbtn  = (talker && talker->player) ? talker->player->cmd.buttons : 0;
+  return 1;
+}
+
+void P_ConversationEnd(void)
+{
+  conv_active  = 0;
+  conv_cur     = NULL;
+  conv_talker  = NULL;
+}
+
+int P_ConversationIsActive(void)
+{
+  return conv_active;
+}
+
+/* Move to the node a choice links to, or end the conversation. */
+static void conv_follow(int link)
+{
+  const conv_node_t *n;
+  if (link == 0)
+  {
+    P_ConversationEnd();
+    return;
+  }
+  /* A link selects another of the speaker's nodes.  Until multi-node-per-
+   * speaker chains are tracked the table keeps one node per speaker, so any
+   * non-zero link re-resolves to the speaker's current node (the page is
+   * redrawn rather than dead-ending).  Wiring real multi-node chains is a
+   * later step. */
+  n = P_ConversationForSpeaker(conv_speaker);
+  if (n)
+    conv_cur = n;
+  conv_sel = 0;
+}
+
+void P_ConversationTicker(void)
+{
+  player_t *pl;
+  int btn, edge, idx[CONV_NUM_CHOICES], noff;
+  if (!conv_active || !conv_cur)
+    return;
+  /* abandon if the talker is gone */
+  if (!conv_talker || !conv_talker->player)
+  {
+    P_ConversationEnd();
+    return;
+  }
+  pl   = conv_talker->player;
+  btn  = pl->cmd.buttons;
+  edge = btn & ~conv_oldbtn;            /* buttons pressed this tic */
+  conv_oldbtn = btn;
+
+  noff = conv_offered(conv_cur, idx);
+
+  if (edge & BT_ATTACK)                 /* cycle the highlighted choice */
+    conv_sel = (conv_sel + 1) % (noff + 1);   /* +1 for the implicit Bye */
+
+  if (edge & BT_USE)                    /* confirm the highlighted choice */
+  {
+    if (noff > 0 && conv_sel < noff)
+      conv_follow(conv_cur->choices[idx[conv_sel]].link);
+    else
+      P_ConversationEnd();              /* the implicit Bye option */
+  }
+}
+
+/* draw one line of small-font text at a virtual 320x200 position */
+static void conv_text(int x, int y, int cm, const char *s)
+{
+  hu_textline_t l;
+  HUlib_initTextLine(&l, x, y, hu_font, HU_FONTSTART, cm);
+  for (; *s; s++)
+    HUlib_addCharToTextLine(&l, *s);
+  HUlib_drawTextLine(&l, false);
+}
+
+void P_ConversationDrawer(void)
+{
+  const conv_node_t *n = conv_cur;
+  int idx[CONV_NUM_CHOICES], noff, i, y;
+  const char *name;
+  if (!conv_active || !n)
+    return;
+  name = n->name[0] ? n->name : "Person";
+  conv_text(8, 8, CR_GOLD, name);
+  conv_text(8, 24, CR_GRAY, n->dialogue);
+
+  noff = conv_offered(n, idx);
+  y = 130;
+  for (i = 0; i < noff; i++)
+  {
+    char line[CONV_CHOICE_TEXT_LEN + 8];
+    const char *txt = n->choices[idx[i]].text;
+    snprintf(line, sizeof(line), "%c %.*s",
+             (i == conv_sel) ? '>' : ' ', CONV_CHOICE_TEXT_LEN, txt);
+    conv_text(16, y, (i == conv_sel) ? CR_GREEN : CR_GRAY, line);
+    y += 10;
+  }
+  /* implicit dismissal option */
+  {
+    char line[16];
+    snprintf(line, sizeof(line), "%c BYE", (conv_sel == noff) ? '>' : ' ');
+    conv_text(16, y, (conv_sel == noff) ? CR_GREEN : CR_GRAY, line);
+  }
 }

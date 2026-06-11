@@ -2554,9 +2554,7 @@ static mobj_t *use_thing_hit;
  * number); P_ThingConversation reports that id when a conversation node exists
  * for it, else -1.  When no conversation lump is loaded (every ordinary Doom,
  * Heretic, Hexen or ACS map) the table is empty and this always reports -1, so
- * the use handler takes the unchanged Active-state path.  The on-screen
- * conversation engine is a later step, so P_StartConversation still declines
- * and nothing visibly changes yet. */
+ * the use handler takes the unchanged Active-state path. */
 static int P_ThingConversation(mobj_t *th)
 {
   if (th && P_ConversationForSpeaker(th->type))
@@ -2566,8 +2564,8 @@ static int P_ThingConversation(mobj_t *th)
 
 static dbool P_StartConversation(mobj_t *th, mobj_t *talker, int conv)
 {
-  (void)th; (void)talker; (void)conv;
-  return FALSE;                           /* no native conversation engine yet */
+  (void)th;
+  return P_ConversationStart(conv, talker) ? TRUE : FALSE;
 }
 
 static dbool PTR_UseThingTraverse(intercept_t *in)
@@ -2593,6 +2591,10 @@ void P_UseLines (player_t*  player)
   fixed_t y1;
   fixed_t x2;
   fixed_t y2;
+
+  /* while a conversation is on screen the use key drives it, not the world */
+  if (P_ConversationIsActive())
+    return;
 
   usething = player->mo;
 

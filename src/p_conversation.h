@@ -67,4 +67,22 @@ int P_ConversationCount(void);
  * rules; here the most recently parsed node for a speaker is returned. */
 const conv_node_t *P_ConversationForSpeaker(int speaker);
 
+/* ------------------------------------------------------------------------- *
+ * On-screen conversation runtime.
+ *
+ * P_ConversationStart opens the conversation for a speaker type id, with the
+ * given talker actor as the other party, and returns 1 if one exists (and is
+ * now on screen) or 0 if not.  While a conversation is active the ticker reads
+ * the talker-player's buttons to move the highlighted choice and to confirm
+ * it, and the drawer paints the speaker name, the page text and the numbered
+ * choices.  Confirming a choice follows its link to the next node or ends the
+ * conversation; this layer renders and navigates the dialogue tree but does
+ * not yet apply choice side effects (item give/take, line specials).
+ * ------------------------------------------------------------------------- */
+int  P_ConversationStart(int speaker, struct mobj_s *talker);
+void P_ConversationTicker(void);
+void P_ConversationDrawer(void);
+void P_ConversationEnd(void);
+int  P_ConversationIsActive(void);
+
 #endif /* P_CONVERSATION_H */

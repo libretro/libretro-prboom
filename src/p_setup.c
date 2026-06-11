@@ -2678,6 +2678,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    P_InitThinkers();
    U_ZSecActClear();    /* forget the previous level's sector actions */
+   P_ConversationEnd();   /* close any conversation left open */
    P_ConversationClear(); /* drop the previous level's Strife dialogue */
    R_ClearDecals();     /* drop the previous level's wall decals */
 

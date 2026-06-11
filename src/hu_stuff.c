@@ -38,6 +38,7 @@
 #include "hu_lib.h"
 #include "st_stuff.h" /* jff 2/16/98 need loc of status bar */
 #include "p_zacs.h"
+#include "p_conversation.h"
 #include "w_wad.h"
 #include "s_sound.h"
 #include "dstrings.h"
@@ -1321,6 +1322,9 @@ void HU_Drawer(void)
 
   /* draw any positioned ACS HudMessage text on top of the HUD */
   Z_ACSHudDrawer();
+
+  /* draw an active Strife-style conversation over the HUD */
+  P_ConversationDrawer();
 }
 
 //
@@ -1362,6 +1366,9 @@ void HU_Ticker(void)
 
   /* tick down any positioned ACS HudMessage hold timers */
   Z_ACSHudTicker();
+
+  /* advance an active Strife-style conversation */
+  P_ConversationTicker();
 
   // tick down message counter if message is up
   if (message_counter && !--message_counter)

@@ -230,6 +230,41 @@ static void conv_follow(int link)
     P_ConversationEnd();                  /* dangling link: end gracefully */
 }
 
+/* Whether a top message is worth printing: Strife uses a lone "_" to mean
+ * "no message", and an empty string is likewise nothing to show. */
+static int conv_has_msg(const char *s)
+{
+  return s[0] && !(s[0] == '_' && s[1] == 0);
+}
+
+/* Apply a confirmed choice.  Without a Strife inventory a choice that demands
+ * items or gold (a positive needitem/needamount) cannot be satisfied and takes
+ * the failure path; a choice with no requirement succeeds.  The matching top
+ * message is shown, and the conversation follows the choice's link (success)
+ * or simply closes (failure with nowhere to go).  Item give/take and line
+ * specials are a later step. */
+static void conv_choose(const conv_choice_t *c)
+{
+  player_t *pl = (conv_talker && conv_talker->player) ? conv_talker->player
+                                                      : NULL;
+  int i, ok = 1;
+  for (i = 0; i < 3; i++)
+    if (c->needitem[i] > 0 || c->needamount[i] > 0)
+      ok = 0;                            /* a requirement we cannot meet */
+
+  if (pl)
+  {
+    const char *m = ok ? c->yes : c->no;
+    if (conv_has_msg(m))
+      pl->message = m;                   /* table storage outlives the line */                   /* table storage outlives the line */
+  }
+
+  if (ok)
+    conv_follow(c->link);
+  else
+    P_ConversationEnd();
+}
+
 void P_ConversationTicker(void)
 {
   player_t *pl;
@@ -255,7 +290,7 @@ void P_ConversationTicker(void)
   if (edge & BT_USE)                    /* confirm the highlighted choice */
   {
     if (noff > 0 && conv_sel < noff)
-      conv_follow(conv_cur->choices[idx[conv_sel]].link);
+      conv_choose(&conv_cur->choices[idx[conv_sel]]);
     else
       P_ConversationEnd();              /* the implicit Bye option */
   }

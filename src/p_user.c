@@ -1501,11 +1501,12 @@ void P_PlayerThink (player_t* player)
 
    cmd = &player->cmd;
 
-   /* while this player is in a conversation, hold them still -- the dialogue
-    * reads the use/fire buttons for its own navigation (in HU_Ticker, after
-    * this), so only the movement intent is cleared here; the buttons are left
-    * intact for the conversation to consume. */
-   if (P_ConversationIsActive() && player == &players[consoleplayer])
+   /* A script may freeze the player solid (ACS PROP_TOTALLYFROZEN) while an
+    * overlay such as a dialogue panel is up.  Hold all intent still -- the
+    * dialogue still reads the use/fire buttons for its own navigation (in
+    * HU_Ticker, after this), so only movement is cleared, not the buttons. */
+   if ((player->cheats & CF_TOTALLYFROZEN) ||
+       (P_ConversationIsActive() && player == &players[consoleplayer]))
    {
       cmd->forwardmove = 0;
       cmd->sidemove    = 0;

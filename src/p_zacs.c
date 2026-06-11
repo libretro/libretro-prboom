@@ -1963,6 +1963,34 @@ static void zacs_dispatch_lspec(zacs_inst_t *inst, int special,
                                 int *a, int *result)
 {
   int r = 0;
+  /* SetPlayerProperty(who, value, property): the only property handled here is
+   * the freeze pair (PROP_FROZEN / PROP_TOTALLYFROZEN), which interactive
+   * content toggles to hold the player still during an overlay.  who==0 acts
+   * on the activator's player; other properties fall through to the map-format
+   * handler. */
+  if (special == 191)
+  {
+    int who = a[0], value = a[1], prop = a[2];
+    if (prop == 0 || prop == 4)             /* PROP_FROZEN / PROP_TOTALLYFROZEN */
+    {
+      int pn;
+      for (pn = 0; pn < MAXPLAYERS; pn++)
+      {
+        if (!playeringame[pn])
+          continue;
+        if (who == 0 && !(inst->activator && inst->activator->player ==
+                          &players[pn]))
+          continue;
+        if (value)
+          players[pn].cheats |= CF_TOTALLYFROZEN;
+        else
+          players[pn].cheats &= ~CF_TOTALLYFROZEN;
+      }
+      if (result)
+        *result = 1;
+      return;
+    }
+  }
   /* Thing_ChangeTID(oldtid, newtid): reassign the TID of every thing that
    * currently has oldtid (0 = the activator) to newtid.  This ZDoom special
    * is not part of the base line-special set, but interactive content relies

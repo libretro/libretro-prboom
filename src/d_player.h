@@ -80,7 +80,11 @@ typedef enum
   // No damage, no health loss.
   CF_GODMODE          = 2,
   // Not really a cheat, just a debug aid.
-  CF_NOMOMENTUM       = 4
+  CF_NOMOMENTUM       = 4,
+  // ACS SetPlayerProperty(PROP_TOTALLYFROZEN): hold the player completely
+  // still -- no movement, turning, or weapon use -- while script-driven
+  // content (e.g. a dialogue overlay) is on screen.
+  CF_TOTALLYFROZEN    = 8
 
 } cheat_t;
 

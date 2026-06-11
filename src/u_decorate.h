@@ -35,7 +35,8 @@ void U_RegisterZDoomUtilityThings(void);
 
 /* DECORATE user variables: total slots a mobjtype declares, and name->slot
  * resolution for the ACS user-variable builtins.  U_DecorateUserVarSlot
- * returns 1 and fills *base/*len on success, 0 if the name is undeclared. */
+ * returns 1 and fills the base and len out-params on success, 0 if the name
+ * is undeclared. */
 int U_DecorateUserVarCount(int type);
 int U_DecorateUserVarSlot(int type, const char *name, int *base, int *len);
 

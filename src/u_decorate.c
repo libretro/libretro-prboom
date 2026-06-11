@@ -174,7 +174,8 @@ int U_DecorateUserVarCount(int type)
 }
 
 /* Public: resolve a user-var name on a mobjtype to its base slot and length.
- * Returns 1 and fills *base/*len on success, 0 if the name is not declared. */
+ * Returns 1 and fills the base and len out-params on success, 0 if the name
+ * is not declared. */
 int U_DecorateUserVarSlot(int type, const char *name, int *base, int *len)
 {
   uvarmap_t *m = uvarmap_for_type(type);
@@ -1514,18 +1515,17 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
        * Two shapes are captured (action functions are otherwise ignored):
        *   "SPRT F -1"     -> a single frozen frame (spawn_static)
        *   "SPRT ABCD 10"  -> an animated sequence, terminated by loop/stop
-       * The quoted keep-sprite/frame placeholder ("####" # ...) is honoured;
-       * such frames render nothing but still run their actions. */
+       * A quoted keep-sprite/frame placeholder ("####" # ...) parses as the
+       * literal sprite word here -- such logic-only frames still run their
+       * actions, and the sprite they name renders harmlessly if absent. */
       char fr[MAX_NAME], tics[MAX_NAME];
       char nspr[8];
-      int  keep_spr = 0;
       const char *q = skip_space(p, end);
       {
         const char *wp = word; int n = 0;
         if (wp[0] == '"') wp++;
         while (wp[n] && wp[n] != '"' && n < 4) { nspr[n] = wp[n]; n++; }
         nspr[n] = 0;
-        if (nspr[0] == '#' || nspr[0] == '-') keep_spr = 1;
       }
       q = read_word(q, end, fr, sizeof(fr));
       if (fr[0] == '"')

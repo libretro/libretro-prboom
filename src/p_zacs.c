@@ -1571,8 +1571,13 @@ static void zacs_hud_store(const char *text, int id, int x, int y,
   zacs_hudmsgs[slot].y        = y;
   zacs_hudmsgs[slot].holdtics = holdtics;
   zacs_hudmsgs[slot].color    = color;
-  strncpy(zacs_hudmsgs[slot].text, text, ZACS_PRINTBUF - 1);
-  zacs_hudmsgs[slot].text[ZACS_PRINTBUF - 1] = 0;
+  {
+    size_t n = strlen(text);
+    if (n > ZACS_PRINTBUF - 1)
+      n = ZACS_PRINTBUF - 1;
+    memcpy(zacs_hudmsgs[slot].text, text, n);
+    zacs_hudmsgs[slot].text[n] = 0;
+  }
 }
 
 static void zacs_deliver(zacs_inst_t *inst, dbool bold)

@@ -1867,12 +1867,19 @@ void Z_ACSHudDrawer(void)
   {
     hu_textline_t l;
     const char *t;
+    int cm;
     if (!zacs_hudmsgs[i].active)
       continue;
+    /* The colour carried on a HUD message indexes the font's colour
+     * translation tables.  An out-of-range value (HUD messages may request
+     * colours that do not map onto this port's CR_* range) would read past the
+     * translation array when the glyphs are drawn, so fold anything invalid
+     * onto the default colour. */
+    cm = zacs_hudmsgs[i].color;
+    if (cm < 0 || cm >= CR_LIMIT)
+      cm = CR_DEFAULT;
     HUlib_initTextLine(&l, zacs_hudmsgs[i].x, zacs_hudmsgs[i].y,
-                       hu_font, HU_FONTSTART,
-                       zacs_hudmsgs[i].color >= 0 ? zacs_hudmsgs[i].color
-                                                  : CR_RED);
+                       hu_font, HU_FONTSTART, cm);
     for (t = zacs_hudmsgs[i].text; *t; t++)
       HUlib_addCharToTextLine(&l, *t);
     HUlib_drawTextLine(&l, false);
@@ -3573,6 +3580,36 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       }
       switch (func)
       {
+        case 39:                          /* ACSF_ACS_NamedExecute */
+        {
+          /* ACS_NamedExecute(str name, int map, arg1, arg2, arg3): start the
+           * named script if an instance is not already running. */
+          int eargs[3], i;
+          for (i = 0; i < 3; i++)
+            eargs[i] = (argc > i + 2) ? a[i + 2] : 0;
+          if (argc > 0)
+            r = Z_ACSStartNamed(a[0], argc > 1 ? a[1] : 0, eargs, 3,
+                                inst->activator, NULL, 0, false) ? 1 : 0;
+          break;
+        }
+        case 44:                          /* ACSF_ACS_NamedExecuteWithResult */
+        {
+          /* ACS_NamedExecuteWithResult(str name, arg1..arg4): start a fresh
+           * instance of the named script.  The C-to-bytecode toolchain used by
+           * some mods lowers its synchronous-script function-pointer calls to
+           * this: the caller clears a return-flag slot, calls here to launch
+           * the callee, then Delay-polls that slot until the callee's epilogue
+           * sets it.  Launching the script (always = a fresh instance) is all
+           * the engine must do; the started script's own code performs the
+           * handshake, so the immediate result is unused by that protocol. */
+          int eargs[4], i;
+          for (i = 0; i < 4; i++)
+            eargs[i] = (argc > i + 1) ? a[i + 1] : 0;
+          if (argc > 0)
+            Z_ACSStartNamed(a[0], 0, eargs, 4, inst->activator, NULL, 0, true);
+          r = 0;
+          break;
+        }
         case 9:                           /* ACSF_GetActorVelX */
         case 10:                          /* ACSF_GetActorVelY */
         case 11:                          /* ACSF_GetActorVelZ */

@@ -3539,6 +3539,36 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           r = 0;
           break;
 
+        case 13:                          /* ACSF_SetActivatorToTarget(tid) */
+        {
+          /* retarget the script's activator to the target of the actor named
+           * by the tid (tid 0 = current activator).  Scripts that operate on
+           * "the thing this actor is fighting" rely on this; without it the
+           * activator-relative work that follows acts on the wrong actor. */
+          mobj_t *mo = zacs_aptr(inst, argc > 0 ? a[0] : 0);
+          if (mo && mo->target)
+          {
+            P_SetTarget(&inst->activator, mo->target);
+            r = 1;
+          }
+          else
+            r = 0;
+          break;
+        }
+
+        case 15:                          /* ACSF_GetChar(str, index) */
+        {
+          /* return the byte at a position in a string, or 0 past the end --
+           * the per-character primitive a C string runtime is built on */
+          const char *s = zacs_string(argc > 0 ? a[0] : 0);
+          int idx = (argc > 1) ? a[1] : 0;
+          if (s && idx >= 0 && idx < (int)strlen(s))
+            r = (unsigned char)s[idx];
+          else
+            r = 0;
+          break;
+        }
+
         /* ---- DECORATE user variables ---------------------------------
          * SetUserVariable/GetUserVariable address a scalar "var int" by name;
          * SetUserArray/GetUserArray index into a "var int name[N]".  A set

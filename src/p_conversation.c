@@ -93,13 +93,19 @@ void P_ConversationParse(const byte *data, int len)
   count = len / CONV_NODE_SIZE;
   for (i = 0; i < count; i++)
   {
+    const byte *rec = data + (size_t)i * CONV_NODE_SIZE;
+    /* A speaker id of zero is not a real conversation actor; editors such as
+     * Doom Builder routinely emit an all-zero DIALOGUE lump for UDMF maps that
+     * have no dialogue, so skip those records rather than table them. */
+    if (conv_rd32(rec) == 0)
+      continue;
     if (conv_count >= conv_cap)
     {
       int ncap = conv_cap ? conv_cap * 2 : 16;
       conv_nodes = realloc(conv_nodes, (size_t)ncap * sizeof(*conv_nodes));
       conv_cap = ncap;
     }
-    conv_parse_node(&conv_nodes[conv_count], data + (size_t)i * CONV_NODE_SIZE);
+    conv_parse_node(&conv_nodes[conv_count], rec);
     conv_count++;
   }
 }

@@ -43,6 +43,7 @@
 #include "hexen/p_spec_hexen.h"
 #include "hexen/po_man.h"
 #include "p_zacs.h"
+#include "p_conversation.h"
 #include "m_bbox.h"
 #include "m_argv.h"
 #include "g_game.h"
@@ -2677,6 +2678,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    P_InitThinkers();
    U_ZSecActClear();    /* forget the previous level's sector actions */
+   P_ConversationClear(); /* drop the previous level's Strife dialogue */
    R_ClearDecals();     /* drop the previous level's wall decals */
 
    if (hexen)
@@ -2921,6 +2923,30 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
       {
          Z_ACSRunOpenScripts();
          Z_ACSRunEnterScripts(players[consoleplayer].mo);
+      }
+   }
+
+   /* Strife conversation data: the global SCRIPT00 (valid on every map), then
+    * the map's own SCRIPTxy, then a UDMF in-map DIALOGUE lump.  Each is parsed
+    * in increasing-priority order so a later, more specific lump overrides the
+    * shared one for the same speaker.  Absent lumps (every non-Strife map)
+    * leave the table empty.  No game path reads the table yet, so this only
+    * populates data. */
+   {
+      int cl;
+      char scriptname[9];
+      cl = W_CheckNumForName("SCRIPT00");
+      if (cl >= 0)
+         P_ConversationParse(W_CacheLumpNum(cl), W_LumpLength(cl));
+      snprintf(scriptname, sizeof(scriptname), "SCRIPT%02d", map);
+      cl = W_CheckNumForName(scriptname);
+      if (cl >= 0)
+         P_ConversationParse(W_CacheLumpNum(cl), W_LumpLength(cl));
+      if (udmf_level)
+      {
+         cl = P_FindUDMFLump(lumpnum, "DIALOGUE");
+         if (cl >= 0)
+            P_ConversationParse(W_CacheLumpNum(cl), W_LumpLength(cl));
       }
    }
 

@@ -134,11 +134,24 @@ int P_ConversationCount(void)
 const conv_node_t *P_ConversationForSpeaker(int speaker)
 {
   int i;
-  /* later definitions override earlier ones, so search from the end */
-  for (i = conv_count - 1; i >= 0; i--)
+  /* The entry node for a speaker is its first node in parse order.  Links
+   * index the parsed array as a whole (see P_ConversationNode), so the array
+   * order must be preserved; when both SCRIPT00 and a map lump define the same
+   * speaker the earlier-parsed entry wins, which matches the usual case of a
+   * single active conversation lump. */
+  for (i = 0; i < conv_count; i++)
     if (conv_nodes[i].speaker == speaker)
       return &conv_nodes[i];
   return NULL;
+}
+
+const conv_node_t *P_ConversationNode(int link)
+{
+  /* A link is the 1-based position of the target node in the parsed array
+   * (the Nth conversation node defined); 0 means "no node" / end. */
+  if (link <= 0 || link > conv_count)
+    return NULL;
+  return &conv_nodes[link - 1];
 }
 
 /* ------------------------------------------------------------------------- *
@@ -157,7 +170,6 @@ extern patchnum_t hu_font[HU_FONTSIZE];
 static int                conv_active;
 static const conv_node_t *conv_cur;       /* current page                 */
 static struct mobj_s     *conv_talker;    /* the other party (the user)   */
-static int                conv_speaker;    /* speaker type id              */
 static int                conv_sel;        /* highlighted choice index     */
 static int                conv_oldbtn;     /* previous tic's buttons       */
 
@@ -181,7 +193,6 @@ int P_ConversationStart(int speaker, struct mobj_s *talker)
   conv_active  = 1;
   conv_cur     = n;
   conv_talker  = talker;
-  conv_speaker = speaker;
   conv_sel     = 0;
   conv_oldbtn  = (talker && talker->player) ? talker->player->cmd.buttons : 0;
   return 1;
@@ -208,15 +219,15 @@ static void conv_follow(int link)
     P_ConversationEnd();
     return;
   }
-  /* A link selects another of the speaker's nodes.  Until multi-node-per-
-   * speaker chains are tracked the table keeps one node per speaker, so any
-   * non-zero link re-resolves to the speaker's current node (the page is
-   * redrawn rather than dead-ending).  Wiring real multi-node chains is a
-   * later step. */
-  n = P_ConversationForSpeaker(conv_speaker);
+  /* a link is the 1-based index of the target node in the parsed array */
+  n = P_ConversationNode(link);
   if (n)
+  {
     conv_cur = n;
-  conv_sel = 0;
+    conv_sel = 0;
+  }
+  else
+    P_ConversationEnd();                  /* dangling link: end gracefully */
 }
 
 void P_ConversationTicker(void)

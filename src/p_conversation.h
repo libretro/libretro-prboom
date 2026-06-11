@@ -67,6 +67,10 @@ int P_ConversationCount(void);
  * rules; here the most recently parsed node for a speaker is returned. */
 const conv_node_t *P_ConversationForSpeaker(int speaker);
 
+/* The conversation node at a 1-based link index in the parsed array, or NULL
+ * if the index is out of range.  Choice and node links use this numbering. */
+const conv_node_t *P_ConversationNode(int link);
+
 /* ------------------------------------------------------------------------- *
  * On-screen conversation runtime.
  *

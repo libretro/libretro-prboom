@@ -1963,6 +1963,44 @@ static void zacs_dispatch_lspec(zacs_inst_t *inst, int special,
                                 int *a, int *result)
 {
   int r = 0;
+  /* Thing_ChangeTID(oldtid, newtid): reassign the TID of every thing that
+   * currently has oldtid (0 = the activator) to newtid.  This ZDoom special
+   * is not part of the base line-special set, but interactive content relies
+   * on it to give an otherwise untagged actor a TID so later TID-addressed
+   * queries (GetUserArray and the like) can find it. */
+  if (special == 176)
+  {
+    int oldtid = a[0], newtid = a[1];
+    if (oldtid == 0)
+    {
+      if (inst->activator)
+      {
+        if (inst->activator->tid)
+          P_RemoveMobjFromTIDList(inst->activator);
+        if (newtid)
+          P_InsertMobjIntoTIDList(inst->activator, (short)newtid);
+        else
+          inst->activator->tid = 0;
+      }
+    }
+    else
+    {
+      int sp = -1;
+      mobj_t *mo;
+      while ((mo = P_FindMobjFromTID((short)oldtid, &sp)) != NULL)
+      {
+        P_RemoveMobjFromTIDList(mo);
+        if (newtid)
+          P_InsertMobjIntoTIDList(mo, (short)newtid);
+        else
+          mo->tid = 0;
+        sp = -1;                      /* list mutated; restart the walk */
+      }
+    }
+    if (result)
+      *result = 0;
+    return;
+  }
   if (map_format.execute_line_special)
     r = map_format.execute_line_special(special, a, inst->line, inst->side,
                                         inst->activator);

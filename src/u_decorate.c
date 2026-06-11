@@ -265,27 +265,24 @@ static int decorate_intern_acsname(const char *name)
 }
 
 /* Runtime action for a DECORATE frame carrying ACS_NamedExecuteAlways("x"):
- * start the named script.  misc1 indexes the interned name table.
+ * start the named script with this actor as the activator.  misc1 indexes the
+ * interned name table.
  *
- * A use-activatable story actor (Activation THINGSPEC_ThingTargets) runs its
- * Active-state special on behalf of the player who used it: the activator is
- * that player, not the actor.  The use handler records the using player as the
- * actor's target, so when the actor itself is not a player but has a player
- * target, run the script as that player.  This is what lets PlayerNumber() and
- * the script's per-player state resolve correctly from a state action. */
+ * A use-activated story actor runs its script as itself (the activator is the
+ * actor, not the player): the script's own body switches the activator to the
+ * actor's target with SetActivatorToTarget and reads its per-actor state by
+ * TID, so it must see the actor first.  The use handler still records the
+ * using player as the actor's target, which is what that in-script switch
+ * resolves to. */
 void A_DecorateACSNamed(mobj_t *mo)
 {
   int idx;
-  mobj_t *activator;
   if (!mo || !mo->state)
     return;
   idx = (int)mo->state->misc1;
   if (idx < 0 || idx >= num_interned_acsnames)
     return;
-  activator = mo;
-  if (!mo->player && mo->target && mo->target->player)
-    activator = mo->target;
-  Z_ACSStartNamedStr(interned_acsnames[idx], NULL, 0, activator, true);
+  Z_ACSStartNamedStr(interned_acsnames[idx], NULL, 0, mo, true);
 }
 
 /* Evaluate one DECORATE operand against a mobj. */

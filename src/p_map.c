@@ -2542,6 +2542,31 @@ dbool PTR_NoWayTraverse(intercept_t* in)
  * does not also trigger a line behind it. */
 static mobj_t *use_thing_hit;
 
+/* Native conversation dispatch seam.
+ *
+ * A used thing can lead to one of two things: an in-script reaction (the
+ * thing's DECORATE Active state, which is how ACS-driven dialogue such as a
+ * visual-novel actor starts), or a native conversation owned by the engine
+ * (the Strife-style dialogue a future track will load from a DIALOGUE lump).
+ * The two are distinct subsystems, so the use handler asks here whether the
+ * thing has a native conversation before falling back to the Active state.
+ *
+ * No content registers a native conversation yet, so this always reports
+ * "none" and every used thing takes the unchanged Active-state path.  The
+ * conversation track will populate the lookup and flesh out the handler; until
+ * then both functions are inert by construction. */
+static int P_ThingConversation(mobj_t *th)
+{
+  (void)th;
+  return -1;                              /* no native conversation (none registered) */
+}
+
+static dbool P_StartConversation(mobj_t *th, mobj_t *talker, int conv)
+{
+  (void)th; (void)talker; (void)conv;
+  return FALSE;                           /* no native conversation engine yet */
+}
+
 static dbool PTR_UseThingTraverse(intercept_t *in)
 {
   mobj_t *th;
@@ -2580,7 +2605,13 @@ void P_UseLines (player_t*  player)
   P_PathTraverse(x1, y1, x2, y2, PT_ADDTHINGS, PTR_UseThingTraverse);
   if (use_thing_hit)
   {
-    int as = U_DecorateActiveState(use_thing_hit->type);
+    int conv = P_ThingConversation(use_thing_hit);
+    int as;
+    /* prefer a native conversation if the thing has one; otherwise the
+     * DECORATE Active state (ACS-driven dialogue and other reactions) */
+    if (conv >= 0 && P_StartConversation(use_thing_hit, usething, conv))
+      return;
+    as = U_DecorateActiveState(use_thing_hit->type);
     if (as >= 0)
       P_SetMobjState(use_thing_hit, (statenum_t)as);
     return;

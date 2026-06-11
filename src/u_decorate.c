@@ -905,6 +905,55 @@ static void decorate_include_name(char out[9], const char *path, size_t plen)
   out[n] = '\0';
 }
 
+/* Does this lump's content look like DECORATE (a top-level "actor" keyword)?
+ * A PK3 flattens "decorate/vn/aosoth.txt" and "vns/aosoth.vns" to the same
+ * 8-char lump name AOSOTH, so an #include must pick the one that is actually
+ * DECORATE rather than whatever same-named lump the name table returns first. */
+static int lump_is_decorate(int lump)
+{
+  size_t len, i;
+  const char *txt;
+  int   result = 0;
+  if (lump < 0)
+    return 0;
+  len = W_LumpLength(lump);
+  txt = W_CacheLumpNum(lump);
+  if (!txt)
+    return 0;
+  for (i = 0; i + 5 < len && i < 4096; i++)
+  {
+    char c = txt[i];
+    if (c == ' ' || c == '\t' || c == '\r' || c == '\n')
+      continue;
+    if (c == '/' )                  /* skip a // or / * comment line/block */
+    {
+      while (i < len && txt[i] != '\n') i++;
+      continue;
+    }
+    if ((c == 'a' || c == 'A') && !strncasecmp(txt + i, "actor", 5) &&
+        (txt[i + 5] == ' ' || txt[i + 5] == '\t'))
+      result = 1;
+    break;                          /* first real token decides */
+  }
+  W_UnlockLumpNum(lump);
+  return result;
+}
+
+/* Resolve an #include lump name to the DECORATE lump that bears it, choosing
+ * by content among same-named lumps (the name table alone is ambiguous in a
+ * PK3).  Falls back to the first match if none looks like DECORATE. */
+static int decorate_resolve_include(const char *nm)
+{
+  int first = (W_CheckNumForName)(nm, ns_global);
+  int l;
+  if (first < 0)
+    return -1;
+  for (l = first; l >= 0; l = (W_FindNumFromName)(nm, ns_global, l))
+    if (lump_is_decorate(l))
+      return l;
+  return first;
+}
+
 #define DECORATE_MAX_LUMPS 128
 static int parsed_lumps[DECORATE_MAX_LUMPS];
 static int num_parsed_lumps;
@@ -960,7 +1009,7 @@ static void parse_decorate_lump(int lump, int incdepth)
           char nm[9];
           int  inc;
           decorate_include_name(nm, txt + s, e - s);
-          inc = (W_CheckNumForName)(nm, ns_global);
+          inc = decorate_resolve_include(nm);
           if (inc >= 0 && ninc < DECORATE_MAX_LUMPS)
             incs[ninc++] = inc;
           j = e;

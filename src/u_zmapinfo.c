@@ -49,19 +49,20 @@ static zlang_entry_t *zlang;
 static int            zlang_count;
 static int            zlang_parsed;
 
-static void Z_ParseLanguage(void)
+/* Parse one LANGUAGE lump's "KEY = "value" ... ;" entries into the table.
+ * A key is either a bareword identifier (VNS_NUM_SCRIPTS, GOTCHAINSAW) or a
+ * quoted string ("knight/default" -> "st_hkn01" portrait aliases that the
+ * VN runtime resolves the same way through PrintLocalized).  Adjacent string
+ * constants are concatenated, matching ZDoom. */
+static void Z_ParseLanguageLump(int lump)
 {
-  int          lump;
-  u_scanner_t  s;
-
-  zlang_parsed = 1;
-  lump = (W_CheckNumForName)("LANGUAGE", ns_global);
-  if (lump < 0)
-    return;
+  u_scanner_t s;
 
   s = U_ScanOpen(W_CacheLumpNum(lump), W_LumpLength(lump), "LANGUAGE");
   while (U_HasTokensLeft(&s))
   {
+    char *key = NULL;
+
     /* "[enu default]" section headers: skip the bracketed tokens */
     if (U_CheckToken(&s, '['))
     {
@@ -69,38 +70,51 @@ static void Z_ParseLanguage(void)
         U_GetNextToken(&s, TRUE);
       continue;
     }
-    if (s.token == TK_Identifier)
+
+    if (s.token == TK_Identifier || s.token == TK_StringConst)
+      key = strdup(s.string);
+
+    if (key && U_CheckToken(&s, '='))
     {
-      char *key = strdup(s.string);
-      if (U_CheckToken(&s, '='))
+      /* concatenate adjacent string constants up to ';' */
+      char  *val = NULL;
+      size_t len = 0;
+      while (U_GetNextToken(&s, TRUE) && s.token == TK_StringConst)
       {
-        /* concatenate adjacent string constants up to ';' */
-        char  *val = NULL;
-        size_t len = 0;
-        while (U_GetNextToken(&s, TRUE) && s.token == TK_StringConst)
-        {
-          size_t add = strlen(s.string);
-          val = realloc(val, len + add + 1);
-          memcpy(val + len, s.string, add + 1);
-          len += add;
-        }
-        if (val)
-        {
-          zlang = realloc(zlang, (zlang_count + 1) * sizeof(*zlang));
-          zlang[zlang_count].key = key;
-          zlang[zlang_count].value = val;
-          zlang_count++;
-        }
-        else
-          free(key);
-        continue;        /* current token is the non-string (';' etc.) */
+        size_t add = strlen(s.string);
+        val = realloc(val, len + add + 1);
+        memcpy(val + len, s.string, add + 1);
+        len += add;
       }
-      free(key);
+      if (val)
+      {
+        zlang = realloc(zlang, (zlang_count + 1) * sizeof(*zlang));
+        zlang[zlang_count].key = key;
+        zlang[zlang_count].value = val;
+        zlang_count++;
+      }
+      else
+        free(key);
+      continue;        /* current token is the non-string (';' etc.) */
     }
+    free(key);
     U_GetNextToken(&s, TRUE);
   }
   U_ScanClose(&s);
   W_UnlockLumpNum(lump);
+}
+
+/* A pk3 names every root-level "language.*" member LANGUAGE (basename up to
+ * the first '.'), so a mod's per-topic tables (language.vns_aosoth, ...)
+ * arrive as several lumps that all share that name.  Walk every one; later
+ * lumps win on duplicate keys, which is the load order ZDoom uses too. */
+static void Z_ParseLanguage(void)
+{
+  int lump;
+
+  zlang_parsed = 1;
+  for (lump = -1; (lump = W_ListNumFromName("LANGUAGE", lump)) >= 0; )
+    Z_ParseLanguageLump(lump);
 }
 
 /* Route the LANGUAGE table onto the engine's BEX string slots: pickup
@@ -173,7 +187,8 @@ const char *U_ZLanguageLookup(const char *key)
   int i;
   if (!zlang_parsed)
     Z_ParseLanguage();
-  for (i = 0; i < zlang_count; i++)
+  /* scan newest-first so a later lump's redefinition wins, as in ZDoom */
+  for (i = zlang_count - 1; i >= 0; i--)
     if (!strcasecmp(zlang[i].key, key))
       return zlang[i].value;
   return NULL;

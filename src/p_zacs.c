@@ -42,6 +42,7 @@
 #include "s_sound.h"
 #include "sounds.h"
 #include "w_wad.h"
+#include "u_zmapinfo.h"
 #include "z_zone.h"
 #include "hexen/p_spec_hexen.h"
 #include "hu_lib.h"
@@ -99,6 +100,18 @@ static zacs_func_t   *zacs_funcs;
 static int            zacs_numfuncs;
 static char         **zacs_strings;
 static int            zacs_numstrings;
+/* Dynamic strings created at run time by PCD_SAVESTRING and the string-
+ * building ACSF helpers live in one global table, independent of the active
+ * module's static STRL space.  GDCC-compiled libraries build a string in one
+ * module and consume it inside a cross-module call (e.g. a mod saves a key in
+ * its own module, then PrintLocalized reads it while libc is the active
+ * module); a per-module string table would lose the handle across that
+ * boundary.  Returned indices carry ZACS_DYNSTR_TAG so zacs_string can tell a
+ * dynamic handle from a module-local STRL index. */
+#define ZACS_DYNSTR_TAG 0x40000000
+static char         **zacs_dynstrings;
+static int            zacs_numdynstrings;
+static int            zacs_dynstrings_cap;
 static char         **zacs_snames;       /* named-script names */
 static int            zacs_numsnames;
 static char         **zacs_fnames;       /* FNAM: function names (for linking) */
@@ -434,6 +447,13 @@ static void zacs_load_strings(int co, int cl, dbool encrypted)
 
 static const char *zacs_string(int i)
 {
+  if (i & ZACS_DYNSTR_TAG)           /* run-time dynamic string (global) */
+  {
+    int d = i & ~ZACS_DYNSTR_TAG;
+    if (d < 0 || d >= zacs_numdynstrings || !zacs_dynstrings[d])
+      return "";
+    return zacs_dynstrings[d];
+  }
   i &= 0xFFFF;                      /* strip library tag bits */
   if (i < 0 || i >= zacs_numstrings || !zacs_strings[i])
     return "";
@@ -680,6 +700,9 @@ static dbool zacs_load_one(int lump)
   zacs_numfuncs = 0;
   zacs_strings = NULL;
   zacs_numstrings = 0;
+  zacs_dynstrings = NULL;
+  zacs_numdynstrings = 0;
+  zacs_dynstrings_cap = 0;
   zacs_snames = NULL;
   zacs_numsnames = 0;
   zacs_fnames = NULL;
@@ -1438,27 +1461,25 @@ static void zacs_clear_inventory(mobj_t *mo)
 
 /* ---- dynamic string append (PCD_SAVESTRING) ----------------------------- */
 
-static int zacs_strings_cap;
-
 static int zacs_save_string(const char *s)
 {
-  int n = strlen(s);
+  int   n = strlen(s);
   char *copy = Z_Malloc(n + 1, PU_LEVEL, 0);
   memcpy(copy, s, n + 1);
-  if (zacs_numstrings >= zacs_strings_cap)
+  if (zacs_numdynstrings >= zacs_dynstrings_cap)
   {
-    int nc = zacs_strings_cap ? zacs_strings_cap * 2 : 64;
+    int nc = zacs_dynstrings_cap ? zacs_dynstrings_cap * 2 : 64;
     char **ns;
-    if (nc < zacs_numstrings + 1)
-      nc = zacs_numstrings + 64;
+    if (nc < zacs_numdynstrings + 1)
+      nc = zacs_numdynstrings + 64;
     ns = Z_Calloc(nc, sizeof(char *), PU_LEVEL, 0);
-    if (zacs_strings)
-      memcpy(ns, zacs_strings, zacs_numstrings * sizeof(char *));
-    zacs_strings = ns;
-    zacs_strings_cap = nc;
+    if (zacs_dynstrings)
+      memcpy(ns, zacs_dynstrings, zacs_numdynstrings * sizeof(char *));
+    zacs_dynstrings = ns;
+    zacs_dynstrings_cap = nc;
   }
-  zacs_strings[zacs_numstrings] = copy;
-  return zacs_numstrings++;
+  zacs_dynstrings[zacs_numdynstrings] = copy;
+  return ZACS_DYNSTR_TAG | zacs_numdynstrings++;
 }
 
 /* ---- print buffer -------------------------------------------------------- */
@@ -2434,8 +2455,19 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       inst->optstart = -1;
       break;
     case PCD_PRINTSTRING:
-    case PCD_PRINTLOCALIZED:
       zacs_print_str(inst, zacs_string(ZPOP()));
+      break;
+    case PCD_PRINTLOCALIZED:
+      /* ACS PrintLocalized: the argument is a LANGUAGE key, not literal text.
+       * Resolve it through the LANGUAGE table; on a miss print the key name,
+       * matching ZDoom's behaviour for an unknown key.  GDCC-compiled content
+       * reads runtime-built string tables this way, so without the lookup the
+       * tables come back empty. */
+      {
+        const char *raw = zacs_string(ZPOP());
+        const char *loc = raw ? U_ZLanguageLookup(raw) : NULL;
+        zacs_print_str(inst, loc ? loc : raw);
+      }
       break;
     case PCD_PRINTBIND:
       zacs_print_str(inst, zacs_string(ZPOP()));
@@ -2585,7 +2617,13 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       break;
     }
     case PCD_SAVESTRING:
+      /* GDCC's print model expects the working buffer to be empty after a
+       * string is captured; it emits SaveString and then continues printing
+       * without a fresh BeginPrint.  Reset here so consecutive saves don't
+       * accumulate. */
       ZPUSH(zacs_save_string(inst->printbuf));
+      inst->printlen = 0;
+      inst->printbuf[0] = 0;
       break;
     case PCD_STRLEN:
       ZSETSTK(1, (int)strlen(zacs_string(ZSTK(1))));

@@ -73,6 +73,7 @@ typedef struct
   int   address;         /* byte offset into behavior data */
   int   flags;           /* SFLG */
   int   varcount;        /* SVCT (locals incl. args); default ZACS_LOCALS */
+  int   module;          /* which module's data the address indexes (0 = map) */
 } zacs_script_t;
 
 typedef struct
@@ -128,6 +129,8 @@ typedef struct
   char        **strings;     int numstrings;
   char        **fnames;      int numfnames;
   zacs_array_t *maparrays;   int nummaparrays;
+  zacs_script_t *scripts;    int numscripts;   /* this module's SPTR table */
+  char        **snames;      int numsnames;    /* this module's SNAM names */
   int           mapvars[ZACS_MAP_VARS];
 } zacs_module_t;
 
@@ -202,6 +205,7 @@ typedef struct zacs_inst_s
   thinker_t  thinker;
   int        script;       /* script number */
   int        info;         /* index into zacs_scripts */
+  int        module;       /* module whose data ip indexes (0 = map) */
   int        ip;           /* byte offset */
   int        state;
   int        statedata;
@@ -690,6 +694,8 @@ static void zacs_snapshot_module(int idx)
   int i;
   for (i = 0; i < zacs_numfuncs; i++)
     zacs_funcs[i].module = idx;
+  for (i = 0; i < zacs_numscripts; i++)
+    zacs_scripts[i].module = idx;
   m->data          = zacs_data;
   m->len           = zacs_len;
   m->fmt           = zacs_fmt;
@@ -701,6 +707,10 @@ static void zacs_snapshot_module(int idx)
   m->numfnames     = zacs_numfnames;
   m->maparrays     = zacs_maparrays;
   m->nummaparrays  = zacs_nummaparrays;
+  m->scripts       = zacs_scripts;
+  m->numscripts    = zacs_numscripts;
+  m->snames        = zacs_snames;
+  m->numsnames     = zacs_numsnames;
   /* m->mapvars was written in place via the zacs_mapvars pointer */
 }
 
@@ -955,6 +965,28 @@ dbool Z_ACSLoadBehavior(int lump)
   zacs_activate(0);
   if (zacs_nummodules > 1)
     zacs_link_imports();
+
+  /* ---- aggregate every module's scripts into one registry --------------
+   * The per-module SPTR tables were snapshot into zacs_modules[].scripts
+   * (each entry tagged with its module).  Map script bodies still live in
+   * module 0, but a library can carry OPEN/ENTER scripts (a script
+   * library's initialiser) that must run at level start; with a single
+   * map-only script table they never did.  Build a combined index space
+   * over all modules and point zacs_scripts/zacs_numscripts at it so the
+   * open/enter pass and zacs_running[] cover library scripts too. */
+  if (zacs_nummodules > 1)
+  {
+    int total = 0, mi, j, w = 0;
+    zacs_script_t *agg;
+    for (mi = 0; mi < zacs_nummodules; mi++)
+      total += zacs_modules[mi].numscripts;
+    agg = Z_Calloc(total > 0 ? total : 1, sizeof(*agg), PU_LEVEL, 0);
+    for (mi = 0; mi < zacs_nummodules; mi++)
+      for (j = 0; j < zacs_modules[mi].numscripts; j++)
+        agg[w++] = zacs_modules[mi].scripts[j];
+    zacs_scripts    = agg;
+    zacs_numscripts = total;
+  }
 
   zacs_running = Z_Calloc(zacs_numscripts, 1, PU_LEVEL, 0);
   lprintf(LO_INFO, "Z_ACSLoadBehavior: %d scripts, %d strings, "
@@ -1352,6 +1384,7 @@ static zacs_inst_t *zacs_spawn(int info, const int *args, int argc,
 
   inst->script = zacs_scripts[info].number;
   inst->info = info;
+  inst->module = zacs_scripts[info].module;
   inst->ip = zacs_scripts[info].address;
   inst->state = ZSTATE_RUNNING;
   inst->side = side;
@@ -1584,11 +1617,13 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       break;
   }
 
-  /* Map script bodies always execute in module 0; cross-module calls restore
-   * the caller's module before any yield, so the active module is module 0 at
-   * every instance boundary.  Pin it defensively in case of an early-out. */
-  if (zacs_active != 0 && zacs_nummodules > 1)
-    zacs_activate(0);
+  /* A script body executes against its own module's data.  Map scripts are
+   * module 0; a library OPEN/ENTER script runs against the module that
+   * defined it.  Cross-module calls restore the caller's module before any
+   * yield, so the active module equals inst->module at every instance
+   * boundary -- activate it here. */
+  if (zacs_nummodules > 1 && zacs_active != inst->module)
+    zacs_activate(inst->module);
 
   ip = inst->ip;
   locals = inst->fp ? inst->frames[inst->fp - 1].locals : inst->locals;

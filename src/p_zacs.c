@@ -137,6 +137,15 @@ static int           zacs_active;        /* index of the active module */
 static char         *zacs_load_list[ZACS_MAX_MODULES]; /* lib names from LOAD */
 static int           zacs_load_count;
 
+/* Global ACS libraries named by a root LOADACS lump (ZDoom).  Unlike a
+ * map BEHAVIOR's LOAD chunk -- which lists imports for that one map --
+ * LOADACS registers libraries that every map's scripts can call.  Parsed
+ * once at startup; merged into each map's module set in Z_ACSLoadBehavior
+ * so their exported functions are linkable and their OPEN scripts run. */
+#define ZACS_MAX_GLOBAL_LIBS 16
+static char  zacs_global_libs[ZACS_MAX_GLOBAL_LIBS][9];
+static int   zacs_num_global_libs;
+
 /* world / global state persists across maps within a session */
 static int          zacs_worldvars[ZACS_WORLD_VARS];
 static int          zacs_globalvars[ZACS_GLOBAL_VARS];
@@ -759,39 +768,119 @@ static int zacs_find_acs_object_lump(const char *name)
 /* Resolve module-0 function imports (address 0) against library exports. */
 static void zacs_link_imports(void)
 {
-  zacs_module_t *m0 = &zacs_modules[0];
-  int i, mi, j, linked = 0;
-  for (i = 0; i < m0->numfuncs; i++)
+  int src, i, mi, j, linked = 0, total_imports = 0;
+
+  /* Resolve unresolved function imports (address 0) in every module against
+   * the exports of every other module.  Module 0 is the map; modules 1.. are
+   * libraries (map LOAD imports and global LOADACS libs).  Linking every
+   * module -- not just the map -- lets libraries call into one another, which
+   * global libraries commonly do (e.g. a script pack calling a libc helper). */
+  for (src = 0; src < zacs_nummodules; src++)
   {
-    if (m0->funcs[i].address != 0)
-      continue;
-    if (i >= m0->numfnames || !m0->fnames[i] || !m0->fnames[i][0])
-      continue;
-    for (mi = 1; mi < zacs_nummodules; mi++)
+    zacs_module_t *ms = &zacs_modules[src];
+    for (i = 0; i < ms->numfuncs; i++)
     {
-      zacs_module_t *ml = &zacs_modules[mi];
-      for (j = 0; j < ml->numfuncs; j++)
+      if (ms->funcs[i].address != 0)
+        continue;
+      if (i >= ms->numfnames || !ms->fnames[i] || !ms->fnames[i][0])
+        continue;
+      total_imports++;
+      for (mi = 0; mi < zacs_nummodules; mi++)
       {
-        if (ml->funcs[j].address == 0)
+        zacs_module_t *ml;
+        if (mi == src)
           continue;
-        if (j >= ml->numfnames || !ml->fnames[j])
-          continue;
-        if (zacs_name_eq(m0->fnames[i], ml->fnames[j]))
+        ml = &zacs_modules[mi];
+        for (j = 0; j < ml->numfuncs; j++)
         {
-          m0->funcs[i].address   = ml->funcs[j].address;
-          m0->funcs[i].argc      = ml->funcs[j].argc;
-          m0->funcs[i].locals    = ml->funcs[j].locals;
-          m0->funcs[i].hasreturn = ml->funcs[j].hasreturn;
-          m0->funcs[i].module    = mi;
-          linked++;
-          mi = zacs_nummodules;      /* break outer */
-          break;
+          if (ml->funcs[j].address == 0)
+            continue;
+          if (j >= ml->numfnames || !ml->fnames[j])
+            continue;
+          if (zacs_name_eq(ms->fnames[i], ml->fnames[j]))
+          {
+            ms->funcs[i].address   = ml->funcs[j].address;
+            ms->funcs[i].argc      = ml->funcs[j].argc;
+            ms->funcs[i].locals    = ml->funcs[j].locals;
+            ms->funcs[i].hasreturn = ml->funcs[j].hasreturn;
+            ms->funcs[i].module    = mi;
+            linked++;
+            mi = zacs_nummodules;      /* break outer */
+            break;
+          }
         }
       }
     }
   }
   lprintf(LO_INFO, "ZACS: linked %d/%d library function import(s) across "
-          "%d module(s)\n", linked, m0->numfuncs, zacs_nummodules - 1);
+          "%d module(s)\n", linked, total_imports, zacs_nummodules - 1);
+}
+
+/* Parse a root LOADACS lump into the global-library name list.  Lines are
+ * one library name each; '//' and ';' begin comments and blank lines are
+ * skipped.  Called once at startup (after the wads are open).  Idempotent:
+ * re-parsing replaces the list. */
+void Z_ACSLoadGlobalLibraries(void)
+{
+  int lump, len, i;
+  const char *buf;
+
+  zacs_num_global_libs = 0;
+
+  lump = (W_CheckNumForName)("LOADACS", ns_global);
+  if (lump < 0)
+    return;
+  len = W_LumpLength(lump);
+  buf = (const char *)W_CacheLumpNum(lump);
+  if (!buf || len <= 0)
+    return;
+
+  i = 0;
+  while (i < len && zacs_num_global_libs < ZACS_MAX_GLOBAL_LIBS)
+  {
+    int n = 0;
+    char name[9];
+
+    /* skip whitespace and line breaks */
+    while (i < len && (buf[i] == ' ' || buf[i] == '\t' ||
+                       buf[i] == '\r' || buf[i] == '\n'))
+      i++;
+    if (i >= len)
+      break;
+
+    /* comment line: ';' or '//' to end of line */
+    if (buf[i] == ';' ||
+        (buf[i] == '/' && i + 1 < len && buf[i + 1] == '/'))
+    {
+      while (i < len && buf[i] != '\n')
+        i++;
+      continue;
+    }
+
+    /* a bare library name token */
+    while (i < len && (unsigned char)buf[i] > ' ' && n < 8)
+    {
+      char c = buf[i++];
+      name[n++] = (c >= 'a' && c <= 'z') ? (char)(c - 32) : c;
+    }
+    name[n] = 0;
+    /* drop any trailing token characters past 8 */
+    while (i < len && (unsigned char)buf[i] > ' ')
+      i++;
+
+    if (n > 0)
+    {
+      memcpy(zacs_global_libs[zacs_num_global_libs], name, 9);
+      zacs_num_global_libs++;
+    }
+  }
+
+  W_UnlockLumpNum(lump);
+
+  if (zacs_num_global_libs)
+    lprintf(LO_INFO, "Z_ACSLoadGlobalLibraries: %d global ACS librar%s\n",
+            zacs_num_global_libs,
+            zacs_num_global_libs == 1 ? "y" : "ies");
 }
 
 dbool Z_ACSLoadBehavior(int lump)
@@ -823,6 +912,30 @@ dbool Z_ACSLoadBehavior(int lump)
     else
       lprintf(LO_WARN, "ZACS: LOAD library '%s' not found\n",
               zacs_load_list[i]);
+  }
+
+  /* ---- global LOADACS libraries ----------------------------------------
+   * Libraries named by a root LOADACS lump are loaded for every map, on top
+   * of whatever the map's own LOAD chunk imported.  Append any not already
+   * present (a map may also LOAD a global lib explicitly). */
+  for (i = 0; i < zacs_num_global_libs && nlibs < ZACS_MAX_MODULES; i++)
+  {
+    int libl = zacs_find_acs_object_lump(zacs_global_libs[i]);
+    int j, dup = 0;
+    if (libl < 0)
+    {
+      lprintf(LO_WARN, "ZACS: LOADACS library '%s' not found\n",
+              zacs_global_libs[i]);
+      continue;
+    }
+    for (j = 0; j < nlibs; j++)
+      if (liblist[j] == libl)
+      {
+        dup = 1;
+        break;
+      }
+    if (!dup)
+      liblist[nlibs++] = libl;
   }
 
   /* ---- libraries -------------------------------------------------------- */

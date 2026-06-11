@@ -80,6 +80,7 @@
 #include "st_stuff.h"
 #include "am_map.h"
 #include "p_setup.h"
+#include "p_zacs.h"
 #include "r_draw.h"
 #include "r_main.h"
 #include "hexen/p_mapinfo.h"
@@ -1772,6 +1773,12 @@ bool D_DoomMainSetup(void)
    * table and define some of these editor numbers natively. */
   if (!hexen && !heretic)
     U_RegisterZDoomUtilityThings();
+
+  /* ZDoom LOADACS: register the global ACS libraries named by a root
+   * LOADACS lump so they are loaded for every map (alongside the map's own
+   * BEHAVIOR imports).  Parsed once here; loaded per-map in
+   * Z_ACSLoadBehavior. */
+  Z_ACSLoadGlobalLibraries();
 
   //jff 9/3/98 use logical output routine
   lprintf(LO_INFO,"R_Init: Init DOOM refresh daemon - ");

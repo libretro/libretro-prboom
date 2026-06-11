@@ -24,6 +24,11 @@
  * least one script was registered.  Frees the previous level's tables. */
 dbool Z_ACSLoadBehavior(int lump);
 
+/* Parse a root LOADACS lump into the global ACS-library list.  Call once at
+ * startup, after the wads are open; the libraries it names are then loaded
+ * for every map alongside that map's own BEHAVIOR imports. */
+void Z_ACSLoadGlobalLibraries(void);
+
 /* True when the current level has ZACS scripts loaded. */
 dbool Z_ACSActive(void);
 

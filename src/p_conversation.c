@@ -306,6 +306,51 @@ static void conv_text(int x, int y, int cm, const char *s)
   HUlib_drawTextLine(&l, false);
 }
 
+/* draw a string word-wrapped to at most `cols` characters per line, starting
+ * at (x,y) and stepping down `dy` per line; returns the y after the last line.
+ * Breaks on spaces; a single word longer than cols is hard-split. */
+static int conv_wrapped(int x, int y, int dy, int cm, const char *s, int cols)
+{
+  char line[64];
+  int len = 0, i;
+  int last_space = -1;            /* index in line[] of the last space */
+  if (cols > (int)sizeof(line) - 1)
+    cols = (int)sizeof(line) - 1;
+  for (i = 0; s[i]; i++)
+  {
+    if (len == cols)
+    {
+      int brk = (last_space >= 0) ? last_space : len;
+      char saved = line[brk];
+      line[brk] = 0;
+      conv_text(x, y, cm, line);
+      y += dy;
+      /* carry the remainder after the break point to the next line */
+      line[brk] = saved;
+      if (last_space >= 0)
+      {
+        int rem = len - (brk + 1), k;
+        for (k = 0; k < rem; k++)
+          line[k] = line[brk + 1 + k];
+        len = rem;
+      }
+      else
+        len = 0;
+      last_space = -1;
+    }
+    if (s[i] == ' ')
+      last_space = len;
+    line[len++] = s[i];
+  }
+  if (len > 0)
+  {
+    line[len] = 0;
+    conv_text(x, y, cm, line);
+    y += dy;
+  }
+  return y;
+}
+
 void P_ConversationDrawer(void)
 {
   const conv_node_t *n = conv_cur;
@@ -315,7 +360,8 @@ void P_ConversationDrawer(void)
     return;
   name = n->name[0] ? n->name : "Person";
   conv_text(8, 8, CR_GOLD, name);
-  conv_text(8, 24, CR_GRAY, n->dialogue);
+  /* the page text can be long; wrap it to the screen width */
+  conv_wrapped(8, 24, 10, CR_GRAY, n->dialogue, 38);
 
   noff = conv_offered(n, idx);
   y = 130;

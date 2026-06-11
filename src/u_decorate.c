@@ -43,6 +43,18 @@
 #define MAX_DECORATE_ACTORS 1024
 #define MAX_NAME 64
 
+/* A DECORATE expression operand: a constant, a user-variable slot, or the
+ * actor's "damage" property.  An expression is "A <op> B"; when op is
+ * EXOP_NONE only A is used. */
+enum { EXK_CONST = 0, EXK_UVAR, EXK_DAMAGE };
+enum { EXOP_NONE = 0, EXOP_ADD, EXOP_SUB, EXOP_LT, EXOP_LE, EXOP_GT,
+       EXOP_GE, EXOP_EQ, EXOP_NE };
+typedef struct {
+  short ka, va;        /* operand A kind / value (slot or constant) */
+  short op;            /* EXOP_* */
+  short kb, vb;        /* operand B kind / value */
+} dexpr_t;
+
 typedef struct
 {
   char name[MAX_NAME];
@@ -64,11 +76,18 @@ typedef struct
    * and wired onto the registered state. */
 #define MAX_SPAWN_FRAMES 32
   struct { short frame; short tics; short act; short snd; } seq[MAX_SPAWN_FRAMES];
+  /* Parallel to seq[]: operands for the user-variable / flag actions.  uvslot
+   * is the target scalar/array base slot (or flag id for DA_CHANGEFLAG); idx
+   * holds an array index expression operand; val holds the value expression;
+   * for DA_CHANGEFLAG, fval is the boolean. */
+  struct { short uvslot; short flag; short fval; dexpr_t idx; dexpr_t val; }
+        seqop[MAX_SPAWN_FRAMES];
   char seq_sprite[5];           /* sprite the sequence uses (one sprite)  */
   int  seq_len;                 /* number of frames captured              */
   int  seq_loops;              /* 1 = loop back to frame 0, 0 = stop      */
   int  translucent;             /* RenderStyle Translucent / Add          */
   int  alpha;                   /* 16.16 alpha, FRACUNIT if unset         */
+  int  damage;                  /* DECORATE Damage property (default 0)    */
 
   /* DECORATE weapon (": <Base>" / "replaces <Base>" rooted in a known
    * weapon slot).  Each of the five engine weapon states is captured as a
@@ -162,7 +181,10 @@ enum {
   DA_ACTIVESOUND,      /* A_ActiveSound -> active sound via A_PlaySound */
   DA_NOBLOCKING,       /* A_NoBlocking / A_Fall -> clears MF_SOLID */
   DA_FACETARGET,       /* A_FaceTarget (harmless no-op without a target) */
-  DA_ACS_NAMED         /* ACS_NamedExecuteAlways("name") -> start named script */
+  DA_ACS_NAMED,        /* ACS_NamedExecuteAlways("name") -> start named script */
+  DA_SETUSERVAR,       /* A_SetUserVar(name, expr) -> set scalar user var */
+  DA_SETUSERARRAY,     /* A_SetUserArray(name, idxexpr, expr) -> set element */
+  DA_CHANGEFLAG        /* A_ChangeFlag("FLAG", bool) -> set/clear a flag */
 };
 
 /* Sound names captured for DA_PLAYSOUND frames, resolved to sfx slots at
@@ -214,6 +236,97 @@ void A_DecorateACSNamed(mobj_t *mo)
   if (idx < 0 || idx >= num_interned_acsnames)
     return;
   Z_ACSStartNamedStr(interned_acsnames[idx], NULL, 0, mo, true);
+}
+
+/* Evaluate one DECORATE operand against a mobj. */
+static int decorate_eval_operand(mobj_t *mo, int kind, int val)
+{
+  switch (kind)
+  {
+    case EXK_UVAR:   return (mo->user_vars) ? mo->user_vars[val] : 0;
+    case EXK_DAMAGE: return mo->info ? mo->info->damage : 0;
+    default:         return val;            /* EXK_CONST */
+  }
+}
+
+/* Evaluate a (kindA,valA,op,kindB,valB) expression against a mobj. */
+static int decorate_eval_expr(mobj_t *mo, int ka, int va, int op,
+                              int kb, int vb)
+{
+  int A = decorate_eval_operand(mo, ka, va);
+  int B;
+  if (op == EXOP_NONE)
+    return A;
+  B = decorate_eval_operand(mo, kb, vb);
+  switch (op)
+  {
+    case EXOP_ADD: return A + B;
+    case EXOP_SUB: return A - B;
+    case EXOP_LT:  return A <  B;
+    case EXOP_LE:  return A <= B;
+    case EXOP_GT:  return A >  B;
+    case EXOP_GE:  return A >= B;
+    case EXOP_EQ:  return A == B;
+    case EXOP_NE:  return A != B;
+    default:       return A;
+  }
+}
+
+/* Ensure a mobj has user-var storage allocated for its type. */
+static int *decorate_uservars(mobj_t *mo)
+{
+  int total;
+  if (mo->user_vars)
+    return mo->user_vars;
+  total = U_DecorateUserVarCount(mo->type);
+  if (total <= 0)
+    return NULL;
+  mo->user_vars = Z_Malloc(total * sizeof(int), PU_LEVEL, NULL);
+  memset(mo->user_vars, 0, total * sizeof(int));
+  return mo->user_vars;
+}
+
+/* A_SetUserVar(name, expr): write the value expression to the scalar slot in
+ * misc1.  Operands are encoded in args[0..4]. */
+void A_DecorateSetUserVar(mobj_t *mo)
+{
+  state_t *st;
+  int *uv;
+  if (!mo || !mo->state)
+    return;
+  st = mo->state;
+  uv = decorate_uservars(mo);
+  if (!uv)
+    return;
+  uv[(int)st->misc1] = decorate_eval_expr(mo, (int)st->args[0],
+      (int)st->args[1], (int)st->args[2], (int)st->args[3], (int)st->args[4]);
+}
+
+/* A_SetUserArray(name, idxexpr, expr): write the value expression to element
+ * (index expression) of the array based at misc1.  The value expression is
+ * args[0..4]; the index expression is args[5..7]+misc2 (low byte = kindB,
+ * high byte = valB). */
+void A_DecorateSetUserArray(mobj_t *mo)
+{
+  state_t *st;
+  int *uv, base, idx, total, ikb, ivb;
+  if (!mo || !mo->state)
+    return;
+  st = mo->state;
+  uv = decorate_uservars(mo);
+  if (!uv)
+    return;
+  base = (int)st->misc1;
+  ikb  = (int)st->misc2 & 0xFF;
+  ivb  = ((int)st->misc2 >> 8) & 0xFF;
+  idx  = decorate_eval_expr(mo, (int)st->args[5], (int)st->args[6],
+                            (int)st->args[7], ikb, ivb);
+  total = U_DecorateUserVarCount(mo->type);
+  if (idx < 0) idx = 0;
+  if (base + idx >= total) idx = (total - 1) - base;
+  if (idx < 0) return;
+  uv[base + idx] = decorate_eval_expr(mo, (int)st->args[0], (int)st->args[1],
+      (int)st->args[2], (int)st->args[3], (int)st->args[4]);
 }
 
 /* Safe weapon-state (pspr) actions: the structural codepointers that make a
@@ -518,6 +631,141 @@ static const char *read_word(const char *p, const char *end,
   return p;
 }
 
+/* Resolve a user-var name declared on the actor being parsed to its base
+ * slot, or -1.  Used while parsing A_SetUserVar/A_SetUserArray operands. */
+static int decorate_uvar_slot(const decorate_actor_t *a, const char *name)
+{
+  int i;
+  for (i = 0; i < a->num_uvars; i++)
+    if (!strcasecmp(a->uvar[i].name, name))
+      return a->uvar[i].base;
+  return -1;
+}
+
+/* Parse a single token of a DECORATE expression into an operand kind/value:
+ * a "var int" name, the "damage" property, "true"/"false", or an integer. */
+static void parse_operand(const decorate_actor_t *a, const char *tok,
+                          short *kind, short *val)
+{
+  char t[40];
+  size_t n = 0;
+  int slot;
+  while (*tok == ' ' || *tok == '\t') tok++;
+  while (tok[n] && n < sizeof(t) - 1) { t[n] = tok[n]; n++; }
+  while (n > 0 && (t[n - 1] == ' ' || t[n - 1] == '\t')) n--;
+  t[n] = 0;
+  if (!strcasecmp(t, "true"))        { *kind = EXK_CONST; *val = 1; return; }
+  if (!strcasecmp(t, "false"))       { *kind = EXK_CONST; *val = 0; return; }
+  if (!strcasecmp(t, "damage"))      { *kind = EXK_DAMAGE; *val = 0; return; }
+  slot = decorate_uvar_slot(a, t);
+  if (slot >= 0)                     { *kind = EXK_UVAR; *val = (short)slot; return; }
+  *kind = EXK_CONST; *val = (short)atoi(t);
+}
+
+/* Parse a DECORATE expression "A", "A + B", "A < B", etc. into a dexpr_t.
+ * Only the small operator set the VN scripts use is recognised; an
+ * unrecognised form degrades to operand A alone. */
+static void parse_dexpr(const decorate_actor_t *a, const char *s, dexpr_t *e)
+{
+  char A[40], B[40];
+  short op = EXOP_NONE;
+  const char *opp = NULL, *q;
+  size_t n;
+  static const struct { const char *t; short op; } ops[] = {
+    { "<=", EXOP_LE }, { ">=", EXOP_GE }, { "==", EXOP_EQ },
+    { "!=", EXOP_NE }, { "+",  EXOP_ADD }, { "-",  EXOP_SUB },
+    { "<",  EXOP_LT }, { ">",  EXOP_GT }
+  };
+  int i;
+  memset(e, 0, sizeof(*e));
+  for (i = 0; i < (int)(sizeof(ops) / sizeof(ops[0])); i++)
+  {
+    const char *f = strstr(s, ops[i].t);
+    if (f) { opp = f; op = ops[i].op; break; }
+  }
+  if (opp)
+  {
+    int ol = (op == EXOP_ADD || op == EXOP_SUB ||
+              op == EXOP_LT  || op == EXOP_GT) ? 1 : 2;
+    n = (size_t)(opp - s); if (n >= sizeof(A)) n = sizeof(A) - 1;
+    memcpy(A, s, n); A[n] = 0;
+    q = opp + ol;
+    n = 0; while (q[n] && n < sizeof(B) - 1) n++;
+    memcpy(B, q, n); B[n] = 0;
+    parse_operand(a, A, &e->ka, &e->va);
+    parse_operand(a, B, &e->kb, &e->vb);
+    e->op = op;
+  }
+  else
+  {
+    parse_operand(a, s, &e->ka, &e->va);
+    e->op = EXOP_NONE;
+  }
+}
+
+/* Copy the parenthesised argument list of an action starting at `start`
+ * (which points at or before the '(') into out, dropping the outer parens
+ * and any internal whitespace runs collapsed to single spaces.  Returns the
+ * position just past the closing ')'. */
+static const char *read_paren_args(const char *start, const char *end,
+                                   char *out, size_t outsz)
+{
+  const char *p = start;
+  size_t n = 0;
+  int depth = 0;
+  while (p < end && *p != '(') p++;
+  if (p < end && *p == '(') { depth = 1; p++; }
+  while (p < end && depth > 0)
+  {
+    char c = *p++;
+    if (c == '(') depth++;
+    else if (c == ')') { depth--; if (depth == 0) break; }
+    if (c == '\r' || c == '\n' || c == '\t') c = ' ';
+    if (n + 1 < outsz) out[n++] = c;
+  }
+  out[n] = 0;
+  return p;
+}
+
+/* Split a top-level comma-separated argument string into up to maxf fields
+ * (quotes and nested parens are not split inside).  Returns the count. */
+static int split_args(const char *s, char fields[][48], int maxf)
+{
+  int nf = 0, depth = 0, inq = 0;
+  size_t k = 0;
+  const char *p = s;
+  if (maxf <= 0) return 0;
+  fields[0][0] = 0;
+  for (; *p; p++)
+  {
+    if (*p == '"') inq = !inq;
+    if (!inq && *p == '(') depth++;
+    else if (!inq && *p == ')') { if (depth) depth--; }
+    if (!inq && depth == 0 && *p == ',')
+    {
+      fields[nf][k] = 0;
+      if (++nf >= maxf) return nf;
+      k = 0; fields[nf][0] = 0;
+      continue;
+    }
+    if (k + 1 < 48) fields[nf][k++] = *p;
+  }
+  fields[nf][k] = 0;
+  return nf + 1;
+}
+
+/* Trim leading/trailing spaces and surrounding quotes in place. */
+static void trim_arg(char *s)
+{
+  char *a = s, *b;
+  while (*a == ' ' || *a == '\t') a++;
+  b = a + strlen(a);
+  while (b > a && (b[-1] == ' ' || b[-1] == '\t')) b--;
+  *b = 0;
+  if (a[0] == '"' && b > a + 1 && b[-1] == '"') { a++; b[-1] = 0; }
+  if (a != s) memmove(s, a, strlen(a) + 1);
+}
+
 /* Parse one "actor ..." header line starting at p (just past "actor"). */
 static void parse_header(const char *p, const char *end)
 {
@@ -807,6 +1055,12 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       p = read_word(p, end, word, sizeof(word));
       a->radius = atoi(word);
     }
+    else if (!strcasecmp(word, "Damage"))
+    {
+      p = skip_space(p, end);
+      p = read_word(p, end, word, sizeof(word));
+      a->damage = atoi(word);
+    }
     else if (!strcasecmp(word, "var"))
     {
       /* "var int name;" or "var int name[N];" -- assign the name a base
@@ -972,14 +1226,20 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         int t = atoi(tics);
         int bright = 0;
         short act = DA_NONE, snd = -1;
+        struct { short uvslot; short flag; short fval; dexpr_t idx; dexpr_t val; }
+              opstage;
         const char *r = skip_space(q, end);
+        const char *act_src;
         char b[MAX_NAME];
         size_t fi;
+        memset(&opstage, 0, sizeof(opstage));
+        act_src = r;
         r = read_word(r, end, b, sizeof(b));
         if (!strcasecmp(b, "BRIGHT"))
         {
           bright = FF_FULLBRIGHT;
           r = skip_space(r, end);
+          act_src = r;
           r = read_word(r, end, b, sizeof(b));   /* action may follow BRIGHT */
         }
         /* a safe, self-contained per-frame action.  Parameterised forms
@@ -1086,6 +1346,45 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
               act = DA_ACS_NAMED;
             }
           }
+          else if (!strcasecmp(fn, "A_SetUserVar") ||
+                   !strcasecmp(fn, "A_SetUserArray"))
+          {
+            /* These carry a parenthesised argument list that may contain
+             * spaces and an expression, so re-read the whole "(...)" from
+             * the action's '(' rather than the space-delimited word. */
+            char args[160];
+            char fld[4][48];
+            const char *lp = strchr(act_src, '(');
+            int nf;
+            read_paren_args((lp && lp < end) ? lp : act_src, end,
+                            args, sizeof(args));
+            nf = split_args(args, fld, 4);
+            if (!strcasecmp(fn, "A_SetUserVar") && nf >= 2)
+            {
+              int slot;
+              trim_arg(fld[0]); trim_arg(fld[1]);
+              slot = decorate_uvar_slot(a, fld[0]);
+              if (slot >= 0)
+              {
+                opstage.uvslot = (short)slot;
+                parse_dexpr(a, fld[1], &opstage.val);
+                act = DA_SETUSERVAR;
+              }
+            }
+            else if (!strcasecmp(fn, "A_SetUserArray") && nf >= 3)
+            {
+              int slot;
+              trim_arg(fld[0]); trim_arg(fld[1]); trim_arg(fld[2]);
+              slot = decorate_uvar_slot(a, fld[0]);
+              if (slot >= 0)
+              {
+                opstage.uvslot = (short)slot;
+                parse_dexpr(a, fld[1], &opstage.idx);
+                parse_dexpr(a, fld[2], &opstage.val);
+                act = DA_SETUSERARRAY;
+              }
+            }
+          }
         }
         if (a->seq_len == 0)
         {
@@ -1104,6 +1403,16 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
            * DECORATE (a multi-letter line repeats the frames, action once) */
           a->seq[a->seq_len].act = (fi == 0) ? act : (short)DA_NONE;
           a->seq[a->seq_len].snd = (fi == 0) ? snd : (short)-1;
+          if (fi == 0 &&
+              (act == DA_SETUSERVAR || act == DA_SETUSERARRAY ||
+               act == DA_CHANGEFLAG))
+          {
+            a->seqop[a->seq_len].uvslot = opstage.uvslot;
+            a->seqop[a->seq_len].flag   = opstage.flag;
+            a->seqop[a->seq_len].fval   = opstage.fval;
+            a->seqop[a->seq_len].idx    = opstage.idx;
+            a->seqop[a->seq_len].val    = opstage.val;
+          }
           a->seq_len++;
         }
         p = q;
@@ -1273,6 +1582,31 @@ void U_RegisterDecorateThings(void)
                                  decorate_acsnames[a->seq[f].snd]);
               }
               break;
+            case DA_SETUSERVAR:
+            case DA_SETUSERARRAY:
+              /* write a user variable when this frame runs.  misc1 holds the
+               * target base slot; args[0..4] encode the value expression
+               * (ka,va,op,kb,vb) and, for arrays, args[5..7]+misc2 encode the
+               * index expression. */
+              state->action.arg0 = (arg0_t)
+                ((a->seq[f].act == DA_SETUSERVAR)
+                   ? (void *)A_DecorateSetUserVar
+                   : (void *)A_DecorateSetUserArray);
+              state->misc1   = a->seqop[f].uvslot;
+              state->args[0] = a->seqop[f].val.ka;
+              state->args[1] = a->seqop[f].val.va;
+              state->args[2] = a->seqop[f].val.op;
+              state->args[3] = a->seqop[f].val.kb;
+              state->args[4] = a->seqop[f].val.vb;
+              if (a->seq[f].act == DA_SETUSERARRAY)
+              {
+                state->args[5] = a->seqop[f].idx.ka;
+                state->args[6] = a->seqop[f].idx.va;
+                state->args[7] = a->seqop[f].idx.op;
+                state->misc2   = (a->seqop[f].idx.kb |
+                                  (a->seqop[f].idx.vb << 8));
+              }
+              break;
             default:
               break;
           }
@@ -1304,6 +1638,7 @@ void U_RegisterDecorateThings(void)
     info->spawnstate  = st;
     info->spawnhealth = 1000;
     info->mass        = 100;
+    info->damage      = a->damage;
     info->radius      = (a->radius >= 0 ? a->radius : 20) * FRACUNIT;
     info->height      = (a->height >= 0 ? a->height : 16) * FRACUNIT;
     info->flags       = (a->solid ? MF_SOLID : 0) |

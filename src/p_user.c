@@ -34,6 +34,7 @@
  *-----------------------------------------------------------------------------*/
 
 #include "doomstat.h"
+#include "p_conversation.h"
 #include "d_event.h"
 #include "r_main.h"
 #include "p_map.h"
@@ -1499,6 +1500,17 @@ void P_PlayerThink (player_t* player)
       player->mo->flags &= ~MF_NOCLIP;
 
    cmd = &player->cmd;
+
+   /* while this player is in a conversation, hold them still -- the dialogue
+    * reads the use/fire buttons for its own navigation (in HU_Ticker, after
+    * this), so only the movement intent is cleared here; the buttons are left
+    * intact for the conversation to consume. */
+   if (P_ConversationIsActive() && player == &players[consoleplayer])
+   {
+      cmd->forwardmove = 0;
+      cmd->sidemove    = 0;
+      cmd->angleturn   = 0;
+   }
 
    /* chain saw run forward */
    if (player->mo->flags & MF_JUSTATTACKED)

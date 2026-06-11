@@ -3804,8 +3804,8 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     { int q = ZPOP(); (void)q; ZSETSTK(1, 0); zacs_warn_pcd(pcd); break; }
     case PCD_GETPLAYERINPUT:
     {
-      /* GetPlayerInput(player, input): read the current (INPUT_BUTTONS = 3) or
-       * previous-tic (INPUT_OLDBUTTONS = 2) button state, translating the
+      /* GetPlayerInput(player, input): read the current (INPUT_BUTTONS = 1) or
+       * previous-tic (INPUT_OLDBUTTONS = 0) button state, translating the
        * engine's button bits into the ZDoom layout (BT_ATTACK = 1<<0,
        * BT_USE = 1<<2) that content tests against.  player < 0 selects the
        * activator's player; other selectors yield 0. */
@@ -3818,9 +3818,16 @@ static void T_ZACSThinker(zacs_inst_t *inst)
                ? inst->activator->player : &players[consoleplayer];
       else if (pnum >= 0 && pnum < MAXPLAYERS && playeringame[pnum])
         pl = &players[pnum];
-      if (pl && (input == 2 || input == 3))
+      /* ZDoom input selectors: INPUT_BUTTONS = 1 and INPUT_OLDBUTTONS = 0 read
+       * this tic's and the previous tic's button state; the MODINPUT_ aliases
+       * (9 and 8) read the same through the mod-input path.  A KeyPressed test
+       * reads BUTTONS and OLDBUTTONS and takes the edge, so both must map to the
+       * button state -- handling only 2/3 (which are PITCH/YAW) left every such
+       * test reading zero, so script-driven dialogue never saw the use key. */
+      if (pl && (input == 0 || input == 1 || input == 8 || input == 9))
       {
-        int b = (input == 3) ? pl->cmd.buttons : zacs_oldbuttons_of(pl);
+        int cur = (input == 1 || input == 9);
+        int b = cur ? pl->cmd.buttons : zacs_oldbuttons_of(pl);
         if (b & BT_ATTACK) r |= 1;
         if (b & BT_USE)    r |= 4;
       }

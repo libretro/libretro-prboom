@@ -3569,6 +3569,139 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           break;
         }
 
+        case 12:                          /* ACSF_SetActivator(tid[,ptr]) */
+        {
+          /* point the script's activator at the actor with this tid (tid 0
+           * leaves it unchanged); the optional pointer selector is not
+           * supported here, so only the direct form is honoured. */
+          mobj_t *mo = (argc > 0 && a[0]) ? zacs_aptr(inst, a[0]) : inst->activator;
+          if (mo)
+          {
+            P_SetTarget(&inst->activator, mo);
+            r = 1;
+          }
+          else
+            r = 0;
+          break;
+        }
+
+        case 46:                          /* ACSF_UniqueTID([start[,limit]]) */
+        {
+          /* return a tid not currently in use, so a script can tag an actor
+           * it just spawned without colliding with map-authored tids.  Scans
+           * upward from the requested start (or a high base) and confirms the
+           * candidate is free via P_FindMobjFromTID. */
+          int start = (argc > 0 && a[0] > 0) ? a[0] : 0;
+          int limit = (argc > 1) ? a[1] : 0;
+          int cand  = (start > 0) ? start : 30000;
+          int tries = (limit > 0) ? limit : 65535;
+          r = 0;
+          while (tries-- > 0)
+          {
+            int sp = -1;
+            if (cand > 0 && cand <= 32767 &&
+                P_FindMobjFromTID((short)cand, &sp) == NULL)
+            {
+              r = cand;
+              break;
+            }
+            if (++cand > 32767)
+              cand = 1;
+          }
+          break;
+        }
+
+        case 79:                          /* ACSF_ChangeActorAngle(tid,ang[,interp]) */
+        {
+          /* set an actor's facing.  The angle is the ACS 16.16 turn fraction
+           * (1.0 == full circle), matching SetActorAngle; interpolation is a
+           * rendering nicety we do not apply. */
+          int sp = -1, hit = 0;
+          int tid = (argc > 0) ? a[0] : 0;
+          angle_t ang = (angle_t)((argc > 1) ? a[1] : 0) << 16;
+          if (tid == 0)
+          {
+            if (inst->activator) { inst->activator->angle = ang; hit = 1; }
+          }
+          else
+          {
+            mobj_t *mo;
+            while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
+            { mo->angle = ang; hit = 1; }
+          }
+          r = hit;
+          break;
+        }
+
+        case 80:                          /* ACSF_ChangeActorPitch(tid,pitch[,interp]) */
+        {
+          /* set an actor's look pitch, same angle encoding as the angle call */
+          int sp = -1, hit = 0;
+          int tid = (argc > 0) ? a[0] : 0;
+          angle_t pit = (angle_t)((argc > 1) ? a[1] : 0) << 16;
+          if (tid == 0)
+          {
+            if (inst->activator) { inst->activator->pitch = pit; hit = 1; }
+          }
+          else
+          {
+            mobj_t *mo;
+            while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
+            { mo->pitch = pit; hit = 1; }
+          }
+          r = hit;
+          break;
+        }
+
+        case 38:                          /* ACSF_SetPointer(assign,tid[,ptr,flags]) */
+        {
+          /* assign one of the activator's actor pointers (target or tracer;
+           * this engine has no master pointer) to the first actor with the
+           * given tid.  AAPTR_TARGET == 1, AAPTR_TRACER == 4. */
+          int assign = (argc > 0) ? a[0] : 0;
+          int tid    = (argc > 1) ? a[1] : 0;
+          mobj_t *src = inst->activator;
+          mobj_t *dst = (tid == 0) ? inst->activator : zacs_aptr(inst, tid);
+          r = 0;
+          if (src)
+          {
+            if (assign & 1)        { P_SetTarget(&src->target, dst); r = 1; }
+            if (assign & 4)        { P_SetTarget(&src->tracer, dst); r = 1; }
+          }
+          break;
+        }
+
+        case 36:                          /* ACSF_SpawnForced(type,x,y,z[,tid,ang]) */
+        {
+          /* spawn an actor unconditionally at an absolute position.  The
+           * engine's P_SpawnMobj already places the actor without a fit
+           * test, so this matches the "forced" contract; the angle is a
+           * 0..255 byte like the Spawn pcode. */
+          int type = zacs_actor_type(zacs_string(argc > 0 ? a[0] : 0));
+          r = 0;
+          if (type >= 0)
+          {
+            mobj_t *mo = P_SpawnMobj(argc > 1 ? a[1] : 0,
+                                     argc > 2 ? a[2] : 0,
+                                     argc > 3 ? a[3] : 0, (mobjtype_t)type);
+            if (mo)
+            {
+              if (argc > 5)
+                mo->angle = (angle_t)(a[5] & 0xFF) << 24;
+              if (argc > 4 && a[4])
+                P_InsertMobjIntoTIDList(mo, (short)a[4]);
+              r = 1;
+            }
+          }
+          break;
+        }
+
+        case 114:                         /* ACSF_GetPlayerAccountName(tid) */
+          /* a Zandronum networking accessor with no meaning in a single
+           * player port: there are no accounts, so return the empty string. */
+          r = zacs_save_string("");
+          break;
+
         /* ---- DECORATE user variables ---------------------------------
          * SetUserVariable/GetUserVariable address a scalar "var int" by name;
          * SetUserArray/GetUserArray index into a "var int name[N]".  A set

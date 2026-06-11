@@ -18,6 +18,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <math.h>
 
 #include "doomstat.h"
 #include "d_items.h"
@@ -3184,40 +3185,73 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       }
       switch (func)
       {
-        case 15:                          /* ACSF_GetActorVelX */
-        case 16:                          /* ACSF_GetActorVelY */
-        case 17:                          /* ACSF_GetActorVelZ */
+        case 9:                           /* ACSF_GetActorVelX */
+        case 10:                          /* ACSF_GetActorVelY */
+        case 11:                          /* ACSF_GetActorVelZ */
         {
           mobj_t *mo = zacs_aptr(inst, argc > 0 ? a[0] : 0);
           if (mo)
-            r = (func == 15) ? mo->momx : (func == 16) ? mo->momy : mo->momz;
+            r = (func == 9) ? mo->momx : (func == 10) ? mo->momy : mo->momz;
           break;
         }
-        case 28:                          /* ACSF_GetActorPowerupTics */
+        case 78:                          /* ACSF_GetActorPowerupTics */
           r = 0;
           break;
 
-        /* ---- string ACSF family (ZDoom indices) ----------------------
+        /* ---- pure math ACSF ------------------------------------------
+         * Self-contained numeric helpers (no map/actor state).  Sqrt is an
+         * integer square root; FixedSqrt operates on 16.16 fixed-point;
+         * VectorLength returns the 16.16 magnitude of a 2D fixed vector. */
+        case 48:                          /* ACSF_Sqrt(n) */
+        {
+          unsigned int v = (argc > 0 && a[0] > 0) ? (unsigned int)a[0] : 0;
+          unsigned int x = 0, b2 = 1u << 30;
+          while (b2 > v) b2 >>= 2;
+          while (b2)
+          {
+            if (v >= x + b2) { v -= x + b2; x = (x >> 1) + b2; }
+            else x >>= 1;
+            b2 >>= 2;
+          }
+          r = (int)x;
+          break;
+        }
+        case 49:                          /* ACSF_FixedSqrt(n) */
+        {
+          double v = (argc > 0) ? a[0] / 65536.0 : 0.0;
+          if (v < 0.0) v = 0.0;
+          r = (int)(sqrt(v) * 65536.0);
+          break;
+        }
+        case 50:                          /* ACSF_VectorLength(x, y) */
+        {
+          double x = (argc > 0) ? a[0] / 65536.0 : 0.0;
+          double y = (argc > 1) ? a[1] / 65536.0 : 0.0;
+          r = (int)(sqrt(x * x + y * y) * 65536.0);
+          break;
+        }
+
+        /* ---- string ACSF family --------------------------------------
          * Self-contained string helpers the VN/script libraries rely on.
-         * StrCmp/StrICmp compare; StrLeft/StrRight/StrMid build a new
+         * strcmp/stricmp compare; StrLeft/StrRight/StrMid build a new
          * string through zacs_save_string and return its index. */
-        case 75:                          /* ACSF_StrCmp(a, b [, n]) */
-        case 76:                          /* ACSF_StrICmp(a, b [, n]) */
+        case 63:                          /* ACSF_strcmp(a, b [, n]) */
+        case 64:                          /* ACSF_stricmp(a, b [, n]) */
         {
           const char *sa = zacs_string(argc > 0 ? a[0] : 0);
           const char *sb = zacs_string(argc > 1 ? a[1] : 0);
           int n = (argc > 2) ? a[2] : -1;
           if (!sa) sa = "";
           if (!sb) sb = "";
-          if (func == 75)
+          if (func == 63)
             r = (n >= 0) ? strncmp(sa, sb, (size_t)n) : strcmp(sa, sb);
           else
             r = (n >= 0) ? strncasecmp(sa, sb, (size_t)n)
                          : strcasecmp(sa, sb);
           break;
         }
-        case 77:                          /* ACSF_StrLeft(str, len) */
-        case 78:                          /* ACSF_StrRight(str, len) */
+        case 65:                          /* ACSF_StrLeft(str, len) */
+        case 66:                          /* ACSF_StrRight(str, len) */
         {
           const char *s = zacs_string(argc > 0 ? a[0] : 0);
           int len = (argc > 1) ? a[1] : 0;
@@ -3228,7 +3262,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           if (len < 0) len = 0;
           take = (len < slen) ? len : slen;
           if (take > (int)sizeof(buf) - 1) take = (int)sizeof(buf) - 1;
-          if (func == 77)                  /* leftmost `take` chars */
+          if (func == 65)                  /* leftmost `take` chars */
             memcpy(buf, s, (size_t)take);
           else                             /* rightmost `take` chars */
             memcpy(buf, s + (slen - take), (size_t)take);
@@ -3236,7 +3270,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           r = zacs_save_string(buf);
           break;
         }
-        case 79:                          /* ACSF_StrMid(str, pos, len) */
+        case 67:                          /* ACSF_StrMid(str, pos, len) */
         {
           const char *s = zacs_string(argc > 0 ? a[0] : 0);
           int pos = (argc > 1) ? a[1] : 0;

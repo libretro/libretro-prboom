@@ -3084,6 +3084,66 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         case 28:                          /* ACSF_GetActorPowerupTics */
           r = 0;
           break;
+
+        /* ---- string ACSF family (ZDoom indices) ----------------------
+         * Self-contained string helpers the VN/script libraries rely on.
+         * StrCmp/StrICmp compare; StrLeft/StrRight/StrMid build a new
+         * string through zacs_save_string and return its index. */
+        case 75:                          /* ACSF_StrCmp(a, b [, n]) */
+        case 76:                          /* ACSF_StrICmp(a, b [, n]) */
+        {
+          const char *sa = zacs_string(argc > 0 ? a[0] : 0);
+          const char *sb = zacs_string(argc > 1 ? a[1] : 0);
+          int n = (argc > 2) ? a[2] : -1;
+          if (!sa) sa = "";
+          if (!sb) sb = "";
+          if (func == 75)
+            r = (n >= 0) ? strncmp(sa, sb, (size_t)n) : strcmp(sa, sb);
+          else
+            r = (n >= 0) ? strncasecmp(sa, sb, (size_t)n)
+                         : strcasecmp(sa, sb);
+          break;
+        }
+        case 77:                          /* ACSF_StrLeft(str, len) */
+        case 78:                          /* ACSF_StrRight(str, len) */
+        {
+          const char *s = zacs_string(argc > 0 ? a[0] : 0);
+          int len = (argc > 1) ? a[1] : 0;
+          int slen, take;
+          char buf[256];
+          if (!s) s = "";
+          slen = (int)strlen(s);
+          if (len < 0) len = 0;
+          take = (len < slen) ? len : slen;
+          if (take > (int)sizeof(buf) - 1) take = (int)sizeof(buf) - 1;
+          if (func == 77)                  /* leftmost `take` chars */
+            memcpy(buf, s, (size_t)take);
+          else                             /* rightmost `take` chars */
+            memcpy(buf, s + (slen - take), (size_t)take);
+          buf[take] = 0;
+          r = zacs_save_string(buf);
+          break;
+        }
+        case 79:                          /* ACSF_StrMid(str, pos, len) */
+        {
+          const char *s = zacs_string(argc > 0 ? a[0] : 0);
+          int pos = (argc > 1) ? a[1] : 0;
+          int len = (argc > 2) ? a[2] : 0;
+          int slen, take;
+          char buf[256];
+          if (!s) s = "";
+          slen = (int)strlen(s);
+          if (pos < 0) pos = 0;
+          if (len < 0) len = 0;
+          if (pos > slen) pos = slen;
+          take = (pos + len > slen) ? (slen - pos) : len;
+          if (take < 0) take = 0;
+          if (take > (int)sizeof(buf) - 1) take = (int)sizeof(buf) - 1;
+          memcpy(buf, s + pos, (size_t)take);
+          buf[take] = 0;
+          r = zacs_save_string(buf);
+          break;
+        }
         default:
           if (func >= 0 && func < 512 &&
               !(zacs_cf_warned[func >> 3] & (1 << (func & 7))))

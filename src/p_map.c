@@ -37,6 +37,7 @@
 #include "p_mobj.h"
 #include "p_maputl.h"
 #include "p_map.h"
+#include "u_decorate.h"
 #include "p_slope.h"
 #include "p_setup.h"
 #include "p_tick.h"
@@ -2535,6 +2536,28 @@ dbool PTR_NoWayTraverse(intercept_t* in)
 // P_UseLines
 // Looks for special lines in front of the player to activate.
 //
+/* +USESPECIAL things: a use-activatable decoration (e.g. a conversation NPC)
+ * directly in front of the player is switched into its Active state when used.
+ * The thing trace runs first and, on a hit, swallows the use so the player
+ * does not also trigger a line behind it. */
+static mobj_t *use_thing_hit;
+
+static dbool PTR_UseThingTraverse(intercept_t *in)
+{
+  mobj_t *th;
+  if (!in->d.thing)
+    return TRUE;
+  th = in->d.thing;
+  if (th == usething)
+    return TRUE;                          /* not the user itself */
+  if (U_DecorateActiveState(th->type) < 0)
+    return TRUE;                          /* not use-activatable; keep going */
+  if (FixedMul(USERANGE, in->frac) > USERANGE)
+    return FALSE;                         /* out of reach: stop the trace */
+  use_thing_hit = th;
+  return FALSE;                           /* this thing takes the use */
+}
+
 void P_UseLines (player_t*  player)
 {
   int     angle;
@@ -2551,6 +2574,17 @@ void P_UseLines (player_t*  player)
   y1 = player->mo->y;
   x2 = x1 + (USERANGE>>FRACBITS)*finecosine[angle];
   y2 = y1 + (USERANGE>>FRACBITS)*finesine[angle];
+
+  /* a use-activatable thing in front takes priority over a line behind it */
+  use_thing_hit = NULL;
+  P_PathTraverse(x1, y1, x2, y2, PT_ADDTHINGS, PTR_UseThingTraverse);
+  if (use_thing_hit)
+  {
+    int as = U_DecorateActiveState(use_thing_hit->type);
+    if (as >= 0)
+      P_SetMobjState(use_thing_hit, (statenum_t)as);
+    return;
+  }
 
   // old code:
   //

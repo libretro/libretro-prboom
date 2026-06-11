@@ -138,6 +138,7 @@ typedef struct
   int  num_uvars;
   int  uvar_slots;              /* total int slots the actor needs */
   int  inherited;              /* 1 once parent state/vars merged in       */
+  int  use_special;            /* 1 if +USESPECIAL: usable -> Active state  */
 } decorate_actor_t;
 
 static decorate_actor_t actors[MAX_DECORATE_ACTORS];
@@ -188,6 +189,24 @@ int U_DecorateUserVarSlot(int type, const char *name, int *base, int *len)
       return 1;
     }
   return 0;
+}
+
+/* Use-activatable decorations (+USESPECIAL): the state a thing of this type
+ * enters when the player presses use on it (its "Active" label resolved to a
+ * concrete state index).  Registered at U_RegisterDecorateThings time. */
+typedef struct { int type; int activestate; } useact_t;
+#define MAX_USEACTS MAX_DECORATE_ACTORS
+static useact_t useacts[MAX_USEACTS];
+static int num_useacts;
+
+/* Public: the Active state a use-activatable mobjtype enters, or -1. */
+int U_DecorateActiveState(int type)
+{
+  int i;
+  for (i = 0; i < num_useacts; i++)
+    if (useacts[i].type == type)
+      return useacts[i].activestate;
+  return -1;
 }
 
 /* Safe per-frame DECORATE actions the registrar can wire onto a decoration
@@ -1104,6 +1123,8 @@ static void inherit_one(decorate_actor_t *c)
 
   if (c->damage == 0 && pp->damage != 0)
     c->damage = pp->damage;
+  if (pp->use_special)
+    c->use_special = 1;
 
   /* append the parent's captured frames after the child's */
   base = c->seq_len;
@@ -1348,6 +1369,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
     }
     else if (!strcasecmp(word, "+SOLID"))
       a->solid = 1;
+    else if (!strcasecmp(word, "+USESPECIAL"))
+      a->use_special = 1;
     else if (!strcasecmp(word, "+NOGRAVITY"))
       a->nogravity = 1;
     else if (!strcasecmp(word, "+SPAWNCEILING"))
@@ -1391,11 +1414,11 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
               !strcasecmp(word, "wait")))
     {
       /* terminator for an animated sequence ("loop"/"wait" repeat, "stop"
-       * freezes on the last frame).  For a multi-label actor it is recorded
-       * on the last captured frame so each label's run terminates correctly;
-       * the flat single-Spawn path keeps using seq_loops. */
+       * freezes on the last frame).  Record it both in seq_loops (the flat
+       * single-Spawn path) and in this frame's seqflow: an actor can turn out
+       * to be multi-state only after a later label, so the flow must be
+       * captured now rather than gated on multi_state being set yet. */
       a->seq_loops = strcasecmp(word, "stop") != 0;
-      if (a->multi_state)
       {
         int lf = a->seq_len - 1;
         a->seqflow[lf].flow = !strcasecmp(word, "loop") ? SEQF_LOOP
@@ -2039,6 +2062,19 @@ void U_RegisterDecorateThings(void)
         memcpy(m->var[u].name, a->uvar[u].name, sizeof(m->var[u].name));
         m->var[u].base = a->uvar[u].base;
         m->var[u].len  = a->uvar[u].len;
+      }
+    }
+
+    /* +USESPECIAL: record the state its "Active" label resolves to, so the
+     * use-trace can switch a used thing of this type into it. */
+    if (a->use_special && !a->spawn_static && num_useacts < MAX_USEACTS)
+    {
+      int li = decorate_label_index(a, "Active");
+      if (li >= 0)
+      {
+        useacts[num_useacts].type        = mt;
+        useacts[num_useacts].activestate = st_base + count + a->seqlabel[li].frame;
+        num_useacts++;
       }
     }
     info->spawnstate  = st;

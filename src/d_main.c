@@ -1777,8 +1777,12 @@ bool D_DoomMainSetup(void)
   /* ZDoom LOADACS: register the global ACS libraries named by a root
    * LOADACS lump so they are loaded for every map (alongside the map's own
    * BEHAVIOR imports).  Parsed once here; loaded per-map in
-   * Z_ACSLoadBehavior. */
-  Z_ACSLoadGlobalLibraries();
+   * Z_ACSLoadBehavior, which itself runs only for ZDoom-namespace UDMF maps
+   * (never for Hexen/Heretic, which use their own ACS engine).  Gate the
+   * parse to the Doom game too, both to match that path and so a Hexen or
+   * Heretic mod that happens to ship a LOADACS lump is left untouched. */
+  if (!hexen && !heretic)
+    Z_ACSLoadGlobalLibraries();
 
   //jff 9/3/98 use logical output routine
   lprintf(LO_INFO,"R_Init: Init DOOM refresh daemon - ");

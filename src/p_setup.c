@@ -3002,6 +3002,24 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
        * args[0]; both tables hang off the freshly spawned level data. */
       P_InitHexenTaggedLines();
       P_CreateTIDList();
+
+      /* Binary Doom-in-Hexen maps carry ACS in a BEHAVIOR lump at the
+       * Hexen slot (after BLOCKMAP), not inside a UDMF block.  The UDMF
+       * path above is gated on udmf_level and so misses these; load the
+       * binary BEHAVIOR into the same ZACS VM here and launch its OPEN and
+       * ENTER scripts.  (Hexen the game takes the earlier branch and uses
+       * its own ACS engine; this is the Doom-game ZDoom case only.) */
+      if (!udmf_level)
+      {
+         int behaviorLump = lumpnum + ML_BLOCKMAP + 1;
+         if (behaviorLump < numlumps &&
+             !strncasecmp(lumpinfo[behaviorLump].name, "BEHAVIOR", 8) &&
+             Z_ACSLoadBehavior(behaviorLump))
+         {
+            Z_ACSRunOpenScripts();
+            Z_ACSRunEnterScripts(players[consoleplayer].mo);
+         }
+      }
    }
 
    P_MapEnd();

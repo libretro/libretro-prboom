@@ -1521,6 +1521,19 @@ dbool Z_ACSStartNamed(int name_index, int map, const int *args, int argc,
   return zacs_start_info(info, args, argc, activator, line, side, always);
 }
 
+/* Start a named script given the name string directly (rather than as a
+ * behavior string-table index).  Used by callers outside the VM -- a
+ * DECORATE actor running ACS_NamedExecuteAlways from a state action. */
+dbool Z_ACSStartNamedStr(const char *name, const int *args, int argc,
+                         mobj_t *activator, dbool always)
+{
+  int info;
+  if (!zacs_numscripts)
+    return false;
+  info = zacs_named_index(name);
+  return zacs_start_info(info, args, argc, activator, NULL, 0, always);
+}
+
 dbool Z_ACSSuspend(int number)
 {
   zacs_inst_t *inst = zacs_find_inst(number, NULL);

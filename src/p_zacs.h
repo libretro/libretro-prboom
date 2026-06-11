@@ -44,6 +44,11 @@ dbool Z_ACSStart(int number, int map, const int *args, int argc,
 dbool Z_ACSStartNamed(int name_index, int map, const int *args, int argc,
                       mobj_t *activator, line_t *line, int side, dbool always);
 
+/* Start a named script by name string (for non-VM callers, e.g. a DECORATE
+ * actor's ACS_NamedExecuteAlways state action). */
+dbool Z_ACSStartNamedStr(const char *name, const int *args, int argc,
+                         mobj_t *activator, dbool always);
+
 dbool Z_ACSSuspend(int number);
 dbool Z_ACSTerminate(int number);
 

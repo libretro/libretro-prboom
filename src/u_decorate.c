@@ -36,6 +36,8 @@
 #include "p_pspr.h"
 #include "d_items.h"
 #include "sounds.h"
+#include "p_mobj.h"
+#include "p_zacs.h"
 #include "u_decorate.h"
 
 #define MAX_DECORATE_ACTORS 1024
@@ -103,7 +105,8 @@ enum {
   DA_SCREAM,           /* A_Scream  (death sound) */
   DA_ACTIVESOUND,      /* A_ActiveSound -> active sound via A_PlaySound */
   DA_NOBLOCKING,       /* A_NoBlocking / A_Fall -> clears MF_SOLID */
-  DA_FACETARGET        /* A_FaceTarget (harmless no-op without a target) */
+  DA_FACETARGET,       /* A_FaceTarget (harmless no-op without a target) */
+  DA_ACS_NAMED         /* ACS_NamedExecuteAlways("name") -> start named script */
 };
 
 /* Sound names captured for DA_PLAYSOUND frames, resolved to sfx slots at
@@ -111,6 +114,51 @@ enum {
 #define MAX_DECORATE_SOUNDS 256
 static char decorate_sounds[MAX_DECORATE_SOUNDS][32];
 static int  num_decorate_sounds;
+
+/* Script names captured for DA_ACS_NAMED frames.  At registration the name is
+ * interned into the engine string pool so the runtime action can hand its
+ * index to the ACS_NamedExecuteAlways line special. */
+#define MAX_DECORATE_ACSNAMES 128
+static char decorate_acsnames[MAX_DECORATE_ACSNAMES][32];
+static int  num_decorate_acsnames;
+
+/* Interned script names that persist past the parse: a registered state's
+ * misc1 holds an index into this table, and the runtime action reads the
+ * name back to start the script.  Kept as plain static storage (the names
+ * are a handful of short identifiers fixed at load). */
+#define MAX_INTERNED_ACSNAMES 128
+static char interned_acsnames[MAX_INTERNED_ACSNAMES][32];
+static int  num_interned_acsnames;
+
+static int decorate_intern_acsname(const char *name)
+{
+  int i;
+  for (i = 0; i < num_interned_acsnames; i++)
+    if (!strcasecmp(interned_acsnames[i], name))
+      return i;
+  if (num_interned_acsnames >= MAX_INTERNED_ACSNAMES)
+    return 0;
+  {
+    int n = 0;
+    while (name[n] && n < 31) { interned_acsnames[num_interned_acsnames][n] = name[n]; n++; }
+    interned_acsnames[num_interned_acsnames][n] = 0;
+  }
+  return num_interned_acsnames++;
+}
+
+/* Runtime action for a DECORATE frame carrying ACS_NamedExecuteAlways("x"):
+ * start the named script with this actor as the activator.  misc1 indexes the
+ * interned name table. */
+void A_DecorateACSNamed(mobj_t *mo)
+{
+  int idx;
+  if (!mo || !mo->state)
+    return;
+  idx = (int)mo->state->misc1;
+  if (idx < 0 || idx >= num_interned_acsnames)
+    return;
+  Z_ACSStartNamedStr(interned_acsnames[idx], NULL, 0, mo, true);
+}
 
 /* Safe weapon-state (pspr) actions: the structural codepointers that make a
  * custom weapon select, ready, fire-cycle, lower/raise and flash.  Firing
@@ -839,7 +887,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         /* a safe, self-contained per-frame action.  Parameterised forms
          * (A_PlaySound) keep their first string argument; everything else is
          * left as DA_NONE so unsupported actions are simply inert. */
-        if (b[0] == 'A' && b[1] == '_')
+        if ((b[0] == 'A' && b[1] == '_') ||
+            !strncasecmp(b, "ACS_", 4))
         {
           char fn[MAX_NAME];
           const char *ar;
@@ -895,6 +944,50 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           else if (!strcasecmp(fn, "A_NoBlocking") ||
                    !strcasecmp(fn, "A_Fall"))          act = DA_NOBLOCKING;
           else if (!strcasecmp(fn, "A_FaceTarget"))    act = DA_FACETARGET;
+          else if (!strcasecmp(fn, "ACS_NamedExecuteAlways") ||
+                   !strcasecmp(fn, "ACS_NamedExecute"))
+          {
+            /* ACS_NamedExecuteAlways("Script", ...): capture the quoted
+             * script name; the runtime action starts it by name.  The name
+             * may be glued to b ("ACS_NamedExecuteAlways(\"x\"") or sit in
+             * the following word. */
+            char arg[32];
+            const char *ar = strchr(b, '"');
+            arg[0] = 0;
+            if (!ar)
+            {
+              char nx[MAX_NAME];
+              const char *r2 = skip_space(r, end);
+              read_word(r2, end, nx, sizeof(nx));
+              ar = strchr(nx, '"');
+              if (ar) { int n = 0; ar++;
+                while (*ar && *ar != '"' && n < 31) arg[n++] = *ar++;
+                arg[n] = 0; }
+            }
+            else
+            {
+              int n = 0; ar++;
+              while (*ar && *ar != '"' && n < 31) arg[n++] = *ar++;
+              arg[n] = 0;
+            }
+            if (arg[0] && num_decorate_acsnames < MAX_DECORATE_ACSNAMES)
+            {
+              int s;
+              snd = -1;
+              for (s = 0; s < num_decorate_acsnames; s++)
+                if (!strcasecmp(decorate_acsnames[s], arg))
+                { snd = (short)s; break; }
+              if (snd < 0)
+              {
+                int cn = 0;
+                while (arg[cn] && cn < 31)
+                { decorate_acsnames[num_decorate_acsnames][cn] = arg[cn]; cn++; }
+                decorate_acsnames[num_decorate_acsnames][cn] = 0;
+                snd = (short)num_decorate_acsnames++;
+              }
+              act = DA_ACS_NAMED;
+            }
+          }
         }
         if (a->seq_len == 0)
         {
@@ -1070,6 +1163,17 @@ void U_RegisterDecorateThings(void)
               break;
             case DA_FACETARGET:
               state->action.arg0 = (arg0_t)A_FaceTarget;
+              break;
+            case DA_ACS_NAMED:
+              /* start a named ACS script when this frame runs.  The script
+               * name is interned into a persistent table; its index rides in
+               * misc1 (free on mobj states -- only weapon psprites use it). */
+              if (a->seq[f].snd >= 0)
+              {
+                state->action.arg0 = (arg0_t)A_DecorateACSNamed;
+                state->misc1 = decorate_intern_acsname(
+                                 decorate_acsnames[a->seq[f].snd]);
+              }
               break;
             default:
               break;

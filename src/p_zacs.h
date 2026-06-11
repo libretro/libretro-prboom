@@ -39,6 +39,11 @@ void Z_ACSRunOpenScripts(void);
 dbool Z_ACSStart(int number, int map, const int *args, int argc,
                  mobj_t *activator, line_t *line, int side, dbool always);
 
+/* ACS_NamedExecute / ACS_NamedExecuteAlways: identify the script by name.
+ * name_index is an index into the active behavior's string table. */
+dbool Z_ACSStartNamed(int name_index, int map, const int *args, int argc,
+                      mobj_t *activator, line_t *line, int side, dbool always);
+
 dbool Z_ACSSuspend(int number);
 dbool Z_ACSTerminate(int number);
 

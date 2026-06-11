@@ -1016,6 +1016,34 @@ static int zacs_script_index(int number)
   return -1;
 }
 
+/* Resolve a named script ("VNS_Execute") to an aggregate script index.
+ * Named scripts carry number -(local SNAM index + 1) within their own
+ * module, so the name is matched against each module's SNAM table and the
+ * aggregate entry tagged with that module and number is returned.  Modules
+ * are searched map-first, so a map's named script shadows a like-named
+ * library one, matching ZDoom. */
+static int zacs_named_index(const char *name)
+{
+  int m;
+  if (!name || !name[0])
+    return -1;
+  for (m = 0; m < zacs_nummodules; m++)
+  {
+    int i;
+    for (i = 0; i < zacs_modules[m].numsnames; i++)
+      if (zacs_modules[m].snames[i] &&
+          !strcasecmp(zacs_modules[m].snames[i], name))
+      {
+        int want = -(i + 1), j;
+        for (j = 0; j < zacs_numscripts; j++)
+          if (zacs_scripts[j].module == m &&
+              zacs_scripts[j].number == want)
+            return j;
+      }
+  }
+  return -1;
+}
+
 /* actor class name -> mobj type via the decorate-compatible name table */
 static int zacs_actor_type(const char *name)
 {
@@ -1455,6 +1483,42 @@ dbool Z_ACSStart(int number, int map, const int *args, int argc,
   }
   zacs_spawn(info, args, argc, activator, line, side);
   return true;
+}
+
+/* Start (or, with `always`, force a fresh instance of) the script at a known
+ * aggregate index.  Shared by the numbered and named entry points. */
+static dbool zacs_start_info(int info, const int *args, int argc,
+                             mobj_t *activator, line_t *line, int side,
+                             dbool always)
+{
+  if (info < 0)
+    return false;
+  if (!always && zacs_running[info])
+  {
+    zacs_inst_t *inst = zacs_find_inst(zacs_scripts[info].number, NULL);
+    if (inst && inst->state == ZSTATE_SUSPENDED)
+    {
+      inst->state = ZSTATE_RUNNING;
+      return true;
+    }
+    return false;
+  }
+  zacs_spawn(info, args, argc, activator, line, side);
+  return true;
+}
+
+/* ACS_NamedExecute / ACS_NamedExecuteAlways and friends: like Z_ACSStart but
+ * the script is identified by name rather than number.  `name_index` is an
+ * index into the active behavior's string table (how the line specials and
+ * ACSF builtins pass the script name). */
+dbool Z_ACSStartNamed(int name_index, int map, const int *args, int argc,
+                      mobj_t *activator, line_t *line, int side, dbool always)
+{
+  int info;
+  if (!zacs_numscripts || (map && map != gamemap))
+    return false;
+  info = zacs_named_index(zacs_string(name_index));
+  return zacs_start_info(info, args, argc, activator, line, side, always);
 }
 
 dbool Z_ACSSuspend(int number)

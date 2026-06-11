@@ -558,7 +558,7 @@ static void D_PageDrawer(void)
 
         if (raven)
           V_DrawRawScreen(pagename);
-        else
+        else if (!V_DrawRGBAFullScreen(0, W_CheckNumForName(pagename)))
           V_DrawNamePatchFS(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
 
         screens[0].data        = saved_data;
@@ -576,7 +576,7 @@ static void D_PageDrawer(void)
          * frame (correct, just not accelerated). */
         if (raven)
           V_DrawRawScreen(pagename);
-        else
+        else if (!V_DrawRGBAFullScreen(0, W_CheckNumForName(pagename)))
           V_DrawNamePatchFS(0, 0, 0, pagename, CR_DEFAULT, VPT_STRETCH);
         return;
       }

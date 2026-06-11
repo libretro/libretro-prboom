@@ -137,6 +137,12 @@ extern void V_DrawNumPatchFullScreenCached(int scrn, int lump, int cm);
 #define V_DrawNamePatchFullScreenCached(s,n,cm) \
   V_DrawNumPatchFullScreenCached(s, W_GetNumForName(n), cm)
 
+/* Draw a full-screen art lump from its retained native-colour image when one
+ * exists (full-colour title/menu/intermission backdrops); returns 1 on success
+ * or 0 when there is no native copy and the caller should use the indexed
+ * patch path instead. */
+int V_DrawRGBAFullScreen(int scrn, int lump);
+
 /* cph -
  * Functions to return width & height of a patch.
  * Doesn't really belong here, but is often used in conjunction with

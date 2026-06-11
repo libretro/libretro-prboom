@@ -44,6 +44,25 @@
 #include "i_video.h"
 #include "r_filter.h"
 #include "lprintf.h"
+#include "u_png.h"
+
+/* SIMD guards for the native-colour full-screen blit (V_DrawRGBAFullScreen).
+ * Same guard shape as the renderer's column blenders. */
+#if defined(__SSE2__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2) || defined(_M_X64)
+#define V_ARGB_SSE2 1
+#include <emmintrin.h>
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(_M_ARM64)
+#define V_ARGB_NEON 1
+#include <arm_neon.h>
+#endif
+
+#if defined(V_ARGB_SSE2) || defined(V_ARGB_NEON)
+#if defined(_MSC_VER)
+#define V_ARGB_ALIGN16 __declspec(align(16))
+#else
+#define V_ARGB_ALIGN16 __attribute__((aligned(16)))
+#endif
+#endif
 
 // Each screen is [SCREENWIDTH*SCREENHEIGHT];
 screeninfo_t screens[NUM_SCREENS];
@@ -809,6 +828,105 @@ void V_DrawNumPatchFS(int x, int y, int scrn, int lump,
 }
 
 /*
+ * V_DrawRGBAFullScreen
+ *
+ * Draw a full-screen art lump from its native-colour image, when one was
+ * retained for it (full-colour title cards, the menu help screen and the
+ * intermission backdrop ship as 24/32-bit PNGs).  The materialized patch the
+ * normal path would draw is PLAYPAL-indexed, which bands these smooth images
+ * badly; here the original image is point-sampled, stretched to the surface,
+ * and written straight to RGB565 at full channel precision.  Returns 1 when it
+ * drew, 0 when the lump has no native copy (caller falls back to the indexed
+ * patch path).  Opaque: these are backdrops, so source alpha is ignored.
+ */
+int V_DrawRGBAFullScreen(int scrn, int lump)
+{
+  const unsigned *argb;
+  uint16_t *surf;
+  int aw = 0, ah = 0, oy;
+  int sx_step, sy_step;
+
+  if (lump < 0)
+    return 0;
+  argb = U_PNGCacheRGBA(lump, &aw, &ah);
+  if (!argb || aw <= 0 || ah <= 0)
+    return 0;
+
+  surf    = (uint16_t *)screens[scrn].data;
+  sx_step = (aw << 16) / SCREENWIDTH;
+  sy_step = (ah << 16) / SCREENHEIGHT;
+
+  for (oy = 0; oy < SCREENHEIGHT; oy++)
+  {
+    int srcy = (oy * sy_step) >> 16;
+    const unsigned *srow;
+    uint16_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    int ox = 0, sx = 0;
+    if (srcy >= ah) srcy = ah - 1;
+    srow = argb + (size_t)srcy * aw;
+
+#if defined(V_ARGB_SSE2) || defined(V_ARGB_NEON)
+    /* Eight pixels per pass: gather the (strided) source texels, then narrow
+     * 0xAABBGGRR -> 565 in vector lanes.  Bit-identical to the scalar tail. */
+    for (; ox + 8 <= SCREENWIDTH; ox += 8)
+    {
+      V_ARGB_ALIGN16 uint32_t sp[8];
+      int j;
+      for (j = 0; j < 8; j++, sx += sx_step)
+        sp[j] = srow[sx >> 16];
+#if defined(V_ARGB_SSE2)
+      {
+        __m128i s0 = _mm_load_si128((const __m128i *)sp);
+        __m128i s1 = _mm_load_si128((const __m128i *)(sp + 4));
+        __m128i m8 = _mm_set1_epi32(0xff);
+        /* R in low byte, B in high byte (0xAABBGGRR) */
+        __m128i r  = _mm_packs_epi32(_mm_srli_epi32(_mm_and_si128(s0, m8), 3),
+                                     _mm_srli_epi32(_mm_and_si128(s1, m8), 3));
+        __m128i g  = _mm_packs_epi32(
+                       _mm_srli_epi32(_mm_and_si128(_mm_srli_epi32(s0, 8), m8), 2),
+                       _mm_srli_epi32(_mm_and_si128(_mm_srli_epi32(s1, 8), m8), 2));
+        __m128i b  = _mm_packs_epi32(
+                       _mm_srli_epi32(_mm_and_si128(_mm_srli_epi32(s0, 16), m8), 3),
+                       _mm_srli_epi32(_mm_and_si128(_mm_srli_epi32(s1, 16), m8), 3));
+        __m128i o  = _mm_or_si128(_mm_or_si128(_mm_slli_epi16(r, 11),
+                                  _mm_slli_epi16(g, 5)), b);
+        _mm_storeu_si128((__m128i *)(row + ox), o);
+      }
+#else /* V_ARGB_NEON */
+      {
+        uint32x4_t s0 = vld1q_u32(sp);
+        uint32x4_t s1 = vld1q_u32(sp + 4);
+        uint16x8_t r  = vcombine_u16(
+                          vmovn_u32(vshrq_n_u32(vandq_u32(s0, vdupq_n_u32(0xff)), 3)),
+                          vmovn_u32(vshrq_n_u32(vandq_u32(s1, vdupq_n_u32(0xff)), 3)));
+        uint16x8_t g  = vcombine_u16(
+                          vmovn_u32(vshrq_n_u32(vandq_u32(vshrq_n_u32(s0, 8), vdupq_n_u32(0xff)), 2)),
+                          vmovn_u32(vshrq_n_u32(vandq_u32(vshrq_n_u32(s1, 8), vdupq_n_u32(0xff)), 2)));
+        uint16x8_t b  = vcombine_u16(
+                          vmovn_u32(vshrq_n_u32(vandq_u32(vshrq_n_u32(s0, 16), vdupq_n_u32(0xff)), 3)),
+                          vmovn_u32(vshrq_n_u32(vandq_u32(vshrq_n_u32(s1, 16), vdupq_n_u32(0xff)), 3)));
+        uint16x8_t o  = vorrq_u16(vorrq_u16(vshlq_n_u16(r, 11),
+                                  vshlq_n_u16(g, 5)), b);
+        vst1q_u16(row + ox, o);
+      }
+#endif
+    }
+#endif
+
+    for (; ox < SCREENWIDTH; ox++, sx += sx_step)
+    {
+      unsigned p = srow[sx >> 16];
+      int r = (int)(p & 0xff);
+      int g = (int)((p >> 8) & 0xff);
+      int b = (int)((p >> 16) & 0xff);
+      row[ox] = (uint16_t)(((r >> 3) << 11) | ((g >> 2) << 5) | (b >> 3));
+    }
+  }
+  return 1;
+}
+
+
+/*
  * V_DrawNumPatchFullScreenCached
  *
  * Draws a full-screen patch (a 320x200 art lump such as CREDIT / HELP2 /
@@ -850,6 +968,7 @@ void V_DrawNumPatchFullScreenCached(int scrn, int lump, int cm)
 
   /* Miss: render the stretched patch the normal way, then snapshot it.
    * Wide offset-less patches are centered like every full-screen draw. */
+  if (!V_DrawRGBAFullScreen(scrn, lump))
   {
     const rpatch_t *patch = R_CachePatchNum(lump);
     if (patch->height > 200)

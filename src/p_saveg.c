@@ -656,6 +656,17 @@ void P_UnArchiveThinkers (void)
       save_p += sizeof(mobj_t)-sizeof(void*)-4*sizeof(fixed_t);
       memcpy (&(mobj->lastenemy), save_p, sizeof(void*));
       save_p += 4*sizeof(void*);
+      /* The copy above stops short of the fields appended to mobj_t after the
+       * historical savegame layout was frozen (the Heretic/Hexen action
+       * special, tid, damage and floorclip, and the DECORATE user_vars
+       * pointer).  They are not in the stream, so the Z_Malloc'd mobj keeps
+       * whatever happened to be in that memory -- which for a recycled heap
+       * block is poison, not zero.  Left as is, a non-zero user_vars makes
+       * P_RemoveMobj later Z_Free a garbage pointer (a stale tid would also
+       * corrupt TID lookups).  Zero the appended tail, matching the zero the
+       * save side already writes for this region. */
+      memset ((char *)mobj + (sizeof(mobj_t)-2*sizeof(void*)-4*sizeof(fixed_t)),
+              0, 2*sizeof(void*)+4*sizeof(fixed_t));
       }
       mobj->state = states + (uintptr_t) mobj->state;
 

@@ -19,6 +19,12 @@ dbool U_DecorateMentionsSprite(const char *name);
  * before R_Init; Doom game only. */
 void U_RegisterDecorateThings(void);
 
+/* Repoint Doom weapon slots to the state chains of DECORATE weapons that
+ * inherit from / replace a base weapon class.  Call once at startup after
+ * U_RegisterDecorateThings (shares the DSDHacked state/sprite growth) and
+ * before R_Init; Doom game only. */
+void U_RegisterDecorateWeapons(void);
+
 /* ZDoom editor-only map things (particle fountains, interpolation points,
  * camera/view stacks, editor cameras): skip without a warning. */
 dbool U_IsInertZDoomThing(int doomednum);

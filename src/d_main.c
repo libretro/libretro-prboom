@@ -1767,6 +1767,11 @@ bool D_DoomMainSetup(void)
    * shared mobjinfo table would expose them to Heretic lookups too). */
   if (!hexen && !heretic && W_CheckNumForName("DECORATE") >= 0)
     U_RegisterDecorateThings();
+  /* ZDoom DECORATE weapons: repoint Doom weapon slots to custom state
+   * chains.  After decorations (shared state/sprite growth), before R_Init,
+   * Doom game only. */
+  if (!hexen && !heretic && W_CheckNumForName("DECORATE") >= 0)
+    U_RegisterDecorateWeapons();
   /* ZDoom map-spot utility things (MapSpot 9001 etc.) are needed for ACS
    * SpawnSpot on Doom-game ZDoom maps whether or not a DECORATE lump is
    * present, but must stay out of Heretic/Hexen, which share the mobjinfo

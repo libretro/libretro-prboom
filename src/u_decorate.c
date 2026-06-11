@@ -26,12 +26,15 @@
 
 #include "doomtype.h"
 #include "doomstat.h"
+#include "doomdef.h"
 #include "info.h"
 #include "m_fixed.h"
 #include "w_wad.h"
 #include "lprintf.h"
 #include "dsda_hacked.h"
 #include "p_enemy.h"
+#include "p_pspr.h"
+#include "d_items.h"
 #include "sounds.h"
 #include "u_decorate.h"
 
@@ -64,6 +67,27 @@ typedef struct
   int  seq_loops;              /* 1 = loop back to frame 0, 0 = stop      */
   int  translucent;             /* RenderStyle Translucent / Add          */
   int  alpha;                   /* 16.16 alpha, FRACUNIT if unset         */
+
+  /* DECORATE weapon (": <Base>" / "replaces <Base>" rooted in a known
+   * weapon slot).  Each of the five engine weapon states is captured as a
+   * frame sequence with per-frame weapon actions; the registrar builds the
+   * chains and repoints weaponinfo[slot].  wpn_slot < 0 => not a weapon. */
+  int  wpn_slot;                /* weapontype_t of the replaced weapon     */
+#define WST_READY  0
+#define WST_SELECT 1
+#define WST_DESEL  2
+#define WST_FIRE   3
+#define WST_FLASH  4
+#define WST_COUNT  5
+#define MAX_WSTATE_FRAMES 24
+  struct {
+    struct { char spr[5]; short frame; short tics; short act; short snd; }
+         fr[MAX_WSTATE_FRAMES];
+    int  len;
+    int  loops;                 /* terminator: 1 loop, 0 stop/goto         */
+    int  present;
+    int  goto_dst;              /* WST_* the block's "goto" targets, or -1  */
+  } wst[WST_COUNT];
 } decorate_actor_t;
 
 static decorate_actor_t actors[MAX_DECORATE_ACTORS];
@@ -88,6 +112,62 @@ enum {
 static char decorate_sounds[MAX_DECORATE_SOUNDS][32];
 static int  num_decorate_sounds;
 
+/* Safe weapon-state (pspr) actions: the structural codepointers that make a
+ * custom weapon select, ready, fire-cycle, lower/raise and flash.  Firing
+ * damage is delegated to the replaced base weapon's native attack so no
+ * ZDoom-only hitscan/puff semantics are reinvented.  WA_NONE leaves the
+ * weapon state actionless. */
+enum {
+  WA_NONE = 0,
+  WA_READY,            /* A_WeaponReady */
+  WA_RAISE,            /* A_Raise */
+  WA_LOWER,            /* A_Lower */
+  WA_GUNFLASH,         /* A_GunFlash */
+  WA_REFIRE,           /* A_ReFire */
+  WA_BASEFIRE          /* delegate to the replaced weapon's native attack */
+};
+
+/* Map a base-weapon class name to its engine slot, or -1.  Only the Doom
+ * weapon classes are recognised; a custom weapon must inherit from or
+ * replace one of these to occupy a usable slot. */
+static int weapon_base_slot(const char *name)
+{
+  static const struct { const char *n; int slot; } tbl[] = {
+    { "Fist",          WP_FIST },
+    { "Chainsaw",      WP_CHAINSAW },
+    { "Pistol",        WP_PISTOL },
+    { "Shotgun",       WP_SHOTGUN },
+    { "SuperShotgun",  WP_SUPERSHOTGUN },
+    { "Chaingun",      WP_CHAINGUN },
+    { "RocketLauncher",WP_MISSILE },
+    { "PlasmaRifle",   WP_PLASMA },
+    { "BFG9000",       WP_BFG }
+  };
+  int i;
+  for (i = 0; i < (int)(sizeof(tbl) / sizeof(tbl[0])); i++)
+    if (!strcasecmp(tbl[i].n, name))
+      return tbl[i].slot;
+  return -1;
+}
+
+/* The base weapon's native fire action, for WA_BASEFIRE delegation. */
+static arg0_t weapon_base_fire(int slot)
+{
+  switch (slot)
+  {
+    case WP_FIST:         return (arg0_t)A_Punch;
+    case WP_CHAINSAW:     return (arg0_t)A_Saw;
+    case WP_PISTOL:       return (arg0_t)A_FirePistol;
+    case WP_SHOTGUN:      return (arg0_t)A_FireShotgun;
+    case WP_SUPERSHOTGUN: return (arg0_t)A_FireShotgun2;
+    case WP_CHAINGUN:     return (arg0_t)A_FireCGun;
+    case WP_MISSILE:      return (arg0_t)A_FireMissile;
+    case WP_PLASMA:       return (arg0_t)A_FirePlasma;
+    case WP_BFG:          return (arg0_t)A_FireBFG;
+    default:              return (arg0_t)NULL;
+  }
+}
+
 /* every 4-char sprite name appearing on a state line anywhere in the
  * DECORATE lump; R_InitSpriteDefs only unifies a sprite's art when the
  * lump actually redefines that sprite's sequence */
@@ -97,6 +177,188 @@ static int num_sprite_names;
 static int parsed;              /* one-shot lazy parse */
 
 static void parse_body(decorate_actor_t *a, const char *p, const char *end);
+static const char *skip_space(const char *p, const char *end);
+static const char *read_word(const char *p, const char *end,
+                             char *out, size_t outsz);
+
+/* Identify a weapon-state label.  Returns the WST_* index or -1.  ZDoom
+ * weapons name many states; only the five the engine's weaponinfo can hold
+ * are captured, plus the common aliases. */
+static int weapon_state_label(const char *w)
+{
+  if (!strcasecmp(w, "Ready"))                            return WST_READY;
+  if (!strcasecmp(w, "Select")  || !strcasecmp(w, "Up"))  return WST_SELECT;
+  if (!strcasecmp(w, "Deselect")|| !strcasecmp(w, "Down"))return WST_DESEL;
+  if (!strcasecmp(w, "Fire"))                             return WST_FIRE;
+  if (!strcasecmp(w, "Flash"))                            return WST_FLASH;
+  return -1;
+}
+
+/* Map a weapon-state action name to WA_*.  Unsupported actions become
+ * WA_NONE (inert).  Firing actions (A_FireBullets/A_FireCGun/...) collapse to
+ * WA_BASEFIRE: the registered chain delegates damage to the replaced base
+ * weapon's native attack, so no ZDoom-only hitscan/puff is reinvented. */
+static int weapon_action_of(const char *fn)
+{
+  if (!strcasecmp(fn, "A_WeaponReady"))  return WA_READY;
+  if (!strcasecmp(fn, "A_Raise"))        return WA_RAISE;
+  if (!strcasecmp(fn, "A_Lower"))        return WA_LOWER;
+  if (!strcasecmp(fn, "A_GunFlash"))     return WA_GUNFLASH;
+  if (!strcasecmp(fn, "A_ReFire") ||
+      !strcasecmp(fn, "A_Refire"))       return WA_REFIRE;
+  if (!strncasecmp(fn, "A_Fire", 6) ||
+      !strcasecmp(fn, "A_Saw") ||
+      !strcasecmp(fn, "A_Punch") ||
+      !strcasecmp(fn, "A_CustomPunch") ||
+      !strcasecmp(fn, "A_BFGsound"))     return WA_BASEFIRE;
+  /* A_PlaySound is deliberately NOT mapped: it is an mobj action
+   * (void A_PlaySound(mobj_t*)) reading its sound from state->misc1, but the
+   * engine's weapon path dispatches actions as (player,psp) and uses misc1/2
+   * as sprite offsets.  Wiring it here would mis-call and shift the gun
+   * sprite, so weapon-frame sounds are simply skipped. */
+  return WA_NONE;
+}
+
+/* Capture the frames of one weapon-state block into a->wst[idx].  p points
+ * just past the label colon; advances until the block's terminator
+ * (loop/stop/goto/wait/fail) or the next label, which it does not consume.
+ * Each line is "SPR <letters> <tics> [bright] [A_action[(args)]]"; the "####"
+ * / "----" sprite placeholder and "#"/"-" frame placeholder are honoured by
+ * leaving the slot's sprite/frame unchanged from the previous frame. */
+static const char *parse_weapon_state_block(decorate_actor_t *a, int idx,
+                                            const char *p, const char *end)
+{
+  char prev_spr[5] = "----";
+  short prev_frame = 0;
+
+  a->wst[idx].present = 1;
+  a->wst[idx].len     = 0;
+  a->wst[idx].loops   = 0;
+  a->wst[idx].goto_dst = -1;
+
+  while (p < end)
+  {
+    char spr[MAX_NAME], fr[MAX_NAME], tics[MAX_NAME];
+    const char *save = p;
+    p = skip_space(p, end);
+    if (p >= end) break;
+    if (*p == '\n' || *p == '{' || *p == '}') { p++; continue; }
+
+    p = read_word(p, end, spr, sizeof(spr));
+    if (!spr[0]) { p++; continue; }
+
+    /* DECORATE quotes the keep-sprite placeholder ("####"/"----") and
+     * occasionally the frame; strip surrounding quotes so the placeholder
+     * is seen as a 4-char token */
+    if (spr[0] == '"')
+    {
+      size_t L = strlen(spr);
+      if (L >= 2 && spr[L - 1] == '"')
+      {
+        memmove(spr, spr + 1, L - 2);
+        spr[L - 2] = 0;
+      }
+    }
+
+    /* a new label ("Fire:", "Hold:") ends this block; leave it unconsumed */
+    if (p < end && *p == ':')
+    {
+      p = save;
+      break;
+    }
+    /* block terminators */
+    if (!strcasecmp(spr, "loop") || !strcasecmp(spr, "wait"))
+    { a->wst[idx].loops = 1; break; }
+    if (!strcasecmp(spr, "stop") || !strcasecmp(spr, "fail"))
+    { a->wst[idx].loops = 0; break; }
+    if (!strcasecmp(spr, "goto"))
+    {
+      /* "goto Label": record which of our captured states it targets so the
+       * registrar can thread the terminal nextstate there (commonly Ready).
+       * A goto to a state we do not model leaves goto_dst -1 -> freeze. */
+      char dst[MAX_NAME];
+      a->wst[idx].loops = 0;
+      p = skip_space(p, end);
+      p = read_word(p, end, dst, sizeof(dst));
+      a->wst[idx].goto_dst = weapon_state_label(dst);
+      break;
+    }
+
+    /* sprite must be 4 chars (or the "####"/"----" keep placeholder) */
+    if (strlen(spr) != 4)
+      continue;
+
+    p = skip_space(p, end);
+    p = read_word(p, end, fr, sizeof(fr));
+    if (fr[0] == '"')
+    {
+      size_t L = strlen(fr);
+      if (L >= 2 && fr[L - 1] == '"') { memmove(fr, fr + 1, L - 2); fr[L - 2] = 0; }
+    }
+    p = skip_space(p, end);
+    p = read_word(p, end, tics, sizeof(tics));
+    if (!fr[0] || !(tics[0] == '-' || (tics[0] >= '0' && tics[0] <= '9')))
+      continue;                            /* not a state line */
+
+    {
+      int  t = atoi(tics);
+      int  bright = 0, act = WA_NONE;
+      short snd = -1;
+      char b[MAX_NAME];
+      const char *r = skip_space(p, end);
+      size_t fi;
+      const char *fr_ptr;
+      char use_spr[5];
+      int  keep_spr = (spr[0] == '#' || spr[0] == '-');
+
+      r = read_word(r, end, b, sizeof(b));
+      if (!strcasecmp(b, "bright"))
+      {
+        bright = FF_FULLBRIGHT;
+        r = skip_space(r, end);
+        r = read_word(r, end, b, sizeof(b));
+      }
+      if (b[0] == 'A' && b[1] == '_')
+      {
+        char fn[MAX_NAME];
+        size_t bi = 0;
+        while (b[bi] && b[bi] != '(') { fn[bi] = b[bi]; bi++; }
+        fn[bi] = 0;
+        act = weapon_action_of(fn);
+      }
+
+      if (keep_spr) memcpy(use_spr, prev_spr, 5);
+      else { memcpy(use_spr, spr, 4); use_spr[4] = 0; }
+      if (t < 0) t = 0;
+      if (t > 32767) t = 32767;
+
+      /* one entry per frame letter; the action fires on the first */
+      for (fi = 0, fr_ptr = fr; fr_ptr[fi]; fi++)
+      {
+        short fval;
+        if (a->wst[idx].len >= MAX_WSTATE_FRAMES) break;
+        if (fr_ptr[fi] == '#' || fr_ptr[fi] == '-')
+          fval = prev_frame;             /* keep current frame */
+        else if (fr_ptr[fi] >= 'A' && fr_ptr[fi] <= '_')
+          fval = (short)(fr_ptr[fi] - 'A');
+        else
+          continue;
+        {
+          int k = a->wst[idx].len++;
+          memcpy(a->wst[idx].fr[k].spr, use_spr, 5);
+          a->wst[idx].fr[k].frame = (short)(fval | bright);
+          a->wst[idx].fr[k].tics  = (short)t;
+          a->wst[idx].fr[k].act   = (short)((fi == 0) ? act : WA_NONE);
+          a->wst[idx].fr[k].snd   = (short)((fi == 0) ? snd : -1);
+          prev_frame = fval;
+          memcpy(prev_spr, use_spr, 5);
+        }
+      }
+      p = r;
+    }
+  }
+  return p;
+}
 
 /* ZDoom class names with fixed editor numbers, for chains that leave the
  * DECORATE lump.  Doom monsters plus ZDoom's Chex Quest class names (from
@@ -165,6 +427,7 @@ static void parse_header(const char *p, const char *end)
   a->doomednum = -1;
   a->radius = a->height = -1;
   a->alpha = FRACUNIT;
+  a->wpn_slot = -1;
 
   p = skip_space(p, end);
   p = read_word(p, end, a->name, sizeof(a->name));
@@ -192,6 +455,16 @@ static void parse_header(const char *p, const char *end)
       a->doomednum = atoi(word);
     /* anything else ("native", editor comments) is ignored */
   }
+
+  /* A custom weapon roots in a base weapon class through ": Base" or
+   * "replaces Base"; record the slot it should take over.  "replaces" wins
+   * (it names the weapon actually displaced) but the parent is the usual
+   * carrier in this mod ("HPistol : Pistol replaces Pistol"). */
+  if (a->replaces[0])
+    a->wpn_slot = weapon_base_slot(a->replaces);
+  if (a->wpn_slot < 0 && a->parent[0])
+    a->wpn_slot = weapon_base_slot(a->parent);
+
   num_actors++;
 }
 
@@ -409,6 +682,18 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
     {
       p++;
       in_spawn = !strcasecmp(word, "Spawn");
+      /* a weapon actor's named state blocks are captured separately and
+       * wired into weaponinfo at registration */
+      if (a->wpn_slot >= 0)
+      {
+        int wi = weapon_state_label(word);
+        if (wi >= 0)
+        {
+          p = parse_weapon_state_block(a, wi, p, end);
+          in_spawn = 0;
+          continue;
+        }
+      }
       continue;
     }
 
@@ -815,6 +1100,133 @@ void U_RegisterDecorateThings(void)
   if (count_mt)
     lprintf(LO_INFO, "U_RegisterDecorateThings: %d decorations (%d states)\n",
             count_mt, count);
+}
+
+/* Resolve a 4-char sprite name to a sprite index, growing the table if the
+ * name is new.  *sp_next tracks the next free slot across calls. */
+static int decorate_sprite_index(const char *name, int *sp_next)
+{
+  int k;
+  for (k = 0; k < *sp_next; k++)
+    if (sprnames[k] && !strncasecmp(sprnames[k], name, 4))
+      return k;
+  k = (*sp_next)++;
+  *dsda_GetSprite(k) = strdup(name);
+  return k;
+}
+
+/* Build one weapon-state chain from a captured block; returns the index of
+ * the first state, or -1 if the block is empty.  base_fire is appended to a
+ * Fire chain's first action-less firing frame via WA_BASEFIRE wiring done by
+ * the caller through the per-frame act codes. */
+static int build_weapon_chain(decorate_actor_t *a, int wi, int slot,
+                              int *st_cursor, int *sp_next)
+{
+  int n = a->wst[wi].len, f, first;
+  if (!a->wst[wi].present || n <= 0)
+    return -1;
+
+  first = *st_cursor;
+  for (f = 0; f < n; f++)
+  {
+    int cur  = (*st_cursor)++;
+    int last = (f == n - 1);
+    int spr  = decorate_sprite_index(a->wst[wi].fr[f].spr, sp_next);
+    /* sprite table resolved (and possibly grown) above; only now take the
+     * state pointer, which dsda_GetState may itself move -- nothing
+     * dereferences a stale states[] pointer across these calls.  Weapon
+     * states never set misc1/misc2: the engine uses them as gun-sprite
+     * offsets, so they must stay zero. */
+    state_t *st = dsda_GetState(cur);
+    st->sprite    = spr;
+    st->frame     = a->wst[wi].fr[f].frame;
+    st->tics      = a->wst[wi].fr[f].tics;
+    st->nextstate = last ? (a->wst[wi].loops ? first : cur) : cur + 1;
+    st->misc1 = st->misc2 = 0;
+    st->action.arg0 = (arg0_t)NULL;
+
+    switch (a->wst[wi].fr[f].act)
+    {
+      case WA_READY:    st->action.arg0 = (arg0_t)A_WeaponReady; break;
+      case WA_RAISE:    st->action.arg0 = (arg0_t)A_Raise;       break;
+      case WA_LOWER:    st->action.arg0 = (arg0_t)A_Lower;       break;
+      case WA_GUNFLASH: st->action.arg0 = (arg0_t)A_GunFlash;    break;
+      case WA_REFIRE:   st->action.arg0 = (arg0_t)A_ReFire;      break;
+      case WA_BASEFIRE: st->action.arg0 = weapon_base_fire(slot);break;
+      default: break;
+    }
+  }
+  return first;
+}
+
+void U_RegisterDecorateWeapons(void)
+{
+  int i, nweap = 0;
+  int sp_next   = num_sprites;
+  int st_start  = num_states;
+  int st_cursor = num_states;
+
+  if (!parsed)
+    parse_decorate();
+
+  for (i = 0; i < num_actors; i++)
+  {
+    decorate_actor_t *a = &actors[i];
+    int slot = a->wpn_slot;
+    int ready, up, down, atk, flash;
+    int first_of[WST_COUNT];
+    int wi;
+
+    if (slot < 0 || slot >= NUMWEAPONS)
+      continue;
+    /* require at least the structural states to consider it a real custom
+     * weapon; a bare "replaces" with no states leaves the base intact */
+    if (!a->wst[WST_READY].present && !a->wst[WST_FIRE].present)
+      continue;
+
+    ready = build_weapon_chain(a, WST_READY,  slot, &st_cursor, &sp_next);
+    up    = build_weapon_chain(a, WST_SELECT, slot, &st_cursor, &sp_next);
+    down  = build_weapon_chain(a, WST_DESEL,  slot, &st_cursor, &sp_next);
+    atk   = build_weapon_chain(a, WST_FIRE,   slot, &st_cursor, &sp_next);
+    flash = build_weapon_chain(a, WST_FLASH,  slot, &st_cursor, &sp_next);
+
+    first_of[WST_READY]  = ready;
+    first_of[WST_SELECT] = up;
+    first_of[WST_DESEL]  = down;
+    first_of[WST_FIRE]   = atk;
+    first_of[WST_FLASH]  = flash;
+
+    /* thread each block's "goto Label" terminator to the first state of the
+     * target chain (e.g. a Fire block ending "goto Ready" must return to the
+     * ready loop, or the weapon would freeze after one shot).  A goto whose
+     * target we did not build leaves the terminal state frozen. */
+    for (wi = 0; wi < WST_COUNT; wi++)
+    {
+      int base = first_of[wi];
+      int dst;
+      if (base < 0 || !a->wst[wi].present || a->wst[wi].len <= 0)
+        continue;
+      if (a->wst[wi].goto_dst < 0)
+        continue;
+      dst = first_of[a->wst[wi].goto_dst];
+      if (dst >= 0)
+        dsda_GetState(base + a->wst[wi].len - 1)->nextstate = dst;
+    }
+
+    /* repoint only the states the DECORATE actually provided; leave the
+     * base weapon's own state for any the actor omitted */
+    if (ready >= 0) weaponinfo[slot].readystate = ready;
+    if (up    >= 0) weaponinfo[slot].upstate    = up;
+    if (down  >= 0) weaponinfo[slot].downstate  = down;
+    if (atk   >= 0) weaponinfo[slot].atkstate   = atk;
+    if (flash >= 0) weaponinfo[slot].flashstate = flash;
+
+    nweap++;
+  }
+
+  if (nweap)
+    lprintf(LO_INFO, "U_RegisterDecorateWeapons: %d weapon(s) "
+            "(%d states)\n", nweap, st_cursor - st_start);
 }
 
 /* does the DECORATE lump redefine this sprite's state sequence? */

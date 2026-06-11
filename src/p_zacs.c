@@ -1659,11 +1659,55 @@ dbool Z_ACSTerminate(int number)
   return any;
 }
 
+/* Name of an aggregated script entry, or NULL for a numbered (non-named)
+ * script.  Named scripts carry number -(SNAM index + 1) in their owning
+ * module's name table. */
+static const char *zacs_script_name(int i)
+{
+  int num, sidx, mod;
+  if (i < 0 || i >= zacs_numscripts)
+    return NULL;
+  num = zacs_scripts[i].number;
+  if (num >= 32768)
+    num -= 65536;                 /* stored as unsigned 16-bit */
+  if (num >= 0)
+    return NULL;                  /* numbered script, no name */
+  sidx = -num - 1;
+  mod  = zacs_scripts[i].module;
+  if (mod < 0 || mod >= zacs_nummodules)
+    return NULL;
+  if (sidx < 0 || sidx >= zacs_modules[mod].numsnames)
+    return NULL;
+  return zacs_modules[mod].snames[sidx];
+}
+
+/* A GDCC-compiled object carries a global-constructor script whose name ends
+ * in "$init"; it lays out that object's static data and C runtime in the
+ * global memory segment and must run before any other script in the object,
+ * or the dependent scripts read an unset runtime and misbehave. */
+static dbool zacs_is_init_script(int i)
+{
+  const char *nm = zacs_script_name(i);
+  size_t n;
+  if (!nm)
+    return false;
+  n = strlen(nm);
+  return (n >= 5 && !strcmp(nm + n - 5, "$init"));
+}
+
 void Z_ACSRunOpenScripts(void)
 {
   int i;
+  /* First pass: GDCC global-constructor ("$init") OPEN scripts, which set up
+   * their object's static data and C runtime before anything else runs.
+   * Running a dependent OPEN script ahead of its object's constructor leaves
+   * that script reading an unset runtime. */
   for (i = 0; i < zacs_numscripts; i++)
-    if (zacs_scripts[i].type == 1)              /* OPEN */
+    if (zacs_scripts[i].type == 1 && zacs_is_init_script(i))
+      zacs_spawn(i, NULL, 0, NULL, NULL, 0);
+  /* Second pass: the remaining OPEN scripts, now that any constructors ran. */
+  for (i = 0; i < zacs_numscripts; i++)
+    if (zacs_scripts[i].type == 1 && !zacs_is_init_script(i))
       zacs_spawn(i, NULL, 0, NULL, NULL, 0);
 }
 

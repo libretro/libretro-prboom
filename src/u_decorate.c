@@ -137,6 +137,7 @@ typedef struct
   struct { char name[28]; short base; short len; } uvar[MAX_USERVARS];
   int  num_uvars;
   int  uvar_slots;              /* total int slots the actor needs */
+  int  inherited;              /* 1 once parent state/vars merged in       */
 } decorate_actor_t;
 
 static decorate_actor_t actors[MAX_DECORATE_ACTORS];
@@ -1006,6 +1007,111 @@ static void parse_decorate_lump(int lump, int incdepth)
     parse_decorate_lump(incs[k], incdepth + 1);
 }
 
+/* Mutable actor lookup by name (parse-time), or NULL. */
+static decorate_actor_t *find_actor_mut(const char *name)
+{
+  int i;
+  for (i = 0; i < num_actors; i++)
+    if (!strcasecmp(actors[i].name, name))
+      return &actors[i];
+  return NULL;
+}
+
+/* DECORATE single inheritance: a child ": Parent" inherits the parent's user
+ * variables, its Damage, and its whole state machine.  The parent's frames are
+ * appended after the child's own and every parent label is recorded twice --
+ * under its plain name (so a label the child does not define resolves to the
+ * parent's) and under "Super::<name>" (so the child's "goto Super::Spawn"
+ * reaches the parent's chain).  Parent-internal flow/jump targets are shifted
+ * by the child's frame count so they keep pointing at the right frames.  Only
+ * a single DECORATE-defined parent level is merged, which is what the content
+ * here needs; engine base classes (no captured frames) contribute nothing. */
+static void inherit_one(decorate_actor_t *c)
+{
+  decorate_actor_t *pp = find_actor_mut(c->parent);
+  int base, u, l, f, li;
+  if (!pp || !pp->name[0])
+    return;
+  /* recurse so a grandparent is merged into the parent first */
+  if (pp->parent[0] && !pp->inherited)
+    inherit_one(pp);
+
+  /* user variables: inherit any the child does not itself declare, keeping
+   * the child's slot layout first and appending the parent's */
+  for (u = 0; u < pp->num_uvars; u++)
+  {
+    if (decorate_uvar_slot(c, pp->uvar[u].name) >= 0)
+      continue;
+    if (c->num_uvars >= MAX_USERVARS)
+      break;
+    {
+      int k = c->num_uvars++;
+      memcpy(c->uvar[k].name, pp->uvar[u].name, sizeof(c->uvar[k].name));
+      c->uvar[k].base = (short)c->uvar_slots;
+      c->uvar[k].len  = pp->uvar[u].len;
+      c->uvar_slots  += pp->uvar[u].len;
+    }
+  }
+
+  if (c->damage == 0 && pp->damage != 0)
+    c->damage = pp->damage;
+
+  /* append the parent's captured frames after the child's */
+  base = c->seq_len;
+  if (base + pp->seq_len > MAX_SPAWN_FRAMES)
+    return;                 /* too large to merge; leave child as-is */
+  for (f = 0; f < pp->seq_len; f++)
+  {
+    c->seq[base + f]   = pp->seq[f];
+    c->seqop[base + f] = pp->seqop[f];
+    c->seqflow[base + f] = pp->seqflow[f];
+    /* shift a numeric/relative goto's resolved-later targets: the parent's
+     * label-name targets resolve through the merged label table, so only the
+     * label frames themselves need the base offset (done below). */
+  }
+  if (c->seq_sprite[0] == 0)
+    memcpy(c->seq_sprite, pp->seq_sprite, sizeof(c->seq_sprite));
+  c->seq_len = base + pp->seq_len;
+  if (pp->multi_state)
+    c->multi_state = 1;
+
+  /* record parent labels, offset into the appended region, under both the
+   * plain name (if the child lacks it) and the Super:: alias */
+  for (l = 0; l < pp->num_seqlabels; l++)
+  {
+    char sup[32];
+    int frame = base + pp->seqlabel[l].frame;
+    if (decorate_label_index(c, pp->seqlabel[l].name) < 0)
+      decorate_add_label(c, pp->seqlabel[l].name, frame);
+    sup[0] = 0;
+    {
+      const char *pre = "Super::";
+      int n = 0, m = 0;
+      while (pre[n]) { sup[m++] = pre[n++]; }
+      n = 0;
+      while (pp->seqlabel[l].name[n] && m < 31)
+      { sup[m++] = pp->seqlabel[l].name[n++]; }
+      sup[m] = 0;
+    }
+    decorate_add_label(c, sup, frame);
+  }
+
+  /* fix the child's own "goto Super::X" terminators: a SEQF_GOTO whose target
+   * name now exists in the label table needs no change (resolved by name at
+   * registration).  Numeric A_JumpIf offsets in the parent region were copied
+   * verbatim and remain relative, which is correct. */
+  (void)li;
+  c->inherited = 1;
+}
+
+static void inherit_from_parents(void)
+{
+  int i;
+  for (i = 0; i < num_actors; i++)
+    if (actors[i].parent[0] && !actors[i].inherited)
+      inherit_one(&actors[i]);
+}
+
 static void parse_decorate(void)
 {
   int lump;
@@ -1020,6 +1126,8 @@ static void parse_decorate(void)
 
   if (num_actors)
     lprintf(LO_INFO, "U_ParseDecorate: %d actor headers\n", num_actors);
+
+  inherit_from_parents();
 }
 
 static const decorate_actor_t *find_actor(const char *name)
@@ -1251,16 +1359,21 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
              !strcasecmp(word, "goto"))
     {
       /* "goto Label": the last captured frame jumps to the named label.  The
-       * target is resolved to a state index at registration. */
+       * target is resolved to a state index at registration.  The label may
+       * be scoped ("Super::Spawn"), so read past ':' which read_word stops on. */
       char dst[MAX_NAME];
       int lf = a->seq_len - 1;
+      size_t dn = 0;
       p = skip_space(p, end);
-      p = read_word(p, end, dst, sizeof(dst));
+      while (p < end && *p != ' ' && *p != '\t' && *p != '\r' &&
+             *p != '\n' && *p != '{' && dn + 1 < sizeof(dst))
+        dst[dn++] = *p++;
+      dst[dn] = 0;
       a->seqflow[lf].flow   = SEQF_GOTO;
       {
-        int dn = 0;
-        while (dst[dn] && dn < 23) { a->seqflow[lf].tname[dn] = dst[dn]; dn++; }
-        a->seqflow[lf].tname[dn] = 0;
+        int k = 0;
+        while (dst[k] && k < 23) { a->seqflow[lf].tname[k] = dst[k]; k++; }
+        a->seqflow[lf].tname[k] = 0;
       }
       a->multi_state = 1;
       in_spawn = 0;

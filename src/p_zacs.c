@@ -48,6 +48,27 @@
 #include "hu_lib.h"
 #include "hu_stuff.h"
 #include "p_zacs.h"
+#include "u_png.h"
+
+/* Vector kernels for the full-colour overlay blit's blend (the hot path: the
+ * per-pixel 8-bit channel LERP dominates, while the strided source gather is
+ * cheap, so a batch is gathered scalar then blended eight-wide).  Same guard
+ * shape as the renderer's column blenders. */
+#if defined(__SSE2__) || (defined(_M_IX86_FP) && _M_IX86_FP >= 2) || defined(_M_X64)
+#define ZACS_BLIT_SSE2 1
+#include <emmintrin.h>
+#elif defined(__ARM_NEON) || defined(__ARM_NEON__) || defined(_M_ARM64)
+#define ZACS_BLIT_NEON 1
+#include <arm_neon.h>
+#endif
+
+#if defined(ZACS_BLIT_SSE2) || defined(ZACS_BLIT_NEON)
+#if defined(_MSC_VER)
+#define ZACS_ALIGN16 __declspec(align(16))
+#else
+#define ZACS_ALIGN16 __attribute__((aligned(16)))
+#endif
+#endif
 
 /* ---- limits ------------------------------------------------------------ */
 
@@ -1547,13 +1568,22 @@ static int zacs_oldbuttons_of(player_t *pl)
 typedef struct {
   int   active;
   int   id;
-  int   x, y;          /* virtual coords, already mapped to 320x200          */
+  int   x, y;          /* raw HUD coords (whole units) within hbox            */
+  int   hbox_w, hbox_h;/* SetHudSize box this message was placed in           */
   int   holdtics;      /* remaining tics; <0 = until replaced                 */
   int   color;         /* CR_* range index, or -1 for default                 */
+  int   centered;      /* draw centered on (x,y) (graphics) vs left-aligned   */
+  int   fadein, fadeout;/* fade ramp lengths in tics (0 = none)               */
+  int   fadetotal;     /* total tics for fade messages                        */
+  int   age;           /* tics elapsed since the message was (re)stored       */
+  int   typeon;        /* typewriter reveal: tics per character, 0 = off      */
+  int   graphic_lump;  /* >=0: draw this patch (a font that is one image)     */
+  char  font[32];      /* current font name when stored                       */
   char  text[ZACS_PRINTBUF];
 } zacs_hudmsg_t;
 static zacs_hudmsg_t zacs_hudmsgs[ZACS_HUDMSG_MAX];
 static int zacs_hud_w = 320, zacs_hud_h = 200;   /* current SetHudSize box   */
+static char zacs_cur_font[32];                   /* current SetFont selection */
 
 /* the status-bar font, defined in hu_stuff.c (no public extern there) */
 extern patchnum_t hu_font[HU_FONTSIZE];
@@ -1572,9 +1602,29 @@ static int zacs_hud_map_y(int fy)
   return (int)((long long)py * 200 / zacs_hud_h);
 }
 
+/* Resolve a font/graphic name to a drawable patch lump, or -1 if it is a real
+ * text font (or unknown).  Story content selects a portrait or the dialogue
+ * frame by SetFont()-ing a single-image "font" and printing one character, so
+ * a name that matches a graphic lump is drawn as that patch.  Genuine text
+ * fonts (SMALLFONT, the engine's own) return -1 and are drawn as glyph text. */
+static int zacs_font_graphic(const char *font)
+{
+  int l;
+  if (!font || !font[0])
+    return -1;
+  if (!strcasecmp(font, "SMALLFONT") || !strcasecmp(font, "BIGFONT") ||
+      !strcasecmp(font, "CONFONT"))
+    return -1;
+  l = (W_CheckNumForName)(font, ns_global);
+  if (l < 0)
+    l = (W_CheckNumForName)(font, ns_sprites);
+  return l;
+}
+
 /* Register/replace a positioned, timed hud message. */
 static void zacs_hud_store(const char *text, int id, int x, int y,
-                           int holdtics, int color)
+                           int holdtics, int color, int type,
+                           int fadein, int fadeout, int typeon)
 {
   int i, slot = -1;
   if (id != 0)
@@ -1590,8 +1640,33 @@ static void zacs_hud_store(const char *text, int id, int x, int y,
   zacs_hudmsgs[slot].id       = id;
   zacs_hudmsgs[slot].x        = x;
   zacs_hudmsgs[slot].y        = y;
+  zacs_hudmsgs[slot].hbox_w   = zacs_hud_w;
+  zacs_hudmsgs[slot].hbox_h   = zacs_hud_h;
   zacs_hudmsgs[slot].holdtics = holdtics;
   zacs_hudmsgs[slot].color    = color;
+  zacs_hudmsgs[slot].graphic_lump = zacs_font_graphic(zacs_cur_font);
+  zacs_hudmsgs[slot].centered = (zacs_hudmsgs[slot].graphic_lump >= 0);
+  zacs_hudmsgs[slot].fadein   = fadein;
+  zacs_hudmsgs[slot].fadeout  = fadeout;
+  zacs_hudmsgs[slot].typeon   = typeon;
+  zacs_hudmsgs[slot].age      = 0;
+  /* For a fade message, hold for the requested time plus the ramps so the
+   * out-ramp is visible; a 0 hold with fades still needs the ramps to play. */
+  if ((type & 3) && (fadein || fadeout))
+  {
+    int hold = holdtics > 0 ? holdtics : 0;
+    zacs_hudmsgs[slot].fadetotal = fadein + hold + fadeout;
+    zacs_hudmsgs[slot].holdtics  = zacs_hudmsgs[slot].fadetotal;
+  }
+  else
+    zacs_hudmsgs[slot].fadetotal = 0;
+  {
+    size_t n = strlen(zacs_cur_font);
+    if (n > sizeof(zacs_hudmsgs[slot].font) - 1)
+      n = sizeof(zacs_hudmsgs[slot].font) - 1;
+    memcpy(zacs_hudmsgs[slot].font, zacs_cur_font, n);
+    zacs_hudmsgs[slot].font[n] = 0;
+  }
   {
     size_t n = strlen(text);
     if (n > ZACS_PRINTBUF - 1)
@@ -1599,6 +1674,14 @@ static void zacs_hud_store(const char *text, int id, int x, int y,
     memcpy(zacs_hudmsgs[slot].text, text, n);
     zacs_hudmsgs[slot].text[n] = 0;
   }
+}
+
+static void zacs_hud_clear(int id)
+{
+  int i;
+  for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+    if (zacs_hudmsgs[i].active && zacs_hudmsgs[i].id == id)
+      zacs_hudmsgs[i].active = 0;
 }
 
 static void zacs_deliver(zacs_inst_t *inst, dbool bold)
@@ -1842,9 +1925,13 @@ void Z_ACSHudTicker(void)
     zacs_oldbuttons_snap[i] = playeringame[i] ? players[i].cmd.buttons : 0;
   }
   for (i = 0; i < ZACS_HUDMSG_MAX; i++)
-    if (zacs_hudmsgs[i].active && zacs_hudmsgs[i].holdtics >= 0)
-      if (--zacs_hudmsgs[i].holdtics < 0)
-        zacs_hudmsgs[i].active = 0;
+    if (zacs_hudmsgs[i].active)
+    {
+      zacs_hudmsgs[i].age++;
+      if (zacs_hudmsgs[i].holdtics >= 0)
+        if (--zacs_hudmsgs[i].holdtics < 0)
+          zacs_hudmsgs[i].active = 0;
+    }
 }
 
 /* Clear all hud messages (level start / reset). */
@@ -1860,29 +1947,337 @@ void Z_ACSHudClear(void)
 /* Draw the live hud messages.  Called from the HUD drawer; uses the small
  * status-bar font via a transient text line so colour escapes and the missing
  * -glyph fallbacks are handled exactly as the message widget's are. */
+/* Draw an indexed patch scaled into a destination rectangle on the RGB565
+ * surface, with a global alpha (0..256) for fade.  The HUD overlay places its
+ * portrait and frame art in a virtual box (SetHudSize) much larger than the
+ * 320x200 page, so the art is point-sampled down to the on-screen rect rather
+ * than drawn at the renderer's fixed page scale.  Transparent patch posts are
+ * skipped, so the source's own cutout is preserved.
+ *
+ * This is the inner pixel loop of the dialogue overlay: for every output pixel
+ * it maps back to a source texel, looks the palette colour up, and (when not
+ * opaque) blends 5/6/5 channels against the destination.  It is deliberately
+ * written as a tight per-row scan so the blend can later be vectorised. */
+/* Indexed-patch fallback for HUD art with no native-colour copy: scales the
+ * PLAYPAL-mapped patch into the destination rect with a global alpha, walking
+ * the column posts for opacity.  Used only when U_PNGCacheRGBA has nothing. */
+static void zacs_blit_scaled_indexed(int lump, int dx, int dy, int dw, int dh,
+                                     int alpha)
+{
+  const rpatch_t *patch;
+  uint16_t *surf;
+  int ox, oy, sw, sh;
+  int x0, x1, y0, y1;
+  int sx_step, sy_step, sx_start;
+  if (lump < 0 || dw <= 0 || dh <= 0 || alpha <= 0)
+    return;
+  patch = R_CachePatchNum(lump);
+  sw = patch->width;
+  sh = patch->height;
+  if (sw <= 0 || sh <= 0)
+  {
+    R_UnlockPatchNum(lump);
+    return;
+  }
+  surf = (uint16_t *)screens[0].data;
+  sx_step = (sw << 16) / dw;
+  sy_step = (sh << 16) / dh;
+  x0 = dx < 0 ? 0 : dx;
+  y0 = dy < 0 ? 0 : dy;
+  x1 = dx + dw; if (x1 > SCREENWIDTH)  x1 = SCREENWIDTH;
+  y1 = dy + dh; if (y1 > SCREENHEIGHT) y1 = SCREENHEIGHT;
+  sx_start = (x0 - dx) * sx_step;
+
+  for (oy = y0; oy < y1; oy++)
+  {
+    int srcy = ((oy - dy) * sy_step) >> 16;
+    uint16_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    int sx = sx_start;
+    if (srcy < 0) srcy = 0; else if (srcy >= sh) srcy = sh - 1;
+    for (ox = x0; ox < x1; ox++, sx += sx_step)
+    {
+      int srcx = sx >> 16;
+      const rcolumn_t *col = R_GetPatchColumn(patch, srcx);
+      int i, idx = -1;
+      for (i = 0; i < col->numPosts; i++)
+      {
+        const rpost_t *post = &col->posts[i];
+        if (srcy >= post->topdelta && srcy < post->topdelta + post->length)
+        {
+          idx = col->pixels[srcy];
+          break;
+        }
+      }
+      if (idx < 0)
+        continue;
+      {
+        uint16_t s = VID_PAL16((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
+        if (alpha >= 256)
+          row[ox] = s;
+        else
+        {
+          uint16_t d = row[ox];
+          int sr = (s >> 11) & 0x1f, sg = (s >> 5) & 0x3f, sb = s & 0x1f;
+          int dr = (d >> 11) & 0x1f, dg = (d >> 5) & 0x3f, db = d & 0x1f;
+          int ia = 256 - alpha;
+          int rr = (sr * alpha + dr * ia) >> 8;
+          int rg = (sg * alpha + dg * ia) >> 8;
+          int rb = (sb * alpha + db * ia) >> 8;
+          row[ox] = (uint16_t)((rr << 11) | (rg << 5) | rb);
+        }
+      }
+    }
+  }
+  R_UnlockPatchNum(lump);
+}
+
+/* Draw a HUD image scaled into a destination rectangle on the surface, with a
+ * global fade alpha (0..256).  Full-colour art (portraits, the dialogue frame)
+ * is blitted from its native 0xAABBGGRR copy: the blend runs at 8-bit channel
+ * precision and is narrowed to the surface format only at store time, so the
+ * result keeps the source colour instead of the 256-colour palette
+ * approximation, and per-texel source alpha gives soft edges rather than a
+ * 1-bit cut.  Art without a native copy falls back to the indexed patch.
+ *
+ * The destination is source-stepped with 16.16 fixed point so the inner loop
+ * carries no divides; this is the overlay's hot pixel loop. */
+static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
+                             int alpha)
+{
+  const unsigned *argb;
+  uint16_t *surf;
+  int aw = 0, ah = 0;
+  int ox, oy, x0, x1, y0, y1;
+  int sx_step, sy_step, sx_start;
+  if (lump < 0 || dw <= 0 || dh <= 0 || alpha <= 0)
+    return;
+
+  argb = U_PNGCacheRGBA(lump, &aw, &ah);
+  if (!argb || aw <= 0 || ah <= 0)
+  {
+    zacs_blit_scaled_indexed(lump, dx, dy, dw, dh, alpha);
+    return;
+  }
+
+  surf    = (uint16_t *)screens[0].data;
+  sx_step = (aw << 16) / dw;
+  sy_step = (ah << 16) / dh;
+  x0 = dx < 0 ? 0 : dx;
+  y0 = dy < 0 ? 0 : dy;
+  x1 = dx + dw; if (x1 > SCREENWIDTH)  x1 = SCREENWIDTH;
+  y1 = dy + dh; if (y1 > SCREENHEIGHT) y1 = SCREENHEIGHT;
+  sx_start = (x0 - dx) * sx_step;
+
+  for (oy = y0; oy < y1; oy++)
+  {
+    int srcy = ((oy - dy) * sy_step) >> 16;
+    uint16_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    const unsigned *srow;
+    int sx = sx_start;
+    ox = x0;
+    if (srcy < 0) srcy = 0; else if (srcy >= ah) srcy = ah - 1;
+    srow = argb + (size_t)srcy * aw;
+
+#if defined(ZACS_BLIT_SSE2) || defined(ZACS_BLIT_NEON)
+    /* Eight output pixels per pass: gather the (strided) source texels and
+     * fold the fade into each texel's alpha scalar, then run the 8-bit channel
+     * LERP and 565 pack in vector lanes.  Bit-identical to the scalar tail. */
+    for (; ox + 8 <= x1; ox += 8)
+    {
+      ZACS_ALIGN16 uint32_t sp[8];
+      ZACS_ALIGN16 uint16_t av[8];
+      int j, anyop = 0;
+      for (j = 0; j < 8; j++, sx += sx_step)
+      {
+        unsigned p = srow[sx >> 16];
+        int a = (int)(p >> 24);
+        a = (a * alpha) >> 8;
+        if (a > 256) a = 256;
+        sp[j] = p;
+        av[j] = (uint16_t)a;
+        anyop |= a;
+      }
+      if (!anyop)
+        continue;                              /* whole batch transparent */
+#if defined(ZACS_BLIT_SSE2)
+      {
+        __m128i s0 = _mm_load_si128((const __m128i *)sp);
+        __m128i s1 = _mm_load_si128((const __m128i *)(sp + 4));
+        __m128i m8 = _mm_set1_epi32(0xff);
+        __m128i sr = _mm_packs_epi32(_mm_and_si128(s0, m8),
+                                     _mm_and_si128(s1, m8));
+        __m128i sg = _mm_packs_epi32(_mm_and_si128(_mm_srli_epi32(s0, 8), m8),
+                                     _mm_and_si128(_mm_srli_epi32(s1, 8), m8));
+        __m128i sb = _mm_packs_epi32(_mm_and_si128(_mm_srli_epi32(s0, 16), m8),
+                                     _mm_and_si128(_mm_srli_epi32(s1, 16), m8));
+        __m128i a  = _mm_load_si128((const __m128i *)av);
+        __m128i ia = _mm_sub_epi16(_mm_set1_epi16(256), a);
+        __m128i d  = _mm_loadu_si128((const __m128i *)(row + ox));
+        __m128i dr = _mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(d, 11),
+                                    _mm_set1_epi16(0x1F)), 3);
+        __m128i dg = _mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(d, 5),
+                                    _mm_set1_epi16(0x3F)), 2);
+        __m128i db = _mm_slli_epi16(_mm_and_si128(d, _mm_set1_epi16(0x1F)), 3);
+        __m128i rr = _mm_srli_epi16(_mm_add_epi16(_mm_mullo_epi16(sr, a),
+                                    _mm_mullo_epi16(dr, ia)), 8);
+        __m128i rg = _mm_srli_epi16(_mm_add_epi16(_mm_mullo_epi16(sg, a),
+                                    _mm_mullo_epi16(dg, ia)), 8);
+        __m128i rb = _mm_srli_epi16(_mm_add_epi16(_mm_mullo_epi16(sb, a),
+                                    _mm_mullo_epi16(db, ia)), 8);
+        __m128i o  = _mm_or_si128(_mm_or_si128(
+                       _mm_slli_epi16(_mm_srli_epi16(rr, 3), 11),
+                       _mm_slli_epi16(_mm_srli_epi16(rg, 2), 5)),
+                       _mm_srli_epi16(rb, 3));
+        /* a==0 texels keep the destination pixel untouched */
+        __m128i keep = _mm_cmpeq_epi16(a, _mm_setzero_si128());
+        o = _mm_or_si128(_mm_and_si128(keep, d), _mm_andnot_si128(keep, o));
+        _mm_storeu_si128((__m128i *)(row + ox), o);
+      }
+#else /* ZACS_BLIT_NEON */
+      {
+        uint32x4_t s0 = vld1q_u32(sp);
+        uint32x4_t s1 = vld1q_u32(sp + 4);
+        uint16x8_t sr = vcombine_u16(vmovn_u32(vandq_u32(s0, vdupq_n_u32(0xff))),
+                                     vmovn_u32(vandq_u32(s1, vdupq_n_u32(0xff))));
+        uint16x8_t sg = vcombine_u16(
+                          vmovn_u32(vandq_u32(vshrq_n_u32(s0, 8), vdupq_n_u32(0xff))),
+                          vmovn_u32(vandq_u32(vshrq_n_u32(s1, 8), vdupq_n_u32(0xff))));
+        uint16x8_t sb = vcombine_u16(
+                          vmovn_u32(vandq_u32(vshrq_n_u32(s0, 16), vdupq_n_u32(0xff))),
+                          vmovn_u32(vandq_u32(vshrq_n_u32(s1, 16), vdupq_n_u32(0xff))));
+        uint16x8_t a  = vld1q_u16(av);
+        uint16x8_t ia = vsubq_u16(vdupq_n_u16(256), a);
+        uint16x8_t d  = vld1q_u16(row + ox);
+        uint16x8_t dr = vshlq_n_u16(vandq_u16(vshrq_n_u16(d, 11),
+                                    vdupq_n_u16(0x1F)), 3);
+        uint16x8_t dg = vshlq_n_u16(vandq_u16(vshrq_n_u16(d, 5),
+                                    vdupq_n_u16(0x3F)), 2);
+        uint16x8_t db = vshlq_n_u16(vandq_u16(d, vdupq_n_u16(0x1F)), 3);
+        uint16x8_t rr = vshrq_n_u16(vaddq_u16(vmulq_u16(sr, a),
+                                    vmulq_u16(dr, ia)), 8);
+        uint16x8_t rg = vshrq_n_u16(vaddq_u16(vmulq_u16(sg, a),
+                                    vmulq_u16(dg, ia)), 8);
+        uint16x8_t rb = vshrq_n_u16(vaddq_u16(vmulq_u16(sb, a),
+                                    vmulq_u16(db, ia)), 8);
+        uint16x8_t o  = vorrq_u16(vorrq_u16(
+                          vshlq_n_u16(vshrq_n_u16(rr, 3), 11),
+                          vshlq_n_u16(vshrq_n_u16(rg, 2), 5)),
+                          vshrq_n_u16(rb, 3));
+        uint16x8_t keep = vceqq_u16(a, vdupq_n_u16(0));
+        o = vbslq_u16(keep, d, o);
+        vst1q_u16(row + ox, o);
+      }
+#endif
+    }
+#endif
+
+    for (; ox < x1; ox++, sx += sx_step)
+    {
+      unsigned p = srow[sx >> 16];
+      int a = (int)(p >> 24);                  /* 0xAABBGGRR: alpha in bits 24+ */
+      if (!a)
+        continue;                              /* fully transparent texel */
+      /* fold the fade into the texel's own alpha (both 0..255 -> 0..256) */
+      a = (a * alpha) >> 8;
+      if (a <= 0)
+        continue;
+      {
+        int sr = (int)(p & 0xff);              /* R in low byte */
+        int sg = (int)((p >> 8) & 0xff);
+        int sb = (int)((p >> 16) & 0xff);
+        uint16_t d = row[ox];
+        int dr = ((d >> 11) & 0x1f) << 3;
+        int dg = ((d >> 5)  & 0x3f) << 2;
+        int db = (d & 0x1f) << 3;
+        int ia = 256 - (a > 256 ? 256 : a);
+        int rr = (sr * a + dr * ia) >> 8;
+        int rg = (sg * a + dg * ia) >> 8;
+        int rb = (sb * a + db * ia) >> 8;
+        if (rr > 255) rr = 255;
+        if (rg > 255) rg = 255;
+        if (rb > 255) rb = 255;
+        row[ox] = (uint16_t)(((rr >> 3) << 11) | ((rg >> 2) << 5) | (rb >> 3));
+      }
+    }
+  }
+}
+
+/* Current fade alpha (0..256) for a hud message, from its fade ramps. */
+static int zacs_hud_alpha(const zacs_hudmsg_t *m)
+{
+  if (!m->fadetotal)
+    return 256;
+  if (m->age < m->fadein)
+    return m->fadein ? (m->age * 256 / m->fadein) : 256;
+  if (m->age >= m->fadetotal - m->fadeout)
+  {
+    int into = m->age - (m->fadetotal - m->fadeout);
+    return m->fadeout ? (256 - into * 256 / m->fadeout) : 0;
+  }
+  return 256;
+}
+
 void Z_ACSHudDrawer(void)
 {
   int i;
   for (i = 0; i < ZACS_HUDMSG_MAX; i++)
   {
-    hu_textline_t l;
-    const char *t;
-    int cm;
-    if (!zacs_hudmsgs[i].active)
+    zacs_hudmsg_t *m = &zacs_hudmsgs[i];
+    int hw, hh, alpha;
+    if (!m->active)
       continue;
-    /* The colour carried on a HUD message indexes the font's colour
-     * translation tables.  An out-of-range value (HUD messages may request
-     * colours that do not map onto this port's CR_* range) would read past the
-     * translation array when the glyphs are drawn, so fold anything invalid
-     * onto the default colour. */
-    cm = zacs_hudmsgs[i].color;
-    if (cm < 0 || cm >= CR_LIMIT)
-      cm = CR_DEFAULT;
-    HUlib_initTextLine(&l, zacs_hudmsgs[i].x, zacs_hudmsgs[i].y,
-                       hu_font, HU_FONTSTART, cm);
-    for (t = zacs_hudmsgs[i].text; *t; t++)
-      HUlib_addCharToTextLine(&l, *t);
-    HUlib_drawTextLine(&l, false);
+    hw = m->hbox_w > 0 ? m->hbox_w : 320;
+    hh = m->hbox_h > 0 ? m->hbox_h : 200;
+    alpha = zacs_hud_alpha(m);
+    if (alpha <= 0)
+      continue;
+
+    if (m->graphic_lump >= 0)
+    {
+      /* The art is one image placed at (x,y) in the hud box.  Fit it to the
+       * box (scaled to the screen) and centre it on the mapped point. */
+      const rpatch_t *p = R_CachePatchNum(m->graphic_lump);
+      int pw = p->width, ph = p->height;
+      /* destination size: scale the patch from box units to screen units */
+      int dw = (int)((long long)pw * SCREENWIDTH / hw);
+      int dh = (int)((long long)ph * SCREENHEIGHT / hh);
+      int cx = (int)((long long)m->x * SCREENWIDTH / hw);
+      int cy = (int)((long long)m->y * SCREENHEIGHT / hh);
+      R_UnlockPatchNum(m->graphic_lump);
+      zacs_blit_scaled(m->graphic_lump, cx - dw / 2, cy - dh / 2, dw, dh,
+                       alpha);
+    }
+    else
+    {
+      /* Plain glyph text, drawn in the engine font.  Position is mapped from
+       * the hud box to the 320x200 page the text line uses. */
+      hu_textline_t l;
+      const char *t;
+      const char *src = m->text;
+      char buf[ZACS_PRINTBUF];
+      int cm = m->color;
+      int tx = (int)((long long)m->x * 320 / hw);
+      int ty = (int)((long long)m->y * 200 / hh);
+      int reveal = -1;
+      if (cm < 0 || cm >= CR_LIMIT)
+        cm = CR_DEFAULT;
+      /* typewriter reveal: only show the first (age/typeon)+1 characters */
+      if (m->typeon)
+      {
+        int nshow = (m->age / m->typeon) + 1;
+        int k = 0;
+        for (; src[k] && k < (int)sizeof(buf) - 1 && k < nshow; k++)
+          buf[k] = src[k];
+        buf[k] = 0;
+        src = buf;
+        reveal = nshow;
+        (void)reveal;
+      }
+      HUlib_initTextLine(&l, tx, ty, hu_font, HU_FONTSTART, cm);
+      for (t = src; *t; t++)
+        HUlib_addCharToTextLine(&l, *t);
+      HUlib_drawTextLine(&l, false);
+    }
   }
 }
 
@@ -2669,31 +3064,64 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     case PCD_ENDHUDMESSAGEBOLD:
     {
       /* Verbose HudMessage lowering pushes the five base params (type, id,
-       * color, x, y) and then OPTHUDMESSAGE marks the boundary; the optional
-       * params (holdtime first) are pushed above it.  So holdtime is at the
-       * top and the base block sits just below optstart.  Read both, then
-       * collapse the stack. */
-      int htype, hid, hcolor, hx, hy, hhold = 0;
+       * color, x, y) then OPTHUDMESSAGE marks the boundary; the optional
+       * params follow above it in order: holdtime, then two type-specific
+       * timing params, then alpha.  For a fade message the two params are the
+       * fade-in and fade-out lengths; for a typeon message the first is the
+       * per-character reveal speed.  All times are 16.16 seconds. */
+      int htype, hid, hcolor, hx, hy;
+      int hhold = 0, hp1 = 0, hp2 = 0;
       int base = (inst->optstart >= 0) ? inst->optstart : inst->sp;
-      if (inst->optstart >= 0 && inst->sp > inst->optstart)
-        hhold = inst->stack[inst->optstart];     /* first optional param */
-      hy     = (base >= 1) ? inst->stack[base - 1] : 0;
-      hx     = (base >= 2) ? inst->stack[base - 2] : 0;
-      hcolor = (base >= 3) ? inst->stack[base - 3] : 0;
-      hid    = (base >= 4) ? inst->stack[base - 4] : 0;
-      htype  = (base >= 5) ? inst->stack[base - 5] : 0;
-      (void)htype;
-      inst->sp = (base >= 5) ? base - 5 : 0;     /* drop base + optionals */
+      int nopt = (inst->optstart >= 0) ? (inst->sp - inst->optstart) : 0;
+      if (nopt > 0) hp1   = inst->stack[inst->optstart];
+      if (nopt > 1) hp2   = inst->stack[inst->optstart + 1];
+      hhold  = (base >= 1) ? inst->stack[base - 1] : 0;
+      hy     = (base >= 2) ? inst->stack[base - 2] : 0;
+      hx     = (base >= 3) ? inst->stack[base - 3] : 0;
+      hcolor = (base >= 4) ? inst->stack[base - 4] : 0;
+      hid    = (base >= 5) ? inst->stack[base - 5] : 0;
+      htype  = (base >= 6) ? inst->stack[base - 6] : 0;
+      inst->sp = (base >= 6) ? base - 6 : 0;     /* drop base + optionals */
       inst->optstart = -1;
       if (inst->printlen)
       {
+        int tdry  = htype & 3;                   /* 1=fadeout 2=typeon 3=both */
+        int fadein = 0, fadeout = 0, typeon = 0;
+        /* ZDoom HudMessage: a coordinate whose magnitude is below 1.0 is a
+         * fraction of the hud box (0.5 = centre) rather than an absolute cell.
+         * Resolve those to whole box units before storing. */
+        int px, py;
+        if (hx > -(1 << 16) && hx < (1 << 16))
+          px = (int)(((long long)hx * zacs_hud_w) >> 16);
+        else
+          px = hx >> 16;
+        if (hy > -(1 << 16) && hy < (1 << 16))
+          py = (int)(((long long)hy * zacs_hud_h) >> 16);
+        else
+          py = hy >> 16;
         /* holdtime is 16.16 seconds; <=0 means "until replaced".  Convert to
          * tics (35/sec); persistent when not positive. */
         int tics = (hhold > 0) ? (int)(((long long)hhold * 35) >> 16) : -1;
-        zacs_hud_store(inst->printbuf, hid,
-                       zacs_hud_map_x(hx), zacs_hud_map_y(hy),
-                       tics, hcolor ? hcolor : -1);
+        if (tdry == 3)                           /* HUDMSG_FADEINOUT */
+        {
+          fadein  = (int)(((long long)hp1 * 35) >> 16);
+          fadeout = (int)(((long long)hp2 * 35) >> 16);
+        }
+        else if (tdry == 1)                      /* HUDMSG_FADEOUT */
+          fadeout = (int)(((long long)hp1 * 35) >> 16);
+        else if (tdry == 2)                      /* HUDMSG_TYPEON */
+        {
+          /* hp1 is seconds per character; derive tics/char (>=1). */
+          int tpc = (int)(((long long)hp1 * 35) >> 16);
+          typeon  = tpc > 0 ? tpc : 1;
+          fadeout = (int)(((long long)hp2 * 35) >> 16);
+        }
+        zacs_hud_store(inst->printbuf, hid, px, py,
+                       tics, hcolor ? hcolor : -1, htype,
+                       fadein, fadeout, typeon);
       }
+      else if (hid != 0)
+        zacs_hud_clear(hid);                  /* empty text = ClearMessage(id) */
       inst->printlen  = 0;
       inst->printbuf[0] = 0;
       break;
@@ -3594,8 +4022,37 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     case PCD_FADERANGE:         ZDROP(9); zacs_warn_pcd(pcd); break;
     case PCD_CANCELFADE:        break;
     case PCD_PLAYMOVIE:         ZSETSTK(1, 0); zacs_warn_pcd(pcd); break;
-    case PCD_SETFONT:           ZDROP(1); break;
-    case PCD_SETFONTDIRECT:     (void)NEXTWORD; break;
+    case PCD_SETFONT:
+    {
+      const char *fn = zacs_string(ZSTK(1));
+      ZDROP(1);
+      if (fn)
+      {
+        size_t n = strlen(fn);
+        if (n > sizeof(zacs_cur_font) - 1)
+          n = sizeof(zacs_cur_font) - 1;
+        memcpy(zacs_cur_font, fn, n);
+        zacs_cur_font[n] = 0;
+      }
+      else
+        zacs_cur_font[0] = 0;
+      break;
+    }
+    case PCD_SETFONTDIRECT:
+    {
+      const char *fn = zacs_string(NEXTWORD);
+      if (fn)
+      {
+        size_t n = strlen(fn);
+        if (n > sizeof(zacs_cur_font) - 1)
+          n = sizeof(zacs_cur_font) - 1;
+        memcpy(zacs_cur_font, fn, n);
+        zacs_cur_font[n] = 0;
+      }
+      else
+        zacs_cur_font[0] = 0;
+      break;
+    }
     case PCD_SETSTYLE:          ZDROP(1); break;
     case PCD_SETSTYLEDIRECT:    (void)NEXTWORD; break;
     case PCD_SETHUDSIZE:

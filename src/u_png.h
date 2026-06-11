@@ -31,4 +31,9 @@ void *U_PNGToFlat(const unsigned char *d, int len, int *out_size);
  * after W_Init and before the renderer first reads those lumps. */
 void U_PNGMaterializeLumps(void);
 
+/* Look up the native-colour (0xAABBGGRR) copy of a global-namespace image
+ * lump retained at materialization time, for the full-colour overlay blit.
+ * Returns NULL if the lump has no cached native image. */
+const unsigned *U_PNGCacheRGBA(int lump, int *w, int *h);
+
 #endif

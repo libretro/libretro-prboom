@@ -177,6 +177,101 @@ static unsigned *zpng_decode(const unsigned char *d, int len,
   }
 }
 
+/* ----------------------------------------------------------------------------
+ * Full-colour cache for HUD/portrait art.
+ *
+ * Most pk3 PNGs are materialized into PLAYPAL-indexed Doom patches so the
+ * column renderer can draw them.  That round-trips full-colour artwork through
+ * a 256-entry palette, which is fine for pixel-art sprites but visibly bands a
+ * smooth-shaded portrait and throws away the per-texel alpha (it survives only
+ * as a 1-bit cut in the patch posts).  The dialogue overlay wants the original
+ * colour and a real alpha channel, so for the global-namespace art that feeds
+ * it we record where each candidate image's *original* PNG bytes live (the
+ * pk3 buffer the lump pointed at before materialization repointed it at a
+ * patch) and decode them to a native 0xAABBGGRR image lazily, the first time
+ * the overlay actually draws that lump.  The pk3 data stays mapped, so this
+ * holds no image memory until a portrait is shown, and only the handful a
+ * conversation uses are ever expanded. */
+typedef struct
+{
+  int             lump;
+  int             w, h;
+  wadfile_info_t *src_wad; /* original lump source, snapshotted pre-replace   */
+  int             src_pos;
+  int             src_len;
+  unsigned       *argb;    /* decoded 0xAABBGGRR, NULL until first draw        */
+  dbool           tried;   /* decode attempted (avoid retrying a bad image)    */
+} u_argb_entry_t;
+
+static u_argb_entry_t *u_argb_cache;
+static int             u_argb_count;
+static int             u_argb_cap;
+
+/* Record where a global-namespace image's original PNG bytes live, for later
+ * lazy decode.  Called at materialization, before the lump is repointed. */
+static void u_argb_keep_src(int lump)
+{
+  int i;
+  for (i = 0; i < u_argb_count; i++)
+    if (u_argb_cache[i].lump == lump)
+      return;
+  if (u_argb_count == u_argb_cap)
+  {
+    int ncap = u_argb_cap ? u_argb_cap * 2 : 32;
+    u_argb_entry_t *nc = realloc(u_argb_cache, ncap * sizeof(*nc));
+    if (!nc)
+      return;
+    u_argb_cache = nc;
+    u_argb_cap   = ncap;
+  }
+  memset(&u_argb_cache[u_argb_count], 0, sizeof(u_argb_cache[u_argb_count]));
+  u_argb_cache[u_argb_count].lump    = lump;
+  u_argb_cache[u_argb_count].src_wad = lumpinfo[lump].wadfile;
+  u_argb_cache[u_argb_count].src_pos = lumpinfo[lump].position;
+  u_argb_cache[u_argb_count].src_len = W_LumpLength(lump);
+  u_argb_count++;
+}
+
+const unsigned *U_PNGCacheRGBA(int lump, int *w, int *h)
+{
+  int i;
+  for (i = 0; i < u_argb_count; i++)
+    if (u_argb_cache[i].lump == lump)
+    {
+      u_argb_entry_t *e = &u_argb_cache[i];
+      if (!e->argb && !e->tried)
+      {
+        e->tried = true;
+        if (e->src_wad && e->src_len > 8)
+        {
+          unsigned char *png = malloc((size_t)e->src_len);
+          if (png)
+          {
+            unsigned aw = 0, ah = 0;
+            /* read the original bytes straight from the still-mapped source */
+            if (e->src_wad->embedded_data)
+              memcpy(png, &e->src_wad->embedded_data[e->src_pos],
+                     (size_t)e->src_len);
+#ifndef MEMORY_LOW
+            else
+              memcpy(png, &e->src_wad->data[e->src_pos], (size_t)e->src_len);
+#endif
+            if (U_PNGIsPNG(png, e->src_len))
+              e->argb = zpng_decode(png, e->src_len, &aw, &ah);
+            free(png);
+            if (e->argb) { e->w = (int)aw; e->h = (int)ah; }
+          }
+        }
+      }
+      if (!e->argb)
+        return NULL;
+      if (w) *w = e->w;
+      if (h) *h = e->h;
+      return e->argb;
+    }
+  return NULL;
+}
+
 /* JPEG sibling of zpng_decode: rjpeg (libretro-common) emits the same
  * 0xAABBGGRR words with supports_rgba=true, so the patch/flat synthesis
  * below is shared.  Used for the JPEG skybox/texture members ZDoom packs
@@ -447,6 +542,12 @@ static void zpng_convert_one(int i, dbool as_flat, dbool scaled, int *count)
             lumpinfo[i].name);
     return;
   }
+  /* Global-namespace art (HUD frames, dialogue portraits) may also be wanted
+   * in native colour for the full-colour overlay blit.  Record where its
+   * original PNG bytes live now, before the lump is repointed; the decode
+   * happens lazily on first draw so unused art costs nothing. */
+  if (!as_flat && lumpinfo[i].li_namespace == ns_global)
+    u_argb_keep_src(i);
   W_ReplaceLumpData(i, conv, convlen);
   (*count)++;
 }

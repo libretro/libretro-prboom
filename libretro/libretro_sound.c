@@ -160,7 +160,17 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
 
     /* check if the sound lump exists */
     if (W_CheckNumForName(sfxlump_name) == -1)
-        return 0;
+    {
+        /* ZDoom-based mods bind SNDINFO logical names directly to lumps
+         * that do not follow Doom's DS<name> convention (e.g. a lump named
+         * SOULSWA1, not DSSOULSWA1).  When the conventional name misses,
+         * fall back to the bare sfx name so those lumps are reachable.
+         * DS<name> keeps priority so an IWAD's real DSxxxx is never shadowed
+         * by an unrelated bare lump of the same stem. */
+        snprintf(sfxlump_name, sizeof(sfxlump_name), "%s", sfxname);
+        if (W_CheckNumForName(sfxlump_name) == -1)
+            return 0;
+    }
 
     sfxlump_num = W_GetNumForName (sfxlump_name);
     sfxlump_len = W_LumpLength (sfxlump_num);
@@ -242,7 +252,6 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
         *step = (unsigned int)(((uint64_t)wav_rate << 16) / (uint64_t)SAMPLERATE);
 
         *len = (int)wav.numsamples;
-
         rwav_free(&wav);
         W_UnlockLumpNum (sfxlump_num);
         return (void *)(out_data);
@@ -371,7 +380,18 @@ int I_GetSfxLumpNum(sfxinfo_t* sfx)
     else
         snprintf(namebuf, sizeof(namebuf), "ds%s", sfx->name);
 
-    return W_CheckNumForName(namebuf);
+    {
+        int n = W_CheckNumForName(namebuf);
+        if (n < 0 && !raven)
+        {
+            /* ZDoom mods may bind a logical name to a lump that lacks the
+             * DS prefix; mirror I_SndLoadSample's bare-name fallback so this
+             * presence check agrees with what the loader can actually read. */
+            snprintf(namebuf, sizeof(namebuf), "%s", sfx->name);
+            n = W_CheckNumForName(namebuf);
+        }
+        return n;
+    }
 }
 
 void I_StopSound (int handle)

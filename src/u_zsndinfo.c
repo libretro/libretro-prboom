@@ -101,13 +101,19 @@ static int *field_of(mobjinfo_t *mi, int field)
 static int new_slots[MAX_ZSND_NEW];
 static int num_new_slots;
 
-/* find the sfx whose lump is `lump` ("dsxxxx"), creating a slot for a
- * lump no existing sfx covers; -1 if the lump is absent from the wads */
+/* find the sfx whose lump is `lump`, creating a slot for a lump no existing
+ * sfx covers; -1 if the lump is absent from the wads.  `lump` may be a
+ * Doom-style dsxxxx name or a ZDoom bare lump name (e.g. SOULSWA1); the sfx
+ * slot is named with the DS prefix stripped when present, since the sfx
+ * loader prepends DS first and falls back to the bare name. */
 static int resolve_sfx(const char *lump, int orig_num_sfx, int *cursor,
                        int template_idx)
 {
   int i;
-  const char *stem = lump + 2;          /* past "ds" */
+  const char *stem = (lump[0] == 'd' || lump[0] == 'D') &&
+                     (lump[1] == 's' || lump[1] == 'S')
+                       ? lump + 2          /* past "ds" */
+                       : lump;             /* bare ZDoom lump name */
 
   if (W_CheckNumForName(lump) < 0)
     return -1;
@@ -197,9 +203,10 @@ void U_ZDoomLoadSndInfo(void)
       p++;
 
     /* the ZDoom form is "logical/name lumpname"; Hexen tags and
-     * $-commands carry no slash */
+     * $-commands carry no slash.  The target lump may be a Doom dsxxxx
+     * name or a bare ZDoom lump name -- accept both. */
     slash = strchr(tag, '/');
-    if (!slash || !lump[0] || strncasecmp(lump, "ds", 2))
+    if (!slash || !lump[0])
       continue;
 
     /* weapons/rocklx: the rocket's impact */

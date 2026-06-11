@@ -2618,7 +2618,14 @@ void P_UseLines (player_t*  player)
       return;
     as = U_DecorateActiveState(use_thing_hit->type);
     if (as >= 0)
+    {
+      /* The Active state runs its special on behalf of the using player
+       * (THINGSPEC_ThingTargets): record the player as the actor's target so
+       * an ACS script started from that state resolves its activator to the
+       * player rather than the actor. */
+      P_SetTarget(&use_thing_hit->target, usething);
       P_SetMobjState(use_thing_hit, (statenum_t)as);
+    }
     return;
   }
 

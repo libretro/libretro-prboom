@@ -31,6 +31,8 @@
 #include "w_wad.h"
 #include "lprintf.h"
 #include "dsda_hacked.h"
+#include "p_enemy.h"
+#include "sounds.h"
 #include "u_decorate.h"
 
 #define MAX_DECORATE_ACTORS 1024
@@ -52,9 +54,11 @@ typedef struct
 
   /* animated Spawn sequence (no action functions): a chain of frames the
    * registrar turns into looping/terminating states.  Captured only for a
-   * plain "SPRITE <letters> <tics>" sequence ending in loop/stop. */
+   * plain "SPRITE <letters> <tics>" sequence ending in loop/stop.  A small,
+   * safe subset of per-frame action functions is also captured (act != 0)
+   * and wired onto the registered state. */
 #define MAX_SPAWN_FRAMES 32
-  struct { short frame; short tics; } seq[MAX_SPAWN_FRAMES];
+  struct { short frame; short tics; short act; short snd; } seq[MAX_SPAWN_FRAMES];
   char seq_sprite[5];           /* sprite the sequence uses (one sprite)  */
   int  seq_len;                 /* number of frames captured              */
   int  seq_loops;              /* 1 = loop back to frame 0, 0 = stop      */
@@ -64,6 +68,25 @@ typedef struct
 
 static decorate_actor_t actors[MAX_DECORATE_ACTORS];
 static int num_actors;
+
+/* Safe per-frame DECORATE actions the registrar can wire onto a decoration
+ * state.  Kept deliberately small: only self-contained codepointers that the
+ * engine already implements and that are harmless on a decoration's own
+ * thinker.  DA_NONE leaves the state actionless. */
+enum {
+  DA_NONE = 0,
+  DA_PLAYSOUND,        /* A_PlaySound / A_StartSound("name") -> A_PlaySound */
+  DA_SCREAM,           /* A_Scream  (death sound) */
+  DA_ACTIVESOUND,      /* A_ActiveSound -> active sound via A_PlaySound */
+  DA_NOBLOCKING,       /* A_NoBlocking / A_Fall -> clears MF_SOLID */
+  DA_FACETARGET        /* A_FaceTarget (harmless no-op without a target) */
+};
+
+/* Sound names captured for DA_PLAYSOUND frames, resolved to sfx slots at
+ * registration time (the sound tables are not grown during the parse). */
+#define MAX_DECORATE_SOUNDS 256
+static char decorate_sounds[MAX_DECORATE_SOUNDS][32];
+static int  num_decorate_sounds;
 
 /* every 4-char sprite name appearing on a state line anywhere in the
  * DECORATE lump; R_InitSpriteDefs only unifies a sprite's art when the
@@ -296,6 +319,7 @@ static void parse_decorate(void)
   int lump;
 
   parsed = 1;
+  num_decorate_sounds = 0;
   lump = (W_CheckNumForName)("DECORATE", ns_global);
   if (lump < 0)
     return;
@@ -516,12 +540,77 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
          * Only a single sprite per Spawn sequence is supported. */
         int t = atoi(tics);
         int bright = 0;
+        short act = DA_NONE, snd = -1;
         const char *r = skip_space(q, end);
         char b[MAX_NAME];
         size_t fi;
-        read_word(r, end, b, sizeof(b));
+        r = read_word(r, end, b, sizeof(b));
         if (!strcasecmp(b, "BRIGHT"))
+        {
           bright = FF_FULLBRIGHT;
+          r = skip_space(r, end);
+          r = read_word(r, end, b, sizeof(b));   /* action may follow BRIGHT */
+        }
+        /* a safe, self-contained per-frame action.  Parameterised forms
+         * (A_PlaySound) keep their first string argument; everything else is
+         * left as DA_NONE so unsupported actions are simply inert. */
+        if (b[0] == 'A' && b[1] == '_')
+        {
+          char fn[MAX_NAME];
+          const char *ar;
+          size_t bi = 0;
+          /* split "A_PlaySound(\"x\"..." into name + first arg */
+          while (b[bi] && b[bi] != '(') { fn[bi] = b[bi]; bi++; }
+          fn[bi] = 0;
+          if (!strcasecmp(fn, "A_PlaySound") ||
+              !strcasecmp(fn, "A_StartSound"))
+          {
+            char arg[32];
+            /* find the opening quote either in b (glued) or the next word */
+            ar = strchr(b, '"');
+            if (!ar)
+            {
+              char nx[MAX_NAME];
+              const char *r2 = skip_space(r, end);
+              read_word(r2, end, nx, sizeof(nx));
+              ar = strchr(nx, '"');
+              if (ar) { int n = 0; ar++;
+                while (*ar && *ar != '"' && n < 31) arg[n++] = *ar++;
+                arg[n] = 0; }
+              else arg[0] = 0;
+            }
+            else
+            {
+              int n = 0; ar++;
+              while (*ar && *ar != '"' && n < 31) arg[n++] = *ar++;
+              arg[n] = 0;
+            }
+            if (arg[0] && num_decorate_sounds < MAX_DECORATE_SOUNDS)
+            {
+              int s;
+              snd = -1;
+              for (s = 0; s < num_decorate_sounds; s++)
+                if (!strcasecmp(decorate_sounds[s], arg)) { snd = (short)s; break; }
+              if (snd < 0)
+              {
+                int cn = 0;
+                while (arg[cn] && cn < 31)
+                {
+                  decorate_sounds[num_decorate_sounds][cn] = arg[cn];
+                  cn++;
+                }
+                decorate_sounds[num_decorate_sounds][cn] = 0;
+                snd = (short)num_decorate_sounds++;
+              }
+              act = DA_PLAYSOUND;
+            }
+          }
+          else if (!strcasecmp(fn, "A_Scream"))        act = DA_SCREAM;
+          else if (!strcasecmp(fn, "A_ActiveSound"))   act = DA_ACTIVESOUND;
+          else if (!strcasecmp(fn, "A_NoBlocking") ||
+                   !strcasecmp(fn, "A_Fall"))          act = DA_NOBLOCKING;
+          else if (!strcasecmp(fn, "A_FaceTarget"))    act = DA_FACETARGET;
+        }
         if (a->seq_len == 0)
         {
           memcpy(a->seq_sprite, word, 4);
@@ -535,6 +624,10 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
             continue;
           a->seq[a->seq_len].frame = (short)((fr[fi] - 'A') | bright);
           a->seq[a->seq_len].tics  = (short)t;
+          /* the action fires on the first frame letter of the line, as in
+           * DECORATE (a multi-letter line repeats the frames, action once) */
+          a->seq[a->seq_len].act = (fi == 0) ? act : (short)DA_NONE;
+          a->seq[a->seq_len].snd = (fi == 0) ? snd : (short)-1;
           a->seq_len++;
         }
         p = q;
@@ -558,6 +651,42 @@ static dbool engine_knows_doomednum(int dn)
  * P_FindDoomedNum call (its hash is built once) and before R_Init (the
  * sprite definitions are built once from sprnames); d_main calls this
  * right before R_Init, and only for the Doom game. */
+/* Resolve a DECORATE A_PlaySound("name") logical name to a sfx index for
+ * state->misc1.  ZDoom binds the logical name through SNDINFO to a lump;
+ * lacking that table here, match an existing sfx by name, else create a
+ * grown slot named for the stem so the engine's lazy "ds%s"/bare lump
+ * lookup finds the sample.  Returns 0 (no sound) when the name is empty. */
+static int decorate_resolve_sfx(const char *name)
+{
+  int i;
+  const char *stem;
+  sfxinfo_t *sfx;
+  char *copy;
+
+  if (!name || !name[0])
+    return 0;
+  /* the bound lump may already carry a "ds" prefix; index by the stem */
+  stem = ((name[0] == 'd' || name[0] == 'D') &&
+          (name[1] == 's' || name[1] == 'S')) ? name + 2 : name;
+
+  for (i = 1; i < num_sfx; i++)
+    if (S_sfx[i].name && !strcasecmp(S_sfx[i].name, stem))
+      return i;
+
+  i   = num_sfx;                 /* grow one slot */
+  sfx = dsda_GetSfx(i);          /* may move S_sfx; use the returned ptr */
+  copy = malloc(strlen(stem) + 1);
+  if (!copy)
+    return 0;
+  strcpy(copy, stem);
+  sfx->name        = copy;
+  sfx->singularity = false;
+  sfx->priority    = 98;
+  sfx->pitch       = -1;
+  sfx->volume      = -1;
+  return i;
+}
+
 void U_RegisterDecorateThings(void)
 {
   int i, count = 0, count_mt = 0;
@@ -630,6 +759,36 @@ void U_RegisterDecorateThings(void)
           state->nextstate = last
             ? (a->seq_loops ? first : cur)   /* loop back or freeze */
             : cur + 1;
+
+          /* wire the safe per-frame action, if any, onto this state */
+          switch (a->seq[f].act)
+          {
+            case DA_PLAYSOUND:
+              state->action.arg0 = (arg0_t)A_PlaySound;
+              state->misc1 = (a->seq[f].snd >= 0)
+                ? decorate_resolve_sfx(decorate_sounds[a->seq[f].snd]) : 0;
+              state->misc2 = 0;          /* positional (not full-volume) */
+              break;
+            case DA_ACTIVESOUND:
+              /* no dedicated active-sound pointer here; emit the named or
+               * (absent a name) the generic sound through A_PlaySound */
+              state->action.arg0 = (arg0_t)A_PlaySound;
+              state->misc1 = (a->seq[f].snd >= 0)
+                ? decorate_resolve_sfx(decorate_sounds[a->seq[f].snd]) : 0;
+              state->misc2 = 0;
+              break;
+            case DA_SCREAM:
+              state->action.arg0 = (arg0_t)A_Scream;
+              break;
+            case DA_NOBLOCKING:
+              state->action.arg0 = (arg0_t)A_Fall;
+              break;
+            case DA_FACETARGET:
+              state->action.arg0 = (arg0_t)A_FaceTarget;
+              break;
+            default:
+              break;
+          }
         }
       }
       st = first;

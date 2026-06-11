@@ -321,10 +321,17 @@ void P_ConversationDrawer(void)
   y = 130;
   for (i = 0; i < noff; i++)
   {
-    char line[CONV_CHOICE_TEXT_LEN + 8];
-    const char *txt = n->choices[idx[i]].text;
-    snprintf(line, sizeof(line), "%c %.*s",
-             (i == conv_sel) ? '>' : ' ', CONV_CHOICE_TEXT_LEN, txt);
+    char line[CONV_CHOICE_TEXT_LEN + 24];
+    const conv_choice_t *c = &n->choices[idx[i]];
+    /* a positive first need-amount is a gold price; Strife shows it as a
+     * " for <count>" suffix on the reply text (this is how shop lines read) */
+    if (c->needamount[0] > 0)
+      snprintf(line, sizeof(line), "%c %.*s for %d",
+               (i == conv_sel) ? '>' : ' ', CONV_CHOICE_TEXT_LEN, c->text,
+               c->needamount[0]);
+    else
+      snprintf(line, sizeof(line), "%c %.*s",
+               (i == conv_sel) ? '>' : ' ', CONV_CHOICE_TEXT_LEN, c->text);
     conv_text(16, y, (i == conv_sel) ? CR_GREEN : CR_GRAY, line);
     y += 10;
   }

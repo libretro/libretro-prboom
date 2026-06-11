@@ -37,6 +37,7 @@
 #include "hu_stuff.h"
 #include "hu_lib.h"
 #include "st_stuff.h" /* jff 2/16/98 need loc of status bar */
+#include "p_zacs.h"
 #include "w_wad.h"
 #include "s_sound.h"
 #include "dstrings.h"
@@ -411,6 +412,8 @@ void HU_Start(void)
 
   if (headsupactive)                    // stop before starting
     HU_Stop();
+
+  Z_ACSHudClear();                      // drop any leftover ACS hud text
 
   plr = &players[displayplayer];        // killough 3/7/98
   message_on = FALSE;
@@ -1315,6 +1318,9 @@ void HU_Drawer(void)
 
   // display the interactive buffer for chat entry
   HUlib_drawIText(&w_chat);
+
+  /* draw any positioned ACS HudMessage text on top of the HUD */
+  Z_ACSHudDrawer();
 }
 
 //
@@ -1353,6 +1359,9 @@ void HU_Ticker(void)
 {
   int i, rc;
   char c;
+
+  /* tick down any positioned ACS HudMessage hold timers */
+  Z_ACSHudTicker();
 
   // tick down message counter if message is up
   if (message_counter && !--message_counter)

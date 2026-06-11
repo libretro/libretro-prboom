@@ -44,6 +44,8 @@
 #include "w_wad.h"
 #include "z_zone.h"
 #include "hexen/p_spec_hexen.h"
+#include "hu_lib.h"
+#include "hu_stuff.h"
 #include "p_zacs.h"
 
 /* ---- limits ------------------------------------------------------------ */
@@ -1414,6 +1416,64 @@ static void T_ZACSThinker(zacs_inst_t *inst);
 static char zacs_msgpool[8][ZACS_PRINTBUF];
 static int  zacs_msgrot;
 
+/* On-screen HudMessage store.  ZDoom's verbose HudMessage places text at a
+ * point in a virtual HUD space (320x200 by default, or the SetHudSize box)
+ * and holds it for a time.  We keep a small set of live messages keyed by the
+ * caller's id (a fresh id 0 always adds; a non-zero id replaces the message
+ * with that id, as ZDoom does) and render them from the HUD drawer. */
+#define ZACS_HUDMSG_MAX 16
+typedef struct {
+  int   active;
+  int   id;
+  int   x, y;          /* virtual coords, already mapped to 320x200          */
+  int   holdtics;      /* remaining tics; <0 = until replaced                 */
+  int   color;         /* CR_* range index, or -1 for default                 */
+  char  text[ZACS_PRINTBUF];
+} zacs_hudmsg_t;
+static zacs_hudmsg_t zacs_hudmsgs[ZACS_HUDMSG_MAX];
+static int zacs_hud_w = 320, zacs_hud_h = 200;   /* current SetHudSize box   */
+
+/* the status-bar font, defined in hu_stuff.c (no public extern there) */
+extern patchnum_t hu_font[HU_FONTSIZE];
+
+/* Map a 16.16 HUD coordinate in the current hud box to 320x200 virtual space. */
+static int zacs_hud_map_x(int fx)
+{
+  int px = fx >> 16;
+  if (zacs_hud_w <= 0) return px;
+  return (int)((long long)px * 320 / zacs_hud_w);
+}
+static int zacs_hud_map_y(int fy)
+{
+  int py = fy >> 16;
+  if (zacs_hud_h <= 0) return py;
+  return (int)((long long)py * 200 / zacs_hud_h);
+}
+
+/* Register/replace a positioned, timed hud message. */
+static void zacs_hud_store(const char *text, int id, int x, int y,
+                           int holdtics, int color)
+{
+  int i, slot = -1;
+  if (id != 0)
+    for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+      if (zacs_hudmsgs[i].active && zacs_hudmsgs[i].id == id)
+      { slot = i; break; }
+  if (slot < 0)
+    for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+      if (!zacs_hudmsgs[i].active) { slot = i; break; }
+  if (slot < 0)
+    slot = 0;                       /* all full: reuse the first */
+  zacs_hudmsgs[slot].active   = 1;
+  zacs_hudmsgs[slot].id       = id;
+  zacs_hudmsgs[slot].x        = x;
+  zacs_hudmsgs[slot].y        = y;
+  zacs_hudmsgs[slot].holdtics = holdtics;
+  zacs_hudmsgs[slot].color    = color;
+  strncpy(zacs_hudmsgs[slot].text, text, ZACS_PRINTBUF - 1);
+  zacs_hudmsgs[slot].text[ZACS_PRINTBUF - 1] = 0;
+}
+
 static void zacs_deliver(zacs_inst_t *inst, dbool bold)
 {
   char *slot;
@@ -1599,6 +1659,48 @@ void Z_ACSRunEnterScripts(mobj_t *playermo)
   for (i = 0; i < zacs_numscripts; i++)
     if (zacs_scripts[i].type == 4)              /* ENTER */
       zacs_spawn(i, NULL, 0, playermo, NULL, 0);
+}
+
+/* Tic the live hud messages: a finite hold time counts down and clears. */
+void Z_ACSHudTicker(void)
+{
+  int i;
+  for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+    if (zacs_hudmsgs[i].active && zacs_hudmsgs[i].holdtics >= 0)
+      if (--zacs_hudmsgs[i].holdtics < 0)
+        zacs_hudmsgs[i].active = 0;
+}
+
+/* Clear all hud messages (level start / reset). */
+void Z_ACSHudClear(void)
+{
+  int i;
+  for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+    zacs_hudmsgs[i].active = 0;
+  zacs_hud_w = 320;
+  zacs_hud_h = 200;
+}
+
+/* Draw the live hud messages.  Called from the HUD drawer; uses the small
+ * status-bar font via a transient text line so colour escapes and the missing
+ * -glyph fallbacks are handled exactly as the message widget's are. */
+void Z_ACSHudDrawer(void)
+{
+  int i;
+  for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+  {
+    hu_textline_t l;
+    const char *t;
+    if (!zacs_hudmsgs[i].active)
+      continue;
+    HUlib_initTextLine(&l, zacs_hudmsgs[i].x, zacs_hudmsgs[i].y,
+                       hu_font, HU_FONTSTART,
+                       zacs_hudmsgs[i].color >= 0 ? zacs_hudmsgs[i].color
+                                                  : CR_RED);
+    for (t = zacs_hudmsgs[i].text; *t; t++)
+      HUlib_addCharToTextLine(&l, *t);
+    HUlib_drawTextLine(&l, false);
+  }
 }
 
 /* ======================================================================== */
@@ -2296,14 +2398,37 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       break;
     case PCD_ENDHUDMESSAGE:
     case PCD_ENDHUDMESSAGEBOLD:
-      /* the hud parameters (type, id, color, x, y, holdtime, +opts) sit
-       * between optstart and sp; this engine shows the text the plain way */
-      if (inst->optstart >= 0)
-        inst->sp = inst->optstart;
-      ZDROP(6);
+    {
+      /* Verbose HudMessage lowering pushes the five base params (type, id,
+       * color, x, y) and then OPTHUDMESSAGE marks the boundary; the optional
+       * params (holdtime first) are pushed above it.  So holdtime is at the
+       * top and the base block sits just below optstart.  Read both, then
+       * collapse the stack. */
+      int htype, hid, hcolor, hx, hy, hhold = 0;
+      int base = (inst->optstart >= 0) ? inst->optstart : inst->sp;
+      if (inst->optstart >= 0 && inst->sp > inst->optstart)
+        hhold = inst->stack[inst->optstart];     /* first optional param */
+      hy     = (base >= 1) ? inst->stack[base - 1] : 0;
+      hx     = (base >= 2) ? inst->stack[base - 2] : 0;
+      hcolor = (base >= 3) ? inst->stack[base - 3] : 0;
+      hid    = (base >= 4) ? inst->stack[base - 4] : 0;
+      htype  = (base >= 5) ? inst->stack[base - 5] : 0;
+      (void)htype;
+      inst->sp = (base >= 5) ? base - 5 : 0;     /* drop base + optionals */
       inst->optstart = -1;
-      zacs_deliver(inst, pcd == PCD_ENDHUDMESSAGEBOLD);
+      if (inst->printlen)
+      {
+        /* holdtime is 16.16 seconds; <=0 means "until replaced".  Convert to
+         * tics (35/sec); persistent when not positive. */
+        int tics = (hhold > 0) ? (int)(((long long)hhold * 35) >> 16) : -1;
+        zacs_hud_store(inst->printbuf, hid,
+                       zacs_hud_map_x(hx), zacs_hud_map_y(hy),
+                       tics, hcolor ? hcolor : -1);
+      }
+      inst->printlen  = 0;
+      inst->printbuf[0] = 0;
       break;
+    }
     case PCD_SAVESTRING:
       ZPUSH(zacs_save_string(inst->printbuf));
       break;
@@ -3175,7 +3300,16 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     case PCD_SETFONTDIRECT:     (void)NEXTWORD; break;
     case PCD_SETSTYLE:          ZDROP(1); break;
     case PCD_SETSTYLEDIRECT:    (void)NEXTWORD; break;
-    case PCD_SETHUDSIZE:        ZDROP(3); break;
+    case PCD_SETHUDSIZE:
+    {
+      /* args pushed width, height, statusbar -> top-down: statusbar(1),
+       * height(2), width(3).  A zero box falls back to the 320x200 default. */
+      int sw = ZSTK(3), sh = ZSTK(2);
+      zacs_hud_w = sw > 0 ? sw : 320;
+      zacs_hud_h = sh > 0 ? sh : 200;
+      ZDROP(3);
+      break;
+    }
     case PCD_SETMUGSHOTSTATE:   ZDROP(1); break;
     case PCD_STARTTRANSLATION:  ZDROP(1); zacs_warn_pcd(pcd); break;
     case PCD_TRANSLATIONRANGE1: ZDROP(4); break;

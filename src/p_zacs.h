@@ -35,6 +35,11 @@ dbool Z_ACSActive(void);
 /* Run all OPEN scripts (called once from P_SetupLevel after spawn). */
 void Z_ACSRunOpenScripts(void);
 
+/* On-screen HudMessage text: tick the hold timers, draw the live messages,
+ * and clear them all (level start / reset). */
+void Z_ACSHudTicker(void);
+void Z_ACSHudDrawer(void);
+void Z_ACSHudClear(void);
 /* ACS_Execute / ACS_ExecuteAlways.  args may be NULL. */
 dbool Z_ACSStart(int number, int map, const int *args, int argc,
                  mobj_t *activator, line_t *line, int side, dbool always);

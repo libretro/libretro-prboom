@@ -31,6 +31,7 @@
 #include "p_inter.h"
 #include "p_map.h"
 #include "p_mobj.h"
+#include "u_decorate.h"
 #include "p_setup.h"
 #include "p_spec.h"
 #include "p_tick.h"
@@ -1086,6 +1087,34 @@ static mobj_t *zacs_aptr(zacs_inst_t *inst, int tid)
     return P_FindMobjFromTID((short)tid, &sp);
   }
 }
+
+/* Resolve a DECORATE user-variable name on a mobj to a pointer into its
+ * lazily-allocated storage, allocating on first write.  scalar names index
+ * slot 0 of their span; arrays add a clamped element index.  Returns NULL if
+ * the name is not declared by the actor's type or (read path) unallocated. */
+static int *zacs_uservar_slot(mobj_t *mo, const char *name, int index,
+                              dbool create)
+{
+  int base = 0, len = 0, total;
+  if (!mo || !name)
+    return NULL;
+  if (!U_DecorateUserVarSlot(mo->type, name, &base, &len))
+    return NULL;
+  if (index < 0) index = 0;
+  if (index >= len) index = len - 1;        /* clamp into the declared span */
+  total = U_DecorateUserVarCount(mo->type);
+  if (total <= 0)
+    return NULL;
+  if (!mo->user_vars)
+  {
+    if (!create)
+      return NULL;
+    mo->user_vars = Z_Malloc(total * sizeof(int), PU_LEVEL, NULL);
+    memset(mo->user_vars, 0, total * sizeof(int));
+  }
+  return &mo->user_vars[base + index];
+}
+
 
 static dbool zacs_tag_busy(int tag)
 {
@@ -3197,6 +3226,51 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         case 78:                          /* ACSF_GetActorPowerupTics */
           r = 0;
           break;
+
+        /* ---- DECORATE user variables ---------------------------------
+         * SetUserVariable/GetUserVariable address a scalar "var int" by name;
+         * SetUserArray/GetUserArray index into a "var int name[N]".  A set
+         * applies to every actor matching the tid (tid 0 = activator); a get
+         * reads the first match.  Names resolve through the actor type's
+         * DECORATE declaration map. */
+        case 24:                          /* SetUserVariable(tid,name,val) */
+        case 28:                          /* SetUserArray(tid,name,idx,val) */
+        {
+          int tid  = (argc > 0) ? a[0] : 0;
+          const char *nm = zacs_string(argc > 1 ? a[1] : 0);
+          int idx  = (func == 28) ? ((argc > 2) ? a[2] : 0) : 0;
+          int val  = (func == 28) ? ((argc > 3) ? a[3] : 0)
+                                  : ((argc > 2) ? a[2] : 0);
+          if (nm)
+          {
+            if (tid == 0)
+            {
+              int *slot = zacs_uservar_slot(inst->activator, nm, idx, true);
+              if (slot) *slot = val;
+            }
+            else
+            {
+              int sp = -1; mobj_t *mo;
+              while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
+              {
+                int *slot = zacs_uservar_slot(mo, nm, idx, true);
+                if (slot) *slot = val;
+              }
+            }
+          }
+          break;
+        }
+        case 25:                          /* GetUserVariable(tid,name) */
+        case 29:                          /* GetUserArray(tid,name,idx) */
+        {
+          int tid  = (argc > 0) ? a[0] : 0;
+          const char *nm = zacs_string(argc > 1 ? a[1] : 0);
+          int idx  = (func == 29) ? ((argc > 2) ? a[2] : 0) : 0;
+          mobj_t *mo = zacs_aptr(inst, tid);
+          int *slot = zacs_uservar_slot(mo, nm, idx, false);
+          r = slot ? *slot : 0;
+          break;
+        }
 
         /* ---- pure math ACSF ------------------------------------------
          * Self-contained numeric helpers (no map/actor state).  Sqrt is an

@@ -499,6 +499,13 @@ typedef struct mobj_s
      * applied yet. */
     fixed_t             floorclip;
 
+    /* DECORATE user variables: lazily allocated per-actor int storage,
+     * indexed by the slots its actor type declares with "var int".  The
+     * ZACS VM (which is what reads/writes these) is not serialised, so this
+     * pointer is nulled across save/load rather than archived -- consistent
+     * with the rest of the ZDoom-ACS runtime state. */
+    int                *user_vars;
+
     // SEE WARNING ABOVE ABOUT POINTER FIELDS!!!
 } mobj_t;
 

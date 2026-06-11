@@ -392,6 +392,7 @@ void P_ArchiveThinkers (void)
           save_p += sizeof(*mobj);
           mobj->state = (state_t *)(mobj->state - states);
           mobj->touching_sectorlist = NULL;
+          mobj->user_vars = NULL;
 
           if (mobj->lastenemy)
             mobj->lastenemy = mobj->lastenemy->thinker.function.arg1 ==
@@ -647,6 +648,7 @@ void P_UnArchiveThinkers (void)
         memcpy (mobj, save_p, sizeof(mobj_t));
         save_p += sizeof(mobj_t);
         mobj->touching_sectorlist = NULL;
+        mobj->user_vars = NULL;
       }
       else
       {

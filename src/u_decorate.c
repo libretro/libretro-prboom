@@ -90,10 +90,66 @@ typedef struct
     int  present;
     int  goto_dst;              /* WST_* the block's "goto" targets, or -1  */
   } wst[WST_COUNT];
+
+  /* DECORATE user variables this actor declares ("var int name;" or
+   * "var int name[N];").  Each maps a name to a base slot and length in the
+   * actor's per-instance user-var array; the ACS user-variable builtins
+   * resolve a name to its slot through this table. */
+#define MAX_USERVARS 16
+  struct { char name[28]; short base; short len; } uvar[MAX_USERVARS];
+  int  num_uvars;
+  int  uvar_slots;              /* total int slots the actor needs */
 } decorate_actor_t;
 
 static decorate_actor_t actors[MAX_DECORATE_ACTORS];
 static int num_actors;
+
+/* Per-mobjtype user-variable map, filled at registration so the ACS
+ * user-variable builtins can resolve (actor type, name) to a storage slot.
+ * Keyed by mobjtype; only DECORATE-registered actors appear here. */
+typedef struct {
+  int   type;                   /* mobjtype this map describes */
+  int   slots;                  /* total int slots the type needs */
+  int   num;                    /* number of named variables */
+  struct { char name[28]; short base; short len; } var[MAX_USERVARS];
+} uvarmap_t;
+#define MAX_UVARMAPS MAX_DECORATE_ACTORS
+static uvarmap_t uvarmaps[MAX_UVARMAPS];
+static int num_uvarmaps;
+
+static uvarmap_t *uvarmap_for_type(int type)
+{
+  int i;
+  for (i = 0; i < num_uvarmaps; i++)
+    if (uvarmaps[i].type == type)
+      return &uvarmaps[i];
+  return NULL;
+}
+
+/* Public: total user-var slots a mobjtype declares (0 if none). */
+int U_DecorateUserVarCount(int type)
+{
+  uvarmap_t *m = uvarmap_for_type(type);
+  return m ? m->slots : 0;
+}
+
+/* Public: resolve a user-var name on a mobjtype to its base slot and length.
+ * Returns 1 and fills *base/*len on success, 0 if the name is not declared. */
+int U_DecorateUserVarSlot(int type, const char *name, int *base, int *len)
+{
+  uvarmap_t *m = uvarmap_for_type(type);
+  int i;
+  if (!m || !name)
+    return 0;
+  for (i = 0; i < m->num; i++)
+    if (!strcasecmp(m->var[i].name, name))
+    {
+      if (base) *base = m->var[i].base;
+      if (len)  *len  = m->var[i].len;
+      return 1;
+    }
+  return 0;
+}
 
 /* Safe per-frame DECORATE actions the registrar can wire onto a decoration
  * state.  Kept deliberately small: only self-contained codepointers that the
@@ -751,6 +807,48 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       p = read_word(p, end, word, sizeof(word));
       a->radius = atoi(word);
     }
+    else if (!strcasecmp(word, "var"))
+    {
+      /* "var int name;" or "var int name[N];" -- assign the name a base
+       * slot (and length) in this actor's user-var array. */
+      char ty[MAX_NAME], nm[MAX_NAME];
+      p = skip_space(p, end);
+      p = read_word(p, end, ty, sizeof(ty));      /* type, e.g. "int" */
+      p = skip_space(p, end);
+      p = read_word(p, end, nm, sizeof(nm));       /* name (maybe name[N] */
+      if (nm[0] && a->num_uvars < MAX_USERVARS)
+      {
+        int len = 1;
+        char *br;
+        char *sc = strchr(nm, ';');     /* "name;" -> drop the terminator */
+        if (sc) *sc = 0;
+        br = strchr(nm, '[');
+        if (br) { len = atoi(br + 1); if (len < 1) len = 1; *br = 0; }
+        else
+        {
+          /* "name [N]" with a space: peek for a bracketed count */
+          const char *q = skip_space(p, end);
+          if (q < end && *q == '[')
+          {
+            char cnt[MAX_NAME];
+            q = read_word(q + 1, end, cnt, sizeof(cnt));
+            len = atoi(cnt); if (len < 1) len = 1;
+            p = q;
+            while (p < end && *p != ']' && *p != '\n') p++;
+            if (p < end && *p == ']') p++;
+          }
+        }
+        {
+          int k = a->num_uvars++;
+          int n = 0;
+          while (nm[n] && n < 27) { a->uvar[k].name[n] = nm[n]; n++; }
+          a->uvar[k].name[n] = 0;
+          a->uvar[k].base = (short)a->uvar_slots;
+          a->uvar[k].len  = (short)len;
+          a->uvar_slots  += len;
+        }
+      }
+    }
     else if (!strcasecmp(word, "Height"))
     {
       p = skip_space(p, end);
@@ -1186,6 +1284,23 @@ void U_RegisterDecorateThings(void)
     mt = mt_base + count_mt;
     info = dsda_GetMobjInfo(mt);
     info->doomednum   = a->doomednum;
+
+    /* publish this actor's user-variable map under its mobjtype so the ACS
+     * user-variable builtins can resolve names to slots at runtime */
+    if (a->num_uvars > 0 && num_uvarmaps < MAX_UVARMAPS)
+    {
+      uvarmap_t *m = &uvarmaps[num_uvarmaps++];
+      int u;
+      m->type  = mt;
+      m->slots = a->uvar_slots;
+      m->num   = a->num_uvars;
+      for (u = 0; u < a->num_uvars; u++)
+      {
+        memcpy(m->var[u].name, a->uvar[u].name, sizeof(m->var[u].name));
+        m->var[u].base = a->uvar[u].base;
+        m->var[u].len  = a->uvar[u].len;
+      }
+    }
     info->spawnstate  = st;
     info->spawnhealth = 1000;
     info->mass        = 100;

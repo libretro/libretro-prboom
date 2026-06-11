@@ -1712,6 +1712,13 @@ void P_RemoveMobj (mobj_t* mobj)
 {
   P_BloodQueueUnhook(mobj);
 
+  /* release any lazily-allocated DECORATE user-variable storage */
+  if (mobj->user_vars)
+  {
+    Z_Free(mobj->user_vars);
+    mobj->user_vars = NULL;
+  }
+
   /* All TID-bearing formats (Hexen and the ZDoom map formats, which
    * build the TID list in P_SetupLevel) must unhook removed mobjs, or
    * TIDMobj keeps a dangling pointer and P_FindMobjFromTID hands out

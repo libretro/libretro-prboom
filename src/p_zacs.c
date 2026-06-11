@@ -106,10 +106,26 @@ static int            zacs_numfnames;
 
 /* ---- VM variable storage ------------------------------------------------ */
 
+/* An ACS array is a dense vector for the ordinary small-index region that all
+ * hand-written content uses.  Objects compiled from a higher-level language
+ * (GDCC) instead treat a single global array as a flat 32-bit address space,
+ * indexing it with values across the whole signed range (a stack near the top,
+ * heap and statics elsewhere).  Those indices cannot back a dense vector, so
+ * any index outside the dense window falls through to an open-addressing hash
+ * side table.  Dense storage keeps the common path bit-for-bit unchanged. */
+typedef struct {
+  int  key;            /* array index */
+  int  val;
+  int  used;
+} zacs_sparse_ent_t;
+
 typedef struct
 {
-  int *data;
-  int  size;
+  int  *data;
+  int   size;          /* dense window length (indices 0 .. size-1)        */
+  zacs_sparse_ent_t *sparse;   /* hash table for out-of-window indices      */
+  int   sparse_cap;            /* power-of-two capacity, 0 = none allocated */
+  int   sparse_used;
 } zacs_array_t;
 
 static int          *zacs_mapvars;       /* -> active module's map-var store */
@@ -160,27 +176,98 @@ static zacs_array_t zacs_worldarrays[ZACS_WORLD_ARRAYS];
 static zacs_array_t zacs_globalarrays[ZACS_GLOBAL_ARRAYS];
 
 /* growable sparse-ish array access: zero default, grow on write */
+/* Largest index served from the dense vector.  Indices in [0, this] grow the
+ * dense array as before (so ordinary content is unchanged); anything outside,
+ * including the high/negative addresses GDCC uses, goes to the hash table. */
+#define ZACS_ARR_DENSE_MAX 0xFFFF
+
+static unsigned zacs_sparse_hash(int key)
+{
+  unsigned h = (unsigned)key;
+  h ^= h >> 16; h *= 0x7feb352dU; h ^= h >> 15; h *= 0x846ca68bU; h ^= h >> 16;
+  return h;
+}
+
+/* Find the slot for key (open addressing, linear probe).  Returns the slot to
+ * use; *found tells whether it already holds key.  Caller guarantees capacity. */
+static int zacs_sparse_slot(zacs_array_t *a, int key, int *found)
+{
+  unsigned mask = (unsigned)a->sparse_cap - 1u;
+  unsigned i = zacs_sparse_hash(key) & mask;
+  for (;;)
+  {
+    if (!a->sparse[i].used) { *found = 0; return (int)i; }
+    if (a->sparse[i].key == key) { *found = 1; return (int)i; }
+    i = (i + 1) & mask;
+  }
+}
+
+static void zacs_sparse_grow(zacs_array_t *a)
+{
+  int oldcap = a->sparse_cap, i, ncap;
+  zacs_sparse_ent_t *old = a->sparse;
+  ncap = oldcap ? oldcap * 2 : 64;
+  a->sparse = calloc((size_t)ncap, sizeof(*a->sparse));
+  a->sparse_cap = ncap;
+  a->sparse_used = 0;
+  if (old)
+  {
+    for (i = 0; i < oldcap; i++)
+      if (old[i].used)
+      {
+        int f, s = zacs_sparse_slot(a, old[i].key, &f);
+        a->sparse[s].key = old[i].key;
+        a->sparse[s].val = old[i].val;
+        a->sparse[s].used = 1;
+        a->sparse_used++;
+      }
+    free(old);
+  }
+}
+
 static int zacs_arr_get(zacs_array_t *a, int ix)
 {
-  if (ix < 0 || ix >= a->size)
-    return 0;
-  return a->data[ix];
+  if (ix >= 0 && ix < a->size)
+    return a->data[ix];
+  if (a->sparse_cap)
+  {
+    int f, s = zacs_sparse_slot(a, ix, &f);
+    if (f)
+      return a->sparse[s].val;
+  }
+  return 0;
 }
 
 static void zacs_arr_set(zacs_array_t *a, int ix, int v)
 {
-  if (ix < 0 || ix > 0xFFFF)            /* sanity cap: 64K elements */
-    return;
-  if (ix >= a->size)
+  if (ix >= 0 && ix <= ZACS_ARR_DENSE_MAX)
   {
-    int ns = a->size ? a->size : 64;
-    while (ix >= ns)
-      ns *= 2;
-    a->data = realloc(a->data, ns * sizeof(int));
-    memset(a->data + a->size, 0, (ns - a->size) * sizeof(int));
-    a->size = ns;
+    if (ix >= a->size)
+    {
+      int ns = a->size ? a->size : 64;
+      while (ix >= ns)
+        ns *= 2;
+      a->data = realloc(a->data, ns * sizeof(int));
+      memset(a->data + a->size, 0, (ns - a->size) * sizeof(int));
+      a->size = ns;
+    }
+    a->data[ix] = v;
+    return;
   }
-  a->data[ix] = v;
+  /* out-of-window index (e.g. a GDCC flat-memory address): hash side table */
+  {
+    int f, s;
+    if (a->sparse_used * 4 >= a->sparse_cap * 3)   /* keep load factor < 0.75 */
+      zacs_sparse_grow(a);
+    s = zacs_sparse_slot(a, ix, &f);
+    if (!f)
+    {
+      a->sparse[s].key = ix;
+      a->sparse[s].used = 1;
+      a->sparse_used++;
+    }
+    a->sparse[s].val = v;
+  }
 }
 
 /* ---- script instances (thinkers) ---------------------------------------- */

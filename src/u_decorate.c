@@ -49,6 +49,17 @@ typedef struct
   char sprite[5];               /* 4-char sprite of a "SPRT F -1" spawn */
   int  frame;                   /* 0-based frame letter, FF_FULLBRIGHT or'd */
   int  spawn_static;            /* spawn state parsed and tics == -1 */
+
+  /* animated Spawn sequence (no action functions): a chain of frames the
+   * registrar turns into looping/terminating states.  Captured only for a
+   * plain "SPRITE <letters> <tics>" sequence ending in loop/stop. */
+#define MAX_SPAWN_FRAMES 32
+  struct { short frame; short tics; } seq[MAX_SPAWN_FRAMES];
+  char seq_sprite[5];           /* sprite the sequence uses (one sprite)  */
+  int  seq_len;                 /* number of frames captured              */
+  int  seq_loops;              /* 1 = loop back to frame 0, 0 = stop      */
+  int  translucent;             /* RenderStyle Translucent / Add          */
+  int  alpha;                   /* 16.16 alpha, FRACUNIT if unset         */
 } decorate_actor_t;
 
 static decorate_actor_t actors[MAX_DECORATE_ACTORS];
@@ -130,6 +141,7 @@ static void parse_header(const char *p, const char *end)
   memset(a, 0, sizeof(*a));
   a->doomednum = -1;
   a->radius = a->height = -1;
+  a->alpha = FRACUNIT;
 
   p = skip_space(p, end);
   p = read_word(p, end, a->name, sizeof(a->name));
@@ -394,6 +406,49 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       a->nogravity = 1;
     else if (!strcasecmp(word, "+SPAWNCEILING"))
       a->spawnceiling = 1;
+    else if (!strcasecmp(word, "RenderStyle"))
+    {
+      char rs[MAX_NAME];
+      p = skip_space(p, end);
+      p = read_word(p, end, rs, sizeof(rs));
+      if (!strcasecmp(rs, "Translucent") || !strcasecmp(rs, "Add") ||
+          !strcasecmp(rs, "Stencil")     || !strcasecmp(rs, "Shaded"))
+        a->translucent = 1;
+    }
+    else if (!strcasecmp(word, "Alpha"))
+    {
+      char av[MAX_NAME];
+      p = skip_space(p, end);
+      p = read_word(p, end, av, sizeof(av));
+      /* "0.4" -> 16.16; atof avoided (no float determinism worry here,
+       * but keep it integer-parsed for consistency) */
+      {
+        int whole = 0, frac = 0, scale = 1, seen_dot = 0;
+        const char *s = av;
+        while (*s)
+        {
+          if (*s == '.') seen_dot = 1;
+          else if (*s >= '0' && *s <= '9')
+          {
+            if (!seen_dot) whole = whole * 10 + (*s - '0');
+            else { frac = frac * 10 + (*s - '0'); scale *= 10; }
+          }
+          s++;
+        }
+        a->alpha = whole * FRACUNIT + (scale > 1 ? (frac * FRACUNIT) / scale : 0);
+        if (a->alpha > FRACUNIT) a->alpha = FRACUNIT;
+        if (a->alpha < 0)        a->alpha = 0;
+      }
+    }
+    else if (in_spawn && !a->spawn_static && a->seq_len > 0 &&
+             (!strcasecmp(word, "loop") || !strcasecmp(word, "stop") ||
+              !strcasecmp(word, "wait")))
+    {
+      /* terminator for an animated Spawn sequence ("loop"/"wait" repeat,
+       * "stop" freezes on the last frame) */
+      a->seq_loops = strcasecmp(word, "stop") != 0;
+      in_spawn = 0;
+    }
     else if (strlen(word) == 4)
     {
       /* a state line is "SPRT ABCD 5 [action]": a 4-char word, a word of
@@ -428,7 +483,10 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       }
       if (in_spawn && !a->spawn_static)
       {
-      /* "SPRT F -1 [BRIGHT]" -- a single static frame */
+      /* A Spawn-state line is "SPRT <frames> <tics> [BRIGHT] [action]".
+       * Two shapes are captured (action functions are otherwise ignored):
+       *   "SPRT F -1"     -> a single frozen frame (spawn_static)
+       *   "SPRT ABCD 10"  -> an animated sequence, terminated by loop/stop */
       char fr[MAX_NAME], tics[MAX_NAME];
       const char *q = skip_space(p, end);
       q = read_word(q, end, fr, sizeof(fr));
@@ -446,9 +504,41 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         if (!strcasecmp(b, "BRIGHT"))
           a->frame |= FF_FULLBRIGHT;
         a->spawn_static = 1;
+        a->seq_len = 0;          /* a frozen frame supersedes any sequence */
         p = q;
       }
-      in_spawn = 0;
+      else if (fr[0] >= 'A' && fr[0] <= '_' &&
+               (tics[0] >= '0' && tics[0] <= '9') &&
+               (a->seq_len == 0 ||
+                !strncasecmp(a->seq_sprite, word, 4)))
+      {
+        /* animated frames: one entry per frame letter, all this sprite.
+         * Only a single sprite per Spawn sequence is supported. */
+        int t = atoi(tics);
+        int bright = 0;
+        const char *r = skip_space(q, end);
+        char b[MAX_NAME];
+        size_t fi;
+        read_word(r, end, b, sizeof(b));
+        if (!strcasecmp(b, "BRIGHT"))
+          bright = FF_FULLBRIGHT;
+        if (a->seq_len == 0)
+        {
+          memcpy(a->seq_sprite, word, 4);
+          a->seq_sprite[4] = 0;
+        }
+        if (t < 0) t = 0;
+        if (t > 32767) t = 32767;
+        for (fi = 0; fr[fi] && a->seq_len < MAX_SPAWN_FRAMES; fi++)
+        {
+          if (fr[fi] < 'A' || fr[fi] > '_')
+            continue;
+          a->seq[a->seq_len].frame = (short)((fr[fi] - 'A') | bright);
+          a->seq[a->seq_len].tics  = (short)t;
+          a->seq_len++;
+        }
+        p = q;
+      }
       }
     }
   }
@@ -470,7 +560,7 @@ static dbool engine_knows_doomednum(int dn)
  * right before R_Init, and only for the Doom game. */
 void U_RegisterDecorateThings(void)
 {
-  int i, count = 0;
+  int i, count = 0, count_mt = 0;
   /* The dsda tables double when their end is touched: allocate
    * sequentially from the counts captured here so ten registrations cost
    * one doubling, not ten. */
@@ -487,17 +577,25 @@ void U_RegisterDecorateThings(void)
     int st, mt, sp, k;
     mobjinfo_t *info;
     state_t *state;
+    int nframes;
+    const char *spr;
 
-    if (a->doomednum < 0 || !a->spawn_static)
+    if (a->doomednum < 0)
       continue;
+    if (!a->spawn_static && a->seq_len <= 0)
+      continue;                 /* nothing renderable captured            */
     if (engine_knows_doomednum(a->doomednum))
       continue;
     if (resolve_class(a->name, a, 0) >= 0)
-      continue;                 /* monsters etc. handled by aliasing */
+      continue;                 /* monsters etc. handled by aliasing      */
+
+    /* a frozen single frame is a one-entry sequence */
+    nframes = a->spawn_static ? 1 : a->seq_len;
+    spr     = a->spawn_static ? a->sprite : a->seq_sprite;
 
     sp = -1;
     for (k = 0; k < sp_next; k++)
-      if (sprnames[k] && !strncasecmp(sprnames[k], a->sprite, 4))
+      if (sprnames[k] && !strncasecmp(sprnames[k], spr, 4))
       {
         sp = k;
         break;
@@ -505,17 +603,39 @@ void U_RegisterDecorateThings(void)
     if (sp < 0)
     {
       sp = sp_next++;
-      *dsda_GetSprite(sp) = strdup(a->sprite);
+      *dsda_GetSprite(sp) = strdup(spr);
     }
 
-    st = st_base + count;
-    state = dsda_GetState(st);
-    state->sprite    = sp;
-    state->frame     = a->frame;
-    state->tics      = -1;
-    state->nextstate = st;
+    /* one state per frame; nextstate chains forward, the last frame loops
+     * to the first (animated loop) or freezes on itself (static / stop) */
+    {
+      int first = st_base + count;
+      int f;
+      for (f = 0; f < nframes; f++)
+      {
+        int cur  = st_base + count + f;
+        int last = (f == nframes - 1);
+        state = dsda_GetState(cur);
+        state->sprite = sp;
+        if (a->spawn_static)
+        {
+          state->frame = a->frame;
+          state->tics  = -1;
+          state->nextstate = cur;
+        }
+        else
+        {
+          state->frame = a->seq[f].frame;
+          state->tics  = a->seq[f].tics;
+          state->nextstate = last
+            ? (a->seq_loops ? first : cur)   /* loop back or freeze */
+            : cur + 1;
+        }
+      }
+      st = first;
+    }
 
-    mt = mt_base + count;
+    mt = mt_base + count_mt;
     info = dsda_GetMobjInfo(mt);
     info->doomednum   = a->doomednum;
     info->spawnstate  = st;
@@ -526,13 +646,16 @@ void U_RegisterDecorateThings(void)
     info->flags       = (a->solid ? MF_SOLID : 0) |
                         (a->nogravity ? MF_NOGRAVITY : 0) |
                         (a->spawnceiling ? (MF_SPAWNCEILING | MF_NOGRAVITY)
-                                         : 0);
-    count++;
+                                         : 0) |
+                        ((a->translucent || a->alpha < FRACUNIT)
+                                         ? MF_TRANSLUCENT : 0);
+    count    += nframes;        /* states consumed */
+    count_mt += 1;              /* one mobj type   */
   }
 
-  if (count)
-    lprintf(LO_INFO, "U_RegisterDecorateThings: %d static decorations\n",
-            count);
+  if (count_mt)
+    lprintf(LO_INFO, "U_RegisterDecorateThings: %d decorations (%d states)\n",
+            count_mt, count);
 }
 
 /* does the DECORATE lump redefine this sprite's state sequence? */

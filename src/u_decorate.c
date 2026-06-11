@@ -82,6 +82,25 @@ typedef struct
    * for DA_CHANGEFLAG, fval is the boolean. */
   struct { short uvslot; short flag; short fval; dexpr_t idx; dexpr_t val; }
         seqop[MAX_SPAWN_FRAMES];
+  /* Parallel to seq[]: control flow.  flow is one of SEQF_*; for SEQF_GOTO and
+   * an A_JumpIf frame, target names the label this frame jumps to (interned in
+   * seqlabel[]) or, when >= 0, jtoff is a numeric "jump N states forward".
+   * jcond is the A_JumpIf condition expression. */
+#define SEQF_NEXT 0           /* fall through to the next frame */
+#define SEQF_LOOP 1           /* loop back to the current label's first frame */
+#define SEQF_STOP 2           /* freeze on this frame */
+#define SEQF_WAIT 3           /* stay on this frame (re-run its action) */
+#define SEQF_GOTO 4           /* jump to label seqlabel[target] */
+  struct { short flow; short target; short jtoff; short has_jump;
+           char tname[24]; char jtname[24]; dexpr_t jcond; }
+        seqflow[MAX_SPAWN_FRAMES];
+  /* Labels encountered in the state block, mapped to the frame index where
+   * each begins.  A multi-label actor (Spawn + InitLoop + Idle + ...) records
+   * every label so goto/A_JumpIf targets resolve to a frame. */
+#define MAX_SEQ_LABELS 16
+  struct { char name[24]; short frame; } seqlabel[MAX_SEQ_LABELS];
+  int  num_seqlabels;
+  int  multi_state;            /* 1 once a non-Spawn label/flow appears */
   char seq_sprite[5];           /* sprite the sequence uses (one sprite)  */
   int  seq_len;                 /* number of frames captured              */
   int  seq_loops;              /* 1 = loop back to frame 0, 0 = stop      */
@@ -327,6 +346,26 @@ void A_DecorateSetUserArray(mobj_t *mo)
   if (idx < 0) return;
   uv[base + idx] = decorate_eval_expr(mo, (int)st->args[0], (int)st->args[1],
       (int)st->args[2], (int)st->args[3], (int)st->args[4]);
+}
+
+/* A_JumpIf(cond, target): if the condition evaluates non-zero, jump to the
+ * target state encoded in args[5]; otherwise fall through.  The condition is
+ * args[0..4].  Uses P_SetMobjState so the destination's own action runs. */
+void A_DecorateJumpIf(mobj_t *mo)
+{
+  state_t *st;
+  int cond, tgt;
+  if (!mo || !mo->state)
+    return;
+  st = mo->state;
+  cond = decorate_eval_expr(mo, (int)st->args[0], (int)st->args[1],
+                            (int)st->args[2], (int)st->args[3],
+                            (int)st->args[4]);
+  if (!cond)
+    return;
+  tgt = (int)st->args[5];
+  if (tgt >= 0 && tgt < num_states)
+    P_SetMobjState(mo, (statenum_t)tgt);
 }
 
 /* Safe weapon-state (pspr) actions: the structural codepointers that make a
@@ -639,6 +678,34 @@ static int decorate_uvar_slot(const decorate_actor_t *a, const char *name)
   for (i = 0; i < a->num_uvars; i++)
     if (!strcasecmp(a->uvar[i].name, name))
       return a->uvar[i].base;
+  return -1;
+}
+
+/* Record a state label at the current frame position (idempotent per name). */
+static void decorate_add_label(decorate_actor_t *a, const char *name, int frame)
+{
+  int i;
+  for (i = 0; i < a->num_seqlabels; i++)
+    if (!strcasecmp(a->seqlabel[i].name, name))
+      return;
+  if (a->num_seqlabels >= MAX_SEQ_LABELS)
+    return;
+  {
+    int n = 0;
+    while (name[n] && n < 23) { a->seqlabel[a->num_seqlabels].name[n] = name[n]; n++; }
+    a->seqlabel[a->num_seqlabels].name[n] = 0;
+  }
+  a->seqlabel[a->num_seqlabels].frame = (short)frame;
+  a->num_seqlabels++;
+}
+
+/* Resolve a label name to the seqlabel[] index, or -1. */
+static int decorate_label_index(const decorate_actor_t *a, const char *name)
+{
+  int i;
+  for (i = 0; i < a->num_seqlabels; i++)
+    if (!strcasecmp(a->seqlabel[i].name, name))
+      return i;
   return -1;
 }
 
@@ -1046,6 +1113,19 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           continue;
         }
       }
+      /* Non-weapon decoration: record every state label against the current
+       * frame position so goto / A_JumpIf targets resolve, and keep capturing
+       * frames under it.  A label other than Spawn means this actor needs the
+       * multi-label state machine rather than the flat Spawn path. */
+      if (a->wpn_slot < 0 && !a->spawn_static)
+      {
+        decorate_add_label(a, word, a->seq_len);
+        if (!in_spawn)
+        {
+          a->multi_state = 1;
+          in_spawn = 1;       /* continue capturing frames under this label */
+        }
+      }
       continue;
     }
 
@@ -1153,20 +1233,70 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
              (!strcasecmp(word, "loop") || !strcasecmp(word, "stop") ||
               !strcasecmp(word, "wait")))
     {
-      /* terminator for an animated Spawn sequence ("loop"/"wait" repeat,
-       * "stop" freezes on the last frame) */
+      /* terminator for an animated sequence ("loop"/"wait" repeat, "stop"
+       * freezes on the last frame).  For a multi-label actor it is recorded
+       * on the last captured frame so each label's run terminates correctly;
+       * the flat single-Spawn path keeps using seq_loops. */
       a->seq_loops = strcasecmp(word, "stop") != 0;
+      if (a->multi_state)
+      {
+        int lf = a->seq_len - 1;
+        a->seqflow[lf].flow = !strcasecmp(word, "loop") ? SEQF_LOOP
+                            : !strcasecmp(word, "wait") ? SEQF_WAIT
+                            : SEQF_STOP;
+      }
       in_spawn = 0;
     }
-    else if (strlen(word) == 4)
+    else if (in_spawn && !a->spawn_static && a->seq_len > 0 &&
+             !strcasecmp(word, "goto"))
+    {
+      /* "goto Label": the last captured frame jumps to the named label.  The
+       * target is resolved to a state index at registration. */
+      char dst[MAX_NAME];
+      int lf = a->seq_len - 1;
+      p = skip_space(p, end);
+      p = read_word(p, end, dst, sizeof(dst));
+      a->seqflow[lf].flow   = SEQF_GOTO;
+      {
+        int dn = 0;
+        while (dst[dn] && dn < 23) { a->seqflow[lf].tname[dn] = dst[dn]; dn++; }
+        a->seqflow[lf].tname[dn] = 0;
+      }
+      a->multi_state = 1;
+      in_spawn = 0;
+    }
+    else if (strlen(word) == 4 ||
+             (word[0] == '"' &&
+              (word[1] == '#' || word[1] == '-')))
     {
       /* a state line is "SPRT ABCD 5 [action]": a 4-char word, a word of
        * frame letters, then a numeric tic count.  Record the sprite name;
        * properties never match (their value words are not all letters or
-       * are not followed by a number). */
+       * are not followed by a number).  ZDoom's quoted keep-sprite
+       * placeholder ("####"/"----") is accepted too -- such an actor carries
+       * no sprite of its own (a logic-only actor), so its frames render
+       * nothing but still run their actions. */
       char fr[MAX_NAME], tics[MAX_NAME];
+      char spr[8];
+      int  keep_spr = 0;
       const char *q = skip_space(p, end);
+      /* normalise the sprite word: strip surrounding quotes, detect keep */
+      {
+        const char *wp = word;
+        int n = 0;
+        if (wp[0] == '"') wp++;
+        while (wp[n] && wp[n] != '"' && n < 4) { spr[n] = wp[n]; n++; }
+        spr[n] = 0;
+        if (spr[0] == '#' || spr[0] == '-') keep_spr = 1;
+      }
       q = read_word(q, end, fr, sizeof(fr));
+      /* the frame-letter word may be quoted as well */
+      if (fr[0] == '"')
+      {
+        int n = 0; const char *fp = fr + 1;
+        while (fp[n] && fp[n] != '"') { fr[n] = fp[n]; n++; }
+        fr[n] = 0;
+      }
       q = skip_space(q, end);
       q = read_word(q, end, tics, sizeof(tics));
       if (fr[0] && (tics[0] == '-' || (tics[0] >= '0' && tics[0] <= '9')))
@@ -1174,19 +1304,22 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         size_t fi;
         int letters = 1;
         for (fi = 0; fr[fi]; fi++)
-          if (fr[fi] < 'A' || fr[fi] > '_')
+          if ((fr[fi] < 'A' || fr[fi] > '_') && fr[fi] != '#' && fr[fi] != '-')
             letters = 0;
         if (letters)
         {
           int k;
-          for (k = 0; k < num_sprite_names; k++)
-            if (!strncasecmp(sprite_names[k], word, 4))
-              break;
-          if (k == num_sprite_names && k < MAX_DECORATE_SPRITES)
+          if (!keep_spr)
           {
-            memcpy(sprite_names[k], word, 4);
-            sprite_names[k][4] = 0;
-            num_sprite_names++;
+            for (k = 0; k < num_sprite_names; k++)
+              if (!strncasecmp(sprite_names[k], spr, 4))
+                break;
+            if (k == num_sprite_names && k < MAX_DECORATE_SPRITES)
+            {
+              memcpy(sprite_names[k], spr, 4);
+              sprite_names[k][4] = 0;
+              num_sprite_names++;
+            }
           }
         }
       }
@@ -1195,20 +1328,37 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       /* A Spawn-state line is "SPRT <frames> <tics> [BRIGHT] [action]".
        * Two shapes are captured (action functions are otherwise ignored):
        *   "SPRT F -1"     -> a single frozen frame (spawn_static)
-       *   "SPRT ABCD 10"  -> an animated sequence, terminated by loop/stop */
+       *   "SPRT ABCD 10"  -> an animated sequence, terminated by loop/stop
+       * The quoted keep-sprite/frame placeholder ("####" # ...) is honoured;
+       * such frames render nothing but still run their actions. */
       char fr[MAX_NAME], tics[MAX_NAME];
+      char nspr[8];
+      int  keep_spr = 0;
       const char *q = skip_space(p, end);
+      {
+        const char *wp = word; int n = 0;
+        if (wp[0] == '"') wp++;
+        while (wp[n] && wp[n] != '"' && n < 4) { nspr[n] = wp[n]; n++; }
+        nspr[n] = 0;
+        if (nspr[0] == '#' || nspr[0] == '-') keep_spr = 1;
+      }
       q = read_word(q, end, fr, sizeof(fr));
+      if (fr[0] == '"')
+      {
+        int n = 0; const char *fp = fr + 1;
+        while (fp[n] && fp[n] != '"') { fr[n] = fp[n]; n++; }
+        fr[n] = 0;
+      }
       q = skip_space(q, end);
       q = read_word(q, end, tics, sizeof(tics));
-      if (strlen(fr) == 1 && fr[0] >= 'A' && fr[0] <= 'Z' &&
-          !strcmp(tics, "-1"))
+      if (strlen(fr) == 1 && ((fr[0] >= 'A' && fr[0] <= 'Z') ||
+          fr[0] == '#' || fr[0] == '-') && !strcmp(tics, "-1"))
       {
         const char *r = skip_space(q, end);
         char b[MAX_NAME];
-        memcpy(a->sprite, word, 4);
+        memcpy(a->sprite, nspr, 4);
         a->sprite[4] = 0;
-        a->frame = fr[0] - 'A';
+        a->frame = (fr[0] == '#' || fr[0] == '-') ? 0 : fr[0] - 'A';
         read_word(r, end, b, sizeof(b));
         if (!strcasecmp(b, "BRIGHT"))
           a->frame |= FF_FULLBRIGHT;
@@ -1216,10 +1366,11 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         a->seq_len = 0;          /* a frozen frame supersedes any sequence */
         p = q;
       }
-      else if (fr[0] >= 'A' && fr[0] <= '_' &&
+      else if (((fr[0] >= 'A' && fr[0] <= '_') ||
+                fr[0] == '#' || fr[0] == '-') &&
                (tics[0] >= '0' && tics[0] <= '9') &&
                (a->seq_len == 0 ||
-                !strncasecmp(a->seq_sprite, word, 4)))
+                !strncasecmp(a->seq_sprite, nspr, 4)))
       {
         /* animated frames: one entry per frame letter, all this sprite.
          * Only a single sprite per Spawn sequence is supported. */
@@ -1228,11 +1379,15 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         short act = DA_NONE, snd = -1;
         struct { short uvslot; short flag; short fval; dexpr_t idx; dexpr_t val; }
               opstage;
+        struct { short has_jump; short jtoff; char tname[24]; dexpr_t jcond; }
+              flowstage;
         const char *r = skip_space(q, end);
         const char *act_src;
         char b[MAX_NAME];
         size_t fi;
         memset(&opstage, 0, sizeof(opstage));
+        memset(&flowstage, 0, sizeof(flowstage));
+        flowstage.jtoff = -1;
         act_src = r;
         r = read_word(r, end, b, sizeof(b));
         if (!strcasecmp(b, "BRIGHT"))
@@ -1347,7 +1502,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
             }
           }
           else if (!strcasecmp(fn, "A_SetUserVar") ||
-                   !strcasecmp(fn, "A_SetUserArray"))
+                   !strcasecmp(fn, "A_SetUserArray") ||
+                   !strcasecmp(fn, "A_JumpIf"))
           {
             /* These carry a parenthesised argument list that may contain
              * spaces and an expression, so re-read the whole "(...)" from
@@ -1384,20 +1540,45 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
                 act = DA_SETUSERARRAY;
               }
             }
+            else if (!strcasecmp(fn, "A_JumpIf") && nf >= 2)
+            {
+              /* A_JumpIf(cond, target): target is a label name or a numeric
+               * "skip N states forward".  This is flow, not a DA_ action --
+               * it rides in the frame's seqflow as a conditional jump. */
+              trim_arg(fld[0]); trim_arg(fld[1]);
+              parse_dexpr(a, fld[0], &flowstage.jcond);
+              flowstage.has_jump = 1;
+              if (fld[1][0] >= '0' && fld[1][0] <= '9')
+                flowstage.jtoff = (short)atoi(fld[1]);
+              else
+              {
+                int dn = 0;
+                flowstage.jtoff = -1;
+                while (fld[1][dn] && dn < 23)
+                { flowstage.tname[dn] = fld[1][dn]; dn++; }
+                flowstage.tname[dn] = 0;
+              }
+              a->multi_state = 1;
+            }
           }
         }
         if (a->seq_len == 0)
         {
-          memcpy(a->seq_sprite, word, 4);
+          memcpy(a->seq_sprite, nspr, 4);
           a->seq_sprite[4] = 0;
         }
         if (t < 0) t = 0;
         if (t > 32767) t = 32767;
         for (fi = 0; fr[fi] && a->seq_len < MAX_SPAWN_FRAMES; fi++)
         {
-          if (fr[fi] < 'A' || fr[fi] > '_')
+          int frbits;
+          if ((fr[fi] < 'A' || fr[fi] > '_') &&
+              fr[fi] != '#' && fr[fi] != '-')
             continue;
-          a->seq[a->seq_len].frame = (short)((fr[fi] - 'A') | bright);
+          /* "#"/"-" keep the current frame; store 0 (a logic-only actor
+           * with no sprite shows nothing regardless) */
+          frbits = (fr[fi] == '#' || fr[fi] == '-') ? 0 : (fr[fi] - 'A');
+          a->seq[a->seq_len].frame = (short)(frbits | bright);
           a->seq[a->seq_len].tics  = (short)t;
           /* the action fires on the first frame letter of the line, as in
            * DECORATE (a multi-letter line repeats the frames, action once) */
@@ -1412,6 +1593,14 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
             a->seqop[a->seq_len].fval   = opstage.fval;
             a->seqop[a->seq_len].idx    = opstage.idx;
             a->seqop[a->seq_len].val    = opstage.val;
+          }
+          if (fi == 0 && flowstage.has_jump)
+          {
+            a->seqflow[a->seq_len].has_jump = 1;
+            a->seqflow[a->seq_len].jtoff    = flowstage.jtoff;
+            a->seqflow[a->seq_len].jcond    = flowstage.jcond;
+            memcpy(a->seqflow[a->seq_len].jtname, flowstage.tname,
+                   sizeof(flowstage.tname));
           }
           a->seq_len++;
         }
@@ -1541,6 +1730,37 @@ void U_RegisterDecorateThings(void)
         {
           state->frame = a->seq[f].frame;
           state->tics  = a->seq[f].tics;
+          if (a->multi_state)
+          {
+            /* honour this frame's recorded flow: loop back to the enclosing
+             * label, freeze, wait (re-run), or goto another label; a frame
+             * with no terminator falls through to the next. */
+            int flow = a->seqflow[f].flow;
+            if (flow == SEQF_LOOP)
+            {
+              /* loop back to the first frame of the label whose run contains
+               * f (the nearest label at or before f) */
+              int li, lab_frame = 0;
+              for (li = 0; li < a->num_seqlabels; li++)
+                if (a->seqlabel[li].frame <= f &&
+                    a->seqlabel[li].frame >= lab_frame)
+                  lab_frame = a->seqlabel[li].frame;
+              state->nextstate = st_base + count + lab_frame;
+            }
+            else if (flow == SEQF_STOP)
+              state->nextstate = cur;
+            else if (flow == SEQF_WAIT)
+              state->nextstate = cur;
+            else if (flow == SEQF_GOTO)
+            {
+              int li = decorate_label_index(a, a->seqflow[f].tname);
+              state->nextstate = (li >= 0)
+                ? st_base + count + a->seqlabel[li].frame : cur;
+            }
+            else
+              state->nextstate = last ? cur : cur + 1;
+          }
+          else
           state->nextstate = last
             ? (a->seq_loops ? first : cur)   /* loop back or freeze */
             : cur + 1;
@@ -1609,6 +1829,30 @@ void U_RegisterDecorateThings(void)
               break;
             default:
               break;
+          }
+
+          /* A_JumpIf(cond, target): a conditional jump overrides this frame's
+           * action wiring.  Encode the condition in args[0..4], the resolved
+           * jump-target state in args[5], and run A_DecorateJumpIf which sets
+           * the mobj's state to the target when the condition is true. */
+          if (a->seqflow[f].has_jump)
+          {
+            int tgt = cur;          /* default: no movement (cond false path) */
+            if (a->seqflow[f].jtoff >= 0)
+              tgt = cur + 1 + a->seqflow[f].jtoff;   /* skip N states forward */
+            else
+            {
+              int li = decorate_label_index(a, a->seqflow[f].jtname);
+              if (li >= 0)
+                tgt = st_base + count + a->seqlabel[li].frame;
+            }
+            state->action.arg0 = (arg0_t)A_DecorateJumpIf;
+            state->args[0] = a->seqflow[f].jcond.ka;
+            state->args[1] = a->seqflow[f].jcond.va;
+            state->args[2] = a->seqflow[f].jcond.op;
+            state->args[3] = a->seqflow[f].jcond.kb;
+            state->args[4] = a->seqflow[f].jcond.vb;
+            state->args[5] = tgt;
           }
         }
       }

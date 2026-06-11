@@ -1416,6 +1416,20 @@ static void T_ZACSThinker(zacs_inst_t *inst);
 static char zacs_msgpool[8][ZACS_PRINTBUF];
 static int  zacs_msgrot;
 
+/* Previous-tic button snapshot per player, for GetPlayerInput INPUT_OLDBUTTONS.
+ * Rolled once per game tic by Z_ACSHudTicker. */
+static int zacs_oldbuttons[MAXPLAYERS];
+static int zacs_oldbuttons_snap[MAXPLAYERS];
+
+static int zacs_oldbuttons_of(player_t *pl)
+{
+  int i;
+  for (i = 0; i < MAXPLAYERS; i++)
+    if (&players[i] == pl)
+      return zacs_oldbuttons[i];
+  return 0;
+}
+
 /* On-screen HudMessage store.  ZDoom's verbose HudMessage places text at a
  * point in a virtual HUD space (320x200 by default, or the SetHudSize box)
  * and holds it for a time.  We keep a small set of live messages keyed by the
@@ -1665,6 +1679,11 @@ void Z_ACSRunEnterScripts(mobj_t *playermo)
 void Z_ACSHudTicker(void)
 {
   int i;
+  for (i = 0; i < MAXPLAYERS; i++)
+  {
+    zacs_oldbuttons[i] = zacs_oldbuttons_snap[i];
+    zacs_oldbuttons_snap[i] = playeringame[i] ? players[i].cmd.buttons : 0;
+  }
   for (i = 0; i < ZACS_HUDMSG_MAX; i++)
     if (zacs_hudmsgs[i].active && zacs_hudmsgs[i].holdtics >= 0)
       if (--zacs_hudmsgs[i].holdtics < 0)
@@ -2788,7 +2807,30 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     case PCD_GETPLAYERINFO:
     { int q = ZPOP(); (void)q; ZSETSTK(1, 0); zacs_warn_pcd(pcd); break; }
     case PCD_GETPLAYERINPUT:
-    { ZDROP(1); ZSETSTK(1, 0); zacs_warn_pcd(pcd); break; }
+    {
+      /* GetPlayerInput(player, input): read the current (INPUT_BUTTONS = 3) or
+       * previous-tic (INPUT_OLDBUTTONS = 2) button state, translating the
+       * engine's button bits into the ZDoom layout (BT_ATTACK = 1<<0,
+       * BT_USE = 1<<2) that content tests against.  player < 0 selects the
+       * activator's player; other selectors yield 0. */
+      int input = ZPOP();
+      int pnum  = ZSTK(1);
+      int r = 0;
+      player_t *pl = NULL;
+      if (pnum < 0)
+        pl = (inst->activator && inst->activator->player)
+               ? inst->activator->player : &players[consoleplayer];
+      else if (pnum >= 0 && pnum < MAXPLAYERS && playeringame[pnum])
+        pl = &players[pnum];
+      if (pl && (input == 2 || input == 3))
+      {
+        int b = (input == 3) ? pl->cmd.buttons : zacs_oldbuttons_of(pl);
+        if (b & BT_ATTACK) r |= 1;
+        if (b & BT_USE)    r |= 4;
+      }
+      ZSETSTK(1, r);
+      break;
+    }
     case PCD_GETSIGILPIECES:
       ZPUSH(0);
       break;

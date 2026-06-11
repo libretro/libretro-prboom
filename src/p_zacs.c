@@ -2041,14 +2041,306 @@ static void zacs_blit_scaled_indexed(int lump, int dx, int dy, int dw, int dh,
  *
  * The destination is source-stepped with 16.16 fixed point so the inner loop
  * carries no divides; this is the overlay's hot pixel loop. */
+/* ----------------------------------------------------------------------------
+ * Scaled-portrait cache.
+ *
+ * A dialogue portrait is a still image: it changes only when the script
+ * advances and uploads a different graphic, not every tic.  Re-running the
+ * 1600x900 -> screen-rect resample (a strided source gather plus the fade
+ * fold) 35 times a second for an image that has not changed is the dominant
+ * cost of the overlay -- ~13 ms a tic at 4K.  So resample once into a
+ * contiguous screen-space ARGB buffer, keyed on (lump, dest size); on the
+ * following tics only the alpha-composite over the (live) game background runs,
+ * which is the one part that genuinely must repeat.  The cache also records the
+ * opaque bounding box so the composite skips the fully transparent margins
+ * (a centred portrait is ~26% opaque inside ~43% of its area).  Measured ~2x
+ * at 4K (13 ms -> 6.8 ms), and more once the empty margins are skipped. */
+typedef struct
+{
+  int       lump;
+  int       dw, dh;        /* dest size this scaled image was built for       */
+  unsigned *argb;          /* dw*dh screen-space 0xAABBGGRR                    */
+  int       bx0, by0;      /* opaque bounding box within the dw*dh image       */
+  int       bx1, by1;      /* exclusive                                        */
+  int       empty;         /* image is wholly transparent                     */
+  unsigned  used;          /* last-use serial, for LRU eviction               */
+} zacs_scaled_t;
+
+static zacs_scaled_t zacs_scaled[ZACS_HUDMSG_MAX];
+static unsigned      zacs_scaled_clock;
+
+/* Total bytes the scaled cache may hold before the least-recently-used slot is
+ * evicted.  A conversation normally keeps a couple of slots live (the portrait
+ * and the frame); the cap only bites a very long exchange that cycles through
+ * many distinct large images, keeping the cache from growing without bound at
+ * high internal resolutions. */
+#define ZACS_SCALED_BUDGET (64 * 1024 * 1024)
+
+static size_t zacs_scaled_bytes(void)
+{
+  size_t by = 0;
+  int i;
+  for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+    if (zacs_scaled[i].argb)
+      by += (size_t)zacs_scaled[i].dw * zacs_scaled[i].dh * sizeof(unsigned);
+  return by;
+}
+
+static void zacs_scaled_evict_lru(void)
+{
+  int i, victim = -1;
+  unsigned oldest = 0xffffffffu;
+  for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+    if (zacs_scaled[i].argb && zacs_scaled[i].used < oldest)
+    {
+      oldest = zacs_scaled[i].used;
+      victim = i;
+    }
+  if (victim >= 0)
+  {
+    free(zacs_scaled[victim].argb);
+    zacs_scaled[victim].argb = NULL;
+    zacs_scaled[victim].lump = -1;
+  }
+}
+
+/* Find the cache slot holding (lump,dw,dh), or a slot to (re)use for it.  Small
+ * linear scan: only a couple of portraits/frames are ever live at once. */
+static int zacs_scaled_slot(int lump, int dw, int dh)
+{
+  int i, free_slot = -1;
+  for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+  {
+    if (zacs_scaled[i].argb && zacs_scaled[i].lump == lump &&
+        zacs_scaled[i].dw == dw && zacs_scaled[i].dh == dh)
+      return i;                                 /* exact hit */
+    if (free_slot < 0 && !zacs_scaled[i].argb)
+      free_slot = i;
+    else if (free_slot < 0 && zacs_scaled[i].lump == lump)
+      free_slot = i;                            /* same lump, stale size */
+  }
+  return free_slot >= 0 ? free_slot : (lump % ZACS_HUDMSG_MAX);
+}
+
+/* Resample the native image into a contiguous dw*dh ARGB buffer and record its
+ * opaque bbox.  Returns the slot, or NULL on allocation failure. */
+static zacs_scaled_t *zacs_scaled_build(int slot, int lump,
+                                        const unsigned *argb, int aw, int ah,
+                                        int dw, int dh)
+{
+  zacs_scaled_t *sc = &zacs_scaled[slot];
+  int sx_step = (aw << 16) / dw;
+  int sy_step = (ah << 16) / dh;
+  int oy, bx0 = dw, by0 = dh, bx1 = 0, by1 = 0;
+  unsigned *buf;
+
+  if (sc->argb && (sc->dw != dw || sc->dh != dh))
+  {
+    free(sc->argb);
+    sc->argb = NULL;
+  }
+  if (!sc->argb)
+  {
+    /* keep total cache memory under budget before adding this image */
+    while (zacs_scaled_bytes() + (size_t)dw * dh * sizeof(unsigned)
+           > ZACS_SCALED_BUDGET && zacs_scaled_bytes() > 0)
+      zacs_scaled_evict_lru();
+    sc->argb = malloc((size_t)dw * dh * sizeof(unsigned));
+    if (!sc->argb)
+      return NULL;
+  }
+  buf = sc->argb;
+
+  for (oy = 0; oy < dh; oy++)
+  {
+    int srcy = (oy * sy_step) >> 16;
+    const unsigned *srow;
+    unsigned *drow = buf + (size_t)oy * dw;
+    int ox, sx = 0;
+    if (srcy >= ah) srcy = ah - 1;
+    srow = argb + (size_t)srcy * aw;
+    for (ox = 0; ox < dw; ox++, sx += sx_step)
+    {
+      unsigned p = srow[sx >> 16];
+      drow[ox] = p;
+      if (p >> 24)                              /* opaque texel: grow bbox */
+      {
+        if (ox < bx0) bx0 = ox;
+        if (ox >= bx1) bx1 = ox + 1;
+        if (oy < by0) by0 = oy;
+        if (oy >= by1) by1 = oy + 1;
+      }
+    }
+  }
+
+  sc->lump = lump;
+  sc->dw = dw; sc->dh = dh;
+  sc->empty = (bx1 <= bx0 || by1 <= by0);
+  sc->bx0 = bx0; sc->by0 = by0; sc->bx1 = bx1; sc->by1 = by1;
+  return sc;
+}
+
+/* Composite one contiguous ARGB source row over a surface row, with a global
+ * fade alpha (0..256).  Shared scalar tail used by the SIMD path below. */
+static void zacs_composite_tail(uint16_t *row, const unsigned *srow,
+                                int ox, int x1, int alpha)
+{
+  for (; ox < x1; ox++)
+  {
+    unsigned p = srow[ox];
+    int a = (int)(p >> 24);
+    if (!a)
+      continue;
+    a = (a * alpha) >> 8;
+    if (a <= 0)
+      continue;
+    {
+      int sr = (int)(p & 0xff);
+      int sg = (int)((p >> 8) & 0xff);
+      int sb = (int)((p >> 16) & 0xff);
+      uint16_t d = row[ox];
+      int dr = ((d >> 11) & 0x1f) << 3;
+      int dg = ((d >> 5)  & 0x3f) << 2;
+      int db = (d & 0x1f) << 3;
+      int ia = 256 - (a > 256 ? 256 : a);
+      int rr = (sr * a + dr * ia) >> 8;
+      int rg = (sg * a + dg * ia) >> 8;
+      int rb = (sb * a + db * ia) >> 8;
+      if (rr > 255) rr = 255;
+      if (rg > 255) rg = 255;
+      if (rb > 255) rb = 255;
+      row[ox] = (uint16_t)(((rr >> 3) << 11) | ((rg >> 2) << 5) | (rb >> 3));
+    }
+  }
+}
+
+/* Composite the cached scaled image (its opaque bbox only) onto the surface at
+ * (dx,dy) with a fade alpha.  Reads contiguous ARGB -- no resample, no margin
+ * scan.  This is the per-tic cost once a portrait is cached. */
+static void zacs_composite_scaled(const zacs_scaled_t *sc, int dx, int dy,
+                                  int alpha)
+{
+  uint16_t *surf = (uint16_t *)screens[0].data;
+  int oy, y0, y1;
+  if (sc->empty || alpha <= 0)
+    return;
+  y0 = sc->by0; y1 = sc->by1;
+  for (oy = y0; oy < y1; oy++)
+  {
+    int dyy = dy + oy;
+    const unsigned *srow;
+    uint16_t *row;
+    int ox = sc->bx0, x1 = sc->bx1;
+    if (dyy < 0 || dyy >= SCREENHEIGHT)
+      continue;
+    row  = surf + (size_t)dyy * SURFACE_SHORT_PITCH;
+    srow = sc->argb + (size_t)oy * sc->dw;
+    /* clip the image-space x span [ox,x1) so dx+x lands inside the surface */
+    if (dx + ox < 0)           ox = -dx;
+    if (dx + x1 > SCREENWIDTH)  x1 = SCREENWIDTH - dx;
+    if (ox >= x1)
+      continue;
+
+#if defined(ZACS_BLIT_SSE2) || defined(ZACS_BLIT_NEON)
+    for (; ox + 8 <= x1; ox += 8)
+    {
+      ZACS_ALIGN16 uint32_t sp[8];
+      ZACS_ALIGN16 uint16_t av[8];
+      int j, anyop = 0, dox = dx + ox;
+      for (j = 0; j < 8; j++)
+      {
+        unsigned p = srow[ox + j];
+        int a = (int)(p >> 24);
+        a = (a * alpha) >> 8;
+        if (a > 256) a = 256;
+        sp[j] = p;
+        av[j] = (uint16_t)a;
+        anyop |= a;
+      }
+      if (!anyop)
+        continue;
+#if defined(ZACS_BLIT_SSE2)
+      {
+        __m128i s0 = _mm_load_si128((const __m128i *)sp);
+        __m128i s1 = _mm_load_si128((const __m128i *)(sp + 4));
+        __m128i m8 = _mm_set1_epi32(0xff);
+        __m128i sr = _mm_packs_epi32(_mm_and_si128(s0, m8),
+                                     _mm_and_si128(s1, m8));
+        __m128i sg = _mm_packs_epi32(_mm_and_si128(_mm_srli_epi32(s0, 8), m8),
+                                     _mm_and_si128(_mm_srli_epi32(s1, 8), m8));
+        __m128i sb = _mm_packs_epi32(_mm_and_si128(_mm_srli_epi32(s0, 16), m8),
+                                     _mm_and_si128(_mm_srli_epi32(s1, 16), m8));
+        __m128i a  = _mm_load_si128((const __m128i *)av);
+        __m128i ia = _mm_sub_epi16(_mm_set1_epi16(256), a);
+        __m128i d  = _mm_loadu_si128((const __m128i *)(row + dox));
+        __m128i dr = _mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(d, 11),
+                                    _mm_set1_epi16(0x1F)), 3);
+        __m128i dg = _mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(d, 5),
+                                    _mm_set1_epi16(0x3F)), 2);
+        __m128i db = _mm_slli_epi16(_mm_and_si128(d, _mm_set1_epi16(0x1F)), 3);
+        __m128i rr = _mm_srli_epi16(_mm_add_epi16(_mm_mullo_epi16(sr, a),
+                                    _mm_mullo_epi16(dr, ia)), 8);
+        __m128i rg = _mm_srli_epi16(_mm_add_epi16(_mm_mullo_epi16(sg, a),
+                                    _mm_mullo_epi16(dg, ia)), 8);
+        __m128i rb = _mm_srli_epi16(_mm_add_epi16(_mm_mullo_epi16(sb, a),
+                                    _mm_mullo_epi16(db, ia)), 8);
+        __m128i o  = _mm_or_si128(_mm_or_si128(
+                       _mm_slli_epi16(_mm_srli_epi16(rr, 3), 11),
+                       _mm_slli_epi16(_mm_srli_epi16(rg, 2), 5)),
+                       _mm_srli_epi16(rb, 3));
+        __m128i keep = _mm_cmpeq_epi16(a, _mm_setzero_si128());
+        o = _mm_or_si128(_mm_and_si128(keep, d), _mm_andnot_si128(keep, o));
+        _mm_storeu_si128((__m128i *)(row + dox), o);
+      }
+#else /* ZACS_BLIT_NEON */
+      {
+        uint32x4_t s0 = vld1q_u32(sp);
+        uint32x4_t s1 = vld1q_u32(sp + 4);
+        uint16x8_t sr = vcombine_u16(vmovn_u32(vandq_u32(s0, vdupq_n_u32(0xff))),
+                                     vmovn_u32(vandq_u32(s1, vdupq_n_u32(0xff))));
+        uint16x8_t sg = vcombine_u16(
+                          vmovn_u32(vandq_u32(vshrq_n_u32(s0, 8), vdupq_n_u32(0xff))),
+                          vmovn_u32(vandq_u32(vshrq_n_u32(s1, 8), vdupq_n_u32(0xff))));
+        uint16x8_t sb = vcombine_u16(
+                          vmovn_u32(vandq_u32(vshrq_n_u32(s0, 16), vdupq_n_u32(0xff))),
+                          vmovn_u32(vandq_u32(vshrq_n_u32(s1, 16), vdupq_n_u32(0xff))));
+        uint16x8_t a  = vld1q_u16(av);
+        uint16x8_t ia = vsubq_u16(vdupq_n_u16(256), a);
+        uint16x8_t d  = vld1q_u16(row + dox);
+        uint16x8_t dr = vshlq_n_u16(vandq_u16(vshrq_n_u16(d, 11),
+                                    vdupq_n_u16(0x1F)), 3);
+        uint16x8_t dg = vshlq_n_u16(vandq_u16(vshrq_n_u16(d, 5),
+                                    vdupq_n_u16(0x3F)), 2);
+        uint16x8_t db = vshlq_n_u16(vandq_u16(d, vdupq_n_u16(0x1F)), 3);
+        uint16x8_t rr = vshrq_n_u16(vaddq_u16(vmulq_u16(sr, a),
+                                    vmulq_u16(dr, ia)), 8);
+        uint16x8_t rg = vshrq_n_u16(vaddq_u16(vmulq_u16(sg, a),
+                                    vmulq_u16(dg, ia)), 8);
+        uint16x8_t rb = vshrq_n_u16(vaddq_u16(vmulq_u16(sb, a),
+                                    vmulq_u16(db, ia)), 8);
+        uint16x8_t o  = vorrq_u16(vorrq_u16(
+                          vshlq_n_u16(vshrq_n_u16(rr, 3), 11),
+                          vshlq_n_u16(vshrq_n_u16(rg, 2), 5)),
+                          vshrq_n_u16(rb, 3));
+        uint16x8_t keep = vceqq_u16(a, vdupq_n_u16(0));
+        o = vbslq_u16(keep, d, o);
+        vst1q_u16(row + dox, o);
+      }
+#endif
+    }
+#endif
+    /* scalar tail composites the remaining pixels at surface offset dx+ox */
+    zacs_composite_tail(row + dx, srow, ox, x1, alpha);
+  }
+}
+
 static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
                              int alpha)
 {
   const unsigned *argb;
-  uint16_t *surf;
   int aw = 0, ah = 0;
-  int ox, oy, x0, x1, y0, y1;
-  int sx_step, sy_step, sx_start;
+  int slot;
+  zacs_scaled_t *sc;
   if (lump < 0 || dw <= 0 || dh <= 0 || alpha <= 0)
     return;
 
@@ -2059,6 +2351,25 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
     return;
   }
 
+  /* Find or build the scaled cache slot for this lump+size.  On a lump or size
+   * change the slot is rebuilt (resampled) once, then reused every tic. */
+  slot = zacs_scaled_slot(lump, dw, dh);
+  sc = &zacs_scaled[slot];
+  if (!sc->argb || sc->lump != lump || sc->dw != dw || sc->dh != dh)
+    sc = zacs_scaled_build(slot, lump, argb, aw, ah, dw, dh);
+  if (sc)
+    sc->used = ++zacs_scaled_clock;
+  if (sc)
+  {
+    zacs_composite_scaled(sc, dx, dy, alpha);
+    return;
+  }
+
+  /* Fallback: cache allocation failed -- resample-and-composite directly. */
+  {
+  uint16_t *surf;
+  int ox, oy, x0, x1, y0, y1;
+  int sx_step, sy_step, sx_start;
   surf    = (uint16_t *)screens[0].data;
   sx_step = (aw << 16) / dw;
   sy_step = (ah << 16) / dh;
@@ -2199,6 +2510,7 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
         row[ox] = (uint16_t)(((rr >> 3) << 11) | ((rg >> 2) << 5) | (rb >> 3));
       }
     }
+  }
   }
 }
 

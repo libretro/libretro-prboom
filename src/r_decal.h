@@ -39,6 +39,12 @@ void R_SpawnDecalByName(const line_t *li, fixed_t x, fixed_t y, fixed_t z,
 /* Discard all placed decals (called at level setup). */
 void R_ClearDecals(void);
 
+/* Runtime toggle: when zero, hitscan impacts do not stamp wall decals.  Many
+ * ZDoom mods leave the engine's bullet-chip decals off (their puff actors do
+ * not request a decal), so this defaults off to match; the frontend exposes it
+ * as a setting. */
+extern int wall_decals_enabled;
+
 /* Accessors for the renderer (next stage). */
 int                    R_DecalListCount(void);
 const placed_decal_t  *R_DecalListEntry(int i);

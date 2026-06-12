@@ -167,6 +167,7 @@ static unsigned doom_devices[1];
 
 /* Whether mouse active when using Gamepad */
 dbool   mouse_on;
+extern int wall_decals_enabled;   /* src/r_decal.c -- frontend toggle */
 /* Whether to search for IWADs on parent folders recursively */
 dbool   find_recursive_on;
 
@@ -1256,6 +1257,11 @@ static void update_variables(bool startup)
       else
          mouse_on = false;
    }
+
+   var.key = "prboom-wall_decals";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      wall_decals_enabled = !strcmp(var.value, "enabled") ? 1 : 0;
 
    var.key = "prboom-find_recursive_on";
    var.value = NULL;

@@ -51,6 +51,9 @@ typedef struct
   fixed_t xscale, yscale;    /* 16.16; default 1.0                 */
   fixed_t alpha;             /* 16.16; default 1.0                 */
   unsigned flags;
+  int     has_shade;         /* 1 if a shade colour was specified  */
+  int     shade_r, shade_g, shade_b;  /* shade target colour, 0..255 */
+  int     shade_trans;       /* built luminance->shade table id, or -1 */
   char    lowerdecal[64];    /* spawned beneath this one, or empty */
 } decaldef_t;
 

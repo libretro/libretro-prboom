@@ -71,6 +71,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
+      "prboom-wall_decals",
+      "Wall Bullet Decals",
+      NULL,
+      "Stamp scuff marks on walls where hitscan shots land. Off by default, matching ZDoom mods that do not request bullet decals; enable for the classic wall-chip marks.",
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       "prboom-find_recursive_on",
       "Look on Parent Folders for IWADs",
       NULL,

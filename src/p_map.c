@@ -2274,8 +2274,11 @@ dbool PTR_ShootTraverse (intercept_t* in)
 
       /* Stamp a wall decal at the impact point.  The DECALDEF "BulletChip"
        * is ZDoom's default scuff mark for hitscan hits; if the loaded wad
-       * defines no such decal (or its pic is absent) this is a no-op. */
-      R_SpawnDecalByName (li, x, y, z, "BulletChip");
+       * defines no such decal (or its pic is absent) this is a no-op.  Off by
+       * default (most mods do not request bullet decals) -- gated on the
+       * frontend setting. */
+      if (wall_decals_enabled)
+         R_SpawnDecalByName (li, x, y, z, "BulletChip");
 
       // don't go any farther
 

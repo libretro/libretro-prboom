@@ -8,6 +8,7 @@
 #include "m_fixed.h"
 #include "tables.h"
 #include "r_state.h"         /* lines, numlines        */
+#include "w_wad.h"           /* PLAYPAL for shade tables */
 #include "p_maputl.h"        /* P_PointOnLineSide      */
 #include "u_decaldef.h"
 #include "r_decal.h"
@@ -19,6 +20,76 @@
 static placed_decal_t decal_list[MAX_DECALS];
 static int            decal_count;   /* number currently stored (<= MAX)  */
 static int            decal_head;    /* next slot to write (ring cursor)  */
+
+/* Off by default: most ZDoom content does not ask for bullet-chip decals, so
+ * forcing them on every hitscan impact made every mod look wrong.  The
+ * frontend setting flips this on for content (or players) that want them. */
+int wall_decals_enabled = 0;
+
+/* DECALDEF "shade" support.  A shade tints the (greyscale) decal toward a
+ * target colour by each source pixel's luminance, so e.g. shade "000000"
+ * renders the scuff mark black instead of its raw light graphic.  Build a
+ * 256-entry palette translation: for every PLAYPAL index, scale the shade
+ * colour by that index's luminance and snap to the nearest palette entry.
+ * Tables are cached per decaldef (decaldef_t::shade_trans indexes here). */
+#define MAX_SHADE_TABLES 64
+static byte shade_tables[MAX_SHADE_TABLES][256];
+static int  num_shade_tables;
+
+static int R_BuildShadeTable(int sr, int sg, int sb)
+{
+  const byte *pal;
+  byte       *tbl;
+  int         id, i;
+
+  if (num_shade_tables >= MAX_SHADE_TABLES)
+    return -1;
+  id  = num_shade_tables++;
+  tbl = shade_tables[id];
+  pal = W_CacheLumpName("PLAYPAL");
+
+  for (i = 0; i < 256; i++)
+  {
+    int pr = pal[i * 3], pg = pal[i * 3 + 1], pb = pal[i * 3 + 2];
+    /* luminance of the source pixel (Rec.601-ish, integer) */
+    int lum = (pr * 77 + pg * 150 + pb * 29) >> 8;   /* 0..255 */
+    int tr  = sr * lum / 255;
+    int tg  = sg * lum / 255;
+    int tb  = sb * lum / 255;
+    int best = 0, bestdist = 0x7FFFFFFF, j;
+    for (j = 0; j < 256; j++)
+    {
+      int dr = tr - pal[j * 3];
+      int dg = tg - pal[j * 3 + 1];
+      int db = tb - pal[j * 3 + 2];
+      int dist = dr * dr + dg * dg + db * db;
+      if (dist < bestdist)
+      {
+        bestdist = dist;
+        best = j;
+        if (!dist)
+          break;
+      }
+    }
+    tbl[i] = (byte)best;
+  }
+  W_UnlockLumpName("PLAYPAL");
+  return id;
+}
+
+/* Resolve (building once) the shade translation table for a decaldef, or NULL
+ * if it has no shade. */
+const byte *R_DecalShadeTable(decaldef_t *def)
+{
+  if (!def->has_shade)
+    return NULL;
+  if (def->shade_trans < 0)
+    def->shade_trans = R_BuildShadeTable(def->shade_r, def->shade_g,
+                                         def->shade_b);
+  if (def->shade_trans < 0)
+    return NULL;
+  return shade_tables[def->shade_trans];
+}
 
 void R_ClearDecals(void)
 {
@@ -197,6 +268,25 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_, int rx1, int rx2)
     def = U_DecalDef(pd->decal);
     if (!def || def->texnum < 0)
       continue;
+
+    /* A shade tints the decal toward its target colour.  Route shaded decals
+     * through the translated column pipeline with the per-shade palette table;
+     * unshaded decals keep the plain pipeline. */
+    {
+      const byte *shade = R_DecalShadeTable(def);
+      if (shade)
+      {
+        dcvars.translation = shade;
+        colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED,
+                                      drawvars.filterwall, drawvars.filterz);
+      }
+      else
+      {
+        dcvars.translation = NULL;
+        colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_STANDARD,
+                                      drawvars.filterwall, drawvars.filterz);
+      }
+    }
 
     patch   = def->pic_is_patch
                 ? R_CachePatchNum(def->texnum)

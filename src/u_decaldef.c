@@ -52,6 +52,7 @@ static void dd_parse_decal(u_scanner_t *s)
   d.texnum = -1;
   d.xscale = d.yscale = FRACUNIT;
   d.alpha  = FRACUNIT;
+  d.shade_trans = -1;        /* built lazily on first render */
 
   if (!U_GetNextToken(s, TRUE) || s->token != '{')
     return;
@@ -140,9 +141,28 @@ static void dd_parse_decal(u_scanner_t *s)
         strncpy(d.lowerdecal, s->string, sizeof(d.lowerdecal) - 1);
     }
     else if (!strcasecmp(s->string, "shade") ||
-             !strcasecmp(s->string, "animator") ||
              !strcasecmp(s->string, "color") ||
              !strcasecmp(s->string, "colors"))
+    {
+      /* shade "RR GG BB": tint the (grey) decal toward this colour by the
+       * source pixel's luminance.  ZDoom writes the triple as a quoted string
+       * of hex byte pairs; accept that form (and a leading #).  Anything that
+       * does not parse cleanly leaves the decal untinted. */
+      if (U_GetNextToken(s, TRUE) &&
+          (s->token == TK_StringConst || s->token == TK_Identifier))
+      {
+        const char *p = s->string;
+        unsigned r = 0, g = 0, b = 0;
+        if (*p == '#') p++;
+        if (sscanf(p, "%2x %2x %2x", &r, &g, &b) == 3 ||
+            sscanf(p, "%2x%2x%2x",   &r, &g, &b) == 3)
+        {
+          d.has_shade = 1;
+          d.shade_r = (int)r; d.shade_g = (int)g; d.shade_b = (int)b;
+        }
+      }
+    }
+    else if (!strcasecmp(s->string, "animator"))
     {
       /* consume the single argument token (a string or identifier) */
       U_GetNextToken(s, TRUE);

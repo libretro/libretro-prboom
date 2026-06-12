@@ -87,7 +87,7 @@ int screenheightarray[MAX_SCREENWIDTH];  // change to MAX_* // dropoff overflow
 spritedef_t *sprites;
 int numsprites;
 
-#define MAX_SPRITE_FRAMES 29          /* Macroized -- killough 1/25/98 */
+#define MAX_SPRITE_FRAMES 30          /* Macroized -- killough 1/25/98 */
 
 static spriteframe_t sprtemp[MAX_SPRITE_FRAMES];
 static int maxframe;
@@ -331,9 +331,18 @@ static void R_InitSpriteDefs(const char * const * namelist)
                switch ((int) sprtemp[frame].rotate)
                {
                   case -1:
-                     // no rotations were found for that frame at all
-                     I_Error ("R_InitSprites: No patches found "
-                           "for %.8s frame %c", namelist[i], frame+'A');
+                     /* No patch for this frame.  Vanilla Doom treats a gap in a
+                      * sprite's frame run as fatal, but ZDoom DECORATE mods
+                      * routinely define sparse frames (e.g. the hdoom female-imp
+                      * sprites skip frame 'H', and the scene sprites skip '\\'),
+                      * relying on the intermediate frames simply not drawing.
+                      * Leave this frame a non-drawable hole -- single rotation,
+                      * sentinel lump -- so the frames that DO exist still render
+                      * and only the absent frame shows nothing.  The projection
+                      * path already skips a frame whose lump is < 0. */
+                     sprtemp[frame].rotate  = 0;
+                     sprtemp[frame].lump[0] = -1;
+                     sprtemp[frame].flip[0] = 0;
                      break;
 
                   case 0:
@@ -341,14 +350,17 @@ static void R_InitSpriteDefs(const char * const * namelist)
                      break;
 
                   case 1:
-                     // must have all 8 frames
+                     /* A frame that supplies some but not all eight rotations:
+                      * fill the missing rotations with the sentinel lump rather
+                      * than aborting, matching the gap handling above. */
                      {
                         int rotation;
                         for (rotation=0 ; rotation<8 ; rotation++)
                            if (sprtemp[frame].lump[rotation] == -1)
-                              I_Error ("R_InitSprites: Sprite %.8s frame %c "
-                                    "is missing rotations",
-                                    namelist[i], frame+'A');
+                           {
+                              sprtemp[frame].lump[rotation] = -1;
+                              sprtemp[frame].flip[rotation] = 0;
+                           }
                         break;
                      }
                }

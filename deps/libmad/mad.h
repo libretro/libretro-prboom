@@ -545,7 +545,6 @@ void mad_stream_finish(struct mad_stream *);
 
 void mad_stream_buffer(struct mad_stream *,
 		       unsigned char const *, unsigned long);
-void mad_stream_skip(struct mad_stream *, unsigned long);
 
 int mad_stream_sync(struct mad_stream *);
 

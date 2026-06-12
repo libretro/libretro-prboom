@@ -22,9 +22,11 @@
 # ifndef LIBMAD_FIXED_H
 # define LIBMAD_FIXED_H
 
-typedef   signed int mad_fixed_t;
+#include <stdint.h>
 
-typedef   signed int mad_fixed64hi_t;
+typedef signed int mad_fixed_t;
+
+typedef signed int mad_fixed64hi_t;
 typedef unsigned int mad_fixed64lo_t;
 
 #if defined(_MSC_VER)
@@ -73,8 +75,7 @@ typedef mad_fixed_t mad_sample_t;
  * This version should be the most accurate if 64-bit types are supported by
  * the compiler, although it may not be the most efficient.
  */
-#   define mad_f_mul(x, y)  \
-    ((mad_fixed_t) (((mad_fixed64_t) (x) * (y)) >> MAD_F_FRACBITS))
+#define mad_f_mul(x, y) ((mad_fixed_t) (((mad_fixed64_t) (x) * (y)) >> MAD_F_FRACBITS))
 
 /* --- Intel --------------------------------------------------------------- */
 

@@ -82,15 +82,6 @@ void mad_stream_buffer(struct mad_stream *stream,
 }
 
 /*
- * NAME:	stream->skip()
- * DESCRIPTION:	arrange to skip bytes before the next frame
- */
-void mad_stream_skip(struct mad_stream *stream, unsigned long length)
-{
-  stream->skiplen += length;
-}
-
-/*
  * NAME:	stream->sync()
  * DESCRIPTION:	locate the next stream sync word
  */

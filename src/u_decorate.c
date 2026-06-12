@@ -2108,6 +2108,141 @@ static int decorate_resolve_sfx(const char *name)
 
 static int decorate_sprite_index(const char *name, int *sp_next);
 
+/* Build an actor's frame sequence into states [base, base+nframes), honouring
+ * the recorded per-frame flow (loop / stop / wait / goto / A_Jump) and wiring
+ * the safe per-frame actions (A_PlaySound, A_Scream, A_NoBlocking,
+ * A_FaceTarget, ACS-named, user-var writes, conditional jumps).  Shared by the
+ * doomednum decoration registrar and the ACS-spawnable actor registrar so
+ * both build identical chains.  A static (single frozen frame) actor is one
+ * entry that freezes on itself. */
+static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
+                                  int nframes)
+{
+  int first = base;
+  int f;
+  for (f = 0; f < nframes; f++)
+  {
+    int cur  = base + f;
+    int last = (f == nframes - 1);
+    state_t *state = dsda_GetState(cur);
+    state->sprite = sp;
+    if (a->spawn_static)
+    {
+      state->frame = a->frame;
+      state->tics  = -1;
+      state->nextstate = cur;
+      continue;
+    }
+    state->frame = a->seq[f].frame;
+    state->tics  = a->seq[f].tics;
+    if (a->multi_state)
+    {
+      int flow = a->seqflow[f].flow;
+      if (flow == SEQF_LOOP)
+      {
+        int li, lab_frame = 0;
+        for (li = 0; li < a->num_seqlabels; li++)
+          if (a->seqlabel[li].frame <= f &&
+              a->seqlabel[li].frame >= lab_frame)
+            lab_frame = a->seqlabel[li].frame;
+        state->nextstate = base + lab_frame;
+      }
+      else if (flow == SEQF_STOP)
+        state->nextstate = cur;
+      else if (flow == SEQF_WAIT)
+        state->nextstate = cur;
+      else if (flow == SEQF_GOTO)
+      {
+        int li = decorate_label_index(a, a->seqflow[f].tname);
+        state->nextstate = (li >= 0)
+          ? base + a->seqlabel[li].frame : cur;
+      }
+      else
+        state->nextstate = last ? cur : cur + 1;
+    }
+    else
+      state->nextstate = last
+        ? (a->seq_loops ? first : cur)
+        : cur + 1;
+
+    switch (a->seq[f].act)
+    {
+      case DA_PLAYSOUND:
+        state->action.arg0 = (arg0_t)A_PlaySound;
+        state->misc1 = (a->seq[f].snd >= 0)
+          ? decorate_resolve_sfx(decorate_sounds[a->seq[f].snd]) : 0;
+        state->misc2 = 0;
+        break;
+      case DA_ACTIVESOUND:
+        state->action.arg0 = (arg0_t)A_PlaySound;
+        state->misc1 = (a->seq[f].snd >= 0)
+          ? decorate_resolve_sfx(decorate_sounds[a->seq[f].snd]) : 0;
+        state->misc2 = 0;
+        break;
+      case DA_SCREAM:
+        state->action.arg0 = (arg0_t)A_Scream;
+        break;
+      case DA_NOBLOCKING:
+        state->action.arg0 = (arg0_t)A_Fall;
+        break;
+      case DA_FACETARGET:
+        state->action.arg0 = (arg0_t)A_FaceTarget;
+        break;
+      case DA_ACS_NAMED:
+        if (a->seq[f].snd >= 0)
+        {
+          state->action.arg0 = (arg0_t)A_DecorateACSNamed;
+          state->misc1 = decorate_intern_acsname(
+                           decorate_acsnames[a->seq[f].snd]);
+        }
+        break;
+      case DA_SETUSERVAR:
+      case DA_SETUSERARRAY:
+        state->action.arg0 = (arg0_t)
+          ((a->seq[f].act == DA_SETUSERVAR)
+             ? (void *)A_DecorateSetUserVar
+             : (void *)A_DecorateSetUserArray);
+        state->misc1   = a->seqop[f].uvslot;
+        state->args[0] = a->seqop[f].val.ka;
+        state->args[1] = a->seqop[f].val.va;
+        state->args[2] = a->seqop[f].val.op;
+        state->args[3] = a->seqop[f].val.kb;
+        state->args[4] = a->seqop[f].val.vb;
+        if (a->seq[f].act == DA_SETUSERARRAY)
+        {
+          state->args[5] = a->seqop[f].idx.ka;
+          state->args[6] = a->seqop[f].idx.va;
+          state->args[7] = a->seqop[f].idx.op;
+          state->misc2   = (a->seqop[f].idx.kb |
+                            (a->seqop[f].idx.vb << 8));
+        }
+        break;
+      default:
+        break;
+    }
+
+    if (a->seqflow[f].has_jump)
+    {
+      int tgt = cur;
+      if (a->seqflow[f].jtoff >= 0)
+        tgt = cur + a->seqflow[f].jtoff;
+      else
+      {
+        int li = decorate_label_index(a, a->seqflow[f].jtname);
+        if (li >= 0)
+          tgt = base + a->seqlabel[li].frame;
+      }
+      state->action.arg0 = (arg0_t)A_DecorateJumpIf;
+      state->args[0] = a->seqflow[f].jcond.ka;
+      state->args[1] = a->seqflow[f].jcond.va;
+      state->args[2] = a->seqflow[f].jcond.op;
+      state->args[3] = a->seqflow[f].jcond.kb;
+      state->args[4] = a->seqflow[f].jcond.vb;
+      state->args[5] = tgt;
+    }
+  }
+}
+
 void U_RegisterDecorateThings(void)
 {
   int i, count = 0, count_mt = 0;
@@ -2126,7 +2261,6 @@ void U_RegisterDecorateThings(void)
     decorate_actor_t *a = &actors[i];
     int st, mt, sp, k;
     mobjinfo_t *info;
-    state_t *state;
     int nframes;
     const char *spr;
 
@@ -2160,149 +2294,7 @@ void U_RegisterDecorateThings(void)
      * to the first (animated loop) or freezes on itself (static / stop) */
     {
       int first = st_base + count;
-      int f;
-      for (f = 0; f < nframes; f++)
-      {
-        int cur  = st_base + count + f;
-        int last = (f == nframes - 1);
-        state = dsda_GetState(cur);
-        state->sprite = sp;
-        if (a->spawn_static)
-        {
-          state->frame = a->frame;
-          state->tics  = -1;
-          state->nextstate = cur;
-        }
-        else
-        {
-          state->frame = a->seq[f].frame;
-          state->tics  = a->seq[f].tics;
-          if (a->multi_state)
-          {
-            /* honour this frame's recorded flow: loop back to the enclosing
-             * label, freeze, wait (re-run), or goto another label; a frame
-             * with no terminator falls through to the next. */
-            int flow = a->seqflow[f].flow;
-            if (flow == SEQF_LOOP)
-            {
-              /* loop back to the first frame of the label whose run contains
-               * f (the nearest label at or before f) */
-              int li, lab_frame = 0;
-              for (li = 0; li < a->num_seqlabels; li++)
-                if (a->seqlabel[li].frame <= f &&
-                    a->seqlabel[li].frame >= lab_frame)
-                  lab_frame = a->seqlabel[li].frame;
-              state->nextstate = st_base + count + lab_frame;
-            }
-            else if (flow == SEQF_STOP)
-              state->nextstate = cur;
-            else if (flow == SEQF_WAIT)
-              state->nextstate = cur;
-            else if (flow == SEQF_GOTO)
-            {
-              int li = decorate_label_index(a, a->seqflow[f].tname);
-              state->nextstate = (li >= 0)
-                ? st_base + count + a->seqlabel[li].frame : cur;
-            }
-            else
-              state->nextstate = last ? cur : cur + 1;
-          }
-          else
-          state->nextstate = last
-            ? (a->seq_loops ? first : cur)   /* loop back or freeze */
-            : cur + 1;
-
-          /* wire the safe per-frame action, if any, onto this state */
-          switch (a->seq[f].act)
-          {
-            case DA_PLAYSOUND:
-              state->action.arg0 = (arg0_t)A_PlaySound;
-              state->misc1 = (a->seq[f].snd >= 0)
-                ? decorate_resolve_sfx(decorate_sounds[a->seq[f].snd]) : 0;
-              state->misc2 = 0;          /* positional (not full-volume) */
-              break;
-            case DA_ACTIVESOUND:
-              /* no dedicated active-sound pointer here; emit the named or
-               * (absent a name) the generic sound through A_PlaySound */
-              state->action.arg0 = (arg0_t)A_PlaySound;
-              state->misc1 = (a->seq[f].snd >= 0)
-                ? decorate_resolve_sfx(decorate_sounds[a->seq[f].snd]) : 0;
-              state->misc2 = 0;
-              break;
-            case DA_SCREAM:
-              state->action.arg0 = (arg0_t)A_Scream;
-              break;
-            case DA_NOBLOCKING:
-              state->action.arg0 = (arg0_t)A_Fall;
-              break;
-            case DA_FACETARGET:
-              state->action.arg0 = (arg0_t)A_FaceTarget;
-              break;
-            case DA_ACS_NAMED:
-              /* start a named ACS script when this frame runs.  The script
-               * name is interned into a persistent table; its index rides in
-               * misc1 (free on mobj states -- only weapon psprites use it). */
-              if (a->seq[f].snd >= 0)
-              {
-                state->action.arg0 = (arg0_t)A_DecorateACSNamed;
-                state->misc1 = decorate_intern_acsname(
-                                 decorate_acsnames[a->seq[f].snd]);
-              }
-              break;
-            case DA_SETUSERVAR:
-            case DA_SETUSERARRAY:
-              /* write a user variable when this frame runs.  misc1 holds the
-               * target base slot; args[0..4] encode the value expression
-               * (ka,va,op,kb,vb) and, for arrays, args[5..7]+misc2 encode the
-               * index expression. */
-              state->action.arg0 = (arg0_t)
-                ((a->seq[f].act == DA_SETUSERVAR)
-                   ? (void *)A_DecorateSetUserVar
-                   : (void *)A_DecorateSetUserArray);
-              state->misc1   = a->seqop[f].uvslot;
-              state->args[0] = a->seqop[f].val.ka;
-              state->args[1] = a->seqop[f].val.va;
-              state->args[2] = a->seqop[f].val.op;
-              state->args[3] = a->seqop[f].val.kb;
-              state->args[4] = a->seqop[f].val.vb;
-              if (a->seq[f].act == DA_SETUSERARRAY)
-              {
-                state->args[5] = a->seqop[f].idx.ka;
-                state->args[6] = a->seqop[f].idx.va;
-                state->args[7] = a->seqop[f].idx.op;
-                state->misc2   = (a->seqop[f].idx.kb |
-                                  (a->seqop[f].idx.vb << 8));
-              }
-              break;
-            default:
-              break;
-          }
-
-          /* A_JumpIf(cond, target): a conditional jump overrides this frame's
-           * action wiring.  Encode the condition in args[0..4], the resolved
-           * jump-target state in args[5], and run A_DecorateJumpIf which sets
-           * the mobj's state to the target when the condition is true. */
-          if (a->seqflow[f].has_jump)
-          {
-            int tgt = cur;          /* default: no movement (cond false path) */
-            if (a->seqflow[f].jtoff >= 0)
-              tgt = cur + a->seqflow[f].jtoff;   /* offset N: Nth state after this one */
-            else
-            {
-              int li = decorate_label_index(a, a->seqflow[f].jtname);
-              if (li >= 0)
-                tgt = st_base + count + a->seqlabel[li].frame;
-            }
-            state->action.arg0 = (arg0_t)A_DecorateJumpIf;
-            state->args[0] = a->seqflow[f].jcond.ka;
-            state->args[1] = a->seqflow[f].jcond.va;
-            state->args[2] = a->seqflow[f].jcond.op;
-            state->args[3] = a->seqflow[f].jcond.kb;
-            state->args[4] = a->seqflow[f].jcond.vb;
-            state->args[5] = tgt;
-          }
-        }
-      }
+      decorate_build_states(a, sp, first, nframes);
       st = first;
     }
 

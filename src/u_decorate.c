@@ -78,7 +78,20 @@ typedef struct
    * plain "SPRITE <letters> <tics>" sequence ending in loop/stop.  A small,
    * safe subset of per-frame action functions is also captured (act != 0)
    * and wired onto the registered state. */
+/* The captured frame budget per actor.  ZDoom "scene" actors (the follow-on
+ * actors whose many SexScene_* labels each hold an animation loop) expand to
+ * well over a hundred frames once multi-letter sprite runs (e.g. "SXT2 ABCDEF
+ * 4" = six frames) are counted -- the largest is ~390 frames across 27 labels.
+ * Anything past the cap collapsed onto the last kept frame, so labels beyond it
+ * played a static/wrong frame.  A cap that covers the whole sequence lets
+ * SetActorState land on the right animation.  Each frame costs ~126 bytes
+ * across the parallel arrays times MAX_DECORATE_ACTORS, so low-memory targets
+ * (Wii, handhelds) keep the original small cap and forgo the long scenes. */
+#ifdef MEMORY_LOW
 #define MAX_SPAWN_FRAMES 32
+#else
+#define MAX_SPAWN_FRAMES 400
+#endif
   struct { short frame; short tics; short act; short snd; char spr[5]; } seq[MAX_SPAWN_FRAMES];
   /* Parallel to seq[]: operands for the user-variable / flag actions.  uvslot
    * is the target scalar/array base slot (or flag id for DA_CHANGEFLAG); idx

@@ -1511,6 +1511,12 @@ void P_PlayerThink (player_t* player)
       cmd->forwardmove = 0;
       cmd->sidemove    = 0;
       cmd->angleturn   = 0;
+      /* A frozen player (a dialogue overlay) must not act on the world: drop
+       * fire and the weapon-change bits so the marine can't shoot or swap
+       * weapons behind the conversation.  The use bit is left intact -- the
+       * dialogue itself is driven by the use key, read straight from the tic
+       * command -- and movement is already zeroed above. */
+      cmd->buttons &= ~(BT_ATTACK | BT_CHANGE | BT_WEAPONMASK);
    }
 
    /* chain saw run forward */

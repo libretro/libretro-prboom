@@ -1,7 +1,7 @@
 /* ProTracker .MOD music player backend.
  *
- * Some mods ship their music as Amiga tracker modules (music/*.mod) rather
- * than MIDI/MUS or MP3.  This wraps pocketmod (a small public-domain/MIT
+ * Some mods ship their music as Amiga tracker modules (.mod files under
+ * music/) rather than MIDI/MUS or MP3.  This wraps pocketmod (a small public-domain/MIT
  * single-header ProTracker player) in the engine's music_player_t interface
  * so a .MOD lump autodetects and plays alongside the other backends.
  *

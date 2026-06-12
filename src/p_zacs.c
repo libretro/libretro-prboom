@@ -4979,10 +4979,13 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     {
       int argc = NEXTBYTE;
       int func = NEXTSHORT;
-      int a[8], k, r = 0;
+      /* ACSF functions take up to a handful of arguments; the widest in use
+       * here is the 9-argument camera spawn (func 60).  Size the buffer with
+       * headroom and drop anything beyond it. */
+      int a[16], k, r = 0;
       for (k = argc - 1; k >= 0; k--)
       {
-        if (k < 8)
+        if (k < 16)
           a[k] = ZPOP();
         else
           ZDROP(1);

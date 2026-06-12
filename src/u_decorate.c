@@ -77,7 +77,7 @@ typedef struct
    * safe subset of per-frame action functions is also captured (act != 0)
    * and wired onto the registered state. */
 #define MAX_SPAWN_FRAMES 32
-  struct { short frame; short tics; short act; short snd; } seq[MAX_SPAWN_FRAMES];
+  struct { short frame; short tics; short act; short snd; char spr[5]; } seq[MAX_SPAWN_FRAMES];
   /* Parallel to seq[]: operands for the user-variable / flag actions.  uvslot
    * is the target scalar/array base slot (or flag id for DA_CHANGEFLAG); idx
    * holds an array index expression operand; val holds the value expression;
@@ -1667,12 +1667,11 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       }
       else if (((fr[0] >= 'A' && fr[0] <= '_') ||
                 fr[0] == '#' || fr[0] == '-') &&
-               (tics[0] >= '0' && tics[0] <= '9') &&
-               (a->seq_len == 0 ||
-                !strncasecmp(a->seq_sprite, nspr, 4)))
+               (tics[0] >= '0' && tics[0] <= '9'))
       {
-        /* animated frames: one entry per frame letter, all this sprite.
-         * Only a single sprite per Spawn sequence is supported. */
+        /* animated frames: one entry per frame letter.  The sprite may change
+         * between lines of one sequence (e.g. TROO ... then STTR ...), so the
+         * sprite is recorded per frame rather than once for the whole run. */
         int t = atoi(tics);
         int bright = 0;
         short act = DA_NONE, snd = -1;
@@ -1879,6 +1878,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           frbits = (fr[fi] == '#' || fr[fi] == '-') ? 0 : (fr[fi] - 'A');
           a->seq[a->seq_len].frame = (short)(frbits | bright);
           a->seq[a->seq_len].tics  = (short)t;
+          memcpy(a->seq[a->seq_len].spr, nspr, 4);
+          a->seq[a->seq_len].spr[4] = 0;
           /* the action fires on the first frame letter of the line, as in
            * DECORATE (a multi-letter line repeats the frames, action once) */
           a->seq[a->seq_len].act = (fi == 0) ? act : (short)DA_NONE;
@@ -2131,7 +2132,7 @@ static int decorate_sprite_index(const char *name, int *sp_next);
  * both build identical chains.  A static (single frozen frame) actor is one
  * entry that freezes on itself. */
 static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
-                                  int nframes)
+                                  int nframes, int *sp_next)
 {
   int first = base;
   int f;
@@ -2139,8 +2140,14 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
   {
     int cur  = base + f;
     int last = (f == nframes - 1);
-    state_t *state = dsda_GetState(cur);
-    state->sprite = sp;
+    int fsp  = sp;
+    state_t *state;
+    /* a frame may carry its own sprite (a sequence that switches sprite mid
+     * way, e.g. TROO -> STTR); resolve it, else fall back to the default */
+    if (!a->spawn_static && a->seq[f].spr[0] && sp_next)
+      fsp = decorate_sprite_index(a->seq[f].spr, sp_next);
+    state = dsda_GetState(cur);
+    state->sprite = fsp;
     if (a->spawn_static)
     {
       state->frame = a->frame;
@@ -2309,7 +2316,7 @@ void U_RegisterDecorateThings(void)
      * to the first (animated loop) or freezes on itself (static / stop) */
     {
       int first = st_base + count;
-      decorate_build_states(a, sp, first, nframes);
+      decorate_build_states(a, sp, first, nframes, &sp_next);
       st = first;
     }
 

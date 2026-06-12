@@ -2596,6 +2596,14 @@ void P_UseLines (player_t*  player)
   if (P_ConversationIsActive())
     return;
 
+  /* A script-driven dialogue (the ZACS path) freezes the player rather than
+   * going through P_ConversationIsActive, and leaves the use bit live so the
+   * dialogue can read it to advance.  That same press must not also activate
+   * doors, switches, or the story actor behind the conversation panel, so
+   * suppress world use while the player is frozen. */
+  if (player->cheats & CF_TOTALLYFROZEN)
+    return;
+
   usething = player->mo;
 
   angle = player->mo->angle >> ANGLETOFINESHIFT;

@@ -36,6 +36,12 @@
 #include "d_event.h"
 #include "d_ticcmd.h"
 #include "tables.h" /* angle_t, for G_PendingTurn */
+#include "u_mapinfo.h" /* mapentry_t, for G_LookupMapinfoByName */
+
+/* Look up a ZDoom/UMAPINFO map entry by its lump name (e.g. "TITLEMAP"), or
+ * NULL if none.  Declared here so callers outside g_game.c get the right
+ * (pointer) return type instead of an implicit int. */
+mapentry_t *G_LookupMapinfoByName(const char *lumpname);
 
 //
 // GAME

@@ -613,11 +613,27 @@ static void D_SetPageName(const char *name)
   pagename = name;
 }
 
+/* The title screen plays the base game's title theme unless a MAPINFO defines
+ * a TITLEMAP with its own Music (ZDoom's way of theming the menu/title), in
+ * which case that lump plays instead -- e.g. hdoom's tracker title music.
+ * Returns nonzero when a TITLEMAP music lump was found and started. */
+static int D_StartTitleMapMusic(void)
+{
+  mapentry_t *me = G_LookupMapinfoByName("TITLEMAP");
+  if (me && me->music[0] && W_CheckNumForName(me->music) >= 0)
+  {
+    S_ChangeMusicByName(me->music, TRUE);
+    return 1;
+  }
+  return 0;
+}
+
 static void D_DrawTitle1(const char *name)
 {
   /* mus_intro maps to the Heretic title lump (MUS_TITL) under Heretic and to
    * Doom's title music otherwise; see the Heretic remap in S_ChangeMusic. */
-  S_StartMusic(mus_intro);
+  if (!D_StartTitleMapMusic())
+    S_StartMusic(mus_intro);
   pagetic = (TICRATE*170)/35;
   if (W_CheckNumForName("SIGILINT") != -1) // Sigil: Longer wait before playing a demo to give the title theme time to end.
     pagetic = (TICRATE*404)/35;
@@ -626,7 +642,9 @@ static void D_DrawTitle1(const char *name)
 
 static void D_DrawTitle2(const char *name)
 {
-  if (raven)
+  if (D_StartTitleMapMusic())
+    ;                           /* a MAPINFO TITLEMAP theme takes precedence */
+  else if (raven)
     S_StartMusic(mus_intro);    /* raven title theme (per-game remap) */
   else
     S_StartMusic(mus_dm2ttl);

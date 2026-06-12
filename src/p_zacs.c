@@ -122,6 +122,20 @@ static zacs_func_t   *zacs_funcs;
 static int            zacs_numfuncs;
 static char         **zacs_strings;
 static int            zacs_numstrings;
+
+/* ZDoom-inventory tokens: a per-player linked list of named items the mod's
+ * GiveInventory/CheckInventory deal in (the _CF_* changeflag tokens).  Declared
+ * up here because Z_ACSLoadBehavior resets the list heads on every map load
+ * (the nodes are PU_LEVEL and vanish with the level). */
+typedef struct zacs_token_s
+{
+  char name[32];
+  int count;
+  struct zacs_token_s *next;
+} zacs_token_t;
+
+static zacs_token_t *zacs_tokens[MAXPLAYERS];
+
 /* Dynamic strings created at run time by PCD_SAVESTRING and the string-
  * building ACSF helpers live in one global table, independent of the active
  * module's static STRL space.  GDCC-compiled libraries build a string in one
@@ -1162,6 +1176,19 @@ dbool Z_ACSLoadBehavior(int lump)
   zacs_active = 0;
   zacs_load_count = 0;
 
+  /* The ZDoom-inventory token lists (GiveInventory/CheckInventory, used by the
+   * mod's _CF_* changeflag tokens) hang off zacs_tokens[], whose nodes are
+   * PU_LEVEL-allocated.  A map change frees that tag, so the list heads would
+   * otherwise still point at freed nodes; the next GiveInventory walks that
+   * stale chain and dereferences reused memory -- e.g. starting Lady's Chambers
+   * and then a stock map crashed here.  Drop the heads (the nodes themselves
+   * are already gone with the level allocation). */
+  {
+    int pl;
+    for (pl = 0; pl < MAXPLAYERS; pl++)
+      zacs_tokens[pl] = NULL;
+  }
+
   /* ---- module 0: the map's BEHAVIOR -------------------------------------
    * lump < 0 means the map has no BEHAVIOR of its own (a stock Doom-format
    * map running under a mod whose scripts live entirely in global LOADACS
@@ -1391,15 +1418,6 @@ static dbool zacs_tag_busy(int tag)
 }
 
 /* ---- doom-mapped ZDoom inventory ---------------------------------------- */
-
-typedef struct zacs_token_s
-{
-  char name[32];
-  int count;
-  struct zacs_token_s *next;
-} zacs_token_t;
-
-static zacs_token_t *zacs_tokens[MAXPLAYERS];
 
 static zacs_token_t *zacs_token_find(int pnum, const char *name)
 {

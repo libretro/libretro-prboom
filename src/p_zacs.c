@@ -3807,7 +3807,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       /* GetPlayerInput(player, input): read the current (INPUT_BUTTONS = 1) or
        * previous-tic (INPUT_OLDBUTTONS = 0) button state, translating the
        * engine's button bits into the ZDoom layout (BT_ATTACK = 1<<0,
-       * BT_USE = 1<<2) that content tests against.  player < 0 selects the
+       * BT_USE = 1<<1) that content tests against.  player < 0 selects the
        * activator's player; other selectors yield 0. */
       int input = ZPOP();
       int pnum  = ZSTK(1);
@@ -3828,8 +3828,8 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       {
         int cur = (input == 1 || input == 9);
         int b = cur ? pl->cmd.buttons : zacs_oldbuttons_of(pl);
-        if (b & BT_ATTACK) r |= 1;
-        if (b & BT_USE)    r |= 4;
+        if (b & BT_ATTACK) r |= 1;   /* ZDoom BT_ATTACK = 1<<0 */
+        if (b & BT_USE)    r |= 2;   /* ZDoom BT_USE    = 1<<1 */
       }
       ZSETSTK(1, r);
       break;

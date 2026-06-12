@@ -4883,7 +4883,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           break;
         }
 
-        case 40:                          /* ACSF_GetActorClass(tid) */
+        case 68:                          /* ACSF_GetActorClass(tid) */
         {
           /* return a runtime string index for the actor's class name.  The
            * death system reads this to build "<Class>_Sex"; the replacement

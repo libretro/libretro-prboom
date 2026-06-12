@@ -795,7 +795,7 @@ static void R_SetupFrame (player_t *player)
    * tic.  Player rotation only ever comes from ticcmds, so anchoring
    * to the latest angle plus the staged remainder loses nothing and
    * advances monotonically. */
-  if (G_PendingTurnActive())
+  if (G_PendingTurnActive() && !zacs_view_camera)
   {
     viewangle = R_SmoothPlaying_Get(player->mo->angle) + viewangleoffset
               + G_PendingTurn();

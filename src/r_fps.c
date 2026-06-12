@@ -88,6 +88,38 @@ void R_InterpolateView (player_t *player)
 
   viewplayer = player;
 
+  /* ACS ChangeCamera: when a camera actor is active the view follows it
+   * instead of the player's body.  A camera mobj has no player viewheight,
+   * so the eye sits at the actor's own z.  Interpolate from its previous
+   * position like any other viewer; a change of viewer resets the lerp. */
+  if (zacs_view_camera)
+  {
+    mobj_t *cam = zacs_view_camera;
+    if (cam != oviewer || NoInterpolate)
+    {
+      R_ResetViewInterpolation();
+      oviewer = cam;
+    }
+    frac = NoInterpolate ? FRACUNIT : tic_vars.frac;
+    if (movement_smooth)
+    {
+      viewx = cam->PrevX + FixedMul(frac, cam->x - cam->PrevX);
+      viewy = cam->PrevY + FixedMul(frac, cam->y - cam->PrevY);
+      viewz = cam->PrevZ + FixedMul(frac, cam->z - cam->PrevZ);
+      viewangle = cam->angle + viewangleoffset;
+      viewpitch = cam->pitch + viewpitchoffset;
+    }
+    else
+    {
+      viewx = cam->x;
+      viewy = cam->y;
+      viewz = cam->z;
+      viewangle = cam->angle + viewangleoffset;
+      viewpitch = cam->pitch + viewpitchoffset;
+    }
+    return;
+  }
+
   if (player->mo != oviewer || NoInterpolate)
   {
     R_ResetViewInterpolation();

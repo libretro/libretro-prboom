@@ -253,6 +253,10 @@ extern  int   gametic;
 // Bookkeeping on players - state.
 extern  player_t  players[MAXPLAYERS];
 
+/* ACS ChangeCamera: when non-NULL the player's view follows this actor
+ * instead of the player's own body (set/cleared by line special 132). */
+extern  struct mobj_s *zacs_view_camera;
+
 // Alive? Disconnected?
 extern  dbool   playeringame[MAXPLAYERS];
 extern  dbool   realplayeringame[MAXPLAYERS];

@@ -2650,6 +2650,9 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    level_setup_failed = FALSE;
 
+   /* a new level invalidates any ACS view camera from the previous one */
+   zacs_view_camera = NULL;
+
    /* Select the per-game map format before any linedefs/specials are
     * processed.  For Doom this installs the Doom descriptor (no behaviour
     * change); Heretic/Hexen selection is added later. */

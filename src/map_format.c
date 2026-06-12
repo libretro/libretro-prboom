@@ -193,6 +193,22 @@ static dbool P_ExecuteZDoomLineSpecial(int special, int *args, line_t *line,
     case 181:                   /* Plane_Align (slopes): unsupported */
     case 208:                   /* TranslucentLine: static, applied at load */
       return false;
+    case 132:                   /* ChangeCamera(tid, who, revert) */
+    {
+      /* Point the view at the actor named by args[0]'s tid; tid 0 reverts to
+       * the player's own body.  Single-player only follows one view, so the
+       * "who" selector is ignored.  ZDoom treats this as a smooth view hand
+       * over; here it is an immediate switch the renderer reads each frame. */
+      if (args[0] == 0)
+        zacs_view_camera = NULL;
+      else
+      {
+        int sp = -1;
+        mobj_t *cam = P_FindMobjFromTID((short)args[0], &sp);
+        zacs_view_camera = cam;       /* NULL if no such tid: stays on player */
+      }
+      return true;
+    }
     default:
       return P_ExecuteHexenLineSpecial(special, args, line, side, mo);
   }

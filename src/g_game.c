@@ -129,6 +129,8 @@ dbool           deathmatch;    // only if started as net death
 dbool           netgame;       // only TRUE if packets are broadcast
 dbool           playeringame[MAXPLAYERS];
 player_t        players[MAXPLAYERS];
+/* ACS ChangeCamera target (NULL = the player's own view); see doomstat.h. */
+struct mobj_s  *zacs_view_camera;
 /* Hexen: per-player chosen class (PCLASS_*); PCLASS_NULL for Doom/Heretic.
  * Copied into players[].class at spawn. */
 pclass_t        PlayerClass[MAXPLAYERS];

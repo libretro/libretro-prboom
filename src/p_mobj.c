@@ -1712,6 +1712,11 @@ void P_RemoveMobj (mobj_t* mobj)
 {
   P_BloodQueueUnhook(mobj);
 
+  /* If the active ACS view camera is being removed, drop the view back to
+   * the player so the renderer never reads a freed mobj. */
+  if (zacs_view_camera == mobj)
+    zacs_view_camera = NULL;
+
   /* release any lazily-allocated DECORATE user-variable storage */
   if (mobj->user_vars)
   {

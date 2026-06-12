@@ -31,6 +31,7 @@
 #include "lprintf.h"
 #include "u_scanner.h"
 #include "u_mapinfo.h"
+#include "m_menu.h"
 #include "d_deh.h"
 #include "u_zmapinfo.h"
 
@@ -286,6 +287,28 @@ static int   zepi_optional;  /* ZDoom 'optional': skip if map lump absent */
 static int   zepi_remove;    /* ZDoom 'remove': do not add this episode */
 static int   zepi_added;     /* episodes fed to the menu (for the summary) */
 
+/* Skill (difficulty) block tracking.  ZDoom names each skill with a class
+ * token ("Skill Baby", "Skill Hard", ...); the engine has five fixed skill
+ * slots, so the class name is mapped to a 0..4 index and the block's Name
+ * string is handed to the menu.  zskill_index is -1 when not inside a skill
+ * block or the class did not map to a known slot. */
+static int   zskill_open;
+static int   zskill_index;
+
+/* Map a ZDoom skill class name to the engine's 0 (easiest) .. 4 (nightmare)
+ * slot, by the conventional doom skill ordering, or -1 if unrecognised. */
+static int z_skill_slot(const char *cls)
+{
+  if (!cls) return -1;
+  if (!strcasecmp(cls, "baby"))      return 0;
+  if (!strcasecmp(cls, "easy"))      return 1;
+  if (!strcasecmp(cls, "normal") ||
+      !strcasecmp(cls, "medium"))    return 2;
+  if (!strcasecmp(cls, "hard"))      return 3;
+  if (!strcasecmp(cls, "nightmare")) return 4;
+  return -1;
+}
+
 /* Close the pending episode block and feed it to the menu.  M_AddEpisode
  * keeps the title pointer (second line of def) alive as the menu item's
  * alttext, so the composed buffer is deliberately never freed. */
@@ -377,6 +400,7 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         clus = NULL;
         map = NULL;
         Z_FlushEpisode();
+        zskill_open = 0;
         if ((tok = z_arg(&s, line)) > 0 && s.token == TK_Identifier)
         {
           map = Z_NewMapEntry(s.string);
@@ -405,6 +429,7 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         map = NULL;
         clus = NULL;
         Z_FlushEpisode();
+        zskill_open = 0;
         if ((tok = z_arg(&s, line)) > 0 && num_zclusters < MAX_ZCLUSTERS)
         {
           clus = &zclusters[num_zclusters++];
@@ -417,6 +442,7 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         map = NULL;
         clus = NULL;
         Z_FlushEpisode();
+        zskill_open = 0;
         if ((tok = z_arg(&s, line)) > 0)
         {
           zlump_name(zepi_map, s.string);
@@ -437,7 +463,6 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         M_AddEpisode("", zepi_clear);
       }
       else if (!strcasecmp(s.string, "gameinfo")        ||
-               !strcasecmp(s.string, "skill")           ||
                !strcasecmp(s.string, "adddefaultmap")   ||
                !strcasecmp(s.string, "defaultmap")      ||
                !strcasecmp(s.string, "doomednums")      ||
@@ -453,8 +478,37 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
         map = NULL;
         clus = NULL;
         Z_FlushEpisode();
+        zskill_open = 0;
+      }
+      else if (!strcasecmp(s.string, "skill"))
+      {
+        /* "Skill <Class> { Name = "..." ... }": open a skill block and resolve
+         * its class to a 0..4 menu slot.  Only the Name key is consumed (below);
+         * the other skill keys are handled generically by the catch-all. */
+        map = NULL;
+        clus = NULL;
+        Z_FlushEpisode();
+        zskill_open  = 1;
+        zskill_index = -1;
+        if ((tok = z_arg(&s, line)) > 0)
+          zskill_index = z_skill_slot(s.string);
       }
       /* ---- episode keys ---- */
+      else if (zskill_open)
+      {
+        /* Inside a Skill block: capture the Name string for the menu and let
+         * everything else fall through harmlessly.  The class-to-slot mapping
+         * was resolved when the block opened; an unmapped class (-1) silently
+         * drops the name. */
+        if (!strcasecmp(s.string, "name"))
+        {
+          if ((tok = z_arg(&s, line)) > 0 && zskill_index >= 0)
+          {
+            const char *v = U_ZLanguageLookup(s.string);
+            M_SetSkillName(zskill_index, v ? v : s.string);
+          }
+        }
+      }
       else if (zepi_open)
       {
         if (!strcasecmp(s.string, "picname"))

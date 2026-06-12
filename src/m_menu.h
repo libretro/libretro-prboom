@@ -63,6 +63,12 @@ void M_Drawer (void);
 
 void M_Init (void);
 
+/* MAPINFO custom skill (difficulty) names: M_SetSkillName records one by index
+ * (0..4) during MAPINFO parsing; M_ApplySkillNames pushes them onto the New
+ * Game menu captions when the skill menu is entered. */
+void M_SetSkillName(int index, const char *name);
+void M_ApplySkillNames(void);
+
 // Called by intro code to force menu up upon a keypress,
 // does nothing if menu is already up.
 

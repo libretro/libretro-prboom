@@ -838,6 +838,21 @@ void M_AddEpisode(const char *map, char *def)
   }
 }
 
+/* Custom skill (difficulty) names from MAPINFO.  A Skill block's Name string
+ * is stored here by index (0 = baby ... 4 = nightmare); M_ApplySkillNames
+ * copies any that were set over the stock New Game menu captions.  Names are
+ * strdup'd so the menu's borrowed alttext pointer stays valid for the session. */
+#define MAX_SKILL_NAMES 5
+static char *custom_skill_names[MAX_SKILL_NAMES];
+
+void M_SetSkillName(int index, const char *name)
+{
+  if (index < 0 || index >= MAX_SKILL_NAMES || !name)
+    return;
+  free(custom_skill_names[index]);
+  custom_skill_names[index] = strdup(name);
+}
+
 void M_DrawEpisode(void)
 {
   // CPhipps - patch drawing updated
@@ -854,6 +869,7 @@ void M_Episode(int choice)
   }
 
   epi = choice;
+  M_ApplySkillNames();
   M_SetupNextMenu(&NewDef);
 }
 
@@ -894,6 +910,16 @@ menu_t NewDef =
   48,63,          // x,y
   hurtme          // lastOn
 };
+
+/* Apply any MAPINFO custom skill names over the stock New Game captions.
+ * Called as the skill menu is entered so a mod's difficulty names appear. */
+void M_ApplySkillNames(void)
+{
+  int i;
+  for (i = 0; i < newg_end && i < MAX_SKILL_NAMES; i++)
+    if (custom_skill_names[i])
+      NewGameMenu[i].alttext = custom_skill_names[i];
+}
 
 //
 // M_NewGame
@@ -1047,7 +1073,10 @@ void M_NewGame(int choice)
   if (hexen)
     M_SetupNextMenu(&ClassDef);
   else if ( EpiDef.numitems == 0 )
+  {
+    M_ApplySkillNames();
     M_SetupNextMenu(&NewDef);
+  }
   else
     M_SetupNextMenu(&EpiDef);
 }

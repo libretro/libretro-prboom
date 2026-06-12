@@ -70,6 +70,7 @@ typedef struct
   char sprite[5];               /* 4-char sprite of a "SPRT F -1" spawn */
   int  frame;                   /* 0-based frame letter, FF_FULLBRIGHT or'd */
   int  spawn_static;            /* spawn state parsed and tics == -1 */
+  int  spawnitem_run;           /* consecutive A_SpawnItemEx frames captured */
 
   /* animated Spawn sequence (no action functions): a chain of frames the
    * registrar turns into looping/terminating states.  Captured only for a
@@ -99,7 +100,7 @@ typedef struct
   /* Labels encountered in the state block, mapped to the frame index where
    * each begins.  A multi-label actor (Spawn + InitLoop + Idle + ...) records
    * every label so goto/A_JumpIf targets resolve to a frame. */
-#define MAX_SEQ_LABELS 16
+#define MAX_SEQ_LABELS 48
   struct { char name[24]; short frame; } seqlabel[MAX_SEQ_LABELS];
   int  num_seqlabels;
   int  multi_state;            /* 1 once a non-Spawn label/flow appears */
@@ -231,7 +232,8 @@ enum {
   DA_ACS_NAMED,        /* ACS_NamedExecuteAlways("name") -> start named script */
   DA_SETUSERVAR,       /* A_SetUserVar(name, expr) -> set scalar user var */
   DA_SETUSERARRAY,     /* A_SetUserArray(name, idxexpr, expr) -> set element */
-  DA_CHANGEFLAG        /* A_ChangeFlag("FLAG", bool) -> set/clear a flag */
+  DA_CHANGEFLAG,       /* A_ChangeFlag("FLAG", bool) -> set/clear a flag */
+  DA_SPAWNITEM         /* A_SpawnItemEx("Class", ...) -> spawn a decoration */
 };
 
 /* Sound names captured for DA_PLAYSOUND frames, resolved to sfx slots at
@@ -239,6 +241,18 @@ enum {
 #define MAX_DECORATE_SOUNDS 256
 static char decorate_sounds[MAX_DECORATE_SOUNDS][32];
 static int  num_decorate_sounds;
+
+/* Class names captured for A_SpawnItemEx frames; resolved to a mobjtype at
+ * registration (the spawned actor must itself be a registered decoration). */
+#define MAX_DECORATE_SPAWNS 128
+static char decorate_spawns[MAX_DECORATE_SPAWNS][32];
+static int  num_decorate_spawns;
+
+/* Max consecutive A_SpawnItemEx emitter lines captured from one run: two
+ * (each a six-frame STTR cycle here) is enough that items appear and the
+ * pose animates, without letting a long repeated emitter crowd out the
+ * actor's later states. */
+#define DECORATE_SPAWNITEM_CAP 2
 
 /* Script names captured for DA_ACS_NAMED frames.  At registration the name is
  * interned into the engine string pool so the runtime action can hand its
@@ -388,6 +402,21 @@ void A_DecorateSetUserVar(mobj_t *mo)
     return;
   uv[(int)st->misc1] = decorate_eval_expr(mo, (int)st->args[0],
       (int)st->args[1], (int)st->args[2], (int)st->args[3], (int)st->args[4]);
+}
+
+/* A_SpawnItemEx("Class", ...): spawn the resolved mobjtype (misc1) at the
+ * actor's position.  The offset/velocity/flag arguments of the DECORATE call
+ * are not modelled; the spawned decoration appears on the actor.  A negative
+ * misc1 means the class did not resolve to a registered type -- skip. */
+void A_DecorateSpawnItem(mobj_t *mo)
+{
+  int type;
+  if (!mo || !mo->state)
+    return;
+  type = (int)mo->state->misc1;
+  if (type <= 0 || type >= num_mobj_types)
+    return;
+  P_SpawnMobj(mo->x, mo->y, mo->z + (mo->height >> 1), (mobjtype_t)type);
 }
 
 /* A_SetUserArray(name, idxexpr, expr): write the value expression to element
@@ -1207,10 +1236,26 @@ static void inherit_one(decorate_actor_t *c)
   if (!c->activesound[0] && pp->activesound[0])
     memcpy(c->activesound, pp->activesound, sizeof(c->activesound));
 
-  /* append the parent's captured frames after the child's */
+  /* append the parent's captured frames after the child's.  The parent's
+   * states are essential -- the child's Spawn jumps into them ("goto TooLate")
+   * and the use action runs the parent's Active label -- so when the merge
+   * would overflow, drop frames from the tail of the child's own sequence
+   * (its later, optional states such as the interactive scenes) to make room
+   * rather than skipping the merge and losing the parent states entirely. */
   base = c->seq_len;
   if (base + pp->seq_len > MAX_SPAWN_FRAMES)
-    return;                 /* too large to merge; leave child as-is */
+  {
+    int room = MAX_SPAWN_FRAMES - pp->seq_len;
+    int l2;
+    if (room < 1)
+      return;               /* parent alone does not fit; nothing sensible */
+    base = room;            /* keep only the child's first `room` frames */
+    /* a child label past the kept region has no frame; clamp it to the last
+     * kept frame so a stale jump cannot run off the end of the table */
+    for (l2 = 0; l2 < c->num_seqlabels; l2++)
+      if (c->seqlabel[l2].frame >= base)
+        c->seqlabel[l2].frame = (short)(base - 1);
+  }
   for (f = 0; f < pp->seq_len; f++)
   {
     c->seq[base + f]   = pp->seq[f];
@@ -1753,6 +1798,50 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
             }
           }
           else if (!strcasecmp(fn, "A_Scream"))        act = DA_SCREAM;
+          else if (!strcasecmp(fn, "A_SpawnItemEx") ||
+                   !strcasecmp(fn, "A_SpawnItem"))
+          {
+            /* first argument is the spawned class name, in quotes; capture it
+             * and resolve to a mobjtype at registration.  The remaining
+             * offset/velocity/flag arguments are not modelled -- the item is
+             * spawned at the actor's position. */
+            char arg[32];
+            const char *ar2 = strchr(b, '"');
+            arg[0] = 0;
+            if (!ar2)
+            {
+              char nx[MAX_NAME];
+              const char *r2 = skip_space(r, end);
+              read_word(r2, end, nx, sizeof(nx));
+              ar2 = strchr(nx, '"');
+              if (ar2) { int nn = 0; ar2++;
+                while (*ar2 && *ar2 != '"' && nn < 31) arg[nn++] = *ar2++;
+                arg[nn] = 0; }
+            }
+            else
+            {
+              int nn = 0; ar2++;
+              while (*ar2 && *ar2 != '"' && nn < 31) arg[nn++] = *ar2++;
+              arg[nn] = 0;
+            }
+            if (arg[0] && num_decorate_spawns < MAX_DECORATE_SPAWNS)
+            {
+              int s2;
+              snd = -1;
+              for (s2 = 0; s2 < num_decorate_spawns; s2++)
+                if (!strcasecmp(decorate_spawns[s2], arg))
+                { snd = (short)s2; break; }
+              if (snd < 0)
+              {
+                int cn = 0;
+                while (arg[cn] && cn < 31)
+                { decorate_spawns[num_decorate_spawns][cn] = arg[cn]; cn++; }
+                decorate_spawns[num_decorate_spawns][cn] = 0;
+                snd = (short)num_decorate_spawns++;
+              }
+              act = DA_SPAWNITEM;
+            }
+          }
           else if (!strcasecmp(fn, "A_ActiveSound"))   act = DA_ACTIVESOUND;
           else if (!strcasecmp(fn, "A_NoBlocking") ||
                    !strcasecmp(fn, "A_Fall"))          act = DA_NOBLOCKING;
@@ -1869,6 +1958,27 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         }
         if (t < 0) t = -1;            /* -1 = freeze on this frame */
         if (t > 32767) t = 32767;
+        /* A spawn-item emitter is often written as the same line repeated
+         * many times (ten identical "STTR ABCDEF A_SpawnItemEx(...)" lines
+         * here = 60 frames) to drizzle items over time.  Capturing every one
+         * blows the per-actor frame budget and crowds out the actor's later
+         * states (its terminators and inherited use/activation chain).  Keep
+         * a bounded run of them -- enough that items still appear and the
+         * animation reads -- and drop the rest; the run resets on any other
+         * frame so a later emitter elsewhere is unaffected. */
+        if (act == DA_SPAWNITEM)
+        {
+          if (a->spawnitem_run >= DECORATE_SPAWNITEM_CAP)
+          {
+            p = q;
+            while (p < end && *p != '\n')
+              p++;
+            continue;
+          }
+          a->spawnitem_run++;
+        }
+        else
+          a->spawnitem_run = 0;
         for (fi = 0; fr[fi] && a->seq_len < MAX_SPAWN_FRAMES; fi++)
         {
           int frbits;
@@ -2126,6 +2236,19 @@ static int decorate_resolve_sfx(const char *name)
 
 static int decorate_sprite_index(const char *name, int *sp_next);
 
+/* Resolve a DECORATE class name to a registered mobjtype via its actorname,
+ * or -1.  Used to wire A_SpawnItemEx targets to the type they spawn. */
+static int decorate_type_by_name(const char *name)
+{
+  int i;
+  if (!name || !name[0])
+    return -1;
+  for (i = 0; i < num_mobj_types; i++)
+    if (mobjinfo[i].actorname && !strcasecmp(mobjinfo[i].actorname, name))
+      return i;
+  return -1;
+}
+
 /* Build an actor's frame sequence into states [base, base+nframes), honouring
  * the recorded per-frame flow (loop / stop / wait / goto / A_Jump) and wiring
  * the safe per-frame actions (A_PlaySound, A_Scream, A_NoBlocking,
@@ -2205,6 +2328,12 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
         break;
       case DA_SCREAM:
         state->action.arg0 = (arg0_t)A_Scream;
+        break;
+      case DA_SPAWNITEM:
+        state->action.arg0 = (arg0_t)A_DecorateSpawnItem;
+        state->misc1 = (a->seq[f].snd >= 0)
+          ? decorate_type_by_name(decorate_spawns[a->seq[f].snd]) : 0;
+        if (state->misc1 < 0) state->misc1 = 0;
         break;
       case DA_NOBLOCKING:
         state->action.arg0 = (arg0_t)A_Fall;
@@ -2616,69 +2745,106 @@ static int is_sexactor_derived(const decorate_actor_t *a)
  * SpawnForced path -- so give each its actorname (so zacs_actor_type resolves
  * it) and build its state chain via the shared builder.  The actor's own Spawn
  * label is its spawn entry point. */
+/* Register one parsed actor as a spawn-only mobjtype: build its Spawn-state
+ * chain and fill a minimal mobjinfo (no editor number; resolved by name).
+ * Returns the new mobjtype, or -1 if it has no usable sequence. */
+static int register_spawnonly_actor(decorate_actor_t *a, int *st_cursor,
+                                    int *mt_cursor, int *sp_next)
+{
+  int mt, sp, base, spawn_label;
+  mobjinfo_t *info;
+  char *nm;
+
+  if (a->seq_len <= 0)
+    return -1;
+
+  sp = decorate_sprite_index(a->seq_sprite[0] ? a->seq_sprite
+                                              : a->seq[0].spr, sp_next);
+  base = *st_cursor;
+  dsda_GetState(base + a->seq_len - 1);   /* grow to fit before building */
+  decorate_build_states(a, sp, base, a->seq_len, sp_next);
+  *st_cursor += a->seq_len;
+
+  spawn_label = decorate_label_index(a, "Spawn");
+
+  mt   = (*mt_cursor)++;
+  info = dsda_GetMobjInfo(mt);
+  memset(info, 0, sizeof(*info));
+  info->doomednum   = -1;
+  info->spawnstate  = base +
+    (spawn_label >= 0 ? a->seqlabel[spawn_label].frame : 0);
+  info->spawnhealth = 1000;
+  info->mass        = 100;
+  info->radius      = (a->radius >= 0 ? a->radius : 20) * FRACUNIT;
+  info->height      = (a->height >= 0 ? a->height : 16) * FRACUNIT;
+  info->seestate = info->painstate = info->meleestate =
+    info->missilestate = info->deathstate = info->xdeathstate =
+    info->raisestate = 0;
+  info->flags = 0;
+
+  nm = malloc(strlen(a->name) + 1);
+  if (nm) { strcpy(nm, a->name); info->actorname = nm; }
+
+  if (a->num_uvars > 0 && num_uvarmaps < MAX_UVARMAPS)
+  {
+    uvarmap_t *m = &uvarmaps[num_uvarmaps++];
+    int u;
+    m->type  = mt;
+    m->slots = a->uvar_slots;
+    m->num   = a->num_uvars;
+    for (u = 0; u < a->num_uvars; u++)
+    {
+      memcpy(m->var[u].name, a->uvar[u].name, sizeof(m->var[u].name));
+      m->var[u].base = a->uvar[u].base;
+      m->var[u].len  = a->uvar[u].len;
+    }
+  }
+
+  /* +USESPECIAL: record the state its "Active" label resolves to so the
+   * use-trace can switch a used actor of this type into it (the follow-on
+   * actors are used to start their interaction). */
+  if (a->use_special && num_useacts < MAX_USEACTS)
+  {
+    int li = decorate_label_index(a, "Active");
+    if (li >= 0)
+    {
+      useacts[num_useacts].type        = mt;
+      useacts[num_useacts].activestate = base + a->seqlabel[li].frame;
+      num_useacts++;
+    }
+  }
+  return mt;
+}
+
 void U_RegisterDecorateSexActors(void)
 {
-  int i, sp_next = num_sprites, n = 0;
+  int i, s, sp_next = num_sprites, n = 0;
   int st_cursor = num_states;
   int mt_cursor = num_mobj_types;
 
   if (!parsed)
     parse_decorate();
 
+  /* First register any class named by an A_SpawnItemEx frame that is not
+   * already a registered type (e.g. PrettyHeart), so the spawn action can
+   * resolve its target.  These are plain decorations with no editor number. */
+  for (s = 0; s < num_decorate_spawns; s++)
+  {
+    decorate_actor_t *t;
+    if (decorate_type_by_name(decorate_spawns[s]) >= 0)
+      continue;
+    t = find_actor_mut(decorate_spawns[s]);
+    if (t && t->seq_len > 0)
+      register_spawnonly_actor(t, &st_cursor, &mt_cursor, &sp_next);
+  }
+
   for (i = 0; i < num_actors; i++)
   {
     decorate_actor_t *a = &actors[i];
-    int mt, sp, base, spawn_label;
-    mobjinfo_t *info;
-    char *nm;
-
     if (!is_sexactor_derived(a) || a->seq_len <= 0)
       continue;
-
-    sp = decorate_sprite_index(a->seq_sprite[0] ? a->seq_sprite
-                                                : a->seq[0].spr, &sp_next);
-
-    base = st_cursor;
-    dsda_GetState(base + a->seq_len - 1);   /* grow to fit before building */
-    decorate_build_states(a, sp, base, a->seq_len, &sp_next);
-    st_cursor += a->seq_len;
-
-    spawn_label = decorate_label_index(a, "Spawn");
-
-    mt   = mt_cursor++;
-    info = dsda_GetMobjInfo(mt);
-    memset(info, 0, sizeof(*info));
-    info->doomednum   = -1;
-    info->spawnstate  = base +
-      (spawn_label >= 0 ? a->seqlabel[spawn_label].frame : 0);
-    info->spawnhealth = 1000;
-    info->mass        = 100;
-    info->radius      = (a->radius >= 0 ? a->radius : 20) * FRACUNIT;
-    info->height      = (a->height >= 0 ? a->height : 16) * FRACUNIT;
-    info->seestate = info->painstate = info->meleestate =
-      info->missilestate = info->deathstate = info->xdeathstate =
-      info->raisestate = 0;
-    info->flags = 0;
-
-    nm = malloc(strlen(a->name) + 1);
-    if (nm) { strcpy(nm, a->name); info->actorname = nm; }
-
-    if (a->num_uvars > 0 && num_uvarmaps < MAX_UVARMAPS)
-    {
-      uvarmap_t *m = &uvarmaps[num_uvarmaps++];
-      int u;
-      m->type  = mt;
-      m->slots = a->uvar_slots;
-      m->num   = a->num_uvars;
-      for (u = 0; u < a->num_uvars; u++)
-      {
-        memcpy(m->var[u].name, a->uvar[u].name, sizeof(m->var[u].name));
-        m->var[u].base = a->uvar[u].base;
-        m->var[u].len  = a->uvar[u].len;
-      }
-    }
-
-    n++;
+    if (register_spawnonly_actor(a, &st_cursor, &mt_cursor, &sp_next) >= 0)
+      n++;
   }
 
   if (n)

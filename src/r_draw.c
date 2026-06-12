@@ -6544,6 +6544,7 @@ static void R_DrawSpan16_PointUV_LinearZ(draw_span_vars_t *dsvars)
       R_DrawSpan16_PointUV_PointZ(dsvars);
       return;
    }
+   {
    unsigned count = dsvars->x2 - dsvars->x1 + 1;
    fixed_t xfrac = dsvars->xfrac;
    fixed_t yfrac = dsvars->yfrac;
@@ -6577,6 +6578,7 @@ static void R_DrawSpan16_PointUV_LinearZ(draw_span_vars_t *dsvars)
       x1--;
 
 
+   }
    }
 }
 

@@ -306,6 +306,113 @@ static dbool CheckedLockedDoor(mobj_t *mo, byte lock)
   return true;
 }
 
+/* --- Generic (Boom-generalized) door ---------------------------------------
+ *
+ * Special 202 Generic_Door(tag, speed, kind, delay, lock) encapsulates Boom's
+ * generalized doors.  kind selects the motion (0 open-wait-close, 1 open-stay,
+ * 2 close-stay, 3 close-wait-open); delay is the wait in octics; a zero tag
+ * means the local door whose sector is on the line's back side.  This builds a
+ * vertical-door thinker directly so the techdemo's use-activated chamber doors
+ * (which ship as Generic_Door rather than Door_Raise) actually open.  The
+ * +128 light-tag variant is not modelled; it falls through as a plain door. */
+static dbool Hexen_EV_GenericDoor(line_t *line, int *args, mobj_t *mo)
+{
+  int      kind  = args[2] & 0x7f;     /* strip the 0x80 light-tag flag */
+  fixed_t  speed = args[1] * (FRACUNIT / 8);
+  int      wait  = args[3] * 8;        /* delay is in octics */
+  vldoor_e type;
+  dbool    rtn = false;
+
+  if (!CheckedLockedDoor(mo, (byte)args[4]))
+    return false;
+
+  switch (kind)
+  {
+    case 1:  type = DREV_OPEN;            break;  /* open and stay */
+    case 2:  type = DREV_CLOSE;           break;  /* close and stay */
+    case 3:  type = DREV_CLOSE30THENOPEN; break;  /* close, wait, open */
+    default: type = DREV_NORMAL;          break;  /* open, wait, close */
+  }
+
+  if (args[0] != 0)
+  {
+    /* tagged: act on every sector carrying the tag */
+    int       secnum;
+    sector_t *sec;
+    HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
+    {
+      vldoor_t *door;
+      sec = &sectors[secnum];
+      if (sec->floordata || sec->ceilingdata)
+        continue;
+      rtn = true;
+      door = Z_Malloc(sizeof(*door), PU_LEVEL, 0);
+      memset(door, 0, sizeof(*door));
+      P_AddThinker(&door->thinker);
+      sec->ceilingdata = door;
+      door->thinker.function.arg1 = (void (*)(void *))T_HexenVerticalDoor;
+      door->sector  = sec;
+      door->line    = line;
+      door->type    = type;
+      door->speed   = speed;
+      door->topwait = wait;
+      if (type == DREV_CLOSE || type == DREV_CLOSE30THENOPEN)
+      {
+        door->topheight = (type == DREV_CLOSE)
+          ? P_FindLowestCeilingSurrounding(sec) - 4 * FRACUNIT
+          : sec->ceilingheight;
+        door->direction = -1;
+        if (type == DREV_CLOSE)
+          Hexen_DoorStartSound(sec, -1);
+      }
+      else
+      {
+        door->topheight = P_FindLowestCeilingSurrounding(sec) - 4 * FRACUNIT;
+        door->direction = 1;
+        Hexen_DoorStartSound(sec, 1);
+      }
+    }
+    return rtn;
+  }
+  else
+  {
+    /* local door: the moving sector is on the line's back side */
+    sector_t *sec;
+    vldoor_t *door;
+    if (!line->sidenum || line->sidenum[1] < 0)
+      return false;
+    sec = sides[line->sidenum[1]].sector;
+    if (!sec || sec->floordata || sec->ceilingdata)
+      return false;
+    door = Z_Malloc(sizeof(*door), PU_LEVEL, 0);
+    memset(door, 0, sizeof(*door));
+    P_AddThinker(&door->thinker);
+    sec->ceilingdata = door;
+    door->thinker.function.arg1 = (void (*)(void *))T_HexenVerticalDoor;
+    door->sector    = sec;
+    door->line      = line;
+    door->type      = type;
+    door->speed     = speed;
+    door->topwait   = wait;
+    if (type == DREV_CLOSE || type == DREV_CLOSE30THENOPEN)
+    {
+      door->topheight = (type == DREV_CLOSE)
+        ? P_FindLowestCeilingSurrounding(sec) - 4 * FRACUNIT
+        : sec->ceilingheight;
+      door->direction = -1;
+      if (type == DREV_CLOSE)
+        Hexen_DoorStartSound(sec, -1);
+    }
+    else
+    {
+      door->topheight = P_FindLowestCeilingSurrounding(sec) - 4 * FRACUNIT;
+      door->direction = 1;
+      Hexen_DoorStartSound(sec, 1);
+    }
+    return true;
+  }
+}
+
 /* --- Floors ---------------------------------------------------------------
  *
  * Value-driven floor movers.  These reuse the engine's T_MoveFloor thinker,
@@ -1923,6 +2030,9 @@ dbool P_ExecuteHexenLineSpecial(int special, int *args, line_t *line,
       if (CheckedLockedDoor(mo, args[3]))
         ok = args[0] ? Hexen_EV_DoDoor(line, args, DREV_NORMAL)
                      : Hexen_EV_VerticalDoor(line, mo);
+      break;
+    case 202:                   /* Generic_Door (Boom generalized) */
+      ok = Hexen_EV_GenericDoor(line, args, mo);
       break;
     case 70:                    /* Teleport */
       if (side == 0)

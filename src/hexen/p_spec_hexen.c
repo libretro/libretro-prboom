@@ -379,7 +379,7 @@ static dbool Hexen_EV_GenericDoor(line_t *line, int *args, mobj_t *mo)
     /* local door: the moving sector is on the line's back side */
     sector_t *sec;
     vldoor_t *door;
-    if (!line->sidenum || line->sidenum[1] < 0)
+    if (line->sidenum[1] == NO_INDEX)
       return false;
     sec = sides[line->sidenum[1]].sector;
     if (!sec || sec->floordata || sec->ceilingdata)

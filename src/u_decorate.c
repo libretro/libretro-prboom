@@ -2229,6 +2229,14 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
   info = dsda_GetMobjInfo(mt);   /* grows the table to fit; cache after */
   *info = mobjinfo[basemt];
   info->doomednum = -1;          /* reached only through the redirect */
+  /* carry the replacement's own class name so ACS GetActorClass reports the
+   * custom name (the death system builds "<Name>_Sex" from it), not the stock
+   * class the clone was copied from.  Names are interned in the actor table,
+   * which outlives registration, so a borrowed pointer is safe. */
+  {
+    char *nm = malloc(strlen(a->name) + 1);
+    if (nm) { strcpy(nm, a->name); info->actorname = nm; }
+  }
 
   /* property overrides the header captured (others stay at stock values) */
   if (a->radius >= 0) info->radius = a->radius * FRACUNIT;

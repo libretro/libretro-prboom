@@ -4850,6 +4850,51 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           r = 0;
           break;
 
+        case 23:                          /* ACSF_SetActorVelocity */
+        {
+          /* SetActorVelocity(tid, velx, vely, velz, add, setbob): set (or
+           * with add!=0, accumulate) an actor's momentum.  tid 0 means the
+           * activator.  Values are already in fixed point, matching momx/y/z.
+           * setbob is a flag for water bobbing the software path ignores. */
+          int tid  = argc > 0 ? a[0] : 0;
+          int vx   = argc > 1 ? a[1] : 0;
+          int vy   = argc > 2 ? a[2] : 0;
+          int vz   = argc > 3 ? a[3] : 0;
+          int add  = argc > 4 ? a[4] : 0;
+          if (tid == 0)
+          {
+            mobj_t *mo = inst->activator;
+            if (mo)
+            {
+              if (add) { mo->momx += vx; mo->momy += vy; mo->momz += vz; }
+              else     { mo->momx  = vx; mo->momy  = vy; mo->momz  = vz; }
+            }
+          }
+          else
+          {
+            int sp = -1;
+            mobj_t *mo;
+            while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
+            {
+              if (add) { mo->momx += vx; mo->momy += vy; mo->momz += vz; }
+              else     { mo->momx  = vx; mo->momy  = vy; mo->momz  = vz; }
+            }
+          }
+          break;
+        }
+
+        case 40:                          /* ACSF_GetActorClass(tid) */
+        {
+          /* return a runtime string index for the actor's class name.  The
+           * death system reads this to build "<Class>_Sex"; the replacement
+           * monsters carry their own DECORATE name in mobjinfo.actorname. */
+          mobj_t *mo = zacs_aptr(inst, argc > 0 ? a[0] : 0);
+          const char *nm = (mo && mobjinfo[mo->type].actorname)
+                           ? mobjinfo[mo->type].actorname : "";
+          r = zacs_save_string(nm);
+          break;
+        }
+
         case 13:                          /* ACSF_SetActivatorToTarget(tid) */
         {
           /* retarget the script's activator to the target of the actor named

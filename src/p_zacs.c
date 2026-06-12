@@ -19,6 +19,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <math.h>
+#include <ctype.h>
 
 #include "doomstat.h"
 #include "d_items.h"
@@ -1656,6 +1657,10 @@ static char zacs_cur_font[32];                   /* current SetFont selection */
 /* the status-bar font, defined in hu_stuff.c (no public extern there) */
 extern patchnum_t hu_font[HU_FONTSIZE];
 
+/* CR_* palette translation tables, defined in v_video.c; used to recolour the
+ * scaled dialogue-text glyphs to the requested text colour. */
+extern const uint8_t *colrngs[CR_LIMIT];
+
 /* Map a 16.16 HUD coordinate in the current hud box to 320x200 virtual space. */
 static int zacs_hud_map_x(int fx)
 {
@@ -2226,6 +2231,68 @@ static void zacs_blit_scaled_indexed(int lump, int dx, int dy, int dw, int dh,
   R_UnlockPatchNum(lump);
 }
 
+/* Draw a font-glyph patch scaled into a destination rectangle, recolouring
+ * each source palette index through a CR_* translation table.  Used by the
+ * scaled dialogue-text path so a line authored for the conversation's hud box
+ * renders at the box's proportion (rather than the engine's fixed 320-wide
+ * text scale) and in the dialogue colour.  trans may be NULL for no recolour. */
+static void zacs_blit_glyph_scaled(int lump, int dx, int dy, int dw, int dh,
+                                   const uint8_t *trans)
+{
+  const rpatch_t *patch;
+  uint16_t *surf;
+  int ox, oy, sw, sh;
+  int x0, x1, y0, y1;
+  int sx_step, sy_step, sx_start;
+  if (lump <= 0 || dw <= 0 || dh <= 0)
+    return;
+  patch = R_CachePatchNum(lump);
+  sw = patch->width;
+  sh = patch->height;
+  if (sw <= 0 || sh <= 0)
+  {
+    R_UnlockPatchNum(lump);
+    return;
+  }
+  surf = (uint16_t *)screens[0].data;
+  sx_step = (sw << 16) / dw;
+  sy_step = (sh << 16) / dh;
+  x0 = dx < 0 ? 0 : dx;
+  y0 = dy < 0 ? 0 : dy;
+  x1 = dx + dw; if (x1 > SCREENWIDTH)  x1 = SCREENWIDTH;
+  y1 = dy + dh; if (y1 > SCREENHEIGHT) y1 = SCREENHEIGHT;
+  sx_start = (x0 - dx) * sx_step;
+
+  for (oy = y0; oy < y1; oy++)
+  {
+    int srcy = ((oy - dy) * sy_step) >> 16;
+    uint16_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    int sx = sx_start;
+    if (srcy < 0) srcy = 0; else if (srcy >= sh) srcy = sh - 1;
+    for (ox = x0; ox < x1; ox++, sx += sx_step)
+    {
+      int srcx = sx >> 16;
+      const rcolumn_t *col = R_GetPatchColumn(patch, srcx);
+      int i, idx = -1;
+      for (i = 0; i < col->numPosts; i++)
+      {
+        const rpost_t *post = &col->posts[i];
+        if (srcy >= post->topdelta && srcy < post->topdelta + post->length)
+        {
+          idx = col->pixels[srcy];
+          break;
+        }
+      }
+      if (idx < 0)
+        continue;
+      if (trans)
+        idx = trans[(unsigned char)idx];
+      row[ox] = VID_PAL16((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
+    }
+  }
+  R_UnlockPatchNum(lump);
+}
+
 /* Draw a HUD image scaled into a destination rectangle on the surface, with a
  * global fade alpha (0..256).  Full-colour art (portraits, the dialogue frame)
  * is blitted from its native 0xAABBGGRR copy: the blend runs at 8-bit channel
@@ -2764,18 +2831,26 @@ void Z_ACSHudDrawer(void)
     }
     else
     {
-      /* Plain glyph text, drawn in the engine font.  Position is mapped from
-       * the hud box to the 320x200 page the text line uses. */
-      hu_textline_t l;
-      const char *t;
+      /* Spoken/label text.  ZDoom draws conversation text sized to the hud
+       * box; this engine's text line stretches the fixed 320-wide page to the
+       * whole screen, which at high resolution blows the dialogue line up far
+       * past its panel.  Draw the glyphs directly instead, scaling each from
+       * its native font size by the same box-to-screen ratio the art uses, so
+       * the line sits at the panel's proportion and in the dialogue colour. */
       const char *src = m->text;
       char buf[ZACS_PRINTBUF];
       int cm = m->color;
-      int tx = (int)((long long)m->x * 320 / hw);
-      int ty = (int)((long long)m->y * 200 / hh);
-      int reveal = -1;
+      const uint8_t *trans;
+      /* box-to-screen scale in 16.16 */
+      long long fx = ((long long)SCREENWIDTH  << 16) / (hw > 0 ? hw : 320);
+      long long fy = ((long long)SCREENHEIGHT << 16) / (hh > 0 ? hh : 200);
+      /* pen position on screen, from the box-mapped anchor */
+      int penx = (int)(((long long)m->x * SCREENWIDTH) / (hw > 0 ? hw : 320));
+      int peny = (int)(((long long)m->y * SCREENHEIGHT) / (hh > 0 ? hh : 200));
+      const char *t;
       if (cm < 0 || cm >= CR_LIMIT)
         cm = CR_DEFAULT;
+      trans = colrngs[cm];
       /* typewriter reveal: only show the first (age/typeon)+1 characters */
       if (m->typeon)
       {
@@ -2785,13 +2860,34 @@ void Z_ACSHudDrawer(void)
           buf[k] = src[k];
         buf[k] = 0;
         src = buf;
-        reveal = nshow;
-        (void)reveal;
       }
-      HUlib_initTextLine(&l, tx, ty, hu_font, HU_FONTSTART, cm);
       for (t = src; *t; t++)
-        HUlib_addCharToTextLine(&l, *t);
-      HUlib_drawTextLine(&l, false);
+      {
+        unsigned char c = (unsigned char)toupper(*t);
+        int gw, lump, dw, dh;
+        if (c == '\n')                  /* next line: carriage return + 8 box units down */
+        {
+          penx = (int)(((long long)m->x * SCREENWIDTH) / (hw > 0 ? hw : 320));
+          peny += (int)((8 * fy) >> 16);
+          continue;
+        }
+        if (c < HU_FONTSTART || c > HU_FONTEND)
+        {
+          penx += (int)((4 * fx) >> 16);   /* space / unprintable */
+          continue;
+        }
+        lump = hu_font[c - HU_FONTSTART].lumpnum;
+        gw   = hu_font[c - HU_FONTSTART].width;
+        if (lump <= 0)
+        {
+          penx += (int)((4 * fx) >> 16);
+          continue;
+        }
+        dw = (int)(((long long)hu_font[c - HU_FONTSTART].width  * fx) >> 16);
+        dh = (int)(((long long)hu_font[c - HU_FONTSTART].height * fy) >> 16);
+        zacs_blit_glyph_scaled(lump, penx, peny, dw, dh, trans);
+        penx += (int)(((long long)gw * fx) >> 16);
+      }
     }
   }
 }

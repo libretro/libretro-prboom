@@ -2595,6 +2595,96 @@ int U_DecorateReplacementType(int doomednum)
   return -1;
 }
 
+/* True if an actor's parent chain roots in SexActor: these are the post-death
+ * follow-on forms the death system's spawn script instantiates by name. */
+static int is_sexactor_derived(const decorate_actor_t *a)
+{
+  const decorate_actor_t *cur = a;
+  int depth = 0;
+  while (cur && cur->parent[0] && depth < 16)
+  {
+    if (!strcasecmp(cur->parent, "SexActor"))
+      return 1;
+    cur = find_actor(cur->parent);
+    depth++;
+  }
+  return 0;
+}
+
+/* Register the SexActor-derived actors as spawnable mobjtypes.  They carry no
+ * editor number -- the death system spawns them by class name through the ACS
+ * SpawnForced path -- so give each its actorname (so zacs_actor_type resolves
+ * it) and build its state chain via the shared builder.  The actor's own Spawn
+ * label is its spawn entry point. */
+void U_RegisterDecorateSexActors(void)
+{
+  int i, sp_next = num_sprites, n = 0;
+  int st_cursor = num_states;
+  int mt_cursor = num_mobj_types;
+
+  if (!parsed)
+    parse_decorate();
+
+  for (i = 0; i < num_actors; i++)
+  {
+    decorate_actor_t *a = &actors[i];
+    int mt, sp, base, spawn_label;
+    mobjinfo_t *info;
+    char *nm;
+
+    if (!is_sexactor_derived(a) || a->seq_len <= 0)
+      continue;
+
+    sp = decorate_sprite_index(a->seq_sprite[0] ? a->seq_sprite
+                                                : a->seq[0].spr, &sp_next);
+
+    base = st_cursor;
+    dsda_GetState(base + a->seq_len - 1);   /* grow to fit before building */
+    decorate_build_states(a, sp, base, a->seq_len, &sp_next);
+    st_cursor += a->seq_len;
+
+    spawn_label = decorate_label_index(a, "Spawn");
+
+    mt   = mt_cursor++;
+    info = dsda_GetMobjInfo(mt);
+    memset(info, 0, sizeof(*info));
+    info->doomednum   = -1;
+    info->spawnstate  = base +
+      (spawn_label >= 0 ? a->seqlabel[spawn_label].frame : 0);
+    info->spawnhealth = 1000;
+    info->mass        = 100;
+    info->radius      = (a->radius >= 0 ? a->radius : 20) * FRACUNIT;
+    info->height      = (a->height >= 0 ? a->height : 16) * FRACUNIT;
+    info->seestate = info->painstate = info->meleestate =
+      info->missilestate = info->deathstate = info->xdeathstate =
+      info->raisestate = 0;
+    info->flags = 0;
+
+    nm = malloc(strlen(a->name) + 1);
+    if (nm) { strcpy(nm, a->name); info->actorname = nm; }
+
+    if (a->num_uvars > 0 && num_uvarmaps < MAX_UVARMAPS)
+    {
+      uvarmap_t *m = &uvarmaps[num_uvarmaps++];
+      int u;
+      m->type  = mt;
+      m->slots = a->uvar_slots;
+      m->num   = a->num_uvars;
+      for (u = 0; u < a->num_uvars; u++)
+      {
+        memcpy(m->var[u].name, a->uvar[u].name, sizeof(m->var[u].name));
+        m->var[u].base = a->uvar[u].base;
+        m->var[u].len  = a->uvar[u].len;
+      }
+    }
+
+    n++;
+  }
+
+  if (n)
+    lprintf(LO_INFO, "U_RegisterDecorateSexActors: %d actor(s)\n", n);
+}
+
 /* Resolve a 4-char sprite name to a sprite index, growing the table if the
  * name is new.  *sp_next tracks the next free slot across calls. */
 static int decorate_sprite_index(const char *name, int *sp_next)

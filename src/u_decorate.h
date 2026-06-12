@@ -30,6 +30,11 @@ void U_RegisterDecorateWeapons(void);
  * the replacement in place of the stock editor number.  Call after
  * U_RegisterDecorateThings (shares the DSDHacked state/sprite growth). */
 void U_RegisterDecorateMonsters(void);
+
+/* Register the SexActor-derived actors as ACS-spawnable mobjtypes (the
+ * death system spawns them by class name).  Call after the monster
+ * replacements so the spawn names resolve. */
+void U_RegisterDecorateSexActors(void);
 int  U_DecorateReplacementType(int doomednum);
 
 /* ZDoom editor-only map things (particle fountains, interpolation points,

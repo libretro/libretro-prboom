@@ -1777,6 +1777,11 @@ bool D_DoomMainSetup(void)
    * before R_Init (shares state/sprite growth), Doom game only. */
   if (!hexen && !heretic && W_CheckNumForName("DECORATE") >= 0)
     U_RegisterDecorateMonsters();
+  /* The death system spawns the SexActor-derived follow-on actors by class
+   * name, so register them after the monster replacements (shares state/
+   * sprite growth), Doom game only. */
+  if (!hexen && !heretic && W_CheckNumForName("DECORATE") >= 0)
+    U_RegisterDecorateSexActors();
   /* ZDoom map-spot utility things (MapSpot 9001 etc.) are needed for ACS
    * SpawnSpot on Doom-game ZDoom maps whether or not a DECORATE lump is
    * present, but must stay out of Heretic/Hexen, which share the mobjinfo

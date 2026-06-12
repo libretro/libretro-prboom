@@ -101,7 +101,16 @@ static void R_InstallSpriteLump(int lump, unsigned frame,
                                 unsigned rotation, dbool   flipped)
 {
    if (frame >= MAX_SPRITE_FRAMES || rotation > 8)
+   {
+      /* I_Error logs and returns in this core rather than aborting, so the
+       * function must bail out here: falling through would index sprtemp[]
+       * (length MAX_SPRITE_FRAMES) with the out-of-range frame and corrupt
+       * memory.  A frame letter past 'A'+MAX_SPRITE_FRAMES-1 reaches this --
+       * some PK3 sprite lumps (e.g. high-frame scene sprites) carry such
+       * letters -- so skip the offending lump instead of installing it. */
       I_Error("R_InstallSpriteLump: Bad frame characters in lump %i", lump);
+      return;
+   }
 
    if ((int) frame > maxframe)
       maxframe = frame;

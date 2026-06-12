@@ -5258,10 +5258,81 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           break;
         }
 
+        case 60:
+        {
+          /* The follow-on scene's Camera script (non-Zandronum branch) spawns
+           * a view camera through this function, then Warps it (func 92) and
+           * hands the view to it with ChangeCamera.  The arguments observed
+           * are (x, y, z, <unused>, <enter script>, <exit script>, angle,
+           * <unused>, tid): an absolute spawn position, a fixed-point facing
+           * angle, and the unique tid the later ChangeCamera resolves.  The
+           * enter/exit script hooks have no view effect here, so the essential
+           * behaviour is to place an invisible point actor at that position
+           * and angle and give it the tid.  A MapSpot is exactly such an
+           * invisible point; the renderer reads only the camera's x/y/z and
+           * angle, which any actor supplies. */
+          int type = zacs_actor_type("MapSpot");
+          r = 0;
+          if (type >= 0)
+          {
+            mobj_t *mo = P_SpawnMobj(argc > 0 ? a[0] : 0,
+                                     argc > 1 ? a[1] : 0,
+                                     argc > 2 ? a[2] : 0, (mobjtype_t)type);
+            if (mo)
+            {
+              if (argc > 6)
+                mo->angle = (angle_t)a[6];   /* 16.16 fixed -> BAM is a no-op
+                                              * here; store the raw value so a
+                                              * subsequent Warp/angle set wins */
+              if (argc > 8 && a[8])
+                P_InsertMobjIntoTIDList(mo, (short)a[8]);
+              r = 1;
+            }
+          }
+          break;
+        }
+
+        case 92:                          /* ACSF_Warp(tid,x,y,z,angle,flags...) */
+        {
+          /* Move the actor(s) named by tid to an offset; the scene uses it to
+           * settle the just-spawned camera into place before the view switch.
+           * Only the position move matters for a view camera, so apply the
+           * x/y/z offset (the flags governing relative/absolute and fog are
+           * not modelled).  Returns 1 if at least one actor moved. */
+          int tid   = argc > 0 ? a[0] : 0;
+          int ox    = argc > 1 ? a[1] : 0;
+          int oy    = argc > 2 ? a[2] : 0;
+          int oz    = argc > 3 ? a[3] : 0;
+          int ang   = argc > 4 ? a[4] : 0;
+          int sp = -1, n = 0;
+          mobj_t *mo;
+          r = 0;
+          if (tid)
+          {
+            while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
+            {
+              fixed_t nx = mo->x + ox, ny = mo->y + oy;
+              if (P_TeleportMove(mo, nx, ny, false))
+              {
+                mo->z += oz;
+                if (ang)
+                  mo->angle = (angle_t)ang;
+                n++;
+              }
+            }
+          }
+          r = (n > 0);
+          break;
+        }
+
         case 114:                         /* ACSF_GetPlayerAccountName(tid) */
           /* a Zandronum networking accessor with no meaning in a single
-           * player port: there are no accounts, so return the empty string. */
-          r = zacs_save_string("");
+           * player port: there are no accounts.  Return 0 (the null string),
+           * not a handle to an empty string -- mods test the result with
+           * "== 0" to detect "no account / not Zandronum" (e.g. hdoom's
+           * source-port probe that decides first- vs third-person camera),
+           * and a non-zero empty-string handle would fail that test. */
+          r = 0;
           break;
 
         /* ---- DECORATE user variables ---------------------------------

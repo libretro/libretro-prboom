@@ -234,3 +234,14 @@ void P_ApplyZDoomInDoomMapFormat(void)
 {
   map_format = zdoom_in_doom_map_format;
 }
+
+/* A stock Doom-format map whose scripts come entirely from global ACS
+ * libraries (no per-map BEHAVIOR, so the Doom descriptor with its NULL
+ * execute_line_special is in force) still needs ACS-issued line specials --
+ * ChangeCamera, door/floor specials, etc. -- to run when a script calls them.
+ * Wire just the special executor onto the active descriptor without otherwise
+ * disturbing the Doom-format line/thing parsing already done for the map. */
+void P_EnableZDoomLineSpecials(void)
+{
+  map_format.execute_line_special = P_ExecuteZDoomLineSpecial;
+}

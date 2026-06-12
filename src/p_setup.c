@@ -3070,6 +3070,11 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
        * into the active script table and stay unreachable. */
       if (Z_ACSLoadBehavior(-1))
       {
+         /* Doom-format map: the active descriptor has no line-special
+          * executor, so ACS calls to ChangeCamera and the like would be
+          * dropped.  Wire the ZDoom executor in so those scripts take
+          * effect. */
+         P_EnableZDoomLineSpecials();
          Z_ACSRunOpenScripts();
          Z_ACSRunEnterScripts(players[consoleplayer].mo);
       }

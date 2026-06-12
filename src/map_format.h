@@ -70,5 +70,6 @@ void P_ApplyMapFormat(void);
  * on a non-Hexen map; P_ApplyMapFormat resets the per-game descriptor at the
  * top of every level setup, so the override only lasts for that map. */
 void P_ApplyZDoomInDoomMapFormat(void);
+void P_EnableZDoomLineSpecials(void);
 
 #endif

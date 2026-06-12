@@ -1550,6 +1550,14 @@ static int  zacs_msgrot;
 static int zacs_oldbuttons[MAXPLAYERS];
 static int zacs_oldbuttons_snap[MAXPLAYERS];
 
+/* Per-player latch for the use key as seen by GetPlayerInput(INPUT_BUTTONS).
+ * Dialogue advance reads the live button state as a level, so a held use key
+ * reads as pressed every tic and walks the script past its end and back to the
+ * first line.  Latch the key so a continuous hold reports as a single press:
+ * report use only on the down edge and then suppress it until the key is let
+ * go.  Edge tracking via INPUT_OLDBUTTONS is left untouched. */
+static int zacs_use_latched[MAXPLAYERS];
+
 static int zacs_oldbuttons_of(player_t *pl)
 {
   int i;
@@ -1557,6 +1565,16 @@ static int zacs_oldbuttons_of(player_t *pl)
     if (&players[i] == pl)
       return zacs_oldbuttons[i];
   return 0;
+}
+
+/* Resolve a player to its index, or -1 if not an in-game player. */
+static int zacs_player_index(player_t *pl)
+{
+  int i;
+  for (i = 0; i < MAXPLAYERS; i++)
+    if (&players[i] == pl)
+      return i;
+  return -1;
 }
 
 /* On-screen HudMessage store.  ZDoom's verbose HudMessage places text at a
@@ -1940,6 +1958,8 @@ void Z_ACSHudClear(void)
   int i;
   for (i = 0; i < ZACS_HUDMSG_MAX; i++)
     zacs_hudmsgs[i].active = 0;
+  for (i = 0; i < MAXPLAYERS; i++)
+    zacs_use_latched[i] = 0;
   zacs_hud_w = 320;
   zacs_hud_h = 200;
 }
@@ -3830,6 +3850,26 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         int b = cur ? pl->cmd.buttons : zacs_oldbuttons_of(pl);
         if (b & BT_ATTACK) r |= 1;   /* ZDoom BT_ATTACK = 1<<0 */
         if (b & BT_USE)    r |= 2;   /* ZDoom BT_USE    = 1<<1 */
+        /* Latch the live use key so a held button reports as a single press,
+         * letting dialogue terminate instead of looping back to the start.
+         * Only the current-tic read (INPUT_BUTTONS) is latched; the previous-
+         * tic read (INPUT_OLDBUTTONS) keeps the raw state for edge tests. */
+        if (cur)
+        {
+          int idx = zacs_player_index(pl);
+          if (idx >= 0)
+          {
+            if (b & BT_USE)
+            {
+              if (zacs_use_latched[idx])
+                r &= ~2;           /* already consumed this hold */
+              else
+                zacs_use_latched[idx] = 1;
+            }
+            else
+              zacs_use_latched[idx] = 0;   /* released: re-arm */
+          }
+        }
       }
       ZSETSTK(1, r);
       break;

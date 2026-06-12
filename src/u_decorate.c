@@ -109,6 +109,11 @@ typedef struct
   int  translucent;             /* RenderStyle Translucent / Add          */
   int  alpha;                   /* 16.16 alpha, FRACUNIT if unset         */
   int  damage;                  /* DECORATE Damage property (default 0)    */
+  char seesound[32];            /* DECORATE sound properties (empty if   */
+  char painsound[32];           /* unset; override the cloned base sounds) */
+  char deathsound[32];
+  char attacksound[32];
+  char activesound[32];
 
   /* DECORATE weapon (": <Base>" / "replaces <Base>" rooted in a known
    * weapon slot).  Each of the five engine weapon states is captured as a
@@ -1380,6 +1385,33 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       p = read_word(p, end, word, sizeof(word));
       a->damage = atoi(word);
     }
+    else if (!strcasecmp(word, "SeeSound")  ||
+             !strcasecmp(word, "PainSound") ||
+             !strcasecmp(word, "DeathSound")||
+             !strcasecmp(word, "AttackSound") ||
+             !strcasecmp(word, "ActiveSound"))
+    {
+      /* "<Kind>Sound \"logical/name\"": capture the logical sound name so the
+       * monster registrar can override the cloned base sound.  The value is a
+       * quoted string; read it and strip the surrounding quotes. */
+      char snd[40];
+      char *dst = (!strcasecmp(word, "SeeSound"))   ? a->seesound   :
+                  (!strcasecmp(word, "PainSound"))  ? a->painsound  :
+                  (!strcasecmp(word, "DeathSound")) ? a->deathsound :
+                  (!strcasecmp(word, "AttackSound"))? a->attacksound:
+                                                      a->activesound;
+      p = skip_space(p, end);
+      p = read_word(p, end, snd, sizeof(snd));
+      {
+        char *s = snd;
+        int   n;
+        if (*s == '"') s++;            /* drop leading quote */
+        n = (int)strlen(s);
+        if (n > 0 && s[n-1] == '"') s[n-1] = 0;   /* drop trailing quote */
+        strncpy(dst, s, 31);
+        dst[31] = 0;
+      }
+    }
     else if (!strcasecmp(word, "var"))
     {
       /* "var int name;" or "var int name[N];" -- assign the name a base
@@ -1882,24 +1914,185 @@ static dbool engine_knows_doomednum(int dn)
  * lacking that table here, match an existing sfx by name, else create a
  * grown slot named for the stem so the engine's lazy "ds%s"/bare lump
  * lookup finds the sample.  Returns 0 (no sound) when the name is empty. */
+/* ---- SNDINFO logical sound names ---------------------------------------
+ *
+ * ZDoom mods bind logical sound names to actual lumps in a SNDINFO lump:
+ *   logical/name  lumpname           (a direct alias)
+ *   $random logical/name { a b c }   (one of a set, chosen at play time)
+ * DECORATE then names the logical sound (SeeSound "impse/see"), not the lump.
+ * This engine plays one sample per sound, so resolve a logical name to the
+ * first lump of its set; that is audibly correct (the right voice) even
+ * without the per-play randomisation.  Parsed once, lazily, into a flat
+ * name->lump table. */
+typedef struct { char logical[40]; char lump[16]; } sndalias_t;
+static sndalias_t *snd_aliases;
+static int         snd_num_aliases;
+static int         snd_aliases_parsed;
+
+static void sndinfo_parse_lump_idx(int lump, int *cap)
+{
+  int len, i;
+  const char *b;
+  if (lump < 0)
+    return;
+  len = W_LumpLength(lump);
+  b   = (const char *)W_CacheLumpNum(lump);
+  if (!b || len <= 0)
+    return;
+  i = 0;
+  while (i < len)
+  {
+    char tag[40];
+    int  t = 0;
+    while (i < len && (b[i]==' '||b[i]=='\t'||b[i]=='\r'||b[i]=='\n')) i++;
+    if (i >= len) break;
+    if (b[i]=='/' && i+1<len && b[i+1]=='/')   /* // comment */
+    { while (i < len && b[i] != '\n') i++; continue; }
+    if (b[i]==';')
+    { while (i < len && b[i] != '\n') i++; continue; }
+    while (i < len && b[i]>' ' && t < 39) tag[t++] = b[i++];
+    tag[t] = 0;
+    if (tag[0] == '$')
+    {
+      if (!strcasecmp(tag, "$random"))
+      {
+        char logical[40], first[16];
+        int  n = 0, got = 0;
+        while (i < len && (b[i]==' '||b[i]=='\t')) i++;
+        while (i < len && b[i]>' ' && n < 39) logical[n++] = b[i++];
+        logical[n] = 0;
+        /* find '{', then take the first token before '}' */
+        while (i < len && b[i] != '{' && b[i] != '\n') i++;
+        if (i < len && b[i] == '{')
+        {
+          i++;
+          while (i < len && (b[i]==' '||b[i]=='\t'||b[i]=='\r'||b[i]=='\n')) i++;
+          n = 0;
+          while (i < len && b[i]>' ' && b[i] != '}' && n < 15) first[n++] = b[i++];
+          first[n] = 0;
+          got = (n > 0);
+          while (i < len && b[i] != '}' && b[i] != '\n') i++;
+        }
+        if (got && logical[0] && snd_num_aliases < *cap)
+        {
+          strncpy(snd_aliases[snd_num_aliases].logical, logical, 39);
+          snd_aliases[snd_num_aliases].logical[39] = 0;
+          strncpy(snd_aliases[snd_num_aliases].lump, first, 15);
+          snd_aliases[snd_num_aliases].lump[15] = 0;
+          snd_num_aliases++;
+        }
+      }
+      else                                 /* other $directive: skip line */
+        while (i < len && b[i] != '\n') i++;
+    }
+    else if (tag[0])
+    {
+      /* "logical lump" direct alias */
+      char lmp[16];
+      int n = 0;
+      while (i < len && (b[i]==' '||b[i]=='\t')) i++;
+      while (i < len && b[i]>' ' && n < 15) lmp[n++] = b[i++];
+      lmp[n] = 0;
+      if (n > 0 && snd_num_aliases < *cap)
+      {
+        strncpy(snd_aliases[snd_num_aliases].logical, tag, 39);
+        snd_aliases[snd_num_aliases].logical[39] = 0;
+        strncpy(snd_aliases[snd_num_aliases].lump, lmp, 15);
+        snd_aliases[snd_num_aliases].lump[15] = 0;
+        snd_num_aliases++;
+      }
+      while (i < len && b[i] != '\n') i++;
+    }
+  }
+}
+
+static void sndinfo_parse(void)
+{
+  int cap = 512, li;
+  snd_aliases_parsed = 1;
+  snd_aliases = malloc(sizeof(sndalias_t) * cap);
+  if (!snd_aliases)
+    return;
+  /* The mod splits its sound table across more than one SNDINFO lump (a
+   * plain "<lump> <lump>" registry plus a "$random <logical> { ... }"
+   * companion), and all collapse to the lump name SNDINFO.  W_CheckNumForName
+   * would see only the last; walk every lump named SNDINFO so both the direct
+   * aliases and the logical-name sets are captured. */
+  for (li = 0; li < numlumps; li++)
+    if (!strncasecmp(lumpinfo[li].name, "SNDINFO", 8))
+      sndinfo_parse_lump_idx(li, &cap);
+  if (snd_num_aliases)
+    lprintf(LO_INFO, "U_Decorate: %d SNDINFO sound alias(es)\n",
+            snd_num_aliases);
+}
+
+/* Translate a DECORATE/logical sound name to the lump it ultimately names,
+ * via SNDINFO; returns the input unchanged when there is no alias.  Aliases
+ * chain (impse/see -> trosee1 -> TROOSEE1: a $random logical set whose members
+ * are themselves "<name> <lump>" aliases), so follow the chain to its end,
+ * bounded against a cycle. */
+static const char *sndinfo_lump_for(const char *logical)
+{
+  int hops;
+  if (!snd_aliases_parsed)
+    sndinfo_parse();
+  if (!logical)
+    return logical;
+  for (hops = 0; hops < 8; hops++)
+  {
+    int i, found = 0;
+    for (i = 0; i < snd_num_aliases; i++)
+      if (!strcasecmp(snd_aliases[i].logical, logical))
+      {
+        /* a self-alias (name -> name) is the terminal lump; stop */
+        if (!strcasecmp(snd_aliases[i].lump, logical))
+          return logical;
+        logical = snd_aliases[i].lump;
+        found = 1;
+        break;
+      }
+    if (!found)
+      break;
+  }
+  return logical;
+}
+
+/* Resolve a DECORATE A_PlaySound("name") logical name to a sfx index for
+ * state->misc1.  ZDoom binds the logical name through SNDINFO to a lump;
+ * translate the logical name to its lump first, then match an existing sfx by
+ * name, else create a grown slot named for the stem so the engine's lazy
+ * "ds%s"/bare lump lookup finds the sample.  Returns 0 (no sound) when the
+ * name is empty. */
 static int decorate_resolve_sfx(const char *name)
 {
   int i;
   const char *stem;
   sfxinfo_t *sfx;
   char *copy;
+  /* Next free sfx slot.  dsda_GetSfx grows the table by doubling to fit an
+   * index and leaves num_sfx at the inflated capacity, so re-reading num_sfx
+   * as the next slot would leap past the just-created entry on every new
+   * sound.  Seed the cursor from num_sfx the first time and advance it
+   * ourselves; -1 means "not yet seeded". */
+  static int sfx_cursor = -1;
 
   if (!name || !name[0])
     return 0;
+  /* a logical SNDINFO name (impse/see) resolves to its bound lump first; a
+   * plain lump name passes through unchanged */
+  name = sndinfo_lump_for(name);
   /* the bound lump may already carry a "ds" prefix; index by the stem */
   stem = ((name[0] == 'd' || name[0] == 'D') &&
           (name[1] == 's' || name[1] == 'S')) ? name + 2 : name;
 
-  for (i = 1; i < num_sfx; i++)
+  if (sfx_cursor < 0)
+    sfx_cursor = num_sfx;
+
+  for (i = 1; i < sfx_cursor; i++)
     if (S_sfx[i].name && !strcasecmp(S_sfx[i].name, stem))
       return i;
 
-  i   = num_sfx;                 /* grow one slot */
+  i   = sfx_cursor++;            /* grow one slot */
   sfx = dsda_GetSfx(i);          /* may move S_sfx; use the returned ptr */
   copy = malloc(strlen(stem) + 1);
   if (!copy)
@@ -2262,6 +2455,16 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
   /* property overrides the header captured (others stay at stock values) */
   if (a->radius >= 0) info->radius = a->radius * FRACUNIT;
   if (a->height >= 0) info->height = a->height * FRACUNIT;
+
+  /* sound overrides: the clone inherited the stock monster's sounds, but the
+   * replacement defines its own (SeeSound "impse/see" etc.).  Resolve each
+   * through SNDINFO to a sfx slot and override; unset sounds keep the stock
+   * value so a partly-specified actor still sounds reasonable. */
+  if (a->seesound[0])    info->seesound    = decorate_resolve_sfx(a->seesound);
+  if (a->painsound[0])   info->painsound   = decorate_resolve_sfx(a->painsound);
+  if (a->deathsound[0])  info->deathsound  = decorate_resolve_sfx(a->deathsound);
+  if (a->attacksound[0]) info->attacksound = decorate_resolve_sfx(a->attacksound);
+  if (a->activesound[0]) info->activesound = decorate_resolve_sfx(a->activesound);
 
   /* if the replacement names a different spawn sprite than the stock
    * monster, re-skin its cloned states to that sprite */

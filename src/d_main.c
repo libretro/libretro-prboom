@@ -1772,6 +1772,11 @@ bool D_DoomMainSetup(void)
    * Doom game only. */
   if (!hexen && !heretic && W_CheckNumForName("DECORATE") >= 0)
     U_RegisterDecorateWeapons();
+  /* ZDoom DECORATE monster replacements: clone the stock monsters a mod
+   * stands in for and record the editor-number redirect.  After weapons,
+   * before R_Init (shares state/sprite growth), Doom game only. */
+  if (!hexen && !heretic && W_CheckNumForName("DECORATE") >= 0)
+    U_RegisterDecorateMonsters();
   /* ZDoom map-spot utility things (MapSpot 9001 etc.) are needed for ACS
    * SpawnSpot on Doom-game ZDoom maps whether or not a DECORATE lump is
    * present, but must stay out of Heretic/Hexen, which share the mobjinfo

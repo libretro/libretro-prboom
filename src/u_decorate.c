@@ -1892,6 +1892,8 @@ static int decorate_resolve_sfx(const char *name)
   return i;
 }
 
+static int decorate_sprite_index(const char *name, int *sp_next);
+
 void U_RegisterDecorateThings(void)
 {
   int i, count = 0, count_mt = 0;
@@ -2142,6 +2144,183 @@ void U_RegisterDecorateThings(void)
   if (count_mt)
     lprintf(LO_INFO, "U_RegisterDecorateThings: %d decorations (%d states)\n",
             count_mt, count);
+}
+
+/* ---- monster replacement (DECORATE "replaces") --------------------------
+ *
+ * hdoom-style mods stand a custom monster in for a stock one with
+ * "actor ImpEncounter1 : HDoomMonster replaces DoomImp".  The custom actor
+ * carries no editor number of its own; it takes over the editor number of the
+ * class it replaces, so every map placement of that stock thing should spawn
+ * the replacement instead.  Most replacements reuse the stock monster's sprite
+ * name (the mod overrides the sprite graphics), so cloning the stock monster's
+ * mobjinfo already yields the right look and the stock AI; the few that use a
+ * fresh sprite (the zombie family's PTRO/STRO/CTRO) get the cloned state chain
+ * re-skinned to the new sprite.  A redirect table maps the replaced editor
+ * number to the clone so P_SpawnMapThing diverts the spawn. */
+
+typedef struct { int doomednum; int mobjtype; } decorate_repl_t;
+static decorate_repl_t decorate_repls[MAX_DECORATE_ACTORS];
+static int             num_decorate_repls;
+
+/* The mobjtype whose editor number is dn, or -1. */
+static int mobjtype_for_doomednum(int dn)
+{
+  int i;
+  if (dn < 0)
+    return -1;
+  for (i = 0; i < num_mobj_types; i++)
+    if (mobjinfo[i].doomednum == dn)
+      return i;
+  return -1;
+}
+
+/* Clone the reachable state graph of a stock monster into fresh state slots,
+ * substituting newspr for the sprite on every cloned frame, and rewrite the
+ * mobjinfo's state entry points to the clones.  Only frames the monster
+ * actually reaches through its labelled entry points are copied; the walk is
+ * bounded by the stock state table so a malformed nextstate cannot run away.
+ * `map` (length oldcount, all -1) memoises old-state -> new-state. */
+static int reskin_clone_state(int old, int newspr, int *map, int oldcount,
+                              int *next_slot)
+{
+  int neu;
+  state_t *src, *dst;
+  if (old <= 0 || old >= oldcount)        /* S_NULL or out of range: keep */
+    return old;
+  if (map[old] >= 0)
+    return map[old];
+
+  neu = (*next_slot)++;
+  map[old] = neu;
+  /* GetState may move the table; fetch dst by index after each recursion */
+  dst = dsda_GetState(neu);
+  src = &states[old];
+  *dst = *src;
+  dst->sprite = newspr;
+  /* recurse into the successor, then re-fetch dst (table may have grown) */
+  {
+    int nn = reskin_clone_state(states[old].nextstate, newspr, map, oldcount,
+                                next_slot);
+    dsda_GetState(neu)->nextstate = nn;
+  }
+  return neu;
+}
+
+static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
+                                      int *st_cursor, int orig_states,
+                                      int *mt_cursor)
+{
+  int basedn = resolve_class(a->replaces, NULL, 0);
+  int basemt = mobjtype_for_doomednum(basedn);
+  int mt;
+  mobjinfo_t *info;
+  char basespr[5];
+
+  if (basemt < 0)
+    return;                      /* unknown stock class: leave it alone */
+
+  /* clone the stock monster wholesale: flags, sounds, speed, health, the
+   * whole state set.  This inherits working A_Look / A_Chase / attack AI.
+   * mt advances through an explicit cursor: dsda_GetMobjInfo grows the table
+   * by doubling to fit the index, so reading num_mobj_types back as the next
+   * slot would leap to the inflated capacity each time. */
+  mt   = (*mt_cursor)++;
+  info = dsda_GetMobjInfo(mt);   /* grows the table to fit; cache after */
+  *info = mobjinfo[basemt];
+  info->doomednum = -1;          /* reached only through the redirect */
+
+  /* property overrides the header captured (others stay at stock values) */
+  if (a->radius >= 0) info->radius = a->radius * FRACUNIT;
+  if (a->height >= 0) info->height = a->height * FRACUNIT;
+
+  /* if the replacement names a different spawn sprite than the stock
+   * monster, re-skin its cloned states to that sprite */
+  if (a->seq_sprite[0])
+  {
+    const char *bs = (states[info->spawnstate].sprite < num_sprites)
+                     ? sprnames[states[info->spawnstate].sprite] : NULL;
+    memset(basespr, 0, sizeof(basespr));
+    if (bs) memcpy(basespr, bs, 4);
+    if (strncasecmp(basespr, a->seq_sprite, 4) != 0)
+    {
+      int newspr = decorate_sprite_index(a->seq_sprite, sp_next);
+      /* Only stock-table states are cloned; map is sized to the original
+       * engine state count and the bound check rejects anything at or beyond
+       * it (already-cloned or out-of-range successors are left as-is). */
+      int *map = malloc(sizeof(int) * orig_states);
+      int k;
+      if (map)
+      {
+        int sp0 = info->spawnstate,   se0 = info->seestate;
+        int pa0 = info->painstate,    me0 = info->meleestate;
+        int mi0 = info->missilestate, de0 = info->deathstate;
+        int xd0 = info->xdeathstate,  ra0 = info->raisestate;
+        for (k = 0; k < orig_states; k++) map[k] = -1;
+        info->spawnstate   = reskin_clone_state(sp0, newspr, map, orig_states, st_cursor);
+        info->seestate     = reskin_clone_state(se0, newspr, map, orig_states, st_cursor);
+        info->painstate    = reskin_clone_state(pa0, newspr, map, orig_states, st_cursor);
+        info->meleestate   = reskin_clone_state(me0, newspr, map, orig_states, st_cursor);
+        info->missilestate = reskin_clone_state(mi0, newspr, map, orig_states, st_cursor);
+        info->deathstate   = reskin_clone_state(de0, newspr, map, orig_states, st_cursor);
+        info->xdeathstate  = reskin_clone_state(xd0, newspr, map, orig_states, st_cursor);
+        info->raisestate   = reskin_clone_state(ra0, newspr, map, orig_states, st_cursor);
+        free(map);
+      }
+    }
+  }
+
+  if (num_decorate_repls < MAX_DECORATE_ACTORS)
+  {
+    decorate_repls[num_decorate_repls].doomednum = basedn;
+    decorate_repls[num_decorate_repls].mobjtype  = mt;
+    num_decorate_repls++;
+  }
+}
+
+void U_RegisterDecorateMonsters(void)
+{
+  int i, sp_next = num_sprites, n = 0;
+  int orig_states = num_states;  /* the stock state count before any growth */
+  int st_cursor   = num_states;  /* next free state slot (advances as we clone) */
+  int mt_cursor   = num_mobj_types; /* next free mobjtype slot */
+
+  if (!parsed)
+    parse_decorate();
+
+  num_decorate_repls = 0;
+  for (i = 0; i < num_actors; i++)
+  {
+    decorate_actor_t *a = &actors[i];
+    int basedn, basemt;
+    if (!a->replaces[0])
+      continue;
+    /* monsters only: the replaced class must be a known stock monster with a
+     * live mobjtype.  Weapons/ammo/blood/puff are handled elsewhere. */
+    basedn = resolve_class(a->replaces, NULL, 0);
+    basemt = mobjtype_for_doomednum(basedn);
+    if (basemt < 0)
+      continue;
+    if (!(mobjinfo[basemt].flags & MF_COUNTKILL) &&
+        !(mobjinfo[basemt].flags & MF_SHOOTABLE))
+      continue;                  /* not a monster */
+    register_one_monster_repl(a, &sp_next, &st_cursor, orig_states, &mt_cursor);
+    n++;
+  }
+
+  if (n)
+    lprintf(LO_INFO, "U_RegisterDecorateMonsters: %d monster replacement(s)\n",
+            n);
+}
+
+/* The replacement mobjtype for a stock editor number, or -1. */
+int U_DecorateReplacementType(int doomednum)
+{
+  int i;
+  for (i = 0; i < num_decorate_repls; i++)
+    if (decorate_repls[i].doomednum == doomednum)
+      return decorate_repls[i].mobjtype;
+  return -1;
 }
 
 /* Resolve a 4-char sprite name to a sprite index, growing the table if the

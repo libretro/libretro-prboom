@@ -25,6 +25,13 @@ void U_RegisterDecorateThings(void);
  * before R_Init; Doom game only. */
 void U_RegisterDecorateWeapons(void);
 
+/* Register DECORATE "replaces" monsters as mobjtypes cloned from the stock
+ * class they replace, and expose the redirect so P_SpawnMapThing can spawn
+ * the replacement in place of the stock editor number.  Call after
+ * U_RegisterDecorateThings (shares the DSDHacked state/sprite growth). */
+void U_RegisterDecorateMonsters(void);
+int  U_DecorateReplacementType(int doomednum);
+
 /* ZDoom editor-only map things (particle fountains, interpolation points,
  * camera/view stacks, editor cameras): skip without a warning. */
 dbool U_IsInertZDoomThing(int doomednum);

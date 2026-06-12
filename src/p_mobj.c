@@ -2430,6 +2430,18 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   else // killough 8/23/98: use table for faster lookup
     i = P_FindDoomedNum(thingtype);
 
+  /* DECORATE "replaces": if a mod stands a custom monster in for this stock
+   * editor number, spawn the replacement instead.  Done after the normal
+   * lookup so the stock class is known to exist.  Applies on every map format
+   * -- hdoom-style mods replace enemies in the stock Doom-format IWAD maps,
+   * not only in ZDoom UDMF maps -- and only fires for editor numbers a
+   * replacement registered against, so it is inert without such a mod. */
+  {
+    int repl = U_DecorateReplacementType(thingtype);
+    if (repl >= 0)
+      i = repl;
+  }
+
   // phares 5/16/98:
   // Do not abort because of an unknown thing. Ignore it, but post a
   // warning message for the player.

@@ -34,6 +34,7 @@
 #include "lprintf.h"
 #include "dsda_hacked.h"
 #include "p_enemy.h"
+#include "r_main.h"
 #include "p_pspr.h"
 #include "d_items.h"
 #include "sounds.h"
@@ -234,7 +235,8 @@ enum {
   DA_SETUSERARRAY,     /* A_SetUserArray(name, idxexpr, expr) -> set element */
   DA_CHANGEFLAG,       /* A_ChangeFlag("FLAG", bool) -> set/clear a flag */
   DA_SPAWNITEM,        /* A_SpawnItemEx("Class", ...) -> spawn a decoration */
-  DA_FADEOUT           /* A_FadeOut(reduce) -> fade the actor out and remove it */
+  DA_FADEOUT,          /* A_FadeOut(reduce) -> fade the actor out and remove it */
+  DA_CUSTOMMISSILE     /* A_CustomMissile("Class",...) -> fire a projectile */
 };
 
 /* Sound names captured for DA_PLAYSOUND frames, resolved to sfx slots at
@@ -452,6 +454,33 @@ void A_DecorateFadeOut(mobj_t *mo)
     mo->special1.i = steps;
   if (--mo->special1.i <= 0)
     P_RemoveMobj(mo);
+}
+
+/* A_CustomMissile("Class", height, spawnofs, angle, ...): fire a projectile at
+ * the actor's current target.  This engine has no general per-class spawning
+ * for arbitrary DECORATE projectiles, so it fires the Doom imp fireball
+ * (MT_TROOPSHOT); the mod's custom projectiles derive from the imp ball and
+ * read as the same shot.  misc1 carries the angle offset in degrees, so a
+ * burst of several calls at different angles fans into a spread.  With no
+ * target the call is a harmless no-op, matching ZDoom. */
+void A_DecorateCustomMissile(mobj_t *mo)
+{
+  int deg;
+  if (!mo || !mo->state || !mo->target)
+    return;
+  A_FaceTarget(mo);
+  deg = (int)mo->state->misc1;
+  if (deg == 0)
+    P_SpawnMissile(mo, mo->target, MT_TROOPSHOT);
+  else
+  {
+    /* aim from the actor toward the target, offset by the requested angle:
+     * ANG1 is the binary-angle measure of one degree, so multiplying gives the
+     * offset directly; unsigned wraparound handles a negative offset. */
+    angle_t base = R_PointToAngle2(mo->x, mo->y, mo->target->x, mo->target->y);
+    angle_t off  = (angle_t)deg * ANG1;
+    P_SpawnMissileAngle(mo, MT_TROOPSHOT, base + off, 0);
+  }
 }
 
 /* A_SetUserArray(name, idxexpr, expr): write the value expression to element
@@ -1895,6 +1924,36 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
             snd = (short)steps;
             act = DA_FADEOUT;
           }
+          else if (!strcasecmp(fn, "A_CustomMissile"))
+          {
+            /* A_CustomMissile("Class", height, spawnofs, angle, ...): only the
+             * angle offset (the 4th argument, in degrees) is modelled so a
+             * multi-call burst fans out; the class always fires the imp ball.
+             * Walk past the first three comma-separated arguments to it. */
+            const char *ar = strchr(b, '(');
+            int deg = 0, commas = 0;
+            if (ar)
+            {
+              const char *q2 = ar + 1;
+              while (*q2 && *q2 != ')')
+              {
+                if (*q2 == ',')
+                {
+                  commas++;
+                  if (commas == 3)      /* the angle argument follows */
+                  {
+                    deg = atoi(q2 + 1);
+                    break;
+                  }
+                }
+                q2++;
+              }
+            }
+            if (deg < -360) deg = -360;
+            if (deg > 360)  deg = 360;
+            snd = (short)deg;
+            act = DA_CUSTOMMISSILE;
+          }
           else if (!strcasecmp(fn, "A_SpawnItemEx") ||
                    !strcasecmp(fn, "A_SpawnItem"))
           {
@@ -2436,6 +2495,10 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
         state->action.arg0 = (arg0_t)A_DecorateFadeOut;
         state->misc1 = (a->seq[f].snd > 0) ? a->seq[f].snd : 8;
         break;
+      case DA_CUSTOMMISSILE:
+        state->action.arg0 = (arg0_t)A_DecorateCustomMissile;
+        state->misc1 = a->seq[f].snd;   /* angle offset in degrees (may be <0) */
+        break;
       case DA_NOBLOCKING:
         state->action.arg0 = (arg0_t)A_Fall;
         break;
@@ -2760,8 +2823,10 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
    * death entries at the action so either kind of kill triggers it. */
   {
     int faint_li = decorate_label_index(a, "Faint");
+    int miss_li  = decorate_label_index(a, "Missile");
     int faint_state = -1;
-    if (faint_li >= 0 && a->seq_len > 0)
+    int miss_state  = -1;
+    if ((faint_li >= 0 || miss_li >= 0) && a->seq_len > 0)
     {
       int fsp  = decorate_sprite_index(a->seq_sprite[0] ? a->seq_sprite
                                                         : a->seq[0].spr, sp_next);
@@ -2770,8 +2835,21 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
       info = dsda_GetMobjInfo(mt);            /* re-cache after possible move */
       decorate_build_states(a, fsp, fbase, a->seq_len, sp_next);
       *st_cursor += a->seq_len;
-      faint_state = fbase + a->seqlabel[faint_li].frame;
+      if (faint_li >= 0)
+        faint_state = fbase + a->seqlabel[faint_li].frame;
+      if (miss_li >= 0)
+        miss_state = fbase + a->seqlabel[miss_li].frame;
     }
+
+    /* A replacement reskins the stock monster it stands in for, inheriting
+     * that monster's attack -- so a variant standing in for a hitscan zombie
+     * would fire hitscan rather than the projectile its own DECORATE Missile
+     * state casts via A_CustomMissile.  When the actor defines its own Missile
+     * sequence, point the missile state at that built sequence so the variant
+     * uses its intended projectile attack; the cloned See/Chase AI still
+     * drives into it through info->missilestate. */
+    if (miss_state > 0)
+      info->missilestate = miss_state;
 
     if (faint_state > 0 || info->deathstate > 0)
     {

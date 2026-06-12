@@ -61,6 +61,7 @@
 #include "p_tick.h"
 #include "p_map.h"
 #include "p_user.h"
+#include "p_conversation.h"
 #include "d_main.h"
 #include "wi_stuff.h"
 #include "hu_stuff.h"
@@ -660,6 +661,14 @@ void G_BuildTiccmd(ticcmd_t* cmd)
  * not driving the player), and outside levels. */
 dbool G_PendingTurnActive(void)
 {
+  /* A script-frozen player (a dialogue overlay) holds the view still: the tic
+   * command's angleturn is already zeroed for the freeze, so the low-latency
+   * preview must be suppressed too, or the view would still swing with the
+   * turn input every rendered frame (visibly worse above 35 fps, where the
+   * preview runs many times per tic). */
+  if (P_ConversationIsActive() ||
+      (players[consoleplayer].cheats & CF_TOTALLYFROZEN))
+    return false;
   return lowlatency_turning && !demoplayback && gamestate == GS_LEVEL &&
          !menuactive && !paused;
 }
@@ -688,6 +697,9 @@ angle_t G_PendingTurn(void)
  * where P_SetPitch leaves mlooky unconsumed. */
 dbool G_PendingPitchActive(const mobj_t *mo)
 {
+  if (P_ConversationIsActive() ||
+      (players[consoleplayer].cheats & CF_TOTALLYFROZEN))
+    return false;
   return movement_mouselook && !mo->reactiontime &&
          !((automapmode & am_active) && !(automapmode & am_overlay));
 }

@@ -3702,6 +3702,9 @@ static void T_ZACSThinker(zacs_inst_t *inst)
          * fraction of the hud box (0.5 = centre) rather than an absolute cell.
          * Resolve those to whole box units before storing. */
         int px, py;
+        /* holdtime is 16.16 seconds; <=0 means "until replaced".  Convert to
+         * tics (35/sec); persistent when not positive. */
+        int tics = (hhold > 0) ? (int)(((long long)hhold * 35) >> 16) : -1;
         if (hx > -(1 << 16) && hx < (1 << 16))
           px = (int)(((long long)hx * zacs_hud_w) >> 16);
         else
@@ -3710,9 +3713,6 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           py = (int)(((long long)hy * zacs_hud_h) >> 16);
         else
           py = hy >> 16;
-        /* holdtime is 16.16 seconds; <=0 means "until replaced".  Convert to
-         * tics (35/sec); persistent when not positive. */
-        int tics = (hhold > 0) ? (int)(((long long)hhold * 35) >> 16) : -1;
         if (tdry == 3)                           /* HUDMSG_FADEINOUT */
         {
           fadein  = (int)(((long long)hp1 * 35) >> 16);

@@ -1447,7 +1447,14 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
                             : !strcasecmp(word, "wait") ? SEQF_WAIT
                             : SEQF_STOP;
       }
-      in_spawn = 0;
+      /* Do not stop capturing here.  A terminator ends the *run* of frames
+       * that flows into it, but in a multi-label actor the frames textually
+       * after it (before the next label or the closing brace) are still real
+       * states reached by an A_JumpIf / goto -- e.g. the StoryCharacter Active
+       * block jumps past its own "wait" to a trailing frame.  Dropping them
+       * left the jump pointing one past the actor's last state, into the next
+       * actor's frames (the dialogue NPCs turned into the imp afterwards).
+       * Keep capturing; a new label or "}" ends the block as before. */
     }
     else if (in_spawn && !a->spawn_static && a->seq_len > 0 &&
              !strcasecmp(word, "goto"))
@@ -2045,7 +2052,7 @@ void U_RegisterDecorateThings(void)
           {
             int tgt = cur;          /* default: no movement (cond false path) */
             if (a->seqflow[f].jtoff >= 0)
-              tgt = cur + 1 + a->seqflow[f].jtoff;   /* skip N states forward */
+              tgt = cur + a->seqflow[f].jtoff;   /* offset N: Nth state after this one */
             else
             {
               int li = decorate_label_index(a, a->seqflow[f].jtname);

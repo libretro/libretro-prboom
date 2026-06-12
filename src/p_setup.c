@@ -3057,6 +3057,20 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
          }
       }
    }
+   else if (Z_ACSHasGlobalLibs())
+   {
+      /* A stock Doom-format map (neither Hexen nor a ZDoom-namespace map) has
+       * no BEHAVIOR of its own, but a mod may ship its scripts entirely in
+       * global LOADACS libraries -- hdoom's death system does.  Load just the
+       * global libraries so their scripts are reachable and run their OPEN /
+       * ENTER scripts; without this the libraries load but never aggregate
+       * into the active script table and stay unreachable. */
+      if (Z_ACSLoadBehavior(-1))
+      {
+         Z_ACSRunOpenScripts();
+         Z_ACSRunEnterScripts(players[consoleplayer].mo);
+      }
+   }
 
    P_MapEnd();
 

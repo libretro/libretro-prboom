@@ -346,6 +346,7 @@ typedef struct zacs_inst_s
   int        optstart;     /* hudmessage parameter marker, -1 none */
   char       printbuf[ZACS_PRINTBUF];
   int        printlen;
+  int        result;       /* PCD_SETRESULTVALUE channel (for sync CallACS) */
 } zacs_inst_t;
 
 /* per-script activity flags, parallel to zacs_scripts */
@@ -354,6 +355,117 @@ static byte *zacs_running;
 /* warn-once bitmap for unimplemented opcodes / callfuncs */
 static byte zacs_warned[(ZACS_NUM_PCODES + 7) / 8];
 static byte zacs_cf_warned[64];          /* callfunc ids 0..511 */
+
+/* ---- CVARINFO-defined console variables ---------------------------------
+ *
+ * ZDoom mods declare custom cvars in a CVARINFO lump and read them from ACS
+ * with GetCVar; the hdoom death system gates on HDoomDoXDeath /
+ * HDoomXDeathChance this way.  This engine has no console, so the values are
+ * just the declared defaults: parse the lump once into a name->value table and
+ * answer GetCVar from it.  bool defaults map to 0/1, int/fixed take the
+ * literal; strings and unparseable values read as 0. */
+typedef struct { char name[40]; int value; } zacs_cvar_t;
+static zacs_cvar_t *zacs_cvars;
+static int          zacs_numcvars;
+static int          zacs_cvars_parsed;
+
+static void zacs_parse_cvarinfo(void)
+{
+  int lump, len, i, cap = 0;
+  const char *txt;
+  zacs_cvars_parsed = 1;
+  lump = W_CheckNumForName("CVARINFO");
+  if (lump < 0)
+    return;
+  len = W_LumpLength(lump);
+  txt = (const char *)W_CacheLumpNum(lump);
+  i = 0;
+  while (i < len)
+  {
+    char word[40];
+    int  n, isbool = 0;
+    /* skip whitespace and // line comments */
+    while (i < len && (txt[i] == ' ' || txt[i] == '\t' ||
+                       txt[i] == '\r' || txt[i] == '\n'))
+      i++;
+    if (i + 1 < len && txt[i] == '/' && txt[i + 1] == '/')
+    {
+      while (i < len && txt[i] != '\n') i++;
+      continue;
+    }
+    /* a declaration is "<scope> <type> <name> [= <value>] ;"; read words to
+     * the name, noting a bool type, then take the value after '=' */
+    /* scope word */
+    n = 0;
+    while (i < len && txt[i] > ' ' && n < 39) word[n++] = txt[i++];
+    word[n] = 0;
+    if (!word[0]) { i++; continue; }
+    /* type word */
+    while (i < len && (txt[i] == ' ' || txt[i] == '\t')) i++;
+    n = 0;
+    while (i < len && txt[i] > ' ' && n < 39) word[n++] = txt[i++];
+    word[n] = 0;
+    if (!strcasecmp(word, "bool")) isbool = 1;
+    /* name word */
+    while (i < len && (txt[i] == ' ' || txt[i] == '\t')) i++;
+    n = 0;
+    while (i < len && (txt[i] == '_' ||
+                       (txt[i] >= 'A' && txt[i] <= 'Z') ||
+                       (txt[i] >= 'a' && txt[i] <= 'z') ||
+                       (txt[i] >= '0' && txt[i] <= '9')) && n < 39)
+      word[n++] = txt[i++];
+    word[n] = 0;
+    if (!word[0]) { while (i < len && txt[i] != '\n') i++; continue; }
+    {
+      int value = 0;
+      /* optional "= value" */
+      while (i < len && (txt[i] == ' ' || txt[i] == '\t')) i++;
+      if (i < len && txt[i] == '=')
+      {
+        char vbuf[40];
+        int vn = 0;
+        i++;
+        while (i < len && (txt[i] == ' ' || txt[i] == '\t')) i++;
+        while (i < len && txt[i] != ';' && txt[i] != '\n' &&
+               txt[i] != ' ' && txt[i] != '\t' && vn < 39)
+          vbuf[vn++] = txt[i++];
+        vbuf[vn] = 0;
+        if (isbool)
+          value = !strcasecmp(vbuf, "true") ? 1 : 0;
+        else
+          value = atoi(vbuf);
+      }
+      /* skip to end of statement */
+      while (i < len && txt[i] != ';' && txt[i] != '\n') i++;
+      /* record */
+      if (zacs_numcvars == cap)
+      {
+        int nc = cap ? cap * 2 : 16;
+        zacs_cvar_t *np = realloc(zacs_cvars, (size_t)nc * sizeof(*np));
+        if (!np) return;
+        zacs_cvars = np; cap = nc;
+      }
+      strncpy(zacs_cvars[zacs_numcvars].name, word, 39);
+      zacs_cvars[zacs_numcvars].name[39] = 0;
+      zacs_cvars[zacs_numcvars].value = value;
+      zacs_numcvars++;
+    }
+  }
+  lprintf(LO_INFO, "Z_ACS: %d CVARINFO cvar(s) loaded\n", zacs_numcvars);
+}
+
+static int zacs_cvar_value(const char *name)
+{
+  int i;
+  if (!zacs_cvars_parsed)
+    zacs_parse_cvarinfo();
+  if (!name)
+    return 0;
+  for (i = 0; i < zacs_numcvars; i++)
+    if (!strcasecmp(zacs_cvars[i].name, name))
+      return zacs_cvars[i].value;
+  return 0;
+}
 
 static void zacs_warn_pcd(int pcd)
 {
@@ -1029,6 +1141,15 @@ void Z_ACSLoadGlobalLibraries(void)
             zacs_num_global_libs == 1 ? "y" : "ies");
 }
 
+/* True if any root LOADACS global ACS libraries are present.  A stock
+ * Doom-format map has no BEHAVIOR of its own, but if a mod ships global ACS
+ * libraries (hdoom's death system), they still need to be loaded and run so
+ * their scripts are reachable. */
+dbool Z_ACSHasGlobalLibs(void)
+{
+  return zacs_num_global_libs > 0;
+}
+
 dbool Z_ACSLoadBehavior(int lump)
 {
   int liblist[ZACS_MAX_MODULES];
@@ -1041,23 +1162,31 @@ dbool Z_ACSLoadBehavior(int lump)
   zacs_active = 0;
   zacs_load_count = 0;
 
-  /* ---- module 0: the map's BEHAVIOR ------------------------------------- */
-  zacs_mapvars = zacs_modules[0].mapvars;
-  memset(zacs_mapvars, 0, ZACS_MAP_VARS * sizeof(int));
-  if (!zacs_load_one(lump))
-    return false;
-  zacs_snapshot_module(0);
-  zacs_nummodules = 1;
-
-  /* capture the LOAD names before loading libraries clobbers the list */
-  for (i = 0; i < zacs_load_count && nlibs < ZACS_MAX_MODULES; i++)
+  /* ---- module 0: the map's BEHAVIOR -------------------------------------
+   * lump < 0 means the map has no BEHAVIOR of its own (a stock Doom-format
+   * map running under a mod whose scripts live entirely in global LOADACS
+   * libraries -- e.g. hdoom's death system).  Skip the map module and let the
+   * first global library take module slot 0 so its scripts still aggregate
+   * and run; without this the global scripts load but stay unreachable. */
+  if (lump >= 0)
   {
-    int libl = zacs_find_acs_object_lump(zacs_load_list[i]);
-    if (libl >= 0)
-      liblist[nlibs++] = libl;
-    else
-      lprintf(LO_WARN, "ZACS: LOAD library '%s' not found\n",
-              zacs_load_list[i]);
+    zacs_mapvars = zacs_modules[0].mapvars;
+    memset(zacs_mapvars, 0, ZACS_MAP_VARS * sizeof(int));
+    if (!zacs_load_one(lump))
+      return false;
+    zacs_snapshot_module(0);
+    zacs_nummodules = 1;
+
+    /* capture the LOAD names before loading libraries clobbers the list */
+    for (i = 0; i < zacs_load_count && nlibs < ZACS_MAX_MODULES; i++)
+    {
+      int libl = zacs_find_acs_object_lump(zacs_load_list[i]);
+      if (libl >= 0)
+        liblist[nlibs++] = libl;
+      else
+        lprintf(LO_WARN, "ZACS: LOAD library '%s' not found\n",
+                zacs_load_list[i]);
+    }
   }
 
   /* ---- global LOADACS libraries ----------------------------------------
@@ -1098,6 +1227,8 @@ dbool Z_ACSLoadBehavior(int lump)
   }
 
   /* ---- activate the map and link imports -------------------------------- */
+  if (zacs_nummodules == 0)
+    return false;                /* nothing loaded (no map BEHAVIOR, no libs) */
   zacs_activate(0);
   if (zacs_nummodules > 1)
     zacs_link_imports();
@@ -2025,6 +2156,32 @@ dbool Z_ACSNamedRunning(const char *name)
   if (info < 0 || info >= zacs_numscripts)
     return false;
   return zacs_running[info] != 0;
+}
+
+/* Run a named script to completion right now and return the value it set with
+ * SetResultValue.  DECORATE's CallACS() form needs a script that behaves like
+ * a function -- the hdoom death states read GetXDeathChance / GetDoXDeath and
+ * trigger SpawnSexActor this way.  The scripts these call do no Delay, so the
+ * freshly spawned instance executes fully within one thinker slice; we read
+ * its result and let the (now finished) instance be reaped on the next pass.
+ * A script that yields would not have completed -- result is read regardless,
+ * which matches how such a script's caller treats an unfinished helper. */
+int Z_ACSCallNamedSync(const char *name, mobj_t *activator)
+{
+  int info, result;
+  zacs_inst_t *inst;
+  if (!zacs_numscripts)
+    return 0;
+  info = zacs_named_index(name);
+  if (info < 0 || info >= zacs_numscripts)
+    return 0;
+  inst = zacs_spawn(info, NULL, 0, activator, NULL, 0);
+  if (!inst)
+    return 0;
+  inst->result = 0;
+  T_ZACSThinker(inst);            /* runs to completion (no Delay in callees) */
+  result = inst->result;
+  return result;
 }
 
 dbool Z_ACSSuspend(int number)
@@ -3382,8 +3539,8 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     case PCD_SWAP:
     { int a = ZSTK(2), b = ZSTK(1); ZSETSTK(2, b); ZSETSTK(1, a); break; }
     case PCD_DROP:
-    case PCD_SETRESULTVALUE:            /* result channel unsupported */
-      ZDROP(1);
+    case PCD_SETRESULTVALUE:            /* result channel for sync CallACS */
+      inst->result = ZPOP();
       break;
     case PCD_FIXEDMUL:
     { int b = ZPOP(); ZSETSTK(1, FixedMul(ZSTK(1), b)); break; }
@@ -4162,8 +4319,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       break;
     }
     case PCD_GETCVAR:
-      ZSETSTK(1, 0);
-      zacs_warn_pcd(pcd);
+      ZSETSTK(1, zacs_cvar_value(zacs_string(ZSTK(1))));
       break;
     case PCD_GETPLAYERINFO:
     { int q = ZPOP(); (void)q; ZSETSTK(1, 0); zacs_warn_pcd(pcd); break; }

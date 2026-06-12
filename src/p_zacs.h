@@ -56,6 +56,13 @@ dbool Z_ACSStartNamedStr(const char *name, const int *args, int argc,
 
 dbool Z_ACSNamedRunning(const char *name);
 
+/* Run a named script synchronously and return its SetResultValue (for
+ * DECORATE CallACS()).  Intended for short function-style scripts. */
+int Z_ACSCallNamedSync(const char *name, mobj_t *activator);
+
+/* True if any root LOADACS global ACS libraries are present. */
+dbool Z_ACSHasGlobalLibs(void);
+
 dbool Z_ACSSuspend(int number);
 dbool Z_ACSTerminate(int number);
 

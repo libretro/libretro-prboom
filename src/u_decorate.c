@@ -1284,9 +1284,48 @@ static void inherit_one(decorate_actor_t *c)
     int l2;
     if (room < 1)
       return;               /* parent alone does not fit; nothing sensible */
-    base = room;            /* keep only the child's first `room` frames */
-    /* a child label past the kept region has no frame; clamp it to the last
-     * kept frame so a stale jump cannot run off the end of the table */
+
+    /* The parent frames do not fit after the whole child sequence.  Two very
+     * different kinds of child reach here:
+     *
+     *  - A map-replacement monster variant (it carries a "replaces" target)
+     *    redefines its own full state machine -- Spawn/See/Faint/... -- and
+     *    builds its death from its own Faint; it needs none of the parent's
+     *    frames, and trimming its sequence would corrupt its own reachable
+     *    states.  Keep it whole and append no parent frames; bind the parent
+     *    labels to the child's own states so a "goto Super::X" still resolves.
+     *
+     *  - A spawned follow-on actor (no "replaces") relies on the parent's base
+     *    states (its Active/TooLate, reached from the child's own Spawn), and
+     *    its own trailing frames are optional.  Trim that tail to make room and
+     *    append the parent. */
+    if (c->replaces[0])
+    {
+      for (l = 0; l < pp->num_seqlabels; l++)
+      {
+        char sup[32];
+        int ci = decorate_label_index(c, pp->seqlabel[l].name);
+        int frame = (ci >= 0) ? c->seqlabel[ci].frame
+                              : (c->seq_len > 0 ? c->seq_len - 1 : 0);
+        const char *pre = "Super::";
+        int nn = 0, mm = 0;
+        if (ci < 0)
+          decorate_add_label(c, pp->seqlabel[l].name, frame);
+        while (pre[nn]) { sup[mm++] = pre[nn++]; }
+        nn = 0;
+        while (pp->seqlabel[l].name[nn] && mm < 31)
+        { sup[mm++] = pp->seqlabel[l].name[nn++]; }
+        sup[mm] = 0;
+        if (decorate_label_index(c, sup) < 0)
+          decorate_add_label(c, sup, frame);
+      }
+      if (pp->multi_state)
+        c->multi_state = 1;
+      c->inherited = 1;
+      return;
+    }
+
+    base = room;            /* keep the child's first `room` frames */
     for (l2 = 0; l2 < c->num_seqlabels; l2++)
       if (c->seqlabel[l2].frame >= base)
         c->seqlabel[l2].frame = (short)(base - 1);

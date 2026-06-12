@@ -148,6 +148,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/libretro_midiout.c \
 				 $(CORE_DIR)/midifile.c \
 				 $(CORE_DIR)/madplayer.c \
+				 $(CORE_DIR)/modplayer.c \
 				 $(CORE_DIR)/u_scanner.c \
 				 $(CORE_DIR)/u_mapinfo.c \
 				 $(CORE_DIR)/u_musinfo.c \

@@ -796,6 +796,16 @@ void S_ChangeMusic(int musicnum, int looping)
     else
       snprintf(namebuf, sizeof(namebuf), "d_%s", music->name);
     music->lumpnum = W_CheckNumForName(namebuf);
+    /* ZDoom-based mods name music lumps directly (MAPINFO "Music = M_TEST"
+     * referring to a lump M_TEST), not by Doom's d_<name> convention.  When
+     * the prefixed name misses, fall back to the bare name so those lumps --
+     * including non-MIDI formats like .mod handled by the tracker player --
+     * are found. */
+    if (music->lumpnum < 0 && !raven)
+    {
+      snprintf(namebuf, sizeof(namebuf), "%s", music->name);
+      music->lumpnum = W_CheckNumForName(namebuf);
+    }
   }
   if (music->lumpnum < 0) {
     I_Error("S_ChangeMusic: No valid music lump");

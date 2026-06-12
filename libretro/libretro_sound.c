@@ -28,6 +28,7 @@ extern int stb_vorbis_decode_memory(const unsigned char *mem, int len,
 #include "../src/flplayer.h"
 #include "../src/oplplayer.h"
 #include "../src/madplayer.h"
+#include "../src/modplayer.h"
 #include "../src/libretro_midiout.h"
 
 #include "../src/lprintf.h"
@@ -118,6 +119,7 @@ static const music_player_t *music_players[] =
 #ifdef HAVE_LIBMAD
   &mp_player, // madplayer.h
 #endif
+  &mod_player, // modplayer.h (ProTracker .MOD via pocketmod)
   NULL
 };
 #define NUM_MUS_PLAYERS ((int)(sizeof (music_players) / sizeof (music_player_t *) - 1))

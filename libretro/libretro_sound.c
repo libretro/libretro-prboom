@@ -12,6 +12,15 @@
 
 #include <formats/rwav.h>
 
+/* stb_vorbis in-memory Ogg decoder (deps/stb/stb_vorbis_impl.c).  Declared
+ * here rather than pulling the whole header; returns the sample count per
+ * channel and a malloc'd interleaved int16 buffer, or a negative count on
+ * error. */
+extern int stb_vorbis_decode_memory(const unsigned char *mem, int len,
+                                     int *channels, int *sample_rate,
+                                     short **output);
+
+
 #include "../src/i_sound.h"
 #include "../src/doomstat.h"
 #include "../src/dsda_hacked.h"
@@ -253,6 +262,65 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
 
         *len = (int)wav.numsamples;
         rwav_free(&wav);
+        W_UnlockLumpNum (sfxlump_num);
+        return (void *)(out_data);
+    }
+
+    /* Some ZDoom-based mods ship sound effects as Ogg Vorbis lumps.  Detect
+     * the "OggS" magic and decode with stb_vorbis into the same output
+     * contract as the WAV path: native-rate signed-16-bit mono PCM with one
+     * duplicated trailing sample for the mixer's cur[1] fetch and a 16.16
+     * *step from the source rate. */
+    if (   sfxlump_len >= 4
+        && sfxlump_data[0] == 'O' && sfxlump_data[1] == 'g'
+        && sfxlump_data[2] == 'g' && sfxlump_data[3] == 'S')
+    {
+        short   *pcm    = NULL;
+        int      channels = 0, rate = 0;
+        int      samples;
+        unsigned int ogg_rate;
+
+        samples = stb_vorbis_decode_memory(sfxlump_data, sfxlump_len,
+                                           &channels, &rate, &pcm);
+        if (samples <= 0 || !pcm || channels < 1)
+        {
+            if (pcm) free(pcm);
+            W_UnlockLumpNum (sfxlump_num);
+            return 0;
+        }
+
+        out_data = (int16_t*)malloc(((size_t)samples + 1) * sizeof(int16_t));
+        if (!out_data)
+        {
+            free(pcm);
+            W_UnlockLumpNum (sfxlump_num);
+            return 0;
+        }
+
+        /* stb_vorbis yields interleaved signed-16 per channel; average to
+         * mono to match the mixer's single-channel sample store. */
+        if (channels == 1)
+        {
+            memcpy(out_data, pcm, (size_t)samples * sizeof(int16_t));
+        }
+        else
+        {
+            int i, c;
+            for (i = 0; i < samples; i++)
+            {
+                int acc = 0;
+                for (c = 0; c < channels; c++)
+                    acc += pcm[i * channels + c];
+                out_data[i] = (int16_t)(acc / channels);
+            }
+        }
+        out_data[samples] = out_data[samples - 1];
+
+        ogg_rate = rate ? (unsigned int)rate : 11025;
+        *step = (unsigned int)(((uint64_t)ogg_rate << 16) / (uint64_t)SAMPLERATE);
+
+        *len = samples;
+        free(pcm);
         W_UnlockLumpNum (sfxlump_num);
         return (void *)(out_data);
     }

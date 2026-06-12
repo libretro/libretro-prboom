@@ -39,6 +39,7 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c
 
 SOURCES_C += $(DEPS_DIR)/miniz/miniz.c \
+				 $(DEPS_DIR)/stb/stb_vorbis_impl.c \
 				 $(DEPS_DIR)/libmad/bit.c \
 				 $(DEPS_DIR)/libmad/decoder.c \
 				 $(DEPS_DIR)/libmad/fixed.c \

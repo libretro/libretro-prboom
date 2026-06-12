@@ -256,6 +256,15 @@ static dbool pk3_is_wav(const unsigned char *d, int len)
   return len >= 4 && !memcmp(d, "RIFF", 4);
 }
 
+/* Ogg sniff.  Like WAV, Ogg used to be quarantined everywhere, but the sfx
+ * loader now decodes Ogg Vorbis lumps too, so an Ogg in a sound-bearing
+ * (global) namespace must stay visible to ns_global lookups.  It is still
+ * deferred inside the renderable namespaces, where it can never be a graphic. */
+static dbool pk3_is_ogg(const unsigned char *d, int len)
+{
+  return len >= 4 && !memcmp(d, "OggS", 4);
+}
+
 /* True only for a byte buffer that is actually a WAD image: the IWAD/PWAD
  * magic AND a directory header (numlumps, infotableofs) that fits inside
  * the buffer.  The bare 4-byte magic is not enough -- ZDoom packs ship
@@ -410,11 +419,12 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
     return PK3_PASS_GLOBAL;
   if (pk3_is_deferred_format(d, len))
   {
-    /* WAV is now consumable by the sfx loader, so unlike the other
-     * deferred formats it stays in the global namespace where
-     * I_SndLoadSample can resolve it (e.g. a ZDoom mod shipping
-     * sounds/DSPISTOL.wav).  PNG/Ogg/FLAC remain quarantined. */
-    if (pk3_is_wav(d, len))
+    /* WAV and Ogg are now consumable by the sfx loader, so unlike the other
+     * deferred formats they stay in the global namespace where
+     * I_SndLoadSample can resolve them (e.g. a ZDoom mod shipping
+     * sounds/DSPISTOL.wav or sounds/BARNSEE1.ogg).  PNG/FLAC remain
+     * quarantined. */
+    if (pk3_is_wav(d, len) || pk3_is_ogg(d, len))
       return PK3_PASS_GLOBAL;
     return PK3_PASS_DEFERRED;
   }

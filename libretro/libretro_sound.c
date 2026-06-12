@@ -15,8 +15,9 @@
 /* stb_vorbis in-memory Ogg decoder (deps/stb/stb_vorbis_impl.c).  Declared
  * here rather than pulling the whole header; returns the sample count per
  * channel and a malloc'd interleaved int16 buffer, or a negative count on
- * error. */
-extern int stb_vorbis_decode_memory(const unsigned char *mem, int len,
+ * error.  The decoder's public symbols are prb_-prefixed so they do not clash
+ * with the stock stb_vorbis a statically linked RetroArch already exports. */
+extern int prb_stb_vorbis_decode_memory(const unsigned char *mem, int len,
                                      int *channels, int *sample_rate,
                                      short **output);
 
@@ -282,7 +283,7 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
         int      samples;
         unsigned int ogg_rate;
 
-        samples = stb_vorbis_decode_memory(sfxlump_data, sfxlump_len,
+        samples = prb_stb_vorbis_decode_memory(sfxlump_data, sfxlump_len,
                                            &channels, &rate, &pcm);
         if (samples <= 0 || !pcm || channels < 1)
         {

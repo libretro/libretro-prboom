@@ -4294,6 +4294,7 @@ static void vorbis_init(stb_vorbis *p, const stb_vorbis_alloc *z)
    #endif
 }
 
+#ifndef STB_VORBIS_PRB_NO_UNUSED
 int stb_vorbis_get_sample_offset(stb_vorbis *f)
 {
    if (f->current_loc_valid)
@@ -4329,6 +4330,7 @@ int stb_vorbis_get_error(stb_vorbis *f)
    f->error = VORBIS__no_error;
    return e;
 }
+#endif /* STB_VORBIS_PRB_NO_UNUSED */
 
 static stb_vorbis * vorbis_alloc(stb_vorbis *f)
 {
@@ -4916,6 +4918,7 @@ int stb_vorbis_seek_frame(stb_vorbis *f, unsigned int sample_number)
    return 1;
 }
 
+#ifndef STB_VORBIS_PRB_NO_UNUSED
 int stb_vorbis_seek(stb_vorbis *f, unsigned int sample_number)
 {
    if (!stb_vorbis_seek_frame(f, sample_number))
@@ -4932,6 +4935,7 @@ int stb_vorbis_seek(stb_vorbis *f, unsigned int sample_number)
 
    return 1;
 }
+#endif /* STB_VORBIS_PRB_NO_UNUSED */
 
 int stb_vorbis_seek_start(stb_vorbis *f)
 {
@@ -5018,10 +5022,12 @@ unsigned int stb_vorbis_stream_length_in_samples(stb_vorbis *f)
    return f->total_samples == SAMPLE_unknown ? 0 : f->total_samples;
 }
 
+#ifndef STB_VORBIS_PRB_NO_UNUSED
 float stb_vorbis_stream_length_in_seconds(stb_vorbis *f)
 {
    return stb_vorbis_stream_length_in_samples(f) / (float) f->sample_rate;
 }
+#endif /* STB_VORBIS_PRB_NO_UNUSED */
 
 
 
@@ -5306,6 +5312,7 @@ int stb_vorbis_get_frame_short_interleaved(stb_vorbis *f, int num_c, short *buff
    return len;
 }
 
+#ifndef STB_VORBIS_PRB_NO_UNUSED
 int stb_vorbis_get_samples_short_interleaved(stb_vorbis *f, int channels, short *buffer, int num_shorts)
 {
    float **outputs;
@@ -5341,6 +5348,7 @@ int stb_vorbis_get_samples_short(stb_vorbis *f, int channels, short **buffer, in
    }
    return n;
 }
+#endif /* STB_VORBIS_PRB_NO_UNUSED */
 
 #ifndef STB_VORBIS_NO_STDIO
 int stb_vorbis_decode_filename(const char *filename, int *channels, int *sample_rate, short **output)
@@ -5423,6 +5431,7 @@ int stb_vorbis_decode_memory(const uint8 *mem, int len, int *channels, int *samp
 }
 #endif // STB_VORBIS_NO_INTEGER_CONVERSION
 
+#ifndef STB_VORBIS_PRB_NO_UNUSED
 int stb_vorbis_get_samples_float_interleaved(stb_vorbis *f, int channels, float *buffer, int num_floats)
 {
    float **outputs;
@@ -5475,6 +5484,7 @@ int stb_vorbis_get_samples_float(stb_vorbis *f, int channels, float **buffer, in
    }
    return n;
 }
+#endif /* STB_VORBIS_PRB_NO_UNUSED */
 #endif // STB_VORBIS_NO_PULLDATA_API
 
 /* Version history

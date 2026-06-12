@@ -286,10 +286,13 @@ void A_DecorateACSNamed(mobj_t *mo)
    * action.  The player is held frozen for the duration of the conversation,
    * and the dialogue itself consumes the use key to advance.  Our use handler
    * still lets a held or repeated use re-activate the actor, which would start
-   * a second, overlapping copy of the conversation each press -- the lines bounce
-   * and replay and the dialogue never settles.  If the using player (the actor's
-   * recorded target) is already frozen in a conversation, the conversation is
-   * in progress: do not start another copy. */
+   * a second, overlapping copy of the conversation each press -- the lines
+   * bounce and replay and the dialogue never settles.  The conversation script
+   * only sets the player's freeze a few tics in, so guarding on the freeze
+   * alone leaves a window where a mashed use stacks a duplicate controller; if
+   * the named conversation script is already running, do not start another. */
+  if (Z_ACSNamedRunning(interned_acsnames[idx]))
+    return;
   if (mo->target && mo->target->player &&
       (mo->target->player->cheats & CF_TOTALLYFROZEN))
     return;

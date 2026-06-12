@@ -2009,6 +2009,24 @@ dbool Z_ACSStartNamedStr(const char *name, const int *args, int argc,
   return zacs_start_info(info, args, argc, activator, NULL, 0, always);
 }
 
+/* True if a named script currently has at least one running (or suspended)
+ * instance.  Used to stop a use-activated story actor from spawning a second
+ * overlapping copy of its conversation: the actor's freeze flag is only set a
+ * few tics into the conversation script, so a guard that waits for the freeze
+ * leaves a window where a mashed use re-fires the start action and stacks a
+ * duplicate controller, wedging the dialogue.  Checking the running count
+ * closes that window on the same tic the controller spawns. */
+dbool Z_ACSNamedRunning(const char *name)
+{
+  int info;
+  if (!zacs_numscripts)
+    return false;
+  info = zacs_named_index(name);
+  if (info < 0 || info >= zacs_numscripts)
+    return false;
+  return zacs_running[info] != 0;
+}
+
 dbool Z_ACSSuspend(int number)
 {
   zacs_inst_t *inst = zacs_find_inst(number, NULL);

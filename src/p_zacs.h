@@ -54,6 +54,8 @@ dbool Z_ACSStartNamed(int name_index, int map, const int *args, int argc,
 dbool Z_ACSStartNamedStr(const char *name, const int *args, int argc,
                          mobj_t *activator, dbool always);
 
+dbool Z_ACSNamedRunning(const char *name);
+
 dbool Z_ACSSuspend(int number);
 dbool Z_ACSTerminate(int number);
 

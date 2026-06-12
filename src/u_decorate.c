@@ -209,6 +209,15 @@ typedef struct { int type; int activestate; } useact_t;
 static useact_t useacts[MAX_USEACTS];
 static int num_useacts;
 
+/* Map a registered mobjtype back to the DECORATE actor it was built from and
+ * the state-table slot its first frame landed at, so a state label ("Missile",
+ * "SexScene_1_1", ...) can be resolved to a concrete state index at runtime.
+ * Populated as each actor is registered; queried by U_DecorateStateForType. */
+typedef struct { int type; int base; const decorate_actor_t *actor; } statemap_t;
+#define MAX_STATEMAPS MAX_DECORATE_ACTORS
+static statemap_t statemaps[MAX_STATEMAPS];
+static int num_statemaps;
+
 /* Public: the Active state a use-activatable mobjtype enters, or -1. */
 int U_DecorateActiveState(int type)
 {
@@ -868,6 +877,40 @@ static int decorate_label_index(const decorate_actor_t *a, const char *name)
   for (i = 0; i < a->num_seqlabels; i++)
     if (!strcasecmp(a->seqlabel[i].name, name))
       return i;
+  return -1;
+}
+
+/* Record that mobjtype `type` was built from actor `a` with its first frame at
+ * state-table slot `base`, so labels can be resolved to states at runtime. */
+static void decorate_record_statemap(int type, int base,
+                                     const decorate_actor_t *a)
+{
+  if (num_statemaps < MAX_STATEMAPS && a)
+  {
+    statemaps[num_statemaps].type  = type;
+    statemaps[num_statemaps].base  = base;
+    statemaps[num_statemaps].actor = a;
+    num_statemaps++;
+  }
+}
+
+/* Public: resolve a DECORATE state label ("Missile", "SexScene_1_1", ...) on a
+ * registered mobjtype to a concrete state index, or -1 if the type was not
+ * built from DECORATE or has no such label.  Used by the ACS SetActorState
+ * pcode to drive an actor to a named state. */
+int U_DecorateStateForType(int type, const char *label)
+{
+  int i;
+  if (!label || !label[0])
+    return -1;
+  for (i = 0; i < num_statemaps; i++)
+    if (statemaps[i].type == type)
+    {
+      int li = decorate_label_index(statemaps[i].actor, label);
+      if (li >= 0)
+        return statemaps[i].base + statemaps[i].actor->seqlabel[li].frame;
+      return -1;
+    }
   return -1;
 }
 
@@ -2835,6 +2878,7 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
       info = dsda_GetMobjInfo(mt);            /* re-cache after possible move */
       decorate_build_states(a, fsp, fbase, a->seq_len, sp_next);
       *st_cursor += a->seq_len;
+      decorate_record_statemap(mt, fbase, a);
       if (faint_li >= 0)
         faint_state = fbase + a->seqlabel[faint_li].frame;
       if (miss_li >= 0)
@@ -2969,6 +3013,7 @@ static int register_spawnonly_actor(decorate_actor_t *a, int *st_cursor,
   info = dsda_GetMobjInfo(mt);
   memset(info, 0, sizeof(*info));
   info->doomednum   = -1;
+  decorate_record_statemap(mt, base, a);
   info->spawnstate  = base +
     (spawn_label >= 0 ? a->seqlabel[spawn_label].frame : 0);
   info->spawnhealth = 1000;

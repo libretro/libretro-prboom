@@ -55,5 +55,6 @@ int U_DecorateUserVarSlot(int type, const char *name, int *base, int *len);
 /* +USESPECIAL decorations: the Active state a use-activatable mobjtype enters
  * when the player presses use on it, or -1 if not use-activatable. */
 int U_DecorateActiveState(int type);
+int U_DecorateStateForType(int type, const char *label);
 
 #endif

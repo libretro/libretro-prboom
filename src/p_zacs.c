@@ -4724,9 +4724,42 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     }
     case PCD_SETACTORSTATE:
     {
+      /* SetActorState(tid, "statename", exact): move every actor with the
+       * given tid (or the activator when tid==0) to the named DECORATE state,
+       * returning the number actually moved.  `exact` (whether to require an
+       * exact label match vs. a prefix) is not distinguished here -- the
+       * label table is matched by full name either way. */
+      int exact = ZSTK(1);
+      const char *sname = zacs_string(ZSTK(2));
+      int tid = ZSTK(3);
+      int moved = 0;
+      (void)exact;
+      if (sname)
+      {
+        if (tid == 0)
+        {
+          mobj_t *mo = inst->activator;
+          if (mo)
+          {
+            int st = U_DecorateStateForType(mo->type, sname);
+            if (st > 0 && P_SetMobjState(mo, (statenum_t)st))
+              moved++;
+          }
+        }
+        else
+        {
+          int sp = -1;
+          mobj_t *mo;
+          while ((mo = P_FindMobjFromTID((short)tid, &sp)) != NULL)
+          {
+            int st = U_DecorateStateForType(mo->type, sname);
+            if (st > 0 && P_SetMobjState(mo, (statenum_t)st))
+              moved++;
+          }
+        }
+      }
       ZDROP(2);
-      ZSETSTK(1, 0);
-      zacs_warn_pcd(pcd);
+      ZSETSTK(1, moved);
       break;
     }
     case PCD_MORPHACTOR:

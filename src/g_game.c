@@ -62,6 +62,7 @@
 #include "p_map.h"
 #include "p_user.h"
 #include "p_conversation.h"
+#include "p_zacs.h"
 #include "d_main.h"
 #include "wi_stuff.h"
 #include "hu_stuff.h"
@@ -830,8 +831,17 @@ static void G_DoLoadLevel (void)
   {
     if (playeringame[i] && players[i].playerstate == PST_DEAD)
       players[i].playerstate = PST_REBORN;
+    /* A script-driven dialogue freezes the player with CF_TOTALLYFROZEN and is
+     * expected to lift it when the conversation ends.  If the level is left or
+     * soft-reset mid-conversation (or the conversation never cleared it), the
+     * flag would otherwise persist into the freshly loaded level and leave the
+     * player unable to move or open doors.  A fresh level never starts frozen,
+     * so clear it here. */
+    players[i].cheats &= ~CF_TOTALLYFROZEN;
     memset (players[i].frags,0,sizeof(players[i].frags));
   }
+  /* Drop any dialogue HUD and per-player input latches from a prior level. */
+  Z_ACSHudClear();
 
   // initialize the msecnode_t freelist.                     phares 3/25/98
   // any nodes in the freelist are gone by now, cleared

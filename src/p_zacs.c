@@ -1558,6 +1558,39 @@ static int zacs_oldbuttons_snap[MAXPLAYERS];
  * go.  Edge tracking via INPUT_OLDBUTTONS is left untouched. */
 static int zacs_use_latched[MAXPLAYERS];
 
+/* Dialogue loop guard.  Some content's conversation scripts, when they reach
+ * their final line, jump back to the opening line instead of terminating, so
+ * the player is held frozen forever and replays the same lines.  Two defences
+ * cover this:
+ *
+ *  - Wrap detection: no legitimate conversation returns to its very first line
+ *    after showing later ones, so the first line is remembered and a return to
+ *    it once other lines have appeared ends the conversation.
+ *
+ *  - Stall watchdog: a conversation that holds the player frozen but stops
+ *    showing new lines (stuck repeating one line, or waiting on input the
+ *    script can no longer consume) is force-ended after a long grace period.
+ *    Every genuinely new line resets the timer, so an attentive reader is
+ *    never cut off; only a wedged conversation reaches the limit.
+ *
+ * On either trigger the freeze is lifted and dialogue is suppressed until the
+ * next conversation starts.  zacs_dlg_active is zero between conversations, so
+ * the stored line re-arms each time a conversation begins. */
+#define ZACS_DLG_FIRSTLEN 96
+#define ZACS_DLG_LASTLEN  96
+#define ZACS_DLG_STALL_TICS 350   /* ~10s with no new line => wedged */
+#define ZACS_DLG_MINLINE  10      /* a spoken line is longer than a label */
+static char zacs_dlg_first[ZACS_DLG_FIRSTLEN];
+static char zacs_dlg_last[ZACS_DLG_LASTLEN];
+static int  zacs_dlg_active;     /* a conversation is in progress */
+static int  zacs_dlg_advanced;   /* a line past the first has been shown */
+static int  zacs_dlg_break;      /* wrap detected: suppress dialogue HUD */
+static int  zacs_dlg_stall;      /* tics since the last new line while frozen */
+static int  zacs_dlg_textid;     /* HUD id carrying the spoken line (0 = none) */
+
+/* Forward decl: clearing the conversation freeze lives below. */
+static void zacs_clear_conversation_freeze(void);
+
 static int zacs_oldbuttons_of(player_t *pl)
 {
   int i;
@@ -1575,6 +1608,23 @@ static int zacs_player_index(player_t *pl)
     if (&players[i] == pl)
       return i;
   return -1;
+}
+
+/* Lift the dialogue freeze from every player and reset the dialogue-loop
+ * guard.  Used when a conversation ends normally and when the loop guard
+ * detects a wrap so the player is never left frozen in place. */
+static void zacs_clear_conversation_freeze(void)
+{
+  int i;
+  for (i = 0; i < MAXPLAYERS; i++)
+    if (playeringame[i])
+      players[i].cheats &= ~CF_TOTALLYFROZEN;
+  zacs_dlg_active   = 0;
+  zacs_dlg_advanced = 0;
+  zacs_dlg_first[0] = 0;
+  zacs_dlg_last[0]  = 0;
+  zacs_dlg_stall    = 0;
+  zacs_dlg_textid   = 0;
 }
 
 /* On-screen HudMessage store.  ZDoom's verbose HudMessage places text at a
@@ -1645,6 +1695,79 @@ static void zacs_hud_store(const char *text, int id, int x, int y,
                            int fadein, int fadeout, int typeon)
 {
   int i, slot = -1;
+  /* Dialogue loop guard.  A conversation posts several HUD messages each tic
+   * under different ids: a one- or two-character portrait, the speaker name,
+   * a "SPEAKING" label, and the spoken line itself.  Only the spoken line
+   * advances as the player presses use, so the guard must follow that one id
+   * and ignore the fixed labels -- otherwise the short labels look like a
+   * conversation wrapping back to its first line and trip the guard at once.
+   *
+   * The spoken line is identified as the first substantial (multi-word) text
+   * posted while the player is frozen; its id is then locked for the rest of
+   * the conversation.  Only that id feeds wrap detection and the stall timer. */
+  {
+    int frozen = 0;
+    for (i = 0; i < MAXPLAYERS; i++)
+      if (playeringame[i] && (players[i].cheats & CF_TOTALLYFROZEN))
+      { frozen = 1; break; }
+    if (frozen && text && text[0] && id != 0)
+    {
+      /* Lock onto the spoken-line id: the first frozen text long enough to be
+       * a sentence rather than a portrait glyph or short label. */
+      if (zacs_dlg_textid == 0 && strlen(text) >= ZACS_DLG_MINLINE)
+        zacs_dlg_textid = id;
+
+      if (id == zacs_dlg_textid)
+      {
+        if (!zacs_dlg_active)
+        {
+          /* First spoken line of a new conversation: remember it and re-arm. */
+          size_t n = strlen(text);
+          if (n > ZACS_DLG_FIRSTLEN - 1) n = ZACS_DLG_FIRSTLEN - 1;
+          memcpy(zacs_dlg_first, text, n);
+          zacs_dlg_first[n] = 0;
+          zacs_dlg_active   = 1;
+          zacs_dlg_advanced = 0;
+          zacs_dlg_break    = 0;
+        }
+        else if (!zacs_dlg_advanced)
+        {
+          /* Still on the opening line until a different line appears. */
+          if (strcmp(text, zacs_dlg_first) != 0)
+            zacs_dlg_advanced = 1;
+        }
+        else if (strcmp(text, zacs_dlg_first) == 0)
+        {
+          /* The opening line returned after the conversation moved on: the
+           * script has wrapped.  End the conversation and drop this line. */
+          zacs_dlg_break = 1;
+          zacs_clear_conversation_freeze();
+          return;
+        }
+        /* A genuinely new spoken line means progress: reset the stall timer.
+         * Re-posting the same line (the script's per-tic redraw) lets the
+         * timer run on toward the wedged-conversation limit. */
+        if (strcmp(text, zacs_dlg_last) != 0)
+        {
+          size_t n = strlen(text);
+          if (n > ZACS_DLG_LASTLEN - 1) n = ZACS_DLG_LASTLEN - 1;
+          memcpy(zacs_dlg_last, text, n);
+          zacs_dlg_last[n] = 0;
+          zacs_dlg_stall   = 0;
+        }
+      }
+    }
+    else if (!frozen)
+    {
+      /* No conversation in progress: clear any lingering suppression so the
+       * next conversation starts fresh. */
+      zacs_dlg_break  = 0;
+      zacs_dlg_active = 0;
+      zacs_dlg_textid = 0;
+    }
+    if (zacs_dlg_break && id == zacs_dlg_textid)
+      return;                         /* keep suppressing the wrapped replay */
+  }
   if (id != 0)
     for (i = 0; i < ZACS_HUDMSG_MAX; i++)
       if (zacs_hudmsgs[i].active && zacs_hudmsgs[i].id == id)
@@ -1942,6 +2065,25 @@ void Z_ACSHudTicker(void)
     zacs_oldbuttons[i] = zacs_oldbuttons_snap[i];
     zacs_oldbuttons_snap[i] = playeringame[i] ? players[i].cmd.buttons : 0;
   }
+  /* Dialogue stall watchdog: while a player is held frozen by a conversation,
+   * count tics since the last new line.  A conversation that wedges without
+   * showing anything new for the grace period is force-ended so the player is
+   * never stuck in place (and cannot reach nearby doors).  Any new line resets
+   * the count in zacs_hud_store, so this never fires on a conversation that is
+   * still progressing. */
+  {
+    int frozen = 0;
+    for (i = 0; i < MAXPLAYERS; i++)
+      if (playeringame[i] && (players[i].cheats & CF_TOTALLYFROZEN))
+      { frozen = 1; break; }
+    if (frozen && zacs_dlg_active)
+    {
+      if (++zacs_dlg_stall >= ZACS_DLG_STALL_TICS)
+        zacs_clear_conversation_freeze();
+    }
+    else if (!frozen)
+      zacs_dlg_stall = 0;
+  }
   for (i = 0; i < ZACS_HUDMSG_MAX; i++)
     if (zacs_hudmsgs[i].active)
     {
@@ -1960,6 +2102,13 @@ void Z_ACSHudClear(void)
     zacs_hudmsgs[i].active = 0;
   for (i = 0; i < MAXPLAYERS; i++)
     zacs_use_latched[i] = 0;
+  zacs_dlg_active   = 0;
+  zacs_dlg_advanced = 0;
+  zacs_dlg_break    = 0;
+  zacs_dlg_first[0] = 0;
+  zacs_dlg_last[0]  = 0;
+  zacs_dlg_stall    = 0;
+  zacs_dlg_textid   = 0;
   zacs_hud_w = 320;
   zacs_hud_h = 200;
 }

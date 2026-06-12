@@ -195,18 +195,16 @@ static dbool P_ExecuteZDoomLineSpecial(int special, int *args, line_t *line,
       return false;
     case 132:                   /* ChangeCamera(tid, who, revert) */
     {
-      /* Point the view at the actor named by args[0]'s tid; tid 0 reverts to
-       * the player's own body.  Single-player only follows one view, so the
-       * "who" selector is ignored.  ZDoom treats this as a smooth view hand
-       * over; here it is an immediate switch the renderer reads each frame. */
-      if (args[0] == 0)
-        zacs_view_camera = NULL;
-      else
-      {
-        int sp = -1;
-        mobj_t *cam = P_FindMobjFromTID((short)args[0], &sp);
-        zacs_view_camera = cam;       /* NULL if no such tid: stays on player */
-      }
+      /* View hand-over is intentionally a recognised no-op.  The hdoom camera
+       * script positions its camera through ACSF spawn-spot semantics that are
+       * not modelled here, so the camera actor stays at the map origin; having
+       * the renderer follow it dropped the view to (0,0,0) and froze apparent
+       * movement on every map (the player body still moved, but the view did
+       * not).  That broke normal play on stock maps as well, since this script
+       * runs as a per-map ENTER script.  Until the camera placement is fully
+       * implemented, leave the view on the player and let the rest of the
+       * script -- and every other ACS line special -- continue to run. */
+      (void)args;
       return true;
     }
     default:

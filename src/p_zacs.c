@@ -1647,10 +1647,12 @@ typedef struct {
   int   age;           /* tics elapsed since the message was (re)stored       */
   int   typeon;        /* typewriter reveal: tics per character, 0 = off      */
   int   graphic_lump;  /* >=0: draw this patch (a font that is one image)     */
+  unsigned drawn_tick; /* drawer pass bookkeeping for id-ordered compositing  */
   char  font[32];      /* current font name when stored                       */
   char  text[ZACS_PRINTBUF];
 } zacs_hudmsg_t;
 static zacs_hudmsg_t zacs_hudmsgs[ZACS_HUDMSG_MAX];
+static unsigned zacs_draw_tick;                  /* bumped each Z_ACSHudDrawer */
 static int zacs_hud_w = 320, zacs_hud_h = 200;   /* current SetHudSize box   */
 static char zacs_cur_font[32];                   /* current SetFont selection */
 
@@ -1699,9 +1701,10 @@ static int zacs_font_graphic(const char *font)
  * engine's CR_* translation index.  The two enumerations agree from 0 (brick)
  * through 8 (orange) but diverge after: ZDoom 9 is white and 10 is yellow,
  * whereas this engine has yellow at 9 and no white.  Map ZDoom white to the
- * engine's nearest light shade and yellow to the engine's yellow; anything
- * outside the shared range falls back to the default.  -1 (untranslated) and
- * other unknowns map to the default light text. */
+ * engine's nearest light shade and yellow to the engine's yellow.  ZDoom -1
+ * (CR_UNTRANSLATED) means "draw the font in its own colours" -- the dialogue
+ * name and SPEAKING labels rely on this to show the font's native red -- so it
+ * returns CR_LIMIT as a sentinel the drawer reads as "no recolour". */
 static int zacs_zdoom_color(int zc)
 {
   switch (zc)
@@ -1717,7 +1720,7 @@ static int zacs_zdoom_color(int zc)
     case 8:  return CR_ORANGE;
     case 9:  return CR_GRAY;     /* ZDoom CR_WHITE -> nearest light shade */
     case 10: return CR_YELLOW;   /* ZDoom CR_YELLOW */
-    default: return CR_GRAY;     /* untranslated / unknown: light text */
+    default: return CR_LIMIT;    /* untranslated / unknown: keep native font colour */
   }
 }
 
@@ -2794,14 +2797,48 @@ static int zacs_hud_alpha(const zacs_hudmsg_t *m)
 void Z_ACSHudDrawer(void)
 {
   int pass, i;
+  zacs_draw_tick++;       /* new compositing pass: invalidate drawn marks */
   /* Two passes so the dialogue art always sits behind the text: ZDoom draws
    * the conversation backdrop and portrait first and the speaker name and
-   * spoken line on top.  Our messages are stored in arbitrary slot order, so
-   * draw every graphic message first (pass 0), then every text message
-   * (pass 1). */
+   * spoken line on top.  Within the graphics pass the art is drawn in
+   * descending message-id order, so a lower-id interface frame (the dialogue
+   * panel) composites on top of a higher-id portrait and its opaque lower
+   * border covers the character, matching ZDoom's layering.  Text is drawn
+   * last (pass 1), on top of all art. */
   for (pass = 0; pass < 2; pass++)
-  for (i = 0; i < ZACS_HUDMSG_MAX; i++)
   {
+    int order, oslot;
+    for (order = 0; order < ZACS_HUDMSG_MAX; order++)
+    {
+      /* pass 0: pick the active, undrawn graphic with the highest id; pass 1:
+       * walk the text messages in slot order. */
+      if (pass == 0)
+      {
+        int best = -1;
+        oslot = -1;
+        for (i = 0; i < ZACS_HUDMSG_MAX; i++)
+        {
+          zacs_hudmsg_t *g = &zacs_hudmsgs[i];
+          if (!g->active || g->graphic_lump < 0 || g->drawn_tick == zacs_draw_tick)
+            continue;
+          if (g->id > best)
+          {
+            best  = g->id;
+            oslot = i;
+          }
+        }
+        if (oslot < 0)
+          break;
+        zacs_hudmsgs[oslot].drawn_tick = zacs_draw_tick;
+        i = oslot;
+      }
+      else
+      {
+        i = order;
+        if (zacs_hudmsgs[i].graphic_lump >= 0)
+          continue;                     /* graphics already drawn in pass 0 */
+      }
+    {
     zacs_hudmsg_t *m = &zacs_hudmsgs[i];
     int hw, hh, alpha;
     if (!m->active)
@@ -2848,9 +2885,18 @@ void Z_ACSHudDrawer(void)
       int penx = (int)(((long long)m->x * SCREENWIDTH) / (hw > 0 ? hw : 320));
       int peny = (int)(((long long)m->y * SCREENHEIGHT) / (hh > 0 ? hh : 200));
       const char *t;
-      if (cm < 0 || cm >= CR_LIMIT)
-        cm = CR_DEFAULT;
-      trans = colrngs[cm];
+      /* CR_LIMIT is the "untranslated" sentinel from zacs_zdoom_color: leave
+       * the glyphs in the font's own colours (the name / SPEAKING labels rely
+       * on the font's native red).  Any other in-range value recolours through
+       * its translation table. */
+      if (cm == CR_LIMIT)
+        trans = NULL;
+      else
+      {
+        if (cm < 0 || cm >= CR_LIMIT)
+          cm = CR_DEFAULT;
+        trans = colrngs[cm];
+      }
       /* typewriter reveal: only show the first (age/typeon)+1 characters */
       if (m->typeon)
       {
@@ -2889,7 +2935,9 @@ void Z_ACSHudDrawer(void)
         penx += (int)(((long long)gw * fx) >> 16);
       }
     }
-  }
+    }   /* per-message block */
+    }   /* order loop */
+  }     /* pass loop */
 }
 
 /* ======================================================================== */

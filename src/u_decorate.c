@@ -1532,6 +1532,21 @@ static void inherit_one(decorate_actor_t *c)
     c->seq[base + f]   = pp->seq[f];
     c->seqop[base + f] = pp->seqop[f];
     c->seqflow[base + f] = pp->seqflow[f];
+    /* The parent's frames may use the "####"/"----" keep-sprite placeholder
+     * (StoryCharacter / SexActor base states are entirely "####"); ZDoom keeps
+     * the sprite the actor already displays.  When such a frame is appended
+     * after the child's own real spawn sprite (e.g. Lilitu's "TROO A" then
+     * "goto Super::Spawn" into the parent's "####" Idle loop), carry the most
+     * recent real sprite forward instead of leaving the literal placeholder,
+     * which has no patches and renders the actor invisible. */
+    if (c->seq[base + f].spr[0] == '#' || c->seq[base + f].spr[0] == '-')
+    {
+      if (base + f > 0)
+        memcpy(c->seq[base + f].spr, c->seq[base + f - 1].spr, 5);
+      else if (c->seq_sprite[0] &&
+               c->seq_sprite[0] != '#' && c->seq_sprite[0] != '-')
+        memcpy(c->seq[base + f].spr, c->seq_sprite, 4);
+    }
     /* shift a numeric/relative goto's resolved-later targets: the parent's
      * label-name targets resolve through the merged label table, so only the
      * label frames themselves need the base offset (done below). */
@@ -2311,7 +2326,7 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
             }
           }
         }
-        if (a->seq_len == 0)
+        if (a->seq_len == 0 && nspr[0] != '#' && nspr[0] != '-')
         {
           memcpy(a->seq_sprite, nspr, 4);
           a->seq_sprite[4] = 0;
@@ -2350,7 +2365,40 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           frbits = (fr[fi] == '#' || fr[fi] == '-') ? 0 : (fr[fi] - 'A');
           a->seq[a->seq_len].frame = (short)(frbits | bright);
           a->seq[a->seq_len].tics  = (short)t;
-          memcpy(a->seq[a->seq_len].spr, nspr, 4);
+          /* The "####"/"----" sprite placeholder means "keep displaying the
+           * sprite the actor already had" (ZDoom semantics) -- not "show
+           * nothing".  Visual-novel and follow-on actors spawn on a real
+           * sprite (e.g. Lilitu's "TROO A 1") and then jump into a Spawn/Idle
+           * loop made entirely of "####" frames; rendering those as a literal
+           * "####" sprite (which has no patches) is what made the actors
+           * invisible.  Inherit the most recent real sprite instead so the
+           * keep-frames carry it forward; the same goes for the "#"/"-" frame
+           * placeholder, which keeps the previous frame index. */
+          if (nspr[0] == '#' || nspr[0] == '-')
+          {
+            if (a->seq_len > 0)
+            {
+              memcpy(a->seq[a->seq_len].spr, a->seq[a->seq_len - 1].spr, 4);
+              if (fr[fi] == '#' || fr[fi] == '-')
+                a->seq[a->seq_len].frame =
+                  (short)((a->seq[a->seq_len - 1].frame & FF_FRAMEMASK) | bright);
+            }
+            else
+            {
+              /* a keep placeholder as the very first frame has nothing to
+               * inherit; fall back to the actor's own sprite if one was
+               * captured (e.g. from a parent's Spawn), else leave it blank */
+              if (a->seq_sprite[0] &&
+                  a->seq_sprite[0] != '#' && a->seq_sprite[0] != '-')
+                memcpy(a->seq[a->seq_len].spr, a->seq_sprite, 4);
+              else
+                memcpy(a->seq[a->seq_len].spr, nspr, 4);
+            }
+          }
+          else
+          {
+            memcpy(a->seq[a->seq_len].spr, nspr, 4);
+          }
           a->seq[a->seq_len].spr[4] = 0;
           /* the action fires on the first frame letter of the line, as in
            * DECORATE (a multi-letter line repeats the frames, action once) */

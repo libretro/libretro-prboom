@@ -4688,7 +4688,14 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       if (mo)
         switch (prop)
         {
-          case 0: v = mo->health; break;            /* APROP_Health */
+          case 0:  v = mo->health; break;           /* APROP_Health */
+          case 1:  v = mo->info ? mo->info->speed : 0; break;   /* Speed */
+          case 2:  v = mo->info ? mo->info->damage : 0; break;  /* Damage */
+          case 16: v = mo->info ? mo->info->spawnhealth : mo->health;
+                   break;                            /* APROP_SpawnHealth */
+          case 31: v = mo->info ? mo->info->mass : 0; break;    /* Mass */
+          case 34: v = mo->height; break;            /* APROP_Height (fixed) */
+          case 35: v = mo->radius; break;            /* APROP_Radius (fixed) */
           default:
             zacs_warn_pcd(pcd);
             break;

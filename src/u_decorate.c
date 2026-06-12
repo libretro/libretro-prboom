@@ -2856,6 +2856,7 @@ static int register_spawnonly_actor(decorate_actor_t *a, int *st_cursor,
     (spawn_label >= 0 ? a->seqlabel[spawn_label].frame : 0);
   info->spawnhealth = 1000;
   info->mass        = 100;
+  info->damage      = a->damage;
   info->radius      = (a->radius >= 0 ? a->radius : 20) * FRACUNIT;
   info->height      = (a->height >= 0 ? a->height : 16) * FRACUNIT;
   info->seestate = info->painstate = info->meleestate =

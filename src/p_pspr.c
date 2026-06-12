@@ -38,6 +38,7 @@
 #include "p_maputl.h"
 #include "p_inter.h"
 #include "p_pspr.h"
+#include "u_decorate.h"
 #include "p_conversation.h"
 extern fixed_t FloatBobOffsets[64];
 dbool P_SeekerMissile(mobj_t *actor, mobj_t **seekTarget, angle_t thresh, angle_t turnMax, dbool seekcenter);
@@ -65,6 +66,15 @@ extern mobj_t *PuffSpawned;   /* last puff spawned by P_SpawnPuff */
 extern void retro_set_rumble_damage(int damage, float duration);
 
 // The following array holds the recoil values         // phares
+
+/* When a DECORATE custom weapon supplies its own firing sound via A_PlaySound,
+ * its Fire state still delegates damage to a base weapon's native attack (so no
+ * ZDoom hitscan/puff is reinvented), but that native attack would also play the
+ * stock firing sound -- doubling it with the laser sound.  This flag, set only
+ * by the DECORATE base-fire wrapper below, squelches the one stock sound for
+ * that shot.  Vanilla weapons never set it, so their behaviour (and the demo
+ * hash) is unchanged. */
+static int weapon_fire_squelch_sound = 0;
 
 static const int recoil_values[] = {    // phares
   10, // WP_FIST
@@ -751,6 +761,55 @@ void A_GunFlash(player_t *player, pspdef_t *psp)
   A_FireSomething(player,0);                                      // phares
 }
 
+/*
+ * A_DecorateWeaponSound
+ *
+ * Weapon-safe sound codepointer for DECORATE custom weapons whose Fire states
+ * call A_PlaySound("name", ...).  The mobj A_PlaySound reads its sfx from
+ * state->misc1, but on a weapon state misc1/misc2 are the gun-sprite offset, so
+ * the resolved sfx id is held in a side table keyed by the state (filled when
+ * the weapon chain is built) and looked up here.  A $random SNDINFO set is
+ * varied per play via U_SoundRandomId, matching the mobj path.
+ */
+void A_DecorateWeaponSound(player_t *player, pspdef_t *psp)
+{
+  int sfx;
+  if (!psp->state)
+    return;
+  sfx = U_DecorateWeaponSound((int)(psp->state - states));
+  if (sfx > 0)
+    S_StartSound(player->mo, U_SoundRandomId(sfx));
+}
+
+/* Squelching base-fire wrappers: a DECORATE custom weapon whose Fire state has
+ * its own A_PlaySound delegates damage to one of these so the stock firing
+ * sound is suppressed (the laser sound replaces it).  Each squelches the one
+ * shot, runs the real attack, then restores the flag. */
+void A_DecorateFirePistolQuiet(player_t *player, pspdef_t *psp)
+{
+  weapon_fire_squelch_sound = 1;
+  A_FirePistol(player, psp);
+  weapon_fire_squelch_sound = 0;
+}
+void A_DecorateFireShotgunQuiet(player_t *player, pspdef_t *psp)
+{
+  weapon_fire_squelch_sound = 1;
+  A_FireShotgun(player, psp);
+  weapon_fire_squelch_sound = 0;
+}
+void A_DecorateFireShotgun2Quiet(player_t *player, pspdef_t *psp)
+{
+  weapon_fire_squelch_sound = 1;
+  A_FireShotgun2(player, psp);
+  weapon_fire_squelch_sound = 0;
+}
+void A_DecorateFireCGunQuiet(player_t *player, pspdef_t *psp)
+{
+  weapon_fire_squelch_sound = 1;
+  A_FireCGun(player, psp);
+  weapon_fire_squelch_sound = 0;
+}
+
 //
 // WEAPON ATTACKS
 //
@@ -1010,7 +1069,8 @@ static void P_GunShot(mobj_t *mo, dbool accurate)
 
 void A_FirePistol(player_t *player, pspdef_t *psp)
 {
-  S_StartSound(player->mo, sfx_pistol);
+  if (!weapon_fire_squelch_sound)
+    S_StartSound(player->mo, sfx_pistol);
 
   P_SetMobjState(player->mo, S_PLAY_ATK2);
   P_SubtractAmmo(player, 1);
@@ -1030,7 +1090,8 @@ void A_FireShotgun(player_t *player, pspdef_t *psp)
 {
   int i;
 
-  S_StartSound(player->mo, sfx_shotgn);
+  if (!weapon_fire_squelch_sound)
+    S_StartSound(player->mo, sfx_shotgn);
   P_SetMobjState(player->mo, S_PLAY_ATK2);
 
   P_SubtractAmmo(player, 1);
@@ -1053,7 +1114,8 @@ void A_FireShotgun2(player_t *player, pspdef_t *psp)
 {
   int i;
 
-  S_StartSound(player->mo, sfx_dshtgn);
+  if (!weapon_fire_squelch_sound)
+    S_StartSound(player->mo, sfx_dshtgn);
   P_SetMobjState(player->mo, S_PLAY_ATK2);
   P_SubtractAmmo(player, 2);
 
@@ -1082,7 +1144,8 @@ void A_FireShotgun2(player_t *player, pspdef_t *psp)
 
 void A_FireCGun(player_t *player, pspdef_t *psp)
 {
-  if (player->ammo[weaponinfo[player->readyweapon].ammo] || comp[comp_sound])
+  if ((player->ammo[weaponinfo[player->readyweapon].ammo] || comp[comp_sound])
+      && !weapon_fire_squelch_sound)
     S_StartSound(player->mo, sfx_pistol);
 
   if (!player->ammo[weaponinfo[player->readyweapon].ammo])

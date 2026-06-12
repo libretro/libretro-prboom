@@ -363,6 +363,35 @@ enum {
 static char decorate_sounds[MAX_DECORATE_SOUNDS][32];
 static int  num_decorate_sounds;
 
+/* Weapon-frame sounds (A_PlaySound on a pspr state): the sfx id a given weapon
+ * state should play, keyed by the state index.  A weapon state cannot stash the
+ * id in misc1/misc2 (the gun-sprite offset), so the weapon-safe codepointer
+ * A_DecorateWeaponSound looks it up here.  Kept as a small open-addressed map so
+ * it costs nothing for the vast majority of states that have no sound. */
+#define MAX_WEAPON_SOUNDS 128
+static struct { int state; int sfx; } decorate_wsnd[MAX_WEAPON_SOUNDS];
+static int  num_decorate_wsnd;
+
+static void decorate_set_weapon_sound(int state, int sfx)
+{
+  if (num_decorate_wsnd < MAX_WEAPON_SOUNDS)
+  {
+    decorate_wsnd[num_decorate_wsnd].state = state;
+    decorate_wsnd[num_decorate_wsnd].sfx   = sfx;
+    num_decorate_wsnd++;
+  }
+}
+
+int U_DecorateWeaponSound(int state)
+{
+  int i;
+  for (i = 0; i < num_decorate_wsnd; i++)
+    if (decorate_wsnd[i].state == state)
+      return decorate_wsnd[i].sfx;
+  return 0;
+}
+
+
 /* Class names captured from A_CustomMissile("Class", ...) frames, so the fired
  * imp ball can inherit that class's DECORATE Translation/Scale.  Each frame
  * stores an index into this table (or -1) in its parallel seqop.uvslot. */
@@ -675,7 +704,10 @@ enum {
   WA_LOWER,            /* A_Lower */
   WA_GUNFLASH,         /* A_GunFlash */
   WA_REFIRE,           /* A_ReFire */
-  WA_BASEFIRE          /* delegate to the replaced weapon's native attack */
+  WA_BASEFIRE,         /* delegate to the replaced weapon's native attack */
+  WA_PLAYSOUND         /* A_PlaySound("name") -> play on the player via a
+                        * weapon-safe codepointer (the sfx id rides in a side
+                        * table keyed by state, never in misc1/2) */
 };
 
 /* Map a base-weapon class name to its engine slot, or -1.  Only the Doom
@@ -716,6 +748,22 @@ static arg0_t weapon_base_fire(int slot)
     case WP_PLASMA:       return (arg0_t)A_FirePlasma;
     case WP_BFG:          return (arg0_t)A_FireBFG;
     default:              return (arg0_t)NULL;
+  }
+}
+
+/* As weapon_base_fire, but for a weapon that supplies its own firing sound:
+ * the stock sound the base attack would play is suppressed for the shot.  Only
+ * the hitscan weapons play a stock sound; the rest fall back to the plain
+ * delegate. */
+static arg0_t weapon_base_fire_quiet(int slot)
+{
+  switch (slot)
+  {
+    case WP_PISTOL:       return (arg0_t)A_DecorateFirePistolQuiet;
+    case WP_SHOTGUN:      return (arg0_t)A_DecorateFireShotgunQuiet;
+    case WP_SUPERSHOTGUN: return (arg0_t)A_DecorateFireShotgun2Quiet;
+    case WP_CHAINGUN:     return (arg0_t)A_DecorateFireCGunQuiet;
+    default:              return weapon_base_fire(slot);
   }
 }
 
@@ -762,11 +810,13 @@ static int weapon_action_of(const char *fn)
       !strcasecmp(fn, "A_Punch") ||
       !strcasecmp(fn, "A_CustomPunch") ||
       !strcasecmp(fn, "A_BFGsound"))     return WA_BASEFIRE;
-  /* A_PlaySound is deliberately NOT mapped: it is an mobj action
-   * (void A_PlaySound(mobj_t*)) reading its sound from state->misc1, but the
-   * engine's weapon path dispatches actions as (player,psp) and uses misc1/2
-   * as sprite offsets.  Wiring it here would mis-call and shift the gun
-   * sprite, so weapon-frame sounds are simply skipped. */
+  /* A_PlaySound / A_StartSound on a weapon frame play the sound on the player.
+   * The mobj A_PlaySound reads its sfx from state->misc1, but the weapon path
+   * uses misc1/misc2 as gun-sprite offsets, so a weapon-safe codepointer is
+   * wired instead (build_weapon_chain) and the resolved sfx id is carried in a
+   * side table keyed by the state, leaving misc1/misc2 zero. */
+  if (!strcasecmp(fn, "A_PlaySound") ||
+      !strcasecmp(fn, "A_StartSound")) return WA_PLAYSOUND;
   return WA_NONE;
 }
 
@@ -876,6 +926,40 @@ static const char *parse_weapon_state_block(decorate_actor_t *a, int idx,
         while (b[bi] && b[bi] != '(') { fn[bi] = b[bi]; bi++; }
         fn[bi] = 0;
         act = weapon_action_of(fn);
+
+        /* A_PlaySound("name", ...): pull the quoted sound name out of the call
+         * and register it in the shared sound table; the frame carries the
+         * table index in snd, resolved to an sfx id at chain-build time. */
+        if (act == WA_PLAYSOUND)
+        {
+          char arg[32];
+          const char *ar = b + bi;
+          int an = 0;
+          while (*ar && *ar != '"') ar++;
+          if (*ar == '"')
+          {
+            ar++;
+            while (*ar && *ar != '"' && an < 31) arg[an++] = *ar++;
+          }
+          arg[an] = 0;
+          if (arg[0] && num_decorate_sounds < MAX_DECORATE_SOUNDS)
+          {
+            int s;
+            snd = -1;
+            for (s = 0; s < num_decorate_sounds; s++)
+              if (!strcasecmp(decorate_sounds[s], arg)) { snd = (short)s; break; }
+            if (snd < 0)
+            {
+              int cn = 0;
+              while (arg[cn] && cn < 31)
+              { decorate_sounds[num_decorate_sounds][cn] = arg[cn]; cn++; }
+              decorate_sounds[num_decorate_sounds][cn] = 0;
+              snd = (short)num_decorate_sounds++;
+            }
+          }
+          else
+            act = WA_NONE;          /* nameless/overflow: leave inert */
+        }
       }
 
       if (keep_spr) memcpy(use_spr, prev_spr, 5);
@@ -3525,8 +3609,15 @@ static int build_weapon_chain(decorate_actor_t *a, int wi, int slot,
                               int *st_cursor, int *sp_next)
 {
   int n = a->wst[wi].len, f, first;
+  int has_sound = 0;
   if (!a->wst[wi].present || n <= 0)
     return -1;
+
+  /* Does this chain supply its own firing sound?  If so the base-fire
+   * delegation must not also play the stock sound. */
+  for (f = 0; f < n; f++)
+    if (a->wst[wi].fr[f].act == WA_PLAYSOUND)
+    { has_sound = 1; break; }
 
   first = *st_cursor;
   for (f = 0; f < n; f++)
@@ -3554,7 +3645,25 @@ static int build_weapon_chain(decorate_actor_t *a, int wi, int slot,
       case WA_LOWER:    st->action.arg0 = (arg0_t)A_Lower;       break;
       case WA_GUNFLASH: st->action.arg0 = (arg0_t)A_GunFlash;    break;
       case WA_REFIRE:   st->action.arg0 = (arg0_t)A_ReFire;      break;
-      case WA_BASEFIRE: st->action.arg0 = weapon_base_fire(slot);break;
+      case WA_BASEFIRE:
+        st->action.arg0 = has_sound ? weapon_base_fire_quiet(slot)
+                                    : weapon_base_fire(slot);
+        break;
+      case WA_PLAYSOUND:
+        /* Resolve the captured sound name to an sfx id (a $random set yields a
+         * logical id the sound system varies per play) and record it against
+         * this state; the codepointer reads it back at fire time.  misc1/2 stay
+         * zero so the gun sprite is not offset. */
+        if (a->wst[wi].fr[f].snd >= 0)
+        {
+          int sfx = decorate_resolve_sfx(decorate_sounds[a->wst[wi].fr[f].snd]);
+          if (sfx > 0)
+          {
+            decorate_set_weapon_sound(cur, sfx);
+            st->action.arg0 = (arg0_t)A_DecorateWeaponSound;
+          }
+        }
+        break;
       default: break;
     }
   }

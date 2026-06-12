@@ -24,6 +24,11 @@ int U_DecorateAliasDoomedNum(int doomednum);
  * plays the way it does in ZDoom. */
 int U_SoundRandomId(int id);
 
+/* The sfx id a DECORATE weapon state should play (its A_PlaySound name resolved
+ * at chain-build time), keyed by state index, or 0 if the state has no sound.
+ * Read by the weapon-safe sound codepointer A_DecorateWeaponSound. */
+int U_DecorateWeaponSound(int state);
+
 /* true if the wad's DECORATE lump redefines the named sprite's state
  * sequence (r_things only unifies art for such sprites) */
 dbool U_DecorateMentionsSprite(const char *name);

@@ -233,7 +233,8 @@ enum {
   DA_SETUSERVAR,       /* A_SetUserVar(name, expr) -> set scalar user var */
   DA_SETUSERARRAY,     /* A_SetUserArray(name, idxexpr, expr) -> set element */
   DA_CHANGEFLAG,       /* A_ChangeFlag("FLAG", bool) -> set/clear a flag */
-  DA_SPAWNITEM         /* A_SpawnItemEx("Class", ...) -> spawn a decoration */
+  DA_SPAWNITEM,        /* A_SpawnItemEx("Class", ...) -> spawn a decoration */
+  DA_FADEOUT           /* A_FadeOut(reduce) -> fade the actor out and remove it */
 };
 
 /* Sound names captured for DA_PLAYSOUND frames, resolved to sfx slots at
@@ -429,6 +430,28 @@ void A_DecorateSpawnItem(mobj_t *mo)
                    mo->z + mo->height - (8 * FRACUNIT), (mobjtype_t)type);
   if (it)
     it->momz = (FRACUNIT + (P_Random(pr_misc) % (3 * FRACUNIT)));
+}
+
+/* A_FadeOut(reduce): in ZDoom this lowers the actor's alpha by `reduce` each
+ * call and removes it once fully transparent.  This engine has no graduated
+ * per-actor alpha (only an on/off translucency), so approximate: draw the
+ * actor translucent immediately, count the fade calls (misc1 holds 1/reduce,
+ * the number of steps to reach zero), and remove the actor when the steps are
+ * spent.  A short-lived decoration (a spawned heart, a puff) then fades to
+ * translucent and disappears instead of lingering forever. */
+void A_DecorateFadeOut(mobj_t *mo)
+{
+  int steps;
+  if (!mo || !mo->state)
+    return;
+  mo->flags |= MF_TRANSLUCENT;
+  steps = (int)mo->state->misc1;
+  if (steps <= 0)
+    steps = 8;                    /* sensible default if no rate was parsed */
+  if (mo->special1.i <= 0)
+    mo->special1.i = steps;
+  if (--mo->special1.i <= 0)
+    P_RemoveMobj(mo);
 }
 
 /* A_SetUserArray(name, idxexpr, expr): write the value expression to element
@@ -1815,6 +1838,24 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
             }
           }
           else if (!strcasecmp(fn, "A_Scream"))        act = DA_SCREAM;
+          else if (!strcasecmp(fn, "A_FadeOut"))
+          {
+            /* A_FadeOut(reduce): reduce is a fixed-point fraction of alpha to
+             * drop per call (default 0.1).  Convert to a step count = 1/reduce
+             * (rounded), stored in the frame's snd slot; the runtime action
+             * removes the actor after that many calls. */
+            const char *ar = strchr(b, '(');
+            double red = 0.1;
+            int steps;
+            if (ar && ar[1] && ar[1] != ')')
+              red = atof(ar + 1);
+            if (red <= 0.0) red = 0.1;
+            steps = (int)(1.0 / red + 0.5);
+            if (steps < 1)  steps = 1;
+            if (steps > 255) steps = 255;
+            snd = (short)steps;
+            act = DA_FADEOUT;
+          }
           else if (!strcasecmp(fn, "A_SpawnItemEx") ||
                    !strcasecmp(fn, "A_SpawnItem"))
           {
@@ -2351,6 +2392,10 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
         state->misc1 = (a->seq[f].snd >= 0)
           ? decorate_type_by_name(decorate_spawns[a->seq[f].snd]) : 0;
         if (state->misc1 < 0) state->misc1 = 0;
+        break;
+      case DA_FADEOUT:
+        state->action.arg0 = (arg0_t)A_DecorateFadeOut;
+        state->misc1 = (a->seq[f].snd > 0) ? a->seq[f].snd : 8;
         break;
       case DA_NOBLOCKING:
         state->action.arg0 = (arg0_t)A_Fall;

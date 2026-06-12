@@ -129,9 +129,16 @@ int W_PK3LumpForPath(const char *path)
     for (lump = 0; lump < numlumps; lump++)
     {
       const lumpinfo_t *li = &lumpinfo[lump];
-      const unsigned char *base = li->wadfile ?
-        (li->wadfile->embedded_data ? li->wadfile->embedded_data
-                                    : li->wadfile->data) : NULL;
+      const unsigned char *base = NULL;
+      if (li->wadfile)
+      {
+        if (li->wadfile->embedded_data)
+          base = li->wadfile->embedded_data;
+#ifndef MEMORY_LOW
+        else
+          base = li->wadfile->data;
+#endif
+      }
       if (base && base + li->position == pk3_paths[i].data)
         return lump;
     }

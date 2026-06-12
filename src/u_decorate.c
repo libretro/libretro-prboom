@@ -39,6 +39,7 @@
 #include "sounds.h"
 #include "p_mobj.h"
 #include "p_zacs.h"
+#include "m_random.h"
 #include "u_decorate.h"
 
 #define MAX_DECORATE_ACTORS 1024
@@ -298,6 +299,26 @@ void A_DecorateACSNamed(mobj_t *mo)
       (mo->target->player->cheats & CF_TOTALLYFROZEN))
     return;
   Z_ACSStartNamedStr(interned_acsnames[idx], NULL, 0, mo, true);
+}
+
+/* Death action for the hdoom replacement monsters.  Their DECORATE Death
+ * chain is entirely ACS-driven: roll the cross-death chance, and if it hits
+ * and the gate cvar is set, hand off to the SpawnSexActor script (which reads
+ * the dying actor's class and position to spawn its replacement).  The actor
+ * then falls through to its normal death animation, which serves as the
+ * "Faint" sequence.  Replicates:
+ *   A_Jump(CallACS("GetXDeathChance"), "XDeath")
+ *   XDeath: A_JumpIf(GetDoXDeath, SpawnSexActor)
+ * Run synchronously here so the spawn happens on the death tic. */
+void A_HDoomDeath(mobj_t *mo)
+{
+  int chance;
+  if (!mo)
+    return;
+  chance = Z_ACSCallNamedSync("GetXDeathChance", mo);
+  if (chance > 0 && P_Random(pr_misc) < chance &&
+      Z_ACSCallNamedSync("GetDoXDeath", mo))
+    Z_ACSCallNamedSync("SpawnSexActor", mo);
 }
 
 /* Evaluate one DECORATE operand against a mobj. */
@@ -2276,6 +2297,30 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
         free(map);
       }
     }
+  }
+
+  /* Prepend a death action that runs the hdoom ACS death decision before the
+   * death animation plays.  A fresh state with a zero-tic TNT1 frame runs
+   * A_HDoomDeath, then falls through (nextstate) to the clone's existing
+   * death animation, which serves as the Faint sequence.  Point both the
+   * normal and gib death entries at it so either kind of kill triggers the
+   * sex-actor spawn.  With no death animation to fall into (deathstate 0)
+   * leave it alone -- there is nothing to play. */
+  if (info->deathstate > 0)
+  {
+    int ds   = (*st_cursor)++;
+    state_t *st;
+    dsda_GetState(ds);            /* grow the table to fit before caching */
+    info = dsda_GetMobjInfo(mt);  /* re-cache: GetState may have moved tables */
+    st = dsda_GetState(ds);
+    st->sprite      = SPR_TNT1;
+    st->frame       = 0;
+    st->tics        = 0;
+    st->action.arg1 = (arg1_t)A_HDoomDeath;
+    st->nextstate   = info->deathstate;
+    st->misc1 = st->misc2 = 0;
+    info->deathstate  = ds;
+    info->xdeathstate = ds;
   }
 
   if (num_decorate_repls < MAX_DECORATE_ACTORS)

@@ -411,12 +411,24 @@ void A_DecorateSetUserVar(mobj_t *mo)
 void A_DecorateSpawnItem(mobj_t *mo)
 {
   int type;
+  mobj_t *it;
+  fixed_t ox, oy;
   if (!mo || !mo->state)
     return;
   type = (int)mo->state->misc1;
   if (type <= 0 || type >= num_mobj_types)
     return;
-  P_SpawnMobj(mo->x, mo->y, mo->z + (mo->height >> 1), (mobjtype_t)type);
+  /* The emitter calls spawn these decorations around the actor's upper body
+   * with a small random horizontal scatter and a gentle upward drift (the
+   * DECORATE call passes xy offsets and a positive z velocity), so they hover
+   * and rise rather than sit on the floor.  The spawned class itself is
+   * NOGRAVITY; give it the rising motion here. */
+  ox = ((P_Random(pr_misc) - 128) * (20 * FRACUNIT)) / 128;
+  oy = ((P_Random(pr_misc) - 128) * (20 * FRACUNIT)) / 128;
+  it = P_SpawnMobj(mo->x + ox, mo->y + oy,
+                   mo->z + mo->height - (8 * FRACUNIT), (mobjtype_t)type);
+  if (it)
+    it->momz = (FRACUNIT + (P_Random(pr_misc) % (3 * FRACUNIT)));
 }
 
 /* A_SetUserArray(name, idxexpr, expr): write the value expression to element
@@ -1525,6 +1537,11 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
     else if (!strcasecmp(word, "+USESPECIAL"))
       a->use_special = 1;
     else if (!strcasecmp(word, "+NOGRAVITY"))
+      a->nogravity = 1;
+    else if (!strcasecmp(word, "+NOINTERACTION"))
+      /* NOINTERACTION actors are frozen out of the physics/clip pipeline;
+       * for the purposes here that means no gravity (they hover) -- enough
+       * for decorative spawns like the hovering hearts not to fall. */
       a->nogravity = 1;
     else if (!strcasecmp(word, "+SPAWNCEILING"))
       a->spawnceiling = 1;
@@ -2780,7 +2797,11 @@ static int register_spawnonly_actor(decorate_actor_t *a, int *st_cursor,
   info->seestate = info->painstate = info->meleestate =
     info->missilestate = info->deathstate = info->xdeathstate =
     info->raisestate = 0;
-  info->flags = 0;
+  info->flags = (a->solid ? MF_SOLID : 0) |
+                (a->nogravity ? MF_NOGRAVITY : 0) |
+                (a->spawnceiling ? (MF_SPAWNCEILING | MF_NOGRAVITY) : 0) |
+                ((a->translucent || a->alpha < FRACUNIT)
+                                 ? MF_TRANSLUCENT : 0);
 
   nm = malloc(strlen(a->name) + 1);
   if (nm) { strcpy(nm, a->name); info->actorname = nm; }

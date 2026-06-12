@@ -38,6 +38,7 @@
 #include "p_maputl.h"
 #include "p_inter.h"
 #include "p_pspr.h"
+#include "p_conversation.h"
 extern fixed_t FloatBobOffsets[64];
 dbool P_SeekerMissile(mobj_t *actor, mobj_t **seekTarget, angle_t thresh, angle_t turnMax, dbool seekcenter);
 void A_UnHideThing(mobj_t *thing);
@@ -2421,6 +2422,25 @@ void P_MovePsprites(player_t *player)
     old[i].sx    = psp[i].sx;
     old[i].sy    = psp[i].sy;
     old[i].state = psp[i].state;
+  }
+
+  /* While a dialogue overlay has the player frozen, the weapon is put away:
+   * slide it down off the screen and hold it there, leaving the state machine
+   * untouched so it springs back up the moment the freeze lifts.  The flash
+   * sprite tracks the weapon, as it does normally. */
+  if ((player->cheats & CF_TOTALLYFROZEN) ||
+      (P_ConversationIsActive() && player == &players[consoleplayer]))
+  {
+    pspdef_t *w = &player->psprites[ps_weapon];
+    if (w->sy < WEAPONBOTTOM)
+    {
+      w->sy += LOWERSPEED;
+      if (w->sy > WEAPONBOTTOM)
+        w->sy = WEAPONBOTTOM;
+    }
+    player->psprites[ps_flash].sx = w->sx;
+    player->psprites[ps_flash].sy = w->sy;
+    return;
   }
 
   /* a null state means not active

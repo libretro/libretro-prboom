@@ -1651,7 +1651,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       q = skip_space(q, end);
       q = read_word(q, end, tics, sizeof(tics));
       if (strlen(fr) == 1 && ((fr[0] >= 'A' && fr[0] <= 'Z') ||
-          fr[0] == '#' || fr[0] == '-') && !strcmp(tics, "-1"))
+          fr[0] == '#' || fr[0] == '-') && !strcmp(tics, "-1") &&
+          a->seq_len == 0 && !a->multi_state)
       {
         const char *r = skip_space(q, end);
         char b[MAX_NAME];
@@ -1667,7 +1668,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       }
       else if (((fr[0] >= 'A' && fr[0] <= '_') ||
                 fr[0] == '#' || fr[0] == '-') &&
-               (tics[0] >= '0' && tics[0] <= '9'))
+               ((tics[0] >= '0' && tics[0] <= '9') ||
+                (tics[0] == '-' && tics[1] == '1')))
       {
         /* animated frames: one entry per frame letter.  The sprite may change
          * between lines of one sequence (e.g. TROO ... then STTR ...), so the
@@ -1865,7 +1867,7 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           memcpy(a->seq_sprite, nspr, 4);
           a->seq_sprite[4] = 0;
         }
-        if (t < 0) t = 0;
+        if (t < 0) t = -1;            /* -1 = freeze on this frame */
         if (t > 32767) t = 32767;
         for (fi = 0; fr[fi] && a->seq_len < MAX_SPAWN_FRAMES; fi++)
         {

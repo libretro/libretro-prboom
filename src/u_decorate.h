@@ -8,6 +8,14 @@
 /* If `doomednum` belongs to a DECORATE actor whose inheritance/replaces
  * chain roots in a class with a known editor number, return that number;
  * otherwise -1. */
+/* 256-byte palette remap table built from a DECORATE Translation property for
+ * the given built-translation id, or NULL.  Used by the sprite renderer. */
+const unsigned char *U_DecorateTranslation(int xlat_id);
+
+/* True if the pointer is one of the built translation tables (a validity
+ * guard for the sprite renderer). */
+int U_DecorateTranslationOK(const unsigned char *p);
+
 int U_DecorateAliasDoomedNum(int doomednum);
 
 /* If `id` is a logical $random SNDINFO sound (more than one member), return a

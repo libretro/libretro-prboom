@@ -506,6 +506,13 @@ typedef struct mobj_s
      * with the rest of the ZDoom-ACS runtime state. */
     int                *user_vars;
 
+    /* DECORATE custom colour remap: a 256-byte palette translation table
+     * built from the actor's Translation property (e.g. the recoloured imp
+     * fireball), or NULL.  Points into a long-lived table owned by the
+     * DECORATE registrar, so it is not freed per-actor; like user_vars it is
+     * runtime-only render state and is not archived across save/load. */
+    const uint8_t      *translation;
+
     // SEE WARNING ABOVE ABOUT POINTER FIELDS!!!
 } mobj_t;
 

@@ -424,6 +424,11 @@ typedef struct vissprite_s
 
   // killough 3/27/98: height sector for underwater/fake ceiling support
   int heightsec;
+
+  /* DECORATE custom colour remap: when non-NULL, a 256-byte palette
+   * translation table built from an actor's Translation property, used in
+   * place of the player-flag translations.  NULL for ordinary sprites. */
+  const uint8_t *xlat;
 } vissprite_t;
 
 //

@@ -631,7 +631,17 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
   if (!dcvars.colormap)   // NULL colormap = shadow draw
     colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_FUZZ, filter, filterz);    // killough 3/14/98
   else
-    if (vis->mobjflags & MF_TRANSLATION)
+    if (vis->xlat && U_DecorateTranslationOK(vis->xlat))
+    {
+      /* DECORATE Translation: an arbitrary palette remap built from the
+       * actor's Translation property (e.g. the recoloured imp fireball).  The
+       * pointer is validated against the built-table storage so a stale or
+       * unset vissprite slot can never feed a wild pointer to the column
+       * drawer. */
+      colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED, filter, filterz);
+      dcvars.translation = vis->xlat;
+    }
+    else if (vis->mobjflags & MF_TRANSLATION)
     {
       colfunc = R_GetDrawColumnFunc(RDC_PIPELINE_TRANSLATED, filter, filterz);
       dcvars.translation = translationtables - 256 +
@@ -875,6 +885,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
          vis = R_NewVisSprite();
          vis->heightsec = thing->subsector->sector->heightsec;
          vis->mobjflags = thing->flags;
+         vis->xlat      = thing->translation;
          vis->scale     = FixedDiv(projectiony, tz);
          vis->gx        = fx;
          vis->gy        = fy;
@@ -989,6 +1000,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    vis->heightsec = heightsec;
 
    vis->mobjflags = thing->flags;
+   vis->xlat      = thing->translation;   /* DECORATE custom colour remap */
    // proff 11/06/98: Changed for high-res
    vis->scale = FixedDiv(projectiony, tz);
    vis->gx = fx;
@@ -1158,6 +1170,7 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    // store information in a vissprite
    vis = &avis;
    vis->mobjflags = MF_PLAYERSPRITE;
+   vis->xlat      = NULL;
    // killough 12/98: fix psprite positioning problem
    vis->texturemid = (BASEYCENTER<<FRACBITS) /* +  FRACUNIT/2 */ -
       (sy-topoffset);

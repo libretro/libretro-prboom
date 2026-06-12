@@ -161,10 +161,106 @@ typedef struct
   int  uvar_slots;              /* total int slots the actor needs */
   int  inherited;              /* 1 once parent state/vars merged in       */
   int  use_special;            /* 1 if +USESPECIAL: usable -> Active state  */
+  int  xlat_id;                /* DECORATE Translation: index into the
+                                * built-translation table, or -1 if none    */
+  char xlat_raw[160];          /* raw Translation property text, captured
+                                * before the table is built at registration */
 } decorate_actor_t;
 
 static decorate_actor_t actors[MAX_DECORATE_ACTORS];
 static int num_actors;
+
+/* Built DECORATE colour-remap tables.  Each entry is a 256-byte palette
+ * translation (identity except for the remapped ranges).  Actors reference one
+ * by index (decorate_actor_t.xlat_id); the spawned mobj carries a pointer to
+ * the bytes so the sprite renderer can swap colours.  Built once at
+ * registration, after the palette is available, and never freed. */
+#define MAX_DECORATE_XLATS 64
+static uint8_t decorate_xlats[MAX_DECORATE_XLATS][256];
+static char    decorate_xlat_src[MAX_DECORATE_XLATS][160];
+static int     num_decorate_xlats;
+
+/* Parse a ZDoom translation string ("a:b=c:d, e:f=g:h, ...") into `tbl`,
+ * which must already be identity-initialised.  Each clause remaps source
+ * palette indices a..b linearly onto destination indices c..d. */
+#define DXLAT_CLAMP(v) ((v) < 0 ? 0 : (v) > 255 ? 255 : (v))
+static void decorate_parse_translation(const char *src, uint8_t *tbl)
+{
+  const char *p = src;
+  while (*p)
+  {
+    int a, b, c, d, i;
+    /* skip separators and optional surrounding quotes */
+    while (*p == ' ' || *p == '\t' || *p == ',' || *p == '"') p++;
+    if (!*p) break;
+    if (sscanf(p, "%d:%d=%d:%d", &a, &b, &c, &d) == 4)
+    {
+      int span_s;
+      a = DXLAT_CLAMP(a);
+      b = DXLAT_CLAMP(b);
+      c = DXLAT_CLAMP(c);
+      d = DXLAT_CLAMP(d);
+      span_s = b - a;
+      if (span_s < 0) span_s = -span_s;     /* iterate magnitude */
+      for (i = 0; i <= span_s; i++)
+      {
+        int s = (b >= a) ? (a + i) : (a - i);
+        int t = (span_s == 0) ? c
+                              : c + (int)((long)(d - c) * i / span_s);
+        t = DXLAT_CLAMP(t);
+        tbl[s & 0xff] = (uint8_t)t;
+      }
+    }
+    /* advance to the next clause (past this one's comma) */
+    while (*p && *p != ',') p++;
+  }
+}
+
+/* Resolve a raw Translation string to a built-table index, building it once
+ * and de-duplicating identical strings.  Returns -1 on empty/overflow. */
+static int decorate_translation_id(const char *raw)
+{
+  int i;
+  if (!raw || !raw[0])
+    return -1;
+  for (i = 0; i < num_decorate_xlats; i++)
+    if (!strcmp(decorate_xlat_src[i], raw))
+      return i;
+  if (num_decorate_xlats >= MAX_DECORATE_XLATS)
+    return -1;
+  i = num_decorate_xlats++;
+  { int k; for (k = 0; k < 256; k++) decorate_xlats[i][k] = (uint8_t)k; }
+  decorate_parse_translation(raw, decorate_xlats[i]);
+  {
+    size_t rl = strlen(raw);
+    if (rl > sizeof(decorate_xlat_src[i]) - 1)
+      rl = sizeof(decorate_xlat_src[i]) - 1;
+    memcpy(decorate_xlat_src[i], raw, rl);
+    decorate_xlat_src[i][rl] = 0;
+  }
+  return i;
+}
+
+/* Public: the 256-byte remap table for a built id, or NULL. */
+const uint8_t *U_DecorateTranslation(int xlat_id)
+{
+  if (xlat_id < 0 || xlat_id >= num_decorate_xlats)
+    return NULL;
+  return decorate_xlats[xlat_id];
+}
+
+/* True if `p` points at one of the built 256-byte translation tables.  The
+ * sprite renderer validates a vissprite's translation pointer with this so a
+ * stale or wild value can never reach the column drawer. */
+int U_DecorateTranslationOK(const uint8_t *p)
+{
+  const uint8_t *base = (const uint8_t *)decorate_xlats;
+  if (!p || num_decorate_xlats <= 0)
+    return 0;
+  return p >= base &&
+         p <  base + (size_t)num_decorate_xlats * 256 &&
+         ((size_t)(p - base) % 256) == 0;   /* must be a table start */
+}
 
 /* Per-mobjtype user-variable map, filled at registration so the ACS
  * user-variable builtins can resolve (actor type, name) to a storage slot.
@@ -266,6 +362,13 @@ enum {
 #define MAX_DECORATE_SOUNDS 256
 static char decorate_sounds[MAX_DECORATE_SOUNDS][32];
 static int  num_decorate_sounds;
+
+/* Class names captured from A_CustomMissile("Class", ...) frames, so the fired
+ * imp ball can inherit that class's DECORATE Translation/Scale.  Each frame
+ * stores an index into this table (or -1) in its parallel seqop.uvslot. */
+#define MAX_DECORATE_CMISS 64
+static char decorate_cmiss_class[MAX_DECORATE_CMISS][32];
+static int  num_decorate_cmiss;
 
 /* Class names captured for A_SpawnItemEx frames; resolved to a mobjtype at
  * registration (the spawned actor must itself be a registered decoration). */
@@ -488,12 +591,18 @@ void A_DecorateFadeOut(mobj_t *mo)
 void A_DecorateCustomMissile(mobj_t *mo)
 {
   int deg;
+  const uint8_t *xlat = NULL;
+  mobj_t *shot = NULL;
   if (!mo || !mo->state || !mo->target)
     return;
   A_FaceTarget(mo);
   deg = (int)mo->state->misc1;
+  /* misc2, when nonzero, is (translation id + 1) of the named projectile
+   * class; recolour the fired imp ball to match the mod's custom shot. */
+  if (mo->state->misc2 > 0)
+    xlat = U_DecorateTranslation((int)mo->state->misc2 - 1);
   if (deg == 0)
-    P_SpawnMissile(mo, mo->target, MT_TROOPSHOT);
+    shot = P_SpawnMissile(mo, mo->target, MT_TROOPSHOT);
   else
   {
     /* aim from the actor toward the target, offset by the requested angle:
@@ -501,8 +610,10 @@ void A_DecorateCustomMissile(mobj_t *mo)
      * offset directly; unsigned wraparound handles a negative offset. */
     angle_t base = R_PointToAngle2(mo->x, mo->y, mo->target->x, mo->target->y);
     angle_t off  = (angle_t)deg * ANG1;
-    P_SpawnMissileAngle(mo, MT_TROOPSHOT, base + off, 0);
+    shot = P_SpawnMissileAngle(mo, MT_TROOPSHOT, base + off, 0);
   }
+  if (shot && xlat)
+    shot->translation = xlat;
 }
 
 /* A_SetUserArray(name, idxexpr, expr): write the value expression to element
@@ -1065,6 +1176,7 @@ static void parse_header(const char *p, const char *end)
   a->radius = a->height = -1;
   a->alpha = FRACUNIT;
   a->wpn_slot = -1;
+  a->xlat_id = -1;
 
   p = skip_space(p, end);
   p = read_word(p, end, a->name, sizeof(a->name));
@@ -1604,6 +1716,23 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       p = read_word(p, end, word, sizeof(word));
       a->damage = atoi(word);
     }
+    else if (!strcasecmp(word, "Translation"))
+    {
+      /* "Translation \"a:b=c:d\", \"e:f=g:h\", ...": a palette colour remap.
+       * Capture the raw text to the end of the line; it is turned into a
+       * 256-byte translation table at registration (the palette is loaded by
+       * then).  Source ranges map onto destination ranges. */
+      const char *ls = p;
+      const char *le = ls;
+      int n;
+      while (le < end && *le != '\n' && *le != '\r') le++;
+      n = (int)(le - ls);
+      if (n > (int)sizeof(a->xlat_raw) - 1)
+        n = (int)sizeof(a->xlat_raw) - 1;
+      memcpy(a->xlat_raw, ls, (size_t)n);
+      a->xlat_raw[n] = 0;
+      p = le;
+    }
     else if (!strcasecmp(word, "SeeSound")  ||
              !strcasecmp(word, "PainSound") ||
              !strcasecmp(word, "DeathSound")||
@@ -1886,6 +2015,7 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         int t = atoi(tics);
         int bright = 0;
         short act = DA_NONE, snd = -1;
+        short cmiss_id = -1;       /* A_CustomMissile class index, or -1 */
         struct { short uvslot; short flag; short fval; dexpr_t idx; dexpr_t val; }
               opstage;
         struct { short has_jump; short jtoff; char tname[24]; dexpr_t jcond; }
@@ -1982,15 +2112,33 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           }
           else if (!strcasecmp(fn, "A_CustomMissile"))
           {
-            /* A_CustomMissile("Class", height, spawnofs, angle, ...): only the
-             * angle offset (the 4th argument, in degrees) is modelled so a
-             * multi-call burst fans out; the class always fires the imp ball.
-             * Walk past the first three comma-separated arguments to it. */
+            /* A_CustomMissile("Class", height, spawnofs, angle, ...): the
+             * angle offset (4th argument, degrees) fans a multi-call burst,
+             * and the projectile class name is captured so its DECORATE
+             * Translation/Scale can be applied to the fired imp ball (the
+             * mod recolours and shrinks it).  Walk the comma-separated args. */
             const char *ar = strchr(b, '(');
             int deg = 0, commas = 0;
             if (ar)
             {
               const char *q2 = ar + 1;
+              /* first argument: the class name (may be quoted) */
+              const char *cs = q2;
+              const char *ce;
+              while (*cs == ' ' || *cs == '\t' || *cs == '"') cs++;
+              ce = cs;
+              while (*ce && *ce != ',' && *ce != ')' && *ce != '"' &&
+                     *ce != ' ' && *ce != '\t') ce++;
+              {
+                int cl = (int)(ce - cs);
+                if (cl > 0 && cl < (int)sizeof(decorate_cmiss_class[0]) &&
+                    num_decorate_cmiss < MAX_DECORATE_CMISS)
+                {
+                  memcpy(decorate_cmiss_class[num_decorate_cmiss], cs, (size_t)cl);
+                  decorate_cmiss_class[num_decorate_cmiss][cl] = 0;
+                  cmiss_id = (short)num_decorate_cmiss++;
+                }
+              }
               while (*q2 && *q2 != ')')
               {
                 if (*q2 == ',')
@@ -2218,6 +2366,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
             a->seqop[a->seq_len].idx    = opstage.idx;
             a->seqop[a->seq_len].val    = opstage.val;
           }
+          else if (fi == 0 && act == DA_CUSTOMMISSILE)
+            a->seqop[a->seq_len].uvslot = cmiss_id;   /* projectile class id */
           if (fi == 0 && flowstage.has_jump)
           {
             a->seqflow[a->seq_len].has_jump = 1;
@@ -2731,6 +2881,23 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
       case DA_CUSTOMMISSILE:
         state->action.arg0 = (arg0_t)A_DecorateCustomMissile;
         state->misc1 = a->seq[f].snd;   /* angle offset in degrees (may be <0) */
+        /* misc2 carries (xlat_id+1) of the named projectile class so the
+         * runtime can recolour the fired ball; 0 means "no translation". */
+        state->misc2 = 0;
+        {
+          int cid = a->seqop[f].uvslot;   /* captured A_CustomMissile class id */
+          if (cid >= 0 && cid < num_decorate_cmiss)
+          {
+            decorate_actor_t *cm = find_actor_mut(decorate_cmiss_class[cid]);
+            if (cm)
+            {
+              if (cm->xlat_id < 0 && cm->xlat_raw[0])
+                cm->xlat_id = decorate_translation_id(cm->xlat_raw);
+              if (cm->xlat_id >= 0)
+                state->misc2 = cm->xlat_id + 1;
+            }
+          }
+        }
         break;
       case DA_NOBLOCKING:
         state->action.arg0 = (arg0_t)A_Fall;

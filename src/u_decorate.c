@@ -2666,26 +2666,45 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
 
   /* Prepend a death action that runs the hdoom ACS death decision before the
    * death animation plays.  A fresh state with a zero-tic TNT1 frame runs
-   * A_HDoomDeath, then falls through (nextstate) to the clone's existing
-   * death animation, which serves as the Faint sequence.  Point both the
-   * normal and gib death entries at it so either kind of kill triggers the
-   * sex-actor spawn.  With no death animation to fall into (deathstate 0)
-   * leave it alone -- there is nothing to play. */
-  if (info->deathstate > 0)
+   * A_HDoomDeath, then falls through (nextstate) to the death animation.
+   *
+   * The mod defines its own death animation under a "Faint" label in its
+   * DECORATE (different frames and timing from the stock monster it reskins),
+   * so build that captured sequence and fall through into it instead of the
+   * reskinned stock death.  Fall back to the reskinned stock death only when
+   * the actor declares no Faint sequence.  Point both the normal and gib
+   * death entries at the action so either kind of kill triggers it. */
   {
-    int ds   = (*st_cursor)++;
-    state_t *st;
-    dsda_GetState(ds);            /* grow the table to fit before caching */
-    info = dsda_GetMobjInfo(mt);  /* re-cache: GetState may have moved tables */
-    st = dsda_GetState(ds);
-    st->sprite      = SPR_TNT1;
-    st->frame       = 0;
-    st->tics        = 0;
-    st->action.arg1 = (arg1_t)A_HDoomDeath;
-    st->nextstate   = info->deathstate;
-    st->misc1 = st->misc2 = 0;
-    info->deathstate  = ds;
-    info->xdeathstate = ds;
+    int faint_li = decorate_label_index(a, "Faint");
+    int faint_state = -1;
+    if (faint_li >= 0 && a->seq_len > 0)
+    {
+      int fsp  = decorate_sprite_index(a->seq_sprite[0] ? a->seq_sprite
+                                                        : a->seq[0].spr, sp_next);
+      int fbase = *st_cursor;
+      dsda_GetState(fbase + a->seq_len - 1);  /* grow before building */
+      info = dsda_GetMobjInfo(mt);            /* re-cache after possible move */
+      decorate_build_states(a, fsp, fbase, a->seq_len, sp_next);
+      *st_cursor += a->seq_len;
+      faint_state = fbase + a->seqlabel[faint_li].frame;
+    }
+
+    if (faint_state > 0 || info->deathstate > 0)
+    {
+      int ds   = (*st_cursor)++;
+      state_t *st;
+      dsda_GetState(ds);            /* grow the table to fit before caching */
+      info = dsda_GetMobjInfo(mt);  /* re-cache: GetState may have moved tables */
+      st = dsda_GetState(ds);
+      st->sprite      = SPR_TNT1;
+      st->frame       = 0;
+      st->tics        = 0;
+      st->action.arg1 = (arg1_t)A_HDoomDeath;
+      st->nextstate   = (faint_state > 0) ? faint_state : info->deathstate;
+      st->misc1 = st->misc2 = 0;
+      info->deathstate  = ds;
+      info->xdeathstate = ds;
+    }
   }
 
   if (num_decorate_repls < MAX_DECORATE_ACTORS)

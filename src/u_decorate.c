@@ -2238,7 +2238,7 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
    * monster, re-skin its cloned states to that sprite */
   if (a->seq_sprite[0])
   {
-    const char *bs = (states[info->spawnstate].sprite < num_sprites)
+    const char *bs = ((int)states[info->spawnstate].sprite < num_sprites)
                      ? sprnames[states[info->spawnstate].sprite] : NULL;
     memset(basespr, 0, sizeof(basespr));
     if (bs) memcpy(basespr, bs, 4);

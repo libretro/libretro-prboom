@@ -22,4 +22,9 @@ dbool W_IsPK3(const unsigned char *data, int length);
 unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
                               int *out_length, const char *archive_name);
 
+/* Global lump number for an exact archive path (e.g. "decorate/monster/
+ * imp.txt"), disambiguating same-basename lumps that collide in the 8-char
+ * lump namespace.  Returns -1 if no archive member with that path is loaded. */
+int W_PK3LumpForPath(const char *path);
+
 #endif

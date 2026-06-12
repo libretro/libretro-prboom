@@ -38,6 +38,107 @@
 
 #include "miniz.h"
 
+/* ---- full-path registry -------------------------------------------------
+ *
+ * The synthesized lump name is the basename truncated to eight characters,
+ * so two archive members that share a basename in different folders collide
+ * (decorate/monster/imp.txt and decorate/sex/imp.txt both become "IMP").
+ * Lookups that need to follow a full path -- chiefly DECORATE #include, which
+ * names "decorate/monster/imp.txt" exactly -- cannot disambiguate by lump name
+ * alone.  Record every emitted lump's full archive path against the address
+ * of its data inside the synthesized image; that address is stable (the image
+ * becomes the wadfile's data buffer), so a path can later be matched to the
+ * one global lump whose data lives there.  Paths are stored lowercased with
+ * forward slashes for case- and separator-insensitive comparison. */
+typedef struct
+{
+  char                 path[192];
+  const unsigned char *data;     /* &image[filepos] once the image is built */
+  int                  filepos;  /* offset of the data within the image     */
+} pk3_pathent_t;
+
+static pk3_pathent_t *pk3_paths;
+static int            pk3_paths_len;
+static int            pk3_paths_cap;
+static int            pk3_paths_base;  /* first index for the current archive */
+
+static void pk3_path_norm(char *out, size_t outsz, const char *path)
+{
+  size_t i;
+  for (i = 0; path[i] && i + 1 < outsz; i++)
+  {
+    char c = path[i];
+    if (c == '\\') c = '/';
+    else if (c >= 'A' && c <= 'Z') c = (char)(c - 'A' + 'a');
+    out[i] = c;
+  }
+  out[i] = 0;
+}
+
+static void pk3_path_record(const char *path, int filepos)
+{
+  pk3_pathent_t *e;
+  if (!path || !path[0])
+    return;
+  if (pk3_paths_len == pk3_paths_cap)
+  {
+    int ncap = pk3_paths_cap ? pk3_paths_cap * 2 : 256;
+    pk3_pathent_t *np = realloc(pk3_paths, (size_t)ncap * sizeof(*np));
+    if (!np)
+      return;                       /* registry is best-effort */
+    pk3_paths = np;
+    pk3_paths_cap = ncap;
+  }
+  e = &pk3_paths[pk3_paths_len++];
+  pk3_path_norm(e->path, sizeof(e->path), path);
+  e->data    = NULL;
+  e->filepos = filepos;
+}
+
+/* Once the image base is known, resolve each pending entry's data address. */
+static void pk3_path_bind(const unsigned char *image)
+{
+  int i;
+  for (i = pk3_paths_base; i < pk3_paths_len; i++)
+    pk3_paths[i].data = image + pk3_paths[i].filepos;
+  pk3_paths_base = pk3_paths_len;
+}
+
+/* Public: the global lump number whose data matches the given full archive
+ * path, or -1.  Matches by exact normalized path first, then by trailing
+ * path (so a leading "./" or namespace prefix on either side still hits). */
+int W_PK3LumpForPath(const char *path)
+{
+  char want[192];
+  int  i, lump;
+  if (!path || !path[0] || !pk3_paths)
+    return -1;
+  pk3_path_norm(want, sizeof(want), path);
+  for (i = 0; i < pk3_paths_len; i++)
+  {
+    const char *p = pk3_paths[i].path;
+    size_t lp = strlen(p), lw = strlen(want);
+    int hit = !strcmp(p, want);
+    if (!hit && lp > lw && p[lp - lw - 1] == '/' && !strcmp(p + lp - lw, want))
+      hit = 1;                      /* want is a trailing segment of p */
+    if (!hit && lw > lp && want[lw - lp - 1] == '/' && !strcmp(want + lw - lp, p))
+      hit = 1;                      /* p is a trailing segment of want */
+    if (!hit)
+      continue;
+    /* find the global lump whose data address matches this entry */
+    for (lump = 0; lump < numlumps; lump++)
+    {
+      const lumpinfo_t *li = &lumpinfo[lump];
+      const unsigned char *base = li->wadfile ?
+        (li->wadfile->embedded_data ? li->wadfile->embedded_data
+                                    : li->wadfile->data) : NULL;
+      if (base && base + li->position == pk3_paths[i].data)
+        return lump;
+    }
+  }
+  return -1;
+}
+
 dbool W_IsPK3(const unsigned char *data, int length)
 {
   return length >= 4 &&
@@ -400,6 +501,10 @@ unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
           if (pass == PK3_PASS_TEXTURES && !pk3_add_lump(&b, "TX_START", NULL, 0)) goto oom;
           if (pass == PK3_PASS_DEFERRED && !pk3_add_lump(&b, "PD_START", NULL, 0)) goto oom;
         }
+        /* record this member's full archive path against the data offset it
+         * is about to occupy, so a later full-path lookup can pick it out of
+         * any same-basename collision (filepos mirrors pk3_add_lump). */
+        pk3_path_record(st.m_filename, b.data_len + 12);
         if (!pk3_add_lump(&b, name, data, (int)size))
           goto oom;
         emitted = 1;
@@ -452,6 +557,10 @@ oom:
   memcpy(image + 12 + b.data_len, b.dir, b.dir_len * 16);
   free(b.data);
   free(b.dir);
+
+  /* the image is now the wadfile's data buffer: resolve each recorded path's
+   * data address against it so W_PK3LumpForPath can match lumps later. */
+  pk3_path_bind(image);
 
   lprintf(LO_INFO,
           "W_TranslatePK3: %s: %d lumps synthesized from %d archive members\n",

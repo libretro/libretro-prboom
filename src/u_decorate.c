@@ -30,6 +30,7 @@
 #include "info.h"
 #include "m_fixed.h"
 #include "w_wad.h"
+#include "w_pk3.h"
 #include "lprintf.h"
 #include "dsda_hacked.h"
 #include "p_enemy.h"
@@ -983,10 +984,21 @@ static int lump_is_decorate(int lump)
 /* Resolve an #include lump name to the DECORATE lump that bears it, choosing
  * by content among same-named lumps (the name table alone is ambiguous in a
  * PK3).  Falls back to the first match if none looks like DECORATE. */
-static int decorate_resolve_include(const char *nm)
+static int decorate_resolve_include(const char *nm, const char *fullpath)
 {
-  int first = (W_CheckNumForName)(nm, ns_global);
-  int l;
+  int first, l;
+  /* Prefer an exact archive-path match: the basename truncates to eight
+   * characters, so different folders sharing a basename (decorate/monster/
+   * imp.txt vs decorate/sex/imp.txt) collide under the lump name "IMP" and a
+   * name lookup would grab whichever was emitted last.  The full path picks
+   * the intended member. */
+  if (fullpath)
+  {
+    int p = W_PK3LumpForPath(fullpath);
+    if (p >= 0)
+      return p;
+  }
+  first = (W_CheckNumForName)(nm, ns_global);
   if (first < 0)
     return -1;
   for (l = first; l >= 0; l = (W_FindNumFromName)(nm, ns_global, l))
@@ -1048,9 +1060,15 @@ static void parse_decorate_lump(int lump, int incdepth)
         if (e < len && txt[e] == '"')
         {
           char nm[9];
+          char fullp[192];
+          size_t pn = e - s;
           int  inc;
+          if (pn >= sizeof(fullp))
+            pn = sizeof(fullp) - 1;
+          memcpy(fullp, txt + s, pn);
+          fullp[pn] = 0;
           decorate_include_name(nm, txt + s, e - s);
-          inc = decorate_resolve_include(nm);
+          inc = decorate_resolve_include(nm, fullp);
           if (inc >= 0 && ninc < DECORATE_MAX_LUMPS)
             incs[ninc++] = inc;
           j = e;

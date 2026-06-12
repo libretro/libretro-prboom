@@ -1192,6 +1192,21 @@ static void inherit_one(decorate_actor_t *c)
   if (pp->use_special)
     c->use_special = 1;
 
+  /* inherit any sound the child did not set itself: ImpEncounter2..4 derive
+   * from ImpEncounter1 (which defines the see/pain/death sounds) and add no
+   * sounds of their own, so without this they would keep the stock sounds of
+   * the monster they replace instead of the mod's. */
+  if (!c->seesound[0]    && pp->seesound[0])
+    memcpy(c->seesound,    pp->seesound,    sizeof(c->seesound));
+  if (!c->painsound[0]   && pp->painsound[0])
+    memcpy(c->painsound,   pp->painsound,   sizeof(c->painsound));
+  if (!c->deathsound[0]  && pp->deathsound[0])
+    memcpy(c->deathsound,  pp->deathsound,  sizeof(c->deathsound));
+  if (!c->attacksound[0] && pp->attacksound[0])
+    memcpy(c->attacksound, pp->attacksound, sizeof(c->attacksound));
+  if (!c->activesound[0] && pp->activesound[0])
+    memcpy(c->activesound, pp->activesound, sizeof(c->activesound));
+
   /* append the parent's captured frames after the child's */
   base = c->seq_len;
   if (base + pp->seq_len > MAX_SPAWN_FRAMES)

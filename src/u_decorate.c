@@ -2260,14 +2260,65 @@ static dbool engine_knows_doomednum(int dn)
  *   logical/name  lumpname           (a direct alias)
  *   $random logical/name { a b c }   (one of a set, chosen at play time)
  * DECORATE then names the logical sound (SeeSound "impse/see"), not the lump.
- * This engine plays one sample per sound, so resolve a logical name to the
- * first lump of its set; that is audibly correct (the right voice) even
- * without the per-play randomisation.  Parsed once, lazily, into a flat
- * name->lump table. */
-typedef struct { char logical[40]; char lump[16]; } sndalias_t;
+ * A $random sound resolves to a member chosen at random each time it is
+ * looked up, matching ZDoom; a direct alias is a one-member set.  Parsed
+ * once, lazily, into a name -> member-list table. */
+#define SND_ALIAS_MAX_MEMBERS 12
+typedef struct {
+  char logical[40];
+  char members[SND_ALIAS_MAX_MEMBERS][40];
+  int  num_members;
+} sndalias_t;
 static sndalias_t *snd_aliases;
 static int         snd_num_aliases;
 static int         snd_aliases_parsed;
+
+/* Maps a logical $random sfx id to the sfx ids of its member samples, so a
+ * play of the logical id can be redirected to a random member at run time. */
+typedef struct {
+  int logical_id;
+  int members[SND_ALIAS_MAX_MEMBERS];
+  int num_members;
+} sfxrandom_t;
+#define MAX_SFX_RANDOM 256
+static sfxrandom_t sfxrandom[MAX_SFX_RANDOM];
+static int         num_sfxrandom;
+
+static void decorate_record_sfxrandom(int logical_id, const int *ids, int n)
+{
+  sfxrandom_t *r;
+  int k;
+  if (n <= 0 || num_sfxrandom >= MAX_SFX_RANDOM)
+    return;
+  r = &sfxrandom[num_sfxrandom++];
+  r->logical_id  = logical_id;
+  r->num_members = (n > SND_ALIAS_MAX_MEMBERS) ? SND_ALIAS_MAX_MEMBERS : n;
+  for (k = 0; k < r->num_members; k++)
+    r->members[k] = ids[k];
+}
+
+static int sfxrandom_count(int logical_id)
+{
+  int i;
+  for (i = 0; i < num_sfxrandom; i++)
+    if (sfxrandom[i].logical_id == logical_id)
+      return sfxrandom[i].num_members;
+  return 0;
+}
+
+static int sfxrandom_member(int logical_id, int which)
+{
+  int i;
+  for (i = 0; i < num_sfxrandom; i++)
+    if (sfxrandom[i].logical_id == logical_id)
+    {
+      int n = sfxrandom[i].num_members;
+      if (n <= 0)
+        return logical_id;
+      return sfxrandom[i].members[(which % n + n) % n];
+    }
+  return logical_id;
+}
 
 static void sndinfo_parse_lump_idx(int lump, int *cap)
 {
@@ -2296,30 +2347,42 @@ static void sndinfo_parse_lump_idx(int lump, int *cap)
     {
       if (!strcasecmp(tag, "$random"))
       {
-        char logical[40], first[16];
-        int  n = 0, got = 0;
+        char logical[40];
+        int  n = 0;
         while (i < len && (b[i]==' '||b[i]=='\t')) i++;
         while (i < len && b[i]>' ' && n < 39) logical[n++] = b[i++];
         logical[n] = 0;
-        /* find '{', then take the first token before '}' */
-        while (i < len && b[i] != '{' && b[i] != '\n') i++;
-        if (i < len && b[i] == '{')
-        {
+        /* find '{' (it may sit on the next line), then collect every member
+         * token up to '}'.  Skip intervening whitespace and newlines, but a
+         * comment line in between must not be mistaken for a brace. */
+        while (i < len && b[i] != '{' &&
+               (b[i]==' '||b[i]=='\t'||b[i]=='\r'||b[i]=='\n'))
           i++;
-          while (i < len && (b[i]==' '||b[i]=='\t'||b[i]=='\r'||b[i]=='\n')) i++;
-          n = 0;
-          while (i < len && b[i]>' ' && b[i] != '}' && n < 15) first[n++] = b[i++];
-          first[n] = 0;
-          got = (n > 0);
-          while (i < len && b[i] != '}' && b[i] != '\n') i++;
-        }
-        if (got && logical[0] && snd_num_aliases < *cap)
+        if (i < len && b[i] == '{' && logical[0] && snd_num_aliases < *cap)
         {
-          strncpy(snd_aliases[snd_num_aliases].logical, logical, 39);
-          snd_aliases[snd_num_aliases].logical[39] = 0;
-          strncpy(snd_aliases[snd_num_aliases].lump, first, 15);
-          snd_aliases[snd_num_aliases].lump[15] = 0;
-          snd_num_aliases++;
+          sndalias_t *al = &snd_aliases[snd_num_aliases];
+          i++;
+          strncpy(al->logical, logical, 39);
+          al->logical[39] = 0;
+          al->num_members = 0;
+          for (;;)
+          {
+            char mem[40];
+            int  m = 0;
+            while (i < len && (b[i]==' '||b[i]=='\t'||b[i]=='\r'||b[i]=='\n')) i++;
+            if (i >= len || b[i] == '}')
+              break;
+            while (i < len && b[i]>' ' && b[i] != '}' && m < 39) mem[m++] = b[i++];
+            mem[m] = 0;
+            if (m > 0 && al->num_members < SND_ALIAS_MAX_MEMBERS)
+            {
+              memcpy(al->members[al->num_members], mem, (size_t)m + 1);
+              al->num_members++;
+            }
+          }
+          while (i < len && b[i] != '}' && b[i] != '\n') i++;
+          if (al->num_members > 0)
+            snd_num_aliases++;
         }
       }
       else                                 /* other $directive: skip line */
@@ -2335,10 +2398,11 @@ static void sndinfo_parse_lump_idx(int lump, int *cap)
       lmp[n] = 0;
       if (n > 0 && snd_num_aliases < *cap)
       {
-        strncpy(snd_aliases[snd_num_aliases].logical, tag, 39);
-        snd_aliases[snd_num_aliases].logical[39] = 0;
-        strncpy(snd_aliases[snd_num_aliases].lump, lmp, 15);
-        snd_aliases[snd_num_aliases].lump[15] = 0;
+        sndalias_t *al = &snd_aliases[snd_num_aliases];
+        strncpy(al->logical, tag, 39);
+        al->logical[39] = 0;
+        memcpy(al->members[0], lmp, (size_t)n + 1);
+        al->num_members = 1;
         snd_num_aliases++;
       }
       while (i < len && b[i] != '\n') i++;
@@ -2348,7 +2412,11 @@ static void sndinfo_parse_lump_idx(int lump, int *cap)
 
 static void sndinfo_parse(void)
 {
-  int cap = 512, li;
+  /* The mod ships hundreds of sound aliases across its SNDINFO lumps (a direct
+   * "<logical> <lump>" registry plus the "$random" companion).  The cap must
+   * clear that total; 512 truncated the table mid-way, dropping later members
+   * (e.g. trosee3..5) so those samples never resolved. */
+  int cap = 2048, li;
   snd_aliases_parsed = 1;
   snd_aliases = malloc(sizeof(sndalias_t) * cap);
   if (!snd_aliases)
@@ -2371,7 +2439,28 @@ static void sndinfo_parse(void)
  * chain (impse/see -> trosee1 -> TROOSEE1: a $random logical set whose members
  * are themselves "<name> <lump>" aliases), so follow the chain to its end,
  * bounded against a cycle. */
-static const char *sndinfo_lump_for(const char *logical)
+/* Number of $random members bound to a logical name (0 if not a set, or a
+ * plain one-member alias counts as 1). */
+static int sndinfo_member_count(const char *logical)
+{
+  int i;
+  if (!snd_aliases_parsed)
+    sndinfo_parse();
+  if (!logical)
+    return 0;
+  for (i = 0; i < snd_num_aliases; i++)
+    if (!strcasecmp(snd_aliases[i].logical, logical))
+      return snd_aliases[i].num_members;
+  return 0;
+}
+
+/* Translate a DECORATE/logical sound name to a lump it names, via SNDINFO;
+ * returns the input unchanged when there is no alias.  `pick` selects which
+ * member of a $random set to use (the caller passes a random index for
+ * per-play variation, or 0 for a deterministic first member).  Aliases chain
+ * (impse/see -> trosee1 -> TROOSEE1), so follow the chain to its end, bounded
+ * against a cycle. */
+static const char *sndinfo_lump_for_pick(const char *logical, int pick)
 {
   int hops;
   if (!snd_aliases_parsed)
@@ -2384,10 +2473,18 @@ static const char *sndinfo_lump_for(const char *logical)
     for (i = 0; i < snd_num_aliases; i++)
       if (!strcasecmp(snd_aliases[i].logical, logical))
       {
-        /* a self-alias (name -> name) is the terminal lump; stop */
-        if (!strcasecmp(snd_aliases[i].lump, logical))
+        int m = snd_aliases[i].num_members;
+        const char *next;
+        if (m <= 0)
           return logical;
-        logical = snd_aliases[i].lump;
+        next = snd_aliases[i].members[(m > 0) ? (pick % m) : 0];
+        /* a self-alias (name -> name) is the terminal lump; stop */
+        if (!strcasecmp(next, logical))
+          return logical;
+        logical = next;
+        /* only the first hop honours the random pick; chained aliases take
+         * their first member so a member name still resolves to its lump */
+        pick = 0;
         found = 1;
         break;
       }
@@ -2395,6 +2492,11 @@ static const char *sndinfo_lump_for(const char *logical)
       break;
   }
   return logical;
+}
+
+static const char *sndinfo_lump_for(const char *logical)
+{
+  return sndinfo_lump_for_pick(logical, 0);
 }
 
 /* Resolve a DECORATE A_PlaySound("name") logical name to a sfx index for
@@ -2409,6 +2511,7 @@ static int decorate_resolve_sfx(const char *name)
   const char *stem;
   sfxinfo_t *sfx;
   char *copy;
+  int   is_random, logical_id;
   /* Next free sfx slot.  dsda_GetSfx grows the table by doubling to fit an
    * index and leaves num_sfx at the inflated capacity, so re-reading num_sfx
    * as the next slot would leap past the just-created entry on every new
@@ -2418,32 +2521,106 @@ static int decorate_resolve_sfx(const char *name)
 
   if (!name || !name[0])
     return 0;
-  /* a logical SNDINFO name (impse/see) resolves to its bound lump first; a
-   * plain lump name passes through unchanged */
-  name = sndinfo_lump_for(name);
-  /* the bound lump may already carry a "ds" prefix; index by the stem */
-  stem = ((name[0] == 'd' || name[0] == 'D') &&
-          (name[1] == 's' || name[1] == 'S')) ? name + 2 : name;
 
   if (sfx_cursor < 0)
     sfx_cursor = num_sfx;
 
+  /* A $random SNDINFO set (impse/see -> { trosee1 .. trosee5 }) must vary per
+   * play.  Register a logical sfx that carries no sample of its own and, on
+   * the side, the sfx id of each member sample; the sound system redirects a
+   * play of the logical id to a random member id.  A single-member alias (or
+   * a plain lump name) bakes straight to its lump as before. */
+  is_random = sndinfo_member_count(name) > 1;
+
+  if (!is_random)
+  {
+    name = sndinfo_lump_for(name);
+    /* the bound lump may already carry a "ds" prefix; index by the stem */
+    stem = ((name[0] == 'd' || name[0] == 'D') &&
+            (name[1] == 's' || name[1] == 'S')) ? name + 2 : name;
+
+    for (i = 1; i < sfx_cursor; i++)
+      if (S_sfx[i].name && !strcasecmp(S_sfx[i].name, stem))
+        return i;
+
+    i   = sfx_cursor++;            /* grow one slot */
+    sfx = dsda_GetSfx(i);          /* may move S_sfx; use the returned ptr */
+    copy = malloc(strlen(stem) + 1);
+    if (!copy)
+      return 0;
+    strcpy(copy, stem);
+    sfx->name        = copy;
+    sfx->singularity = false;
+    sfx->priority    = 98;
+    sfx->pitch       = -1;
+    sfx->volume      = -1;
+    return i;
+  }
+
+  /* random set: reuse an existing logical entry if already built */
   for (i = 1; i < sfx_cursor; i++)
-    if (S_sfx[i].name && !strcasecmp(S_sfx[i].name, stem))
+    if (S_sfx[i].name && !strcasecmp(S_sfx[i].name, name))
       return i;
 
-  i   = sfx_cursor++;            /* grow one slot */
-  sfx = dsda_GetSfx(i);          /* may move S_sfx; use the returned ptr */
-  copy = malloc(strlen(stem) + 1);
+  /* logical entry first (no sample) */
+  logical_id = sfx_cursor++;
+  sfx = dsda_GetSfx(logical_id);
+  copy = malloc(strlen(name) + 1);
   if (!copy)
     return 0;
-  strcpy(copy, stem);
+  strcpy(copy, name);
   sfx->name        = copy;
   sfx->singularity = false;
   sfx->priority    = 98;
   sfx->pitch       = -1;
   sfx->volume      = -1;
-  return i;
+
+  /* register each member as its own sfx and record the mapping */
+  {
+    int mc = sndinfo_member_count(name), k;
+    int ids[SND_ALIAS_MAX_MEMBERS], nids = 0;
+    for (k = 0; k < mc && k < SND_ALIAS_MAX_MEMBERS; k++)
+    {
+      const char *ml = sndinfo_lump_for_pick(name, k);
+      const char *ms;
+      int j, mid = -1;
+      if (!ml)
+        continue;
+      ms = ((ml[0] == 'd' || ml[0] == 'D') &&
+            (ml[1] == 's' || ml[1] == 'S')) ? ml + 2 : ml;
+      for (j = 1; j < sfx_cursor; j++)
+        if (S_sfx[j].name && !strcasecmp(S_sfx[j].name, ms))
+        { mid = j; break; }
+      if (mid < 0)
+      {
+        char *mc2 = malloc(strlen(ms) + 1);
+        if (!mc2)
+          continue;
+        mid = sfx_cursor++;
+        sfx = dsda_GetSfx(mid);
+        strcpy(mc2, ms);
+        sfx->name        = mc2;
+        sfx->singularity = false;
+        sfx->priority    = 98;
+        sfx->pitch       = -1;
+        sfx->volume      = -1;
+      }
+      ids[nids++] = mid;
+    }
+    decorate_record_sfxrandom(logical_id, ids, nids);
+  }
+  return logical_id;
+}
+
+/* Map a logical $random sfx id to one of its member ids at play time, or the
+ * id itself when it is not a random set.  Returns a member chosen at random so
+ * the sound varies between plays. */
+int U_SoundRandomId(int id)
+{
+  int n = sfxrandom_count(id);
+  if (n <= 0)
+    return id;
+  return sfxrandom_member(id, P_Random(pr_misc) % n);
 }
 
 static int decorate_sprite_index(const char *name, int *sp_next);

@@ -42,6 +42,7 @@
 #include "d_main.h"
 #include "r_main.h"
 #include "m_random.h"
+#include "u_decorate.h"
 #include "w_wad.h"
 #include "lprintf.h"
 #include "dsda_hacked.h"
@@ -403,6 +404,12 @@ static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
 
   is_pickup = sfx_id & PICKUP_SOUND || sfx_id == sfx_oof || (compatibility_level >= prboom_2_compatibility && sfx_id == sfx_noway); // killough 4/25/98
   sfx_id &= ~PICKUP_SOUND;
+
+  /* A DECORATE $random sound is registered as a logical id whose play is
+   * redirected to a random member sample each time, so the sound varies
+   * between plays the way it does in ZDoom (e.g. a monster's five "see"
+   * grunts) instead of always playing the same member. */
+  sfx_id = U_SoundRandomId(sfx_id);
 
   // check for bogus sound #
   // DSDHacked: valid ids are 1..num_sfx-1 against the runtime-grown S_sfx

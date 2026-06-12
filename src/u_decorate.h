@@ -10,6 +10,12 @@
  * otherwise -1. */
 int U_DecorateAliasDoomedNum(int doomednum);
 
+/* If `id` is a logical $random SNDINFO sound (more than one member), return a
+ * randomly chosen member's sfx id (varies per call); otherwise return `id`
+ * unchanged.  The sound system calls this so a $random sound varies between
+ * plays the way it does in ZDoom. */
+int U_SoundRandomId(int id);
+
 /* true if the wad's DECORATE lump redefines the named sprite's state
  * sequence (r_things only unifies art for such sprites) */
 dbool U_DecorateMentionsSprite(const char *name);

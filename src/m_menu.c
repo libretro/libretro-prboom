@@ -912,13 +912,22 @@ menu_t NewDef =
 };
 
 /* Apply any MAPINFO custom skill names over the stock New Game captions.
- * Called as the skill menu is entered so a mod's difficulty names appear. */
+ * Called as the skill menu is entered so a mod's difficulty names appear.
+ *
+ * The menu prefers a drawable patch (M_JKILL, M_ROUGH, ...) over alttext and
+ * only falls back to text when a patch is missing.  The stock skill patches
+ * exist, so to make a custom name actually show we must also clear that item's
+ * patch name -- that forces M_DrawNewGame's "any missing patch -> draw the
+ * whole menu as text" path, so every skill (custom or not) renders as text. */
 void M_ApplySkillNames(void)
 {
   int i;
   for (i = 0; i < newg_end && i < MAX_SKILL_NAMES; i++)
     if (custom_skill_names[i])
+    {
       NewGameMenu[i].alttext = custom_skill_names[i];
+      NewGameMenu[i].name[0] = 0;     /* drop the patch: draw as text */
+    }
 }
 
 //

@@ -31,9 +31,10 @@ int wall_decals_enabled = 0;
  * renders the scuff mark black instead of its raw light graphic.  Build a
  * 256-entry palette translation: for every PLAYPAL index, scale the shade
  * colour by that index's luminance and snap to the nearest palette entry.
- * Tables are cached per decaldef (decaldef_t::shade_trans indexes here). */
+ * Tables are cached by their shade colour (few distinct shades are in use). */
 #define MAX_SHADE_TABLES 64
 static byte shade_tables[MAX_SHADE_TABLES][256];
+static int  shade_key[MAX_SHADE_TABLES];   /* packed 0x00RRGGBB per table */
 static int  num_shade_tables;
 
 static int R_BuildShadeTable(int sr, int sg, int sb)
@@ -46,6 +47,7 @@ static int R_BuildShadeTable(int sr, int sg, int sb)
     return -1;
   id  = num_shade_tables++;
   tbl = shade_tables[id];
+  shade_key[id] = ((sr & 0xff) << 16) | ((sg & 0xff) << 8) | (sb & 0xff);
   pal = W_CacheLumpName("PLAYPAL");
 
   for (i = 0; i < 256; i++)
@@ -77,18 +79,22 @@ static int R_BuildShadeTable(int sr, int sg, int sb)
   return id;
 }
 
-/* Resolve (building once) the shade translation table for a decaldef, or NULL
- * if it has no shade. */
-const byte *R_DecalShadeTable(decaldef_t *def)
+/* Resolve (building once per distinct shade colour) the translation table for
+ * a decaldef, or NULL if it has no shade.  The def is read-only: the cache is
+ * keyed by the shade colour, so decals that share a shade share a table. */
+const byte *R_DecalShadeTable(const decaldef_t *def)
 {
+  int key, i;
   if (!def->has_shade)
     return NULL;
-  if (def->shade_trans < 0)
-    def->shade_trans = R_BuildShadeTable(def->shade_r, def->shade_g,
-                                         def->shade_b);
-  if (def->shade_trans < 0)
-    return NULL;
-  return shade_tables[def->shade_trans];
+  key = ((def->shade_r & 0xff) << 16) |
+        ((def->shade_g & 0xff) << 8)  |
+         (def->shade_b & 0xff);
+  for (i = 0; i < num_shade_tables; i++)
+    if (shade_key[i] == key)
+      return shade_tables[i];
+  i = R_BuildShadeTable(def->shade_r, def->shade_g, def->shade_b);
+  return (i >= 0) ? shade_tables[i] : NULL;
 }
 
 void R_ClearDecals(void)

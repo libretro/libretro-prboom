@@ -1794,20 +1794,6 @@ extern patchnum_t hu_font[HU_FONTSIZE];
  * scaled dialogue-text glyphs to the requested text colour. */
 extern const uint8_t *colrngs[CR_LIMIT];
 
-/* Map a 16.16 HUD coordinate in the current hud box to 320x200 virtual space. */
-static int zacs_hud_map_x(int fx)
-{
-  int px = fx >> 16;
-  if (zacs_hud_w <= 0) return px;
-  return (int)((long long)px * 320 / zacs_hud_w);
-}
-static int zacs_hud_map_y(int fy)
-{
-  int py = fy >> 16;
-  if (zacs_hud_h <= 0) return py;
-  return (int)((long long)py * 200 / zacs_hud_h);
-}
-
 /* Resolve a font/graphic name to a drawable patch lump, or -1 if it is a real
  * text font (or unknown).  Story content selects a portrait or the dialogue
  * frame by SetFont()-ing a single-image "font" and printing one character, so

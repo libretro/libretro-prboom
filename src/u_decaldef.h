@@ -53,7 +53,6 @@ typedef struct
   unsigned flags;
   int     has_shade;         /* 1 if a shade colour was specified  */
   int     shade_r, shade_g, shade_b;  /* shade target colour, 0..255 */
-  int     shade_trans;       /* built luminance->shade table id, or -1 */
   char    lowerdecal[64];    /* spawned beneath this one, or empty */
 } decaldef_t;
 

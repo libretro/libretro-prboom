@@ -52,7 +52,6 @@ static void dd_parse_decal(u_scanner_t *s)
   d.texnum = -1;
   d.xscale = d.yscale = FRACUNIT;
   d.alpha  = FRACUNIT;
-  d.shade_trans = -1;        /* built lazily on first render */
 
   if (!U_GetNextToken(s, TRUE) || s->token != '{')
     return;

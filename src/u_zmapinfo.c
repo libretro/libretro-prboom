@@ -72,7 +72,7 @@ static void Z_ParseLanguageLump(int lump)
       continue;
     }
 
-    if (s.token == TK_Identifier || s.token == TK_StringConst)
+    if ((s.token == TK_Identifier || s.token == TK_StringConst) && s.string)
       key = strdup(s.string);
 
     if (key && U_CheckToken(&s, '='))
@@ -80,7 +80,7 @@ static void Z_ParseLanguageLump(int lump)
       /* concatenate adjacent string constants up to ';' */
       char  *val = NULL;
       size_t len = 0;
-      while (U_GetNextToken(&s, TRUE) && s.token == TK_StringConst)
+      while (U_GetNextToken(&s, TRUE) && s.token == TK_StringConst && s.string)
       {
         size_t add = strlen(s.string);
         val = realloc(val, len + add + 1);

@@ -282,6 +282,17 @@ void A_DecorateACSNamed(mobj_t *mo)
   idx = (int)mo->state->misc1;
   if (idx < 0 || idx >= num_interned_acsnames)
     return;
+  /* A use-activated story actor starts its conversation script with this
+   * action.  The player is held frozen for the duration of the conversation,
+   * and the dialogue itself consumes the use key to advance.  Our use handler
+   * still lets a held or repeated use re-activate the actor, which would start
+   * a second, overlapping copy of the conversation each press -- the lines bounce
+   * and replay and the dialogue never settles.  If the using player (the actor's
+   * recorded target) is already frozen in a conversation, the conversation is
+   * in progress: do not start another copy. */
+  if (mo->target && mo->target->player &&
+      (mo->target->player->cheats & CF_TOTALLYFROZEN))
+    return;
   Z_ACSStartNamedStr(interned_acsnames[idx], NULL, 0, mo, true);
 }
 

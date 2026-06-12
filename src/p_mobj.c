@@ -2449,7 +2449,8 @@ void P_SpawnMapThing (const mapthing_t* mthing)
     if (map_format.zdoom)
     {
       int alias;
-      if (thingtype >= 9982 && thingtype <= 9999)
+      if ((thingtype >= 9982 && thingtype <= 9999) ||
+          (thingtype >= 9040 && thingtype <= 9048))
       {
         /* sector action marker: no mobj, just the registry */
         U_ZSecActRegister(mthing->x << FRACBITS, mthing->y << FRACBITS,

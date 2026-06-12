@@ -81,3 +81,49 @@ void U_ZSecActTrigger(sector_t *sector, int type, mobj_t *activator)
   }
   depth--;
 }
+
+/* Run every registered action in the activator's current sector whose type is
+ * one of the two given editor numbers (the floor and 3D-floor variants of a
+ * damage or death event), with the actor as activator.  Kept separate from
+ * U_ZSecActTrigger so the two responding editor numbers are matched in one
+ * pass without a second sector walk. */
+static void U_ZSecActTriggerPair(mobj_t *activator, int type_a, int type_b)
+{
+  static int depth;
+  sector_t  *sector;
+  int        i;
+
+  if (!num_actions || !activator || !activator->player)
+    return;
+  sector = activator->subsector->sector;
+  if (depth >= 8)
+    return;
+
+  depth++;
+  for (i = 0; i < num_actions; i++)
+  {
+    zsecact_t *a = &actions[i];
+    if (a->sector != sector || !a->special)
+      continue;
+    if (a->type != type_a && a->type != type_b)
+      continue;
+    if (map_format.execute_line_special)
+      map_format.execute_line_special(a->special, a->args, NULL, 0,
+                                      activator);
+    if (activator->subsector->sector != sector)
+      break;
+  }
+  depth--;
+}
+
+void U_ZSecActDamage(mobj_t *activator)
+{
+  /* This port has no 3D floors, so the floor and 3D-floor damage actions
+   * both answer an ordinary "took damage" event. */
+  U_ZSecActTriggerPair(activator, ZSECACT_DAMAGEFLOOR, ZSECACT_DAMAGE3D);
+}
+
+void U_ZSecActDeath(mobj_t *activator)
+{
+  U_ZSecActTriggerPair(activator, ZSECACT_DEATHFLOOR, ZSECACT_DEATH3D);
+}

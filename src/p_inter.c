@@ -45,6 +45,7 @@
 #include "lprintf.h"
 
 #include "p_inter.h"
+#include "u_zsecact.h"
 #include "p_pspr.h"
 #include "hexen/p_acs.h"
 #include "hexen/p_spec_hexen.h"
@@ -2626,6 +2627,10 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
         }
 
       P_KillMobj (source, target);
+      /* ZDoom death sector actions (SecActDeathFloor / Death3D): a player
+       * who dies in the marker's sector runs its special. */
+      if (player)
+        U_ZSecActDeath(target);
       return;
     }
 
@@ -2721,4 +2726,11 @@ void P_DamageMobj(mobj_t *target,mobj_t *inflictor, mobj_t *source, int damage)
   if (justhit && (target->target == source || !target->target ||
       !(target->flags & target->target->flags & MF_FRIEND)))
     target->flags |= MF_JUSTHIT;    // fight back!
+
+  /* ZDoom damage sector actions (SecActDamageFloor / Damage3D): a player who
+   * survives taking damage in the marker's sector runs its special.  Reached
+   * only on the survive path; the death path returns above after firing the
+   * death action. */
+  if (player)
+    U_ZSecActDamage(target);
 }

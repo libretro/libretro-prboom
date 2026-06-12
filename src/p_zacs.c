@@ -5051,6 +5051,30 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           break;
         }
 
+        case 69:                          /* ACSF_GetWeapon() */
+        {
+          /* return the activator player's current weapon as a class-name
+           * string.  The dialogue system saves this before switching the
+           * player to an unarmed state for the duration of a conversation and
+           * restores it on exit (GetWeapon -> ... -> SetWeapon); returning 0
+           * here left it with an empty weapon name to restore, breaking the
+           * dialogue's weapon handling. */
+          const char *nm = "";
+          if (inst->activator && inst->activator->player)
+          {
+            int w = (int)inst->activator->player->readyweapon;
+            size_t i;
+            for (i = 0; i < sizeof(zacs_weapmap)/sizeof(zacs_weapmap[0]); i++)
+              if (zacs_weapmap[i].weapon == w)
+              {
+                nm = zacs_weapmap[i].name;
+                break;
+              }
+          }
+          r = zacs_save_string(nm);
+          break;
+        }
+
         case 13:                          /* ACSF_SetActivatorToTarget(tid) */
         {
           /* retarget the script's activator to the target of the actor named

@@ -1690,6 +1690,32 @@ static int zacs_font_graphic(const char *font)
 }
 
 /* Register/replace a positioned, timed hud message. */
+/* Translate a ZDoom text-color index (as passed to HudMessage) to this
+ * engine's CR_* translation index.  The two enumerations agree from 0 (brick)
+ * through 8 (orange) but diverge after: ZDoom 9 is white and 10 is yellow,
+ * whereas this engine has yellow at 9 and no white.  Map ZDoom white to the
+ * engine's nearest light shade and yellow to the engine's yellow; anything
+ * outside the shared range falls back to the default.  -1 (untranslated) and
+ * other unknowns map to the default light text. */
+static int zacs_zdoom_color(int zc)
+{
+  switch (zc)
+  {
+    case 0:  return CR_BRICK;
+    case 1:  return CR_TAN;
+    case 2:  return CR_GRAY;
+    case 3:  return CR_GREEN;
+    case 4:  return CR_BROWN;
+    case 5:  return CR_GOLD;
+    case 6:  return CR_RED;
+    case 7:  return CR_BLUE;
+    case 8:  return CR_ORANGE;
+    case 9:  return CR_GRAY;     /* ZDoom CR_WHITE -> nearest light shade */
+    case 10: return CR_YELLOW;   /* ZDoom CR_YELLOW */
+    default: return CR_GRAY;     /* untranslated / unknown: light text */
+  }
+}
+
 static void zacs_hud_store(const char *text, int id, int x, int y,
                            int holdtics, int color, int type,
                            int fadein, int fadeout, int typeon)
@@ -2700,13 +2726,21 @@ static int zacs_hud_alpha(const zacs_hudmsg_t *m)
 
 void Z_ACSHudDrawer(void)
 {
-  int i;
+  int pass, i;
+  /* Two passes so the dialogue art always sits behind the text: ZDoom draws
+   * the conversation backdrop and portrait first and the speaker name and
+   * spoken line on top.  Our messages are stored in arbitrary slot order, so
+   * draw every graphic message first (pass 0), then every text message
+   * (pass 1). */
+  for (pass = 0; pass < 2; pass++)
   for (i = 0; i < ZACS_HUDMSG_MAX; i++)
   {
     zacs_hudmsg_t *m = &zacs_hudmsgs[i];
     int hw, hh, alpha;
     if (!m->active)
       continue;
+    if ((pass == 0) != (m->graphic_lump >= 0))
+      continue;                       /* pass 0: graphics, pass 1: text */
     hw = m->hbox_w > 0 ? m->hbox_w : 320;
     hh = m->hbox_h > 0 ? m->hbox_h : 200;
     alpha = zacs_hud_alpha(m);
@@ -3598,7 +3632,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           fadeout = (int)(((long long)hp2 * 35) >> 16);
         }
         zacs_hud_store(inst->printbuf, hid, px, py,
-                       tics, hcolor ? hcolor : -1, htype,
+                       tics, zacs_zdoom_color(hcolor), htype,
                        fadein, fadeout, typeon);
       }
       else if (hid != 0)

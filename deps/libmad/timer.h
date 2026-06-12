@@ -79,22 +79,5 @@ enum mad_units {
   MAD_UNITS_59_94_FPS	 =   -60
 };
 
-# define mad_timer_reset(timer)	((void) (*(timer) = mad_timer_zero))
-
-int mad_timer_compare(mad_timer_t, mad_timer_t);
-
-# define mad_timer_sign(timer)	mad_timer_compare((timer), mad_timer_zero)
-
-void mad_timer_negate(mad_timer_t *);
-mad_timer_t mad_timer_abs(mad_timer_t);
-
 void mad_timer_set(mad_timer_t *, unsigned long, unsigned long, unsigned long);
-void mad_timer_add(mad_timer_t *, mad_timer_t);
-void mad_timer_multiply(mad_timer_t *, signed long);
-
-signed long mad_timer_count(mad_timer_t, enum mad_units);
-unsigned long mad_timer_fraction(mad_timer_t, unsigned long);
-void mad_timer_string(mad_timer_t, char *, char const *,
-		      enum mad_units, enum mad_units, unsigned long);
-
 # endif

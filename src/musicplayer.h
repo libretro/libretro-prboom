@@ -48,7 +48,6 @@ calls to render, and not some external timing source.  That's why things stay
 synced.
 */
 
-
 typedef struct
 {
   // descriptive name of the player, such as "OPL2 Synth"
@@ -106,41 +105,4 @@ typedef struct
   int (*unserialize)(const void *src, size_t size);
 } music_player_t;
 
-
-
-// helper for deferred load dll
-
-#ifdef _MSC_VER
-#if 1
-#define TESTDLLLOAD(a,b)
-#else
-#define TESTDLLLOAD(a,b)                                                           \
-  if (1)                                                                           \
-  {                                                                                \
-    HMODULE h = LoadLibrary (a);                                                   \
-    if (!h)                                                                        \
-    {                                                                              \
-      lprintf (LO_INFO, a " not found!\n");                                        \
-      return 0;                                                                    \
-    }                                                                              \
-    FreeLibrary (h);                                                               \
-    if (b && FAILED (__HrLoadAllImportsForDll (a)))                                \
-    {                                                                              \
-      lprintf (LO_INFO, "Couldn't get all symbols from " a "\n");                  \
-      return 0;                                                                    \
-    }                                                                              \
-  }
-#endif
-
-#else // _MSC_VER
-#define TESTDLLLOAD(a,b)
-
-#endif // _MSC_VER
-
-
-
-
-
-
-
-#endif // MUSICPLAYER_H
+#endif /* MUSICPLAYER_H */

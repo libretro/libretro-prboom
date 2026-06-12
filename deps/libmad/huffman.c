@@ -19,7 +19,6 @@
  * $Id: huffman.c,v 1.10 2004/01/23 09:41:32 rob Exp $
  */
 
-# include "global.h"
 # include "huffman.h"
 
 # include <retro_endianness.h>

@@ -115,8 +115,6 @@ static int mp_init (int samplerate)
 
 static void mp_shutdown (void)
 {
-                   
-  mad_synth_finish (&Synth);
   mad_frame_finish (&Frame);
   mad_stream_finish (&Stream);
   mad_header_finish (&Header);

@@ -22,42 +22,44 @@
 # ifndef LIBMAD_HUFFMAN_H
 # define LIBMAD_HUFFMAN_H
 
+#include <stdint.h>
+
 union huffquad {
   struct {
-    unsigned short final  :  1;
-    unsigned short bits   :  3;
-    unsigned short offset : 12;
+    uint16_t final  :  1;
+    uint16_t bits   :  3;
+    uint16_t offset : 12;
   } ptr;
   struct {
-    unsigned short final  :  1;
-    unsigned short hlen   :  3;
-    unsigned short v      :  1;
-    unsigned short w      :  1;
-    unsigned short x      :  1;
-    unsigned short y      :  1;
+    uint16_t final  :  1;
+    uint16_t hlen   :  3;
+    uint16_t v      :  1;
+    uint16_t w      :  1;
+    uint16_t x      :  1;
+    uint16_t y      :  1;
   } value;
-  unsigned short final    :  1;
+  uint16_t final    :  1;
 };
 
 union huffpair {
   struct {
-    unsigned short final  :  1;
-    unsigned short bits   :  3;
-    unsigned short offset : 12;
+    uint16_t final  :  1;
+    uint16_t bits   :  3;
+    uint16_t offset : 12;
   } ptr;
   struct {
-    unsigned short final  :  1;
-    unsigned short hlen   :  3;
-    unsigned short x      :  4;
-    unsigned short y      :  4;
+    uint16_t final  :  1;
+    uint16_t hlen   :  3;
+    uint16_t x      :  4;
+    uint16_t y      :  4;
   } value;
-  unsigned short final    :  1;
+  uint16_t final    :  1;
 };
 
 struct hufftable {
   union huffpair const *table;
-  unsigned short linbits;
-  unsigned short startbits;
+  uint16_t linbits;
+  uint16_t startbits;
 };
 
 extern union huffquad const *const mad_huff_quad_table[2];

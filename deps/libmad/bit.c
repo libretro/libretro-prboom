@@ -19,12 +19,7 @@
  * $Id: bit.c,v 1.12 2004/01/23 09:41:32 rob Exp $
  */
 
-# include "global.h"
-
-#ifndef CHAR_BIT
-#define CHAR_BIT  8
-#endif
-
+#include <stdint.h>
 # include "bit.h"
 
 /*
@@ -34,8 +29,7 @@
  *
  * G(X) = X^16 + X^15 + X^2 + 1
  */
-static
-unsigned short const crc_table[256] = {
+static uint16_t const crc_table[256] = {
   0x0000, 0x8005, 0x800f, 0x000a, 0x801b, 0x001e, 0x0014, 0x8011,
   0x8033, 0x0036, 0x003c, 0x8039, 0x0028, 0x802d, 0x8027, 0x0022,
   0x8063, 0x0066, 0x006c, 0x8069, 0x0078, 0x807d, 0x8077, 0x0072,
@@ -83,7 +77,7 @@ void mad_bit_init(struct mad_bitptr *bitptr, unsigned char const *byte)
 {
   bitptr->byte  = byte;
   bitptr->cache = 0;
-  bitptr->left  = CHAR_BIT;
+  bitptr->left  = 8;
 }
 
 /*
@@ -94,7 +88,7 @@ unsigned int mad_bit_length(struct mad_bitptr const *begin,
 			    struct mad_bitptr const *end)
 {
   return begin->left +
-    CHAR_BIT * (end->byte - (begin->byte + 1)) + (CHAR_BIT - end->left);
+    8 * (end->byte - (begin->byte + 1)) + (8 - end->left);
 }
 
 /*
@@ -103,7 +97,7 @@ unsigned int mad_bit_length(struct mad_bitptr const *begin,
  */
 unsigned char const *mad_bit_nextbyte(struct mad_bitptr const *bitptr)
 {
-  return bitptr->left == CHAR_BIT ? bitptr->byte : bitptr->byte + 1;
+  return bitptr->left == 8 ? bitptr->byte : bitptr->byte + 1;
 }
 
 /*
@@ -112,15 +106,15 @@ unsigned char const *mad_bit_nextbyte(struct mad_bitptr const *bitptr)
  */
 void mad_bit_skip(struct mad_bitptr *bitptr, unsigned int len)
 {
-  bitptr->byte += len / CHAR_BIT;
-  bitptr->left -= len % CHAR_BIT;
+  bitptr->byte += len / 8;
+  bitptr->left -= len % 8;
 
-  if (bitptr->left > CHAR_BIT) {
+  if (bitptr->left > 8) {
     bitptr->byte++;
-    bitptr->left += CHAR_BIT;
+    bitptr->left += 8;
   }
 
-  if (bitptr->left < CHAR_BIT)
+  if (bitptr->left < 8)
     bitptr->cache = *bitptr->byte;
 }
 
@@ -132,7 +126,7 @@ unsigned long mad_bit_read(struct mad_bitptr *bitptr, unsigned int len)
 {
   register unsigned long value;
 
-  if (bitptr->left == CHAR_BIT)
+  if (bitptr->left == 8)
     bitptr->cache = *bitptr->byte;
 
   if (len < bitptr->left) {
@@ -149,19 +143,19 @@ unsigned long mad_bit_read(struct mad_bitptr *bitptr, unsigned int len)
   len  -= bitptr->left;
 
   bitptr->byte++;
-  bitptr->left = CHAR_BIT;
+  bitptr->left = 8;
 
   /* more bytes */
 
-  while (len >= CHAR_BIT) {
-    value = (value << CHAR_BIT) | *bitptr->byte++;
-    len  -= CHAR_BIT;
+  while (len >= 8) {
+    value = (value << 8) | *bitptr->byte++;
+    len  -= 8;
   }
 
   if (len > 0) {
     bitptr->cache = *bitptr->byte;
 
-    value = (value << len) | (bitptr->cache >> (CHAR_BIT - len));
+    value = (value << len) | (bitptr->cache >> (8 - len));
     bitptr->left -= len;
   }
 
@@ -188,8 +182,8 @@ void mad_bit_write(struct mad_bitptr *bitptr, unsigned int len,
  * NAME:	bit->crc()
  * DESCRIPTION:	compute CRC-check word
  */
-unsigned short mad_bit_crc(struct mad_bitptr bitptr, unsigned int len,
-			   unsigned short init)
+uint16_t mad_bit_crc(struct mad_bitptr bitptr, unsigned int len,
+			   uint16_t init)
 {
   register unsigned int crc;
 

@@ -25,6 +25,8 @@
 # ifndef LIBMAD_VERSION_H
 # define LIBMAD_VERSION_H
 
+#include <stdint.h>
+
 # define MAD_VERSION_MAJOR	0
 # define MAD_VERSION_MINOR	15
 # define MAD_VERSION_PATCH	1
@@ -60,16 +62,12 @@ typedef   signed int mad_fixed64hi_t;
 typedef unsigned int mad_fixed64lo_t;
 
 # if defined(_MSC_VER)
-#  define mad_fixed64_t  signed __int64
-# elif 1 || defined(__GNUC__)
-#  define mad_fixed64_t  signed long long
-# endif
+#define mad_fixed64_t  signed __int64
+#else
+#define mad_fixed64_t  signed long long
+#endif
 
-# if defined(FPM_FLOAT)
-typedef double mad_sample_t;
-# else
 typedef mad_fixed_t mad_sample_t;
-# endif
 
 /*
  * Fixed-point format: 0xABBBBBBB
@@ -96,62 +94,21 @@ typedef mad_fixed_t mad_sample_t;
 
 # define MAD_F_FRACBITS		28
 
-# if MAD_F_FRACBITS == 28
 #  define MAD_F(x)		((mad_fixed_t) (x##L))
-# else
-#  if MAD_F_FRACBITS < 28
-#   warning "MAD_F_FRACBITS < 28"
-#   define MAD_F(x)		((mad_fixed_t)  \
-				 (((x##L) +  \
-				   (1L << (28 - MAD_F_FRACBITS - 1))) >>  \
-				  (28 - MAD_F_FRACBITS)))
-#  elif MAD_F_FRACBITS > 28
-#   error "MAD_F_FRACBITS > 28 not currently supported"
-#   define MAD_F(x)		((mad_fixed_t)  \
-				 ((x##L) << (MAD_F_FRACBITS - 28)))
-#  endif
-# endif
 
 # define MAD_F_MIN		((mad_fixed_t) -0x80000000L)
 # define MAD_F_MAX		((mad_fixed_t) +0x7fffffffL)
 
 # define MAD_F_ONE		MAD_F(0x10000000)
 
-# define mad_f_tofixed(x)	((mad_fixed_t)  \
-				 ((x) * (double) (1L << MAD_F_FRACBITS) + 0.5))
-# define mad_f_todouble(x)	((double)  \
-				 ((x) / (double) (1L << MAD_F_FRACBITS)))
-
-# define mad_f_intpart(x)	((x) >> MAD_F_FRACBITS)
-# define mad_f_fracpart(x)	((x) & ((1L << MAD_F_FRACBITS) - 1))
-				/* (x should be positive) */
-
-# define mad_f_fromint(x)	((x) << MAD_F_FRACBITS)
-
-# define mad_f_add(x, y)	((x) + (y))
-# define mad_f_sub(x, y)	((x) - (y))
-
-# if defined(FPM_FLOAT)
-#  error "FPM_FLOAT not yet supported"
-
-#  undef MAD_F
-#  define MAD_F(x)		mad_f_todouble(x)
-
-#  define mad_f_mul(x, y)	((x) * (y))
-#  define mad_f_scale64
-
-#  undef ASO_ZEROCHECK
-
-# elif defined(FPM_64BIT)
+#if defined(FPM_64BIT)
 
 /*
  * This version should be the most accurate if 64-bit types are supported by
  * the compiler, although it may not be the most efficient.
  */
 #   define mad_f_mul(x, y)  \
-    ((mad_fixed_t) (((mad_fixed64_t) (x) * (y)) >> MAD_F_SCALEBITS))
-
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
+    ((mad_fixed_t) (((mad_fixed64_t) (x) * (y)) >> MAD_F_FRACBITS))
 
 /* --- Intel --------------------------------------------------------------- */
 
@@ -201,7 +158,7 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 	    "orl %2,%1"  \
 	    : "=rm" (__result)  \
 	    : "0" (lo), "r" (hi),  \
-	      "I" (MAD_F_SCALEBITS), "I" (32 - MAD_F_SCALEBITS)  \
+	      "I" (MAD_F_FRACBITS), "I" (32 - MAD_F_FRACBITS)  \
 	    : "cc");  \
        __result;  \
     })
@@ -210,13 +167,11 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
     ({ mad_fixed_t __result;  \
        asm ("shrdl %3,%2,%1"  \
 	    : "=rm" (__result)  \
-	    : "0" (lo), "r" (hi), "I" (MAD_F_SCALEBITS)  \
+	    : "0" (lo), "r" (hi), "I" (MAD_F_FRACBITS)  \
 	    : "cc");  \
        __result;  \
     })
 #   endif
-
-#   define MAD_F_SCALEBITS  MAD_F_FRACBITS
 #  endif
 
 /* --- ARM ----------------------------------------------------------------- */
@@ -227,7 +182,6 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
  * This ARM V4 version is as accurate as FPM_64BIT but much faster. The
  * least significant bit is properly rounded at no CPU cycle cost!
  */
-# if 1
 /*
  * This is faster than the default implementation via MAD_F_MLX() and
  * mad_f_scale64().
@@ -241,11 +195,10 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 	    "adc	%2, %0, %1, lsl %6"  \
 	    : "=&r" (__lo), "=&r" (__hi), "=r" (__result)  \
 	    : "%r" (x), "r" (y),  \
-	      "M" (MAD_F_SCALEBITS), "M" (32 - MAD_F_SCALEBITS)  \
+	      "M" (MAD_F_FRACBITS), "M" (32 - MAD_F_FRACBITS)  \
 	    : "cc");  \
        __result;  \
     })
-# endif
 
 #  define MAD_F_MLX(hi, lo, x, y)  \
     asm ("smull	%0, %1, %2, %3"  \
@@ -270,12 +223,10 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 	    "adc	%0, %0, %2, lsl %4"  \
 	    : "=&r" (__result)  \
 	    : "r" (lo), "r" (hi),  \
-	      "M" (MAD_F_SCALEBITS), "M" (32 - MAD_F_SCALEBITS)  \
+	      "M" (MAD_F_FRACBITS), "M" (32 - MAD_F_FRACBITS)  \
 	    : "cc");  \
        __result;  \
     })
-
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
 
 /* --- MIPS ---------------------------------------------------------------- */
 
@@ -311,9 +262,7 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 #  define MAD_F_MLZ(hi, lo)  ((mad_fixed_t) (lo))
 # endif
 
-#  define mad_f_scale64(hi, lo)  \
-    ((mad_fixed_t) ((hi) << (32 - MAD_F_SCALEBITS)))
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
+#  define mad_f_scale64(hi, lo) ((mad_fixed_t) ((hi) << (32 - MAD_F_FRACBITS)))
 
 /* --- SPARC --------------------------------------------------------------- */
 
@@ -352,14 +301,12 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
     ({ mad_fixed_t __result;  \
        asm ("rotrwi %0,%1,%2"  \
 	    : "=r" (__result)  \
-	    : "r" (lo), "i" (MAD_F_SCALEBITS));  \
+	    : "r" (lo), "i" (MAD_F_FRACBITS));  \
        asm ("insrwi %0,%1,%2,0"  \
 	    : "+r" (__result)  \
-	    : "r" (hi), "i" (MAD_F_SCALEBITS));  \
+	    : "r" (hi), "i" (MAD_F_FRACBITS));  \
        __result;  \
     })
-
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
 
 /* --- Default ------------------------------------------------------------- */
 
@@ -415,9 +362,8 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 # if !defined(mad_f_scale64)
 #   define mad_f_scale64(hi, lo)  \
     ((mad_fixed_t)  \
-     (((hi) << (32 - MAD_F_SCALEBITS)) |  \
-      ((lo) >> MAD_F_SCALEBITS)))
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
+     (((hi) << (32 - MAD_F_FRACBITS)) |  \
+      ((lo) >> MAD_F_FRACBITS)))
 # endif
 
 /* C routines */
@@ -433,19 +379,16 @@ mad_fixed_t mad_f_div(mad_fixed_t, mad_fixed_t);
 # define LIBMAD_BIT_H
 
 struct mad_bitptr {
-  unsigned char const *byte;
-  unsigned short cache;
-  unsigned short left;
+  uint8_t const *byte;
+  uint16_t cache;
+  uint16_t left;
 };
 
 void mad_bit_init(struct mad_bitptr *, unsigned char const *);
 
-# define mad_bit_finish(bitptr)		/* nothing */
-
 unsigned int mad_bit_length(struct mad_bitptr const *,
 			    struct mad_bitptr const *);
 
-# define mad_bit_bitsleft(bitptr)  ((bitptr)->left)
 unsigned char const *mad_bit_nextbyte(struct mad_bitptr const *);
 
 void mad_bit_skip(struct mad_bitptr *, unsigned int);
@@ -518,24 +461,7 @@ enum mad_units {
   MAD_UNITS_59_94_FPS	 =   -60
 };
 
-# define mad_timer_reset(timer)	((void) (*(timer) = mad_timer_zero))
-
-int mad_timer_compare(mad_timer_t, mad_timer_t);
-
-# define mad_timer_sign(timer)	mad_timer_compare((timer), mad_timer_zero)
-
-void mad_timer_negate(mad_timer_t *);
-mad_timer_t mad_timer_abs(mad_timer_t);
-
 void mad_timer_set(mad_timer_t *, unsigned long, unsigned long, unsigned long);
-void mad_timer_add(mad_timer_t *, mad_timer_t);
-void mad_timer_multiply(mad_timer_t *, signed long);
-
-signed long mad_timer_count(mad_timer_t, enum mad_units);
-unsigned long mad_timer_fraction(mad_timer_t, unsigned long);
-void mad_timer_string(mad_timer_t, char *, char const *,
-		      enum mad_units, enum mad_units, unsigned long);
-
 # endif
 
 /* Id: stream.h,v 1.20 2004/02/05 09:02:39 rob Exp */
@@ -729,7 +655,6 @@ void mad_frame_mute(struct mad_frame *);
 # ifndef LIBMAD_SYNTH_H
 # define LIBMAD_SYNTH_H
 
-
 struct mad_pcm {
   unsigned int samplerate;		/* sampling frequency (Hz) */
   unsigned short channels;		/* number of channels */
@@ -765,80 +690,8 @@ enum {
 
 void mad_synth_init(struct mad_synth *);
 
-# define mad_synth_finish(synth)  /* nothing */
-
 void mad_synth_mute(struct mad_synth *);
 
 void mad_synth_frame(struct mad_synth *, struct mad_frame const *);
-
-# endif
-
-/* Id: decoder.h,v 1.17 2004/01/23 09:41:32 rob Exp */
-
-# ifndef LIBMAD_DECODER_H
-# define LIBMAD_DECODER_H
-
-
-enum mad_decoder_mode {
-  MAD_DECODER_MODE_SYNC  = 0,
-  MAD_DECODER_MODE_ASYNC
-};
-
-enum mad_flow {
-  MAD_FLOW_CONTINUE = 0x0000,	/* continue normally */
-  MAD_FLOW_STOP     = 0x0010,	/* stop decoding normally */
-  MAD_FLOW_BREAK    = 0x0011,	/* stop decoding and signal an error */
-  MAD_FLOW_IGNORE   = 0x0020	/* ignore the current frame */
-};
-
-struct mad_decoder {
-  enum mad_decoder_mode mode;
-
-  int options;
-
-  struct {
-    long pid;
-    int in;
-    int out;
-  } async;
-
-  struct {
-    struct mad_stream stream;
-    struct mad_frame frame;
-    struct mad_synth synth;
-  } *sync;
-
-  void *cb_data;
-
-  enum mad_flow (*input_func)(void *, struct mad_stream *);
-  enum mad_flow (*header_func)(void *, struct mad_header const *);
-  enum mad_flow (*filter_func)(void *,
-			       struct mad_stream const *, struct mad_frame *);
-  enum mad_flow (*output_func)(void *,
-			       struct mad_header const *, struct mad_pcm *);
-  enum mad_flow (*error_func)(void *, struct mad_stream *, struct mad_frame *);
-  enum mad_flow (*message_func)(void *, void *, unsigned int *);
-};
-
-void mad_decoder_init(struct mad_decoder *, void *,
-		      enum mad_flow (*)(void *, struct mad_stream *),
-		      enum mad_flow (*)(void *, struct mad_header const *),
-		      enum mad_flow (*)(void *,
-					struct mad_stream const *,
-					struct mad_frame *),
-		      enum mad_flow (*)(void *,
-					struct mad_header const *,
-					struct mad_pcm *),
-		      enum mad_flow (*)(void *,
-					struct mad_stream *,
-					struct mad_frame *),
-		      enum mad_flow (*)(void *, void *, unsigned int *));
-int mad_decoder_finish(struct mad_decoder *);
-
-# define mad_decoder_options(decoder, opts)  \
-    ((void) ((decoder)->options = (opts)))
-
-int mad_decoder_run(struct mad_decoder *, enum mad_decoder_mode);
-int mad_decoder_message(struct mad_decoder *, void *, unsigned int *);
 
 # endif

@@ -28,7 +28,7 @@ fixed.h:
 	    "orl %2,%1"  \
 	    : "=rm" (__result)  \
 	    : "0" (lo), "r" (hi),  \
-	      "I" (MAD_F_SCALEBITS), "I" (32 - MAD_F_SCALEBITS)  \
+	      "I" (MAD_F_FRACBITS), "I" (32 - MAD_F_FRACBITS)  \
 	    : "cc");  \
        __result;  \
     })
@@ -39,11 +39,11 @@ fixed.h:
        mad_fixed_t __result;  \
        asm ("sall %2,%1"  \
 	    : "=r" (__hi_)  \
-	    : "0" (hi), "I" (32 - MAD_F_SCALEBITS)  \
+	    : "0" (hi), "I" (32 - MAD_F_FRACBITS)  \
 	    : "cc");  \
        asm ("shrl %2,%1"  \
 	    : "=r" (__lo_)  \
-	    : "0" (lo), "I" (MAD_F_SCALEBITS)  \
+	    : "0" (lo), "I" (MAD_F_FRACBITS)  \
 	    : "cc");  \
        asm ("orl %1,%2"  \
 	    : "=rm" (__result)  \

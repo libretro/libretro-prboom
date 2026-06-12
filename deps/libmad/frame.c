@@ -19,8 +19,6 @@
  * $Id: frame.c,v 1.29 2004/02/04 22:59:19 rob Exp $
  */
 
-# include "global.h"
-
 # include <stdlib.h>
 
 # include "bit.h"
@@ -450,8 +448,6 @@ int mad_frame_decode(struct mad_frame *frame, struct mad_stream *stream)
 
     stream->anc_ptr    = stream->ptr;
     stream->anc_bitlen = mad_bit_length(&stream->ptr, &next_frame);
-
-    mad_bit_finish(&next_frame);
   }
 
   return 0;

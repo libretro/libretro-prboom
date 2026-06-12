@@ -27,17 +27,13 @@ typedef   signed int mad_fixed_t;
 typedef   signed int mad_fixed64hi_t;
 typedef unsigned int mad_fixed64lo_t;
 
-# if defined(_MSC_VER)
-#  define mad_fixed64_t  signed __int64
-# elif 1 || defined(__GNUC__)
-#  define mad_fixed64_t  signed long long
-# endif
+#if defined(_MSC_VER)
+#define mad_fixed64_t  signed __int64
+#else
+#define mad_fixed64_t  signed long long
+#endif
 
-# if defined(FPM_FLOAT)
-typedef double mad_sample_t;
-# else
 typedef mad_fixed_t mad_sample_t;
-# endif
 
 /*
  * Fixed-point format: 0xABBBBBBB
@@ -64,62 +60,21 @@ typedef mad_fixed_t mad_sample_t;
 
 # define MAD_F_FRACBITS		28
 
-# if MAD_F_FRACBITS == 28
 #  define MAD_F(x)		((mad_fixed_t) (x##L))
-# else
-#  if MAD_F_FRACBITS < 28
-#   warning "MAD_F_FRACBITS < 28"
-#   define MAD_F(x)		((mad_fixed_t)  \
-				 (((x##L) +  \
-				   (1L << (28 - MAD_F_FRACBITS - 1))) >>  \
-				  (28 - MAD_F_FRACBITS)))
-#  elif MAD_F_FRACBITS > 28
-#   error "MAD_F_FRACBITS > 28 not currently supported"
-#   define MAD_F(x)		((mad_fixed_t)  \
-				 ((x##L) << (MAD_F_FRACBITS - 28)))
-#  endif
-# endif
 
 # define MAD_F_MIN		((mad_fixed_t) -0x80000000L)
 # define MAD_F_MAX		((mad_fixed_t) +0x7fffffffL)
 
 # define MAD_F_ONE		MAD_F(0x10000000)
 
-# define mad_f_tofixed(x)	((mad_fixed_t)  \
-				 ((x) * (double) (1L << MAD_F_FRACBITS) + 0.5))
-# define mad_f_todouble(x)	((double)  \
-				 ((x) / (double) (1L << MAD_F_FRACBITS)))
-
-# define mad_f_intpart(x)	((x) >> MAD_F_FRACBITS)
-# define mad_f_fracpart(x)	((x) & ((1L << MAD_F_FRACBITS) - 1))
-				/* (x should be positive) */
-
-# define mad_f_fromint(x)	((x) << MAD_F_FRACBITS)
-
-# define mad_f_add(x, y)	((x) + (y))
-# define mad_f_sub(x, y)	((x) - (y))
-
-# if defined(FPM_FLOAT)
-#  error "FPM_FLOAT not yet supported"
-
-#  undef MAD_F
-#  define MAD_F(x)		mad_f_todouble(x)
-
-#  define mad_f_mul(x, y)	((x) * (y))
-#  define mad_f_scale64
-
-#  undef ASO_ZEROCHECK
-
-# elif defined(FPM_64BIT)
+#if defined(FPM_64BIT)
 
 /*
  * This version should be the most accurate if 64-bit types are supported by
  * the compiler, although it may not be the most efficient.
  */
 #   define mad_f_mul(x, y)  \
-    ((mad_fixed_t) (((mad_fixed64_t) (x) * (y)) >> MAD_F_SCALEBITS))
-
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
+    ((mad_fixed_t) (((mad_fixed64_t) (x) * (y)) >> MAD_F_FRACBITS))
 
 /* --- Intel --------------------------------------------------------------- */
 
@@ -169,7 +124,7 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 	    "orl %2,%1"  \
 	    : "=rm" (__result)  \
 	    : "0" (lo), "r" (hi),  \
-	      "I" (MAD_F_SCALEBITS), "I" (32 - MAD_F_SCALEBITS)  \
+	      "I" (MAD_F_FRACBITS), "I" (32 - MAD_F_FRACBITS)  \
 	    : "cc");  \
        __result;  \
     })
@@ -178,13 +133,11 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
     ({ mad_fixed_t __result;  \
        asm ("shrdl %3,%2,%1"  \
 	    : "=rm" (__result)  \
-	    : "0" (lo), "r" (hi), "I" (MAD_F_SCALEBITS)  \
+	    : "0" (lo), "r" (hi), "I" (MAD_F_FRACBITS)  \
 	    : "cc");  \
        __result;  \
     })
 #   endif
-
-#   define MAD_F_SCALEBITS  MAD_F_FRACBITS
 #  endif
 
 /* --- ARM ----------------------------------------------------------------- */
@@ -195,7 +148,6 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
  * This ARM V4 version is as accurate as FPM_64BIT but much faster. The
  * least significant bit is properly rounded at no CPU cycle cost!
  */
-# if 1
 /*
  * This is faster than the default implementation via MAD_F_MLX() and
  * mad_f_scale64().
@@ -209,11 +161,10 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 	    "adc	%2, %0, %1, lsl %6"  \
 	    : "=&r" (__lo), "=&r" (__hi), "=r" (__result)  \
 	    : "%r" (x), "r" (y),  \
-	      "M" (MAD_F_SCALEBITS), "M" (32 - MAD_F_SCALEBITS)  \
+	      "M" (MAD_F_FRACBITS), "M" (32 - MAD_F_FRACBITS)  \
 	    : "cc");  \
        __result;  \
     })
-# endif
 
 #  define MAD_F_MLX(hi, lo, x, y)  \
     asm ("smull	%0, %1, %2, %3"  \
@@ -238,12 +189,10 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 	    "adc	%0, %0, %2, lsl %4"  \
 	    : "=&r" (__result)  \
 	    : "r" (lo), "r" (hi),  \
-	      "M" (MAD_F_SCALEBITS), "M" (32 - MAD_F_SCALEBITS)  \
+	      "M" (MAD_F_FRACBITS), "M" (32 - MAD_F_FRACBITS)  \
 	    : "cc");  \
        __result;  \
     })
-
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
 
 /* --- MIPS ---------------------------------------------------------------- */
 
@@ -280,8 +229,7 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 # endif
 
 #  define mad_f_scale64(hi, lo)  \
-    ((mad_fixed_t) ((hi) << (32 - MAD_F_SCALEBITS)))
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
+    ((mad_fixed_t) ((hi) << (32 - MAD_F_FRACBITS)))
 
 /* --- SPARC --------------------------------------------------------------- */
 
@@ -320,14 +268,12 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
     ({ mad_fixed_t __result;  \
        asm ("rotrwi %0,%1,%2"  \
 	    : "=r" (__result)  \
-	    : "r" (lo), "i" (MAD_F_SCALEBITS));  \
+	    : "r" (lo), "i" (MAD_F_FRACBITS));  \
        asm ("insrwi %0,%1,%2,0"  \
 	    : "+r" (__result)  \
-	    : "r" (hi), "i" (MAD_F_SCALEBITS));  \
+	    : "r" (hi), "i" (MAD_F_FRACBITS));  \
        __result;  \
     })
-
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
 
 /* --- Default ------------------------------------------------------------- */
 
@@ -383,14 +329,8 @@ mad_fixed_t mad_f_mul_inline(mad_fixed_t x, mad_fixed_t y)
 # if !defined(mad_f_scale64)
 #   define mad_f_scale64(hi, lo)  \
     ((mad_fixed_t)  \
-     (((hi) << (32 - MAD_F_SCALEBITS)) |  \
-      ((lo) >> MAD_F_SCALEBITS)))
-#  define MAD_F_SCALEBITS  MAD_F_FRACBITS
+     (((hi) << (32 - MAD_F_FRACBITS)) |  \
+      ((lo) >> MAD_F_FRACBITS)))
 # endif
-
-/* C routines */
-
-mad_fixed_t mad_f_abs(mad_fixed_t);
-mad_fixed_t mad_f_div(mad_fixed_t, mad_fixed_t);
 
 # endif

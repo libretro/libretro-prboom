@@ -41,8 +41,6 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 SOURCES_C += $(DEPS_DIR)/miniz/miniz.c \
 				 $(DEPS_DIR)/stb/stb_vorbis_impl.c \
 				 $(DEPS_DIR)/libmad/bit.c \
-				 $(DEPS_DIR)/libmad/decoder.c \
-				 $(DEPS_DIR)/libmad/fixed.c \
 				 $(DEPS_DIR)/libmad/frame.c \
 				 $(DEPS_DIR)/libmad/huffman.c \
 				 $(DEPS_DIR)/libmad/layer3.c \

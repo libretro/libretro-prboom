@@ -19,8 +19,6 @@
  * $Id: stream.c,v 1.12 2004/02/05 09:02:39 rob Exp $
  */
 
-# include "global.h"
-
 # include <stdlib.h>
 
 # include "bit.h"
@@ -63,9 +61,6 @@ void mad_stream_finish(struct mad_stream *stream)
     free(stream->main_data);
     stream->main_data = 0;
   }
-
-  mad_bit_finish(&stream->anc_ptr);
-  mad_bit_finish(&stream->ptr);
 }
 
 /*

@@ -1742,11 +1742,16 @@ static int zacs_use_latched[MAXPLAYERS];
 #define ZACS_DLG_LASTLEN  96
 #define ZACS_DLG_STALL_TICS 350   /* ~10s with no new line => wedged */
 #define ZACS_DLG_MINLINE  10      /* a spoken line is longer than a label */
+#define ZACS_DLG_MAXWRAPS 3       /* returns to the opening line tolerated as
+                                   * legitimate hub/menu re-entry before the
+                                   * conversation is judged a runaway loop */
 static char zacs_dlg_first[ZACS_DLG_FIRSTLEN];
 static char zacs_dlg_last[ZACS_DLG_LASTLEN];
 static int  zacs_dlg_active;     /* a conversation is in progress */
 static int  zacs_dlg_advanced;   /* a line past the first has been shown */
 static int  zacs_dlg_break;      /* wrap detected: suppress dialogue HUD */
+static int  zacs_dlg_wraps;      /* times the opening line has recurred */
+static int  zacs_dlg_used;       /* player pressed use since last check */
 static int  zacs_dlg_stall;      /* tics since the last new line while frozen */
 static int  zacs_dlg_textid;     /* HUD id carrying the spoken line (0 = none) */
 
@@ -1785,6 +1790,8 @@ static void zacs_clear_conversation_freeze(void)
   zacs_dlg_advanced = 0;
   zacs_dlg_first[0] = 0;
   zacs_dlg_last[0]  = 0;
+  zacs_dlg_wraps    = 0;
+  zacs_dlg_used     = 0;
   zacs_dlg_stall    = 0;
   zacs_dlg_textid   = 0;
 }
@@ -1930,6 +1937,7 @@ static void zacs_hud_store(const char *text, int id, int x, int y,
           zacs_dlg_active   = 1;
           zacs_dlg_advanced = 0;
           zacs_dlg_break    = 0;
+          zacs_dlg_wraps    = 0;
         }
         else if (!zacs_dlg_advanced)
         {
@@ -1939,12 +1947,27 @@ static void zacs_hud_store(const char *text, int id, int x, int y,
         }
         else if (strcmp(text, zacs_dlg_first) == 0)
         {
-          /* The opening line returned after the conversation moved on: the
-           * script has wrapped.  End the conversation and drop this line. */
-          zacs_dlg_break = 1;
-          zacs_clear_conversation_freeze();
-          return;
+          /* The opening line returned after the conversation moved on.  A
+           * branching/hub conversation legitimately comes back to its opening
+           * prompt between branches -- but only because the player drove it
+           * there with the use key.  A runaway script loops back on its own,
+           * with no use-press in between.  So a return that the player caused
+           * (use pressed since the last line) is progress: re-arm and reset
+           * the wrap count.  A return with no intervening use-press is a true
+           * loop; count those, and end the conversation once they pile up. */
+          if (zacs_dlg_used)
+          {
+            zacs_dlg_wraps    = 0;
+            zacs_dlg_advanced = 0;   /* player navigated back: await next line */
+          }
+          else if (++zacs_dlg_wraps >= ZACS_DLG_MAXWRAPS)
+          {
+            zacs_dlg_break = 1;
+            zacs_clear_conversation_freeze();
+            return;
+          }
         }
+        zacs_dlg_used = 0;   /* consume the advance signal each posted line */
         /* A genuinely new spoken line means progress: reset the stall timer.
          * Re-posting the same line (the script's per-tic redraw) lets the
          * timer run on toward the wedged-conversation limit. */
@@ -2352,6 +2375,8 @@ void Z_ACSHudClear(void)
   zacs_dlg_break    = 0;
   zacs_dlg_first[0] = 0;
   zacs_dlg_last[0]  = 0;
+  zacs_dlg_wraps    = 0;
+  zacs_dlg_used     = 0;
   zacs_dlg_stall    = 0;
   zacs_dlg_textid   = 0;
   zacs_hud_w = 320;
@@ -4414,7 +4439,10 @@ static void T_ZACSThinker(zacs_inst_t *inst)
               if (zacs_use_latched[idx])
                 r &= ~2;           /* already consumed this hold */
               else
+              {
                 zacs_use_latched[idx] = 1;
+                zacs_dlg_used = 1;   /* down-edge: the player advanced dialogue */
+              }
             }
             else
               zacs_use_latched[idx] = 0;   /* released: re-arm */

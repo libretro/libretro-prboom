@@ -1511,6 +1511,14 @@ void P_PlayerThink (player_t* player)
       cmd->forwardmove = 0;
       cmd->sidemove    = 0;
       cmd->angleturn   = 0;
+      /* Clearing the tic command stops new movement intent, but any momentum
+       * the player already carried into the freeze would keep coasting off
+       * under friction -- so a scene activated while running forward drifts the
+       * player for a few tics before the camera takes over.  Kill the residual
+       * velocity so they stop dead the instant the freeze begins. */
+      player->mo->momx = 0;
+      player->mo->momy = 0;
+      player->mo->momz = 0;
       /* A frozen player (a dialogue overlay) must not act on the world: drop
        * fire and the weapon-change bits so the marine can't shoot or swap
        * weapons behind the conversation.  The use bit is left intact -- the

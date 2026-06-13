@@ -4720,11 +4720,22 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           case 0:  v = mo->health; break;           /* APROP_Health */
           case 1:  v = mo->info ? mo->info->speed : 0; break;   /* Speed */
           case 2:  v = mo->info ? mo->info->damage : 0; break;  /* Damage */
+          case 11:                                   /* APROP_Invulnerable */
+            if (mo->player)
+              v = mo->player->powers[pw_invulnerability] ? 1 : 0;
+            else
+              v = (mo->flags2 & MF2_INVULNERABLE) ? 1 : 0;
+            break;
           case 16: v = mo->info ? mo->info->spawnhealth : mo->health;
                    break;                            /* APROP_SpawnHealth */
+          case 30: v = (mo->flags2 & MF2_DORMANT) ? 1 : 0; break; /* Dormant */
           case 31: v = mo->info ? mo->info->mass : 0; break;    /* Mass */
           case 34: v = mo->height; break;            /* APROP_Height (fixed) */
           case 35: v = mo->radius; break;            /* APROP_Radius (fixed) */
+          case 48:                                   /* APROP_Angle: BAM->deg
+                                                      * in 16.16 fixed */
+            v = (int)(((uint64_t)mo->angle * 360) >> 16);
+            break;
           default:
             zacs_warn_pcd(pcd);
             break;
@@ -4744,6 +4755,24 @@ static void T_ZACSThinker(zacs_inst_t *inst)
             mo->health = val;
             if (mo->player)
               mo->player->health = val;
+            break;
+          case 11:                                   /* APROP_Invulnerable */
+            if (mo->player)
+              mo->player->powers[pw_invulnerability] = val ? -1 : 0;
+            if (val)
+              mo->flags2 |= MF2_INVULNERABLE;
+            else
+              mo->flags2 &= ~MF2_INVULNERABLE;
+            break;
+          case 30:                                   /* APROP_Dormant */
+            if (val)
+              mo->flags2 |= MF2_DORMANT;
+            else
+              mo->flags2 &= ~MF2_DORMANT;
+            break;
+          case 48:                                   /* APROP_Angle: deg
+                                                      * 16.16 fixed -> BAM */
+            mo->angle = (angle_t)(((uint64_t)(uint32_t)val << 16) / 360);
             break;
           default:
             zacs_warn_pcd(pcd);

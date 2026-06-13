@@ -5094,6 +5094,19 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           r = 0;
           break;
         }
+        case 45:                          /* ACSF_ACS_NamedExecuteAlways */
+        {
+          /* ACS_NamedExecuteAlways(str name, int map, arg1, arg2, arg3): like
+           * ACS_NamedExecute but always starts a fresh instance even when one
+           * with the same name is already running (the "always" flag). */
+          int eargs[3], i;
+          for (i = 0; i < 3; i++)
+            eargs[i] = (argc > i + 2) ? a[i + 2] : 0;
+          if (argc > 0)
+            r = Z_ACSStartNamed(a[0], argc > 1 ? a[1] : 0, eargs, 3,
+                                inst->activator, NULL, 0, true) ? 1 : 0;
+          break;
+        }
         case 9:                           /* ACSF_GetActorVelX */
         case 10:                          /* ACSF_GetActorVelY */
         case 11:                          /* ACSF_GetActorVelZ */

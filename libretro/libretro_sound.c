@@ -30,6 +30,7 @@ extern int prb_stb_vorbis_decode_memory(const unsigned char *mem, int len,
 #include "../src/oplplayer.h"
 #include "../src/madplayer.h"
 #include "../src/modplayer.h"
+#include "../src/oggplayer.h"
 #include "../src/libretro_midiout.h"
 
 #include "../src/lprintf.h"
@@ -121,6 +122,7 @@ static const music_player_t *music_players[] =
   &mp_player, // madplayer.h
 #endif
   &mod_player, // modplayer.h (ProTracker .MOD via pocketmod)
+  &ogg_player, // oggplayer.h (Ogg Vorbis via stb_vorbis)
   NULL
 };
 #define NUM_MUS_PLAYERS ((int)(sizeof (music_players) / sizeof (music_player_t *) - 1))

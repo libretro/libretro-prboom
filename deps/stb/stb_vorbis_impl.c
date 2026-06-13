@@ -15,10 +15,6 @@
 #define STB_VORBIS_NO_STDIO
 #define STB_VORBIS_NO_PUSHDATA_API
 #define STB_VORBIS_NO_COMMENTS
-/* drop the public query/seek/sample-fetch entry points the core never calls
- * (it uses only prb_stb_vorbis_decode_memory); the internal helpers they
- * shared stay, so the in-memory decode path is unaffected. */
-#define STB_VORBIS_PRB_NO_UNUSED
 
 #define stb_vorbis_get_info                     prb_stb_vorbis_get_info
 #define stb_vorbis_get_comment                  prb_stb_vorbis_get_comment

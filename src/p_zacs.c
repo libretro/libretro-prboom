@@ -3206,13 +3206,26 @@ static void zacs_dispatch_lspec(zacs_inst_t *inst, int special,
     int who = a[0], value = a[1], prop = a[2];
     if (prop == 0 || prop == 4)             /* PROP_FROZEN / PROP_TOTALLYFROZEN */
     {
+      /* who==0 means the activator's player.  A +USESPECIAL actor runs this on
+       * behalf of the player who used it (THINGSPEC_ThingTargets) but is itself
+       * the activator, so the using player is the actor's target rather than
+       * the activator; resolve through it so the freeze (which puts the weapon
+       * away for the scene) lands on the real player. */
+      mobj_t *act = inst->activator;
+      player_t *who_pl = NULL;
       int pn;
+      if (act)
+      {
+        if (act->player)
+          who_pl = act->player;
+        else if (act->target && act->target->player)
+          who_pl = act->target->player;
+      }
       for (pn = 0; pn < MAXPLAYERS; pn++)
       {
         if (!playeringame[pn])
           continue;
-        if (who == 0 && !(inst->activator && inst->activator->player ==
-                          &players[pn]))
+        if (who == 0 && who_pl != &players[pn])
           continue;
         if (value)
           players[pn].cheats |= CF_TOTALLYFROZEN;

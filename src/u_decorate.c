@@ -355,7 +355,9 @@ enum {
   DA_CHANGEFLAG,       /* A_ChangeFlag("FLAG", bool) -> set/clear a flag */
   DA_SPAWNITEM,        /* A_SpawnItemEx("Class", ...) -> spawn a decoration */
   DA_FADEOUT,          /* A_FadeOut(reduce) -> fade the actor out and remove it */
-  DA_CUSTOMMISSILE     /* A_CustomMissile("Class",...) -> fire a projectile */
+  DA_CUSTOMMISSILE,    /* A_CustomMissile("Class",...) -> fire a projectile */
+  DA_CUSTOMBULLET,     /* A_CustomBulletAttack(...) -> hitscan burst at target */
+  DA_SPIDREFIRE        /* A_SpidRefire -> keep firing or break off to See */
 };
 
 /* Sound names captured for DA_PLAYSOUND frames, resolved to sfx slots at
@@ -2387,6 +2389,11 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           else if (!strcasecmp(fn, "A_NoBlocking") ||
                    !strcasecmp(fn, "A_Fall"))          act = DA_NOBLOCKING;
           else if (!strcasecmp(fn, "A_FaceTarget"))    act = DA_FACETARGET;
+          else if (!strcasecmp(fn, "A_CustomBulletAttack"))
+            /* a hitscan burst at the target; the stock SpiderMastermind it
+             * stands in for fires the same way (A_SPosAttack: 3 bullets) */
+            act = DA_CUSTOMBULLET;
+          else if (!strcasecmp(fn, "A_SpidRefire"))    act = DA_SPIDREFIRE;
           else if (!strcasecmp(fn, "ACS_NamedExecuteAlways") ||
                    !strcasecmp(fn, "ACS_NamedExecute"))
           {
@@ -3039,7 +3046,8 @@ static int decorate_type_by_name(const char *name)
  * both build identical chains.  A static (single frozen frame) actor is one
  * entry that freezes on itself. */
 static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
-                                  int nframes, int *sp_next)
+                                  int nframes, int *sp_next,
+                                  const mobjinfo_t *inh)
 {
   int first = base;
   int f;
@@ -3082,9 +3090,41 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
         state->nextstate = cur;
       else if (flow == SEQF_GOTO)
       {
-        int li = decorate_label_index(a, a->seqflow[f].tname);
-        state->nextstate = (li >= 0)
-          ? base + a->seqlabel[li].frame : cur;
+        /* "goto Label" or "goto Label+N": split off a trailing "+N" relative
+         * offset, then resolve the label.  A label the actor defines itself
+         * resolves within its built block (e.g. the spider's "Missile+1" loops
+         * back to the second Missile frame for rapid fire).  A label it does
+         * not define is inherited from the stock monster it replaces (e.g. the
+         * cyberdemon's "goto See" returns to the inherited chase states), so
+         * fall back to that monster's corresponding state rather than leaving
+         * the terminal frame self-looping, which would freeze the monster in
+         * its attack and stop it moving. */
+        const char *tn = a->seqflow[f].tname;
+        char lbl[24];
+        int off = 0, li, dst = cur, k = 0;
+        const char *plus = NULL;
+        while (tn[k] && tn[k] != '+' && k < 23) { lbl[k] = tn[k]; k++; }
+        lbl[k] = 0;
+        if (tn[k] == '+') plus = tn + k + 1;
+        if (plus) off = atoi(plus);
+        li = decorate_label_index(a, lbl);
+        if (li >= 0)
+          dst = base + a->seqlabel[li].frame + off;
+        else if (inh)
+        {
+          int s = -1;
+          if      (!strcasecmp(lbl, "See"))    s = inh->seestate;
+          else if (!strcasecmp(lbl, "Missile"))s = inh->missilestate;
+          else if (!strcasecmp(lbl, "Melee"))  s = inh->meleestate;
+          else if (!strcasecmp(lbl, "Pain"))   s = inh->painstate;
+          else if (!strcasecmp(lbl, "Death"))  s = inh->deathstate;
+          else if (!strcasecmp(lbl, "XDeath")) s = inh->xdeathstate;
+          else if (!strcasecmp(lbl, "Spawn"))  s = inh->spawnstate;
+          else if (!strcasecmp(lbl, "Raise"))  s = inh->raisestate;
+          if (s > 0)
+            dst = s + off;
+        }
+        state->nextstate = dst;
       }
       else
         state->nextstate = last ? cur : cur + 1;
@@ -3147,6 +3187,19 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
         break;
       case DA_FACETARGET:
         state->action.arg0 = (arg0_t)A_FaceTarget;
+        break;
+      case DA_CUSTOMBULLET:
+        /* hitscan burst at the target.  The stock SpiderMastermind this stands
+         * in for fires its missile state through A_SPosAttack (3 bullets,
+         * (rand%5+1)*3 damage), matching the mod's A_CustomBulletAttack burst;
+         * reuse it so the variant actually shoots rather than looping inert. */
+        state->action.arg0 = (arg0_t)A_SPosAttack;
+        break;
+      case DA_SPIDREFIRE:
+        /* keep firing while the target is alive and in sight, else drop back to
+         * the (inherited) See state -- without this the attack loop never
+         * breaks and the monster is stuck firing in place. */
+        state->action.arg0 = (arg0_t)A_SpidRefire;
         break;
       case DA_ACS_NAMED:
         if (a->seq[f].snd >= 0)
@@ -3265,7 +3318,7 @@ void U_RegisterDecorateThings(void)
      * to the first (animated loop) or freezes on itself (static / stop) */
     {
       int first = st_base + count;
-      decorate_build_states(a, sp, first, nframes, &sp_next);
+      decorate_build_states(a, sp, first, nframes, &sp_next, NULL);
       st = first;
     }
 
@@ -3487,7 +3540,7 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
       int fbase = *st_cursor;
       dsda_GetState(fbase + a->seq_len - 1);  /* grow before building */
       info = dsda_GetMobjInfo(mt);            /* re-cache after possible move */
-      decorate_build_states(a, fsp, fbase, a->seq_len, sp_next);
+      decorate_build_states(a, fsp, fbase, a->seq_len, sp_next, info);
       *st_cursor += a->seq_len;
       decorate_record_statemap(mt, fbase, a);
       if (faint_li >= 0)
@@ -3615,7 +3668,7 @@ static int register_spawnonly_actor(decorate_actor_t *a, int *st_cursor,
                                               : a->seq[0].spr, sp_next);
   base = *st_cursor;
   dsda_GetState(base + a->seq_len - 1);   /* grow to fit before building */
-  decorate_build_states(a, sp, base, a->seq_len, sp_next);
+  decorate_build_states(a, sp, base, a->seq_len, sp_next, NULL);
   *st_cursor += a->seq_len;
 
   spawn_label = decorate_label_index(a, "Spawn");

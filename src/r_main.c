@@ -44,6 +44,7 @@
 #include "u_brightmap.h"
 #include "r_state.h"
 #include "r_things.h"
+#include "r_camtex.h"
 #include "r_plane.h"
 #include "r_bsp.h"
 #include "r_draw.h"
@@ -906,6 +907,17 @@ void R_RenderPlayerView (player_t* player)
 
   R_SetupFrame (player);
 
+  /* Refresh any ACS camera-to-texture targets before the scene that samples
+   * them is drawn.  This re-renders the world from each bound camera actor
+   * into its texture; it saves and restores the render target and view, but
+   * the player view globals R_SetupFrame just set must be re-established
+   * afterwards since the camera render overwrites viewx/y/z/angle. */
+  if (R_CamTexActive())
+  {
+    R_RenderCameraTextures();
+    R_SetupFrame (player);
+  }
+
   // Clear buffers.
   R_ClearClipSegs ();
   R_ClearDrawSegs ();
@@ -1002,4 +1014,71 @@ void R_RenderPlayerView (player_t* player)
 #endif
 
   R_RestoreInterpolations();
+}
+
+/* --- camera-to-texture render --------------------------------------------
+ *
+ * Render the world from the current view globals (viewx/y/z/viewangle, set by
+ * the caller to a camera actor) into a private scratch surface, reusing the
+ * ordinary BSP/wall/plane/sprite pipeline.  To avoid rebuilding the dozen
+ * interdependent projection tables at a second resolution -- and the subtle
+ * breakage that invites -- the camera renders at the SAME viewport as the
+ * main view (all projection state unchanged); the caller's blit downscales the
+ * result into the smaller camera texture.  Only the render target, the view
+ * trig, and the freelook/clip scratch are touched, and every one is restored.
+ *
+ * `scrn` selects a scratch screen surface (allocated here on demand at the full
+ * surface pitch); `w`/`h` and `fovdeg` are advisory and currently unused by
+ * this same-viewport path (kept for the interface and a future true-FOV path).
+ */
+void R_RenderViewToScratch(int scrn, int w, int h, int fovdeg)
+{
+  unsigned short *save_short = drawvars.short_topleft;
+  unsigned int   *save_int   = drawvars.int_topleft;
+  size_t          need;
+
+  (void)w; (void)h; (void)fovdeg;
+  if (scrn <= 0 || scrn >= NUM_SCREENS)
+    return;
+
+  /* allocate the scratch surface at the live surface size on first use (and
+   * grow it if the video mode enlarged) */
+  need = (size_t)SURFACE_BYTE_PITCH * SCREENHEIGHT;
+  if (screens[scrn].height < SCREENHEIGHT || !screens[scrn].data)
+  {
+    if (screens[scrn].data)
+      free(screens[scrn].data);
+    screens[scrn].data        = (unsigned char *)malloc(need);
+    screens[scrn].height      = SCREENHEIGHT;
+    screens[scrn].not_on_heap = FALSE;
+    if (!screens[scrn].data)
+    {
+      screens[scrn].height = 0;
+      return;
+    }
+  }
+
+  /* retarget the rasteriser at the scratch surface */
+  drawvars.short_topleft = (unsigned short *)screens[scrn].data;
+  drawvars.int_topleft   = (unsigned int *)screens[scrn].data;
+
+  viewsin = finesine[viewangle >> ANGLETOFINESHIFT];
+  viewcos = finecosine[viewangle >> ANGLETOFINESHIFT];
+  R_SetupFreelook();
+
+  R_ClearClipSegs();
+  R_ClearDrawSegs();
+  R_ClearPlanes();
+  R_ClearSprites();
+
+  R_RenderBSPNode(numnodes - 1);
+  R_DrawCmdReplay();
+  R_ResetColumnBuffer();
+  R_DrawPlanes();
+  R_DrawMasked();
+  R_ResetColumnBuffer();
+
+  /* restore the main render target */
+  drawvars.short_topleft = save_short;
+  drawvars.int_topleft   = save_int;
 }

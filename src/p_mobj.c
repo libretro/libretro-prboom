@@ -2475,10 +2475,26 @@ void P_SpawnMapThing (const mapthing_t* mthing)
         return;
       }
       if (U_IsInertZDoomThing(thingtype))
-        return;
-      alias = U_DecorateAliasDoomedNum(thingtype);
-      if (alias >= 0)
-        i = P_FindDoomedNum(alias);
+      {
+        /* The ZDoom security/aiming cameras (9025, 9070-9073) are normally
+         * inert editor markers, but a camera-to-texture render needs a real
+         * mobj at the camera's position carrying its tid and facing so the
+         * renderer can adopt that point of view.  Spawn them as an invisible,
+         * non-solid position holder (the teleport-destination actor, which is
+         * exactly that) instead of discarding them.  Other inert markers stay
+         * discarded. */
+        if (thingtype == 9025 ||
+            (thingtype >= 9070 && thingtype <= 9073))
+          i = MT_TELEPORTMAN;
+        else
+          return;
+      }
+      else
+      {
+        alias = U_DecorateAliasDoomedNum(thingtype);
+        if (alias >= 0)
+          i = P_FindDoomedNum(alias);
+      }
     }
     if (i >= num_mobj_types)
     {

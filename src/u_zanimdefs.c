@@ -25,6 +25,7 @@
 #include "lprintf.h"
 #include "u_scanner.h"
 #include "u_zanimdefs.h"
+#include "r_camtex.h"
 
 #define MAX_ZANIM_FRAMES 32
 
@@ -155,6 +156,34 @@ void U_LoadAnimDefs(void)
                   cur.speed = 1;
               }
             }
+        }
+      }
+      else if (!strcasecmp(s.string, "cameratexture"))
+      {
+        /* cameratexture NAME W H [fit cw ch] -- a render-to-texture target.
+         * Record the declaration and its camera render size; ACS binds a
+         * camera actor to it at runtime (SetCameraToTexture). */
+        char nm[9];
+        int  cw = 0, ch = 0;
+        building = 0;
+        nm[0] = 0;
+        if ((tok = za_arg(&s, line)) > 0)
+        {
+          strncpy(nm, s.string, 8); nm[8] = 0;
+          /* W H */
+          if ((tok = za_arg(&s, line)) > 0) { /* width  (texel) */ }
+          if (tok > 0 && (tok = za_arg(&s, line)) > 0) { /* height */ }
+          /* optional "fit cw ch" */
+          if (tok > 0 && (tok = za_arg(&s, line)) > 0 &&
+              s.token == TK_Identifier && !strcasecmp(s.string, "fit"))
+          {
+            if ((tok = za_arg(&s, line)) > 0 && s.token == TK_IntConst)
+              cw = s.number;
+            if (tok > 0 && (tok = za_arg(&s, line)) > 0 && s.token == TK_IntConst)
+              ch = s.number;
+          }
+          if (nm[0])
+            R_CamTexDeclare(nm, cw, ch);
         }
       }
       else

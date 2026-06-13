@@ -34,6 +34,8 @@
 #include "lprintf.h"
 #include "dsda_hacked.h"
 #include "p_enemy.h"
+#include "s_sound.h"
+#include "p_inter.h"
 #include "r_main.h"
 #include "p_pspr.h"
 #include "d_items.h"
@@ -68,6 +70,19 @@ typedef struct
   /* simple-prop registration (static single-frame actors only) */
   int  radius, height;          /* map units; -1 if unspecified */
   int  solid, nogravity, spawnceiling;
+  /* A custom DECORATE monster (the "Monster" keyword with its own behaviour
+   * states) is brought to life with AI.  It is deliberately NOT made solid:
+   * a solid monster placed overlapping another actor in the map wedges both
+   * (P_Move fails in every direction), so these stay non-solid and simply
+   * pass through, while still being shootable and counting as a kill. */
+  int  is_monster;              /* the "Monster" keyword was seen           */
+  int  health;                  /* spawnhealth, -1 if unset                 */
+  int  speed;                   /* chase speed, -1 if unset                 */
+  int  painchance;              /* 0-255, -1 if unset                       */
+  int  mass;                    /* -1 if unset                              */
+  int  meleedamage;             /* A_MeleeAttack/A_ComboAttack, -1 if unset */
+  int  m_float;                 /* +FLOAT/+NOGRAVITY flying                  */
+  int  m_nocountkill;           /* -COUNTKILL                               */
   char sprite[5];               /* 4-char sprite of a "SPRT F -1" spawn */
   int  frame;                   /* 0-based frame letter, FF_FULLBRIGHT or'd */
   int  spawn_static;            /* spawn state parsed and tics == -1 */
@@ -357,7 +372,19 @@ enum {
   DA_FADEOUT,          /* A_FadeOut(reduce) -> fade the actor out and remove it */
   DA_CUSTOMMISSILE,    /* A_CustomMissile("Class",...) -> fire a projectile */
   DA_CUSTOMBULLET,     /* A_CustomBulletAttack(...) -> hitscan burst at target */
-  DA_SPIDREFIRE        /* A_SpidRefire -> keep firing or break off to See */
+  DA_SPIDREFIRE,       /* A_SpidRefire -> keep firing or break off to See */
+  DA_LOOK,             /* A_Look  -> wake on a target */
+  DA_CHASE,            /* A_Chase -> pursue the target / enter attack */
+  DA_FASTCHASE,        /* A_FastChase */
+  DA_PAIN,             /* A_Pain  -> pain sound */
+  DA_XSCREAM,          /* A_XScream -> gib death sound */
+  DA_BOSSDEATH,        /* A_BossDeath */
+  DA_CPOSREFIRE,       /* A_CPosRefire */
+  DA_SKULLATTACK,      /* A_SkullAttack */
+  DA_EXPLODE,          /* A_Explode */
+  DA_MELEEATTACK,      /* A_MeleeAttack -> melee for MeleeDamage */
+  DA_MISSILEATTACK,    /* A_MissileAttack -> fire the actor's projectile */
+  DA_COMBOATTACK       /* A_ComboAttack -> melee if close, else missile */
 };
 
 /* Sound names captured for DA_PLAYSOUND frames, resolved to sfx slots at
@@ -677,6 +704,54 @@ void A_DecorateCustomMissile(mobj_t *mo)
   }
   if (shot && xlat)
     shot->translation = xlat;
+}
+
+/* A_MeleeAttack: deal the actor's MeleeDamage (carried in state->misc1, with a
+ * stock-melee 3d8 default) when the target is in melee range. */
+void A_DecorateMeleeAttack(mobj_t *mo)
+{
+  if (!mo || !mo->target)
+    return;
+  A_FaceTarget(mo);
+  if (P_CheckMeleeRange(mo))
+  {
+    int dmg = (mo->state ? (int)mo->state->misc1 : 0);
+    if (mo->info->attacksound)
+      S_StartSound(mo, mo->info->attacksound);
+    if (dmg <= 0)
+      dmg = (P_Random(pr_troopattack) % 8 + 1) * 3;
+    P_DamageMobj(mo->target, mo, mo, dmg);
+  }
+}
+
+/* A_MissileAttack: fire a projectile at the target.  This engine has no
+ * per-class projectile spawning, so it fires the generic imp-ball shot the
+ * custom projectiles derive from (as A_CustomMissile does). */
+void A_DecorateMissileAttack(mobj_t *mo)
+{
+  if (!mo || !mo->target)
+    return;
+  A_FaceTarget(mo);
+  P_SpawnMissile(mo, mo->target, MT_TROOPSHOT);
+}
+
+/* A_ComboAttack: melee when the target is in range, otherwise a missile. */
+void A_DecorateComboAttack(mobj_t *mo)
+{
+  if (!mo || !mo->target)
+    return;
+  A_FaceTarget(mo);
+  if (P_CheckMeleeRange(mo))
+  {
+    int dmg = (mo->state ? (int)mo->state->misc1 : 0);
+    if (mo->info->attacksound)
+      S_StartSound(mo, mo->info->attacksound);
+    if (dmg <= 0)
+      dmg = (P_Random(pr_troopattack) % 8 + 1) * 3;
+    P_DamageMobj(mo->target, mo, mo, dmg);
+  }
+  else
+    P_SpawnMissile(mo, mo->target, MT_TROOPSHOT);
 }
 
 /* A_SetUserArray(name, idxexpr, expr): write the value expression to element
@@ -1342,6 +1417,7 @@ static void parse_header(const char *p, const char *end)
   memset(a, 0, sizeof(*a));
   a->doomednum = -1;
   a->radius = a->height = -1;
+  a->health = a->speed = a->painchance = a->mass = a->meleedamage = -1;
   a->alpha = FRACUNIT;
   a->wpn_slot = -1;
   a->xlat_id = -1;
@@ -1893,6 +1969,42 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       p = read_word(p, end, word, sizeof(word));
       a->radius = atoi(word);
     }
+    else if (!strcasecmp(word, "Health"))
+    {
+      p = skip_space(p, end);
+      p = read_word(p, end, word, sizeof(word));
+      a->health = atoi(word);
+    }
+    else if (!strcasecmp(word, "Speed"))
+    {
+      p = skip_space(p, end);
+      p = read_word(p, end, word, sizeof(word));
+      a->speed = atoi(word);
+    }
+    else if (!strcasecmp(word, "PainChance"))
+    {
+      p = skip_space(p, end);
+      p = read_word(p, end, word, sizeof(word));
+      a->painchance = atoi(word);
+    }
+    else if (!strcasecmp(word, "Mass"))
+    {
+      p = skip_space(p, end);
+      p = read_word(p, end, word, sizeof(word));
+      a->mass = atoi(word);
+    }
+    else if (!strcasecmp(word, "MeleeDamage"))
+    {
+      p = skip_space(p, end);
+      p = read_word(p, end, word, sizeof(word));
+      a->meleedamage = atoi(word);
+    }
+    else if (!strcasecmp(word, "Monster"))
+      a->is_monster = 1;
+    else if (!strcasecmp(word, "+FLOAT") || !strcasecmp(word, "+FLY"))
+      a->m_float = 1;
+    else if (!strcasecmp(word, "-COUNTKILL"))
+      a->m_nocountkill = 1;
     else if (!strcasecmp(word, "Damage"))
     {
       p = skip_space(p, end);
@@ -2389,6 +2501,21 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           else if (!strcasecmp(fn, "A_NoBlocking") ||
                    !strcasecmp(fn, "A_Fall"))          act = DA_NOBLOCKING;
           else if (!strcasecmp(fn, "A_FaceTarget"))    act = DA_FACETARGET;
+          else if (!strcasecmp(fn, "A_Look"))          act = DA_LOOK;
+          else if (!strcasecmp(fn, "A_Chase") ||
+                   !strcasecmp(fn, "A_Wander"))         act = DA_CHASE;
+          else if (!strcasecmp(fn, "A_FastChase"))     act = DA_FASTCHASE;
+          else if (!strcasecmp(fn, "A_Pain"))          act = DA_PAIN;
+          else if (!strcasecmp(fn, "A_XScream"))       act = DA_XSCREAM;
+          else if (!strcasecmp(fn, "A_BossDeath"))     act = DA_BOSSDEATH;
+          else if (!strcasecmp(fn, "A_CPosRefire"))    act = DA_CPOSREFIRE;
+          else if (!strcasecmp(fn, "A_SkullAttack"))   act = DA_SKULLATTACK;
+          else if (!strcasecmp(fn, "A_Explode"))       act = DA_EXPLODE;
+          else if (!strcasecmp(fn, "A_MeleeAttack"))   act = DA_MELEEATTACK;
+          else if (!strcasecmp(fn, "A_MissileAttack")) act = DA_MISSILEATTACK;
+          else if (!strcasecmp(fn, "A_ComboAttack"))   act = DA_COMBOATTACK;
+          /* A_SentinelBob (hover wobble) and A_Set/UnSetFloorClip (corpse
+           * sink) are cosmetic with no engine equivalent; leave as no-ops. */
           else if (!strcasecmp(fn, "A_CustomBulletAttack"))
             /* a hitscan burst at the target; the stock SpiderMastermind it
              * stands in for fires the same way (A_SPosAttack: 3 bullets) */
@@ -3201,6 +3328,44 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
          * breaks and the monster is stuck firing in place. */
         state->action.arg0 = (arg0_t)A_SpidRefire;
         break;
+      case DA_LOOK:
+        state->action.arg0 = (arg0_t)A_Look;
+        break;
+      case DA_CHASE:
+        state->action.arg0 = (arg0_t)A_Chase;
+        break;
+      case DA_FASTCHASE:
+        state->action.arg0 = (arg0_t)A_FastChase;
+        break;
+      case DA_PAIN:
+        state->action.arg0 = (arg0_t)A_Pain;
+        break;
+      case DA_XSCREAM:
+        state->action.arg0 = (arg0_t)A_XScream;
+        break;
+      case DA_BOSSDEATH:
+        state->action.arg0 = (arg0_t)A_BossDeath;
+        break;
+      case DA_CPOSREFIRE:
+        state->action.arg0 = (arg0_t)A_CPosRefire;
+        break;
+      case DA_SKULLATTACK:
+        state->action.arg0 = (arg0_t)A_SkullAttack;
+        break;
+      case DA_EXPLODE:
+        state->action.arg0 = (arg0_t)A_Explode;
+        break;
+      case DA_MELEEATTACK:
+        state->action.arg0 = (arg0_t)A_DecorateMeleeAttack;
+        state->misc1 = (a->meleedamage >= 0) ? a->meleedamage : 0;
+        break;
+      case DA_MISSILEATTACK:
+        state->action.arg0 = (arg0_t)A_DecorateMissileAttack;
+        break;
+      case DA_COMBOATTACK:
+        state->action.arg0 = (arg0_t)A_DecorateComboAttack;
+        state->misc1 = (a->meleedamage >= 0) ? a->meleedamage : 0;
+        break;
       case DA_ACS_NAMED:
         if (a->seq[f].snd >= 0)
         {
@@ -3367,6 +3532,47 @@ void U_RegisterDecorateThings(void)
                                          : 0) |
                         ((a->translucent || a->alpha < FRACUNIT)
                                          ? MF_TRANSLUCENT : 0);
+
+    /* A custom DECORATE monster comes alive with AI: wire each behaviour label
+     * to its mobjinfo state so the chase/attack/pain/death machinery drives it,
+     * make it shootable and (unless told otherwise) count it as a kill, and
+     * fill in health/speed/painchance/mass.  Crucially it is left NON-solid:
+     * a solid monster placed overlapping another actor in the map wedges both
+     * permanently (P_Move fails in every direction).  A non-solid monster moves
+     * through other things instead of jamming against them, while still chasing,
+     * attacking, being shot, and dying. */
+    if (a->is_monster)
+    {
+      int base = st_base + count;
+      int li;
+      if ((li = decorate_label_index(a, "See"))     >= 0) info->seestate    = base + a->seqlabel[li].frame;
+      if ((li = decorate_label_index(a, "Pain"))    >= 0) info->painstate    = base + a->seqlabel[li].frame;
+      if ((li = decorate_label_index(a, "Melee"))   >= 0) info->meleestate   = base + a->seqlabel[li].frame;
+      if ((li = decorate_label_index(a, "Missile")) >= 0) info->missilestate = base + a->seqlabel[li].frame;
+      if ((li = decorate_label_index(a, "Death"))   >= 0) info->deathstate   = base + a->seqlabel[li].frame;
+      if ((li = decorate_label_index(a, "XDeath"))  >= 0) info->xdeathstate  = base + a->seqlabel[li].frame;
+      if ((li = decorate_label_index(a, "Raise"))   >= 0) info->raisestate   = base + a->seqlabel[li].frame;
+
+      info->spawnhealth  = (a->health >= 0)     ? a->health     : 1000;
+      info->speed        = (a->speed  >= 0)     ? a->speed      : 8;
+      info->painchance   = (a->painchance >= 0) ? a->painchance : 0;
+      info->mass         = (a->mass   >= 0)     ? a->mass       : 100;
+      info->reactiontime = 8;
+      info->radius       = (a->radius >= 0 ? a->radius : 20) * FRACUNIT;
+      info->height       = (a->height >= 0 ? a->height : 56) * FRACUNIT;
+
+      info->flags |= MF_SHOOTABLE;          /* can be hurt; deliberately NOT MF_SOLID */
+      if (!a->m_nocountkill)
+        info->flags |= MF_COUNTKILL;
+      if (a->m_float)
+        info->flags |= MF_FLOAT | MF_NOGRAVITY;
+
+      if (a->seesound[0])    info->seesound    = decorate_resolve_sfx(a->seesound);
+      if (a->painsound[0])   info->painsound   = decorate_resolve_sfx(a->painsound);
+      if (a->deathsound[0])  info->deathsound  = decorate_resolve_sfx(a->deathsound);
+      if (a->attacksound[0]) info->attacksound = decorate_resolve_sfx(a->attacksound);
+      if (a->activesound[0]) info->activesound = decorate_resolve_sfx(a->activesound);
+    }
     count    += nframes;        /* states consumed */
     count_mt += 1;              /* one mobj type   */
   }

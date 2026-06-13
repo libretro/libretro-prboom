@@ -2013,7 +2013,8 @@ dbool P_HexenTeleport(mobj_t *thing, fixed_t x, fixed_t y, angle_t angle,
   return true;
 }
 
-dbool EV_HexenTeleport(int tid, mobj_t *thing, dbool fog)
+dbool EV_HexenTeleportTagged(int tid, int sectortag, mobj_t *thing,
+                             dbool fog)
 {
   int     count;
   int     searcher;
@@ -2023,23 +2024,42 @@ dbool EV_HexenTeleport(int tid, mobj_t *thing, dbool fog)
   if (!thing || (thing->flags2 & MF2_NOTELEPORT))
     return false;
 
+  /* Count candidate destinations.  When a sector tag is given (ZDoom's
+   * Teleport second arg), only destinations standing in a sector carrying
+   * that tag qualify -- this is how a map disambiguates many same-tid
+   * teleport spots.  A zero tag accepts any destination (Hexen behaviour). */
   count = 0;
   searcher = -1;
-  while (P_FindMobjFromTID((short) tid, &searcher) != NULL)
-    count++;
+  while ((mo = P_FindMobjFromTID((short) tid, &searcher)) != NULL)
+    if (sectortag == 0 || mo->subsector->sector->tag == sectortag)
+      count++;
   if (count == 0)
     return false;
 
   count = 1 + (P_Random(pr_heretic) % count);
   searcher = -1;
   mo = NULL;
-  for (i = 0; i < count; i++)
-    mo = P_FindMobjFromTID((short) tid, &searcher);
+  for (i = 0; i < count; )
+  {
+    mobj_t *cand = P_FindMobjFromTID((short) tid, &searcher);
+    if (cand == NULL)
+      break;
+    if (sectortag == 0 || cand->subsector->sector->tag == sectortag)
+    {
+      mo = cand;
+      i++;
+    }
+  }
 
   if (mo == NULL)
     return false;
 
   return P_HexenTeleport(thing, mo->x, mo->y, mo->angle, fog);
+}
+
+dbool EV_HexenTeleport(int tid, mobj_t *thing, dbool fog)
+{
+  return EV_HexenTeleportTagged(tid, 0, thing, fog);
 }
 
 /* --- Floor waggle ---------------------------------------------------------
@@ -2291,13 +2311,18 @@ dbool P_ExecuteHexenLineSpecial(int special, int *args, line_t *line,
     case 202:                   /* Generic_Door (Boom generalized) */
       ok = Hexen_EV_GenericDoor(line, args, mo);
       break;
-    case 70:                    /* Teleport */
+    case 70:                    /* Teleport(tid, sectortag, flags) */
       if (side == 0)
-        ok = EV_HexenTeleport(args[0], mo, true);
+        ok = EV_HexenTeleportTagged(args[0], args[1], mo,
+                                    (args[2] & 1) ? false : true);
       break;
-    case 71:                    /* Teleport_NoFog */
+    case 71:                    /* Teleport_NoFog: Hexen (tid, tag); ZDoom
+                                 * (tid, useang, sectortag, keepheight) */
       if (side == 0)
-        ok = EV_HexenTeleport(args[0], mo, false);
+      {
+        int tag = map_format.zdoom ? args[2] : args[1];
+        ok = EV_HexenTeleportTagged(args[0], tag, mo, false);
+      }
       break;
     case 80:                    /* ACS_Execute */
       ok = P_StartACS(args[0], args[1], &args[2], mo, line, side);

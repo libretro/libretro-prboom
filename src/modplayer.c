@@ -187,6 +187,138 @@ static void mod_render(void *dest, unsigned nsamp)
   }
 }
 
+/* Save/restore playback position so a save state (and runahead and rewind,
+ * which save and restore every frame) resumes tracker music where it was
+ * instead of forcing the generic music layer's render-replay -- which for a
+ * module re-runs the whole song from the start on every restore.
+ *
+ * pocketmod_context is mostly read-only song data (sample/pattern pointers and
+ * the per-sample tables) that pocketmod_init rebuilds deterministically from
+ * the lump, plus the 32-entry channel array (1152 bytes) and a handful of
+ * scalar position/timing fields.  Saving the whole 1.7KB context would not fit
+ * the fixed music-state budget, so only the dynamic state is serialized: the
+ * scalar position/timing/loop/LFO fields and just the channels actually in use
+ * (num_channels of them).  On restore we pocketmod_init from the lump to
+ * rebuild the read-only data and pointers, then splice the saved dynamic state
+ * back in.  The result resumes sample-exact.
+ *
+ * Wire format (little-endian-host, matching the other backends):
+ *   uint32_t magic    = 'MODS'
+ *   uint32_t version  = 1
+ *   uint32_t looping
+ *   uint32_t num_channels       (sanity: must match the re-init'd song)
+ *   -- scalar dynamic state --
+ *   float    samples_per_tick
+ *   int32_t  ticks_per_line
+ *   uint8_t  visited[16]
+ *   int32_t  loop_count
+ *   uint8_t  pattern_delay
+ *   uint32_t lfo_rng
+ *   int8_t   pattern, line
+ *   int16_t  tick
+ *   float    sample
+ *   -- per-channel state --
+ *   _pocketmod_chan channels[num_channels] */
+#define MOD_STATE_MAGIC   0x4D4F4453u  /* 'MODS' */
+#define MOD_STATE_VERSION 1u
+
+typedef struct {
+  float    samples_per_tick;
+  int32_t  ticks_per_line;
+  uint8_t  visited[16];
+  int32_t  loop_count;
+  uint8_t  pattern_delay;
+  uint32_t lfo_rng;
+  int8_t   pattern;
+  int8_t   line;
+  int16_t  tick;
+  float    sample;
+} mod_state_scalars_t;
+
+static size_t mod_serialize(void *dest, size_t cap)
+{
+  uint32_t hdr[4];
+  mod_state_scalars_t sc;
+  unsigned nch;
+  size_t   need;
+
+  if (!mod_ctx || !mod_data || !mod_playing)
+    return 0;                  /* nothing playing -> no state to record */
+  nch  = mod_ctx->num_channels;
+  if (nch == 0 || nch > POCKETMOD_MAX_CHANNELS)
+    return 0;
+  need = sizeof hdr + sizeof sc + nch * sizeof(_pocketmod_chan);
+  if (!dest)
+    return need;               /* size-query mode */
+  if (cap < need)
+    return 0;                  /* won't fit the budget -> defer to replay */
+
+  hdr[0] = MOD_STATE_MAGIC;
+  hdr[1] = MOD_STATE_VERSION;
+  hdr[2] = (uint32_t)(mod_looping ? 1 : 0);
+  hdr[3] = (uint32_t)nch;
+
+  sc.samples_per_tick = mod_ctx->samples_per_tick;
+  sc.ticks_per_line   = (int32_t)mod_ctx->ticks_per_line;
+  memcpy(sc.visited, mod_ctx->visited, sizeof sc.visited);
+  sc.loop_count       = (int32_t)mod_ctx->loop_count;
+  sc.pattern_delay    = mod_ctx->pattern_delay;
+  sc.lfo_rng          = mod_ctx->lfo_rng;
+  sc.pattern          = mod_ctx->pattern;
+  sc.line             = mod_ctx->line;
+  sc.tick             = mod_ctx->tick;
+  sc.sample           = mod_ctx->sample;
+
+  memcpy(dest, hdr, sizeof hdr);
+  memcpy((unsigned char *)dest + sizeof hdr, &sc, sizeof sc);
+  memcpy((unsigned char *)dest + sizeof hdr + sizeof sc,
+         mod_ctx->channels, nch * sizeof(_pocketmod_chan));
+  return need;
+}
+
+static int mod_unserialize(const void *src, size_t size)
+{
+  uint32_t hdr[4];
+  mod_state_scalars_t sc;
+  const unsigned char *p;
+  unsigned nch;
+
+  if (!mod_ctx || !mod_data)                          return 0;
+  if (size < sizeof hdr + sizeof sc)                  return 0;
+  memcpy(hdr, src, sizeof hdr);
+  if (hdr[0] != MOD_STATE_MAGIC)                      return 0;
+  if (hdr[1] != MOD_STATE_VERSION)                    return 0;
+  nch = hdr[3];
+  if (nch == 0 || nch > POCKETMOD_MAX_CHANNELS)       return 0;
+  if (size < sizeof hdr + sizeof sc + nch * sizeof(_pocketmod_chan)) return 0;
+
+  /* Rebuild read-only song data + pointers from the same lump. */
+  if (!pocketmod_init(mod_ctx, mod_data, mod_len, mod_rate))
+    return 0;                  /* can't resume -> defer to render-replay */
+  if (mod_ctx->num_channels != nch)
+    return 0;                  /* state was taken under a different module */
+
+  memcpy(&sc, (const unsigned char *)src + sizeof hdr, sizeof sc);
+  mod_ctx->samples_per_tick = sc.samples_per_tick;
+  mod_ctx->ticks_per_line   = (int)sc.ticks_per_line;
+  memcpy(mod_ctx->visited, sc.visited, sizeof mod_ctx->visited);
+  mod_ctx->loop_count       = (int)sc.loop_count;
+  mod_ctx->pattern_delay    = sc.pattern_delay;
+  mod_ctx->lfo_rng          = sc.lfo_rng;
+  mod_ctx->pattern          = sc.pattern;
+  mod_ctx->line             = sc.line;
+  mod_ctx->tick             = sc.tick;
+  mod_ctx->sample           = sc.sample;
+
+  p = (const unsigned char *)src + sizeof hdr + sizeof sc;
+  memcpy(mod_ctx->channels, p, nch * sizeof(_pocketmod_chan));
+
+  mod_looping = (hdr[2] != 0);
+  mod_playing = 1;
+  mod_paused  = 0;
+  return 1;
+}
+
 const music_player_t mod_player =
 {
   mod_name,
@@ -200,6 +332,6 @@ const music_player_t mod_player =
   mod_play,
   mod_stop,
   mod_render,
-  NULL,   /* serialize   -- tracker position state not implemented */
-  NULL    /* unserialize */
+  mod_serialize,
+  mod_unserialize
 };

@@ -1306,6 +1306,16 @@ void I_SafeExit(int rc);
 
 void retro_run(void)
 {
+#ifdef ACS_SELFTEST
+  /* Fire once the world is actually in play, so a real player actor exists for
+   * the conversation trigger to act on (players[0].mo is NULL before that). */
+  { static int acs_st_done = 0;
+    extern int ZACS_ConversationSelfTest(void);
+    if (!acs_st_done && gamestate == GS_LEVEL && players[0].mo)
+    { acs_st_done = 1; ZACS_ConversationSelfTest(); }
+  }
+#endif
+
    bool updated = false;
 
    in_retro_run = true;

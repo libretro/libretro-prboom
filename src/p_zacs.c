@@ -2383,6 +2383,142 @@ void Z_ACSHudClear(void)
   zacs_hud_h = 200;
 }
 
+#ifdef ACS_SELFTEST
+/* ------------------------------------------------------------------------ *
+ * ACS conversation-lifecycle regression self-test.                         *
+ *                                                                          *
+ * Content-neutral coverage for the dialogue subsystem, exercising the whole *
+ * lifecycle rather than any single code path: trigger (SetPlayerProperty    *
+ * freeze, line special 191), dialogue posting and activation, use-driven    *
+ * advance through a branching/hub conversation, the runaway-loop guard, the *
+ * stall watchdog, and clean unfreeze.  Returns the number of failed checks  *
+ * (0 = all pass).  Driven by tools/acs_selftest (see that file); compiled   *
+ * only under ACS_SELFTEST so it never ships in release builds.              *
+ *                                                                          *
+ * The probe drives the same internal entry points the ACS VM uses -- the    *
+ * line-special dispatcher for the freeze and zacs_hud_store for each posted  *
+ * line -- so a regression anywhere in trigger, suppression, advance or       *
+ * teardown is caught here regardless of which mod first exposed it. */
+
+static void zacs_dispatch_lspec(zacs_inst_t *inst, int special,
+                                int *a, int *result);
+
+static int acs_st_fail;
+static void acs_st_check(int cond, const char *what)
+{
+  if (!cond)
+  {
+    acs_st_fail++;
+    lprintf(LO_ERROR, "ACS-SELFTEST FAIL: %s\n", what);
+  }
+  else
+    lprintf(LO_INFO, "ACS-SELFTEST ok:   %s\n", what);
+}
+
+static int acs_st_frozen(void)
+{
+  int i;
+  for (i = 0; i < MAXPLAYERS; i++)
+    if (playeringame[i] && (players[i].cheats & CF_TOTALLYFROZEN))
+      return 1;
+  return 0;
+}
+
+/* Post a dialogue line the way a conversation script does (spoken-line id). */
+static void acs_st_say(const char *text)
+{
+  zacs_hud_store(text, 201, 10, 10, -1, 6, 0, 0, 0, 0);
+}
+
+/* Drive line special 191 (SetPlayerProperty) on player 0 the way ACS does. */
+static void acs_st_setfreeze(int value)
+{
+  zacs_inst_t inst;
+  int a[3];
+  memset(&inst, 0, sizeof inst);
+  inst.activator = players[0].mo;
+  a[0] = 0;       /* who: activator's player */
+  a[1] = value;   /* on/off */
+  a[2] = 4;       /* PROP_TOTALLYFROZEN */
+  zacs_dispatch_lspec(&inst, 191, a, NULL);
+}
+
+int ZACS_ConversationSelfTest(void);
+int ZACS_ConversationSelfTest(void)
+{
+  int saved_pig    = playeringame[0];
+  int saved_cheats = players[0].cheats;
+  int k;
+
+  acs_st_fail = 0;
+  playeringame[0] = 1;
+  players[0].cheats &= ~CF_TOTALLYFROZEN;
+  Z_ACSHudClear();
+
+  /* 1. Trigger: SetPlayerProperty freeze must actually freeze the player. */
+  acs_st_setfreeze(1);
+  acs_st_check(acs_st_frozen(), "trigger: SetPlayerProperty freezes the player");
+
+  /* 2. Posting the opening line activates the conversation and is not
+   *    suppressed. */
+  acs_st_say("What would you like to do?");
+  acs_st_check(zacs_dlg_active, "start: opening line activates the conversation");
+  acs_st_check(!zacs_dlg_break,  "start: opening line is not suppressed");
+
+  /* 3. A branching/hub conversation: player presses use to pick a branch,
+   *    the branch line shows, then the conversation legitimately returns to
+   *    the opening prompt.  None of this must suppress dialogue. */
+  zacs_dlg_used = 1; acs_st_say("Tell me about the keep.");
+  acs_st_check(zacs_dlg_advanced && !zacs_dlg_break, "branch: first branch line shows");
+  zacs_dlg_used = 1; acs_st_say("What would you like to do?");
+  acs_st_check(!zacs_dlg_break, "hub: player-driven return to opening keeps dialogue active");
+  zacs_dlg_used = 1; acs_st_say("Tell me about the war.");
+  acs_st_check(!zacs_dlg_break, "branch: second branch line shows after hub return");
+  acs_st_check(acs_st_frozen(), "hub: player stays frozen through the conversation");
+
+  /* 4. Clean end: lifting the freeze ends the conversation and re-arms. */
+  acs_st_setfreeze(0);
+  acs_st_check(!acs_st_frozen(), "end: SetPlayerProperty unfreeze releases the player");
+  /* a fresh frozen post after unfreeze starts a brand-new conversation */
+  acs_st_setfreeze(1);
+  acs_st_say("A new conversation begins.");
+  acs_st_check(zacs_dlg_active && !zacs_dlg_break, "restart: a new conversation triggers cleanly");
+  acs_st_setfreeze(0);
+  Z_ACSHudClear();
+
+  /* 5. Runaway loop: a script that cycles opening<->body on its own with no
+   *    use-press must still be force-ended so the player is never stuck. */
+  acs_st_setfreeze(1);
+  acs_st_say("Loop opening prompt.");
+  for (k = 0; k < 16 && !zacs_dlg_break; k++)
+  {
+    acs_st_say("Loop body line.");
+    acs_st_say("Loop opening prompt.");
+  }
+  acs_st_check(zacs_dlg_break, "guard: a self-looping conversation is force-ended");
+  acs_st_check(!acs_st_frozen(), "guard: force-ended loop unfreezes the player");
+  Z_ACSHudClear();
+
+  /* 6. Stall watchdog: frozen with no new line for the grace period ends it. */
+  acs_st_setfreeze(1);
+  acs_st_say("A line that then stops updating.");
+  acs_st_check(acs_st_frozen(), "stall: conversation frozen before the watchdog");
+  for (k = 0; k < ZACS_DLG_STALL_TICS + 2; k++)
+    Z_ACSHudTicker();
+  acs_st_check(!acs_st_frozen(), "stall: watchdog ends a wedged single-line conversation");
+  Z_ACSHudClear();
+
+  players[0].cheats = saved_cheats & ~CF_TOTALLYFROZEN;
+  playeringame[0]   = saved_pig;
+  Z_ACSHudClear();
+
+  lprintf(acs_st_fail ? LO_ERROR : LO_INFO,
+          "ACS-SELFTEST: %d failure(s)\n", acs_st_fail);
+  return acs_st_fail;
+}
+#endif /* ACS_SELFTEST */
+
+
 /* Draw the live hud messages.  Called from the HUD drawer; uses the small
  * status-bar font via a transient text line so colour escapes and the missing
  * -glyph fallbacks are handled exactly as the message widget's are. */

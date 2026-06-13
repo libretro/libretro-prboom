@@ -2278,14 +2278,14 @@ dbool P_ExecuteHexenLineSpecial(int special, int *args, line_t *line,
       ok = Hexen_EV_DoFloor(line, args, FLEV_MOVETOVALUETIMES8);
       break;
     case 60:                    /* Plat_PerpetualRaise */
-      ok = EV_DoHexenPlat(line, args, PLAT_PERPETUALRAISE, 8);
+      ok = EV_DoHexenPlat(line, args, PLAT_PERPETUALRAISE, 0);
       break;
     case 61:                    /* Plat_Stop */
       Hexen_EV_StopPlat(line, args);
       ok = true;
       break;
     case 62:                    /* Plat_DownWaitUpStay */
-      ok = EV_DoHexenPlat(line, args, PLAT_DOWNWAITUPSTAY, 8);
+      ok = EV_DoHexenPlat(line, args, PLAT_DOWNWAITUPSTAY, 0);
       break;
     case 63:                    /* Plat_DownByValueWaitUpStay */
       ok = EV_DoHexenPlat(line, args, PLAT_DOWNBYVALUEWAITUPSTAY, 0);

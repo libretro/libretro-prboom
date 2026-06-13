@@ -2344,6 +2344,7 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           while (b[bi] && b[bi] != '(') { fn[bi] = b[bi]; bi++; }
           fn[bi] = 0;
           if (!strcasecmp(fn, "A_PlaySound") ||
+              !strcasecmp(fn, "A_PlaySoundEx") ||
               !strcasecmp(fn, "A_StartSound"))
           {
             char arg[32];
@@ -3735,11 +3736,16 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
    * the actor declares no Faint sequence.  Point both the normal and gib
    * death entries at the action so either kind of kill triggers it. */
   {
-    int faint_li = decorate_label_index(a, "Faint");
-    int miss_li  = decorate_label_index(a, "Missile");
-    int faint_state = -1;
-    int miss_state  = -1;
-    if ((faint_li >= 0 || miss_li >= 0) && a->seq_len > 0)
+    int faint_li  = decorate_label_index(a, "Faint");
+    int miss_li   = decorate_label_index(a, "Missile");
+    int death_li  = decorate_label_index(a, "Death");
+    int xdeath_li = decorate_label_index(a, "XDeath");
+    int faint_state  = -1;
+    int miss_state   = -1;
+    int death_state  = -1;
+    int xdeath_state = -1;
+    if ((faint_li >= 0 || miss_li >= 0 || death_li >= 0 || xdeath_li >= 0) &&
+        a->seq_len > 0)
     {
       int fsp  = decorate_sprite_index(a->seq_sprite[0] ? a->seq_sprite
                                                         : a->seq[0].spr, sp_next);
@@ -3753,6 +3759,10 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
         faint_state = fbase + a->seqlabel[faint_li].frame;
       if (miss_li >= 0)
         miss_state = fbase + a->seqlabel[miss_li].frame;
+      if (death_li >= 0)
+        death_state = fbase + a->seqlabel[death_li].frame;
+      if (xdeath_li >= 0)
+        xdeath_state = fbase + a->seqlabel[xdeath_li].frame;
     }
 
     /* A replacement reskins the stock monster it stands in for, inheriting
@@ -3765,7 +3775,22 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
     if (miss_state > 0)
       info->missilestate = miss_state;
 
-    if (faint_state > 0 || info->deathstate > 0)
+    /* A variant that restates its own Death/XDeath (a custom gib animation
+     * with its own frames, A_Jump between two death sequences, etc.) was left
+     * playing the reskinned stock death because its captured death block was
+     * never built or wired -- so the intended animation never ran.  Point the
+     * death states at the built sequence so the variant plays its own death.
+     * This is independent of the hdoom Faint/A_HDoomDeath ACS hook below. */
+    if (death_state > 0)
+      info->deathstate = death_state;
+    if (xdeath_state > 0)
+      info->xdeathstate = xdeath_state;
+
+    /* hdoom drives its death through an ACS hook under a "Faint" label: prepend
+     * a zero-tic A_HDoomDeath that falls through to the death animation.  Only
+     * do this when the actor actually uses that hook (a Faint label); a variant
+     * whose death is a plain DECORATE animation must not be rerouted. */
+    if (faint_state > 0)
     {
       int ds   = (*st_cursor)++;
       state_t *st;
@@ -3776,7 +3801,7 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
       st->frame       = 0;
       st->tics        = 0;
       st->action.arg1 = (arg1_t)A_HDoomDeath;
-      st->nextstate   = (faint_state > 0) ? faint_state : info->deathstate;
+      st->nextstate   = faint_state;
       st->misc1 = st->misc2 = 0;
       info->deathstate  = ds;
       info->xdeathstate = ds;

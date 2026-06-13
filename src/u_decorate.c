@@ -108,7 +108,7 @@ typedef struct
 #define SEQF_STOP 2           /* freeze on this frame */
 #define SEQF_WAIT 3           /* stay on this frame (re-run its action) */
 #define SEQF_GOTO 4           /* jump to label seqlabel[target] */
-  struct { short flow; short target; short jtoff; short has_jump;
+  struct { short flow; short target; short jtoff; short has_jump; short jchance;
            char tname[24]; char jtname[24]; dexpr_t jcond; }
         seqflow[MAX_SPAWN_FRAMES];
   /* Labels encountered in the state block, mapped to the frame index where
@@ -698,6 +698,23 @@ void A_DecorateJumpIf(mobj_t *mo)
   if (!cond)
     return;
   tgt = (int)st->args[5];
+  if (tgt >= 0 && tgt < num_states)
+    P_SetMobjState(mo, (statenum_t)tgt);
+}
+
+/* A_Jump(chance, target): unconditional probabilistic jump.  With chance/256
+ * probability jump to the target state in args[5]; otherwise fall through.  Used
+ * by the scene state machines, notably A_Jump(256, "Finish") as the guaranteed
+ * exit from a sex act back to the death/finish sprite. */
+void A_DecorateJump(mobj_t *mo)
+{
+  int chance, tgt;
+  if (!mo || !mo->state)
+    return;
+  chance = (int)mo->state->args[0];
+  if (chance < 256 && P_Random(pr_randomjump) >= chance)
+    return;
+  tgt = (int)mo->state->args[5];
   if (tgt >= 0 && tgt < num_states)
     P_SetMobjState(mo, (statenum_t)tgt);
 }
@@ -2127,7 +2144,7 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
         short cmiss_id = -1;       /* A_CustomMissile class index, or -1 */
         struct { short uvslot; short flag; short fval; dexpr_t idx; dexpr_t val; }
               opstage;
-        struct { short has_jump; short jtoff; char tname[24]; dexpr_t jcond; }
+        struct { short has_jump; short jtoff; short jchance; char tname[24]; dexpr_t jcond; }
               flowstage;
         const char *r = skip_space(q, end);
         const char *act_src;
@@ -2361,7 +2378,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           }
           else if (!strcasecmp(fn, "A_SetUserVar") ||
                    !strcasecmp(fn, "A_SetUserArray") ||
-                   !strcasecmp(fn, "A_JumpIf"))
+                   !strcasecmp(fn, "A_JumpIf") ||
+                   !strcasecmp(fn, "A_Jump"))
           {
             /* These carry a parenthesised argument list that may contain
              * spaces and an expression, so re-read the whole "(...)" from
@@ -2406,6 +2424,33 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
               trim_arg(fld[0]); trim_arg(fld[1]);
               parse_dexpr(a, fld[0], &flowstage.jcond);
               flowstage.has_jump = 1;
+              if (fld[1][0] >= '0' && fld[1][0] <= '9')
+                flowstage.jtoff = (short)atoi(fld[1]);
+              else
+              {
+                int dn = 0;
+                flowstage.jtoff = -1;
+                while (fld[1][dn] && dn < 23)
+                { flowstage.tname[dn] = fld[1][dn]; dn++; }
+                flowstage.tname[dn] = 0;
+              }
+              a->multi_state = 1;
+            }
+            else if (!strcasecmp(fn, "A_Jump") && nf >= 2)
+            {
+              /* A_Jump(chance, target[, target2...]): with chance/256
+               * probability jump to a target (only the first is modelled),
+               * else fall through.  Rides the same seqflow jump slot as
+               * A_JumpIf but with no condition -- jchance records the
+               * probability and marks it unconditional.  The scene state
+               * machines use A_Jump(256, "Finish") as the guaranteed exit out
+               * of a sex act, so without this the actor never leaves the act
+               * sprite. */
+              trim_arg(fld[0]); trim_arg(fld[1]);
+              flowstage.has_jump = 1;
+              flowstage.jchance  = (short)atoi(fld[0]);
+              if (flowstage.jchance < 1)   flowstage.jchance = 1;
+              if (flowstage.jchance > 256) flowstage.jchance = 256;
               if (fld[1][0] >= '0' && fld[1][0] <= '9')
                 flowstage.jtoff = (short)atoi(fld[1]);
               else
@@ -2514,6 +2559,7 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           {
             a->seqflow[a->seq_len].has_jump = 1;
             a->seqflow[a->seq_len].jtoff    = flowstage.jtoff;
+            a->seqflow[a->seq_len].jchance  = flowstage.jchance;
             a->seqflow[a->seq_len].jcond    = flowstage.jcond;
             memcpy(a->seqflow[a->seq_len].jtname, flowstage.tname,
                    sizeof(flowstage.tname));
@@ -3091,13 +3137,24 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
         if (li >= 0)
           tgt = base + a->seqlabel[li].frame;
       }
-      state->action.arg0 = (arg0_t)A_DecorateJumpIf;
-      state->args[0] = a->seqflow[f].jcond.ka;
-      state->args[1] = a->seqflow[f].jcond.va;
-      state->args[2] = a->seqflow[f].jcond.op;
-      state->args[3] = a->seqflow[f].jcond.kb;
-      state->args[4] = a->seqflow[f].jcond.vb;
-      state->args[5] = tgt;
+      if (a->seqflow[f].jchance > 0)
+      {
+        /* A_Jump(chance, target): unconditional probabilistic jump.  The
+         * chance (1..256) rides in args[0]; A_DecorateJump rolls against it. */
+        state->action.arg0 = (arg0_t)A_DecorateJump;
+        state->args[0] = a->seqflow[f].jchance;
+        state->args[5] = tgt;
+      }
+      else
+      {
+        state->action.arg0 = (arg0_t)A_DecorateJumpIf;
+        state->args[0] = a->seqflow[f].jcond.ka;
+        state->args[1] = a->seqflow[f].jcond.va;
+        state->args[2] = a->seqflow[f].jcond.op;
+        state->args[3] = a->seqflow[f].jcond.kb;
+        state->args[4] = a->seqflow[f].jcond.vb;
+        state->args[5] = tgt;
+      }
     }
   }
 }

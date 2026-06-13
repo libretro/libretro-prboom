@@ -1009,6 +1009,50 @@ static int currentPaletteIndex = 0;
 //
 // V_UpdateTrueColorPalette
 //
+/* The engine expects PLAYPAL to carry the 14 standard palettes: the base
+ * palette, eight red damage-flash palettes, four gold item-pickup palettes
+ * and one green radiation-suit palette.  Some ZDoom-targeted mods ship a
+ * PLAYPAL with only the base palette (768 bytes) and rely on the source port
+ * to synthesise the flash palettes at runtime.  When the lump is short, the
+ * code that indexes a flash palette would read past the lump (and past the
+ * Palettes16 buffer), tinting the screen with garbage on damage.  Reproduce
+ * the colours id's palette generator (dcolors) baked into the stock lump:
+ * blend the base palette toward red / gold / green by the canonical amounts. */
+#define V_NUM_STD_PALETTES 14
+static void V_SynthPaletteColor(const uint8_t *base, int palnum, int idx,
+                                uint8_t *out)
+{
+  /* base RGB for this colour index in palette 0 */
+  int br = base[idx*3+0], bg = base[idx*3+1], bb = base[idx*3+2];
+  int tr, tg, tb;       /* blend target */
+  int num = 0, den = 1; /* blend fraction num/den */
+
+  if (palnum >= 1 && palnum <= 8)        /* red damage flash */
+  {
+    tr = 255; tg = 0; tb = 0;
+    num = palnum; den = 9;               /* level/9, matches the stock lump */
+  }
+  else if (palnum >= 9 && palnum <= 12)  /* gold item pickup */
+  {
+    tr = 215; tg = 186; tb = 69;
+    num = palnum - 8; den = 8;           /* (level+1)/8 -> 1/8..4/8 */
+  }
+  else if (palnum == 13)                 /* green radiation suit */
+  {
+    tr = 0; tg = 255; tb = 0;
+    num = 1; den = 8;                    /* 1/8 */
+  }
+  else                                   /* base palette, no blend */
+  {
+    out[0] = (uint8_t)br; out[1] = (uint8_t)bg; out[2] = (uint8_t)bb;
+    return;
+  }
+
+  out[0] = (uint8_t)(br + ((tr - br) * num) / den);
+  out[1] = (uint8_t)(bg + ((tg - bg) * num) / den);
+  out[2] = (uint8_t)(bb + ((tb - bb) * num) / den);
+}
+
 void V_UpdateTrueColorPalette(void) {
   int i, w, p;
   int paletteNum = currentPaletteIndex;
@@ -1022,7 +1066,8 @@ void V_UpdateTrueColorPalette(void) {
   ;
 
   int numPals = W_LumpLength(pplump) / (3*256);
-  
+  int genPals = (numPals < V_NUM_STD_PALETTES) ? V_NUM_STD_PALETTES : numPals;
+
   if (usegammaOnLastPaletteGeneration != usegamma) {
     if (Palettes16) free(Palettes16);
     Palettes16 = NULL;
@@ -1032,20 +1077,36 @@ void V_UpdateTrueColorPalette(void) {
   if (!Palettes16)
   {
      // set short palette
-     Palettes16 = malloc(numPals*256*sizeof(uint16_t)*VID_NUMCOLORWEIGHTS);
-     for (p=0; p<numPals; p++)
+     Palettes16 = malloc(genPals*256*sizeof(uint16_t)*VID_NUMCOLORWEIGHTS);
+     for (p=0; p<genPals; p++)
      {
         for (i=0; i<256; i++)
         {
-           uint8_t r = gtable[pal[(256*p+i)*3+0]];
-           uint8_t g = gtable[pal[(256*p+i)*3+1]];
-           uint8_t b = gtable[pal[(256*p+i)*3+2]];
+           uint8_t r, g, b;
+           float roundUpR, roundUpG, roundUpB;
+           if (p < numPals)
+           {
+              r = gtable[pal[(256*p+i)*3+0]];
+              g = gtable[pal[(256*p+i)*3+1]];
+              b = gtable[pal[(256*p+i)*3+2]];
+           }
+           else
+           {
+              /* lump is missing this flash palette: synthesise it from the
+               * base palette so a damage/pickup/radsuit tint still works
+               * instead of reading garbage past the lump */
+              uint8_t rgb[3];
+              V_SynthPaletteColor(pal, p, i, rgb);
+              r = gtable[rgb[0]];
+              g = gtable[rgb[1]];
+              b = gtable[rgb[2]];
+           }
 
            // ideally, we should always round up, but very bright colors
            // overflow the blending adds, so they don't get rounded.
-           float roundUpR = (r > DONT_ROUND_ABOVE) ? 0 : 0.5f;
-           float roundUpG = (g > DONT_ROUND_ABOVE) ? 0 : 0.5f;
-           float roundUpB = (b > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+           roundUpR = (r > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+           roundUpG = (g > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+           roundUpB = (b > DONT_ROUND_ABOVE) ? 0 : 0.5f;
 
            for (w=0; w<VID_NUMCOLORWEIGHTS; w++)
            {
@@ -1195,6 +1256,9 @@ void V_SetPaletteBlend(int pal1, int pal2, fixed_t t)
                            : (const uint8_t *) W_CacheLumpNum(gtlump))
            + (256 * usegamma);
 
+  {
+    int numPals = W_LumpLength(pplump) / (3*256);
+
   blend_flip ^= 1;
   if (!BlendPal16[blend_flip])
     BlendPal16[blend_flip] =
@@ -1203,18 +1267,24 @@ void V_SetPaletteBlend(int pal1, int pal2, fixed_t t)
 
   for (i = 0; i < 256; i++)
   {
-    uint8_t r1 = gtable[pal[(256*pal1+i)*3+0]];
-    uint8_t g1 = gtable[pal[(256*pal1+i)*3+1]];
-    uint8_t b1 = gtable[pal[(256*pal1+i)*3+2]];
-    uint8_t r2 = gtable[pal[(256*pal2+i)*3+0]];
-    uint8_t g2 = gtable[pal[(256*pal2+i)*3+1]];
-    uint8_t b2 = gtable[pal[(256*pal2+i)*3+2]];
-    uint8_t r = (uint8_t) ((r1 * (FRACUNIT - t) + r2 * t) >> FRACBITS);
-    uint8_t g = (uint8_t) ((g1 * (FRACUNIT - t) + g2 * t) >> FRACBITS);
-    uint8_t b = (uint8_t) ((b1 * (FRACUNIT - t) + b2 * t) >> FRACBITS);
-    float roundUpR = (r > DONT_ROUND_ABOVE) ? 0 : 0.5f;
-    float roundUpG = (g > DONT_ROUND_ABOVE) ? 0 : 0.5f;
-    float roundUpB = (b > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+    uint8_t s1[3], s2[3];
+    uint8_t r1, g1, b1, r2, g2, b2;
+    uint8_t r, g, b;
+    float roundUpR, roundUpG, roundUpB;
+    /* a flash palette the lump does not carry is synthesised, matching the
+     * full-palette build path, so blending never reads past the lump */
+    if (pal1 < numPals) { s1[0]=pal[(256*pal1+i)*3+0]; s1[1]=pal[(256*pal1+i)*3+1]; s1[2]=pal[(256*pal1+i)*3+2]; }
+    else V_SynthPaletteColor(pal, pal1, i, s1);
+    if (pal2 < numPals) { s2[0]=pal[(256*pal2+i)*3+0]; s2[1]=pal[(256*pal2+i)*3+1]; s2[2]=pal[(256*pal2+i)*3+2]; }
+    else V_SynthPaletteColor(pal, pal2, i, s2);
+    r1 = gtable[s1[0]]; g1 = gtable[s1[1]]; b1 = gtable[s1[2]];
+    r2 = gtable[s2[0]]; g2 = gtable[s2[1]]; b2 = gtable[s2[2]];
+    r = (uint8_t) ((r1 * (FRACUNIT - t) + r2 * t) >> FRACBITS);
+    g = (uint8_t) ((g1 * (FRACUNIT - t) + g2 * t) >> FRACBITS);
+    b = (uint8_t) ((b1 * (FRACUNIT - t) + b2 * t) >> FRACBITS);
+    roundUpR = (r > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+    roundUpG = (g > DONT_ROUND_ABOVE) ? 0 : 0.5f;
+    roundUpB = (b > DONT_ROUND_ABOVE) ? 0 : 0.5f;
 
     for (w = 0; w < VID_NUMCOLORWEIGHTS; w++)
     {
@@ -1236,6 +1306,7 @@ void V_SetPaletteBlend(int pal1, int pal2, fixed_t t)
   if (gtlump != -1)
     W_UnlockLumpNum(gtlump);
   V_Palette16 = BlendPal16[blend_flip];
+  }
 }
 
 //

@@ -2096,6 +2096,8 @@ static const size_t num_version_headers = sizeof(version_headers) / sizeof(versi
 //
 // Load the game from the internal savebuffer
 //
+void G_SetLoadMapName(const char *mn);
+
 static int G_DoLoadGameFromSaveBuffer(int length)
 {
   int isok;
@@ -2176,6 +2178,21 @@ static int G_DoLoadGameFromSaveBuffer(int length)
   gameskill = *save_p++;
   gameepisode = *save_p++;
   gamemap = *save_p++;
+
+  /* Recover the stored map lump name (see G_DoSaveGameToBuffer).  A non-empty
+   * name re-enters the level by lump, which is the only way to reach a ZDoom
+   * MAPINFO map whose lump is not MAPnn/ExMy; otherwise the numeric gamemap
+   * would silently load a different (often IWAD) lump and the thinker/special
+   * stream would not match the level, crashing the unarchive. */
+  {
+    char mn[9];
+    memcpy(mn, save_p, sizeof(mn));
+    save_p += sizeof(mn);
+    mn[8] = 0;
+    if (mn[0])
+      G_SetLoadMapName(mn);
+  }
+
   gamemapinfo = G_LookupMapinfo(gameepisode, gamemap);
 
   for (i=0 ; i<MAXPLAYERS ; i++)
@@ -2406,7 +2423,7 @@ static int G_DoSaveGameToSaveBuffer() {
     *save_p++ = 0;
   }
 
-  CheckSaveGame(GAME_OPTION_SIZE+MIN_MAXPLAYERS+14);
+  CheckSaveGame(GAME_OPTION_SIZE+MIN_MAXPLAYERS+14+9);
 
   *save_p++ = compatibility_level;
 
@@ -2414,6 +2431,18 @@ static int G_DoSaveGameToSaveBuffer() {
   *save_p++ = gameepisode;
   *save_p++ = gamemap;
 
+  /* The numeric gamemap byte cannot name a ZDoom MAPINFO map whose lump is not
+   * MAPnn/ExMy (e.g. ZDCMP2).  Store the current map's lump name so the load
+   * path can re-enter the right level by name; an empty string means the
+   * numeric episode/map is sufficient (ordinary Doom/Heretic maps). */
+  {
+    char mn[9];
+    memset(mn, 0, sizeof(mn));
+    if (gamemapinfo && gamemapinfo->mapname)
+      strncpy(mn, gamemapinfo->mapname, 8);
+    memcpy(save_p, mn, sizeof(mn));
+    save_p += sizeof(mn);
+  }
   for (i=0 ; i<MAXPLAYERS ; i++)
     *save_p++ = playeringame[i];
 
@@ -2529,6 +2558,15 @@ static int     d_map;
  * is not a MAPnn/ExMy lump (e.g. ZDCMP2).  Empty == use the d_episode/d_map
  * numeric path. */
 static char    d_mapname[9];
+
+/* Set the deferred start-map lump name used by the next G_InitNew (consumed
+ * and cleared there).  Used by the savegame loader to re-enter a named map. */
+void G_SetLoadMapName(const char *mn)
+{
+  if (!mn) { d_mapname[0] = 0; return; }
+  strncpy(d_mapname, mn, 8);
+  d_mapname[8] = 0;
+}
 
 void G_DeferedInitNew(skill_t skill, int episode, int map)
 {

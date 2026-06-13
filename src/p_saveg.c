@@ -41,6 +41,8 @@
 #include "m_random.h"
 #include "am_map.h"
 #include "p_enemy.h"
+#include "hexen/p_spec_hexen.h"
+#include "hexen/po_man.h"
 #include "hexen/p_acs.h"
 #include "hexen/sn_sonix.h"
 #include "lprintf.h"
@@ -812,6 +814,15 @@ enum {
   tc_scroll,      // killough 3/7/98: new scroll effect thinker
   tc_pusher,      // phares 3/22/98:  new push/pull effect thinker
   tc_flicker,     // killough 10/4/98
+  tc_hexenplat,   // ZDoom/Hexen lift thinker (T_HexenPlatRaise, a plat_t)
+  tc_pillar,      // ZDoom/Hexen pillar thinker (T_HexenBuildPillar)
+  tc_hexenceiling,// ZDoom/Hexen ceiling (T_HexenMoveCeiling, a ceiling_t)
+  tc_hexendoor,   // ZDoom/Hexen door (T_HexenVerticalDoor, a vldoor_t)
+  tc_hexenlight,  // ZDoom/Hexen sector light (T_HexenLight, a light_t)
+  tc_floorwaggle, // ZDoom/Hexen floor waggle (T_FloorWaggle, a planeWaggle_t)
+  tc_rotatepoly,  // ZDoom/Hexen polyobject rotate (T_RotatePoly, a polyevent_t)
+  tc_movepoly,    // ZDoom/Hexen polyobject move (T_MovePoly, a polyevent_t)
+  tc_polydoor,    // ZDoom/Hexen polyobject door (T_PolyDoor, a polydoor_t)
   tc_endspecials
 } specials_e;
 
@@ -870,6 +881,15 @@ void P_ArchiveSpecials (void)
         th->function.arg1==(void (*)(void *))T_Scroll       ? 4+sizeof(scroll_t)  :
         th->function.arg1==(void (*)(void *))T_Pusher       ? 4+sizeof(pusher_t)  :
         th->function.arg1==(void (*)(void *))T_FireFlicker? 4+sizeof(fireflicker_t) :
+        th->function.arg1==(void (*)(void *))T_HexenPlatRaise   ? 4+sizeof(plat_t)   :
+        th->function.arg1==(void (*)(void *))T_HexenBuildPillar ? 4+sizeof(pillar_t) :
+        th->function.arg1==(void (*)(void *))T_HexenMoveCeiling ? 4+sizeof(ceiling_t):
+        th->function.arg1==(void (*)(void *))T_HexenVerticalDoor? 4+sizeof(vldoor_t) :
+        th->function.arg1==(void (*)(void *))T_HexenLight       ? 4+sizeof(light_t)  :
+        th->function.arg1==(void (*)(void *))T_FloorWaggle      ? 4+sizeof(planeWaggle_t):
+        th->function.arg1==(void (*)(void *))T_RotatePoly       ? 4+sizeof(polyevent_t):
+        th->function.arg1==(void (*)(void *))T_MovePoly         ? 4+sizeof(polyevent_t):
+        th->function.arg1==(void (*)(void *))T_PolyDoor         ? 4+sizeof(polydoor_t):
       0;
 
   CheckSaveGame(size + 1);    // killough; cph: +1 for the tc_endspecials
@@ -1028,6 +1048,115 @@ void P_ArchiveSpecials (void)
           *save_p++ = tc_pusher;
           memcpy (save_p, th, sizeof(pusher_t));
           save_p += sizeof(pusher_t);
+          continue;
+        }
+
+      // ZDoom/Hexen lift: a plat_t driven by T_HexenPlatRaise.  Without this
+      // an active lift (or one in stasis) was silently dropped from the save
+      // and the size reserved above did not match, corrupting the stream.
+      if (th->function.arg1 == (void (*)(void *))T_HexenPlatRaise)
+        {
+          plat_t *plat;
+          *save_p++ = tc_hexenplat;
+          PADSAVEP();
+          plat = (plat_t *)save_p;
+          memcpy (plat, th, sizeof(*plat));
+          save_p += sizeof(*plat);
+          plat->sector = (sector_t *)(plat->sector - sectors);
+          continue;
+        }
+
+      // ZDoom/Hexen pillar: a pillar_t driven by T_HexenBuildPillar
+      if (th->function.arg1 == (void (*)(void *))T_HexenBuildPillar)
+        {
+          pillar_t *pillar;
+          *save_p++ = tc_pillar;
+          PADSAVEP();
+          pillar = (pillar_t *)save_p;
+          memcpy (pillar, th, sizeof(*pillar));
+          save_p += sizeof(*pillar);
+          pillar->sector = (sector_t *)(pillar->sector - sectors);
+          continue;
+        }
+
+      // ZDoom/Hexen ceiling: a ceiling_t driven by T_HexenMoveCeiling
+      if (th->function.arg1 == (void (*)(void *))T_HexenMoveCeiling)
+        {
+          ceiling_t *ceiling;
+          *save_p++ = tc_hexenceiling;
+          PADSAVEP();
+          ceiling = (ceiling_t *)save_p;
+          memcpy (ceiling, th, sizeof(*ceiling));
+          save_p += sizeof(*ceiling);
+          ceiling->sector = (sector_t *)(ceiling->sector - sectors);
+          continue;
+        }
+
+      // ZDoom/Hexen door: a vldoor_t driven by T_HexenVerticalDoor
+      if (th->function.arg1 == (void (*)(void *))T_HexenVerticalDoor)
+        {
+          vldoor_t *door;
+          *save_p++ = tc_hexendoor;
+          PADSAVEP();
+          door = (vldoor_t *)save_p;
+          memcpy (door, th, sizeof(*door));
+          save_p += sizeof(*door);
+          door->sector = (sector_t *)(door->sector - sectors);
+          continue;
+        }
+
+      // ZDoom/Hexen sector light: a light_t driven by T_HexenLight
+      if (th->function.arg1 == (void (*)(void *))T_HexenLight)
+        {
+          light_t *light;
+          *save_p++ = tc_hexenlight;
+          PADSAVEP();
+          light = (light_t *)save_p;
+          memcpy (light, th, sizeof(*light));
+          save_p += sizeof(*light);
+          light->sector = (sector_t *)(light->sector - sectors);
+          continue;
+        }
+
+      // ZDoom/Hexen floor waggle: a planeWaggle_t driven by T_FloorWaggle
+      if (th->function.arg1 == (void (*)(void *))T_FloorWaggle)
+        {
+          planeWaggle_t *waggle;
+          *save_p++ = tc_floorwaggle;
+          PADSAVEP();
+          waggle = (planeWaggle_t *)save_p;
+          memcpy (waggle, th, sizeof(*waggle));
+          save_p += sizeof(*waggle);
+          waggle->sector = (sector_t *)(waggle->sector - sectors);
+          continue;
+        }
+
+      /* ZDoom/Hexen polyobjects reference their polyobject by index, not by a
+       * pointer, so they need no sector/pointer swizzle -- copy them whole. */
+      if (th->function.arg1 == (void (*)(void *))T_RotatePoly)
+        {
+          *save_p++ = tc_rotatepoly;
+          PADSAVEP();
+          memcpy (save_p, th, sizeof(polyevent_t));
+          save_p += sizeof(polyevent_t);
+          continue;
+        }
+
+      if (th->function.arg1 == (void (*)(void *))T_MovePoly)
+        {
+          *save_p++ = tc_movepoly;
+          PADSAVEP();
+          memcpy (save_p, th, sizeof(polyevent_t));
+          save_p += sizeof(polyevent_t);
+          continue;
+        }
+
+      if (th->function.arg1 == (void (*)(void *))T_PolyDoor)
+        {
+          *save_p++ = tc_polydoor;
+          PADSAVEP();
+          memcpy (save_p, th, sizeof(polydoor_t));
+          save_p += sizeof(polydoor_t);
           continue;
         }
     }
@@ -1193,6 +1322,123 @@ void P_UnArchiveSpecials (void)
           pusher->thinker.function.arg1 = (void (*)(void *))T_Pusher;
           pusher->source = P_GetPushThing(pusher->affectee);
           P_AddThinker(&pusher->thinker);
+          break;
+        }
+
+      case tc_hexenplat:
+        PADSAVEP();
+        {
+          plat_t *plat = Z_Malloc (sizeof(*plat), PU_LEVEL, NULL);
+          memcpy (plat, save_p, sizeof(*plat));
+          save_p += sizeof(*plat);
+          plat->sector = &sectors[(uintptr_t)plat->sector];
+          plat->sector->floordata = plat;
+
+          if (plat->thinker.function.arg1)
+            plat->thinker.function.arg1 = (void (*)(void *))T_HexenPlatRaise;
+
+          P_AddThinker (&plat->thinker);
+          P_AddActivePlat(plat);
+          break;
+        }
+
+      case tc_pillar:
+        PADSAVEP();
+        {
+          pillar_t *pillar = Z_Malloc (sizeof(*pillar), PU_LEVEL, NULL);
+          memcpy (pillar, save_p, sizeof(*pillar));
+          save_p += sizeof(*pillar);
+          pillar->sector = &sectors[(uintptr_t)pillar->sector];
+          pillar->sector->floordata = pillar;
+          pillar->thinker.function.arg1 = (void (*)(void *))T_HexenBuildPillar;
+          P_AddThinker (&pillar->thinker);
+          break;
+        }
+
+      case tc_hexenceiling:
+        PADSAVEP();
+        {
+          ceiling_t *ceiling = Z_Malloc (sizeof(*ceiling), PU_LEVEL, NULL);
+          memcpy (ceiling, save_p, sizeof(*ceiling));
+          save_p += sizeof(*ceiling);
+          ceiling->sector = &sectors[(uintptr_t)ceiling->sector];
+          ceiling->sector->ceilingdata = ceiling;
+          if (ceiling->thinker.function.arg1)
+            ceiling->thinker.function.arg1 = (void (*)(void *))T_HexenMoveCeiling;
+          P_AddThinker (&ceiling->thinker);
+          P_AddActiveCeiling(ceiling);
+          break;
+        }
+
+      case tc_hexendoor:
+        PADSAVEP();
+        {
+          vldoor_t *door = Z_Malloc (sizeof(*door), PU_LEVEL, NULL);
+          memcpy (door, save_p, sizeof(*door));
+          save_p += sizeof(*door);
+          door->sector = &sectors[(uintptr_t)door->sector];
+          door->line = (intptr_t)door->line != -1 ? &lines[(uintptr_t)door->line] : NULL;
+          door->sector->ceilingdata = door;
+          door->thinker.function.arg1 = (void (*)(void *))T_HexenVerticalDoor;
+          P_AddThinker (&door->thinker);
+          break;
+        }
+
+      case tc_hexenlight:
+        PADSAVEP();
+        {
+          light_t *light = Z_Malloc (sizeof(*light), PU_LEVEL, NULL);
+          memcpy (light, save_p, sizeof(*light));
+          save_p += sizeof(*light);
+          light->sector = &sectors[(uintptr_t)light->sector];
+          light->thinker.function.arg1 = (void (*)(void *))T_HexenLight;
+          P_AddThinker (&light->thinker);
+          break;
+        }
+
+      case tc_floorwaggle:
+        PADSAVEP();
+        {
+          planeWaggle_t *waggle = Z_Malloc (sizeof(*waggle), PU_LEVEL, NULL);
+          memcpy (waggle, save_p, sizeof(*waggle));
+          save_p += sizeof(*waggle);
+          waggle->sector = &sectors[(uintptr_t)waggle->sector];
+          waggle->sector->floordata = waggle;
+          waggle->thinker.function.arg1 = (void (*)(void *))T_FloorWaggle;
+          P_AddThinker (&waggle->thinker);
+          break;
+        }
+
+      case tc_rotatepoly:
+        PADSAVEP();
+        {
+          polyevent_t *pe = Z_Malloc (sizeof(*pe), PU_LEVEL, NULL);
+          memcpy (pe, save_p, sizeof(*pe));
+          save_p += sizeof(*pe);
+          pe->thinker.function.arg1 = (void (*)(void *))T_RotatePoly;
+          P_AddThinker (&pe->thinker);
+          break;
+        }
+
+      case tc_movepoly:
+        PADSAVEP();
+        {
+          polyevent_t *pe = Z_Malloc (sizeof(*pe), PU_LEVEL, NULL);
+          memcpy (pe, save_p, sizeof(*pe));
+          save_p += sizeof(*pe);
+          pe->thinker.function.arg1 = (void (*)(void *))T_MovePoly;
+          P_AddThinker (&pe->thinker);
+          break;
+        }
+
+      case tc_polydoor:
+        PADSAVEP();
+        {
+          polydoor_t *pd = Z_Malloc (sizeof(*pd), PU_LEVEL, NULL);
+          memcpy (pd, save_p, sizeof(*pd));
+          save_p += sizeof(*pd);
+          pd->thinker.function.arg1 = (void (*)(void *))T_PolyDoor;
+          P_AddThinker (&pd->thinker);
           break;
         }
 

@@ -1885,8 +1885,13 @@ int EV_SetThingSpecial(int *args)
   return success;
 }
 
-/* SetLineSpecial(id, special, arg1..arg5): rewrite the special on every line
- * carrying the given line id. */
+/* SetLineSpecial(id, special, arg1, arg2, arg3): rewrite the special on every
+ * line carrying the given line id.  As a line-special the dispatcher passes
+ * five ints: [id, special, arg1, arg2, arg3]; the new line keeps the first
+ * three of its own args (the most a line-special call can carry) and clears
+ * the rest.  (Scripts usually reach this through the PCD_SETLINESPECIAL
+ * opcode, which carries all five new args; this path covers the rarer
+ * line-activated form.) */
 int EV_SetLineSpecial(int *args)
 {
   int i;
@@ -1896,10 +1901,10 @@ int EV_SetLineSpecial(int *args)
     if (lines[i].tag == args[0])
     {
       lines[i].special = (short) args[1];
-      lines[i].args[0] = args[1];
-      lines[i].args[1] = args[2];
-      lines[i].args[2] = args[3];
-      lines[i].args[3] = args[4];
+      lines[i].args[0] = args[2];
+      lines[i].args[1] = args[3];
+      lines[i].args[2] = args[4];
+      lines[i].args[3] = 0;
       lines[i].args[4] = 0;
       success = 1;
     }

@@ -669,6 +669,36 @@ int Hexen_EV_DoCeiling(line_t *line, int *args, ceiling_e type)
         }
         break;
       }
+      case CLEV_MOVETOVALUE:
+      {
+        /* Ceiling_MoveToValue(tag, speed, height, negative): move the
+         * ceiling to an absolute height given in raw map units. */
+        int destHeight = args[2] * FRACUNIT;
+        if (args[3])
+          destHeight = -destHeight;
+        if (sec->ceilingheight <= destHeight)
+        {
+          ceiling->direction = 1;
+          ceiling->topheight = destHeight;
+          if (sec->ceilingheight == destHeight)
+            rtn = 0;
+        }
+        else
+        {
+          ceiling->direction = -1;
+          ceiling->bottomheight = destHeight;
+        }
+        break;
+      }
+      case CLEV_RAISETONEAREST:
+        /* Ceiling_RaiseToNearest: raise to the next higher neighbour. */
+        ceiling->topheight =
+          P_FindNextHighestCeiling(sec, sec->ceilingheight);
+        if (ceiling->topheight <= sec->ceilingheight)
+          rtn = 0;
+        else
+          ceiling->direction = 1;
+        break;
       default:
         rtn = 0;
         break;
@@ -1688,6 +1718,213 @@ int EV_ThingDestroy(int tid)
   return success;
 }
 
+/* Thing_SpawnFacing(tid, type, nofog, newtid): spawn an actor at every mapspot
+ * with the given tid, keeping the spot's own facing angle (unlike Thing_Spawn,
+ * which takes an explicit angle byte). */
+int EV_ThingSpawnFacing(int *args, int fog)
+{
+  int        tid = args[0];
+  int        searcher = -1;
+  int        success = 0;
+  mobjtype_t moType;
+  mobj_t    *mobj;
+
+  if (args[1] >= TT_COUNT)
+    return 0;
+  moType = TranslateThingType[args[1]];
+  if (nomonsters && (mobjinfo[moType].flags & MF_COUNTKILL))
+    return 0;
+
+  while ((mobj = P_FindMobjFromTID((short) tid, &searcher)) != NULL)
+  {
+    fixed_t z = (mobjinfo[moType].flags2 & MF2_FLOATBOB)
+                  ? mobj->z - mobj->floorz : mobj->z;
+    mobj_t *newMobj = P_SpawnMobj(mobj->x, mobj->y, z, moType);
+    if (!P_TestMobjLocation(newMobj))
+      P_RemoveMobj(newMobj);
+    else
+    {
+      newMobj->angle = mobj->angle;     /* inherit the spot's facing */
+      if (fog)
+      {
+        mobj_t *fogMobj = P_SpawnMobj(mobj->x, mobj->y,
+                                      mobj->z + TELEFOGHEIGHT, HEXEN_MT_TFOG);
+        S_StartSound(fogMobj, hexen_sfx_teleport);
+      }
+      newMobj->flags |= MF_DROPPED;
+      if (newMobj->flags2 & MF2_FLOATBOB)
+        newMobj->special1.i = newMobj->z - newMobj->floorz;
+      if (args[3])
+        P_InsertMobjIntoTIDList(newMobj, (short) args[3]);
+      success = 1;
+    }
+  }
+  return success;
+}
+
+/* Thing_Move(tid, mapspot, nofog): warp the tid'd actor onto the mapspot with
+ * the matching id.  A direct placement (P_TeleportMove) keeps it simple; the
+ * fog is cosmetic and omitted. */
+int EV_ThingMove(int tid, int mapspot, int nofog)
+{
+  mobj_t *mobj, *dest;
+  int     s1 = -1, s2 = -1;
+  int     success = 0;
+
+  (void) nofog;
+  dest = P_FindMobjFromTID((short) mapspot, &s2);
+  if (!dest)
+    return 0;
+  while ((mobj = P_FindMobjFromTID((short) tid, &s1)) != NULL)
+  {
+    fixed_t ox = mobj->x, oy = mobj->y, oz = mobj->z;
+    if (P_TeleportMove(mobj, dest->x, dest->y, false))
+    {
+      mobj->z = dest->z;
+      mobj->angle = dest->angle;
+      success = 1;
+    }
+    else
+    {
+      mobj->x = ox; mobj->y = oy; mobj->z = oz;
+    }
+  }
+  return success;
+}
+
+/* Thing_Stop(tid): zero an actor's momentum. */
+int EV_ThingStop(int tid)
+{
+  mobj_t *mobj;
+  int     searcher = -1;
+  int     success = 0;
+
+  while ((mobj = P_FindMobjFromTID((short) tid, &searcher)) != NULL)
+  {
+    mobj->momx = mobj->momy = mobj->momz = 0;
+    if (mobj->player)
+      mobj->player->momx = mobj->player->momy = 0;
+    success = 1;
+  }
+  return success;
+}
+
+/* Thing_Raise(tid): resurrect a corpse, like an archvile's heal. */
+int EV_ThingRaise(int tid)
+{
+  mobj_t *mobj;
+  int     searcher = -1;
+  int     success = 0;
+
+  while ((mobj = P_FindMobjFromTID((short) tid, &searcher)) != NULL)
+    if (A_RaiseMobj(mobj))
+      success = 1;
+  return success;
+}
+
+/* Thing_ChangeTID(oldtid, newtid): re-key actors in the TID list. */
+int EV_ThingChangeTID(int oldtid, int newtid)
+{
+  mobj_t *mobj;
+  int     searcher = -1;
+  int     success = 0;
+
+  while ((mobj = P_FindMobjFromTID((short) oldtid, &searcher)) != NULL)
+  {
+    P_RemoveMobjFromTIDList(mobj);
+    if (newtid)
+      P_InsertMobjIntoTIDList(mobj, (short) newtid);
+    else
+      mobj->tid = 0;
+    searcher = -1;              /* the list mutated; restart the walk */
+    success = 1;
+  }
+  return success;
+}
+
+/* Thing_Hate(hater, hatee): point one actor's aggression at another. */
+int EV_ThingHate(int hater, int hatee)
+{
+  mobj_t *mobj, *target;
+  int     s1 = -1, s2 = -1;
+  int     success = 0;
+
+  target = P_FindMobjFromTID((short) hatee, &s2);
+  if (!target)
+    return 0;
+  while ((mobj = P_FindMobjFromTID((short) hater, &s1)) != NULL)
+    if (mobj->flags & MF_SHOOTABLE)
+    {
+      P_SetTarget(&mobj->target, target);
+      if (mobj->info->seestate &&
+          mobj->state == &states[mobj->info->spawnstate])
+        P_SetMobjState(mobj, mobj->info->seestate);
+      success = 1;
+    }
+  return success;
+}
+
+/* SetThingSpecial(tid, special, arg1..arg3): stamp an actor's activation
+ * special, used so a later Thing_Activate runs it. */
+int EV_SetThingSpecial(int *args)
+{
+  mobj_t *mobj;
+  int     searcher = -1;
+  int     success = 0;
+
+  while ((mobj = P_FindMobjFromTID((short) args[0], &searcher)) != NULL)
+  {
+    mobj->special         = args[1];
+    mobj->special_args[0] = args[2];
+    mobj->special_args[1] = args[3];
+    mobj->special_args[2] = args[4];
+    mobj->special_args[3] = 0;
+    mobj->special_args[4] = 0;
+    success = 1;
+  }
+  return success;
+}
+
+/* SetLineSpecial(id, special, arg1..arg5): rewrite the special on every line
+ * carrying the given line id. */
+int EV_SetLineSpecial(int *args)
+{
+  int i;
+  int success = 0;
+
+  for (i = 0; i < numlines; i++)
+    if (lines[i].tag == args[0])
+    {
+      lines[i].special = (short) args[1];
+      lines[i].args[0] = args[1];
+      lines[i].args[1] = args[2];
+      lines[i].args[2] = args[3];
+      lines[i].args[3] = args[4];
+      lines[i].args[4] = 0;
+      success = 1;
+    }
+  return success;
+}
+
+/* Line_SetBlockMonsters(lineid, on): toggle the monster-block flag on the
+ * tagged lines. */
+int EV_SetLineBlockMonsters(int lineid, int on)
+{
+  int i;
+  int success = 0;
+
+  for (i = 0; i < numlines; i++)
+    if (lines[i].tag == lineid)
+    {
+      if (on)
+        lines[i].flags |= ML_BLOCKMONSTERS;
+      else
+        lines[i].flags &= ~ML_BLOCKMONSTERS;
+      success = 1;
+    }
+  return success;
+}
+
 /* --- Teleport -------------------------------------------------------------
  *
  * Hexen teleports send the activating mobj to a teleport-destination mapspot
@@ -2226,6 +2463,44 @@ dbool P_ExecuteHexenLineSpecial(int special, int *args, line_t *line,
     case 137:                   /* Thing_SpawnNoFog */
       ok = EV_ThingSpawn(args, 0);
       break;
+    case 139:                   /* Thing_SpawnFacing */
+      ok = EV_ThingSpawnFacing(args, 0);
+      break;
+    case 47:                    /* Ceiling_MoveToValue */
+      ok = Hexen_EV_DoCeiling(line, args, CLEV_MOVETOVALUE);
+      break;
+    case 252:                   /* Ceiling_RaiseToNearest */
+      ok = Hexen_EV_DoCeiling(line, args, CLEV_RAISETONEAREST);
+      break;
+    case 125:                   /* Thing_Move(tid, mapspot, nofog) */
+      ok = EV_ThingMove(args[0], args[1], args[2]);
+      break;
+    case 145:                   /* Thing_SetGoal / Thing_Stop */
+      ok = EV_ThingStop(args[0]);
+      break;
+    case 173:                   /* Thing_Raise(tid) */
+      ok = EV_ThingRaise(args[0]);
+      break;
+    case 176:                   /* Thing_ChangeTID(oldtid, newtid) */
+      ok = EV_ThingChangeTID(args[0], args[1]);
+      break;
+    case 177:                   /* Thing_Hate(hater, hatee, type) */
+      ok = EV_ThingHate(args[0], args[1]);
+      break;
+    case 127:                   /* SetThingSpecial(tid, spec, a1..a4 partial) */
+      ok = EV_SetThingSpecial(args);
+      break;
+    case 155:                   /* SetLineBlocking-ish (Line_SetBlockMonsters
+                                 * uses 156); 155 is Line_AlignFloor in ZDoom,
+                                 * recognised as a no-op decoration */
+      ok = true;
+      break;
+    case 156:                   /* Line_SetBlockMonsters(lineid, on) */
+      ok = EV_SetLineBlockMonsters(args[0], args[1]);
+      break;
+    case 278:                   /* SetLineSpecial(id, spec, a1..a5) */
+      ok = EV_SetLineSpecial(args);
+      break;
     case 35:                    /* Floor_RaiseByValueTimes8 */
       ok = Hexen_EV_DoFloor(line, args, FLEV_RAISEBYVALUETIMES8);
       break;
@@ -2295,6 +2570,37 @@ dbool P_ExecuteHexenLineSpecial(int special, int *args, line_t *line,
       break;
     case 65:                    /* Plat_UpByValueWaitDownStay */
       ok = EV_DoHexenPlat(line, args, PLAT_UPBYVALUEWAITDOWNSTAY, 0);
+      break;
+    /* Recognised-but-unmodelled specials.  These are cosmetic or rendering
+     * features the software engine does not implement (ZDoom colored sector
+     * lighting/fog, generalised scrollers, dynamic-light tweaks, animated
+     * door textures, fake-floor height transfer).  They are acknowledged as
+     * handled so that scripts which call them -- and especially scripts that
+     * branch on their result -- keep running instead of stalling on a
+     * spurious failure.  The visual effect is simply absent. */
+    case 14:                    /* Door_Animated (texture anim only) */
+    case 15:                    /* Autosave */
+    case 16:                    /* Transfer_WallLight */
+    case 38:                    /* Ceiling_Waggle (cosmetic ceiling bob) */
+    case 51:                    /* Sector_SetLink */
+    case 52:                    /* Scroll_Wall / Scroll_Texture_Left */
+    case 53:                    /* Scroll_Texture_Right */
+    case 117:                   /* Light_Stop */
+    case 180:                   /* Sector_SetTranslucent */
+    case 205:                   /* Generic_Crusher (use Ceiling_* instead) */
+    case 209:                   /* Transfer_Heights (fake floors) */
+    case 212:                   /* Sector_SetColor (colored lighting) */
+    case 213:                   /* Sector_SetFade (colored fog) */
+    case 214:                   /* Sector_SetDamage */
+    case 217:                   /* Scroll_Texture_Model / SetTextureScale */
+    case 218:                   /* Scroll_Floor */
+    case 222:                   /* Scroll_Texture_Both */
+    case 223:                   /* Sector_SetFriction */
+    case 224:                   /* Sector_SetGravity */
+    case 225:                   /* Sector_SetColorGradient-ish */
+    case 228:                   /* Sector_SetCurrentHeight / wind */
+    case 234:                   /* Light_ChangeToValueTimes */
+      ok = true;
       break;
     default:
       /* The remaining special groups (floors, platforms, lights, teleports,

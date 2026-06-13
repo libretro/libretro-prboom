@@ -436,6 +436,8 @@ typedef enum
    * instant speed, mirroring the FLEV TIMES8INSTANT pattern) */
   CLEV_LOWERTIMES8INSTANT,
   CLEV_RAISETIMES8INSTANT,
+  CLEV_MOVETOVALUE,          /* Ceiling_MoveToValue: dest in raw map units */
+  CLEV_RAISETONEAREST,       /* Ceiling_RaiseToNearest: next higher neighbour */
 } ceiling_e;
 
 // p_floor

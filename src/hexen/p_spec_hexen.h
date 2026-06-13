@@ -59,6 +59,15 @@ int   EV_ThingActivate(int tid);
 int   EV_ThingDeactivate(int tid);
 int   EV_ThingRemove(int tid);
 int   EV_ThingDestroy(int tid);
+int   EV_ThingSpawnFacing(int *args, int fog);
+int   EV_ThingMove(int tid, int mapspot, int nofog);
+int   EV_ThingStop(int tid);
+int   EV_ThingRaise(int tid);
+int   EV_ThingChangeTID(int oldtid, int newtid);
+int   EV_ThingHate(int hater, int hatee);
+int   EV_SetThingSpecial(int *args);
+int   EV_SetLineSpecial(int *args);
+int   EV_SetLineBlockMonsters(int lineid, int on);
 int   Hexen_EV_BuildStairs(line_t *line, int *args, int direction,
                            int stairsType);
 int   EV_ThingProjectile(int *args, int gravity);

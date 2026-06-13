@@ -164,6 +164,8 @@ static dbool P_ExecuteZDoomLineSpecial(int special, int *args, line_t *line,
     }
     case 80:                    /* ACS_Execute */
       return Z_ACSStart(args[0], args[1], &args[2], 3, mo, line, side, false);
+    case 84:                    /* ACS_ExecuteWithResult */
+      return Z_ACSStart(args[0], 0, &args[1], 3, mo, line, side, true);
     case 226:                   /* ACS_ExecuteAlways */
       return Z_ACSStart(args[0], args[1], &args[2], 3, mo, line, side, true);
     case 274:                   /* ACS_NamedExecute */

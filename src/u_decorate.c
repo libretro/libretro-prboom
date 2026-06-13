@@ -3492,6 +3492,16 @@ void U_RegisterDecorateThings(void)
     info = dsda_GetMobjInfo(mt);
     info->doomednum   = a->doomednum;
 
+    /* Carry the class name so ACS Spawn/SpawnSpot, which look an actor up by
+     * name (zacs_actor_type), can find it.  Without this a decoration that the
+     * scripts spawn by name -- e.g. an objective marker or a portal effect --
+     * fails to resolve and silently never appears. */
+    if (a->name[0] && !info->actorname)
+    {
+      char *nm = malloc(strlen(a->name) + 1);
+      if (nm) { strcpy(nm, a->name); info->actorname = nm; }
+    }
+
     /* publish this actor's user-variable map under its mobjtype so the ACS
      * user-variable builtins can resolve names to slots at runtime */
     if (a->num_uvars > 0 && num_uvarmaps < MAX_UVARMAPS)
@@ -4068,6 +4078,31 @@ void U_RegisterDecorateSexActors(void)
       }
     }
     break;
+  }
+
+  /* Some non-monster actors are reachable for map placement only through
+   * doomednum aliasing or carry no editor number at all, so neither the
+   * decoration registrar nor the alias path gives them an actorname.  When
+   * the scripts spawn such an actor by name -- a temporary teleport-portal
+   * effect, a spawned prop or marker -- zacs_actor_type cannot resolve it and
+   * the spawn silently fails.  Register any remaining named non-monster actor
+   * that has a usable Spawn sequence as a spawn-only type so ACS can find it
+   * by name.  Monsters are deliberately excluded: register_spawnonly_actor
+   * builds only a minimal Spawn-state mobjinfo, which is right for an inert
+   * effect but wrong for a full monster (its See/Melee/Missile/Death chains
+   * are not wired); those are reached through the monster-replacement and
+   * alias paths instead.  Anything already resolvable by name is skipped, so
+   * this only fills genuine gaps, and runs last so the puff/BFG passes still
+   * see their targets unregistered. */
+  for (i = 0; i < num_actors; i++)
+  {
+    decorate_actor_t *a = &actors[i];
+    if (!a->name[0] || a->seq_len <= 0 || a->is_monster)
+      continue;
+    if (decorate_type_by_name(a->name) >= 0)
+      continue;
+    if (register_spawnonly_actor(a, &st_cursor, &mt_cursor, &sp_next) >= 0)
+      n++;
   }
 
   if (n)

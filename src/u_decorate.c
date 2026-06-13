@@ -1895,6 +1895,59 @@ static int class_is_inventory(const char *name)
   return 0;
 }
 
+/* Decide whether a DECORATE actor should be a touch-collected pickup
+ * (MF_SPECIAL).  Inventory/pickup-derived non-monster actors are, EXCEPT
+ * +USESPECIAL actors, which are use-activated interactive objects (NPCs,
+ * conversation starters) that must persist and respond to use rather than be
+ * collected and removed on touch.  Exposed as a named predicate so the rule is
+ * explicit and can be regression-checked directly. */
+static int decorate_is_touch_pickup(const decorate_actor_t *a)
+{
+  if (!a || a->is_monster || a->use_special)
+    return 0;
+  return a->is_pickup || class_is_inventory(a->parent);
+}
+
+#ifdef ACS_SELFTEST
+/* Regression check for the touch-pickup classification.  A +USESPECIAL actor
+ * (an interactive NPC / conversation starter), even one derived from
+ * CustomInventory, must NOT be a touch-collected pickup -- otherwise walking
+ * into it collects and removes it before it can be used, so its conversation
+ * never triggers.  Returns the number of failed checks. */
+int U_DecoratePickupSelfTest(void);
+int U_DecoratePickupSelfTest(void)
+{
+  int fail = 0;
+  decorate_actor_t a;
+
+  /* A plain inventory item is a touch pickup. */
+  memset(&a, 0, sizeof a);
+  strncpy(a.parent, "Inventory", sizeof a.parent - 1);
+  if (!decorate_is_touch_pickup(&a))
+  { fail++; lprintf(LO_ERROR, "ACS-SELFTEST FAIL: inventory item should be a touch pickup\n"); }
+  else lprintf(LO_INFO, "ACS-SELFTEST ok:   inventory item is a touch pickup\n");
+
+  /* A +USESPECIAL CustomInventory actor is an interactive object, NOT a
+   * touch pickup -- this is the conversation-starter case that regressed. */
+  memset(&a, 0, sizeof a);
+  strncpy(a.parent, "CustomInventory", sizeof a.parent - 1);
+  a.use_special = 1;
+  if (decorate_is_touch_pickup(&a))
+  { fail++; lprintf(LO_ERROR, "ACS-SELFTEST FAIL: +USESPECIAL actor must not be a touch pickup\n"); }
+  else lprintf(LO_INFO, "ACS-SELFTEST ok:   +USESPECIAL interactive actor is not consumed on touch\n");
+
+  /* A monster is never a touch pickup regardless of parent. */
+  memset(&a, 0, sizeof a);
+  strncpy(a.parent, "Inventory", sizeof a.parent - 1);
+  a.is_monster = 1;
+  if (decorate_is_touch_pickup(&a))
+  { fail++; lprintf(LO_ERROR, "ACS-SELFTEST FAIL: a monster must not be a touch pickup\n"); }
+  else lprintf(LO_INFO, "ACS-SELFTEST ok:   a monster is not a touch pickup\n");
+
+  return fail;
+}
+#endif /* ACS_SELFTEST */
+
 static int base_class_doomednum(const char *name)
 {
   int i;
@@ -3599,9 +3652,16 @@ void U_RegisterDecorateThings(void)
      * walks straight through and P_TouchSpecialThing never runs -- which also
      * means any thing-special the map gave the pickup (commonly an ACS_Execute
      * that opens a door or raises a lift) never fires.  Flag it here; the
-     * touch handler grants it, fires its special, and removes it. */
-    if (!a->is_monster &&
-        (a->is_pickup || class_is_inventory(a->parent)))
+     * touch handler grants it, fires its special, and removes it.
+     *
+     * A +USESPECIAL actor is the opposite kind of object: it is activated by
+     * the player pressing use, not by being walked into, and it is meant to
+     * persist and keep responding (an interactive NPC or a conversation
+     * starter, often itself derived from CustomInventory).  Marking such an
+     * actor MF_SPECIAL would let the touch handler collect and remove it before
+     * it could ever be used, so its scene/conversation could not be triggered.
+     * Exclude use-activated actors from touch-pickup flagging. */
+    if (decorate_is_touch_pickup(a))
     {
       info->flags |= MF_SPECIAL;
       if (a->m_countitem)

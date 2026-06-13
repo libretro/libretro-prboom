@@ -2512,6 +2512,13 @@ int ZACS_ConversationSelfTest(void)
   playeringame[0]   = saved_pig;
   Z_ACSHudClear();
 
+  /* Touch-pickup vs. use-activated classification (DECORATE side): a
+   * +USESPECIAL conversation starter must not be consumed on touch. */
+  {
+    extern int U_DecoratePickupSelfTest(void);
+    acs_st_fail += U_DecoratePickupSelfTest();
+  }
+
   lprintf(acs_st_fail ? LO_ERROR : LO_INFO,
           "ACS-SELFTEST: %d failure(s)\n", acs_st_fail);
   return acs_st_fail;

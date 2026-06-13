@@ -478,6 +478,18 @@ static int zacs_cvar_value(const char *name)
   for (i = 0; i < zacs_numcvars; i++)
     if (!strcasecmp(zacs_cvars[i].name, name))
       return zacs_cvars[i].value;
+  /* Engine built-in CVars the mod reads but does not define in CVARINFO.  The
+   * follow-on scene's chasecam sizes its distance as
+   *   Clamp(GetCVarFixed("chase_dist"), actor Stamina, 30000)
+   * and the scene actors set Stamina 0, so an unknown chase_dist (0) collapses
+   * the clamp to 0 and the camera sits on top of the actor, cutting the scene
+   * sprites off.  ZDoom defines chase_dist with a default of 90.0, so answer
+   * with that fixed-point value (and chase_height -8.0, its companion) to match
+   * the real chasecam framing. */
+  if (!strcasecmp(name, "chase_dist"))
+    return 90 << 16;            /* 90.0 fixed (ZDoom default) */
+  if (!strcasecmp(name, "chase_height"))
+    return -(8 << 16);          /* -8.0 fixed (ZDoom default) */
   return 0;
 }
 

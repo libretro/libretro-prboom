@@ -3666,6 +3666,15 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
   info = dsda_GetMobjInfo(mt);   /* grows the table to fit; cache after */
   *info = mobjinfo[basemt];
   info->doomednum = -1;          /* reached only through the redirect */
+  /* A reskinned monster is placed by the mod the way it sits in the source
+   * port it was authored for, where two monsters that start overlapping push
+   * apart.  This engine has no such push: two solid monsters that overlap (or
+   * a solid monster overlapping a solid prop) deadlock -- P_Move fails in every
+   * direction, P_NewChaseDir sets DI_NODIR, and the trapped monster loops its
+   * walk animation in place without ever moving.  Clear MF_SOLID so the reskin
+   * cannot wedge: it still chases, attacks, is shot and dies, but passes
+   * through other actors instead of jamming against them. */
+  info->flags &= ~MF_SOLID;
   /* carry the replacement's own class name so ACS GetActorClass reports the
    * custom name (the death system builds "<Name>_Sex" from it), not the stock
    * class the clone was copied from.  Names are interned in the actor table,

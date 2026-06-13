@@ -363,6 +363,16 @@ enum {
 static char decorate_sounds[MAX_DECORATE_SOUNDS][32];
 static int  num_decorate_sounds;
 
+/* The mobjtype a DECORATE actor "replaces BulletPuff" registered to, or -1.
+ * P_SpawnPuff emits this in place of MT_PUFF so the mod's laser-puff sprite is
+ * shown on hitscan impacts. */
+static int decorate_bulletpuff_type = -1;
+
+int U_DecoratePuffReplacement(void)
+{
+  return decorate_bulletpuff_type;
+}
+
 /* Weapon-frame sounds (A_PlaySound on a pspr state): the sfx id a given weapon
  * state should play, keyed by the state index.  A weapon state cannot stash the
  * id in misc1/misc2 (the gun-sprite offset), so the weapon-safe codepointer
@@ -3582,6 +3592,23 @@ void U_RegisterDecorateSexActors(void)
       continue;
     if (register_spawnonly_actor(a, &st_cursor, &mt_cursor, &sp_next) >= 0)
       n++;
+  }
+
+  /* Register the DECORATE bullet-puff replacement (RedLaserPuff "replaces
+   * BulletPuff" in this mod) as a spawnable type and record it so P_SpawnPuff
+   * emits the mod's laser puff sprite instead of the stock Doom puff.  The puff
+   * carries no editor number, so it is otherwise never registered. */
+  for (i = 0; i < num_actors; i++)
+  {
+    decorate_actor_t *a = &actors[i];
+    if (a->seq_len <= 0)
+      continue;
+    if (a->replaces[0] && !strcasecmp(a->replaces, "BulletPuff"))
+    {
+      int mt = register_spawnonly_actor(a, &st_cursor, &mt_cursor, &sp_next);
+      if (mt >= 0)
+        decorate_bulletpuff_type = mt;
+    }
   }
 
   if (n)

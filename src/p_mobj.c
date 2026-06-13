@@ -2634,7 +2634,13 @@ void P_SpawnPuff(fixed_t x,fixed_t y,fixed_t z)
   t = P_Random(pr_spawnpuff);
   z += (t - P_Random(pr_spawnpuff))<<10;
 
-  th = P_SpawnMobj (x,y,z, MT_PUFF);
+  {
+    /* Use the DECORATE "replaces BulletPuff" actor (the mod's laser puff) when
+     * one is registered, so hitscan impacts show its sprite; otherwise the
+     * stock Doom puff. */
+    int pt = U_DecoratePuffReplacement();
+    th = P_SpawnMobj (x,y,z, (pt >= 0) ? (mobjtype_t)pt : MT_PUFF);
+  }
   th->momz = FRACUNIT;
   th->tics -= P_Random(pr_spawnpuff)&3;
 
@@ -2642,8 +2648,9 @@ void P_SpawnPuff(fixed_t x,fixed_t y,fixed_t z)
     th->tics = 1;
 
   // don't make punches spark on the wall
+  // (the custom puff has no S_PUFF3 frame; only the stock puff does)
 
-  if (attackrange == MELEERANGE)
+  if (attackrange == MELEERANGE && th->type == MT_PUFF)
     P_SetMobjState (th, S_PUFF3);
 }
 

@@ -29,6 +29,11 @@ int U_SoundRandomId(int id);
  * Read by the weapon-safe sound codepointer A_DecorateWeaponSound. */
 int U_DecorateWeaponSound(int state);
 
+/* The mobjtype that a DECORATE actor "replaces BulletPuff" registered to, so
+ * P_SpawnPuff can emit the mod's laser puff instead of the stock Doom puff;
+ * -1 if the wad defines no such replacement. */
+int U_DecoratePuffReplacement(void);
+
 /* true if the wad's DECORATE lump redefines the named sprite's state
  * sequence (r_things only unifies art for such sprites) */
 dbool U_DecorateMentionsSprite(const char *name);

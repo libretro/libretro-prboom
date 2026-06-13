@@ -2519,6 +2519,13 @@ int ZACS_ConversationSelfTest(void)
     acs_st_fail += U_DecoratePickupSelfTest();
   }
 
+  /* Use-activation vertical reach: a short same-floor scene actor must be
+   * activatable, an actor raised out of reach must not swallow the use. */
+  {
+    extern int P_UseReachSelfTest(void);
+    acs_st_fail += P_UseReachSelfTest();
+  }
+
   lprintf(acs_st_fail ? LO_ERROR : LO_INFO,
           "ACS-SELFTEST: %d failure(s)\n", acs_st_fail);
   return acs_st_fail;

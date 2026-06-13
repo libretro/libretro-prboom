@@ -2571,6 +2571,57 @@ static dbool P_StartConversation(mobj_t *th, mobj_t *talker, int conv)
   return P_ConversationStart(conv, talker) ? TRUE : FALSE;
 }
 
+/* True when a use-activatable thing at (th_z, th_height) is within the player's
+ * vertical reach when the player stands at p_z with the given view height.  The
+ * player's use is a horizontal ray at eye level, so a thing whose body is wholly
+ * above where the player can reach (it rode a lift up) or wholly below the
+ * player's feet does not take the use and the trace continues to the line behind
+ * it.  A thing at the player's own level always reaches, however short -- the
+ * earlier eye-point containment test wrongly rejected short same-floor actors.
+ * The 24-unit tolerance matches the step the player can reach over. */
+static dbool P_UseThingInVerticalReach(fixed_t p_z, fixed_t viewheight,
+                                       fixed_t th_z, fixed_t th_height)
+{
+  fixed_t reach_lo = p_z - 24 * FRACUNIT;
+  fixed_t reach_hi = p_z + viewheight + 24 * FRACUNIT;
+  fixed_t th_hi    = th_z + th_height;
+  if (th_hi < reach_lo || th_z > reach_hi)
+    return false;
+  return true;
+}
+
+#ifdef ACS_SELFTEST
+/* Regression check for use-activation vertical reach.  A short interactive
+ * actor (a conversation/scene starter) on the player's own floor must be
+ * within reach -- the prior eye-point test rejected it, so pressing use did
+ * nothing -- while an actor raised well above (it rode a lift up) must be out
+ * of reach so the use falls through to the switch behind it. */
+int P_UseReachSelfTest(void);
+int P_UseReachSelfTest(void)
+{
+  int fail = 0;
+  const fixed_t F  = 0;                 /* player + same-floor actor at z 0 */
+  const fixed_t VH = VIEWHEIGHT;        /* 41 units */
+
+  /* short (16-tall) actor on the same floor: must reach */
+  if (!P_UseThingInVerticalReach(F, VH, F, 16 * FRACUNIT))
+  { fail++; lprintf(LO_ERROR, "ACS-SELFTEST FAIL: short same-floor use-actor must be in reach\n"); }
+  else lprintf(LO_INFO, "ACS-SELFTEST ok:   short same-floor use-actor is in reach\n");
+
+  /* a flat 1-unit trigger actor on the same floor: must still reach */
+  if (!P_UseThingInVerticalReach(F, VH, F, 1 * FRACUNIT))
+  { fail++; lprintf(LO_ERROR, "ACS-SELFTEST FAIL: flat same-floor use-actor must be in reach\n"); }
+  else lprintf(LO_INFO, "ACS-SELFTEST ok:   flat same-floor use-actor is in reach\n");
+
+  /* an actor raised 128 units up (on a lift): must be out of reach */
+  if (P_UseThingInVerticalReach(F, VH, F + 128 * FRACUNIT, 56 * FRACUNIT))
+  { fail++; lprintf(LO_ERROR, "ACS-SELFTEST FAIL: actor raised out of reach must not take the use\n"); }
+  else lprintf(LO_INFO, "ACS-SELFTEST ok:   actor raised out of reach does not take the use\n");
+
+  return fail;
+}
+#endif /* ACS_SELFTEST */
+
 static dbool PTR_UseThingTraverse(intercept_t *in)
 {
   mobj_t *th;
@@ -2586,17 +2637,19 @@ static dbool PTR_UseThingTraverse(intercept_t *in)
   /* Vertical reach: the player's use reaches roughly eye level (a horizontal
    * ray, as vanilla Doom use has no pitch), so a thing far above or below --
    * e.g. a scene actor that rode a lift up while the player stayed below --
-   * must not keep swallowing the use and blocking the switch behind it.  Only
-   * take the use when the user's eye band overlaps the thing's vertical extent;
-   * otherwise let the trace continue to the line behind it.  The 24-unit
-   * tolerance matches the step the player could "reach" over, as in the line
-   * checks below. */
+   * must not keep swallowing the use and blocking the switch behind it.  But a
+   * thing at the player's own level must always activate regardless of how
+   * short it is, so test whether the player's reach column overlaps the thing's
+   * vertical extent rather than whether the single eye point falls inside it:
+   * the eye-point test rejected any actor shorter than the eye offset (a short
+   * conversation/scene actor on the same floor), which read as "use does
+   * nothing".  Reject only when the thing is genuinely out of reach -- its
+   * whole body above where the player can reach, or entirely below the player's
+   * feet -- using the same 24-unit step tolerance the line checks use. */
   if (usething->player)
   {
-    fixed_t eye = usething->z + usething->player->viewheight;
-    fixed_t lo  = th->z - 24 * FRACUNIT;
-    fixed_t hi  = th->z + th->height + 24 * FRACUNIT;
-    if (eye < lo || eye > hi)
+    if (!P_UseThingInVerticalReach(usething->z, usething->player->viewheight,
+                                   th->z, th->height))
       return TRUE;                        /* out of vertical reach: keep going */
   }
   use_thing_hit = th;

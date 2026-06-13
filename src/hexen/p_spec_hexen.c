@@ -2659,7 +2659,17 @@ static dbool P_ActivateHexenLine(line_t *line, mobj_t *mo, int side,
   if (!line->special)
     return false;
   if (GET_SPAC(line->flags) != activation)
-    return false;
+  {
+    /* A monster crossing a line whose primary class is player-cross still
+     * activates it when the line was flagged to also accept monsters (a
+     * ZDoom playercross+monstercross line collapsed into one SPAC slot).
+     * Monsters never "use" lines in this engine, so only the cross case is
+     * bridged here. */
+    if (!((line->flags & ML_MONSTERSCANACTIVATE) &&
+          activation == SPAC_MCROSS &&
+          GET_SPAC(line->flags) == SPAC_CROSS))
+      return false;
+  }
 
   COLLAPSE_SPECIAL_ARGS(args, line->args);
   ok = map_format.execute_line_special(line->special, args, line, side, mo);

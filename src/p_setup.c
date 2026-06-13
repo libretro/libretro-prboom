@@ -2504,6 +2504,15 @@ static void P_LoadUDMFLineDefs(void)
       ld->flags |= (unsigned short)(spac << HML_SPAC_SHIFT);
       if (mld->flags & UDMF_ML_REPEATSPECIAL)
         ld->flags |= ML_REPEATSPECIAL;
+      /* The SPAC field holds a single class.  ZDoom lines commonly grant a
+       * monster activation alongside the player one -- most usefully a line
+       * tagged both playercross and monstercross.  When the primary class is
+       * player-cross and a monster-cross flag is also set, record that
+       * monsters may trigger it too (monsters never "use" lines here, so only
+       * the cross pairing is bridged). */
+      if (spac == SPAC_CROSS &&
+          (mld->flags & (UDMF_ML_MONSTERCROSS | UDMF_ML_MONSTERACTIVATE)))
+        ld->flags |= ML_MONSTERSCANACTIVATE;
     }
     else
       ld->flags = (unsigned short)(mld->flags & UDMF_LINE_ENGINE_FLAGS);

@@ -168,6 +168,11 @@ typedef struct {
  * triggered).  These overlap the Doom/MBF21 bit assignments above, but only
  * apply on Hexen-format maps where those Doom flags are not used. */
 #define ML_REPEATSPECIAL 0x0200      /* bit 9: special may retrigger */
+/* bit 14: ZDoom/UDMF secondary activation -- the line also fires for a monster
+ * (monstercross / monsteruse / monsteractivate) when its primary SPAC class is
+ * a player class.  The single-slot SPAC field can hold only one class, so this
+ * carries the "monsters may also trigger it" modifier alongside it. */
+#define ML_MONSTERSCANACTIVATE 0x4000
 #define HML_SPAC_SHIFT   10
 #define HML_SPAC_MASK    0x1c00
 #define GET_SPAC(flags)  (((flags) & HML_SPAC_MASK) >> HML_SPAC_SHIFT)

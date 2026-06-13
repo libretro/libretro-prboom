@@ -1154,7 +1154,18 @@ void A_FireCGun(player_t *player, pspdef_t *psp)
   P_SetMobjState(player->mo, S_PLAY_ATK2);
   P_SubtractAmmo(player, 1);
 
-  A_FireSomething(player,psp->state - &states[S_CHAIN1]);           // phares
+  /* The muzzle-flash alternation is encoded as the distance of the current
+   * weapon state from S_CHAIN1 (0 or 1 for the two vanilla fire frames).  A
+   * DECORATE custom chaingun fires from its own high-numbered states, so that
+   * distance is a large bogus offset that pushes the flash state out of bounds
+   * and crashes P_SetPsprite.  Only use the offset when the firing state is one
+   * of the two stock chaingun frames; otherwise flash from the base frame. */
+  {
+    int adder = (int)(psp->state - &states[S_CHAIN1]);
+    if (adder < 0 || adder > 1)
+      adder = 0;
+    A_FireSomething(player, adder);                                // phares
+  }
 
   P_BulletSlope(player->mo);
 

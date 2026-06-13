@@ -68,6 +68,7 @@ typedef struct
   /* simple-prop registration (static single-frame actors only) */
   int  radius, height;          /* map units; -1 if unspecified */
   int  solid, nogravity, spawnceiling;
+  int  is_monster;              /* the "Monster" keyword was seen */
   char sprite[5];               /* 4-char sprite of a "SPRT F -1" spawn */
   int  frame;                   /* 0-based frame letter, FF_FULLBRIGHT or'd */
   int  spawn_static;            /* spawn state parsed and tics == -1 */
@@ -1893,6 +1894,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       p = read_word(p, end, word, sizeof(word));
       a->radius = atoi(word);
     }
+    else if (!strcasecmp(word, "Monster"))
+      a->is_monster = 1;
     else if (!strcasecmp(word, "Damage"))
     {
       p = skip_space(p, end);
@@ -3362,6 +3365,7 @@ void U_RegisterDecorateThings(void)
     info->radius      = (a->radius >= 0 ? a->radius : 20) * FRACUNIT;
     info->height      = (a->height >= 0 ? a->height : 16) * FRACUNIT;
     info->flags       = (a->solid ? MF_SOLID : 0) |
+                        (a->is_monster ? MF_SOLID : 0) |
                         (a->nogravity ? MF_NOGRAVITY : 0) |
                         (a->spawnceiling ? (MF_SPAWNCEILING | MF_NOGRAVITY)
                                          : 0) |

@@ -3732,6 +3732,51 @@ void U_RegisterDecorateSexActors(void)
     }
   }
 
+  /* A DECORATE actor that "replaces BFGBall" (the mod's PoetryProjectile, with
+   * its own PBPR flight sprite and PBPE explosion) re-skins the BFG ball: the
+   * weapon fires the stock MT_BFG, so without this the custom projectile sprite
+   * never shows.  Re-point the BFG shot's flight and land states to the
+   * replacement's Spawn and Death sprites.  Only the player's BFG fires MT_BFG
+   * here, and vanilla has no DECORATE, so the demo hash is unchanged.  The
+   * stock states (2 flight + 6 land) line up with the replacement's frames. */
+  for (i = 0; i < num_actors; i++)
+  {
+    decorate_actor_t *a = &actors[i];
+    if (a->seq_len <= 0 || !a->replaces[0] ||
+        strcasecmp(a->replaces, "BFGBall"))
+      continue;
+    {
+      /* the replacement's Spawn label is its first sequence frame; find the
+       * Death label for the explosion sprite. */
+      int spawn_spr = -1, death_spr = -1, li;
+      if (a->seq[0].spr[0])
+        spawn_spr = decorate_sprite_index(a->seq[0].spr, &sp_next);
+      for (li = 0; li < a->num_seqlabels; li++)
+        if (!strcasecmp(a->seqlabel[li].name, "Death"))
+        {
+          int fr = a->seqlabel[li].frame;
+          if (fr >= 0 && fr < a->seq_len && a->seq[fr].spr[0])
+            death_spr = decorate_sprite_index(a->seq[fr].spr, &sp_next);
+          break;
+        }
+      if (spawn_spr >= 0)
+      {
+        dsda_GetState(S_BFGSHOT)->sprite  = spawn_spr;
+        dsda_GetState(S_BFGSHOT2)->sprite = spawn_spr;
+      }
+      if (death_spr >= 0)
+      {
+        statenum_t ds[6];
+        int d;
+        ds[0] = S_BFGLAND;  ds[1] = S_BFGLAND2; ds[2] = S_BFGLAND3;
+        ds[3] = S_BFGLAND4; ds[4] = S_BFGLAND5; ds[5] = S_BFGLAND6;
+        for (d = 0; d < 6; d++)
+          dsda_GetState(ds[d])->sprite = death_spr;
+      }
+    }
+    break;
+  }
+
   if (n)
     lprintf(LO_INFO, "U_RegisterDecorateSexActors: %d actor(s)\n", n);
 }

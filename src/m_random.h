@@ -132,7 +132,7 @@ typedef enum {
 
 // The random number generator's state.
 typedef struct {
-  unsigned long seed[NUMPRCLASS];      // Each block's random seed
+  uint32_t seed[NUMPRCLASS];           // Each block's random seed
   int rndindex, prndindex;             // For compatibility support
 } rng_t;
 

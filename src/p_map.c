@@ -2583,6 +2583,22 @@ static dbool PTR_UseThingTraverse(intercept_t *in)
     return TRUE;                          /* neither use-activatable nor a talker */
   if (FixedMul(USERANGE, in->frac) > USERANGE)
     return FALSE;                         /* out of reach: stop the trace */
+  /* Vertical reach: the player's use reaches roughly eye level (a horizontal
+   * ray, as vanilla Doom use has no pitch), so a thing far above or below --
+   * e.g. a scene actor that rode a lift up while the player stayed below --
+   * must not keep swallowing the use and blocking the switch behind it.  Only
+   * take the use when the user's eye band overlaps the thing's vertical extent;
+   * otherwise let the trace continue to the line behind it.  The 24-unit
+   * tolerance matches the step the player could "reach" over, as in the line
+   * checks below. */
+  if (usething->player)
+  {
+    fixed_t eye = usething->z + usething->player->viewheight;
+    fixed_t lo  = th->z - 24 * FRACUNIT;
+    fixed_t hi  = th->z + th->height + 24 * FRACUNIT;
+    if (eye < lo || eye > hi)
+      return TRUE;                        /* out of vertical reach: keep going */
+  }
   use_thing_hit = th;
   return FALSE;                           /* this thing takes the use */
 }

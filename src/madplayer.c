@@ -317,6 +317,102 @@ static void mp_render (void *dest, unsigned nsamp)
   I_ResampleStream (dest, nsamp, mp_render_ex, Header.samplerate, mp_samplerate_target);
 }
 
+/* Save/restore playback position so a save state (and runahead and rewind,
+ * which save and restore every frame) resumes MP3 music near where it was
+ * instead of forcing the generic music layer's render-replay -- which for an
+ * MP3 stream re-decodes from the start on every restore.
+ *
+ * libmad has no sample-accurate seek: the decode position is the byte offset
+ * of the current frame within the lump, plus the intra-frame leftover-sample
+ * cursor.  serialize records that offset (start of the frame currently being
+ * consumed) and the cursor; unserialize re-buffers libmad at the offset,
+ * re-decodes that one frame to repopulate the synth, and restores the cursor.
+ * MP3 frames are independently decodable from a frame boundary apart from the
+ * bit-reservoir, so the resumed audio carries a tiny one-frame transient
+ * (~26ms) -- inaudible, and far cheaper than re-decoding the whole track.
+ *
+ * Wire format (little-endian-host, matching the other backends):
+ *   uint32_t magic   = 'MP3S'
+ *   uint32_t version = 1
+ *   uint32_t looping
+ *   int32_t  frame_offset      (byte offset of this_frame; <0 = defer)
+ *   int32_t  leftoversamps
+ *   int32_t  leftoversamppos */
+#define MP3_STATE_MAGIC   0x4D503353u  /* 'MP3S' */
+#define MP3_STATE_VERSION 1u
+
+static size_t mp_serialize (void *dest, size_t cap)
+{
+  uint32_t hdr[3];
+  int32_t  body[3];
+  size_t   need = sizeof hdr + sizeof body;
+  long     off;
+
+  if (!mp_playing || !mp_data)
+    return 0;                    /* nothing playing -> no state to record */
+  if (!Stream.this_frame || !Stream.buffer)
+    return 0;
+  off = (long)(Stream.this_frame - (const unsigned char *)mp_data);
+  if (off < 0 || off > mp_len)
+    return 0;                    /* position outside the lump -> defer */
+  if (!dest)
+    return need;                 /* size-query mode */
+  if (cap < need)
+    return 0;
+
+  hdr[0]  = MP3_STATE_MAGIC;
+  hdr[1]  = MP3_STATE_VERSION;
+  hdr[2]  = (uint32_t)(mp_looping ? 1 : 0);
+  body[0] = (int32_t)off;
+  body[1] = (int32_t)mp_leftoversamps;
+  body[2] = (int32_t)mp_leftoversamppos;
+  memcpy(dest, hdr, sizeof hdr);
+  memcpy((unsigned char *)dest + sizeof hdr, body, sizeof body);
+  return need;
+}
+
+static int mp_unserialize (const void *src, size_t size)
+{
+  uint32_t hdr[3];
+  int32_t  body[3];
+  long     off;
+
+  if (!mp_data)                                     return 0;
+  if (size < sizeof hdr + sizeof body)              return 0;
+  memcpy(hdr, src, sizeof hdr);
+  if (hdr[0] != MP3_STATE_MAGIC)                    return 0;
+  if (hdr[1] != MP3_STATE_VERSION)                  return 0;
+  memcpy(body, (const unsigned char *)src + sizeof hdr, sizeof body);
+  off = (long)body[0];
+  if (off < 0 || off > mp_len)                      return 0;
+
+  mp_looping = (hdr[2] != 0);
+
+  /* Re-buffer libmad from the saved frame and decode it so Synth.pcm holds
+   * the frame the leftover cursor indexes into. */
+  mad_stream_buffer (&Stream, (const unsigned char *)mp_data + off,
+                     (unsigned long)(mp_len - off));
+  if (mad_frame_decode (&Frame, &Stream) != 0)
+  {
+    if (!MAD_RECOVERABLE (Stream.error))
+      return 0;                  /* could not resume here -> defer to replay */
+  }
+  mad_synth_frame (&Synth, &Frame);
+
+  /* Restore the intra-frame cursor, clamped to the freshly synthed frame. */
+  mp_leftoversamps   = (int)body[1];
+  mp_leftoversamppos = (int)body[2];
+  if (mp_leftoversamppos < 0) mp_leftoversamppos = 0;
+  if (mp_leftoversamppos > Synth.pcm.length) mp_leftoversamppos = Synth.pcm.length;
+  if (mp_leftoversamps < 0) mp_leftoversamps = 0;
+  if (mp_leftoversamps > Synth.pcm.length - mp_leftoversamppos)
+    mp_leftoversamps = Synth.pcm.length - mp_leftoversamppos;
+
+  mp_playing = 1;
+  mp_paused  = 0;
+  return 1;
+}
+
 
 const music_player_t mp_player =
 {
@@ -331,8 +427,8 @@ const music_player_t mp_player =
   mp_play,
   mp_stop,
   mp_render,
-  NULL,  /* serialize -- mp3 stream position not yet implemented */
-  NULL   /* unserialize */
+  mp_serialize,
+  mp_unserialize
 };
 
 #endif // HAVE_LIBMAD

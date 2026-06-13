@@ -2515,6 +2515,24 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
           else if (!strcasecmp(fn, "A_MeleeAttack"))   act = DA_MELEEATTACK;
           else if (!strcasecmp(fn, "A_MissileAttack")) act = DA_MISSILEATTACK;
           else if (!strcasecmp(fn, "A_ComboAttack"))   act = DA_COMBOATTACK;
+          else if (!strcasecmp(fn, "A_BasicAttack"))
+          {
+            /* A_BasicAttack(meleedamage, meleesound, missiletype, meleeheight):
+             * melee when the target is in range, otherwise fire a missile --
+             * exactly the combo-attack behaviour.  Capture the first argument
+             * (melee damage) into the actor's melee damage when it has none of
+             * its own so the melee branch deals the authored amount; the missile
+             * branch fires the generic shot the combo path already uses.
+             * Without this the frame was inert and the monster never attacked. */
+            const char *ar = strchr(b, '(');
+            if (ar && a->meleedamage < 0)
+            {
+              int d = atoi(ar + 1);
+              if (d > 0)
+                a->meleedamage = d;
+            }
+            act = DA_COMBOATTACK;
+          }
           /* A_SentinelBob (hover wobble) and A_Set/UnSetFloorClip (corpse
            * sink) are cosmetic with no engine equivalent; leave as no-ops. */
           else if (!strcasecmp(fn, "A_CustomBulletAttack"))

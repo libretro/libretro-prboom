@@ -39,6 +39,8 @@ extern prb_stb_vorbis_info prb_stb_vorbis_get_info(stb_vorbis *f);
 extern int  prb_stb_vorbis_get_samples_short_interleaved(stb_vorbis *f, int channels,
                                                          short *buffer, int num_shorts);
 extern int  prb_stb_vorbis_seek_start(stb_vorbis *f);
+extern int  prb_stb_vorbis_seek(stb_vorbis *f, unsigned int sample_number);
+extern int  prb_stb_vorbis_get_sample_offset(stb_vorbis *f);
 extern void prb_stb_vorbis_close(stb_vorbis *f);
 
 static stb_vorbis  *ogg_v;
@@ -259,6 +261,70 @@ static void ogg_render(void *dest, unsigned nsamp)
   }
 }
 
+/* Save/restore playback position so a save state (and, importantly, runahead
+ * and rewind, which save and restore every frame) resumes the music at the
+ * right spot instead of forcing the generic layer's render-replay -- which for
+ * an Ogg stream would re-decode from the start every restore.  The fast path
+ * records the decoder's current sample offset; restore re-seeks the same
+ * stream there.  Accuracy is to within one decode burst (sub-100ms), which is
+ * inaudible, and avoids the O(position) replay walk entirely.
+ *
+ * Wire format (little-endian-host, matching the other backends):
+ *   uint32_t magic   = 'OGGS'
+ *   uint32_t version = 1
+ *   uint32_t looping
+ *   int32_t  sample_offset   (decoder position; <0 = unknown -> defer) */
+#define OGG_STATE_MAGIC   0x4F474753u  /* 'OGGS' */
+#define OGG_STATE_VERSION 1u
+
+static size_t ogg_serialize(void *dest, size_t cap)
+{
+  uint32_t hdr[3];
+  int32_t  off;
+  size_t   need = sizeof hdr + sizeof off;
+
+  if (!ogg_v || !ogg_playing)
+    return 0;                 /* nothing playing -> no state to record */
+  off = prb_stb_vorbis_get_sample_offset(ogg_v);
+  if (off < 0)
+    return 0;                 /* position unknown -> let the generic layer cope */
+  if (!dest)
+    return need;              /* size-query mode */
+  if (cap < need)
+    return 0;
+  hdr[0] = OGG_STATE_MAGIC;
+  hdr[1] = OGG_STATE_VERSION;
+  hdr[2] = (uint32_t)(ogg_looping ? 1 : 0);
+  memcpy(dest, hdr, sizeof hdr);
+  memcpy((unsigned char *)dest + sizeof hdr, &off, sizeof off);
+  return need;
+}
+
+static int ogg_unserialize(const void *src, size_t size)
+{
+  uint32_t hdr[3];
+  int32_t  off;
+
+  if (!ogg_v)                                       return 0;
+  if (size < sizeof hdr + sizeof off)               return 0;
+  memcpy(hdr, src, sizeof hdr);
+  if (hdr[0] != OGG_STATE_MAGIC)                    return 0;
+  if (hdr[1] != OGG_STATE_VERSION)                  return 0;
+  memcpy(&off, (const unsigned char *)src + sizeof hdr, sizeof off);
+  if (off < 0)                                      return 0;
+
+  ogg_looping = (hdr[2] != 0);
+  if (!prb_stb_vorbis_seek(ogg_v, (unsigned)off))
+    return 0;                 /* seek failed -> defer to render-replay */
+  /* drop the resampler buffer so render() refills from the sought position */
+  ogg_src_have = 0;
+  ogg_src_pos  = 0;
+  ogg_frac     = 0;
+  ogg_playing  = 1;
+  ogg_paused   = 0;
+  return 1;
+}
+
 const music_player_t ogg_player =
 {
   ogg_name,
@@ -272,6 +338,6 @@ const music_player_t ogg_player =
   ogg_play,
   ogg_stop,
   ogg_render,
-  NULL,   /* serialize   -- stream position state not implemented */
-  NULL    /* unserialize */
+  ogg_serialize,
+  ogg_unserialize
 };

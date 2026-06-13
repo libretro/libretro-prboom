@@ -3737,12 +3737,14 @@ dbool   deh_GetData(char *s, char *k, uint64_t *l, char **strval, FILE *fpout)
 
   *buffer = '\0';
   val = 0;  // defaults in case not otherwise set
-  for (i=0, t=s; *t && i < DEH_MAXKEYLEN; t++, i++)
+  for (i=0, t=s; *t && i < DEH_MAXKEYLEN - 1; t++, i++)
     {
       if (*t == '=') break;
       buffer[i] = *t;  // copy it
     }
-  buffer[--i] = '\0';  // terminate the key before the '='
+  if (i > 0)
+    i--;
+  buffer[i] = '\0';  // terminate the key before the '='
   if (!*t)  // end of string with no equal sign
     {
       okrc = FALSE;

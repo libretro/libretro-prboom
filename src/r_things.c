@@ -194,6 +194,37 @@ static void R_UnifyDecorateSprite(const wadfile_info_t *decorate_wad)
    if (!has_dec || !has_old)
       return;
 
+   /* Only unify a sprite the DECORATE wad genuinely *replaces* -- one where it
+    * supplies art at the same frame letters the older wad already had.  A mod
+    * that merely *adds* new frames (e.g. ZDCMP2 ships BSPI Q-Y gib-death frames
+    * while the walk/attack frames A-P come from the IWAD, with no frame-letter
+    * overlap) is not replacing anything: its monster animates through the IWAD
+    * frames on purpose.  Borrowing a DECORATE death frame into those IWAD walk
+    * slots would collapse the whole animation onto one sprite (the monster then
+    * moves and fights while showing a single frozen frame).  Detect a real
+    * replacement by a frame the both wads supply; if there is none, the
+    * DECORATE frames are purely additive and nothing is unified. */
+   {
+      int replaces = 0;
+      for (f = 0; f <= maxframe && !replaces; f++)
+      {
+         int dec_here = 0, old_here = 0;
+         for (r = 0; r < 8; r++)
+            if (sprtemp[f].lump[r] != -1)
+            {
+               if (lumpinfo[firstspritelump + sprtemp[f].lump[r]].wadfile
+                   == decorate_wad)
+                  dec_here = 1;
+               else
+                  old_here = 1;
+            }
+         if (dec_here && old_here)
+            replaces = 1;       /* same frame from both wads: a real override */
+      }
+      if (!replaces)
+         return;                /* additive-only: leave the older frames intact */
+   }
+
    for (f = 0; f <= maxframe; f++)
       for (r = 0; r < 8; r++)
       {

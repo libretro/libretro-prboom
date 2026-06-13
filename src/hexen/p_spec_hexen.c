@@ -1021,84 +1021,104 @@ int EV_OpenPillar(line_t *line, int *args)
  * the Hexen movement types set low/high/wait/status and otherwise fall
  * through the thinker's Doom change-type handling.  Movement sound is the
  * engine default until the sound-sequence subsystem lands. */
+static void Hexen_BuildPlat(sector_t *sec, int *args, plattype_e type,
+                            int amount)
+{
+  plat_t *plat = Z_Malloc(sizeof(*plat), PU_LEVEL, 0);
+  memset(plat, 0, sizeof(*plat));
+  P_AddThinker(&plat->thinker);
+  plat->type = type;
+  plat->sector = sec;
+  plat->sector->floordata = plat;
+  plat->thinker.function.arg1 = (void (*)(void *))T_HexenPlatRaise;
+  plat->crush = FALSE;
+  plat->tag   = args[0];
+  plat->speed = args[1] * (FRACUNIT / 8);
+
+  switch (type)
+  {
+    case PLAT_DOWNWAITUPSTAY:
+      /* `amount` is the lip in map units (8 for the Hexen specials,
+       * args[3] for ZDoom's Plat_*Lip variants) */
+      plat->low = P_FindLowestFloorSurrounding(sec) + amount * FRACUNIT;
+      if (plat->low > sec->floorheight)
+        plat->low = sec->floorheight;
+      plat->high   = sec->floorheight;
+      plat->wait   = args[2];
+      plat->status = PLAT_DOWN;
+      break;
+    case PLAT_DOWNBYVALUEWAITUPSTAY:
+      plat->low = sec->floorheight - args[3] * 8 * FRACUNIT;
+      if (plat->low > sec->floorheight)
+        plat->low = sec->floorheight;
+      plat->high   = sec->floorheight;
+      plat->wait   = args[2];
+      plat->status = PLAT_DOWN;
+      break;
+    case PLAT_UPWAITDOWNSTAY:
+      plat->high = P_FindHighestFloorSurrounding(sec);
+      if (plat->high < sec->floorheight)
+        plat->high = sec->floorheight;
+      plat->low    = sec->floorheight;
+      plat->wait   = args[2];
+      plat->status = PLAT_UP;
+      break;
+    case PLAT_UPBYVALUEWAITDOWNSTAY:
+      plat->high = sec->floorheight + args[3] * 8 * FRACUNIT;
+      if (plat->high < sec->floorheight)
+        plat->high = sec->floorheight;
+      plat->low    = sec->floorheight;
+      plat->wait   = args[2];
+      plat->status = PLAT_UP;
+      break;
+    case PLAT_PERPETUALRAISE:
+      plat->low = P_FindLowestFloorSurrounding(sec) + amount * FRACUNIT;
+      if (plat->low > sec->floorheight)
+        plat->low = sec->floorheight;
+      plat->high = P_FindHighestFloorSurrounding(sec);
+      if (plat->high < sec->floorheight)
+        plat->high = sec->floorheight;
+      plat->wait   = args[2];
+      plat->status = (P_Random(pr_heretic) & 1) ? PLAT_UP : PLAT_DOWN;
+      break;
+    default:
+      break;
+  }
+  P_AddActivePlat(plat);
+  Hexen_MoverStartSound(sec, g_sfx_pstart);
+}
+
 int EV_DoHexenPlat(line_t *line, int *args, plattype_e type, int amount)
 {
   int       secnum;
   int       rtn = 0;
   sector_t *sec;
-  plat_t   *plat;
 
-  (void) line;
+  /* A zero tag means a manual lift: act on the sector on the far side of the
+   * line the player used, exactly like vanilla Doom's tag-0 plats.  Without
+   * this, P_FindSectorFromTag(0) walks every untagged sector in the map and
+   * the lift the player is standing on never moves -- the player can ride
+   * nothing.  Hexen specials normally carry a real tag, so only the
+   * manually-activated ZDoom-style lifts (e.g. Plat_DownWaitUpStay with no
+   * tag, playeruse) take this path. */
+  if (args[0] == 0)
+  {
+    if (!line || !line->backsector)
+      return 0;
+    sec = line->backsector;
+    if (sec->floordata || sec->ceilingdata)
+      return 0;
+    Hexen_BuildPlat(sec, args, type, amount);
+    return 1;
+  }
 
   HEXEN_FOR_TAGGED_SECTORS(secnum, args[0])
   {
     sec = &sectors[secnum];
     if (sec->floordata || sec->ceilingdata)
       continue;
-
     rtn = 1;
-    plat = Z_Malloc(sizeof(*plat), PU_LEVEL, 0);
-    memset(plat, 0, sizeof(*plat));
-    P_AddThinker(&plat->thinker);
-    plat->type = type;
-    plat->sector = sec;
-    plat->sector->floordata = plat;
-    plat->thinker.function.arg1 = (void (*)(void *))T_HexenPlatRaise;
-    plat->crush = FALSE;
-    plat->tag   = args[0];
-    plat->speed = args[1] * (FRACUNIT / 8);
-
-    switch (type)
-    {
-      case PLAT_DOWNWAITUPSTAY:
-        /* `amount` is the lip in map units (8 for the Hexen specials,
-         * args[3] for ZDoom's Plat_*Lip variants) */
-        plat->low = P_FindLowestFloorSurrounding(sec) + amount * FRACUNIT;
-        if (plat->low > sec->floorheight)
-          plat->low = sec->floorheight;
-        plat->high   = sec->floorheight;
-        plat->wait   = args[2];
-        plat->status = PLAT_DOWN;
-        break;
-      case PLAT_DOWNBYVALUEWAITUPSTAY:
-        plat->low = sec->floorheight - args[3] * 8 * FRACUNIT;
-        if (plat->low > sec->floorheight)
-          plat->low = sec->floorheight;
-        plat->high   = sec->floorheight;
-        plat->wait   = args[2];
-        plat->status = PLAT_DOWN;
-        break;
-      case PLAT_UPWAITDOWNSTAY:
-        plat->high = P_FindHighestFloorSurrounding(sec);
-        if (plat->high < sec->floorheight)
-          plat->high = sec->floorheight;
-        plat->low    = sec->floorheight;
-        plat->wait   = args[2];
-        plat->status = PLAT_UP;
-        break;
-      case PLAT_UPBYVALUEWAITDOWNSTAY:
-        plat->high = sec->floorheight + args[3] * 8 * FRACUNIT;
-        if (plat->high < sec->floorheight)
-          plat->high = sec->floorheight;
-        plat->low    = sec->floorheight;
-        plat->wait   = args[2];
-        plat->status = PLAT_UP;
-        break;
-      case PLAT_PERPETUALRAISE:
-        plat->low = P_FindLowestFloorSurrounding(sec) + amount * FRACUNIT;
-        if (plat->low > sec->floorheight)
-          plat->low = sec->floorheight;
-        plat->high = P_FindHighestFloorSurrounding(sec);
-        if (plat->high < sec->floorheight)
-          plat->high = sec->floorheight;
-        plat->wait   = args[2];
-        plat->status = (P_Random(pr_heretic) & 1) ? PLAT_UP : PLAT_DOWN;
-        break;
-      default:
-        break;
-    }
-    P_AddActivePlat(plat);
-    Hexen_MoverStartSound(sec, g_sfx_pstart);
+    Hexen_BuildPlat(sec, args, type, amount);
   }
   return rtn;
 }

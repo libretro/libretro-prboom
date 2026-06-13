@@ -49,7 +49,6 @@
 #include "hu_lib.h"
 #include "hu_stuff.h"
 #include "p_zacs.h"
-#include "r_camtex.h"
 #include "u_png.h"
 
 /* Vector kernels for the full-colour overlay blit's blend (the hot path: the
@@ -5036,17 +5035,7 @@ static void T_ZACSThinker(zacs_inst_t *inst)
     case PCD_GETFROMINI:        ZDROP(2); ZSETSTK(1, 0); zacs_warn_pcd(pcd); break;
     case PCD_SETMARINEWEAPON:   ZDROP(2); zacs_warn_pcd(pcd); break;
     case PCD_SETMARINESPRITE:   ZDROP(2); zacs_warn_pcd(pcd); break;
-    case PCD_SETCAMERATOTEXTURE:
-    {
-      /* SetCameraToTexture(tid, str texture, fov): bind the camera actor with
-       * the given tid to the named camera texture so the texture shows that
-       * actor's view each frame (security monitors etc.). */
-      int fov  = ZPOP();
-      const char *tex = zacs_string(ZPOP());
-      int tid  = ZPOP();
-      R_CamTexBind(tid, tex, fov);
-      break;
-    }
+    case PCD_SETCAMERATOTEXTURE: ZDROP(3); zacs_warn_pcd(pcd); break;
     case PCD_GRABINPUT:         ZDROP(2); zacs_warn_pcd(pcd); break;
     case PCD_SETMOUSEPOINTER:   ZDROP(3); zacs_warn_pcd(pcd); break;
     case PCD_MOVEMOUSEPOINTER:  ZDROP(2); zacs_warn_pcd(pcd); break;

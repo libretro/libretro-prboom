@@ -53,7 +53,6 @@
 #include "p_maputl.h"
 #include "p_map.h"
 #include "p_setup.h"
-#include "r_camtex.h"
 #include "r_decal.h"
 #include "u_zanimdefs.h"
 #include "u_voxel.h"
@@ -2662,7 +2661,6 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    /* a new level invalidates any ACS view camera from the previous one */
    zacs_view_camera = NULL;
-   R_CamTexClearBindings();   /* drop last level's camera-texture bindings */
 
    /* Select the per-game map format before any linedefs/specials are
     * processed.  For Doom this installs the Doom descriptor (no behaviour

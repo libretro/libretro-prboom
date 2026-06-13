@@ -3911,8 +3911,12 @@ void U_RegisterDecorateWeapons(void)
 
     /* thread each block's "goto Label" terminator to the first state of the
      * target chain (e.g. a Fire block ending "goto Ready" must return to the
-     * ready loop, or the weapon would freeze after one shot).  A goto whose
-     * target we did not build leaves the terminal state frozen. */
+     * ready loop, or the weapon would freeze after one shot).  When the actor
+     * did not provide the target block itself (a common case: a custom Fire
+     * state that ends "goto Ready" while inheriting the stock Ready state), the
+     * built chain has no first state for it, so fall back to the base weapon's
+     * inherited state for that label.  Without this the terminal state keeps
+     * its self-loop and the weapon freezes after one shot. */
     for (wi = 0; wi < WST_COUNT; wi++)
     {
       int base = first_of[wi];
@@ -3922,6 +3926,19 @@ void U_RegisterDecorateWeapons(void)
       if (a->wst[wi].goto_dst < 0)
         continue;
       dst = first_of[a->wst[wi].goto_dst];
+      if (dst < 0)
+      {
+        /* target block not built here -- use the base weapon's state */
+        switch (a->wst[wi].goto_dst)
+        {
+          case WST_READY:  dst = weaponinfo[slot].readystate;  break;
+          case WST_SELECT: dst = weaponinfo[slot].upstate;     break;
+          case WST_DESEL:  dst = weaponinfo[slot].downstate;   break;
+          case WST_FIRE:   dst = weaponinfo[slot].atkstate;    break;
+          case WST_FLASH:  dst = weaponinfo[slot].flashstate;  break;
+          default: break;
+        }
+      }
       if (dst >= 0)
         dsda_GetState(base + a->wst[wi].len - 1)->nextstate = dst;
     }

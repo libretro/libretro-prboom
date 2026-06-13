@@ -837,9 +837,26 @@ void P_TouchSpecialThing(mobj_t *special, mobj_t *toucher)
       break;
 
     default:
-      I_Error ("P_SpecialThing: Unknown gettable thing");
+      /* A custom (DECORATE) pickup the vanilla sprite switch does not know:
+       * it reached here only because it is MF_SPECIAL, i.e. a collectible
+       * inventory actor placed by a ZDoom map.  Rather than abort, collect it
+       * the ZDoom way -- fire any thing-special it carries (commonly an
+       * ACS_Execute that drives a door or lift) with the player as activator,
+       * then fall through to the shared removal below.  An unknown pickup with
+       * no special is simply taken (it still counts and plays the sound). */
+      break;
     }
 
+  /* A picked-up thing fires its action special with the player as activator
+   * (matches ZDoom: e.g. a logbook whose ACS_Execute raises a lift). */
+  if (special->special)
+  {
+    if (map_format.execute_line_special)
+      map_format.execute_line_special(special->special,
+                                      special->special_args, NULL, 0,
+                                      toucher);
+    special->special = 0;
+  }
   if (special->flags & MF_COUNTITEM)
     player->itemcount++;
   P_RemoveMobj (special);

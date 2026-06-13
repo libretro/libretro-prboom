@@ -83,6 +83,8 @@ typedef struct
   int  meleedamage;             /* A_MeleeAttack/A_ComboAttack, -1 if unset */
   int  m_float;                 /* +FLOAT/+NOGRAVITY flying                  */
   int  m_nocountkill;           /* -COUNTKILL                               */
+  int  is_pickup;               /* parent chain is an Inventory/pickup base */
+  int  m_countitem;             /* +COUNTITEM                               */
   char sprite[5];               /* 4-char sprite of a "SPRT F -1" spawn */
   int  frame;                   /* 0-based frame letter, FF_FULLBRIGHT or'd */
   int  spawn_static;            /* spawn state parsed and tics == -1 */
@@ -1865,6 +1867,34 @@ static const decorate_actor_t *find_actor(const char *name)
   return NULL;
 }
 
+/* True when `name` is (or derives from) a ZDoom inventory/pickup base class.
+ * Walks the DECORATE parent chain up to a known inventory root.  These actors
+ * are collected by touching them; the engine marks them MF_SPECIAL so the
+ * player can pick them up and so any thing-special they carry fires on pickup
+ * (e.g. a logbook whose ACS_Execute raises a lift). */
+static int class_is_inventory(const char *name)
+{
+  int hops = 0;
+  while (name && name[0] && hops++ < 16)
+  {
+    const decorate_actor_t *p;
+    if (!strcasecmp(name, "Inventory")       ||
+        !strcasecmp(name, "FakeInventory")   ||
+        !strcasecmp(name, "CustomInventory") ||
+        !strcasecmp(name, "Health")          ||
+        !strcasecmp(name, "Ammo")            ||
+        !strcasecmp(name, "PuzzleItem")      ||
+        !strcasecmp(name, "ScoreItem")       ||
+        !strcasecmp(name, "DummyStrifeItem"))
+      return 1;
+    p = find_actor(name);
+    if (!p || !p->parent[0])
+      return 0;
+    name = p->parent;
+  }
+  return 0;
+}
+
 static int base_class_doomednum(const char *name)
 {
   int i;
@@ -2005,6 +2035,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       a->m_float = 1;
     else if (!strcasecmp(word, "-COUNTKILL"))
       a->m_nocountkill = 1;
+    else if (!strcasecmp(word, "+COUNTITEM"))
+      a->m_countitem = 1;
     else if (!strcasecmp(word, "Damage"))
     {
       p = skip_space(p, end);
@@ -3561,6 +3593,20 @@ void U_RegisterDecorateThings(void)
                                          : 0) |
                         ((a->translucent || a->alpha < FRACUNIT)
                                          ? MF_TRANSLUCENT : 0);
+
+    /* A DECORATE inventory/pickup actor (a logbook, keycard, ammo token, ...)
+     * is collected by touching it, so it must be MF_SPECIAL or the player
+     * walks straight through and P_TouchSpecialThing never runs -- which also
+     * means any thing-special the map gave the pickup (commonly an ACS_Execute
+     * that opens a door or raises a lift) never fires.  Flag it here; the
+     * touch handler grants it, fires its special, and removes it. */
+    if (!a->is_monster &&
+        (a->is_pickup || class_is_inventory(a->parent)))
+    {
+      info->flags |= MF_SPECIAL;
+      if (a->m_countitem)
+        info->flags |= MF_COUNTITEM;
+    }
 
     /* A custom DECORATE monster comes alive with AI: wire each behaviour label
      * to its mobjinfo state so the chase/attack/pain/death machinery drives it,

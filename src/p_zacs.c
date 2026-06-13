@@ -1840,6 +1840,26 @@ static int zacs_font_graphic(const char *font)
   l = (W_CheckNumForName)(font, ns_global);
   if (l < 0)
     l = (W_CheckNumForName)(font, ns_sprites);
+  if (l < 0)
+    return -1;
+  /* The "single image as a font" trick only works when the lump really is a
+   * Doom patch.  A name can equally resolve to a genuine multi-glyph bitmap
+   * font (ZDoom FON1/FON2) or to image data the patch cache cannot parse;
+   * feeding any of those to R_CachePatchNum walks bogus column offsets and
+   * crashes.  Sniff the header: FON1/FON2 (and any PNG/JPEG that escaped
+   * materialisation) are real fonts, so fall back to glyph-text rendering. */
+  {
+    int len = W_LumpLength(l);
+    if (len >= 4)
+    {
+      const unsigned char *d = (const unsigned char *)W_CacheLumpNum(l);
+      if ((d[0] == 'F' && d[1] == 'O' && d[2] == 'N' &&
+           (d[3] == '1' || d[3] == '2')) ||
+          U_PNGIsPNG(d, len) ||
+          (d[0] == 0xFF && d[1] == 0xD8))   /* JPEG SOI */
+        return -1;
+    }
+  }
   return l;
 }
 

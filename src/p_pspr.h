@@ -197,6 +197,8 @@ void A_DecorateFirePistolQuiet(player_t *player, pspdef_t *psp);
 void A_DecorateFireShotgunQuiet(player_t *player, pspdef_t *psp);
 void A_DecorateFireShotgun2Quiet(player_t *player, pspdef_t *psp);
 void A_DecorateFireCGunQuiet(player_t *player, pspdef_t *psp);
+void A_DecorateFireShotgunBluePuff(player_t *player, pspdef_t *psp);
+void A_DecorateFireShotgun2BluePuff(player_t *player, pspdef_t *psp);
 void A_FireMissile(player_t *player, pspdef_t *psp);
 void A_Saw(player_t *player, pspdef_t *psp);
 void A_FirePlasma(player_t *player, pspdef_t *psp);

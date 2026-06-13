@@ -161,6 +161,7 @@ typedef struct
   int  uvar_slots;              /* total int slots the actor needs */
   int  inherited;              /* 1 once parent state/vars merged in       */
   int  use_special;            /* 1 if +USESPECIAL: usable -> Active state  */
+  int  uses_blue_puff;         /* 1 if a fire frame named BlueLaserPuff      */
   int  xlat_id;                /* DECORATE Translation: index into the
                                 * built-translation table, or -1 if none    */
   char xlat_raw[160];          /* raw Translation property text, captured
@@ -367,10 +368,31 @@ static int  num_decorate_sounds;
  * P_SpawnPuff emits this in place of MT_PUFF so the mod's laser-puff sprite is
  * shown on hitscan impacts. */
 static int decorate_bulletpuff_type = -1;
+/* The blue laser puff (named per-shot by the shotgun/SSG A_FireBullets, with no
+ * "replaces" of its own) and a one-shot override the weapon-fire path raises
+ * just before delegating to the base hitscan attack, so a shot that asked for a
+ * specific puff gets it instead of the global BulletPuff replacement. */
+static int decorate_bluepuff_type = -1;
+static int decorate_puff_override = -1;
 
 int U_DecoratePuffReplacement(void)
 {
+  /* an active per-shot override wins over the global "replaces BulletPuff" */
+  if (decorate_puff_override >= 0)
+    return decorate_puff_override;
   return decorate_bulletpuff_type;
+}
+
+/* Raise (mt>=0) or clear (-1) the per-shot puff override.  Set from the weapon
+ * codepointer around a base-fire delegation that named a non-default puff. */
+void U_DecorateSetPuffOverride(int mt)
+{
+  decorate_puff_override = mt;
+}
+
+int U_DecorateBluePuffType(void)
+{
+  return decorate_bluepuff_type;
 }
 
 /* Weapon-frame sounds (A_PlaySound on a pspr state): the sfx id a given weapon
@@ -794,6 +816,20 @@ static arg0_t weapon_base_fire_quiet(int slot)
   }
 }
 
+/* As weapon_base_fire_quiet, but for a hitscan weapon that named BlueLaserPuff
+ * in A_FireBullets: in addition to squelching the stock sound, the wrapper
+ * raises the blue-puff override around the shot so the impacts show the blue
+ * puff sprite.  Only the shotgun and SSG do this; others fall back to quiet. */
+static arg0_t weapon_base_fire_bluepuff(int slot)
+{
+  switch (slot)
+  {
+    case WP_SHOTGUN:      return (arg0_t)A_DecorateFireShotgunBluePuff;
+    case WP_SUPERSHOTGUN: return (arg0_t)A_DecorateFireShotgun2BluePuff;
+    default:              return weapon_base_fire_quiet(slot);
+  }
+}
+
 /* every 4-char sprite name appearing on a state line anywhere in the
  * DECORATE lump; R_InitSpriteDefs only unifies a sprite's art when the
  * lump actually redefines that sprite's sequence */
@@ -953,6 +989,25 @@ static const char *parse_weapon_state_block(decorate_actor_t *a, int idx,
         while (b[bi] && b[bi] != '(') { fn[bi] = b[bi]; bi++; }
         fn[bi] = 0;
         act = weapon_action_of(fn);
+
+        /* A_FireBullets(..., "BlueLaserPuff"): the shotgun and SSG name the blue
+         * laser puff per shot rather than via a global "replaces BulletPuff".
+         * The puff name is a later argument, past where read_word stopped, so
+         * scan the rest of the action line (up to the newline) for it.  The
+         * hitscan damage is delegated to the base weapon attack, which spawns
+         * the global puff; note here that this weapon wants the blue puff so the
+         * chain can raise the per-shot override around its fire. */
+        if (act == WA_BASEFIRE)
+        {
+          const char *ls = r, *le = r;
+          while (le < end && *le != '\n') le++;
+          {
+            const char *q;
+            for (q = ls; q + 13 <= le; q++)
+              if (!strncasecmp(q, "BlueLaserPuff", 13))
+              { a->uses_blue_puff = 1; break; }
+          }
+        }
 
         /* A_PlaySound("name", ...): pull the quoted sound name out of the call
          * and register it in the shared sound table; the frame carries the
@@ -3654,7 +3709,10 @@ void U_RegisterDecorateSexActors(void)
   /* Register the DECORATE bullet-puff replacement (RedLaserPuff "replaces
    * BulletPuff" in this mod) as a spawnable type and record it so P_SpawnPuff
    * emits the mod's laser puff sprite instead of the stock Doom puff.  The puff
-   * carries no editor number, so it is otherwise never registered. */
+   * carries no editor number, so it is otherwise never registered.  The blue
+   * laser puff is named per-shot by the shotgun/SSG via A_FireBullets but has no
+   * "replaces" of its own, so it is registered here by name too and recorded
+   * separately; the weapon-fire path selects it when a frame asked for it. */
   for (i = 0; i < num_actors; i++)
   {
     decorate_actor_t *a = &actors[i];
@@ -3665,6 +3723,12 @@ void U_RegisterDecorateSexActors(void)
       int mt = register_spawnonly_actor(a, &st_cursor, &mt_cursor, &sp_next);
       if (mt >= 0)
         decorate_bulletpuff_type = mt;
+    }
+    else if (a->name[0] && !strcasecmp(a->name, "BlueLaserPuff"))
+    {
+      int mt = register_spawnonly_actor(a, &st_cursor, &mt_cursor, &sp_next);
+      if (mt >= 0)
+        decorate_bluepuff_type = mt;
     }
   }
 
@@ -3730,8 +3794,17 @@ static int build_weapon_chain(decorate_actor_t *a, int wi, int slot,
       case WA_GUNFLASH: st->action.arg0 = (arg0_t)A_GunFlash;    break;
       case WA_REFIRE:   st->action.arg0 = (arg0_t)A_ReFire;      break;
       case WA_BASEFIRE:
-        st->action.arg0 = has_sound ? weapon_base_fire_quiet(slot)
-                                    : weapon_base_fire(slot);
+        /* a weapon that named the blue laser puff uses the blue-puff wrapper
+         * (which also squelches the stock sound); one that supplies its own
+         * sound but the default puff uses the quiet wrapper; otherwise the
+         * plain base attack.  The blue puff itself is registered later (with the
+         * scene actors), so the wrapper resolves its type at fire time -- route
+         * on the parse-time flag alone here. */
+        if (a->uses_blue_puff)
+          st->action.arg0 = weapon_base_fire_bluepuff(slot);
+        else
+          st->action.arg0 = has_sound ? weapon_base_fire_quiet(slot)
+                                       : weapon_base_fire(slot);
         break;
       case WA_PLAYSOUND:
         /* Resolve the captured sound name to an sfx id (a $random set yields a

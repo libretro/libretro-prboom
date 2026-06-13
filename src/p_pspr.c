@@ -803,6 +803,27 @@ void A_DecorateFireShotgun2Quiet(player_t *player, pspdef_t *psp)
   A_FireShotgun2(player, psp);
   weapon_fire_squelch_sound = 0;
 }
+/* As the quiet shotgun/SSG wrappers, but also raise the blue-laser-puff
+ * override around the hitscan so the impacts show the blue puff the weapon
+ * named in A_FireBullets rather than the global red BulletPuff replacement. */
+void A_DecorateFireShotgunBluePuff(player_t *player, pspdef_t *psp)
+{
+  int bp = U_DecorateBluePuffType();
+  weapon_fire_squelch_sound = 1;
+  if (bp >= 0) U_DecorateSetPuffOverride(bp);
+  A_FireShotgun(player, psp);
+  if (bp >= 0) U_DecorateSetPuffOverride(-1);
+  weapon_fire_squelch_sound = 0;
+}
+void A_DecorateFireShotgun2BluePuff(player_t *player, pspdef_t *psp)
+{
+  int bp = U_DecorateBluePuffType();
+  weapon_fire_squelch_sound = 1;
+  if (bp >= 0) U_DecorateSetPuffOverride(bp);
+  A_FireShotgun2(player, psp);
+  if (bp >= 0) U_DecorateSetPuffOverride(-1);
+  weapon_fire_squelch_sound = 0;
+}
 void A_DecorateFireCGunQuiet(player_t *player, pspdef_t *psp)
 {
   weapon_fire_squelch_sound = 1;

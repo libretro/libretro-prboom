@@ -33,6 +33,8 @@ int U_DecorateWeaponSound(int state);
  * P_SpawnPuff can emit the mod's laser puff instead of the stock Doom puff;
  * -1 if the wad defines no such replacement. */
 int U_DecoratePuffReplacement(void);
+int U_DecorateBluePuffType(void);
+void U_DecorateSetPuffOverride(int mt);
 
 /* true if the wad's DECORATE lump redefines the named sprite's state
  * sequence (r_things only unifies art for such sprites) */

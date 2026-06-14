@@ -223,21 +223,21 @@ static void mod_render(void *dest, unsigned nsamp)
 #define MOD_STATE_VERSION 1u
 
 typedef struct {
-  float    samples_per_tick;
-  int32_t  ticks_per_line;
-  uint8_t  visited[16];
-  int32_t  loop_count;
-  uint8_t  pattern_delay;
-  uint32_t lfo_rng;
-  int8_t   pattern;
-  int8_t   line;
-  int16_t  tick;
-  float    sample;
+  float          samples_per_tick;
+  int            ticks_per_line;   /* 32-bit on every MSVC target          */
+  unsigned char  visited[16];
+  int            loop_count;
+  unsigned char  pattern_delay;
+  unsigned int   lfo_rng;          /* 32-bit                                */
+  signed char    pattern;
+  signed char    line;
+  short          tick;             /* 16-bit                                */
+  float          sample;
 } mod_state_scalars_t;
 
 static size_t mod_serialize(void *dest, size_t cap)
 {
-  uint32_t hdr[4];
+  unsigned int hdr[4];
   mod_state_scalars_t sc;
   unsigned nch;
   size_t   need;
@@ -255,13 +255,13 @@ static size_t mod_serialize(void *dest, size_t cap)
 
   hdr[0] = MOD_STATE_MAGIC;
   hdr[1] = MOD_STATE_VERSION;
-  hdr[2] = (uint32_t)(mod_looping ? 1 : 0);
-  hdr[3] = (uint32_t)nch;
+  hdr[2] = (unsigned int)(mod_looping ? 1 : 0);
+  hdr[3] = (unsigned int)nch;
 
   sc.samples_per_tick = mod_ctx->samples_per_tick;
-  sc.ticks_per_line   = (int32_t)mod_ctx->ticks_per_line;
+  sc.ticks_per_line   = (int)mod_ctx->ticks_per_line;
   memcpy(sc.visited, mod_ctx->visited, sizeof sc.visited);
-  sc.loop_count       = (int32_t)mod_ctx->loop_count;
+  sc.loop_count       = (int)mod_ctx->loop_count;
   sc.pattern_delay    = mod_ctx->pattern_delay;
   sc.lfo_rng          = mod_ctx->lfo_rng;
   sc.pattern          = mod_ctx->pattern;
@@ -278,7 +278,7 @@ static size_t mod_serialize(void *dest, size_t cap)
 
 static int mod_unserialize(const void *src, size_t size)
 {
-  uint32_t hdr[4];
+  unsigned int hdr[4];
   mod_state_scalars_t sc;
   const unsigned char *p;
   unsigned nch;

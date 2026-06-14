@@ -1122,34 +1122,37 @@ void R_WaterDarkenSpan(int y, int x1, int x2, int surf_y)
    }
 }
 
-/* Lit blue water-surface band.  band_top is the first row of the visible
- * water opening and band_h the band height; the strip is brightest at its top
- * (the lit surface line) and fades to nothing at the bottom, blended over the
- * already-darkened water beneath.  This draws the flat top of the water (the
- * surface seen at a grazing angle from below) -- darkening alone only tints
- * the wall behind the glass, and when the true surface line projects above the
- * opening the whole view is "deep", so the depth-graded blue never appears;
- * this band gives the visible waterline regardless. */
-void R_WaterSurfaceBand(int y, int x1, int x2, int band_top, int band_h)
+/* Lit water-surface band drawn AT the waterline.  Renders one column run
+ * [yl..yh] (already clamped to the band's vertical extent) of the water
+ * surface: surf_line is the row the true surface projects to and band_h the
+ * band height below it.  Strongest right at the line and fading into the
+ * volume, blended over the already-darkened water.  A cheap ripple (a per-row,
+ * per-column sinusoid via a small table) breaks the flat edge so it reads as a
+ * water surface caustic rather than a ruled line.  Nothing is drawn above
+ * surf_line, so the dry wall above the waterline is left untouched. */
+static const signed char water_ripple[8] =
+   { 0, 2, 3, 2, 0, -2, -3, -2 };
+void R_WaterSurfaceBand(int x, int yl, int yh, int surf_line, int band_h)
 {
-   uint16_t *dest = drawvars.short_topleft + y * SURFACE_SHORT_PITCH + x1;
-   int n = x2 - x1 + 1;
-   int row = y - band_top;            /* 0 at the surface line */
-   int fade;                          /* strength of the lift, top -> bottom */
-   if (n <= 0 || row < 0 || row >= band_h) return;
-   fade = 10 - (row * 10) / band_h;   /* 10 at top -> 0 at band bottom */
-   if (fade <= 0) return;
-   while (n-- > 0)
+   uint16_t *dest = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + x;
+   int y;
+   for (y = yl; y <= yh; y++, dest += SURFACE_SHORT_PITCH)
    {
-      uint16_t d = *dest;
-      int r = (d >> 11) & 0x1F;
-      int g = (d >> 5)  & 0x3F;
-      int b =  d        & 0x1F;
-      /* Lift toward a desaturated lit blue-grey caustic (not a pure-blue
-       * wash): blue rises most, green a little, red a touch, scaled by the
-       * row fade, so the surface reads as lit water rather than paint. */
-      b += (fade * (28 - b)) >> 5;
-      g += (fade * (20 - g)) >> 6;
+      int row = y - surf_line;          /* 0 at the surface line, grows down */
+      int fade, rip, b, g, r;
+      uint16_t d;
+      if (row < 0 || row >= band_h) continue;
+      fade = 12 - (row * 12) / band_h;  /* 12 at the line -> 0 at band bottom */
+      rip  = water_ripple[(x + (row << 1)) & 7];   /* small surface wobble */
+      fade += rip;
+      if (fade <= 0) continue;
+      d = *dest;
+      r =  (d >> 11) & 0x1F;
+      g =  (d >> 5)  & 0x3F;
+      b =   d        & 0x1F;
+      /* lift toward a desaturated lit blue-grey caustic, scaled by fade */
+      b += (fade * (29 - b)) >> 5;
+      g += (fade * (22 - g)) >> 6;
       r += (fade * (10 - r)) >> 6;
       if (b > 31) b = 31;
       if (b < 0)  b = 0;
@@ -1157,7 +1160,7 @@ void R_WaterSurfaceBand(int y, int x1, int x2, int band_top, int band_h)
       if (g < 0)  g = 0;
       if (r > 31) r = 31;
       if (r < 0)  r = 0;
-      *dest++ = (uint16_t)((r << 11) | (g << 5) | b);
+      *dest = (uint16_t)((r << 11) | (g << 5) | b);
    }
 }
 

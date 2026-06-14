@@ -423,32 +423,28 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
             }
          }
       }
-      /* Surface band: paint a lit blue water surface across the TOP of the
-       * visible opening.  Darkening alone tints the wall behind the glass, but
-       * the flat top of the water (the surface seen at a grazing angle from
-       * below) is its own lit blue band -- and when the true surface line
-       * projects above the window (looking up from deep water) the whole
-       * opening is "deep", so the depth-graded blue never appears.  Lay it
-       * over the already-darkened top rows: a band whose height scales with
-       * the view, brightest at its top and fading into the volume. */
+      /* Surface band: paint the lit water surface AT the waterline -- the row
+       * each column's true surface line projects to -- not at the window top.
+       * The band runs a fixed height DOWN from that line (the surface seen at a
+       * grazing angle), brightest at the line and fading into the volume below.
+       * Nothing is drawn above the waterline: the dry wall there is untouched.
+       * Columns whose surface projects above the visible opening (looking up
+       * from deep water) draw no band -- the whole column is already deep. */
       {
-         extern void R_WaterSurfaceBand(int y, int x1, int x2, int band_top,
+         extern void R_WaterSurfaceBand(int x, int yl, int yh, int surf_line,
                                         int band_h);
-         int band_h = viewheight / 9;          /* ~11% of the view */
+         int band_h = viewheight / 18;         /* ~5.5% of the view */
          if (band_h < 2) band_h = 2;
-         for (y = ylmin; y < ylmin + band_h && y <= yhmax; y++)
+         for (wx = x1; wx <= x2; wx++)
          {
-            int rx = x1;
-            while (rx <= x2)
-            {
-               while (rx <= x2 && !(y >= wcol_yl[rx] && y <= wcol_yh[rx])) rx++;
-               if (rx > x2) break;
-               {
-                  int rs = rx;
-                  while (rx <= x2 && (y >= wcol_yl[rx] && y <= wcol_yh[rx])) rx++;
-                  R_WaterSurfaceBand(y, rs, rx - 1, ylmin, band_h);
-               }
-            }
+            int yl = wcol_yl[wx], yh = wcol_yh[wx];
+            int sline = wcol_surf[wx];
+            int bl_top, bl_bot;
+            if (yl > yh) continue;             /* empty column */
+            bl_top = sline; if (bl_top < yl) bl_top = yl;
+            bl_bot = sline + band_h - 1; if (bl_bot > yh) bl_bot = yh;
+            if (bl_top <= bl_bot)
+               R_WaterSurfaceBand(wx, bl_top, bl_bot, sline, band_h);
          }
       }
       R_UnlockTextureCompositePatchNum(texnum);

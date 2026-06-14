@@ -1008,6 +1008,48 @@ static void R_FlushQuadADD16(void)
 /* Per-alpha lerp flushers: dst + (src-dst)*tl_alpha/32 per channel -- ZDoom
  * alpha glass at its true alpha rather than the bucketed 50/50.  Same shape as
  * the additive trio; the diff is signed so the quad uses an arithmetic shift. */
+/* Submerged 3D-floor water (matching GZDoom's hardware look): rather than
+ * alpha-blending the water surface texture over the scene, the swimmable-water
+ * midtexture darkens the geometry behind it toward a dark blue-grey, fading
+ * with depth below the surface line.  Deep water lands near-black with a faint
+ * blue; near the surface it stays lighter and bluer.  This reproduces the
+ * reference profile (surface ~RGB 56,69,85 -> deep ~15,15,15) and composites
+ * correctly because it darkens whatever is behind, sidestepping the draw-order
+ * problem of overlaying a translucent plane that later geometry paints over. */
+static INLINE uint16_t R_WaterDarken1(uint16_t d, int keep, int bluelift)
+{
+   int dr = (d >> 11) & 0x1F, dg = (d >> 5) & 0x3F, db = d & 0x1F;
+   int nr = (dr * keep) >> 5;
+   int ng = (dg * keep) >> 5;
+   int nb = ((db * keep) >> 5) + bluelift;
+   if (nb > 31) nb = 31;
+   return (uint16_t)((nr << 11) | (ng << 5) | nb);
+}
+
+/* Darken one screen column [yl..yh] with depth below surf_y.
+ * SIMD CANDIDATE: this per-pixel RGB565 darken over a vertical run is a prime
+ * SSE2/NEON target -- unpack 8 px to channels, multiply by keep, shift, add
+ * blue, repack; keep/bluelift vary slowly so they can be recomputed per short
+ * block.  Mirrors the existing quad-column LERP/ADD flushers. */
+void R_WaterDarkenColumn(int x, int yl, int yh, int surf_y)
+{
+   uint16_t *dest = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + x;
+   int y;
+   for (y = yl; y <= yh; y++, dest += SURFACE_SHORT_PITCH)
+   {
+      int depth = y - surf_y; if (depth < 0) depth = 0;
+      {
+         int keep = 28 - depth;
+         int bl;
+         if (keep < 9) keep = 9;             /* deep floor, not pure black */
+         bl = (depth < 32) ? (8 - depth/4) : 0;
+         bl += 2;                            /* constant deep blue */
+         if (bl < 2) bl = 2;
+         *dest = R_WaterDarken1(*dest, keep, bl);
+      }
+   }
+}
+
 static void R_FlushWholeLERP16(void)
 {
    while(--temp_x >= 0)

@@ -262,6 +262,7 @@ static fixed_t R_ScaleFromGlobalAngle(angle_t visangle)
 
 void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
 {
+   int water_seg = 0;
    int      texnum;
    sector_t tempsec;      // killough 4/13/98
    const rpatch_t *patch;
@@ -356,6 +357,17 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
 
    /* draw the columns */
 
+   /* A swimmable 3D-floor whose surface sits above this sector's floor is a
+    * water body: render its 2-sided "glass" midtexture as a submerged volume
+    * (darken what is behind it) instead of an alpha-blended texture. */
+   {
+      const ffloor_t *ffw;
+      for (ffw = frontsector->ffloors; ffw; ffw = ffw->next)
+         if (ffw->type == FFLOOR_SWIMMABLE &&
+             ffw->model->ceilingheight > frontsector->floorheight)
+         { water_seg = 1; break; }
+   }
+
    for (dcvars.x = x1 ; dcvars.x <= x2 ; dcvars.x++, spryscale += rw_scalestep)
    {
       if (maskedtexturecol[dcvars.x] == INT_MAX) // dropoff overflow
@@ -418,6 +430,24 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
       // bytes in the column referred to below, which explains
       // the Medusa effect. The fix is to construct TRUE columns
       // when forming multipatched textures (see r_data.c).
+
+      if (water_seg)
+      {
+         /* darken from the surface line down to the floor clip, clamped into
+          * the column's open span -- the submerged volume seen through it. */
+         extern void R_WaterDarkenColumn(int x, int yl, int yh, int surf_y);
+         int surf = (int)(sprtopscreen >> FRACBITS);
+         int yl = surf;
+         int yh = ds->sprbottomclip[dcvars.x] - 1;
+         if (yl <= ds->sprtopclip[dcvars.x])
+            yl = ds->sprtopclip[dcvars.x] + 1;
+         if (yh >= viewheight)
+            yh = viewheight - 1;
+         if (yl <= yh)
+            R_WaterDarkenColumn(dcvars.x, yl, yh, surf);
+         maskedtexturecol[dcvars.x] = INT_MAX;
+         continue;
+      }
 
       // draw the texture
       R_DrawMaskedColumn(

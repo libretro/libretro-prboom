@@ -1031,21 +1031,101 @@ static INLINE uint16_t R_WaterDarken1(uint16_t d, int keep, int bluelift)
  * SSE2/NEON target -- unpack 8 px to channels, multiply by keep, shift, add
  * blue, repack; keep/bluelift vary slowly so they can be recomputed per short
  * block.  Mirrors the existing quad-column LERP/ADD flushers. */
+/* Per-depth curve LUT (keep = scene fraction /32, bl = additive blue).  The
+ * curve depends only on depth, so precompute it once; the inner loops then read
+ * the table instead of recomputing the curve per pixel. */
+#define MAXWATERDEPTH 4096
+static unsigned char water_keep_lut[MAXWATERDEPTH];
+static unsigned char water_bl_lut[MAXWATERDEPTH];
+static int water_lut_ready = 0;
+static void R_BuildWaterLUT(void)
+{
+   int depth;
+   for (depth = 0; depth < MAXWATERDEPTH; depth++)
+   {
+      int keep = 28 - depth;
+      int bl;
+      if (keep < 9) keep = 9;
+      bl = (depth < 32) ? (8 - depth/4) : 0;
+      bl += 2;
+      if (bl < 2) bl = 2;
+      water_keep_lut[depth] = (unsigned char)keep;
+      water_bl_lut[depth]   = (unsigned char)bl;
+   }
+   water_lut_ready = 1;
+}
+
+/* Row-major water darken: darken a horizontal run [x1..x2] at a constant row y.
+ * keep/bl are constant across the row, so this is both cache-friendly
+ * (contiguous writes) and SIMD-friendly.  SSE2 does 8 RGB565 px/iter; other
+ * targets use the scalar tail.  This is the hot path (the submerged volume). */
+void R_WaterDarkenSpan(int y, int x1, int x2, int surf_y)
+{
+   uint16_t *dest = drawvars.short_topleft + y * SURFACE_SHORT_PITCH + x1;
+   int n = x2 - x1 + 1;
+   int depth = y - surf_y, keep, bl;
+   if (n <= 0) return;
+   if (!water_lut_ready) R_BuildWaterLUT();
+   if (depth < 0) depth = 0;
+   if (depth >= MAXWATERDEPTH) depth = MAXWATERDEPTH - 1;
+   keep = water_keep_lut[depth];
+   bl   = water_bl_lut[depth];
+#if defined(__SSE2__)
+   {
+      const __m128i vkeep = _mm_set1_epi16((short)keep);
+      const __m128i vbl   = _mm_set1_epi16((short)bl);
+      const __m128i mr = _mm_set1_epi16((short)0xF800);
+      const __m128i mg = _mm_set1_epi16((short)0x07E0);
+      const __m128i mb = _mm_set1_epi16((short)0x001F);
+      const __m128i b31= _mm_set1_epi16(31);
+      while (n >= 8)
+      {
+         __m128i d = _mm_loadu_si128((const __m128i *)dest);
+         __m128i r = _mm_srli_epi16(_mm_and_si128(d, mr), 11);
+         __m128i g = _mm_srli_epi16(_mm_and_si128(d, mg), 5);
+         __m128i b = _mm_and_si128(d, mb);
+         r = _mm_srli_epi16(_mm_mullo_epi16(r, vkeep), 5);
+         g = _mm_srli_epi16(_mm_mullo_epi16(g, vkeep), 5);
+         b = _mm_srli_epi16(_mm_mullo_epi16(b, vkeep), 5);
+         b = _mm_add_epi16(b, vbl);
+         b = _mm_min_epi16(b, b31);
+         d = _mm_or_si128(_mm_or_si128(_mm_slli_epi16(r, 11),
+                                       _mm_slli_epi16(g, 5)), b);
+         _mm_storeu_si128((__m128i *)dest, d);
+         dest += 8; n -= 8;
+      }
+   }
+#endif
+   while (n-- > 0)
+   {
+      uint16_t d = *dest;
+      int nr = (((d >> 11) & 0x1F) * keep) >> 5;
+      int ng = (((d >> 5) & 0x3F) * keep) >> 5;
+      int nb = (((d & 0x1F) * keep) >> 5) + bl;
+      if (nb > 31) nb = 31;
+      *dest++ = (uint16_t)((nr << 11) | (ng << 5) | nb);
+   }
+}
+
+/* Per-column (vertical) darken, used by the floor post-pass where spans are
+ * naturally columnar.  LUT-driven; strided, so not the hot path. */
 void R_WaterDarkenColumn(int x, int yl, int yh, int surf_y)
 {
    uint16_t *dest = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + x;
-   int y;
+   int y, depth;
+   if (!water_lut_ready) R_BuildWaterLUT();
    for (y = yl; y <= yh; y++, dest += SURFACE_SHORT_PITCH)
    {
-      int depth = y - surf_y; if (depth < 0) depth = 0;
+      depth = y - surf_y; if (depth < 0) depth = 0;
+      if (depth >= MAXWATERDEPTH) depth = MAXWATERDEPTH - 1;
       {
-         int keep = 28 - depth;
-         int bl;
-         if (keep < 9) keep = 9;             /* deep floor, not pure black */
-         bl = (depth < 32) ? (8 - depth/4) : 0;
-         bl += 2;                            /* constant deep blue */
-         if (bl < 2) bl = 2;
-         *dest = R_WaterDarken1(*dest, keep, bl);
+         uint16_t d = *dest;
+         int keep = water_keep_lut[depth];
+         int nr = (((d >> 11) & 0x1F) * keep) >> 5;
+         int ng = (((d >> 5) & 0x3F) * keep) >> 5;
+         int nb = (((d & 0x1F) * keep) >> 5) + water_bl_lut[depth];
+         if (nb > 31) nb = 31;
+         *dest = (uint16_t)((nr << 11) | (ng << 5) | nb);
       }
    }
 }

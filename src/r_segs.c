@@ -377,9 +377,15 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
     * glass texture itself is not drawn; the darkened background is the water. */
    if (water_seg)
    {
-      extern void R_WaterDarkenColumn(int x, int yl, int yh, int surf_y);
+      /* Darken the submerged opening ROW-MAJOR: compute each column's surface
+       * line and vertical [yl,yh] span, then sweep rows and darken each row's
+       * contiguous x-run in one SSE2-friendly pass.  Much faster than the
+       * per-column vertical walk, which strided across a cache line per pixel. */
+      extern void R_WaterDarkenSpan(int y, int x1, int x2, int surf_y);
+      static int wcol_yl[MAX_SCREENWIDTH], wcol_yh[MAX_SCREENWIDTH],
+                 wcol_surf[MAX_SCREENWIDTH];
       fixed_t sc = ds->scale1 + (x1 - ds->x1)*rw_scalestep;
-      int wx;
+      int wx, y, ylmin = viewheight, yhmax = -1;
       for (wx = x1; wx <= x2; wx++, sc += rw_scalestep)
       {
          int64_t st = ((int64_t) centeryfrac << FRACBITS) -
@@ -391,9 +397,31 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
             yl = ds->sprtopclip[wx] + 1;
          if (yh >= viewheight)
             yh = viewheight - 1;
+         wcol_surf[wx] = surf;
          if (yl <= yh)
-            R_WaterDarkenColumn(wx, yl, yh, surf);
+         {
+            wcol_yl[wx] = yl; wcol_yh[wx] = yh;
+            if (yl < ylmin) ylmin = yl;
+            if (yh > yhmax) yhmax = yh;
+         }
+         else { wcol_yl[wx] = 1; wcol_yh[wx] = 0; }   /* empty */
          maskedtexturecol[wx] = INT_MAX;
+      }
+      for (y = ylmin; y <= yhmax; y++)
+      {
+         int rx = x1;
+         while (rx <= x2)
+         {
+            while (rx <= x2 && !(y >= wcol_yl[rx] && y <= wcol_yh[rx])) rx++;
+            if (rx > x2) break;
+            {
+               int rs = rx;
+               while (rx <= x2 && (y >= wcol_yl[rx] && y <= wcol_yh[rx])) rx++;
+               /* depth is ~constant across the run (surf varies slowly); use
+                * the run's left surf -- any sub-band error is invisible. */
+               R_WaterDarkenSpan(y, rs, rx - 1, wcol_surf[rs]);
+            }
+         }
       }
       R_UnlockTextureCompositePatchNum(texnum);
       curline = NULL;

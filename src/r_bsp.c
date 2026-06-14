@@ -611,6 +611,7 @@ static void R_Subsector(int num)
    * R_RenderSegLoop and it is drawn after the opaque planes.  waterplane is
    * reset every subsector so a stale plane never leaks into an ordinary one. */
   waterplane = NULL;
+  waterceil = NULL;
   nmorewater = 0;
   if (frontsector->ffloors)
   {
@@ -633,8 +634,21 @@ static void R_Subsector(int num)
       wtop = ff->model->ceilingheight;        /* slab/water surface height */
       if (ff->model->floorheight >= wtop)
         continue;
-      if (wtop > viewz)                        /* only above-surface case */
+      if (wtop > viewz)
+      {
+        /* Water surface above the eye (looking up/across at it from below):
+         * a translucent horizontal plane above the viewer, so render it like a
+         * translucent ceiling at the surface height -- it projects with proper
+         * perspective and covers only the band it actually occupies (the old
+         * span model wrongly tinted the whole opening).  Genuine swimmable
+         * water only, lowest above-eye surface. */
+        if (ff->type == FFLOOR_SWIMMABLE &&
+            (!waterceil || wtop < waterceil->height))
+          waterceil = R_FindWaterPlane(wtop,
+                                       ff->model->ceilingpic,
+                                       ff->model->lightlevel);
         continue;
+      }
       if (ncand < MAXMOREWATER + 1)
       {
         for (i = ncand; i > 0 && candh[i - 1] < wtop; i--)

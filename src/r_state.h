@@ -110,6 +110,7 @@ extern int              rw_angle1;
 extern visplane_t       *floorplane;
 extern visplane_t       *ceilingplane;
 extern visplane_t       *waterplane;
+extern visplane_t       *waterceil;
 
 /* Stacked see-through 3D-floor surfaces below the topmost (waterplane).  A
  * single subsector can hold several translucent slabs (a pile of gratings or

@@ -79,6 +79,7 @@ visplane_t *floorplane, *ceilingplane;
  * planes in R_DrawPlanes.  NULL except in a swimmable sector viewed from
  * above its water surface. */
 visplane_t *waterplane;
+visplane_t *waterceil;  /* above-eye swimmable surface, ceiling-projected */
 visplane_t *morewater[MAXMOREWATER];
 int nmorewater;
 

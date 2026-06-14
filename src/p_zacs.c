@@ -1831,6 +1831,272 @@ extern patchnum_t hu_font[HU_FONTSIZE];
  * scaled dialogue-text glyphs to the requested text colour. */
 extern const uint8_t *colrngs[CR_LIMIT];
 
+/* ------------------------------------------------------------------------ *
+ * FON2 bitmap fonts.                                                       *
+ *                                                                          *
+ * ZDoom's FON2 is a multi-glyph bitmap font lump: a header, a per-glyph    *
+ * width table, an embedded RGB colour table, and PackBits-RLE glyph pixel  *
+ * data indexing that colour table.  Conversation/data-log text selects     *
+ * such a font with SetFont; without a decoder the text path fell back to   *
+ * the stock upper-case-only Doom font, losing the font's own glyphs, case  *
+ * and colour.  Decode the lump once, map its colour table to the nearest   *
+ * PLAYPAL index per entry (index 0 = transparent), and draw scaled,        *
+ * case-preserving glyphs from it, recolouring through the active CR_ table  *
+ * exactly as the hu_font path does. */
+typedef struct {
+  int       lump;          /* source lump, -1 if slot unused                */
+  int       height;        /* glyph cell height                             */
+  int       first, count;  /* first char code and glyph count               */
+  int      *gw;            /* per-glyph width (count entries)               */
+  int      *goff;          /* per-glyph offset into pix (count entries)     */
+  uint8_t  *pix;           /* all glyph pixels, palette-mapped (0 = clear)  */
+  int       pixlen;
+} zacs_fon2_t;
+
+#define ZACS_FON2_CACHE 8
+static zacs_fon2_t zacs_fon2_cache[ZACS_FON2_CACHE];
+
+/* Nearest base-PLAYPAL index for an RGB triple (for the FON2 colour table). */
+static int zacs_fon2_best(const byte *pal, int r, int g, int b)
+{
+  int i, best = 0;
+  long bestd = 0x7fffffffL;
+  if (!pal)
+    return 0;
+  for (i = 0; i < 256; i++)
+  {
+    int dr = (int)pal[i * 3 + 0] - r;
+    int dg = (int)pal[i * 3 + 1] - g;
+    int db = (int)pal[i * 3 + 2] - b;
+    long d = (long)dr * dr + (long)dg * dg + (long)db * db;
+    if (d < bestd) { bestd = d; best = i; }
+  }
+  return best;
+}
+
+/* Decode (and cache) the FON2 font in `lump`, or NULL if it is not a FON2. */
+static const zacs_fon2_t *zacs_fon2_get(int lump)
+{
+  zacs_fon2_t *f = NULL;
+  const unsigned char *d;
+  const byte *pal;
+  int len, i, slot, free_slot = -1;
+  int height, first, last, count, constw, palsize;
+  const unsigned char *p, *endd;
+  uint8_t palmap[256];
+  int *widths;
+  int totalpix, off;
+
+  if (lump <= 0)
+    return NULL;
+  for (slot = 0; slot < ZACS_FON2_CACHE; slot++)
+  {
+    if (zacs_fon2_cache[slot].lump == lump)
+      return &zacs_fon2_cache[slot];
+    if (zacs_fon2_cache[slot].lump <= 0 && free_slot < 0)
+      free_slot = slot;
+  }
+  len = W_LumpLength(lump);
+  if (len < 8)
+    return NULL;
+  d = (const unsigned char *)W_CacheLumpNum(lump);
+  if (!(d[0] == 'F' && d[1] == 'O' && d[2] == 'N' && d[3] == '2'))
+    return NULL;
+  /* header: "FON2", uint16 height, byte first, byte last, byte constWidth,
+   * byte shading, byte palSize, byte flags */
+  height  = d[4] | (d[5] << 8);
+  first   = d[6];
+  last    = d[7];
+  constw  = d[8];
+  /* d[9] = shading (active colour count hint, unused) */
+  palsize = d[10];
+  /* d[11] = flags */
+  if (last < first)
+    return NULL;
+  count = last - first + 1;
+  if (count <= 0 || count > 256 || height <= 0 || height > 256)
+    return NULL;
+
+  p    = d + 12;
+  endd = d + len;
+  widths = (int *)malloc(sizeof(int) * count);
+  if (!widths)
+    return NULL;
+  if (constw)
+  {
+    for (i = 0; i < count; i++)
+      widths[i] = constw;
+  }
+  else
+  {
+    for (i = 0; i < count; i++)
+    {
+      if (p + 2 > endd) { free(widths); return NULL; }
+      widths[i] = p[0] | (p[1] << 8);
+      p += 2;
+    }
+  }
+
+  /* colour table: (palSize + 1) RGB triples; index 0 is transparent */
+  pal = NULL;
+  {
+    int l = (W_CheckNumForName)("PLAYPAL", ns_global);
+    if (l >= 0) pal = (const byte *)W_CacheLumpNum(l);
+  }
+  for (i = 0; i < 256; i++)
+    palmap[i] = 0;
+  for (i = 0; i <= palsize && i < 256; i++)
+  {
+    if (p + 3 > endd) { free(widths); return NULL; }
+    if (i == 0)
+      palmap[0] = 0;                 /* transparent */
+    else
+      palmap[i] = (uint8_t)zacs_fon2_best(pal, p[0], p[1], p[2]);
+    p += 3;
+  }
+
+  /* glyph pixels: PackBits RLE per glyph, width*height palette indices */
+  totalpix = 0;
+  for (i = 0; i < count; i++)
+    totalpix += widths[i] * height;
+  if (totalpix <= 0) { free(widths); return NULL; }
+
+  slot = (free_slot >= 0) ? free_slot : 0;   /* reuse slot 0 if cache full */
+  f = &zacs_fon2_cache[slot];
+  if (f->lump > 0) { free(f->gw); free(f->goff); free(f->pix); }
+  f->gw   = widths;
+  f->goff = (int *)malloc(sizeof(int) * count);
+  f->pix  = (uint8_t *)malloc((size_t)totalpix);
+  if (!f->goff || !f->pix)
+  {
+    free(f->gw); free(f->goff); free(f->pix);
+    f->lump = 0; f->gw = NULL; f->goff = NULL; f->pix = NULL;
+    return NULL;
+  }
+  off = 0;
+  for (i = 0; i < count; i++)
+  {
+    int need = widths[i] * height;
+    int got  = 0;
+    f->goff[i] = off;
+    /* PackBits: signed control c; c>=0 -> (c+1) literal bytes; c<0 (as
+     * signed char, i.e. >=128) -> repeat next byte (257-c) times. */
+    while (got < need && p < endd)
+    {
+      int c = (signed char)*p++;
+      if (c >= 0)
+      {
+        int n = c + 1, k;
+        for (k = 0; k < n && got < need && p < endd; k++)
+        {
+          unsigned char v = *p++;
+          f->pix[off + got] = palmap[v];
+          got++;
+        }
+      }
+      else
+      {
+        int n = 257 - (c & 0xff), k;
+        unsigned char v;
+        if (p >= endd) break;
+        v = *p++;
+        for (k = 0; k < n && got < need; k++)
+        {
+          f->pix[off + got] = palmap[v];
+          got++;
+        }
+      }
+    }
+    while (got < need) { f->pix[off + got] = 0; got++; }  /* pad short glyph */
+    off += need;
+  }
+  f->lump   = lump;
+  f->height = height;
+  f->first  = first;
+  f->count  = count;
+  f->pixlen = totalpix;
+  return f;
+}
+
+/* Draw FON2 glyph `gi` scaled into (dx,dy,dw,dh), recoloured through trans. */
+static void zacs_fon2_blit(const zacs_fon2_t *f, int gi, int dx, int dy,
+                           int dw, int dh, const uint8_t *trans)
+{
+  uint16_t *surf;
+  int gw, x0, x1, y0, y1, ox, oy, sx_step, sy_step;
+  const uint8_t *gp;
+  if (!f || gi < 0 || gi >= f->count || dw <= 0 || dh <= 0)
+    return;
+  gw = f->gw[gi];
+  if (gw <= 0)
+    return;
+  gp = f->pix + f->goff[gi];
+  surf = (uint16_t *)screens[0].data;
+  sx_step = (gw << 16) / dw;
+  sy_step = (f->height << 16) / dh;
+  x0 = dx < 0 ? 0 : dx;
+  y0 = dy < 0 ? 0 : dy;
+  x1 = dx + dw; if (x1 > SCREENWIDTH)  x1 = SCREENWIDTH;
+  y1 = dy + dh; if (y1 > SCREENHEIGHT) y1 = SCREENHEIGHT;
+  for (oy = y0; oy < y1; oy++)
+  {
+    int srcy = ((oy - dy) * sy_step) >> 16;
+    uint16_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    if (srcy < 0) srcy = 0; else if (srcy >= f->height) srcy = f->height - 1;
+    for (ox = x0; ox < x1; ox++)
+    {
+      int srcx = (((ox - dx) * sx_step) >> 16);
+      int idx;
+      if (srcx < 0) srcx = 0; else if (srcx >= gw) srcx = gw - 1;
+      idx = gp[srcy * gw + srcx];
+      if (idx == 0)
+        continue;                    /* transparent */
+      if (trans)
+        idx = trans[(unsigned char)idx];
+      row[ox] = VID_PAL16((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
+    }
+  }
+}
+
+/* Resolve a font name to a decoded FON2, or NULL.  Looks the lump up in the
+ * global then sprite namespaces (where mods place HUD fonts). */
+static const zacs_fon2_t *zacs_fon2_for(const char *font)
+{
+  int l;
+  if (!font || !font[0])
+    return NULL;
+  l = (W_CheckNumForName)(font, ns_global);
+  if (l < 0)
+    l = (W_CheckNumForName)(font, ns_sprites);
+  if (l < 0)
+    return NULL;
+  return zacs_fon2_get(l);
+}
+
+/* Map an inline ZDoom colour-escape letter (\cX) to a CR_ translation index.
+ * a..k cover the standard ramps; '-' resets to the message's base colour
+ * (signalled as -2); an unknown letter yields CR_LIMIT (no recolour). */
+static int zacs_color_escape(int letter)
+{
+  switch (letter)
+  {
+    case 'a': return CR_BRICK;
+    case 'b': return CR_TAN;
+    case 'c': return CR_GRAY;
+    case 'd': return CR_GREEN;
+    case 'e': return CR_BROWN;
+    case 'f': return CR_GOLD;
+    case 'g': return CR_RED;
+    case 'h': return CR_BLUE;
+    case 'i': return CR_ORANGE;
+    case 'j': return CR_GRAY;     /* white -> nearest light */
+    case 'k': return CR_YELLOW;
+    case '-': return -2;          /* reset to base colour */
+    default:  return CR_LIMIT;    /* unknown: no recolour */
+  }
+}
+
+
 /* Resolve a font/graphic name to a drawable patch lump, or -1 if it is a real
  * text font (or unknown).  Story content selects a portrait or the dialogue
  * frame by SetFont()-ing a single-image "font" and printing one character, so
@@ -3274,6 +3540,10 @@ void Z_ACSHudDrawer(void)
       int penx = (int)(((long long)m->x * SCREENWIDTH) / (hw > 0 ? hw : 320));
       int peny = (int)(((long long)m->y * SCREENHEIGHT) / (hh > 0 ? hh : 200));
       const char *t;
+      /* If the message's font is a FON2 bitmap font, draw case-preserving
+       * glyphs from it; otherwise fall back to the stock upper-case hu_font. */
+      const zacs_fon2_t *f2 = zacs_fon2_for(m->font);
+      const uint8_t *base_trans;
       /* CR_LIMIT is the "untranslated" sentinel from zacs_zdoom_color: leave
        * the glyphs in the font's own colours (the name / SPEAKING labels rely
        * on the font's native red).  Any other in-range value recolours through
@@ -3286,6 +3556,7 @@ void Z_ACSHudDrawer(void)
           cm = CR_DEFAULT;
         trans = colrngs[cm];
       }
+      base_trans = trans;             /* restored by a "\c-" reset escape */
       /* typewriter reveal: only show the first (age/typeon)+1 characters */
       if (m->typeon)
       {
@@ -3298,14 +3569,45 @@ void Z_ACSHudDrawer(void)
       }
       for (t = src; *t; t++)
       {
-        unsigned char c = (unsigned char)toupper(*t);
+        unsigned char rc = (unsigned char)*t;
+        unsigned char c;
         int gw, lump, dw, dh;
-        if (c == '\n')                  /* next line: carriage return + 8 box units down */
+        /* inline colour escape: '\c' + letter switches the active colour for
+         * the rest of the string ('-' restores the base); the escape draws
+         * nothing and consumes both bytes. */
+        if (rc == '\\' && t[1] == 'c' && t[2])
+        {
+          int e = zacs_color_escape((unsigned char)t[2]);
+          if (e == -2)        trans = base_trans;
+          else if (e == CR_LIMIT) trans = NULL;
+          else                trans = colrngs[e];
+          t += 2;
+          continue;
+        }
+        if (rc == '\n')                 /* next line: CR + 8 box units down */
         {
           penx = (int)(((long long)m->x * SCREENWIDTH) / (hw > 0 ? hw : 320));
           peny += (int)((8 * fy) >> 16);
           continue;
         }
+        if (f2)
+        {
+          /* FON2 path: case-preserving, glyph indexed by raw code. */
+          int gi = (int)rc - f2->first;
+          if (rc == ' ' || gi < 0 || gi >= f2->count)
+          {
+            int adv = f2->count > 0 ? f2->gw[0] : 4;
+            penx += (int)(((long long)(adv > 0 ? adv : 4) * fx) >> 16);
+            continue;
+          }
+          gw = f2->gw[gi];
+          dw = (int)(((long long)gw         * fx) >> 16);
+          dh = (int)(((long long)f2->height * fy) >> 16);
+          zacs_fon2_blit(f2, gi, penx, peny, dw, dh, trans);
+          penx += (int)(((long long)gw * fx) >> 16);
+          continue;
+        }
+        c = (unsigned char)toupper(rc);
         if (c < HU_FONTSTART || c > HU_FONTEND)
         {
           penx += (int)((4 * fx) >> 16);   /* space / unprintable */

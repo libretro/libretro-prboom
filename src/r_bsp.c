@@ -622,7 +622,15 @@ static void R_Subsector(int num)
       if (ffp->type == FFLOOR_SWIMMABLE &&
           ffp->model->ceilingheight > frontsector->floorheight)
       {
-        if (floorplane && frontsector->floorheight < ffp->model->ceilingheight)
+        /* Only darken the submerged floor when the eye is ABOVE the water
+         * surface -- i.e. looking down through the water at the floor.  When
+         * the eye is below the surface (wading in the room, or looking
+         * horizontally through a window into it), the floor underfoot is
+         * ordinary ground and must render normally; darkening it then turned
+         * every connected water sector's walkable floor into dark water. */
+        if (floorplane &&
+            frontsector->floorheight < ffp->model->ceilingheight &&
+            viewz > ffp->model->ceilingheight)
           floorplane->water_darken = 1;
         break;
       }

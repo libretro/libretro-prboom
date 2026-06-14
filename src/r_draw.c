@@ -6949,8 +6949,11 @@ static void R_DrawSpan16_TLA(draw_span_vars_t *dsvars) {
    const fixed_t ystep = dsvars->ystep;
    const uint8_t *source = dsvars->source;
    uint16_t *dest = drawvars.short_topleft + dsvars->y * SCREENWIDTH + dsvars->x1;
-   const uint16_t *lut = R_GetComposedColormap(dsvars->colormap);
    const int a = r_span_wateralpha;
+   /* water keeps its own colour: use the base (undimmed) colormap so the
+    * tint is not distance-darkened into the surrounding murk. */
+   extern const lighttable_t **colormaps;
+   const uint16_t *lut = R_GetComposedColormap(colormaps[0]);
    while (count--) {
       unsigned spot = ((yfrac >> 10) & 0xFC0) | ((xfrac >> 16) & 0x3F);
       uint16_t src = lut[source[spot]];

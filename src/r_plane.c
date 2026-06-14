@@ -73,6 +73,7 @@
 static visplane_t *visplanes[MAXVISPLANES];   // killough
 static visplane_t *freetail;                  // killough
 static visplane_t **freehead = &freetail;     // killough
+#define WATER_TINT_INDEX 200   /* palette index for the water tint (deep blue) */
 visplane_t *floorplane, *ceilingplane;
 /* Per-subsector translucent 3D-floor (swimmable) surface, set in
  * R_Subsector, span-filled in R_RenderSegLoop, drawn after the opaque
@@ -849,6 +850,20 @@ static void R_DoDrawPlane(visplane_t *pl)
             int fnum = flattranslation[pl->picnum];
             dsvars.source = W_CacheLumpNum(firstflat + fnum);
             dsvars.brightmask = U_BrightmaskForFlat(fnum);
+         }
+
+         /* A swimmable water surface whose 3D-floor control sector carries no
+          * real flat (a zero-length F*_START namespace marker -- common, since
+          * ZDoom water gets its look from translucency, not a flat) would
+          * otherwise texture the surface with garbage.  Substitute a solid
+          * water-colour source so the translucent blend reads as water. */
+         if (pl->translucent && pl->wateralpha)
+         {
+            static unsigned char waterbuf[4096];
+            static int wbinit = 0;
+            if (!wbinit) { memset(waterbuf, WATER_TINT_INDEX, sizeof waterbuf); wbinit = 1; }
+            dsvars.source = waterbuf;
+            dsvars.brightmask = NULL;
          }
 
          xoffs = pl->xoffs;  // killough 2/28/98: Add offsets

@@ -1122,6 +1122,45 @@ void R_WaterDarkenSpan(int y, int x1, int x2, int surf_y)
    }
 }
 
+/* Lit blue water-surface band.  band_top is the first row of the visible
+ * water opening and band_h the band height; the strip is brightest at its top
+ * (the lit surface line) and fades to nothing at the bottom, blended over the
+ * already-darkened water beneath.  This draws the flat top of the water (the
+ * surface seen at a grazing angle from below) -- darkening alone only tints
+ * the wall behind the glass, and when the true surface line projects above the
+ * opening the whole view is "deep", so the depth-graded blue never appears;
+ * this band gives the visible waterline regardless. */
+void R_WaterSurfaceBand(int y, int x1, int x2, int band_top, int band_h)
+{
+   uint16_t *dest = drawvars.short_topleft + y * SURFACE_SHORT_PITCH + x1;
+   int n = x2 - x1 + 1;
+   int row = y - band_top;            /* 0 at the surface line */
+   int fade;                          /* strength of the lift, top -> bottom */
+   if (n <= 0 || row < 0 || row >= band_h) return;
+   fade = 10 - (row * 10) / band_h;   /* 10 at top -> 0 at band bottom */
+   if (fade <= 0) return;
+   while (n-- > 0)
+   {
+      uint16_t d = *dest;
+      int r = (d >> 11) & 0x1F;
+      int g = (d >> 5)  & 0x3F;
+      int b =  d        & 0x1F;
+      /* Lift toward a desaturated lit blue-grey caustic (not a pure-blue
+       * wash): blue rises most, green a little, red a touch, scaled by the
+       * row fade, so the surface reads as lit water rather than paint. */
+      b += (fade * (28 - b)) >> 5;
+      g += (fade * (20 - g)) >> 6;
+      r += (fade * (10 - r)) >> 6;
+      if (b > 31) b = 31;
+      if (b < 0)  b = 0;
+      if (g > 63) g = 63;
+      if (g < 0)  g = 0;
+      if (r > 31) r = 31;
+      if (r < 0)  r = 0;
+      *dest++ = (uint16_t)((r << 11) | (g << 5) | b);
+   }
+}
+
 /* Per-column (vertical) darken, used by the floor post-pass where spans are
  * naturally columnar.  LUT-driven; strided, so not the hot path. */
 void R_WaterDarkenColumn(int x, int yl, int yh, int surf_y)

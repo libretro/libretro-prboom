@@ -340,8 +340,22 @@ static void createPatch(int id) {
 
       // fill in the post's pixels
       oldColumnPixelData = (const uint8_t *)oldColumn + 3;
-      for (y=0; y<oldColumn->length; y++) {
-        patch->pixels[x * patch->height + top + y] = oldColumnPixelData[y];
+      {
+        /* DeePsea tall patches accumulate topdelta, so a post's top (and a
+         * deliberately overlong or malformed post's length) can run past the
+         * patch height.  Each column owns exactly patch->height pixel slots, so
+         * writing top+y >= height spills into the next column's pixels and
+         * renders as torn vertical garbage (e.g. ZDCMP2's CRIP seaweed sprite,
+         * which the map author flagged as not displaying in software mode).
+         * Clamp the copy to the column. */
+        int copylen = oldColumn->length;
+        if (top >= patch->height)
+          copylen = 0;
+        else if (top + copylen > patch->height)
+          copylen = patch->height - top;
+        for (y=0; y<copylen; y++) {
+          patch->pixels[x * patch->height + top + y] = oldColumnPixelData[y];
+        }
       }
 
       oldColumn = (const column_t *)((const uint8_t *)oldColumn + oldColumn->length + 4);

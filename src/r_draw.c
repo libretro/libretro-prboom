@@ -6903,6 +6903,7 @@ static void R_DrawSpan16_TL(draw_span_vars_t *dsvars)
 
 /* Set by the plane drawer around a translucent 3D-floor surface pass. */
 int r_span_translucent = 0;
+int r_span_wateralpha  = 0;   /* 0 = 50/50 (R_DrawSpan16_TL); 1..32 = LERP weight */
 
 static R_DrawSpan_f drawspanfuncs[RDRAW_FILTER_MAXFILTERS][RDRAW_FILTER_MAXFILTERS] = {
     {
@@ -6940,9 +6941,32 @@ R_DrawSpan_f R_GetDrawSpanFunc(enum draw_filter_type_e filter,
   return result;
 }
 
+static void R_DrawSpan16_TLA(draw_span_vars_t *dsvars) {
+   unsigned count = dsvars->x2 - dsvars->x1 + 1;
+   fixed_t xfrac = dsvars->xfrac;
+   fixed_t yfrac = dsvars->yfrac;
+   const fixed_t xstep = dsvars->xstep;
+   const fixed_t ystep = dsvars->ystep;
+   const uint8_t *source = dsvars->source;
+   uint16_t *dest = drawvars.short_topleft + dsvars->y * SCREENWIDTH + dsvars->x1;
+   const uint16_t *lut = R_GetComposedColormap(dsvars->colormap);
+   const int a = r_span_wateralpha;
+   while (count--) {
+      unsigned spot = ((yfrac >> 10) & 0xFC0) | ((xfrac >> 16) & 0x3F);
+      uint16_t src = lut[source[spot]];
+      *dest = LERP565A(src, *dest, a);
+      dest++;
+      xfrac += xstep;
+      yfrac += ystep;
+   }
+}
+
 void R_DrawSpan(draw_span_vars_t *dsvars) {
   if (r_span_translucent) {
-    R_DrawSpan16_TL(dsvars);
+    if (r_span_wateralpha)
+      R_DrawSpan16_TLA(dsvars);
+    else
+      R_DrawSpan16_TL(dsvars);
     return;
   }
   R_GetDrawSpanFunc(drawvars.filterfloor, drawvars.filterz)(dsvars);

@@ -498,7 +498,8 @@ typedef struct visplane
   const secplane_t *slope;      /* tilted plane (NULL = horizontal) */
   fixed_t xoffs, yoffs;         // killough 2/28/98: Support scrolling flats
   byte modified;              // set when a seg actually writes a span here
-  byte translucent;           // 3D-floor water surface: blend 50/50 on draw
+  byte translucent;           // 3D-floor water surface: blend on draw
+  byte wateralpha;            // 0 = legacy 50/50; else blend weight 1..32
   unsigned int pad1;          // leave pads for [minx-1]/[maxx+1]
   unsigned int top[MAX_SCREENWIDTH];
   unsigned int pad2, pad3;    // killough 2/8/98, 4/25/98

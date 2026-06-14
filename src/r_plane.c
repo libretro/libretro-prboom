@@ -544,7 +544,7 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
  * floor), so it is allocated fresh; a swimmable sector has at most one per
  * subsector, span-extended across that subsector's segs by R_CheckPlane.
  */
-visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel)
+visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel, int wateralpha)
 {
    visplane_t *check = new_visplane(visplane_hash(picnum, lightlevel, height));
 
@@ -558,6 +558,7 @@ visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel)
    check->slope = NULL;
    check->modified = 0;
    check->translucent = 1;
+   check->wateralpha = (byte)wateralpha;
 
    memset (check->top, 0xff, sizeof check->top);
 
@@ -872,13 +873,17 @@ static void R_DoDrawPlane(visplane_t *pl)
             tilt_plane = NULL;
 
          if (pl->translucent)
+         {
             r_span_translucent = 1;
+            r_span_wateralpha  = pl->wateralpha;   /* 0 = 50/50, else LERP weight */
+         }
 
          for (x = pl->minx ; x <= stop ; x++)
             R_MakeSpans(x,pl->top[x-1],pl->bottom[x-1],
                   pl->top[x],pl->bottom[x], &dsvars);
 
          r_span_translucent = 0;
+         r_span_wateralpha  = 0;
 
          tilt_plane = NULL;
 

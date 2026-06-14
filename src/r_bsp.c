@@ -644,9 +644,14 @@ static void R_Subsector(int num)
          * water only, lowest above-eye surface. */
         if (ff->type == FFLOOR_SWIMMABLE &&
             (!waterceil || wtop < waterceil->height))
+        {
+          int wa = (ff->alpha * 32 + 127) / 255;   /* 0..255 -> 0..32 */
+          if (wa < 1)  wa = 1;
+          if (wa > 32) wa = 32;
           waterceil = R_FindWaterPlane(wtop,
                                        ff->model->ceilingpic,
-                                       ff->model->lightlevel);
+                                       ff->model->lightlevel, wa);
+        }
         continue;
       }
       if (ncand < MAXMOREWATER + 1)
@@ -666,11 +671,11 @@ static void R_Subsector(int num)
     {
       waterplane = R_FindWaterPlane(candh[0],
                                     cand[0]->model->floorpic,
-                                    cand[0]->model->lightlevel);
+                                    cand[0]->model->lightlevel, 0);
       for (j = 1; j < ncand; j++)
         morewater[nmorewater++] = R_FindWaterPlane(candh[j],
                                     cand[j]->model->floorpic,
-                                    cand[j]->model->lightlevel);
+                                    cand[j]->model->lightlevel, 0);
     }
   }
 

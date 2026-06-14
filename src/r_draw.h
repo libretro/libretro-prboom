@@ -171,6 +171,7 @@ void R_DrawSpan(draw_span_vars_t *dsvars);
 /* When nonzero, R_DrawSpan blends its output 50/50 against the framebuffer
  * instead of overwriting it; set around a translucent 3D-floor surface. */
 extern int r_span_translucent;
+extern int r_span_wateralpha;
 
 /* Underwater tint: mean colour of a flat, and a 50/50 blend of the whole 3D
  * view toward a colour (applied when the camera is inside a 3D-floor water

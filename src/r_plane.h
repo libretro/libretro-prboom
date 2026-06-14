@@ -59,6 +59,6 @@ visplane_t *R_FindPlane(
 
 visplane_t *R_CheckPlane(visplane_t *pl, int start, int stop);
 visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop);
-visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel);
+visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel, int wateralpha);
 
 #endif

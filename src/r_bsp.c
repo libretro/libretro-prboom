@@ -658,11 +658,8 @@ static void R_Subsector(int num)
       wtop = ff->model->ceilingheight;        /* slab/water surface height */
       if (ff->model->floorheight >= wtop)
         continue;
-      /* draw the water surface whether the eye is above it (looking down at
-       * the top) or below it (looking up at the underside): both show the
-       * water flat.  The below-surface case is what makes the surface visible
-       * when standing in a flooded room -- without it the opening is only the
-       * dark volume with no waterline. */
+      if (wtop > viewz)                        /* only above-surface case */
+        continue;
       if (ncand < MAXMOREWATER + 1)
       {
         for (i = ncand; i > 0 && candh[i - 1] < wtop; i--)

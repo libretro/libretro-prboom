@@ -1125,6 +1125,38 @@ void R_WaterDarkenSpan(int y, int x1, int x2, int surf_y)
 
 /* Per-column (vertical) darken, used by the floor post-pass where spans are
  * naturally columnar.  LUT-driven; strided, so not the hot path. */
+/* Blue-grey caustic lift for the water-surface plane.  The translucent water
+ * flat blended 50/50 over the dark volume reads too dim, so brighten + blue-
+ * tint its column span: brightest at the surface line (bandtop), easing to a
+ * gentle floor in the depths, so the water level reads as lit water rather
+ * than a near-black void while the depths stay dark-blue. */
+void R_WaterSurfaceLift(int x, int y0, int y1, int bandtop)
+{
+   uint16_t *dest = drawvars.short_topleft + y0 * SURFACE_SHORT_PITCH + x;
+   int span = y1 - bandtop + 1;
+   int y;
+   if (span < 1) span = 1;
+   for (y = y0; y <= y1; y++, dest += SURFACE_SHORT_PITCH)
+   {
+      uint16_t d = *dest;
+      int r = (d >> 11) & 0x1F, g = (d >> 5) & 0x3F, b = d & 0x1F;
+      int row  = y - bandtop;            /* 0 at the waterline */
+      int fade = 14 - (row * 9) / span;  /* bright at line -> gentle floor */
+      if (fade < 4)
+         fade = 4;
+      b += (fade * (31 - b)) >> 5;
+      g += (fade * (26 - g)) >> 6;
+      r += (fade * (8  - r)) >> 6;
+      if (b > 31) b = 31;
+      if (b < 0)  b = 0;
+      if (g > 63) g = 63;
+      if (g < 0)  g = 0;
+      if (r > 31) r = 31;
+      if (r < 0)  r = 0;
+      *dest = (uint16_t)((r << 11) | (g << 5) | b);
+   }
+}
+
 void R_WaterDarkenColumn(int x, int yl, int yh, int surf_y)
 {
    uint16_t *dest = drawvars.short_topleft + yl * SURFACE_SHORT_PITCH + x;

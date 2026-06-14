@@ -879,6 +879,24 @@ static void R_DoDrawPlane(visplane_t *pl)
 
          r_span_translucent = 0;
 
+         /* The translucent water flat blended 50/50 over the dark volume reads
+          * too dim; lift the water-surface span toward a blue-grey caustic so
+          * the water level is clearly visible -- brightest at the surface line,
+          * easing to a gentle blue floor in the depths.  Uses the plane's own
+          * per-column span, so the lit surface is consistent across the whole
+          * opening (no per-wall-seg approximation). */
+         if (pl->translucent)
+         {
+            extern void R_WaterSurfaceLift(int x, int y0, int y1, int bandtop);
+            int xx;
+            for (xx = pl->minx; xx <= stop; xx++)
+            {
+               unsigned t = pl->top[xx], b = pl->bottom[xx];
+               if (t > b || b == 0xffffffffu) continue;
+               R_WaterSurfaceLift(xx, (int)t, (int)b, (int)t);
+            }
+         }
+
          /* Submerged floor of a flooded sector: darken its pixels toward the
           * deep-water tone so it matches the wall volume darkened in
           * R_RenderMaskedSegRange (surf_y well above the span -> deep curve). */

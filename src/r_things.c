@@ -904,6 +904,17 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
 
    xscale = FixedDiv(projectionx, tz);
 
+   /* DECORATE Scale: multiply the projected sprite size by the actor's scale.
+    * xscale drives the horizontal extent (x1/x2 below) and is mirrored into
+    * vis->scale for the vertical, so scaling it here shrinks the billboard
+    * uniformly and makes the per-column texture step (iscale) coarser -- which
+    * is exactly what stops an oversized native sprite from smearing.  A zero
+    * (vanilla) or FRACUNIT scale leaves xscale untouched, so vanilla and
+    * unscaled actors are bit-exact. */
+   if (thing->info && thing->info->spritescale > 0 &&
+       thing->info->spritescale != FRACUNIT)
+      xscale = FixedMul(xscale, thing->info->spritescale);
+
    // Do not attempt to render special TNT1 invisible sprite
    if (thing->sprite == SPR_TNT1) return;
 
@@ -1088,6 +1099,12 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    }
    // proff 11/06/98: Changed for high-res
    vis->scale = FixedDiv(projectiony, tz);
+   /* DECORATE Scale: match the vertical projection to the horizontal xscale
+    * adjustment above so the sprite scales uniformly (vis->scale feeds
+    * spryscale/iscale/texturemid in R_DrawVisSprite). */
+   if (thing->info && thing->info->spritescale > 0 &&
+       thing->info->spritescale != FRACUNIT)
+      vis->scale = FixedMul(vis->scale, thing->info->spritescale);
    vis->gx = fx;
    vis->gy = fy;
    vis->gz = fz;

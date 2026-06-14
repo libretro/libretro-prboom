@@ -6622,6 +6622,11 @@ typedef struct
    * used only when render_style != 0. */
   int render_style;
   int render_alpha;
+  /* DECORATE Scale: 16.16 sprite scale multiplier.  Appended last so the
+   * positional mobjinfo_seed[] initializers leave it zero for every vanilla
+   * type; the sprite projection treats 0 (and FRACUNIT) as "no scaling" and
+   * renders bit-exact, so only DECORATE actors that set Scale are affected. */
+  int spritescale;
 } mobjinfo_t;
 
 /* MBF21 thing-group default sentinels.  User-supplied group numbers are

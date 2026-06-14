@@ -141,6 +141,7 @@ typedef struct
   int  translucent;             /* RenderStyle Translucent / Add          */
   int  additive;                /* 1 = RenderStyle Add (additive blend)   */
   int  alpha;                   /* 16.16 alpha, FRACUNIT if unset         */
+  int  scale;                   /* 16.16 sprite scale, FRACUNIT if unset   */
   int  damage;                  /* DECORATE Damage property (default 0)    */
   char seesound[32];            /* DECORATE sound properties (empty if   */
   char painsound[32];           /* unset; override the cloned base sounds) */
@@ -1422,6 +1423,7 @@ static void parse_header(const char *p, const char *end)
   a->radius = a->height = -1;
   a->health = a->speed = a->painchance = a->mass = a->meleedamage = -1;
   a->alpha = FRACUNIT;
+  a->scale = FRACUNIT;
   a->wpn_slot = -1;
   a->xlat_id = -1;
 
@@ -2082,6 +2084,34 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       p = skip_space(p, end);
       p = read_word(p, end, word, sizeof(word));
       a->meleedamage = atoi(word);
+    }
+    else if (!strcasecmp(word, "Scale"))
+    {
+      /* "Scale N.N": a uniform sprite scale multiplier (ZDoom default 1.0).
+       * Parse the decimal into 16.16 fixed point without floating point so
+       * the C89/MSVC build stays clean.  The renderer multiplies the sprite's
+       * projected size by this, so 0.5 draws a sprite at half size -- ZDCMP2's
+       * vegetation props (seaweed at 0.5, palms) rely on it; without it their
+       * oversized art smears across the view.  Values <= 0 are ignored. */
+      int whole = 0, frac = 0, fdiv = 1, seen = 0;
+      p = skip_space(p, end);
+      p = read_word(p, end, word, sizeof(word));
+      {
+        const char *q = word;
+        while (*q >= '0' && *q <= '9') { whole = whole * 10 + (*q - '0'); q++; seen = 1; }
+        if (*q == '.')
+        {
+          q++;
+          while (*q >= '0' && *q <= '9' && fdiv < 100000)
+          { frac = frac * 10 + (*q - '0'); fdiv *= 10; q++; seen = 1; }
+        }
+      }
+      if (seen)
+      {
+        int v = whole * FRACUNIT + (fdiv > 1 ? (frac * FRACUNIT) / fdiv : 0);
+        if (v > 0)
+          a->scale = v;
+      }
     }
     else if (!strcasecmp(word, "Monster"))
       a->is_monster = 1;
@@ -3548,6 +3578,11 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
 static void decorate_set_render_style(mobjinfo_t *info, const decorate_actor_t *a)
 {
   int w;
+  /* Sprite scale is independent of translucency, so carry it before the
+   * opaque early-out: an opaque Scale 0.5 prop (ZDCMP2 seaweed/palms) still
+   * needs it.  Only a non-default scale is stored; FRACUNIT and the vanilla
+   * zero both mean "draw at native size". */
+  info->spritescale = (a->scale > 0 && a->scale != FRACUNIT) ? a->scale : 0;
   if (!a->translucent && a->alpha >= FRACUNIT)
   {
     info->render_style = 0;

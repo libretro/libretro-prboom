@@ -1187,6 +1187,11 @@ static const struct { const char *name; int dn; } base_classes[] =
   { "FlemoidusCycloptisCommonus", 3002 },
   { "Flembrane",                  3003 },
   { "ChexSoul",                   3006 },
+  /* stock decorations a mod subclasses with a new editor number but no states
+   * of its own (it inherits the vanilla sprite/frames): alias to the vanilla
+   * doomednum so the prop renders rather than spawning as "Unknown Thing".
+   * EvilEyeStatic : EvilEye in this map is one such. */
+  { "EvilEye",                    41   },
   { NULL, 0 }
 };
 
@@ -4522,6 +4527,7 @@ dbool U_IsInertZDoomThing(int doomednum)
          doomednum == 9025 ||                         /* security camera */
          doomednum == 9026 ||                         /* spark */
          (doomednum >= 9080 && doomednum <= 9082) ||  /* sky viewpoint/picker/silencer */
+         (doomednum >= 9500 && doomednum <= 9511) ||  /* sky/stack/portal compat markers */
          (doomednum >= 9800 && doomednum <= 9859) ||  /* GZDoom dynamic lights */
          (doomednum >= 14001 && doomednum <= 14067) ||/* ambient sounds */
          (doomednum >= 1400 && doomednum <= 1410);    /* sound sequence overrides */

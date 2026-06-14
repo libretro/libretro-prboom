@@ -611,7 +611,6 @@ static void R_Subsector(int num)
    * R_RenderSegLoop and it is drawn after the opaque planes.  waterplane is
    * reset every subsector so a stale plane never leaks into an ordinary one. */
   waterplane = NULL;
-  waterceil = NULL;
   nmorewater = 0;
   if (frontsector->ffloors)
   {
@@ -634,26 +633,8 @@ static void R_Subsector(int num)
       wtop = ff->model->ceilingheight;        /* slab/water surface height */
       if (ff->model->floorheight >= wtop)
         continue;
-      if (wtop > viewz)
-      {
-        /* Water surface above the eye (looking up/across at it from below):
-         * a translucent horizontal plane above the viewer, so render it like a
-         * translucent ceiling at the surface height -- it projects with proper
-         * perspective and covers only the band it actually occupies (the old
-         * span model wrongly tinted the whole opening).  Genuine swimmable
-         * water only, lowest above-eye surface. */
-        if (ff->type == FFLOOR_SWIMMABLE &&
-            (!waterceil || wtop < waterceil->height))
-        {
-          int wa = (ff->alpha * 32 + 127) / 255;   /* 0..255 -> 0..32 */
-          if (wa < 1)  wa = 1;
-          if (wa > 32) wa = 32;
-          waterceil = R_FindWaterPlane(wtop,
-                                       ff->model->ceilingpic,
-                                       ff->model->lightlevel, wa);
-        }
+      if (wtop > viewz)                        /* only above-surface case */
         continue;
-      }
       if (ncand < MAXMOREWATER + 1)
       {
         for (i = ncand; i > 0 && candh[i - 1] < wtop; i--)
@@ -671,11 +652,11 @@ static void R_Subsector(int num)
     {
       waterplane = R_FindWaterPlane(candh[0],
                                     cand[0]->model->floorpic,
-                                    cand[0]->model->lightlevel, 0);
+                                    cand[0]->model->lightlevel);
       for (j = 1; j < ncand; j++)
         morewater[nmorewater++] = R_FindWaterPlane(candh[j],
                                     cand[j]->model->floorpic,
-                                    cand[j]->model->lightlevel, 0);
+                                    cand[j]->model->lightlevel);
     }
   }
 

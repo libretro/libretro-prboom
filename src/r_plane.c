@@ -73,14 +73,12 @@
 static visplane_t *visplanes[MAXVISPLANES];   // killough
 static visplane_t *freetail;                  // killough
 static visplane_t **freehead = &freetail;     // killough
-#define WATER_TINT_INDEX 200   /* palette index for the water tint (deep blue) */
 visplane_t *floorplane, *ceilingplane;
 /* Per-subsector translucent 3D-floor (swimmable) surface, set in
  * R_Subsector, span-filled in R_RenderSegLoop, drawn after the opaque
  * planes in R_DrawPlanes.  NULL except in a swimmable sector viewed from
  * above its water surface. */
 visplane_t *waterplane;
-visplane_t *waterceil;  /* above-eye swimmable surface, ceiling-projected */
 visplane_t *morewater[MAXMOREWATER];
 int nmorewater;
 
@@ -545,7 +543,7 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
  * floor), so it is allocated fresh; a swimmable sector has at most one per
  * subsector, span-extended across that subsector's segs by R_CheckPlane.
  */
-visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel, int wateralpha)
+visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel)
 {
    visplane_t *check = new_visplane(visplane_hash(picnum, lightlevel, height));
 
@@ -559,7 +557,6 @@ visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel, int wat
    check->slope = NULL;
    check->modified = 0;
    check->translucent = 1;
-   check->wateralpha = (byte)wateralpha;
 
    memset (check->top, 0xff, sizeof check->top);
 
@@ -852,20 +849,6 @@ static void R_DoDrawPlane(visplane_t *pl)
             dsvars.brightmask = U_BrightmaskForFlat(fnum);
          }
 
-         /* A swimmable water surface whose 3D-floor control sector carries no
-          * real flat (a zero-length F*_START namespace marker -- common, since
-          * ZDoom water gets its look from translucency, not a flat) would
-          * otherwise texture the surface with garbage.  Substitute a solid
-          * water-colour source so the translucent blend reads as water. */
-         if (pl->translucent && pl->wateralpha)
-         {
-            static unsigned char waterbuf[4096];
-            static int wbinit = 0;
-            if (!wbinit) { memset(waterbuf, WATER_TINT_INDEX, sizeof waterbuf); wbinit = 1; }
-            dsvars.source = waterbuf;
-            dsvars.brightmask = NULL;
-         }
-
          xoffs = pl->xoffs;  // killough 2/28/98: Add offsets
          yoffs = pl->yoffs;
          planeheight = D_abs(pl->height-viewz);
@@ -888,17 +871,13 @@ static void R_DoDrawPlane(visplane_t *pl)
             tilt_plane = NULL;
 
          if (pl->translucent)
-         {
             r_span_translucent = 1;
-            r_span_wateralpha  = pl->wateralpha;   /* 0 = 50/50, else LERP weight */
-         }
 
          for (x = pl->minx ; x <= stop ; x++)
             R_MakeSpans(x,pl->top[x-1],pl->bottom[x-1],
                   pl->top[x],pl->bottom[x], &dsvars);
 
          r_span_translucent = 0;
-         r_span_wateralpha  = 0;
 
          tilt_plane = NULL;
 

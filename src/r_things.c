@@ -538,6 +538,14 @@ void R_DrawMaskedColumn(
     if (dcvars->yl <= mceilingclip[dcvars->x])
       dcvars->yl = mceilingclip[dcvars->x]+1;
 
+    /* mceilingclip's default sentinel is -1, so a sprite whose top projects
+     * above the viewport (a tall or oversized sprite) can leave yl negative.
+     * The column drawers index the temp buffer and the framebuffer by yl, so a
+     * negative yl reads/writes before those buffers -- a torn strip of
+     * framebuffer garbage.  Clamp to the top of the screen. */
+    if (dcvars->yl < 0)
+      dcvars->yl = 0;
+
     // killough 3/2/98, 3/27/98: Failsafe against overflow/crash:
     if (dcvars->yl <= dcvars->yh && dcvars->yh < viewheight)
     {
@@ -602,6 +610,16 @@ static void R_DrawMaskedColumnDirect(const rpatch_t *patch,
       yh = mfloorclip[x] - 1;
     if (yl <= mceilingclip[x])
       yl = mceilingclip[x] + 1;
+    /* mceilingclip's default sentinel is -1, so the clamp above can leave yl
+     * negative for a sprite whose top projects above the viewport (e.g. a tall
+     * or oversized sprite).  The destination pointer and run length below are
+     * derived from yl, so a negative yl writes the column into memory before
+     * the surface -- a torn strip of framebuffer garbage.  The canonical
+     * R_DrawMaskedColumn path relies on the column drawer clamping this; the
+     * direct path inlines the write, so clamp here too.  frac is recomputed
+     * from the clamped yl below, keeping the texture sample aligned. */
+    if (yl < 0)
+      yl = 0;
 
     if (yl <= yh && yh < viewheight)
     {

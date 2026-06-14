@@ -2526,6 +2526,9 @@ int ZACS_ConversationSelfTest(void)
     acs_st_fail += P_UseReachSelfTest();
   }
 
+  /* Runtime palette translations (StartTranslation/TranslationRange/...). */
+  acs_st_fail += ZACS_XlatSelfTest();
+
   lprintf(acs_st_fail ? LO_ERROR : LO_INFO,
           "ACS-SELFTEST: %d failure(s)\n", acs_st_fail);
   return acs_st_fail;
@@ -3325,6 +3328,161 @@ void Z_ACSHudDrawer(void)
     }   /* order loop */
   }     /* pass loop */
 }
+
+/* ======================================================================== */
+/* runtime palette translations (ACS StartTranslation/TranslationRange/...)  */
+/* ======================================================================== */
+/* ZDoom lets a script build a palette remap at runtime and assign it to an
+ * actor (SetActorProperty APROP_Translation).  StartTranslation(id) opens a
+ * build slot, one or more TranslationRange* opcodes paint remap ranges into
+ * it, and EndTranslation finalises it.  The renderer already honours an actor's
+ * 256-byte translation table via mobj_t.translation / vis->xlat, so a built
+ * table just needs storing and pointing the actor at it.  Tables are keyed by
+ * the small ACS translation id (ZDoom translations start at a base; we accept
+ * any non-negative id and map it into a fixed bank). */
+#define ZACS_MAX_XLATS 32
+static uint8_t zacs_xlats[ZACS_MAX_XLATS][256];
+static int     zacs_xlat_used[ZACS_MAX_XLATS];   /* slot has been finalised */
+static int     zacs_xlat_build = -1;             /* slot being built, or -1 */
+
+/* Map an ACS translation id to a bank slot, or -1 if it cannot be held. */
+static int zacs_xlat_slot(int id)
+{
+  if (id < 0 || id >= ZACS_MAX_XLATS)
+    return -1;
+  return id;
+}
+
+/* StartTranslation(id): open a build slot, initialised to identity. */
+static void zacs_xlat_start(int id)
+{
+  int s = zacs_xlat_slot(id);
+  int k;
+  zacs_xlat_build = s;
+  if (s < 0)
+    return;
+  for (k = 0; k < 256; k++)
+    zacs_xlats[s][k] = (uint8_t)k;
+  zacs_xlat_used[s] = 0;
+}
+
+/* TranslationRange1(start,end,pal1,pal2): remap palette range [start,end]
+ * onto palette range [pal1,pal2], interpolating across the span. */
+static void zacs_xlat_range_pal(int start, int end, int pal1, int pal2)
+{
+  int s = zacs_xlat_build;
+  int span, i;
+  if (s < 0)
+    return;
+  start &= 0xff; end &= 0xff; pal1 &= 0xff; pal2 &= 0xff;
+  span = end - start;
+  if (span < 0) span = -span;
+  for (i = 0; i <= span; i++)
+  {
+    int src = (end >= start) ? (start + i) : (start - i);
+    int dst = (span == 0) ? pal1
+                          : pal1 + (int)((long)(pal2 - pal1) * i / span);
+    if (dst < 0) dst = 0; else if (dst > 255) dst = 255;
+    zacs_xlats[s][src & 0xff] = (uint8_t)dst;
+  }
+}
+
+/* Nearest base-PLAYPAL index for an RGB triple, for the RGB gradient range. */
+static int zacs_xlat_best_rgb(int r, int g, int b)
+{
+  static const byte *pal;
+  static int haspal;
+  int i, best = 0;
+  long bestd = 0x7fffffffL;
+  if (!haspal)
+  {
+    int l = (W_CheckNumForName)("PLAYPAL", ns_global);
+    pal = (l >= 0) ? (const byte *)W_CacheLumpNum(l) : NULL;
+    haspal = 1;
+  }
+  if (!pal)
+    return 0;
+  for (i = 0; i < 256; i++)
+  {
+    int dr = (int)pal[i * 3 + 0] - r;
+    int dg = (int)pal[i * 3 + 1] - g;
+    int db = (int)pal[i * 3 + 2] - b;
+    long d = (long)dr * dr + (long)dg * dg + (long)db * db;
+    if (d < bestd) { bestd = d; best = i; }
+  }
+  return best;
+}
+
+/* TranslationRange2(start,end,r1,g1,b1,r2,g2,b2): remap [start,end] onto an
+ * RGB gradient, each step resolved to its nearest base-palette index. */
+static void zacs_xlat_range_rgb(int start, int end,
+                                int r1, int g1, int b1,
+                                int r2, int g2, int b2)
+{
+  int s = zacs_xlat_build;
+  int span, i;
+  if (s < 0)
+    return;
+  start &= 0xff; end &= 0xff;
+  span = end - start;
+  if (span < 0) span = -span;
+  for (i = 0; i <= span; i++)
+  {
+    int src = (end >= start) ? (start + i) : (start - i);
+    int r = (span == 0) ? r1 : r1 + (int)((long)(r2 - r1) * i / span);
+    int g = (span == 0) ? g1 : g1 + (int)((long)(g2 - g1) * i / span);
+    int b = (span == 0) ? b1 : b1 + (int)((long)(b2 - b1) * i / span);
+    zacs_xlats[s][src & 0xff] = (uint8_t)zacs_xlat_best_rgb(r, g, b);
+  }
+}
+
+/* EndTranslation: finalise the open slot. */
+static void zacs_xlat_end(void)
+{
+  if (zacs_xlat_build >= 0)
+    zacs_xlat_used[zacs_xlat_build] = 1;
+  zacs_xlat_build = -1;
+}
+
+/* The finalised table for an ACS translation id, or NULL if none. */
+static const uint8_t *zacs_xlat_table(int id)
+{
+  int s = zacs_xlat_slot(id);
+  if (s < 0 || !zacs_xlat_used[s])
+    return NULL;
+  return zacs_xlats[s];
+}
+
+#ifdef ACS_SELFTEST
+/* Regression check for the runtime palette-translation builder: a
+ * StartTranslation / TranslationRange1 / EndTranslation sequence must produce
+ * an interpolated palette remap addressable by its id, leave indices outside
+ * the painted range as identity, and report NULL for an id never built. */
+int ZACS_XlatSelfTest(void);
+int ZACS_XlatSelfTest(void)
+{
+  int fail = 0;
+  const uint8_t *t;
+
+  zacs_xlat_start(5);
+  zacs_xlat_range_pal(112, 127, 96, 111);
+  zacs_xlat_end();
+  t = zacs_xlat_table(5);
+  if (!t || t[112] != 96 || t[127] != 111 || t[120] != 104)
+  { fail++; lprintf(LO_ERROR, "ACS-SELFTEST FAIL: TranslationRange1 must remap the painted range\n"); }
+  else lprintf(LO_INFO, "ACS-SELFTEST ok:   TranslationRange1 remaps the painted range\n");
+
+  if (!t || t[0] != 0 || t[200] != 200)
+  { fail++; lprintf(LO_ERROR, "ACS-SELFTEST FAIL: translation must leave unpainted indices identity\n"); }
+  else lprintf(LO_INFO, "ACS-SELFTEST ok:   translation leaves unpainted indices identity\n");
+
+  if (zacs_xlat_table(9) != NULL)
+  { fail++; lprintf(LO_ERROR, "ACS-SELFTEST FAIL: an unbuilt translation id must be NULL\n"); }
+  else lprintf(LO_INFO, "ACS-SELFTEST ok:   an unbuilt translation id is NULL\n");
+
+  return fail;
+}
+#endif /* ACS_SELFTEST */
 
 /* ======================================================================== */
 /* the interpreter                                                           */
@@ -4972,6 +5130,15 @@ static void T_ZACSThinker(zacs_inst_t *inst)
                                                       * 16.16 fixed -> BAM */
             mo->angle = (angle_t)(((uint64_t)(uint32_t)val << 16) / 360);
             break;
+          case 22:                                   /* APROP_Translation */
+          {
+            /* Assign a runtime translation built by StartTranslation, or
+             * clear it for id 0 (no translation).  The renderer reads
+             * mo->translation; an unbuilt id leaves the actor untranslated. */
+            const uint8_t *t = (val != 0) ? zacs_xlat_table(val) : NULL;
+            mo->translation = t;
+            break;
+          }
           default:
             zacs_warn_pcd(pcd);
             break;
@@ -5222,13 +5389,23 @@ static void T_ZACSThinker(zacs_inst_t *inst)
       break;
     }
     case PCD_SETMUGSHOTSTATE:   ZDROP(1); break;
-    case PCD_STARTTRANSLATION:  ZDROP(1); zacs_warn_pcd(pcd); break;
-    case PCD_TRANSLATIONRANGE1: ZDROP(4); break;
-    case PCD_TRANSLATIONRANGE2: ZDROP(8); break;
+    case PCD_STARTTRANSLATION:  zacs_xlat_start(ZSTK(1)); ZDROP(1); break;
+    case PCD_TRANSLATIONRANGE1:
+      /* args top-down: pal2(1), pal1(2), end(3), start(4) */
+      zacs_xlat_range_pal(ZSTK(4), ZSTK(3), ZSTK(2), ZSTK(1));
+      ZDROP(4);
+      break;
+    case PCD_TRANSLATIONRANGE2:
+      /* args top-down: b2,g2,r2,b1,g1,r1,end,start */
+      zacs_xlat_range_rgb(ZSTK(8), ZSTK(7),
+                          ZSTK(6), ZSTK(5), ZSTK(4),
+                          ZSTK(3), ZSTK(2), ZSTK(1));
+      ZDROP(8);
+      break;
     case PCD_TRANSLATIONRANGE3: ZDROP(8); break;
     case PCD_TRANSLATIONRANGE4: ZDROP(5); break;
     case PCD_TRANSLATIONRANGE5: ZDROP(6); break;
-    case PCD_ENDTRANSLATION:    break;
+    case PCD_ENDTRANSLATION:    zacs_xlat_end(); break;
     case PCD_WRITETOINI:        ZDROP(3); zacs_warn_pcd(pcd); break;
     case PCD_GETFROMINI:        ZDROP(2); ZSETSTK(1, 0); zacs_warn_pcd(pcd); break;
     case PCD_SETMARINEWEAPON:   ZDROP(2); zacs_warn_pcd(pcd); break;

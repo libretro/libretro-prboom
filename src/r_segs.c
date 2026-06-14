@@ -103,6 +103,8 @@ static fixed_t  waterfrac;       // 3D-floor water surface screen-y, per column
 static fixed_t  waterstep;
 static fixed_t  wcfrac;          // above-eye water surface (ceiling-projected)
 static fixed_t  wcstep;
+static fixed_t  wcfrac;          // above-eye water surface (ceiling-projected)
+static fixed_t  wcstep;
 static fixed_t  mwfrac[MAXMOREWATER];   // stacked see-through surfaces, per column
 static fixed_t  mwstep[MAXMOREWATER];
 static int      *maskedtexturecol; // dropoff overflow
@@ -711,6 +713,24 @@ static void R_RenderSegLoop (void)
             waterplane->modified = 1;
          }
          waterfrac += waterstep;
+      }
+      /* Above-eye water surface: the submerged volume is below the projected
+       * surface line.  Fill from that line down to the visible floor (the
+       * region seen through the water), clamped into the wall's opening, so the
+       * flooded geometry is tinted and the area above the surface is not. */
+      if (waterceil)
+      {
+         int wctop = wcfrac >> heightbits;
+         int wcbot = bottom;
+         if (wctop < cc_rwx + 1)
+            wctop = cc_rwx + 1;
+         if (wctop <= wcbot)
+         {
+            waterceil->top[rw_x] = wctop;
+            waterceil->bottom[rw_x] = wcbot;
+            waterceil->modified = 1;
+         }
+         wcfrac += wcstep;
       }
       /* Above-eye water surface: a translucent ceiling-like plane.  Covers the
        * opening from the top (ceiling clip) down to its projected surface line;
@@ -1355,6 +1375,12 @@ void R_StoreWallRange(const int start, const int stop)
       wcstep = -FixedMul (rw_scalestep, worldwc);
       wcfrac = (centeryfrac >> invhgtbits) - FixedMul (worldwc, rw_scale);
    }
+   if (waterceil)
+   {
+      int worldwc = (waterceil->height - viewz) >> invhgtbits;
+      wcstep = -FixedMul (rw_scalestep, worldwc);
+      wcfrac = (centeryfrac >> invhgtbits) - FixedMul (worldwc, rw_scale);
+   }
 
    /* same projection for each stacked see-through surface below the topmost */
    {
@@ -1476,6 +1502,8 @@ void R_StoreWallRange(const int start, const int stop)
     * column range in it so R_RenderSegLoop can write the spans. */
    if (waterplane)
       waterplane = R_CheckPlane (waterplane, rw_x, rw_stopx-1);
+   if (waterceil)
+      waterceil = R_CheckPlane (waterceil, rw_x, rw_stopx-1);
    if (waterceil)
       waterceil = R_CheckPlane (waterceil, rw_x, rw_stopx-1);
    {

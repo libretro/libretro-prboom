@@ -1045,9 +1045,18 @@ static void R_BuildWaterLUT(void)
    {
       int keep = 28 - depth;
       int bl;
-      if (keep < 9) keep = 9;
-      bl = (depth < 32) ? (8 - depth/4) : 0;
-      bl += 2;
+      if (keep < 9) keep = 9;          /* deep: dark, not pure black */
+      /* Surface band: a brighter, bluer lit strip right at the waterline
+       * (light entering the surface), widened so it reads as a water
+       * surface rather than a one-pixel line, then falling off into the
+       * dark volume below.  The deep volume keeps only a faint constant
+       * blue so it stays dark blue-grey, not a blue wash. */
+      if (depth < 6)
+         bl = 16;                      /* lit surface line */
+      else if (depth < 56)
+         bl = 16 - ((depth - 6) / 4);  /* falloff over ~50px: 16 -> 4 */
+      else
+         bl = 2;                       /* deep: faint constant blue */
       if (bl < 2) bl = 2;
       water_keep_lut[depth] = (unsigned char)keep;
       water_bl_lut[depth]   = (unsigned char)bl;

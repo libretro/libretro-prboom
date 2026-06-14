@@ -139,6 +139,7 @@ typedef struct
   int  seq_len;                 /* number of frames captured              */
   int  seq_loops;              /* 1 = loop back to frame 0, 0 = stop      */
   int  translucent;             /* RenderStyle Translucent / Add          */
+  int  additive;                /* 1 = RenderStyle Add (additive blend)   */
   int  alpha;                   /* 16.16 alpha, FRACUNIT if unset         */
   int  damage;                  /* DECORATE Damage property (default 0)    */
   char seesound[32];            /* DECORATE sound properties (empty if   */
@@ -2209,6 +2210,8 @@ static void parse_body(decorate_actor_t *a, const char *p, const char *end)
       if (!strcasecmp(rs, "Translucent") || !strcasecmp(rs, "Add") ||
           !strcasecmp(rs, "Stencil")     || !strcasecmp(rs, "Shaded"))
         a->translucent = 1;
+      if (!strcasecmp(rs, "Add"))
+        a->additive = 1;
     }
     else if (!strcasecmp(word, "Alpha"))
     {
@@ -3536,6 +3539,33 @@ static void decorate_build_states(const decorate_actor_t *a, int sp, int base,
   }
 }
 
+/* Translate a DECORATE actor's render style and alpha onto its mobjinfo so the
+ * sprite renderer can blend it.  render_style 2 = additive ("Add"), 1 = any
+ * other translucency, 0 = opaque.  render_alpha is the 0..32 blend weight; an
+ * actor flagged translucent with no explicit Alpha gets a default 2/3 weight,
+ * matching ZDoom's default translucency.  Opaque actors leave both zero, so a
+ * vanilla type (which never calls this) renders unchanged. */
+static void decorate_set_render_style(mobjinfo_t *info, const decorate_actor_t *a)
+{
+  int w;
+  if (!a->translucent && a->alpha >= FRACUNIT)
+  {
+    info->render_style = 0;
+    info->render_alpha = 0;
+    return;
+  }
+  /* alpha*32 in 0..32; an unset alpha (FRACUNIT) on a translucent actor maps
+   * to ~21/32 (about 0.66), ZDoom's default translucent weight. */
+  if (a->alpha < FRACUNIT)
+    w = (int)(((long)a->alpha * 32) / FRACUNIT);
+  else
+    w = 21;
+  if (w < 0)  w = 0;
+  if (w > 32) w = 32;
+  info->render_style = a->additive ? 2 : 1;
+  info->render_alpha = w;
+}
+
 void U_RegisterDecorateThings(void)
 {
   int i, count = 0, count_mt = 0;
@@ -3646,6 +3676,11 @@ void U_RegisterDecorateThings(void)
                                          : 0) |
                         ((a->translucent || a->alpha < FRACUNIT)
                                          ? MF_TRANSLUCENT : 0);
+    /* Carry the DECORATE render style to the sprite renderer.  Additive "Add"
+     * is style 2, any other translucency is style 1; the weight is alpha*32
+     * (0..32).  An actor flagged translucent with no explicit Alpha uses a
+     * mid 2/3 weight, matching ZDoom's default translucency. */
+    decorate_set_render_style(info, a);
 
     /* A DECORATE inventory/pickup actor (a logbook, keycard, ammo token, ...)
      * is collected by touching it, so it must be MF_SPECIAL or the player
@@ -4067,6 +4102,7 @@ static int register_spawnonly_actor(decorate_actor_t *a, int *st_cursor,
                 (a->spawnceiling ? (MF_SPAWNCEILING | MF_NOGRAVITY) : 0) |
                 ((a->translucent || a->alpha < FRACUNIT)
                                  ? MF_TRANSLUCENT : 0);
+  decorate_set_render_style(info, a);
 
   nm = malloc(strlen(a->name) + 1);
   if (nm) { strcpy(nm, a->name); info->actorname = nm; }

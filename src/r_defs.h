@@ -429,6 +429,11 @@ typedef struct vissprite_s
    * translation table built from an actor's Translation property, used in
    * place of the player-flag translations.  NULL for ordinary sprites. */
   const uint8_t *xlat;
+  /* DECORATE render style: 0 = opaque, 1 = translucent (alpha lerp),
+   * 2 = additive ("Add").  alpha is the blend weight 0..32 (= alpha * 32),
+   * used only when translucent != 0.  Both 0 for ordinary/vanilla sprites. */
+  int            translucent;
+  int            alpha;
 } vissprite_t;
 
 //

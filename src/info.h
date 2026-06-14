@@ -6614,6 +6614,14 @@ typedef struct
   int altspeed;          /* speed used on skill 5 / -fast */
   int meleerange;        /* range at which a monster initiates a melee attack */
   int crashstate;        /* Heretic: state entered on hitting the ground while falling */
+  /* DECORATE render style for the sprite.  Appended at the end so the
+   * positional mobjinfo_seed[] initializers leave these zero for every vanilla
+   * type, which means "opaque, no alpha override" and keeps vanilla rendering
+   * bit-exact.  render_style: 0 = normal/opaque, 1 = translucent (alpha lerp),
+   * 2 = additive ("Add").  render_alpha: blend weight 0..32 (= alpha * 32),
+   * used only when render_style != 0. */
+  int render_style;
+  int render_alpha;
 } mobjinfo_t;
 
 /* MBF21 thing-group default sentinels.  User-supplied group numbers are

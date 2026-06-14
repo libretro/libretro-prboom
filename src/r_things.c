@@ -667,6 +667,15 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
    * sprite keeps its lit colormap and the column flushers blend. */
   if (raven && (vis->mobjflags & (MF_SHADOW | MF_ALTSHADOW)) && vis->colormap)
     R_SetSpriteTranslucency((vis->mobjflags & MF_ALTSHADOW) ? 2 : 1);
+  /* DECORATE render style: an actor with RenderStyle Add (vis->translucent==2)
+   * blends additively, any other translucency (==1) alpha-lerps; the weight is
+   * vis->alpha (0..32).  Modes 3/4 are the per-alpha additive/lerp flushers.
+   * The raven shadow path above takes precedence (it has set its own mode). */
+  else if (vis->translucent && vis->colormap)
+  {
+    R_SetSpriteTranslucency(vis->translucent == 2 ? 3 : 4);
+    R_SetTransAlpha(vis->alpha);
+  }
 
   // killough 4/11/98: rearrange and handle translucent sprites
   // mixed with translucent/non-translucenct 2s normals
@@ -719,6 +728,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
     if ((run_cls == 1 || run_cls == 2) &&
         !sprmask &&
         dcvars.edgetype != RDRAW_MASKEDCOLUMNEDGE_SLOPED &&
+        !vis->translucent &&
         !(raven && (vis->mobjflags & (MF_SHADOW | MF_ALTSHADOW)) &&
           vis->colormap))
     {
@@ -1044,6 +1054,20 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
 
    vis->mobjflags = thing->flags;
    vis->xlat      = thing->translation;   /* DECORATE custom colour remap */
+   /* DECORATE render style: carry the actor's translucency/additive style and
+    * alpha weight onto the vissprite so R_DrawVisSprite can blend it.  Opaque
+    * actors (every vanilla type) set these to 0 and draw unchanged.  The slot
+    * is reused between frames, so this is assigned unconditionally. */
+   if (thing->info)
+   {
+      vis->translucent = thing->info->render_style;
+      vis->alpha       = (unsigned char)thing->info->render_alpha;
+   }
+   else
+   {
+      vis->translucent = 0;
+      vis->alpha       = 0;
+   }
    // proff 11/06/98: Changed for high-res
    vis->scale = FixedDiv(projectiony, tz);
    vis->gx = fx;

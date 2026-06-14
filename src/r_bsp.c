@@ -633,7 +633,13 @@ static void R_Subsector(int num)
       wtop = ff->model->ceilingheight;        /* slab/water surface height */
       if (ff->model->floorheight >= wtop)
         continue;
-      if (wtop > viewz)                        /* only above-surface case */
+      /* Render water in another sector seen across an opening even when its
+       * surface is above the eye: the span model (surface line down to the
+       * visible floor) is correct there.  Only skip it when the viewer is
+       * standing in THIS sector and submerged in this slab -- looking up at
+       * its underside, which the over-the-floor span model cannot represent. */
+      if (frontsector == viewplayer->mo->subsector->sector
+          && ff->model->floorheight <= viewz && viewz < wtop)
         continue;
       if (ncand < MAXMOREWATER + 1)
       {

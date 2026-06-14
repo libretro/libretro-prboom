@@ -279,9 +279,9 @@ static void ogg_render(void *dest, unsigned nsamp)
 
 static size_t ogg_serialize(void *dest, size_t cap)
 {
-  uint32_t hdr[3];
-  int32_t  off;
-  size_t   need = sizeof hdr + sizeof off;
+  unsigned int hdr[3];
+  int          off;
+  size_t       need = sizeof hdr + sizeof off;
 
   if (!ogg_v || !ogg_playing)
     return 0;                 /* nothing playing -> no state to record */
@@ -294,7 +294,7 @@ static size_t ogg_serialize(void *dest, size_t cap)
     return 0;
   hdr[0] = OGG_STATE_MAGIC;
   hdr[1] = OGG_STATE_VERSION;
-  hdr[2] = (uint32_t)(ogg_looping ? 1 : 0);
+  hdr[2] = (unsigned int)(ogg_looping ? 1 : 0);
   memcpy(dest, hdr, sizeof hdr);
   memcpy((unsigned char *)dest + sizeof hdr, &off, sizeof off);
   return need;
@@ -302,8 +302,8 @@ static size_t ogg_serialize(void *dest, size_t cap)
 
 static int ogg_unserialize(const void *src, size_t size)
 {
-  uint32_t hdr[3];
-  int32_t  off;
+  unsigned int hdr[3];
+  int          off;
 
   if (!ogg_v)                                       return 0;
   if (size < sizeof hdr + sizeof off)               return 0;

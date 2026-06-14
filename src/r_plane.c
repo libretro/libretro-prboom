@@ -203,11 +203,23 @@ static void R_MapTiltedPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
 
       tt = R_TiltedHit(cx1, y, &wx, &wy);
       R_TiltedHit(cx2 + 1, y, &wx2, &wy2);   /* one past, exact end step */
-      if (tt <= 0)
+      /* The span's screen rows were already bounded to this plane's visible
+       * extent by the visplane top[]/bottom[] walk, so the chunk is genuinely
+       * on-surface.  R_TiltedHit's t is the signed ray parameter: it comes out
+       * negative when the eye is on the plane's back face relative to the
+       * up-facing normal p_slope enforces (a sloped ceiling viewed from below,
+       * or a reverse-facing slab), even though the intersection the visplane
+       * selected is real and visible.  Rejecting t <= 0 dropped those chunks
+       * and left the framebuffer uncovered (a torn residue band over sloped
+       * ceilings and reverse-facing slabs).  Use |t| for depth and only skip
+       * the genuinely degenerate parallel ray. */
+      if (tt == 0.0)
       {
          cx1 = cx2 + 1;
-         continue;                            /* behind or parallel */
+         continue;                            /* ray parallel to plane */
       }
+      if (tt < 0.0)
+         tt = -tt;
 
       dsvars->xfrac = xoffs + (fixed_t)(wx * 65536.0);
       dsvars->yfrac = yoffs - (fixed_t)(wy * 65536.0);

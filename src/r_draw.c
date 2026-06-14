@@ -1043,9 +1043,15 @@ static void R_BuildWaterLUT(void)
    int depth;
    for (depth = 0; depth < MAXWATERDEPTH; depth++)
    {
-      int keep = 28 - depth;
+      /* Keep grades the scene fraction from ~26/32 just under the surface
+       * down to a dark floor over a long depth range, so the submerged
+       * geometry stays visible-but-dark (a tinted volume you can see the
+       * wall/floor through) instead of being crushed to near-black a few
+       * rows down.  Matches the reference, where the underwater wall reads
+       * through as dark grey-green rather than vanishing. */
+      int keep = 26 - (depth / 3);
       int bl;
-      if (keep < 9) keep = 9;          /* deep: dark, not pure black */
+      if (keep < 11) keep = 11;        /* deep: dark, geometry just visible */
       /* Surface band: a brighter, bluer lit strip right at the waterline
        * (light entering the surface), widened so it reads as a water
        * surface rather than a one-pixel line, then falling off into the

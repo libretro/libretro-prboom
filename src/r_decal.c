@@ -331,6 +331,22 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_, int rx1, int rx2)
     rw_scalestep = ds->scalestep;
     colscale     = ds->scale1 + (rx1 - ds->x1) * rw_scalestep;
 
+    /* Clip the decal to the wall's own per-column screen extent (as GZDoom
+     * hands walltop/wallbottom to its decal drawer) so it stays on the wall
+     * surface instead of the full screen.  These arrays exist for masked/
+     * silhouette segs; a plain solid seg may not have built them, in which
+     * case fall back to the full-screen bounds. */
+    if (ds->sprtopclip && ds->sprbottomclip)
+    {
+      mceilingclip = ds->sprtopclip;
+      mfloorclip   = ds->sprbottomclip;
+    }
+    else
+    {
+      mfloorclip   = screenheightarray;
+      mceilingclip = negonearray;
+    }
+
     for (x = rx1; x <= rx2; x++, colscale += rw_scalestep)
     {
       angle_t angle = (ds->rw_centerangle + xtoviewangle[x]) >> ANGLETOFINESHIFT;
@@ -356,21 +372,31 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_, int rx1, int rx2)
       if (col < 0 || col >= patch->width)
         continue;
 
-      /* vertical placement: decal centre at pd->z, half-height up/down */
+      /* vertical placement: the decal's top sits at world height
+       * pd->z + dheight/2 (dheight already folds in yscale, so the decal
+       * spans yscale x its texel height in world units).  The top's SCREEN
+       * row is anchored with the wall's own scale (colscale) -- exactly as a
+       * wall texel at that height projects -- so the decal stays locked to
+       * the wall under view bob.  yscale must NOT enter the position term
+       * (matching GZDoom, where ScaleY scales only the texture step, never
+       * the projected top); it enters only spryscale/iscale below, which
+       * stretch the texture across the projected span. */
       {
         fixed_t vscale = FixedMul(colscale, def->yscale);
-        if (vscale <= 0)
+        if (vscale <= 0 || colscale <= 0)
           continue;
         dcvars.texturemid = (pd->z + (dheight >> 1)) - viewz;
         dcvars.iscale     = 0xffffffffu / (unsigned)vscale;
 
         t = ((int64_t)centeryfrac << FRACBITS)
-            - (int64_t)dcvars.texturemid * vscale;
+            - (int64_t)dcvars.texturemid * colscale;
         if (t > ((int64_t)MAX_SCREENHEIGHT << (FRACBITS * 2)))
           continue;
         sprtopscreen = (long)(t >> FRACBITS);
-        /* R_DrawMaskedColumn positions posts with the global spryscale, so
-         * it must carry the decal's vertical scale for this column. */
+        /* R_DrawMaskedColumn steps texel offsets to screen rows with the
+         * global spryscale; it carries the yscale-stretched scale so the
+         * texture is drawn at its intended height, while the anchor above
+         * keeps the top on the wall. */
         spryscale = vscale;
       }
 
@@ -382,9 +408,6 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_, int rx1, int rx2)
                                         colscale);
       dcvars.nextcolormap = dcvars.colormap;
       dcvars.z        = colscale;
-
-      mfloorclip   = screenheightarray;
-      mceilingclip = negonearray;
 
       R_DrawMaskedColumn(patch, colfunc, &dcvars,
                          R_GetPatchColumnClamped(patch, col),

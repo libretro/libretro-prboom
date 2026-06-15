@@ -43,11 +43,47 @@ extern int prb_stb_vorbis_decode_memory(const unsigned char *mem, int len,
 
 #include "../src/mus2mid.h"
 
-#define SAMPLERATE    		(4 * 11025)
-#define SAMPLECOUNT_35		(SAMPLERATE / 35)
+/* The audio output rate is no longer a compile-time constant.  prboom's
+ * music is synthesised in real time (OPL/Fluidsynth MIDI, the mod tracker,
+ * Ogg/MP3 streams), so there is no single "native" rate the core must emit
+ * at -- we can pick whichever supported rate best matches the host's audio
+ * device and let the synths render straight to it.  Higher rates lower
+ * latency, push aliasing images above the audible band, sidestep the
+ * frontend resampler's low-pass smearing, and give the SFX/stream
+ * resamplers finer time-domain resolution.
+ *
+ * snd_samplerate_output holds the rate currently in force (one of the
+ * SND_SAMPLERATE_* values).  Everything that used to reference the old
+ * SAMPLERATE macro now reads this variable through the alias below, so a
+ * single assignment in I_SetSoundRate() retunes the whole pipeline.  It
+ * defaults to 44100 so behaviour is unchanged until the core option is
+ * read. */
+#define SND_SAMPLERATE_32K      32000
+#define SND_SAMPLERATE_44K      44100
+#define SND_SAMPLERATE_48K      48000
+#define SND_SAMPLERATE_96K      96000
+#define SND_SAMPLERATE_MIN      SND_SAMPLERATE_32K
+#define SND_SAMPLERATE_MAX      SND_SAMPLERATE_96K
+#define SND_SAMPLERATE_DEFAULT  SND_SAMPLERATE_44K
+
+int snd_samplerate_output = SND_SAMPLERATE_DEFAULT;
+
+/* SAMPLERATE was a macro used throughout the mixer and loaders.  Keep the
+ * name as a read-only alias of the runtime variable so the body of this
+ * file needs no churn beyond the few spots that genuinely must size for
+ * the worst case (the static mixbuffer) or re-init the synths. */
+#define SAMPLERATE      (snd_samplerate_output)
+
+/* SAMPLECOUNT_35 (samples per 35Hz tic) tracks the active rate and is only
+ * the degenerate fallback when tic_vars.sample_step is 0.  The static
+ * mixbuffer, however, must be sized for the worst case -- the highest
+ * supported rate at the slowest tic rate -- so that switching up to 96 kHz
+ * at runtime can never overrun it. */
+#define SAMPLECOUNT_35      (SAMPLERATE / 35)
+#define SAMPLECOUNT_35_MAX  (SND_SAMPLERATE_MAX / 35)
 #define NUM_CHANNELS		32
 #define BUFMUL           4
-#define MIXBUFFERSIZE   (SAMPLECOUNT_35*BUFMUL)
+#define MIXBUFFERSIZE   (SAMPLECOUNT_35_MAX*BUFMUL)
 #define MAX_CHANNELS    32
 
 static const void *music_handle;
@@ -78,9 +114,20 @@ int *lengths = NULL;
  * recorded by the loader; samples are stored at their native rate and the
  * mixer advances through them at this step. */
 static unsigned int *sfx_steps = NULL;
+/* Per-sfx native (source) sample rate in Hz, retained alongside sfx_steps
+ * so the step table can be recomputed for a new output rate without
+ * reloading every lump (see I_RecalcSfxSteps).  Mirrors the link aliasing
+ * that lengths/sfx_steps use. */
+static unsigned int *sfx_orig_rate = NULL;
 static int lengths_size = 0;
 int snd_card = 1;
 int mus_card = 0;
+
+/* 16.16 resample step that plays a sound recorded at `rate` Hz at the
+ * current output rate.  Clamped to a minimum of 1 so a (degenerate) zero
+ * never stalls a channel forever. */
+#define STEP_FROM_RATE(rate) \
+   ((unsigned int)(((uint64_t)(rate) << 16) / (uint64_t)SAMPLERATE))
 
 /* The global mixing buffer.
  * Basically, samples from all active internal channels
@@ -130,6 +177,13 @@ static const music_player_t *music_players[] =
 /* Music player currently used */
 music_player_t* current_player = NULL;
 
+/* True once I_InitMusic has brought the synth backends up; gates the music
+ * re-init path in I_SetSoundRate so a rate set before I_InitMusic (the
+ * normal startup order: update_variables runs before I_Init) doesn't
+ * shutdown/init backends that haven't been initialised yet, nor
+ * double-initialise them ahead of I_InitMusic's own init pass. */
+static int music_system_up = 0;
+
 static channel_t channels[NUM_CHANNELS];
 
 
@@ -153,7 +207,8 @@ static channel_t channels[NUM_CHANNELS];
  * over from a buffering scheme the libretro mixer doesn't use; the
  * mix loop terminates each channel via the snd_start_ptr/snd_end_ptr
  * comparison. */
-static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
+static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step,
+                             unsigned int* out_rate)
 {
     int             out_i, sfxlump_num, sfxlump_len;
     char            sfxlump_name[20];
@@ -263,7 +318,8 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
         out_data[wav.numsamples] = out_data[wav.numsamples - 1];
 
         wav_rate = wav.samplerate ? wav.samplerate : 11025;
-        *step = (unsigned int)(((uint64_t)wav_rate << 16) / (uint64_t)SAMPLERATE);
+        *step = STEP_FROM_RATE(wav_rate);
+        if (out_rate) *out_rate = wav_rate;
 
         *len = (int)wav.numsamples;
         rwav_free(&wav);
@@ -322,7 +378,8 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
         out_data[samples] = out_data[samples - 1];
 
         ogg_rate = rate ? (unsigned int)rate : 11025;
-        *step = (unsigned int)(((uint64_t)ogg_rate << 16) / (uint64_t)SAMPLERATE);
+        *step = STEP_FROM_RATE(ogg_rate);
+        if (out_rate) *out_rate = ogg_rate;
 
         *len = samples;
         free(pcm);
@@ -362,7 +419,8 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step)
         out_data[out_i] = (int16_t)(((int)sfxlump_sound[out_i] - 128) << 8);
     out_data[sfxlump_len] = out_data[sfxlump_len - 1];
 
-    *step = (unsigned int)(((uint64_t)orig_rate << 16) / (uint64_t)SAMPLERATE);
+    *step = STEP_FROM_RATE(orig_rate);
+    if (out_rate) *out_rate = orig_rate;
 
     /* Release the cached lump back to the zone via the cache's
      * lock-count mechanism.  The previous Z_Free here freed the
@@ -840,23 +898,27 @@ void I_InitSound(void)
   {
     lengths = (int*)realloc(lengths, num_sfx * sizeof(int));
     sfx_steps = (unsigned int*)realloc(sfx_steps, num_sfx * sizeof(unsigned int));
+    sfx_orig_rate = (unsigned int*)realloc(sfx_orig_rate, num_sfx * sizeof(unsigned int));
     lengths_size = num_sfx;
   }
   memset(lengths, 0, sizeof(int) * num_sfx);
   memset(sfx_steps, 0, sizeof(unsigned int) * num_sfx);
+  memset(sfx_orig_rate, 0, sizeof(unsigned int) * num_sfx);
 
   for (i = 1; i < num_sfx; i++)
   {
      // Alias? Example is the chaingun sound linked to pistol.
      if (!S_sfx[i].link) // Load data from WAD file.
-        S_sfx[i].data = I_SndLoadSample( S_sfx[i].name, &lengths[i], &sfx_steps[i] );
+        S_sfx[i].data = I_SndLoadSample( S_sfx[i].name, &lengths[i],
+                                         &sfx_steps[i], &sfx_orig_rate[i] );
      else // Previously loaded already?
      {
         S_sfx[i].data = S_sfx[i].link->data;
         /* link - S_sfx is already an element index (pointer subtraction of
          * sfxinfo_t*); do not divide by sizeof again. */
-        lengths[i]    = lengths[S_sfx[i].link - S_sfx];
-        sfx_steps[i]  = sfx_steps[S_sfx[i].link - S_sfx];
+        lengths[i]       = lengths[S_sfx[i].link - S_sfx];
+        sfx_steps[i]     = sfx_steps[S_sfx[i].link - S_sfx];
+        sfx_orig_rate[i] = sfx_orig_rate[S_sfx[i].link - S_sfx];
      }
   }
 
@@ -1362,6 +1424,7 @@ void I_InitMusic(void)
    int i;
    for (i = 0; music_players[i]; i++)
       music_players[i]->init (SAMPLERATE);
+   music_system_up = 1;
 }
 
 void I_ShutdownMusic(void)
@@ -1369,4 +1432,118 @@ void I_ShutdownMusic(void)
    int i;
    for (i = 0; music_players[i]; i++)
       music_players[i]->shutdown ();
+   music_system_up = 0;
+}
+
+/* Recompute every sfx's 16.16 playback step for the current output rate
+ * from its retained native rate.  Cheap (one 64-bit divide per sfx, no
+ * lump I/O) and safe to call at any time: a channel that is mid-playback
+ * keeps its cur/frac cursor and simply advances at the new step from the
+ * next mixed sample on.  Channels whose sfxid still resolves are also
+ * retuned so an in-flight sound doesn't keep playing at the old pitch. */
+static void I_RecalcSfxSteps(void)
+{
+   int i;
+
+   if (!sfx_steps || !sfx_orig_rate)
+      return;
+
+   for (i = 0; i < num_sfx; i++)
+   {
+      if (sfx_orig_rate[i])
+      {
+         sfx_steps[i] = STEP_FROM_RATE(sfx_orig_rate[i]);
+         if (!sfx_steps[i])
+            sfx_steps[i] = 1;
+      }
+   }
+
+   /* Retune any active channels.  step_fx may carry vanilla pitch jitter
+    * (raven / pitched_sounds) baked in at I_StartSound time; we can't
+    * recover the original pitch byte here, so recompute from the base
+    * step only.  The audible effect of dropping a one-frame pitch jitter
+    * across a rate switch is nil. */
+   for (i = 0; i < NUM_CHANNELS; i++)
+   {
+      if (channels[i].snd_start_ptr)
+      {
+         unsigned int s = sfx_steps[channels[i].sfxid];
+         channels[i].step_fx = s ? s : 1;
+      }
+   }
+}
+
+/* Set the desired audio output rate.  Clamps to a supported value.  If the
+ * rate is unchanged this is a no-op.  Otherwise it retunes the SFX step
+ * table in place and, if music is playing, re-inits the synth backends at
+ * the new rate and resumes the current song at its saved sample position
+ * (the same render-replay path the save-state code uses, which is the only
+ * rate-agnostic way to resume the opaque synth/decoder state).  Returns the
+ * rate in force afterwards. */
+int I_SetSoundRate(int rate)
+{
+   int old_rate = snd_samplerate_output;
+
+   /* Snap to the nearest supported rate so a caller passing a raw host
+    * rate (e.g. 22050 or 192000) still lands on something we render at. */
+   if      (rate <= (SND_SAMPLERATE_32K + SND_SAMPLERATE_44K) / 2)
+      rate = SND_SAMPLERATE_32K;
+   else if (rate <= (SND_SAMPLERATE_44K + SND_SAMPLERATE_48K) / 2)
+      rate = SND_SAMPLERATE_44K;
+   else if (rate <= (SND_SAMPLERATE_48K + SND_SAMPLERATE_96K) / 2)
+      rate = SND_SAMPLERATE_48K;
+   else
+      rate = SND_SAMPLERATE_96K;
+
+   if (rate == old_rate)
+      return old_rate;
+
+   snd_samplerate_output = rate;
+
+   /* SFX: just retune; samples are stored at native rate. */
+   I_RecalcSfxSteps();
+
+#ifdef MUSIC_SUPPORT
+   /* Music: re-init every synth backend at the new rate so their internal
+    * rate-derived tables (OPL envelope/LFO scaling via Chip__Setup, the
+    * fluidsynth synth.sample-rate, the stream resampler steps, etc.) are
+    * rebuilt for the new rate.
+    *
+    * We deliberately do NOT resume the song from here.  Per-song,
+    * rate-derived state lives in each backend's registersong() (the libretro
+    * MIDI player's samples-per-MIDI-clock lm_spmc, fluidsynth's spmc, the
+    * ogg resampler's ogg_step, OPL's per-track timing), so a bare
+    * shutdown()/init()/play() would leave that state stale -> wrong tempo or
+    * pitch.  The correct, backend-agnostic resume is a full re-registration
+    * from the song lump, which the s_sound.c layer owns: the libretro layer
+    * calls S_RestartMusic() after this returns.
+    *
+    * For backends whose rate state is fully re-derived per render call and
+    * not at registersong (the MP3 resampler reads mp_samplerate_target live;
+    * the mod renderer reads mod_rate live), S_RestartMusic's early-out for
+    * non-lump tracks is harmless -- they simply keep decoding and pick up the
+    * new rate on the next render.
+    *
+    * Skipped until I_InitMusic has run (normal startup order sets the rate
+    * first), since I_InitMusic will init the backends at the new rate itself.
+    *
+    * NOTE: backends own the lifetime of the parsed song handle across
+    * shutdown(); we leave music_handle/current_player untouched so the
+    * non-lump backends above keep a valid handle.  S_RestartMusic replaces
+    * both for the lump-backed case via I_UnRegisterSong + I_RegisterSong. */
+   if (music_system_up)
+   {
+      int i;
+      for (i = 0; music_players[i]; i++)
+      {
+         music_players[i]->shutdown();
+         music_players[i]->init(SAMPLERATE);
+      }
+   }
+#endif
+
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "I_SetSoundRate: output rate %d Hz\n", rate);
+
+   return rate;
 }

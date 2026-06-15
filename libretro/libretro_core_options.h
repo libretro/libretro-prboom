@@ -32,6 +32,11 @@ extern "C" {
 
 
 struct retro_core_option_v2_category option_cats_us[] = {
+   {
+      "audio",
+      "Audio",
+      "Configure audio output, including the synthesis/output sample rate."
+   },
    { NULL, NULL, NULL },
 };
 
@@ -187,6 +192,23 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { NULL, NULL },
       },
       "fighter"
+   },
+   {
+      "prboom-sound_samplerate",
+      "Sound Samplerate (Hint)",
+      "Sound Samplerate (Hint)",
+      "Audio output rate. prboom synthesizes MIDI and tracker music in real time, so it has no fixed native rate and can render directly at whichever rate you pick. Higher rates lower latency, push aliasing above the audible range, avoid the frontend resampler's low-pass smearing, and give the sound-effect and music-stream resamplers finer time resolution. 'Auto' queries the frontend's target rate and snaps to the nearest supported value.",
+      "Audio output rate. prboom has no fixed native rate (music is synthesized in real time), so it renders directly at the chosen rate. Higher rates lower latency, reduce aliasing, and avoid resampler smearing. 'Auto' matches the frontend's target rate.",
+      "audio",
+      {
+         { "auto",  "Auto" },
+         { "32000", "32 kHz" },
+         { "44100", "44 kHz" },
+         { "48000", "48 kHz" },
+         { "96000", "96 kHz" },
+         { NULL, NULL },
+      },
+      "auto"
    },
    { NULL, NULL, NULL, NULL, NULL, NULL, {{0}}, NULL },
 };

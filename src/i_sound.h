@@ -60,6 +60,20 @@ extern int mus_opl_gain; // NSM  fine tune OPL output level
  *       libretro_sound.c, which use matching #ifdefs. */
 extern int midi_player;
 
+/* Active audio output rate in Hz (one of 32000/44100/48000/96000).  Set
+ * from the "Sound Samplerate (Hint)" core option before I_InitSound /
+ * I_InitMusic so the SFX loaders, mixer step tables and music synths are
+ * all built for the same rate.  prboom has no fixed output rate (MIDI and
+ * tracker music are synthesised in real time), so the libretro layer
+ * chooses one that matches the host. */
+extern int snd_samplerate_output;
+
+/* Sets the desired output rate.  Clamps to a supported value; if the rate
+ * actually changes and the sound system is already running, rebuilds the
+ * SFX step table and re-inits the music backends so the new rate takes
+ * effect immediately.  Returns the rate in force afterwards. */
+int  I_SetSoundRate(int rate);
+
 // Init at program start...
 void I_InitSound(void);
 

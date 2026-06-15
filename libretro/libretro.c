@@ -40,6 +40,7 @@
 #include "../src/m_argv.h"
 #include "../src/i_system.h"
 #include "../src/i_sound.h"
+#include "../src/s_sound.h"
 #include "../src/v_video.h"
 #include "../src/st_stuff.h"
 #include "../src/w_wad.h"
@@ -137,6 +138,23 @@ retro_audio_sample_batch_t audio_batch_cb;
 static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
+
+/* prboom's music is synthesised in real time, so the core can output at
+ * whichever of its supported rates best fits the host instead of a fixed
+ * 44100.  The chosen rate (set from the "Sound Samplerate (Hint)" core
+ * option, resolved against the frontend's target rate when "Auto") feeds
+ * info.timing.sample_rate and the sound layer's snd_samplerate_output. */
+#ifndef RETRO_ENVIRONMENT_GET_TARGET_SAMPLE_RATE
+/* Added to libretro.h after the copy bundled here; data is unsigned* (Hz).
+ * Guarded so this still builds against the in-tree header and any newer
+ * one that already defines it. */
+#define RETRO_ENVIRONMENT_GET_TARGET_SAMPLE_RATE (81 | RETRO_ENVIRONMENT_EXPERIMENTAL)
+#endif
+
+/* Resolved output rate currently advertised to the frontend (Hz).  Kept in
+ * sync with snd_samplerate_output; compared in R_InitInterpolation to
+ * decide whether timing changed enough to warrant SET_SYSTEM_AV_INFO. */
+static int audio_sample_rate = 44100;
 
 static void process_input(void);
 
@@ -1062,7 +1080,7 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
       info->timing.fps = TICRATE;
       break;
   }
-  info->timing.sample_rate    = 44100.0;
+  info->timing.sample_rate    = (double)audio_sample_rate;
   info->geometry.base_width   = SCREENWIDTH;
   info->geometry.base_height  = SCREENHEIGHT;
   info->geometry.max_width    = MAX_SCREENWIDTH;
@@ -1195,6 +1213,55 @@ void retro_reset(void)
 
 extern dbool   quit_pressed;
 
+/* Snap an arbitrary host rate to the nearest rate prboom renders at. */
+static int prboom_nearest_supported_rate(unsigned host_rate)
+{
+   if      (host_rate <= (32000u + 44100u) / 2) return 32000;
+   else if (host_rate <= (44100u + 48000u) / 2) return 44100;
+   else if (host_rate <= (48000u + 96000u) / 2) return 48000;
+   return 96000;
+}
+
+/* Resolve the "Sound Samplerate (Hint)" core option to a concrete rate and
+ * apply it.  "auto" asks the frontend for its target rate via
+ * RETRO_ENVIRONMENT_GET_TARGET_SAMPLE_RATE and snaps to the nearest
+ * supported value (falling back to 44100 if the frontend doesn't implement
+ * the call).  Updates audio_sample_rate and, when the sound system is
+ * already up, retunes it through I_SetSoundRate.  The AV-info side effects
+ * (timing.sample_rate, SET_SYSTEM_AV_INFO) are handled by
+ * R_InitInterpolation, which the caller invokes after content is loaded. */
+static void update_audio_samplerate(void)
+{
+   struct retro_variable var;
+   int chosen = 44100;
+
+   var.key   = "prboom-sound_samplerate";
+   var.value = NULL;
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "auto"))
+      {
+         unsigned host_rate = 0;
+         if (environ_cb(RETRO_ENVIRONMENT_GET_TARGET_SAMPLE_RATE, &host_rate)
+               && host_rate > 0)
+            chosen = prboom_nearest_supported_rate(host_rate);
+         else
+            chosen = 44100;  /* frontend can't tell us; safe default */
+      }
+      else
+         chosen = atoi(var.value);  /* "32000".."96000" */
+   }
+
+   audio_sample_rate = chosen;
+
+   /* If the sound system is already running (option toggled in-game), apply
+    * immediately; otherwise this just primes snd_samplerate_output for the
+    * upcoming I_InitSound/I_InitMusic.  I_SetSoundRate clamps, no-ops when
+    * unchanged, and re-tunes SFX + music as needed. */
+   I_SetSoundRate(chosen);
+}
+
 static void update_variables(bool startup)
 {
    struct retro_variable var;
@@ -1300,6 +1367,24 @@ static void update_variables(bool startup)
       Z_SetPurgeLimit(purge_limit);
    }
 #endif
+
+   /* Resolve and apply the audio output rate.  At startup this primes
+    * snd_samplerate_output before I_InitSound/I_InitMusic.  When toggled
+    * in-game, I_SetSoundRate retunes the live SFX pipeline and re-inits the
+    * synth backends at the new rate; S_RestartMusic then re-registers the
+    * current track so each backend rebuilds its per-song, rate-derived state
+    * (tempo/clock scaling, resampler steps) correctly.  R_InitInterpolation
+    * notices timing.sample_rate changed and pushes SET_SYSTEM_AV_INFO so the
+    * frontend resampler retargets the new rate. */
+   {
+      int prev_rate = audio_sample_rate;
+      update_audio_samplerate();
+      if (!startup && audio_sample_rate != prev_rate)
+      {
+         S_RestartMusic();
+         R_InitInterpolation();
+      }
+   }
 }
 
 void I_SafeExit(int rc);
@@ -3565,9 +3650,14 @@ void I_Init(void)
 
 void R_InitInterpolation(void)
 {
+  /* Remembers the rate last programmed into tic_vars.sample_step so a
+   * sample-rate-only change (fps unchanged) still re-derives the step and
+   * pushes SET_SYSTEM_AV_INFO.  Initialised to 0 so the first call always
+   * takes the update path. */
+  static double last_sample_rate = 0.0;
   struct retro_system_av_info info;
   retro_get_system_av_info(&info);
-  if(tic_vars.fps != info.timing.fps)
+  if(tic_vars.fps != info.timing.fps || last_sample_rate != info.timing.sample_rate)
   {
      // Only update av_info if changed and it's not the first run
      if(tic_vars.fps)
@@ -3586,6 +3676,7 @@ void R_InitInterpolation(void)
       * is exact. */
      tic_vars.sample_step = (fixed_t)(((int64_t)info.timing.sample_rate
                                        << FRACBITS) / (int64_t)tic_vars.fps);
+     last_sample_rate = info.timing.sample_rate;
 
      if (log_cb)
         log_cb(RETRO_LOG_DEBUG, "R_InitInterpolation: Framerate set to %.2f FPS\n", info.timing.fps);

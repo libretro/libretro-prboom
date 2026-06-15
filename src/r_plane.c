@@ -488,6 +488,7 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
       new_pl->xoffs = pl->xoffs;           // killough 2/28/98
       new_pl->yoffs = pl->yoffs;
       new_pl->slope = pl->slope;
+      new_pl->skybox = pl->skybox;
       new_pl->minx = start;
       new_pl->maxx = stop;
       new_pl->modified = 0;
@@ -502,22 +503,26 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
 
 #ifdef PRBOOM_RENDER_PROFILE
 static visplane_t *R_FindPlane_impl(fixed_t height, int picnum, int lightlevel,
-                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope);
+                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope,
+                        int skybox);
 visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
-                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope)
+                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope,
+                        int skybox)
 {
    extern double prof_findplane_usec;
    visplane_t *r;
    double _t0 = I_RenderProfileUsec();
-   r = R_FindPlane_impl(height, picnum, lightlevel, xoffs, yoffs, slope);
+   r = R_FindPlane_impl(height, picnum, lightlevel, xoffs, yoffs, slope, skybox);
    prof_findplane_usec += (I_RenderProfileUsec() - _t0);
    return r;
 }
 static visplane_t *R_FindPlane_impl(fixed_t height, int picnum, int lightlevel,
-                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope)
+                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope,
+                        int skybox)
 #else
 visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
-                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope)
+                        fixed_t xoffs, fixed_t yoffs, const secplane_t *slope,
+                        int skybox)
 #endif
 {
    visplane_t *check;
@@ -536,7 +541,8 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
             xoffs == check->xoffs &&      // killough 2/28/98: Add offset checks
             yoffs == check->yoffs &&
             !check->translucent &&        /* water planes never merge with opaque */
-            slope == check->slope)        /* tilted planes never merge with flat */
+            slope == check->slope &&      /* tilted planes never merge with flat */
+            skybox == check->skybox)      /* different skyboxes never merge */
          return check;
 
    check = new_visplane(hash);         // killough
@@ -551,6 +557,7 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
    check->slope = slope;
    check->modified = 0;
    check->translucent = 0;
+   check->skybox = skybox;
 
    memset (check->top, 0xff, sizeof check->top);
 
@@ -578,6 +585,7 @@ visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel)
    check->slope = NULL;
    check->modified = 0;
    check->translucent = 1;
+   check->skybox = -1;
 
    memset (check->top, 0xff, sizeof check->top);
 
@@ -946,6 +954,34 @@ static void R_DoDrawPlane(visplane_t *pl)
 // RDrawPlanes
 // At the end of each frame.
 //
+
+int R_CollectSkyboxSpan(int sbidx, short *out_top, short *out_bot)
+{
+  int x, any = 0, i;
+  visplane_t *pl;
+  for (x = 0; x < viewwidth; x++) { out_top[x] = 32767; out_bot[x] = -1; }
+  for (i = 0; i < MAXVISPLANES; i++)
+    for (pl = visplanes[i]; pl; pl = pl->next)
+    {
+      if (!pl->modified || pl->skybox != sbidx)
+        continue;
+      if (!(pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT)))
+        continue;
+      for (x = pl->minx; x <= pl->maxx; x++)
+      {
+        int t = (int)pl->top[x];
+        int b = (int)pl->bottom[x];
+        /* top[x] == -1 (0xffffffff fill) is the "no span" sentinel, exactly
+         * as the sky column draw tests it; skip those columns. */
+        if (t == -1 || t > b)
+          continue;
+        if (t < out_top[x]) out_top[x] = (short)t;
+        if (b > out_bot[x]) out_bot[x] = (short)b;
+        any = 1;
+      }
+    }
+  return any;
+}
 
 void R_DrawPlanes (void)
 {

@@ -47,6 +47,7 @@
 #include "r_plane.h"
 #include "r_bsp.h"
 #include "r_draw.h"
+#include "p_skybox.h"
 #include "p_ffloor.h"
 #include "m_bbox.h"
 #include "r_sky.h"
@@ -928,6 +929,70 @@ static void R_RenderSkybox(void)
   viewangle = saveang; viewcos = savecos; viewsin = savesin;
 }
 
+/* Per-sector tagged skyboxes (SkyPicker).  After the main scene draws, the
+ * sky pixels of sectors using a tagged skybox still show the default
+ * sky/skyview.  For each tagged skybox visible this frame we re-render its
+ * scene into a scratch buffer and copy back only the columns/rows owned by
+ * that skybox's sky visplanes.
+ *
+ * The per-column window [top,bottom] for each tagged skybox is captured
+ * from the sky visplanes BEFORE this runs, because the per-skybox render
+ * clears the planes. */
+static short  sb_top[MAX_SCREENWIDTH];
+static short  sb_bot[MAX_SCREENWIDTH];
+static unsigned short sb_scratch[MAX_SCREENWIDTH * MAX_SCREENHEIGHT];
+
+/* render skybox camera `sb` into scratch, then copy its owned sky pixels. */
+static void R_RenderTaggedSkybox(const skybox_t *sb)
+{
+  fixed_t savex = viewx, savey = viewy, savez = viewz;
+  angle_t saveang = viewangle;
+  fixed_t savecos = viewcos, savesin = viewsin;
+  unsigned short *real_tl = drawvars.short_topleft;
+  int x, y;
+
+  /* render the skybox scene into the scratch buffer */
+  drawvars.short_topleft = sb_scratch;
+
+  r_in_skybox = 1;
+  viewx = sb->x;
+  viewy = sb->y;
+  viewz = sb->z;
+  viewangle = saveang + sb->angle;
+  viewsin = finesine[viewangle>>ANGLETOFINESHIFT];
+  viewcos = finecosine[viewangle>>ANGLETOFINESHIFT];
+  viewplayer = &players[displayplayer];
+
+  R_ClearClipSegs();
+  R_ClearDrawSegs();
+  R_ClearPlanes();
+  R_ClearSprites();
+  R_RenderBSPNode(numnodes-1);
+  R_DrawCmdReplay();
+  R_ResetColumnBuffer();
+  R_DrawPlanes();
+  R_DrawMasked();
+  R_ResetColumnBuffer();
+  r_in_skybox = 0;
+
+  viewx = savex; viewy = savey; viewz = savez;
+  viewangle = saveang; viewcos = savecos; viewsin = savesin;
+  drawvars.short_topleft = real_tl;
+
+  /* composite: copy only the captured sky region from scratch to real */
+  for (x = 0; x < viewwidth; x++)
+  {
+    int t = sb_top[x], b = sb_bot[x];
+    if (b < t)
+      continue;
+    if (t < 0) t = 0;                       /* clamp to the surface */
+    if (b >= SCREENHEIGHT) b = SCREENHEIGHT - 1;
+    for (y = t; y <= b; y++)
+      real_tl[y * SURFACE_SHORT_PITCH + x] =
+        sb_scratch[y * SURFACE_SHORT_PITCH + x];
+  }
+}
+
 void R_RenderPlayerView (player_t* player)
 {
 #ifdef PRBOOM_RENDER_PROFILE
@@ -1010,6 +1075,38 @@ void R_RenderPlayerView (player_t* player)
 
     R_DrawMasked ();
     R_ResetColumnBuffer();
+
+    /* Per-sector tagged skyboxes (SkyPicker): for each tagged skybox
+     * visible this frame, capture its sky-region span, then re-render that
+     * skybox masked to those pixels.  Spans for all tagged skyboxes are
+     * captured up front because each per-skybox render clears the planes
+     * (destroying the main scene's sky visplanes). */
+    if (numskyboxes > 0)
+    {
+      static short cap_top[16][MAX_SCREENWIDTH];
+      static short cap_bot[16][MAX_SCREENWIDTH];
+      int used[16], nused = 0, k, x;
+      int nb = numskyboxes < 16 ? numskyboxes : 16;
+      /* which tagged skyboxes appear, and capture their spans */
+      for (k = 0; k < nb; k++)
+      {
+        if (R_CollectSkyboxSpan(k, sb_top, sb_bot))
+        {
+          memcpy(cap_top[nused], sb_top, sizeof(short) * viewwidth);
+          memcpy(cap_bot[nused], sb_bot, sizeof(short) * viewwidth);
+          used[nused++] = k;
+        }
+      }
+      for (k = 0; k < nused; k++)
+      {
+        for (x = 0; x < viewwidth; x++)
+        {
+          sb_top[x] = cap_top[k][x];
+          sb_bot[x] = cap_bot[k][x];
+        }
+        R_RenderTaggedSkybox(&skyboxes[used[k]]);
+      }
+    }
 
     /* Underwater: blend the finished view toward the water colour. */
     if (view_underwater)

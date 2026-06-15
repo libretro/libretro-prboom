@@ -585,7 +585,8 @@ static void R_Subsector(int num)
                 floorlightlevel,                // killough 3/16/98
                 frontsector->floor_xoffs,       // killough 3/7/98
                 frontsector->floor_yoffs,
-                frontsector->floor_slope
+                frontsector->floor_slope,
+                frontsector->floorpic == skyflatnum ? frontsector->skybox : -1
                 ) : NULL;
 
   ceilingplane = frontsector->ceiling_slope ||    /* sloped: never cull */
@@ -600,7 +601,8 @@ static void R_Subsector(int num)
                 ceilinglightlevel,              // killough 4/11/98
                 frontsector->ceiling_xoffs,     // killough 3/7/98
                 frontsector->ceiling_yoffs,
-                frontsector->ceiling_slope
+                frontsector->ceiling_slope,
+                frontsector->ceilingpic == skyflatnum ? frontsector->skybox : -1
                 ) : NULL;
 
   /* ZDoom swimmable 3D floors (water) AND translucent solid/render-only

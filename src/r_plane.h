@@ -55,10 +55,16 @@ visplane_t *R_FindPlane(
   int lightlevel,
   fixed_t xoffs,                /* killough 2/28/98: add x-y offsets */
   fixed_t yoffs,
-  const secplane_t *slope);     /* tilted plane or NULL */
+  const secplane_t *slope,      /* tilted plane or NULL */
+  int skybox);                  /* per-sector 3D skybox index, or -1 */
 
 visplane_t *R_CheckPlane(visplane_t *pl, int start, int stop);
 visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop);
 visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel);
+
+/* collect the union per-column span [top,bottom] of all modified sky
+ * visplanes using skybox index sbidx, into caller arrays sized viewwidth.
+ * Returns 1 if any column is covered. */
+int R_CollectSkyboxSpan(int sbidx, short *out_top, short *out_bot);
 
 #endif

@@ -182,6 +182,14 @@ typedef struct {
 typedef struct {
   const char* x;
   const char* y;
+  /* ZDoom vertex-slope heights (UDMF zfloor/zceiling).  The text pointer
+   * is NULL when the key is absent; the *_set flag distinguishes a key
+   * explicitly set to 0 from an absent key, matching the reference
+   * engine's per-vertex enable flags. */
+  const char* zfloor;
+  const char* zceiling;
+  int zfloor_set;
+  int zceiling_set;
 } udmf_vertex_t;
 
 /* ---- sector flags ---- */

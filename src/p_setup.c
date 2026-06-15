@@ -2387,6 +2387,17 @@ static void P_LoadUDMFVertexes(void)
   {
     vertexes[i].x = udmf_to_fixed(udmf.vertices[i].x);
     vertexes[i].y = udmf_to_fixed(udmf.vertices[i].y);
+
+    /* ZDoom UDMF vertex-slope heights: a zfloor/zceiling key on a vertex
+     * feeds the same per-sector plane fit as the 1504/1505 things, keyed
+     * on the vertex coordinate.  Registered here so P_SpawnVertexSlopes
+     * sees them alongside any slope-vertex things. */
+    if (udmf.vertices[i].zfloor_set)
+      P_AddSlopeVertex(vertexes[i].x, vertexes[i].y,
+                       udmf_to_fixed(udmf.vertices[i].zfloor), 0);
+    if (udmf.vertices[i].zceiling_set)
+      P_AddSlopeVertex(vertexes[i].x, vertexes[i].y,
+                       udmf_to_fixed(udmf.vertices[i].zceiling), 1);
   }
 }
 
@@ -2798,6 +2809,10 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    // figgi 10/19/00 -- check for gl lumps and load them
    udmf_level = P_LevelIsUDMF(lumpnum);
 
+   P_ClearSlopeVertices();      /* drop last level's vertex-slope markers
+                                 * before any vertex/thing load registers
+                                 * this level's */
+
    if (udmf_level)
    {
       int textmap = lumpnum + 1;
@@ -2954,8 +2969,6 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
          P_InitMonsters();           /* reset D'Sparil boss-spot collection */
       }
    }
-
-   P_ClearSlopeVertices();      /* drop last level's vertex-slope markers */
 
    if (udmf_level)
       P_LoadUDMFThings();

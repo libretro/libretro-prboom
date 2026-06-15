@@ -382,6 +382,16 @@ static void dsda_ParseUDMFVertex(scanner_t *s)
 
     if      (scanner_string_match(s, "x")) SCAN_FLOAT_STRING(vertex.x);
     else if (scanner_string_match(s, "y")) SCAN_FLOAT_STRING(vertex.y);
+    else if (scanner_string_match(s, "zfloor"))
+    {
+      SCAN_FLOAT_STRING(vertex.zfloor);
+      vertex.zfloor_set = 1;
+    }
+    else if (scanner_string_match(s, "zceiling"))
+    {
+      SCAN_FLOAT_STRING(vertex.zceiling);
+      vertex.zceiling_set = 1;
+    }
     else dsda_SkipValue(s);
   }
 

@@ -982,7 +982,22 @@ void I_UnRegisterSong(int handle)
 
 #ifdef MUSIC_SUPPORT
   if (current_player)
+  {
     current_player->stop();
+    /* Release the backend's parsed song, not just the playback state.
+     * stop() only halts playback and frees per-iteration state (e.g. OPL's
+     * track iterators); the song parse itself -- OPL's MIDI_LoadFileSpecial
+     * handle, the libretro MIDI player's lm_midifile/lm_events -- is owned
+     * by registersong() and must be released here.  Omitting this (as the
+     * code did after the c62e559 refactor) leaks the parse on every
+     * re-registration AND leaves the previous MIDI backend holding stale
+     * song state, so an on-the-fly "MIDI Hardware" change
+     * (M_ChangeMidiPlayer -> S_RestartMusic -> S_StopMusic -> here ->
+     * I_RegisterSong) never cleanly takes effect.  music_handle is the
+     * value registersong() returned, which is what unregistersong() expects. */
+    if (music_handle)
+      current_player->unregistersong(music_handle);
+  }
 
    free(song_data);
    music_handle = NULL;

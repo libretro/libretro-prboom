@@ -46,6 +46,8 @@ int skyflatnum;
 int skytexture;
 int skytexturemid;
 
+skyview_t skyview;   /* 3D skybox camera (SkyViewpoint 9080); active==0 if none */
+
 /* Hexen dual-sky support.  Sky1 is the regular sky; during a lightning flash
  * the renderer swaps Sky1 to the brighter Sky2.  With DoubleSky a second sky
  * (Sky2) scrolls behind a foreground sky (Sky1) that has transparent areas.

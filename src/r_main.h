@@ -53,6 +53,7 @@ extern fixed_t  viewheightfrac; //e6y: for correct clipping of things
 extern fixed_t  projection;
 extern fixed_t  projectionx;
 extern int      render_aspect;
+extern int      r_in_skybox;
 extern fixed_t  projectiony; /* proff 11/06/98: Added for high-res */
 extern int      validcount;
 extern fixed_t skyiscale;

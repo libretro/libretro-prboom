@@ -688,6 +688,12 @@ static void R_DoDrawPlane(visplane_t *pl)
          const rpatch_t *tex_patch;
          angle_t an, flip;
 
+         /* 3D skybox active and this is the main (non-skybox) pass: leave the
+          * sky pixels showing the skybox scene already rendered underneath
+          * rather than overwriting them with the flat sky texture. */
+         if (skyview.active && !r_in_skybox)
+            return;
+
          // killough 10/98: allow skies to come from sidedefs.
          // Allows scrolling and/or animated skies, as well as
          // arbitrary multiple skies per level without having

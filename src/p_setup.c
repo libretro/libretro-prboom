@@ -50,6 +50,7 @@
 #include "w_wad.h"
 #include "r_main.h"
 #include "r_things.h"
+#include "r_sky.h"
 #include "p_maputl.h"
 #include "p_map.h"
 #include "p_setup.h"
@@ -2661,6 +2662,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    /* a new level invalidates any ACS view camera from the previous one */
    zacs_view_camera = NULL;
+   skyview.active = 0;   /* and any 3D skybox (SkyViewpoint) from the previous map */
 
    /* Select the per-game map format before any linedefs/specials are
     * processed.  For Doom this installs the Doom descriptor (no behaviour

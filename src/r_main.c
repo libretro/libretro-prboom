@@ -94,6 +94,7 @@ int      fieldofview;
  * this to size the render buffer width; the renderer itself derives
  * FOV from the resulting buffer dimensions and needs no other input. */
 int      render_aspect;
+int      r_in_skybox;   /* set while rendering the 3D-skybox pass */
 extern lighttable_t **walllights;
 
 //
@@ -880,6 +881,53 @@ int autodetect_hom = 0;       // killough 2/7/98: HOM autodetection flag
 //
 // R_RenderView
 //
+/* Render the 3D skybox (ZDoom SkyViewpoint) into the view buffer.  Called
+ * before the main scene when a default SkyViewpoint exists; the main pass then
+ * leaves its sky pixels untouched so this scene shows through them.
+ *
+ * Camera (matching GZDoom's HWSkyboxPortal::Setup): positioned at the
+ * SkyViewpoint's location, fixed (no parallax for a plain SkyViewpoint), with
+ * the view yaw set to the player's yaw plus the viewpoint's own yaw, same
+ * pitch.  The skybox's own sky areas draw the flat sky texture as usual. */
+static void R_RenderSkybox(void)
+{
+  fixed_t savex = viewx, savey = viewy, savez = viewz;
+  angle_t saveang = viewangle;
+  fixed_t savecos = viewcos, savesin = viewsin;
+  subsector_t *sub;
+
+  r_in_skybox = 1;
+
+  viewx = skyview.x;
+  viewy = skyview.y;
+  viewz = skyview.z;
+  viewangle = saveang + skyview.angle;
+  viewsin = finesine[viewangle>>ANGLETOFINESHIFT];
+  viewcos = finecosine[viewangle>>ANGLETOFINESHIFT];
+
+  /* viewplane/segment state is keyed off the camera's subsector */
+  sub = R_PointInSubsector(viewx, viewy);
+  viewplayer = &players[displayplayer];
+  (void)sub;
+
+  R_ClearClipSegs();
+  R_ClearDrawSegs();
+  R_ClearPlanes();
+  R_ClearSprites();
+
+  R_RenderBSPNode(numnodes-1);
+  R_DrawCmdReplay();
+  R_ResetColumnBuffer();
+  R_DrawPlanes();
+  R_DrawMasked();
+  R_ResetColumnBuffer();
+
+  r_in_skybox = 0;
+
+  viewx = savex; viewy = savey; viewz = savez;
+  viewangle = saveang; viewcos = savecos; viewsin = savesin;
+}
+
 void R_RenderPlayerView (player_t* player)
 {
 #ifdef PRBOOM_RENDER_PROFILE
@@ -905,6 +953,11 @@ void R_RenderPlayerView (player_t* player)
 #endif
 
   R_SetupFrame (player);
+
+  /* 3D skybox: render the SkyViewpoint scene first so the main pass's sky
+   * pixels reveal it instead of the flat sky texture. */
+  if (skyview.active)
+    R_RenderSkybox();
 
   // Clear buffers.
   R_ClearClipSegs ();

@@ -35,6 +35,7 @@
 #include "doomstat.h"
 #include "m_random.h"
 #include "r_main.h"
+#include "r_sky.h"
 #include "p_maputl.h"
 #include "p_slope.h"
 #include "p_map.h"
@@ -2472,6 +2473,25 @@ void P_SpawnMapThing (const mapthing_t* mthing)
         /* sector action marker: no mobj, just the registry */
         U_ZSecActRegister(mthing->x << FRACBITS, mthing->y << FRACBITS,
                           thingtype, hexen_thing_special, hexen_thing_args);
+        return;
+      }
+      if (thingtype == 9080)
+      {
+        /* SkyViewpoint: an untagged one is the level's default 3D skybox
+         * camera.  Record its position and yaw so the renderer can draw the
+         * sky from here (distant scenery) instead of the flat sky texture.
+         * Match ZDoom: keep the camera a few units off the sector floor. */
+        fixed_t sx = mthing->x << FRACBITS;
+        fixed_t sy = mthing->y << FRACBITS;
+        subsector_t *ss = R_PointInSubsector(sx, sy);
+        if (!skyview.active)   /* first/untagged one wins, as in ZDoom */
+        {
+          skyview.active = 1;
+          skyview.x = sx;
+          skyview.y = sy;
+          skyview.z = ss->sector->floorheight + (41 << FRACBITS);
+          skyview.angle = ANG45 * (mthing->angle / 45);
+        }
         return;
       }
       if (U_IsInertZDoomThing(thingtype))

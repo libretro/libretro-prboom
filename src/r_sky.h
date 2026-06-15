@@ -35,6 +35,7 @@
 #define __R_SKY__
 
 #include "m_fixed.h"
+#include "tables.h"
 
 /* SKY, store the number for name. */
 #define SKYFLATNAME  "F_SKY1"
@@ -44,6 +45,17 @@
 
 extern int skytexture;
 extern int skytexturemid;
+
+/* 3D skybox (ZDoom SkyViewpoint, doomednum 9080).  When a map places an
+ * untagged SkyViewpoint it becomes the level's default skybox: sky pixels show
+ * the scene rendered from this camera (e.g. distant mountains) instead of the
+ * flat sky texture.  Captured in P_SpawnMapThing; consumed in R_RenderPlayerView. */
+typedef struct {
+  int     active;   /* a default SkyViewpoint was placed */
+  fixed_t x, y, z;  /* camera position (map units, 16.16) */
+  angle_t angle;    /* camera's own yaw, added to the player's view yaw */
+} skyview_t;
+extern skyview_t skyview;
 
 /* Hexen dual-sky / lightning support. */
 extern int     Sky1Texture;

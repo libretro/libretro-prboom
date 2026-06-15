@@ -928,21 +928,6 @@ static void R_DoDrawPlane(visplane_t *pl)
             }
          }
 
-         /* Submerged floor of a flooded sector: darken its pixels toward the
-          * deep-water tone so it matches the wall volume darkened in
-          * R_RenderMaskedSegRange (surf_y well above the span -> deep curve). */
-         if (pl->water_darken)
-         {
-            extern void R_WaterDarkenColumn(int x, int yl, int yh, int surf_y);
-            int xx;
-            for (xx = pl->minx; xx <= pl->maxx; xx++)
-            {
-               unsigned t = pl->top[xx], b = pl->bottom[xx];
-               if (t <= b && b != 0xffffffffu)
-                  R_WaterDarkenColumn(xx, (int)t, (int)b, (int)t - 64);
-            }
-         }
-
          tilt_plane = NULL;
 
          if (!R_IsSyntheticFlat(pl->picnum))

@@ -610,31 +610,6 @@ static void R_Subsector(int num)
    * handled (view above the top); its span is bounded per-column in
    * R_RenderSegLoop and it is drawn after the opaque planes.  waterplane is
    * reset every subsector so a stale plane never leaks into an ordinary one. */
-  /* A flooded sector (a swimmable 3D-floor whose surface sits above the
-   * sector floor) has a submerged floor: darken it like the water volume drawn
-   * on the walls, so the whole underwater area reads dark rather than leaving
-   * the bright floor flat showing through.  Only the genuinely submerged floor
-   * (below the water surface) is marked; the swimmable type gates it, so normal
-   * sectors are untouched. */
-  {
-    const ffloor_t *ffp;
-    for (ffp = frontsector->ffloors; ffp; ffp = ffp->next)
-      if (ffp->type == FFLOOR_SWIMMABLE &&
-          ffp->model->ceilingheight > frontsector->floorheight)
-      {
-        /* Only darken the submerged floor when the eye is ABOVE the water
-         * surface -- i.e. looking down through the water at the floor.  When
-         * the eye is below the surface (wading in the room, or looking
-         * horizontally through a window into it), the floor underfoot is
-         * ordinary ground and must render normally; darkening it then turned
-         * every connected water sector's walkable floor into dark water. */
-        if (floorplane &&
-            frontsector->floorheight < ffp->model->ceilingheight &&
-            viewz > ffp->model->ceilingheight)
-          floorplane->water_darken = 1;
-        break;
-      }
-  }
   waterplane = NULL;
   nmorewater = 0;
   if (frontsector->ffloors)

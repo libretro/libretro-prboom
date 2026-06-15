@@ -107,6 +107,7 @@ static int spanstart[MAX_SCREENHEIGHT];                // killough 2/8/98
 
 static const lighttable_t **planezlight;
 static int                  planelightlevel; /* LIGHTLEVELS index of current plane, for Smooth fine weight */
+static int                  planerawlight;   /* raw 0..255 sector light + extralight, for Smooth sub-band base */
 static fixed_t planeheight;
 
 // killough 2/8/98: make variables static
@@ -251,8 +252,13 @@ static void R_MapTiltedPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
          dsvars->colormap = planezlight[index];
          if (r_smooth_shading && fullcolormap)
          {
-            int startmap = ((LIGHTLEVELS-1-planelightlevel)*2)
-                           * SMOOTH_WEIGHTS / LIGHTLEVELS;
+            /* Continuous base darkness from the raw 0..255 sector light
+             * (planerawlight) instead of the 16-band planelightlevel.  This
+             * agrees with the band formula at band centres but interpolates
+             * between them, so adjacent sectors with close light levels no
+             * longer snap to different bands (the floor light banding). */
+            int startmap = ((255 - planerawlight) * 2 * (LIGHTLEVELS-1)
+                            * SMOOTH_WEIGHTS) / (255 * LIGHTLEVELS);
             int scale    = FixedDiv((320/2*FRACUNIT),((int)index+1)<<LIGHTZSHIFT);
             int fine2    = startmap
                          - (scale >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))/DISTMAP;
@@ -381,8 +387,13 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
        * weight (max = brightest). */
       if (r_smooth_shading && fullcolormap)
       {
-         int startmap = ((LIGHTLEVELS-1-planelightlevel)*2)
-                        * SMOOTH_WEIGHTS / LIGHTLEVELS;
+         /* Continuous base darkness from the raw 0..255 sector light
+          * (planerawlight) instead of the 16-band planelightlevel, so
+          * adjacent sectors with close light levels no longer snap to
+          * different bands (the floor light banding).  Agrees with the band
+          * formula at band centres. */
+         int startmap = ((255 - planerawlight) * 2 * (LIGHTLEVELS-1)
+                         * SMOOTH_WEIGHTS) / (255 * LIGHTLEVELS);
          int scale    = FixedDiv((320/2*FRACUNIT),(index+1)<<LIGHTZSHIFT);
          /* Both halves scaled to SMOOTH_WEIGHTS resolution: startmap via the
           * *SMOOTH_WEIGHTS factor above, and the distance term via the shift
@@ -873,6 +884,16 @@ static void R_DoDrawPlane(visplane_t *pl)
          stop = pl->maxx + 1;
          planezlight = zlight[light];
          planelightlevel = light;
+         /* Smooth mode bases its sub-band darkness on planelightlevel, which
+          * is the sector light quantised to LIGHTLEVELS(16) bands.  On maps
+          * with many adjacent sectors at slightly different light levels that
+          * quantisation makes the floor/ceiling break into hard light bands.
+          * Keep the raw 0..255 sector light (plus extralight, in the same
+          * LIGHTSEGSHIFT units the band uses) so the Smooth path can place the
+          * base darkness continuously between bands instead. */
+         planerawlight = pl->lightlevel + (extralight << LIGHTSEGSHIFT);
+         if (planerawlight < 0)        planerawlight = 0;
+         else if (planerawlight > 255) planerawlight = 255;
          pl->top[pl->minx-1] = pl->top[stop] = 0xffffffffu; // dropoff overflow
 
          if (pl->slope)

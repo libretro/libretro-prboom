@@ -758,11 +758,25 @@ void M_AddEpisode(const char *map, char *def)
       *
       * Backfill the slots that M_Init already populated: vanilla
       * Doom episodes start at map 1 of their own episode number,
-      * matching the non-EpiCustom default formula. */
+      * matching the non-EpiCustom default formula.
+      *
+      * Issue: M_ChooseSkill launches the EpiCustom path by map *name*
+      * via G_DeferedInitNewName(choice, EpiMenuName[epi]), not by the
+      * EpiMenuEpi/EpiMenuMap numbers.  The loop below must therefore also
+      * seed EpiMenuName[k] for the vanilla episodes; otherwise those slots
+      * stay BSS-empty ("") and G_DeferedInitNewName, given an empty name,
+      * falls through to its default e=1,m=1 -- so selecting Episode 2/3/4
+      * (e.g. when SIGIL's UMAPINFO appends E5 and flips EpiCustom) silently
+      * relaunches E1M1.  Vanilla Doom episodes start at E<k+1>M1. */
      for (k = 0; k < EpiDef.numitems; k++)
      {
         EpiMenuEpi[k] = k + 1;
         EpiMenuMap[k] = 1;
+        EpiMenuName[k][0] = 'E';
+        EpiMenuName[k][1] = (char)('1' + k);
+        EpiMenuName[k][2] = 'M';
+        EpiMenuName[k][3] = '1';
+        EpiMenuName[k][4] = 0;
      }
      /* Doom II (and the other commercial IWADs) has no episode menu of its
       * own -- M_Init leaves EpiDef.numitems at 0 and New Game jumps straight

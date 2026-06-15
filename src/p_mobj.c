@@ -37,6 +37,7 @@
 #include "r_main.h"
 #include "r_sky.h"
 #include "p_skybox.h"
+#include "p_sectorportal.h"
 #include "p_maputl.h"
 #include "p_slope.h"
 #include "p_map.h"
@@ -2506,6 +2507,17 @@ void P_SpawnMapThing (const mapthing_t* mthing)
          * arg0.  Recorded now, resolved after all things load. */
         P_AddSkyboxPicker(mthing->x << FRACBITS, mthing->y << FRACBITS,
                           hexen_thing_args[0]);
+        return;
+      }
+      if (thingtype == 9077 || thingtype == 9078)
+      {
+        /* UpperStackLookOnly (9077) / LowerStackLookOnly (9078): stacked-
+         * sector "look only" portal anchors, paired by tid.  arg0 of the
+         * upper carries the portal alpha.  Recorded now, paired after all
+         * things load. */
+        P_AddStackPoint(thingtype == 9077, hexen_thing_tid,
+                        mthing->x << FRACBITS, mthing->y << FRACBITS,
+                        thingtype == 9077 ? hexen_thing_args[0] : 255);
         return;
       }
       if (U_IsInertZDoomThing(thingtype))

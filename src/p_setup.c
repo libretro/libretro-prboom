@@ -62,6 +62,7 @@
 #include "p_spec.h"
 #include "map_format.h"
 #include "udmf.h"
+#include "p_vslope.h"
 #include "miniz.h"
 #include "p_tick.h"
 #include "p_enemy.h"
@@ -1320,6 +1321,21 @@ static void P_LoadThings (int lump)
           hexen_thing_special = 0;
           hexen_thing_args[0] = hexen_thing_args[1] = hexen_thing_args[2] =
             hexen_thing_args[3] = hexen_thing_args[4] = 0;
+        }
+
+      /* ZDoom vertex-slope things (Vertex Floor Z 1504, Vertex Ceiling Z
+       * 1505) are load-time slope markers, not world mobjs: record the
+       * spawn height at the thing's vertex and consume it before the
+       * doomednum lookup spams "Unknown Thing type". */
+      if (hexen_fmt && (mt.type == 1504 || mt.type == 1505))
+        {
+          P_AddSlopeVertex(SHORT(((const hexen_mapthing_t *)data + i)->x)
+                             << FRACBITS,
+                           SHORT(((const hexen_mapthing_t *)data + i)->y)
+                             << FRACBITS,
+                           (fixed_t)hexen_thing_height << FRACBITS,
+                           mt.type == 1505);
+          continue;
         }
 
       if (!P_IsDoomnumAllowed(mt.type))
@@ -2624,6 +2640,20 @@ static void P_LoadUDMFThings(void)
     hexen_thing_args[3] = dmt->arg3;
     hexen_thing_args[4] = dmt->arg4;
 
+    /* ZDoom vertex-slope things: record the parsed height at the thing's
+     * full-precision vertex coordinate and consume it before the narrow
+     * mapthing_t spawn (which would truncate the position and spam
+     * "Unknown Thing type"). */
+    if (dmt->type == 1504 || dmt->type == 1505)
+    {
+      if (dmt->height)
+        P_AddSlopeVertex(udmf_to_fixed(dmt->x),
+                         udmf_to_fixed(dmt->y),
+                         udmf_to_fixed(dmt->height),
+                         dmt->type == 1505);
+      continue;
+    }
+
     if (!P_IsDoomnumAllowed(mt.type))
       continue;
 
@@ -2924,6 +2954,8 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
          P_InitMonsters();           /* reset D'Sparil boss-spot collection */
       }
    }
+
+   P_ClearSlopeVertices();      /* drop last level's vertex-slope markers */
 
    if (udmf_level)
       P_LoadUDMFThings();

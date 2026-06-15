@@ -42,6 +42,7 @@
 #include "doomstat.h"
 #include "p_spec.h"
 #include "p_slope.h"
+#include "p_vslope.h"
 #include "u_zanimdefs.h"
 #include "map_format.h"
 #include "hexen/p_spec_hexen.h"
@@ -3076,6 +3077,9 @@ void P_SpawnSpecials (void)
 
     /* Plane_Align (181) slopes are likewise static */
     P_SpawnZDoomSlopes();
+
+    /* thing-based vertex slopes (1504/1505) recorded at thing load */
+    P_SpawnVertexSlopes();
   }
 }
 

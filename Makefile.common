@@ -154,6 +154,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/u_decorate.c \
 				 $(CORE_DIR)/u_zsndinfo.c \
    $(CORE_DIR)/p_slope.c \
+   $(CORE_DIR)/p_vslope.c \
    $(CORE_DIR)/p_zacs.c \
    $(CORE_DIR)/p_conversation.c \
    $(CORE_DIR)/u_png.c \

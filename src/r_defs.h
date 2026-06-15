@@ -161,6 +161,10 @@ typedef struct
   /* ZDoom 3D floors (Sector_Set3DFloor): slabs attached to this
    * sector, geometry living in their control sectors (p_ffloor.c) */
   struct ffloor_s *ffloors;
+
+  /* per-sector 3D skybox (SkyPicker 9081): index into the skyboxes[]
+   * camera table, or -1 to use the level default sky/skyview. */
+  int skybox;
 } sector_t;
 
 //

@@ -36,6 +36,7 @@
 #include "m_random.h"
 #include "r_main.h"
 #include "r_sky.h"
+#include "p_skybox.h"
 #include "p_maputl.h"
 #include "p_slope.h"
 #include "p_map.h"
@@ -2484,14 +2485,27 @@ void P_SpawnMapThing (const mapthing_t* mthing)
         fixed_t sx = mthing->x << FRACBITS;
         fixed_t sy = mthing->y << FRACBITS;
         subsector_t *ss = R_PointInSubsector(sx, sy);
-        if (!skyview.active)   /* first/untagged one wins, as in ZDoom */
+        fixed_t sz = ss->sector->floorheight + (41 << FRACBITS);
+        angle_t sang = ANG45 * (mthing->angle / 45);
+        if (hexen_thing_tid)
+          /* tagged: a named skybox a SkyPicker can select per-sector */
+          P_AddSkyboxViewpoint(hexen_thing_tid, sx, sy, sz, sang);
+        else if (!skyview.active)   /* untagged: the level default */
         {
           skyview.active = 1;
           skyview.x = sx;
           skyview.y = sy;
-          skyview.z = ss->sector->floorheight + (41 << FRACBITS);
-          skyview.angle = ANG45 * (mthing->angle / 45);
+          skyview.z = sz;
+          skyview.angle = sang;
         }
+        return;
+      }
+      if (thingtype == 9081)
+      {
+        /* SkyPicker: this sector shows the skybox whose SkyViewpoint tid is
+         * arg0.  Recorded now, resolved after all things load. */
+        P_AddSkyboxPicker(mthing->x << FRACBITS, mthing->y << FRACBITS,
+                          hexen_thing_args[0]);
         return;
       }
       if (U_IsInertZDoomThing(thingtype))

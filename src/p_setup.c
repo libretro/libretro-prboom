@@ -63,6 +63,7 @@
 #include "map_format.h"
 #include "udmf.h"
 #include "p_vslope.h"
+#include "p_skybox.h"
 #include "miniz.h"
 #include "p_tick.h"
 #include "p_enemy.h"
@@ -2812,6 +2813,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    P_ClearSlopeVertices();      /* drop last level's vertex-slope markers
                                  * before any vertex/thing load registers
                                  * this level's */
+   P_ClearSkyboxes();           /* and last level's skybox cameras/pickers */
 
    if (udmf_level)
    {
@@ -2977,6 +2979,10 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
 
    if (heretic)
       P_CloseWeapons();         /* place (at most) one firemace */
+
+   /* resolve SkyPicker requests against tagged SkyViewpoints now that all
+    * things (in any order) have loaded; fills sector->skybox */
+   P_SpawnSkyboxes();
 
    if (map_format.polyobjs)
       /* spawn and place the polyobjects; UDMF maps have no binary THINGS

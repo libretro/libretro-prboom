@@ -498,6 +498,9 @@ static vissprite_t *R_NewVisSprite(void)
 int   *mfloorclip;   // dropoff overflow
 int   *mceilingclip; // dropoff overflow
 fixed_t spryscale;
+#ifndef DIRECT_COLUMN_MINPX
+#define DIRECT_COLUMN_MINPX 64
+#endif
 fixed_t sprtopscreen;
 
 /* Per-column fullbright mask base for the sprite currently being drawn by
@@ -771,7 +774,19 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
          * flush per post, so multi-post columns go direct.  The two
          * paths never touch the same pixels -- columns are disjoint
          * in x -- so they interleave safely within a sprite. */
-        if (column->numPosts > 1)
+        /* Tall columns: the temp-buffer batcher writes every pixel twice
+         * (colfunc -> short_tempbuf, then R_FlushWhole16 -> framebuffer),
+         * which the 4-wide flush only amortises for short runs.  A close
+         * sprite's columns are hundreds of pixels tall, so the second pass
+         * dominates; send those straight to the single-pass direct writer.
+         * Multi-post columns already go direct (the batcher flushes per
+         * post for them).  Output is bit-identical either way.  The height
+         * test is overflow-safe: spryscale>>8 keeps the product well within
+         * 32 bits for any realistic scale/post length. */
+        if (column->numPosts > 1 ||
+            (column->numPosts == 1 &&
+             (((spryscale >> 8) * column->posts[0].length) >> (FRACBITS - 8))
+               >= DIRECT_COLUMN_MINPX))
         {
           dcvars.texheight = patch->height;
           R_DrawMaskedColumnDirect(patch, &dcvars, column, lut);

@@ -331,20 +331,28 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_, int rx1, int rx2)
     rw_scalestep = ds->scalestep;
     colscale     = ds->scale1 + (rx1 - ds->x1) * rw_scalestep;
 
-    /* Clip the decal to the wall's own per-column screen extent (as GZDoom
-     * hands walltop/wallbottom to its decal drawer) so it stays on the wall
-     * surface instead of the full screen.  These arrays exist for masked/
-     * silhouette segs; a plain solid seg may not have built them, in which
-     * case fall back to the full-screen bounds. */
-    if (ds->sprtopclip && ds->sprbottomclip)
+    /* Clip the decal to the wall's own per-column screen extent (as the
+     * reference engine hands walltop/wallbottom to its decal drawer) so it
+     * stays on the wall surface.  Only a masked/two-sided seg builds real
+     * per-column opening arrays.  A solid one-sided wall instead stores the
+     * sentinels sprtopclip=screenheightarray / sprbottomclip=negonearray,
+     * meaning "this wall fully occludes sprites"; those are NOT usable as
+     * decal bounds -- feeding them to the column drawer (ceiling clip at the
+     * screen bottom, floor clip above the top) rejects every row and the
+     * decal vanishes.  Use the seg's arrays only when they are genuine
+     * openings; otherwise fall back to the real full-screen decal bounds
+     * (ceiling clip just above the screen, floor clip at the bottom). */
+    if (ds->sprtopclip && ds->sprbottomclip
+        && ds->sprtopclip != screenheightarray
+        && ds->sprbottomclip != negonearray)
     {
       mceilingclip = ds->sprtopclip;
       mfloorclip   = ds->sprbottomclip;
     }
     else
     {
-      mfloorclip   = screenheightarray;
       mceilingclip = negonearray;
+      mfloorclip   = screenheightarray;
     }
 
     for (x = rx1; x <= rx2; x++, colscale += rw_scalestep)

@@ -220,6 +220,12 @@ extern angle_t xtoviewangle[];
 static int  decal_col_owner[MAX_SCREENWIDTH];
 static int  decal_owner_valid;   /* has the array been reset this frame?    */
 
+/* Per-column wall top/bottom screen rows, recomputed for each decal from its
+ * seg's front sector so the decal clips to the wall surface (see
+ * R_DrawDecalsForSeg). */
+static int  decal_topclip[MAX_SCREENWIDTH];
+static int  decal_bottomclip[MAX_SCREENWIDTH];
+
 void R_DecalsBeginFrame(void)
 {
   int x;
@@ -331,28 +337,48 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_, int rx1, int rx2)
     rw_scalestep = ds->scalestep;
     colscale     = ds->scale1 + (rx1 - ds->x1) * rw_scalestep;
 
-    /* Clip the decal to the wall's own per-column screen extent (as the
-     * reference engine hands walltop/wallbottom to its decal drawer) so it
-     * stays on the wall surface.  Only a masked/two-sided seg builds real
-     * per-column opening arrays.  A solid one-sided wall instead stores the
-     * sentinels sprtopclip=screenheightarray / sprbottomclip=negonearray,
-     * meaning "this wall fully occludes sprites"; those are NOT usable as
-     * decal bounds -- feeding them to the column drawer (ceiling clip at the
-     * screen bottom, floor clip above the top) rejects every row and the
-     * decal vanishes.  Use the seg's arrays only when they are genuine
-     * openings; otherwise fall back to the real full-screen decal bounds
-     * (ceiling clip just above the screen, floor clip at the bottom). */
-    if (ds->sprtopclip && ds->sprbottomclip
-        && ds->sprtopclip != screenheightarray
-        && ds->sprbottomclip != negonearray)
+    /* Clip the decal to the wall's own vertical extent, the way the
+     * reference engine hands walltop/wallbottom (the seg's projected ceiling
+     * and floor screen rows) to its decal drawer.  The drawseg's
+     * sprtopclip/sprbottomclip are the sprite *opening* (the gap between the
+     * upper and lower silhouettes), not the wall surface: on a step or box
+     * the opening starts at the back sector's floor, so a decal stamped on
+     * the lower texture sits below it and gets clipped away -- the glitch
+     * seen when shooting boxes.  Instead, derive the clip from the front
+     * sector's own ceiling/floor projected per column (exactly as
+     * R_RenderSegLoop projects the wall), which always contains the decal
+     * wherever on the wall it landed while still bounding it to the surface.
+     * Fall back to full screen if the front sector is somehow unavailable. */
     {
-      mceilingclip = ds->sprtopclip;
-      mfloorclip   = ds->sprbottomclip;
-    }
-    else
-    {
-      mceilingclip = negonearray;
-      mfloorclip   = screenheightarray;
+      const sector_t *fs = seg->frontsector;
+      if (fs)
+      {
+        fixed_t cscale = colscale;
+        fixed_t ctop = fs->ceilingheight - viewz;
+        fixed_t cbot = fs->floorheight   - viewz;
+        int xx;
+        for (xx = rx1; xx <= rx2; xx++, cscale += rw_scalestep)
+        {
+          int ty = (int)(((int64_t)centeryfrac - (int64_t)FixedMul(ctop, cscale)) >> FRACBITS);
+          int by = (int)(((int64_t)centeryfrac - (int64_t)FixedMul(cbot, cscale)) >> FRACBITS);
+          /* mceilingclip is the last row ABOVE the wall (drawer keeps rows
+           * strictly below it); mfloorclip the first row BELOW. */
+          ty -= 1;
+          if (ty < -1)            ty = -1;
+          if (ty > viewheight)    ty = viewheight;
+          if (by < -1)            by = -1;
+          if (by > viewheight)    by = viewheight;
+          decal_topclip[xx]    = ty;
+          decal_bottomclip[xx] = by;
+        }
+        mceilingclip = decal_topclip;
+        mfloorclip   = decal_bottomclip;
+      }
+      else
+      {
+        mceilingclip = negonearray;
+        mfloorclip   = screenheightarray;
+      }
     }
 
     for (x = rx1; x <= rx2; x++, colscale += rw_scalestep)

@@ -21,6 +21,18 @@ static placed_decal_t decal_list[MAX_DECALS];
 static int            decal_count;   /* number currently stored (<= MAX)  */
 static int            decal_head;    /* next slot to write (ring cursor)  */
 
+/* Per-line count of live decals.  R_DrawDecalsForSeg is invoked for every
+ * drawseg in the final masked pass, and again for every seg occluded by a
+ * sprite in the interleaved pass; without an index each invocation scans the
+ * whole decal ring and then claims its entire column span in the owner array,
+ * so the cost grows with drawsegs x decals x seg-width every frame even
+ * though almost no seg actually carries a decal.  This lets a seg whose line
+ * has no decal bail in O(1) before any of that work.  Sized to numlines at
+ * level setup; a slot is decremented when its decal is recycled in the
+ * ring. */
+static int           *decal_line_count;
+static int            decal_line_cap;
+
 /* Off by default: most ZDoom content does not ask for bullet-chip decals, so
  * forcing them on every hitscan impact made every mod look wrong.  The
  * frontend setting flips this on for content (or players) that want them. */
@@ -101,6 +113,18 @@ void R_ClearDecals(void)
 {
   decal_count = 0;
   decal_head  = 0;
+
+  if (numlines > decal_line_cap)
+  {
+    int *p = (int *)realloc(decal_line_count, (size_t)numlines * sizeof(int));
+    if (p)
+    {
+      decal_line_count = p;
+      decal_line_cap   = numlines;
+    }
+  }
+  if (decal_line_count && decal_line_cap > 0)
+    memset(decal_line_count, 0, (size_t)decal_line_cap * sizeof(int));
 }
 
 void R_SpawnDecal(const line_t *li, fixed_t x, fixed_t y, fixed_t z,
@@ -154,12 +178,20 @@ void R_SpawnDecal(const line_t *li, fixed_t x, fixed_t y, fixed_t z,
     }
 
     pd = &decal_list[decal_head];
+    if (decal_count == MAX_DECALS && decal_line_count
+        && pd->line >= 0 && pd->line < decal_line_cap
+        && decal_line_count[pd->line] > 0)
+      decal_line_count[pd->line]--;   /* this ring slot is being recycled */
+
     pd->line   = (int)(li - lines);
     pd->side   = side;
     pd->offset = (fixed_t)proj;
     pd->z      = z;
     pd->decal  = decalnum;
     pd->flags  = flags;
+
+    if (decal_line_count && pd->line >= 0 && pd->line < decal_line_cap)
+      decal_line_count[pd->line]++;
 
     decal_head = (decal_head + 1) % MAX_DECALS;
     if (decal_count < MAX_DECALS)
@@ -253,6 +285,15 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_, int rx1, int rx2)
   ld      = seg->linedef;
   lineidx = (int)(ld - lines);
   dsindex = (int)(ds - drawsegs);
+
+  /* Fast reject: nothing on this seg's line means neither the decal scan nor
+   * the column-owner claim below has anything to do.  This is the common
+   * case for nearly every seg and keeps the decal passes off the frame's hot
+   * path until a decal is actually present on that wall. */
+  if (decal_line_count && lineidx >= 0 && lineidx < decal_line_cap
+      && decal_line_count[lineidx] == 0)
+    return;
+
   /* seg side: 0 if this seg runs along the front side, else 1 */
   segside = seg->sidedef == &sides[ld->sidenum[0]] ? 0 : 1;
 

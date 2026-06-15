@@ -190,8 +190,18 @@ static double R_TiltedHit(int x, int y, double *wx, double *wy)
 
 static void R_MapTiltedPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
 {
+   /* The flat-plane mapper (R_MapPlane) caches per-row xstep/ystep keyed on
+    * planeheight via cachedheight[y].  A tilted plane writes spans at row y
+    * with its own per-span steps but never updates cachedheight[y], so a later
+    * flat plane that happens to share that planeheight takes the cache hit and
+    * reuses steps left over from before the tilted draw -- the flat floor then
+    * shears into diagonal stripes (visible on large floors behind/around
+    * sloped sectors).  Invalidate this row's cache so the next flat span at
+    * row y recomputes its steps. */
    double wx, wy, wx2, wy2, tt;
    int cx1 = x1;
+
+   cachedheight[y] = 0;
 
    while (cx1 <= x2)
    {

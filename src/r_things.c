@@ -632,18 +632,38 @@ static void R_DrawMaskedColumnDirect(const rpatch_t *patch,
       uint16_t *dest = drawvars.short_topleft
                      + yl * SURFACE_SHORT_PITCH + x;
       int count = yh - yl + 1;
-
-      while (count--)
+      /* iscale (= FRACUNIT/scale) is always positive, so frac is monotonic
+       * over the run: if the first and last texel indices both fall inside
+       * [0, spr_th) every index in between does too.  In that case -- which
+       * is effectively always, for a normally projected sprite -- the inner
+       * loop needs no per-pixel wrap, removing two branches from the hottest
+       * column loop.  The wrapping loop is kept as the exact fallback for the
+       * rare out-of-range frac (oversized/clipped projections). */
+      int idx0 = frac >> 16;
+      int idxN = (frac + (count - 1) * iscale) >> 16;
+      if (count > 0 && idx0 >= 0 && idx0 < spr_th
+                    && idxN >= 0 && idxN < spr_th)
       {
-        int idx = frac >> 16;
-
-        while (idx < 0)
-          idx += spr_th;
-        while (idx >= spr_th)
-          idx -= spr_th;
-        *dest = lut[ source[idx] ];
-        dest += SURFACE_SHORT_PITCH;
-        frac += iscale;
+        while (count--)
+        {
+          *dest = lut[ source[frac >> 16] ];
+          dest += SURFACE_SHORT_PITCH;
+          frac += iscale;
+        }
+      }
+      else
+      {
+        while (count--)
+        {
+          int idx = frac >> 16;
+          while (idx < 0)
+            idx += spr_th;
+          while (idx >= spr_th)
+            idx -= spr_th;
+          *dest = lut[ source[idx] ];
+          dest += SURFACE_SHORT_PITCH;
+          frac += iscale;
+        }
       }
     }
   }

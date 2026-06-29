@@ -9,7 +9,6 @@
 #endif
 
 #include "libretro.h"
-#include "audio_float_compat.h"
 
 #include <formats/rwav.h>
 

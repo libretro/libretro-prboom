@@ -14,7 +14,6 @@
 #include <time.h>
 
 #include <libretro.h>
-#include "audio_float_compat.h"
 #include <file/file_path.h>
 #include <streams/file_stream.h>
 #include <vfs/vfs_implementation.h>

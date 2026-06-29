@@ -368,10 +368,10 @@ def json2h(intl_dir_path: str, file_list) -> None:
          or file.is_dir():
          continue
 
-      with open(file.path, 'r+', encoding='utf-8') as json_file:
+      with open(os.path.realpath(file.path), 'r+', encoding='utf-8') as json_file:
          messages = json.load(json_file)
          new_translation = update(messages, template, source_messages, os.path.splitext(file.name)[0])
-      with open(os.path.splitext(file.path)[0] + '.h', 'w', encoding='utf-8') as h_file:
+      with open(os.path.realpath(os.path.splitext(file.path)[0] + '.h'), 'w', encoding='utf-8') as h_file:
          h_file.seek(0)
          h_file.write(new_translation)
          h_file.truncate()
@@ -604,7 +604,7 @@ if __name__ == '__main__':
          _temp = sys.argv[1]
       while _temp.endswith('/') or _temp.endswith('\\'):
          _temp = _temp[:-1]
-      TARGET_DIR_PATH = _temp
+      TARGET_DIR_PATH = os.path.realpath(_temp)
    except IndexError:
       TARGET_DIR_PATH = os.path.dirname(os.path.dirname(os.path.realpath(__file__)))
       print("No path provided, assuming parent directory:\n" + TARGET_DIR_PATH)

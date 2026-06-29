@@ -641,9 +641,12 @@ static void _pocketmod_render_channel(pocketmod_context *c,
 
     int i, num;
 
-    /* A zero increment would stall (and the float path divided by it); a muted
-     * channel contributes nothing, so skip either case cheaply. */
-    if (chan->increment <= 0 || (gain_l == 0 && gain_r == 0)) {
+    /* A zero increment would divide by zero below; the float path's only guard
+     * was position/sample, so guard increment here.  Do NOT skip on zero gain:
+     * a muted-but-playing channel must keep advancing its position (tracker
+     * music mutes a running sample and later ramps it back, expecting the
+     * sample to have advanced in the meantime). */
+    if (chan->increment <= 0) {
         return;
     }
 

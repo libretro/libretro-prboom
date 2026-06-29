@@ -769,25 +769,40 @@ void I_UpdateSound(void)
    else
       out_frames = SAMPLECOUNT_35;
 
-   /* Step 1: music or silence into mixbuffer. */
-   if (music_handle && current_player)
+   /* Step 1: music into the canonical buffer.
+    *
+    * When float output is active and the current backend renders float
+    * natively (Ogg via stb_vorbis, MIDI via fluidsynth), it writes
+    * straight into fmixbuffer, skipping the int16->float widen below.
+    * Integer-native backends (OPL/MOD/MP3/FLAC) have render_float == NULL,
+    * so they render int16 into mixbuffer and get widened in Step 1b. */
+   if (music_handle && current_player &&
+       use_float_output && current_player->render_float)
    {
-      current_player->render(mixbuffer, out_frames);
+      current_player->render_float(fmixbuffer, out_frames);
       music_samples_played += (uint64_t)out_frames;
    }
    else
-      memset(mixbuffer, 0, (size_t)out_frames * 2 * sizeof(int16_t));
-
-   /* Step 1b: float output -- widen the int16 music into the float buffer
-    * once; SFX then accumulate into it in place.  (First cut: the music
-    * backends still render int16; feeding float-native decoders straight
-    * in is a later refinement.)  Skipped entirely on the int16 path. */
-   if (use_float_output)
    {
-      int n = out_frames * 2;
-      int k;
-      for (k = 0; k < n; k++)
-         fmixbuffer[k] = (float)mixbuffer[k] * (1.0f / 32768.0f);
+      if (music_handle && current_player)
+      {
+         current_player->render(mixbuffer, out_frames);
+         music_samples_played += (uint64_t)out_frames;
+      }
+      else
+         memset(mixbuffer, 0, (size_t)out_frames * 2 * sizeof(int16_t));
+
+      /* Step 1b: float output -- widen the int16 music into the float
+       * buffer once; SFX then accumulate into it in place.  Integer-native
+       * backends take this path; float-native ones handled it above.
+       * Skipped entirely on the int16 path. */
+      if (use_float_output)
+      {
+         int n = out_frames * 2;
+         int k;
+         for (k = 0; k < n; k++)
+            fmixbuffer[k] = (float)mixbuffer[k] * (1.0f / 32768.0f);
+      }
    }
 
    /* Step 2: gather active SFX channels. */

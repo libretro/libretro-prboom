@@ -38,6 +38,8 @@ extern stb_vorbis *prb_stb_vorbis_open_memory(const unsigned char *data, int len
 extern prb_stb_vorbis_info prb_stb_vorbis_get_info(stb_vorbis *f);
 extern int  prb_stb_vorbis_get_samples_short_interleaved(stb_vorbis *f, int channels,
                                                          short *buffer, int num_shorts);
+extern int  prb_stb_vorbis_get_samples_float_interleaved(stb_vorbis *f, int channels,
+                                                         float *buffer, int num_floats);
 extern int  prb_stb_vorbis_seek_start(stb_vorbis *f);
 extern int  prb_stb_vorbis_seek(stb_vorbis *f, unsigned int sample_number);
 extern int  prb_stb_vorbis_get_sample_offset(stb_vorbis *f);
@@ -57,6 +59,11 @@ static int          ogg_paused;
 /* resampler state: source frames buffered, and the 16.16 read cursor */
 #define OGG_SRC_FRAMES 4096
 static short        ogg_src[OGG_SRC_FRAMES * 2]; /* interleaved s16 stereo src */
+/* Float twin of ogg_src, used only on the float-output path.  Vorbis is
+ * float-native, so decoding through the float API and resampling in float
+ * avoids the float->s16->float round-trip the s16 path pays.  Only one of
+ * ogg_src / ogg_srcf is ever filled in a given game lifetime. */
+static float        ogg_srcf[OGG_SRC_FRAMES * 2];
 static int          ogg_src_have;   /* frames currently in ogg_src           */
 static int          ogg_src_pos;    /* next unconsumed source frame          */
 static unsigned     ogg_frac;       /* 16.16 fractional position within src  */
@@ -185,6 +192,33 @@ static int ogg_fill(void)
       return 0;
   }
   ogg_src_have = got;   /* get_samples_short_interleaved returns frames */
+  return got;
+}
+
+/* Float twin of ogg_fill: decode Vorbis straight into ogg_srcf via the
+ * float API.  Shares the resampler cursor (pos/have/frac/step) with the
+ * s16 path; only one fill variant runs per game lifetime. */
+static int ogg_fill_f(void)
+{
+  int got;
+  ogg_src_pos = 0;
+  ogg_src_have = 0;
+  if (!ogg_v)
+    return 0;
+  got = prb_stb_vorbis_get_samples_float_interleaved(ogg_v, 2, ogg_srcf,
+                                                     OGG_SRC_FRAMES * 2);
+  if (got <= 0)
+  {
+    if (ogg_looping)
+    {
+      prb_stb_vorbis_seek_start(ogg_v);
+      got = prb_stb_vorbis_get_samples_float_interleaved(ogg_v, 2, ogg_srcf,
+                                                         OGG_SRC_FRAMES * 2);
+    }
+    if (got <= 0)
+      return 0;
+  }
+  ogg_src_have = got;   /* get_samples_float_interleaved returns frames */
   return got;
 }
 
@@ -325,6 +359,83 @@ static int ogg_unserialize(const void *src, size_t size)
   return 1;
 }
 
+/* Float mirror of ogg_render: identical resample cursor and looping
+ * logic, but reads the float source (ogg_srcf, filled by ogg_fill_f),
+ * interpolates and applies volume in float, and writes normalized
+ * [-1,1] float stereo.  No int16 round-trip. */
+static void ogg_render_float(void *dest, unsigned nsamp)
+{
+  float *out = (float *)dest;
+  int    vol = ogg_volume;
+
+  if (!ogg_playing || ogg_paused || !ogg_v)
+  {
+    memset(dest, 0, nsamp * 8);   /* float stereo: 8 bytes per frame */
+    return;
+  }
+
+  while (nsamp > 0)
+  {
+    int base;
+    /* ensure the current and next source frame are available */
+    while (ogg_src_pos + (int)(ogg_frac >> 16) + 1 >= ogg_src_have)
+    {
+      /* carry any leftover position past the consumed frames, then refill */
+      int consumed = ogg_src_pos + (int)(ogg_frac >> 16);
+      if (consumed > 0 && consumed < ogg_src_have)
+      {
+        int rem = ogg_src_have - consumed, i;
+        for (i = 0; i < rem * 2; i++)
+          ogg_srcf[i] = ogg_srcf[consumed * 2 + i];
+        ogg_src_have = rem;
+        ogg_src_pos  = 0;
+        ogg_frac    &= 0xFFFF;
+      }
+      else if (consumed >= ogg_src_have)
+      {
+        ogg_src_pos = 0;
+        ogg_frac   &= 0xFFFF;
+        if (!ogg_fill_f())
+        {
+          memset(out, 0, nsamp * 8);
+          ogg_playing = 0;
+          return;
+        }
+      }
+      else
+      {
+        if (!ogg_fill_f())
+        {
+          memset(out, 0, nsamp * 8);
+          ogg_playing = 0;
+          return;
+        }
+      }
+    }
+
+    base = (ogg_src_pos + (int)(ogg_frac >> 16)) * 2;
+    {
+      /* linear interpolate between frame `base` and the next */
+      float f = (float)(ogg_frac & 0xFFFF) * (1.0f / 65536.0f);
+      float l0 = ogg_srcf[base + 0], r0 = ogg_srcf[base + 1];
+      float l1, r1, l, r;
+      int nbase = base + 2;
+      if ((nbase >> 1) < ogg_src_have) { l1 = ogg_srcf[nbase + 0]; r1 = ogg_srcf[nbase + 1]; }
+      else                             { l1 = l0; r1 = r0; }
+      l = l0 + (l1 - l0) * f;
+      r = r0 + (r1 - r0) * f;
+      l = l * (float)vol * (1.0f / 15.0f);
+      r = r * (float)vol * (1.0f / 15.0f);
+      if (l >  1.0f) l =  1.0f; else if (l < -1.0f) l = -1.0f;
+      if (r >  1.0f) r =  1.0f; else if (r < -1.0f) r = -1.0f;
+      *out++ = l;
+      *out++ = r;
+    }
+    ogg_frac += ogg_step;
+    nsamp--;
+  }
+}
+
 const music_player_t ogg_player =
 {
   ogg_name,
@@ -339,5 +450,6 @@ const music_player_t ogg_player =
   ogg_stop,
   ogg_render,
   ogg_serialize,
-  ogg_unserialize
+  ogg_unserialize,
+  ogg_render_float
 };

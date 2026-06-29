@@ -103,6 +103,17 @@ typedef struct
   // implement state restore.  On failure the player should leave
   // playback running as-is; the caller treats this as a soft error.
   int (*unserialize)(const void *src, size_t size);
+
+  // Optional: render float stereo, normalized to [-1.0, 1.0], at the
+  // samplerate given to init().  Only used when the libretro frontend
+  // negotiated float audio output (RETRO_ENVIRONMENT_GET_AUDIO_SAMPLE_
+  // BATCH_FLOAT); the caller passes a float* dest and the same nsamp
+  // contract as render().  Leave NULL for integer-native backends
+  // (OPL/MOD/MP3/FLAC) -- the caller renders them via render() and
+  // widens to float.  Implementing this lets float-native decoders
+  // (Ogg via stb_vorbis, MIDI via fluidsynth) skip a float->int16->
+  // float round-trip and feed the float mixer directly.
+  void (*render_float)(void *dest, unsigned nsamp);
 } music_player_t;
 
 #endif /* MUSICPLAYER_H */

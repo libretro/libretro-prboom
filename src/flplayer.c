@@ -357,6 +357,15 @@ static void fl_writesamples_ex (short *dest, int nsamp)
   fluid_synth_write_s16(f_syn, nsamp, dest, 0, 2, dest, 1, 2);
 }
 
+static void fl_writesamples_ex_f (float *dest, int nsamp)
+{
+  /* Float twin of fl_writesamples_ex.  Volume is already folded into the
+   * synth gain (fl_setvolume), so this is a straight float stereo render
+   * with no extra scaling; used on the float-output path to skip the
+   * int16 narrowing that fluid_synth_write_s16 performs. */
+  fluid_synth_write_float(f_syn, nsamp, dest, 0, 2, dest, 1, 2);
+}
+
 static void writesysex (unsigned char *data, int len)
 {
   // sysex code is untested
@@ -428,10 +437,13 @@ static void fl_apply_event (midi_event_t *currevent)
   }
 }
 
-static void fl_render (void *vdest, unsigned length)
+/* Core MIDI event loop + render.  is_float selects the output buffer
+ * type: int16 stereo (the canonical path) or normalized float stereo
+ * (used only when the frontend negotiated float audio output).  Writes
+ * are addressed off vdest by the running frame offset (sampleswritten),
+ * so the s16 path is byte-identical to the old running-pointer code. */
+static void fl_render_core (void *vdest, unsigned length, int is_float)
 {
-  short *dest = vdest;
-  
   unsigned sampleswritten = 0;
   unsigned samples;
 
@@ -448,14 +460,14 @@ static void fl_render (void *vdest, unsigned length)
    * S_RestartMusic transitions). */
   if (!f_syn)
   {
-    memset (vdest, 0, length * 4);
+    memset (vdest, 0, length * (is_float ? 8u : 4u));
     return;
   }
 
   if (!f_playing || f_paused)
   { 
     /* save CPU time and allow for seamless resume after pause */
-    memset (vdest, 0, length * 4);
+    memset (vdest, 0, length * (is_float ? 8u : 4u));
     return;
   }
 
@@ -480,10 +492,10 @@ static void fl_render (void *vdest, unsigned length)
 
     if (samples)
     {
-      fl_writesamples_ex (dest, samples);
+      if (is_float) fl_writesamples_ex_f ((float *)vdest + sampleswritten * 2, samples);
+      else          fl_writesamples_ex   ((short *)vdest + sampleswritten * 2, samples);
       sampleswritten += samples;
       f_delta -= samples;
-      dest += samples * 2;
     }
 
     // process event
@@ -510,11 +522,10 @@ static void fl_render (void *vdest, unsigned length)
       samples = length - sampleswritten;
       if (samples)
       {
-        fl_writesamples_ex (dest, samples);
+        if (is_float) fl_writesamples_ex_f ((float *)vdest + sampleswritten * 2, samples);
+        else          fl_writesamples_ex   ((short *)vdest + sampleswritten * 2, samples);
         sampleswritten += samples;
         // timecodes no longer relevant
-        dest += samples * 2;
-
       }
       return;
     }
@@ -533,10 +544,10 @@ static void fl_render (void *vdest, unsigned length)
     samples = length - sampleswritten;
     if (samples)
     {
-      fl_writesamples_ex (dest, samples);
+      if (is_float) fl_writesamples_ex_f ((float *)vdest + sampleswritten * 2, samples);
+      else          fl_writesamples_ex   ((short *)vdest + sampleswritten * 2, samples);
       sampleswritten += samples;
       f_delta -= samples; // save offset
-      dest += samples * 2;
     }
   }
   else
@@ -544,6 +555,18 @@ static void fl_render (void *vdest, unsigned length)
     return;
   }
 }  
+
+/* Public render entry points: s16 (canonical) and float (used only when
+ * the frontend negotiated float audio output). */
+static void fl_render (void *vdest, unsigned length)
+{
+  fl_render_core (vdest, length, 0);
+}
+
+static void fl_render_float (void *vdest, unsigned length)
+{
+  fl_render_core (vdest, length, 1);
+}
 
 
 /* State save/restore -----------------------------------------------------
@@ -674,7 +697,8 @@ const music_player_t fl_player =
   fl_stop,
   fl_render,
   fl_serialize,
-  fl_unserialize
+  fl_unserialize,
+  fl_render_float
 };
 
 

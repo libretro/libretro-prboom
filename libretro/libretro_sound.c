@@ -9,6 +9,7 @@
 #endif
 
 #include "libretro.h"
+#include "audio_float_compat.h"
 
 #include <formats/rwav.h>
 
@@ -134,6 +135,17 @@ int mus_card = 0;
  *  are modifed and added, and stored in the buffer
  *  that is submitted to the audio device. */
 int16_t mixbuffer[MIXBUFFERSIZE];
+
+/* Parallel float output buffer, used only when the frontend negotiated
+ * float audio (use_float_output). Normalized to [-1.0, 1.0]. Both are
+ * statically sized for the worst case, exactly like mixbuffer. */
+float fmixbuffer[MIXBUFFERSIZE];
+
+/* Set once in retro_load_game (see libretro.c). When use_float_output is
+ * zero the entire float path is dead and the int16 path is byte-identical
+ * to before. */
+extern int use_float_output;
+extern retro_audio_sample_batch_float_t audio_batch_cb_float;
 
 typedef struct
 {
@@ -676,6 +688,62 @@ dbool   I_SoundIsPlaying (int handle)
  *     consumption for the standard frontends; the retry loop
  *     guarded a non-issue).
  */
+/* Per-chunk inner mix. Both variants advance channel state identically
+ * (the interpolation/stepping lives in mix_inner.h, included once each); they
+ * differ only in accumulator type, seed, and clamp/store. mix_chunk_s16
+ * expands to the exact arithmetic the int16 path used before this change. */
+static void mix_chunk_s16(int16_t *out, int chunk,
+                          channel_t **active, int n_active)
+{
+   int f;
+   for (f = 0; f < chunk; f++)
+   {
+#define MIX_ACC            int
+#define MIX_SEED0          (out[0])
+#define MIX_SEED1          (out[1])
+#define MIX_ADD(acc, s, v) ((acc) + (((s) * (v)) >> 7))
+#define MIX_STORE0(a)      (out[0] = (int16_t)((a) >  0x7fff ?  0x7fff : \
+                                               ((a) < -0x8000 ? -0x8000 : (a))))
+#define MIX_STORE1(a)      (out[1] = (int16_t)((a) >  0x7fff ?  0x7fff : \
+                                               ((a) < -0x8000 ? -0x8000 : (a))))
+#define MIX_ADVANCE        (out += 2)
+#include "mix_inner.h"
+#undef MIX_ACC
+#undef MIX_SEED0
+#undef MIX_SEED1
+#undef MIX_ADD
+#undef MIX_STORE0
+#undef MIX_STORE1
+#undef MIX_ADVANCE
+   }
+}
+
+/* out holds the music already widened to float [-1,1]; SFX accumulate in
+ * place. SFX term is (s * v / 128) / 32768 to match the int16 path's scaling. */
+static void mix_chunk_f32(float *out, int chunk,
+                          channel_t **active, int n_active)
+{
+   int f;
+   for (f = 0; f < chunk; f++)
+   {
+#define MIX_ACC            float
+#define MIX_SEED0          (out[0])
+#define MIX_SEED1          (out[1])
+#define MIX_ADD(acc, s, v) ((acc) + (float)(s) * (v) * (1.0f / (128.0f * 32768.0f)))
+#define MIX_STORE0(a)      (out[0] = ((a) >  1.0f ?  1.0f : ((a) < -1.0f ? -1.0f : (a))))
+#define MIX_STORE1(a)      (out[1] = ((a) >  1.0f ?  1.0f : ((a) < -1.0f ? -1.0f : (a))))
+#define MIX_ADVANCE        (out += 2)
+#include "mix_inner.h"
+#undef MIX_ACC
+#undef MIX_SEED0
+#undef MIX_SEED1
+#undef MIX_ADD
+#undef MIX_STORE0
+#undef MIX_STORE1
+#undef MIX_ADVANCE
+   }
+}
+
 void I_UpdateSound(void)
 {
    /* Compact list of currently-playing SFX channels, rebuilt each
@@ -685,7 +753,6 @@ void I_UpdateSound(void)
    int        n_active = 0;
    int        i;
    int        out_frames;
-   int16_t   *out;
 
    /* sample_step is 16.16 fixed-point samples-per-frame.  Carry the
     * fractional remainder across frames so the emitted frame count is
@@ -712,6 +779,18 @@ void I_UpdateSound(void)
    else
       memset(mixbuffer, 0, (size_t)out_frames * 2 * sizeof(int16_t));
 
+   /* Step 1b: float output -- widen the int16 music into the float buffer
+    * once; SFX then accumulate into it in place.  (First cut: the music
+    * backends still render int16; feeding float-native decoders straight
+    * in is a later refinement.)  Skipped entirely on the int16 path. */
+   if (use_float_output)
+   {
+      int n = out_frames * 2;
+      int k;
+      for (k = 0; k < n; k++)
+         fmixbuffer[k] = (float)mixbuffer[k] * (1.0f / 32768.0f);
+   }
+
    /* Step 2: gather active SFX channels. */
    for (i = 0; i < NUM_CHANNELS; i++)
    {
@@ -720,8 +799,8 @@ void I_UpdateSound(void)
    }
 
    /* Step 3: per-sample mix.  When there are no SFX active we can
-    * skip the mix loop entirely -- the mixbuffer already holds
-    * music (or silence) and is ready to submit. */
+    * skip the mix loop entirely -- the buffer already holds music
+    * (or silence) and is ready to submit. */
    if (n_active > 0)
    {
       /* Determine the longest contiguous prefix of frames during
@@ -732,18 +811,15 @@ void I_UpdateSound(void)
        * (which becomes the dominant cost when many channels are
        * active). */
       int frames_left = out_frames;
-
-      out = mixbuffer;
+      int base        = 0;
 
       while (frames_left > 0 && n_active > 0)
       {
          int chunk = frames_left;
          int j;
-         int16_t *chunk_end;
 
          /* Find the smallest "remaining samples" across active
-          * channels; that's our chunk length.  remaining = (end -
-          * start) bytes, one byte per output sample. */
+          * channels; that's our chunk length. */
          for (j = 0; j < n_active; j++)
          {
             channel_t *c = active[j];
@@ -758,48 +834,16 @@ void I_UpdateSound(void)
          if (chunk <= 0)
             chunk = 1;  /* defensive; shouldn't happen */
 
-         chunk_end = out + chunk * 2;
+         /* Mix this chunk into the active output format.  Both variants
+          * step channel state identically; only seed/add/store differ
+          * (see mix_inner.h).  The int16 variant is byte-identical to the
+          * loop this replaced. */
+         if (use_float_output)
+            mix_chunk_f32(fmixbuffer + (size_t)base * 2, chunk, active, n_active);
+         else
+            mix_chunk_s16(mixbuffer  + (size_t)base * 2, chunk, active, n_active);
 
-         /* Inner loop: mix `chunk` samples with no end-of-channel
-          * checks. */
-         while (out < chunk_end)
-         {
-            int dl = out[0];
-            int dr = out[1];
-
-            for (j = 0; j < n_active; j++)
-            {
-               channel_t *c = active[j];
-               /* Linear interpolation between the sample under the read
-                * cursor and its neighbor (the loader appends a sentinel
-                * duplicate of the final sample, so cur[1] is always in
-                * bounds).  The fraction is taken at 8 bits so the
-                * multiply stays comfortably inside 32-bit arithmetic. */
-               int        a = c->cur[0];
-               int        s = a + ((((int)c->cur[1] - a) *
-                                    (int)(c->frac >> 8)) >> 8);
-               c->frac   += c->step_fx;
-               c->cur    += c->frac >> 16;
-               c->frac   &= 0xffff;
-               /* s is signed 16-bit; leftvol/rightvol are 0..127.
-                * (s * vol) >> 7 scales by vol/128, keeping full
-                * precision and the int16 output range. */
-               dl += (s * c->leftvol)  >> 7;
-               dr += (s * c->rightvol) >> 7;
-            }
-
-            /* Clamp to int16 range.  GCC and Clang both compile
-             * this to a pair of conditional moves. */
-            if      (dl >  0x7fff) dl =  0x7fff;
-            else if (dl < -0x8000) dl = -0x8000;
-            if      (dr >  0x7fff) dr =  0x7fff;
-            else if (dr < -0x8000) dr = -0x8000;
-
-            out[0] = (int16_t)dl;
-            out[1] = (int16_t)dr;
-            out   += 2;
-         }
-
+         base        += chunk;
          frames_left -= chunk;
 
          /* Reap any channels that just hit end-of-data and rebuild
@@ -817,13 +861,16 @@ void I_UpdateSound(void)
          }
       }
 
-      /* If we exited because n_active reached 0 with frames left,
-       * the rest of mixbuffer already holds music/silence -- no
-       * further work needed. */
+      /* If we exited because n_active reached 0 with frames left, the
+       * rest of the buffer already holds music/silence -- no further
+       * work needed (the float buffer was widened up front). */
    }
 
-   /* Step 4: hand off to libretro. */
-   audio_batch_cb(mixbuffer, out_frames);
+   /* Step 4: hand off to libretro -- float or int16 per negotiation. */
+   if (use_float_output)
+      audio_batch_cb_float(fmixbuffer, out_frames);
+   else
+      audio_batch_cb(mixbuffer, out_frames);
 }
 
 void I_UpdateSoundParams (int handle, int vol, int sep, int pitch)

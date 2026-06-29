@@ -14,6 +14,7 @@
 #include <time.h>
 
 #include <libretro.h>
+#include "audio_float_compat.h"
 #include <file/file_path.h>
 #include <streams/file_stream.h>
 #include <vfs/vfs_implementation.h>
@@ -135,6 +136,14 @@ static struct retro_midi_interface midi_iface;
 static bool                        midi_iface_valid = false;
 static retro_video_refresh_t video_cb;
 retro_audio_sample_batch_t audio_batch_cb;
+
+/* Float audio output, negotiated once in retro_load_game via
+ * RETRO_ENVIRONMENT_GET_AUDIO_SAMPLE_BATCH_FLOAT. use_float_output stays 0
+ * (and audio_batch_cb_float NULL) on any frontend that doesn't support it,
+ * leaving the int16 path byte-identical. Read by the mixer in
+ * libretro_sound.c. */
+retro_audio_sample_batch_float_t audio_batch_cb_float = NULL;
+int use_float_output = 0;
 static retro_environment_t environ_cb;
 static retro_input_poll_t input_poll_cb;
 static retro_input_state_t input_state_cb;
@@ -2328,6 +2337,23 @@ bool retro_load_game(const struct retro_game_info *info)
    cheats_pending      = false;
    cheats_pending_list = NULL;
 
+   /* Negotiate float audio output once, now that the game is loaded and
+    * the audio path is up. If the frontend supports it we commit to float
+    * for this game's lifetime; otherwise the int16 path is used unchanged.
+    * (Contract: do this once per loaded game, never mix formats.) */
+   use_float_output     = 0;
+   audio_batch_cb_float = NULL;
+   {
+      struct retro_audio_sample_float_callback fcb;
+      fcb.batch = NULL;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_AUDIO_SAMPLE_BATCH_FLOAT, &fcb)
+            && fcb.batch)
+      {
+         audio_batch_cb_float = fcb.batch;
+         use_float_output     = 1;
+      }
+   }
+
    return true;
 
 failed:
@@ -2378,6 +2404,11 @@ failed:
 void retro_unload_game(void)
 {
    D_DoomDeinit();
+
+   /* Drop the float-output negotiation; the frontend's batch pointer is
+    * only valid until here, and the next game re-negotiates. */
+   use_float_output     = 0;
+   audio_batch_cb_float = NULL;
 
    cheats_enabled = false;
    cheats_pending = false;

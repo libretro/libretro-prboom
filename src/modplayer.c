@@ -5,11 +5,14 @@
  * single-header ProTracker player) in the engine's music_player_t interface
  * so a .MOD lump autodetects and plays alongside the other backends.
  *
- * pocketmod renders interleaved float stereo; the engine's mixer wants
- * interleaved signed-16 stereo at the init samplerate, so render() decodes
- * into a small float scratch buffer and converts.  The whole decoder state
- * lives in a heap-allocated context (it carries per-channel and sample
- * tables), allocated once at init. */
+ * pocketmod has been reworked into an integer-only, deterministic decoder that
+ * emits interleaved signed-16 stereo directly at the init samplerate -- exactly
+ * what the engine's mixer wants -- so render() decodes straight into the output
+ * with no float scratch and no per-sample float->int conversion.  The 0..15
+ * music volume is handed to the decoder (ctx->out_gain) and folded into the mix
+ * before the s16 clamp, matching the old volume-then-clamp ordering.  The whole
+ * decoder state lives in a heap-allocated context (it carries per-channel and
+ * sample tables), allocated once at init. */
 
 #include <stdlib.h>
 #include <string.h>
@@ -29,9 +32,8 @@ static int                mod_looping;
 static int                mod_playing;
 static int                mod_paused;
 
-/* scratch space for one render burst of float stereo before s16 convert */
-#define MOD_SCRATCH_FRAMES 1024
-static float mod_scratch[MOD_SCRATCH_FRAMES * 2];
+/* Largest burst handed to pocketmod_render() in one call (frames). */
+#define MOD_BURST_FRAMES 1024
 
 static const char *mod_name(void)
 {
@@ -145,15 +147,19 @@ static void mod_render(void *dest, unsigned nsamp)
     return;
   }
 
+  /* Fold the 0..15 music volume into the decoder so it is applied before the
+   * s16 clamp (matching the prior volume-then-clamp behaviour). */
+  mod_ctx->out_gain = mod_volume < 0 ? 0 : (mod_volume > 15 ? 15 : mod_volume);
+
   while (nsamp > 0)
   {
-    unsigned want = nsamp > MOD_SCRATCH_FRAMES ? MOD_SCRATCH_FRAMES : nsamp;
+    unsigned want = nsamp > MOD_BURST_FRAMES ? MOD_BURST_FRAMES : nsamp;
     int      got_bytes;
-    unsigned got_frames, i;
+    unsigned got_frames;
 
-    got_bytes = pocketmod_render(mod_ctx, mod_scratch,
-                                 (int)(want * 2 * sizeof(float)));
-    got_frames = (unsigned)got_bytes / (2 * sizeof(float));
+    /* pocketmod now emits interleaved s16 stereo straight into the output. */
+    got_bytes  = pocketmod_render(mod_ctx, out, (int)(want * 2 * sizeof(short)));
+    got_frames = (unsigned)got_bytes / (2 * sizeof(short));
 
     if (got_frames == 0)
     {
@@ -161,6 +167,8 @@ static void mod_render(void *dest, unsigned nsamp)
       if (mod_looping && mod_data)
       {
         pocketmod_init(mod_ctx, mod_data, mod_len, mod_rate);
+        mod_ctx->out_gain = mod_volume < 0 ? 0
+                          : (mod_volume > 15 ? 15 : mod_volume);
         continue;
       }
       memset(out, 0, nsamp * 4);
@@ -168,21 +176,7 @@ static void mod_render(void *dest, unsigned nsamp)
       return;
     }
 
-    for (i = 0; i < got_frames; i++)
-    {
-      /* scale by the 0..15 music volume, clamp to s16 */
-      float l = mod_scratch[i * 2 + 0] * (float)mod_volume / 15.0f;
-      float r = mod_scratch[i * 2 + 1] * (float)mod_volume / 15.0f;
-      int   li = (int)(l * 32767.0f);
-      int   ri = (int)(r * 32767.0f);
-      if (li >  32767) li =  32767;
-      if (li < -32768) li = -32768;
-      if (ri >  32767) ri =  32767;
-      if (ri < -32768) ri = -32768;
-      *out++ = (short)li;
-      *out++ = (short)ri;
-    }
-
+    out   += got_frames * 2;
     nsamp -= got_frames;
   }
 }
@@ -204,11 +198,12 @@ static void mod_render(void *dest, unsigned nsamp)
  *
  * Wire format (little-endian-host, matching the other backends):
  *   uint32_t magic    = 'MODS'
- *   uint32_t version  = 1
+ *   uint32_t version  = 2          (bumped: timing/position fields are now
+ *                                   integer fixed-point, not float)
  *   uint32_t looping
  *   uint32_t num_channels       (sanity: must match the re-init'd song)
  *   -- scalar dynamic state --
- *   float    samples_per_tick
+ *   int64_t  samples_per_tick   (Q32.32)
  *   int32_t  ticks_per_line
  *   uint8_t  visited[16]
  *   int32_t  loop_count
@@ -216,14 +211,14 @@ static void mod_render(void *dest, unsigned nsamp)
  *   uint32_t lfo_rng
  *   int8_t   pattern, line
  *   int16_t  tick
- *   float    sample
+ *   int64_t  sample             (Q32.32)
  *   -- per-channel state --
  *   _pocketmod_chan channels[num_channels] */
 #define MOD_STATE_MAGIC   0x4D4F4453u  /* 'MODS' */
-#define MOD_STATE_VERSION 1u
+#define MOD_STATE_VERSION 2u
 
 typedef struct {
-  float          samples_per_tick;
+  pm_s64         samples_per_tick; /* Q32.32                                */
   int            ticks_per_line;   /* 32-bit on every MSVC target          */
   unsigned char  visited[16];
   int            loop_count;
@@ -232,7 +227,7 @@ typedef struct {
   signed char    pattern;
   signed char    line;
   short          tick;             /* 16-bit                                */
-  float          sample;
+  pm_s64         sample;           /* Q32.32                                */
 } mod_state_scalars_t;
 
 static size_t mod_serialize(void *dest, size_t cap)

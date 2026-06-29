@@ -7,6 +7,21 @@
 extern "C" {
 #endif
 
+/* Portable 64-bit integer types for the fixed-point mixer.  This decoder is
+ * integer-only end-to-end: sample positions, pitch increments, tick timing and
+ * the mix accumulator are all fixed-point, and pocketmod_render() emits signed
+ * 16-bit interleaved stereo directly.  No float is used anywhere, so the output
+ * is bit-identical across compilers and architectures (no x87/SSE rounding
+ * divergence, no -ffast-math sensitivity).  MSVC C89 has no <stdint.h>, so use
+ * __int64 there and the long-long extension elsewhere. */
+#if defined(_MSC_VER)
+typedef signed   __int64 pm_s64;
+typedef unsigned __int64 pm_u64;
+#else
+typedef signed   long long pm_s64;
+typedef unsigned long long pm_u64;
+#endif
+
 typedef struct pocketmod_context pocketmod_context;
 int pocketmod_init(pocketmod_context *c, const void *data, int size, int rate);
 int pocketmod_render(pocketmod_context *c, void *buffer, int size);
@@ -49,8 +64,8 @@ typedef struct {
     unsigned char paramEA;      /* Parameter memory for EAx                */
     unsigned char paramEB;      /* Parameter memory for EBx                */
     unsigned char real_volume;  /* Volume (with tremolo adjustment)        */
-    float position;             /* Position in sample data buffer          */
-    float increment;            /* Position increment per output sample    */
+    pm_s64 position;            /* Position in sample data (Q32.32, <0=off) */
+    pm_s64 increment;          /* Position increment per output (Q32.32)   */
 } _pocketmod_chan;
 
 struct pocketmod_context
@@ -69,7 +84,9 @@ struct pocketmod_context
     /* Timing variables */
     int samples_per_second;     /* Sample rate (set by user)               */
     int ticks_per_line;         /* A.K.A. song speed (initially 6)         */
-    float samples_per_tick;     /* Depends on sample rate and BPM          */
+    pm_s64 samples_per_tick;    /* Depends on sample rate and BPM (Q32.32) */
+    pm_u64 clock;               /* 3546894.6 * 2^32 / rate (per-song const) */
+    int out_gain;               /* Music volume 0..15 (folded pre-clamp)   */
 
     /* Loop detection state */
     unsigned char visited[16];  /* Bit mask of previously visited patterns */
@@ -84,7 +101,7 @@ struct pocketmod_context
     signed char pattern;        /* Current pattern in order                */
     signed char line;           /* Current line in pattern                 */
     short tick;                 /* Current tick in line                    */
-    float sample;               /* Current sample in tick                  */
+    pm_s64 sample;              /* Current sample in tick (Q32.32)         */
 };
 
 #ifdef POCKETMOD_IMPLEMENTATION
@@ -107,8 +124,42 @@ struct pocketmod_context
 #define POCKETMOD_PITCH  0x01
 #define POCKETMOD_VOLUME 0x02
 
-/* The size of one sample in bytes */
-#define POCKETMOD_SAMPLE_SIZE sizeof(float[2])
+/* The size of one output sample in bytes (signed 16-bit interleaved stereo) */
+#define POCKETMOD_SAMPLE_SIZE sizeof(short[2])
+
+/* Fixed-point configuration.
+ * - Sample position / pitch increment live in Q32.32 (PM_POS_FRAC = 32).
+ * - Note periods are computed in Q16.16 (PM_PER_FRAC = 16) so vibrato and
+ *   arpeggio retain sub-period precision before deriving the increment.
+ * - The interpolation weight uses the top PM_INTERP_BITS of the position
+ *   fraction; the per-channel mix accumulates in 64-bit and is scaled to s16
+ *   once per frame, so there is ample headroom for up to 32 channels. */
+#define PM_POS_FRAC    32
+#define PM_PER_FRAC    16
+#define PM_INTERP_BITS 16
+/* acc / PM_OUT_DIV maps the full-scale mix back to the s16 range.  Derivation:
+ *   out = volume/(128*64*4) * level * sample * out_gain/15 * 32768
+ * with sample carried as (sample<<PM_INTERP_BITS) and gain folding
+ * real_volume*(255-balance)*out_gain (left) the 32768 cancels 128*64*4=32768,
+ * leaving 255 * 2^PM_INTERP_BITS * 15 = 250675200. */
+#define PM_OUT_DIV ((pm_s64)255 * (1 << PM_INTERP_BITS) * 15)
+
+/* Frames mixed per chunk before scaling to s16.  pocketmod splits a tick at
+ * chunk boundaries, so for the output to match the original decoder the chunk
+ * must be >= the caller's render burst (modplayer uses 1024-frame bursts);
+ * then this cap never binds below samples_remaining and the tick-split points
+ * are identical to the pre-rewrite float path.  (The split itself is inherent
+ * to pocketmod and was buffer-size dependent before this change too.) */
+#define PM_CHUNK 1024
+
+/* round(2^(x/12) * 2^PM_PER_FRAC) for x in 0..15 -- the arpeggio ratios as
+ * Q16.16 fixed-point divisors (entry 0 == 1.0 exactly). */
+static const int _pocketmod_arp[16] = {
+    65536, 69433, 73562, 77936,
+    82570, 87480, 92682, 98193,
+    104032, 110218, 116772, 123715,
+    131072, 138866, 147123, 155872
+};
 
 /* Finetune adjustment table. Three octaves for each finetune setting. */
 static const signed char _pocketmod_finetune[16][36] = {
@@ -197,30 +248,32 @@ static int _pocketmod_lfo(pocketmod_context *c, _pocketmod_chan *ch, int step)
 static void _pocketmod_update_pitch(pocketmod_context *c, _pocketmod_chan *ch)
 {
     /* Don't do anything if the period is zero */
-    ch->increment = 0.0f;
+    ch->increment = 0;
     if (ch->period) {
-        float period = ch->period;
+        pm_s64 period = (pm_s64) ch->period << PM_PER_FRAC; /* Q16.16 */
 
         /* Apply vibrato (if active) */
         if (ch->effect == 0x4 || ch->effect == 0x6) {
             int step = (ch->param4 >> 4) * ch->lfo_step;
             int rate = ch->param4 & 0x0f;
-            period += _pocketmod_lfo(c, ch, step) * rate / 128.0f;
+            /* period += lfo*rate/128 (in Q16.16) */
+            period += (((pm_s64)_pocketmod_lfo(c, ch, step) * rate) << PM_PER_FRAC) / 128;
 
         /* Apply arpeggio (if active) */
         } else if (ch->effect == 0x0 && ch->param) {
-            static const float arpeggio[16] = { /* 2^(X/12) for X in 0..15 */
-                1.000000f, 1.059463f, 1.122462f, 1.189207f,
-                1.259921f, 1.334840f, 1.414214f, 1.498307f,
-                1.587401f, 1.681793f, 1.781797f, 1.887749f,
-                2.000000f, 2.118926f, 2.244924f, 2.378414f
-            };
             int step = (ch->param >> ((2 - c->tick % 3) << 2)) & 0x0f;
-            period /= arpeggio[step];
+            /* period /= 2^(step/12), divisor in Q16.16 */
+            period = (period << PM_PER_FRAC) / _pocketmod_arp[step];
         }
 
-        /* Calculate sample buffer position increment */
-        ch->increment = 3546894.6f / (period * c->samples_per_second);
+        /* Calculate sample buffer position increment (Q32.32):
+         *   increment = 3546894.6 / (period_real * rate)
+         * c->clock = 3546894.6 * 2^32 / rate (precomputed at init), and
+         * period = period_real * 2^PM_PER_FRAC, so
+         *   increment = (c->clock << PM_PER_FRAC) / period. */
+        if (period > 0) {
+            ch->increment = (pm_s64)((c->clock << PM_PER_FRAC) / (pm_u64)period);
+        }
     }
 
     /* Clear the pitch dirty flag */
@@ -313,7 +366,7 @@ static void _pocketmod_next_line(pocketmod_context *c)
                 if (ch->effect != 0xED) {
                     ch->period = period;
                     ch->dirty |= POCKETMOD_PITCH;
-                    ch->position = 0.0f;
+                    ch->position = 0;
                     ch->lfo_step = 0;
                 } else {
                     ch->delayed = period;
@@ -343,7 +396,7 @@ static void _pocketmod_next_line(pocketmod_context *c)
             case 0x9: {
                 if (period != 0 || sample != 0) {
                     ch->param9 = ch->param ? ch->param : ch->param9;
-                    ch->position = ch->param9 << 8;
+                    ch->position = (pm_s64)(ch->param9 << 8) << PM_POS_FRAC;
                 }
             } break;
 
@@ -410,8 +463,11 @@ static void _pocketmod_next_line(pocketmod_context *c)
                     if (ch->param < 0x20) {
                         c->ticks_per_line = ch->param;
                     } else {
-                        float rate = c->samples_per_second;
-                        c->samples_per_tick = rate / (0.4f * ch->param);
+                        /* samples_per_tick = rate / (0.4 * bpm)
+                         *                  = rate * 5 / (2 * bpm)   (Q32.32) */
+                        c->samples_per_tick =
+                            (((pm_s64)c->samples_per_second * 5) << PM_POS_FRAC)
+                            / ((pm_s64)2 * ch->param);
                     }
                 }
             } break;
@@ -464,7 +520,7 @@ static void _pocketmod_next_tick(pocketmod_context *c)
             /* E9x: Retrigger note every x ticks */
             case 0xE9: {
                 if (!(param && c->tick % param)) {
-                    ch->position = 0.0f;
+                    ch->position = 0;
                     ch->lfo_step = 0;
                 }
             } break;
@@ -482,7 +538,7 @@ static void _pocketmod_next_tick(pocketmod_context *c)
                 if (c->tick == param && ch->sample) {
                     ch->dirty |= POCKETMOD_VOLUME | POCKETMOD_PITCH;
                     ch->period = ch->delayed;
-                    ch->position = 0.0f;
+                    ch->position = 0;
                     ch->lfo_step = 0;
                 }
             } break;
@@ -563,7 +619,7 @@ static void _pocketmod_next_tick(pocketmod_context *c)
 
 static void _pocketmod_render_channel(pocketmod_context *c,
                                       _pocketmod_chan *chan,
-                                      float *output,
+                                      pm_s64 *output,
                                       int samples_to_write)
 {
     /* Gather some loop data */
@@ -572,43 +628,64 @@ static void _pocketmod_render_channel(pocketmod_context *c,
     const int loop_start = ((data[4] << 8) | data[5]) << 1;
     const int loop_length = ((data[6] << 8) | data[7]) << 1;
     const int loop_end = loop_length > 2 ? loop_start + loop_length : 0xffffff;
-    const float sample_end = 1 + _pocketmod_min(loop_end, sample->length);
+    const int sample_end = 1 + _pocketmod_min(loop_end, (int)sample->length);
+    const pm_s64 end_pos = (pm_s64) sample_end << PM_POS_FRAC;
 
-    /* Calculate left/right levels */
-    const float volume = chan->real_volume / (float) (128 * 64 * 4);
-    const float level_l = volume * (1.0f - chan->balance / 255.0f);
-    const float level_r = volume * (0.0f + chan->balance / 255.0f);
+    /* Per-channel integer gains.  Folds the music volume (out_gain, 0..15) in
+     * before the final clamp, exactly as the float path did (volume then
+     * scale-to-s16 then clamp), but with no float and no rounding divergence.
+     *   gain_l = real_volume * (255 - balance) * out_gain   (<= 64*255*15)
+     *   gain_r = real_volume *  balance        * out_gain */
+    const int gain_l = chan->real_volume * (255 - chan->balance) * c->out_gain;
+    const int gain_r = chan->real_volume * (0   + chan->balance) * c->out_gain;
+
+    int i, num;
+
+    /* A zero increment would stall (and the float path divided by it); a muted
+     * channel contributes nothing, so skip either case cheaply. */
+    if (chan->increment <= 0 || (gain_l == 0 && gain_r == 0)) {
+        return;
+    }
 
     /* Write samples */
-    int i, num;
     do {
 
-        /* Calculate how many samples we can write in one go */
-        num = (sample_end - chan->position) / chan->increment;
+        /* Calculate how many samples we can write in one go.  Both operands
+         * are Q32.32, so the 2^32 scale cancels and the quotient is a plain
+         * sample count (floor, matching the float truncation). */
+        pm_s64 remain = end_pos - chan->position;
+        num = (remain > 0) ? (int)(remain / chan->increment) : 0;
         num = _pocketmod_min(num, samples_to_write);
 
-        /* Resample and write 'num' samples */
+        /* Resample and mix 'num' samples */
         for (i = 0; i < num; i++) {
-            int x0 = chan->position;
+            int x0 = (int)(chan->position >> PM_POS_FRAC);
+            int s; /* interpolated value * 2^PM_INTERP_BITS */
 #ifdef POCKETMOD_NO_INTERPOLATION
-            float s = sample->data[x0];
+            s = (int)sample->data[x0] << PM_INTERP_BITS;
 #else
-            int x1 = x0 + 1 - loop_length * (x0 + 1 >= loop_end);
-            float t = chan->position - x0;
-            float s = (1.0f - t) * sample->data[x0] + t * sample->data[x1];
+            {
+                int x1 = x0 + 1 - loop_length * (x0 + 1 >= loop_end);
+                /* top PM_INTERP_BITS of the Q32.32 fraction == interp weight */
+                int t  = (int)((chan->position >> (PM_POS_FRAC - PM_INTERP_BITS))
+                               & ((1 << PM_INTERP_BITS) - 1));
+                int s0 = sample->data[x0];
+                int s1 = sample->data[x1];
+                s = (s0 << PM_INTERP_BITS) + (s1 - s0) * t;
+            }
 #endif
             chan->position += chan->increment;
-            *output++ += level_l * s;
-            *output++ += level_r * s;
+            *output++ += (pm_s64) gain_l * s;
+            *output++ += (pm_s64) gain_r * s;
         }
 
         /* Rewind the sample when reaching the loop point */
-        if (chan->position >= loop_end) {
-            chan->position -= loop_length;
+        if (chan->position >= ((pm_s64) loop_end << PM_POS_FRAC)) {
+            chan->position -= (pm_s64) loop_length << PM_POS_FRAC;
 
         /* Cut the sample if the end is reached */
-        } else if (chan->position >= sample->length) {
-            chan->position = -1.0f;
+        } else if (chan->position >= ((pm_s64) sample->length << PM_POS_FRAC)) {
+            chan->position = -1;
             break;
         }
 
@@ -778,7 +855,12 @@ int pocketmod_init(pocketmod_context *c, const void *data, int size, int rate)
     /* Prepare to render from the start */
     c->ticks_per_line = 6;
     c->samples_per_second = rate;
-    c->samples_per_tick = rate / 50.0f;
+    /* clock = 3546894.6 * 2^32 / rate, computed with integers (numerator is
+     * 35468946 << 32 <= ~1.5e17, well inside 64 bits for any sane rate). */
+    c->clock = (pm_u64)(((pm_u64)35468946 << 32) / ((pm_u64)10 * (unsigned)rate));
+    /* default samples_per_tick = rate / 50 (125 BPM), Q32.32 */
+    c->samples_per_tick = ((pm_s64)rate << PM_POS_FRAC) / 50;
+    c->out_gain = 15;           /* full music volume until set otherwise */
     c->lfo_rng = 0xbadc0de;
     c->line = -1;
     c->tick = c->ticks_per_line - 1;
@@ -789,29 +871,52 @@ int pocketmod_init(pocketmod_context *c, const void *data, int size, int rate)
 int pocketmod_render(pocketmod_context *c, void *buffer, int buffer_size)
 {
     int i, samples_rendered = 0;
-    int samples_remaining = buffer_size / POCKETMOD_SAMPLE_SIZE;
+    int samples_remaining = buffer_size / (int)POCKETMOD_SAMPLE_SIZE;
     if (c && buffer) {
-        float (*output)[2] = (float(*)[2]) buffer;
+        short (*output)[2] = (short(*)[2]) buffer;
+        /* 64-bit stereo mix accumulator for one chunk.  static (like the
+         * float scratch this replaces) to keep it off the audio-thread stack
+         * on memory-constrained targets; the decoder runs single-instance. */
+        static pm_s64 mix[PM_CHUNK * 2];
         while (samples_remaining > 0) {
 
-            /* Calculate the number of samples left in this tick */
-            int num = (int) (c->samples_per_tick - c->sample);
+            /* Calculate the number of samples left in this tick (Q32.32 ->
+             * integer floor), guaranteeing forward progress with !num. */
+            int num = (int) ((c->samples_per_tick - c->sample) >> PM_POS_FRAC);
             num = _pocketmod_min(num + !num, samples_remaining);
+            if (num > PM_CHUNK) {
+                num = PM_CHUNK;
+            }
 
-            /* Render and mix 'num' samples from each channel */
-            _pocketmod_zero(output, num * POCKETMOD_SAMPLE_SIZE);
+            /* Render and mix 'num' frames from each channel */
+            _pocketmod_zero(mix, num * (int)sizeof(pm_s64) * 2);
             for (i = 0; i < c->num_channels; i++) {
                 _pocketmod_chan *chan = &c->channels[i];
-                if (chan->sample != 0 && chan->position >= 0.0f) {
-                    _pocketmod_render_channel(c, chan, *output, num);
+                if (chan->sample != 0 && chan->position >= 0) {
+                    _pocketmod_render_channel(c, chan, mix, num);
                 }
             }
+
+            /* Scale the accumulator to s16 and clamp.  PM_OUT_DIV brings the
+             * folded (volume * level * out_gain * 2^PM_INTERP_BITS) mix back to
+             * full-scale s16; clamp to the signed-16 range. */
+            for (i = 0; i < num; i++) {
+                pm_s64 l = mix[i * 2 + 0] / PM_OUT_DIV;
+                pm_s64 r = mix[i * 2 + 1] / PM_OUT_DIV;
+                if (l >  32767) l =  32767;
+                if (l < -32768) l = -32768;
+                if (r >  32767) r =  32767;
+                if (r < -32768) r = -32768;
+                output[i][0] = (short) l;
+                output[i][1] = (short) r;
+            }
+
             samples_remaining -= num;
             samples_rendered += num;
             output += num;
 
-            /* Advance song position by 'num' samples */
-            if ((c->sample += num) >= c->samples_per_tick) {
+            /* Advance song position by 'num' samples (Q32.32) */
+            if ((c->sample += (pm_s64) num << PM_POS_FRAC) >= c->samples_per_tick) {
                 c->sample -= c->samples_per_tick;
                 _pocketmod_next_tick(c);
 
@@ -828,7 +933,7 @@ int pocketmod_render(pocketmod_context *c, void *buffer, int buffer_size)
             }
         }
     }
-    return samples_rendered * POCKETMOD_SAMPLE_SIZE;
+    return samples_rendered * (int)POCKETMOD_SAMPLE_SIZE;
 }
 
 int pocketmod_loop_count(pocketmod_context *c)

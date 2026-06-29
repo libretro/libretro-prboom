@@ -1195,6 +1195,10 @@ static void I_OPL_PlaySong(const void *handle, int looping)
     file = handle;
     current_song = file;
 
+    /* Drop any look-ahead the output resampler buffered for the previous
+     * song so its tail can't bleed into this one. */
+    OPL_FlushResampler();
+
     // Allocate track data.
 
     tracks = malloc(MIDI_NumTracks(file) * sizeof(opl_track_data_t));

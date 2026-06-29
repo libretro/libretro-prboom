@@ -114,6 +114,10 @@ extern unsigned int opl_sample_rate;
 
 void OPL_Render_Samples (void *dest, unsigned nsamp);
 
+/* Drop native samples buffered ahead of the output cursor (call on
+ * playback (re)start so a song change cannot leak stale audio). */
+void OPL_FlushResampler (void);
+
 
 void OPL_SetCallback(unsigned int ms, opl_callback_t callback, void *data);
 

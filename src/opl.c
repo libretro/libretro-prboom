@@ -39,6 +39,29 @@ static int init_stage_reg_writes = 1;
 
 unsigned int opl_sample_rate = 22050;
 
+/* The OPL chip is emulated at its true hardware rate (OPLRATE = 14.318 MHz
+ * / 288 ~= 49716 Hz) so that envelopes, the LFO, vibrato/tremolo and phase
+ * accumulators advance exactly per-sample as they do on real silicon, then
+ * the mono chip output is resampled once to the frontend rate.  The old
+ * behaviour rendered the chip directly at the output rate, which scaled the
+ * chip's increments by 49716/rate (only approximately correct) and, at
+ * 48 kHz, folded the chip's top octave -- it produces content up to ~24.86
+ * kHz -- back down into the audible band.  opl_sample_rate now always holds
+ * the native rate (it drives Chip__Setup and the ms/tics->sample timer math,
+ * both of which want the hardware rate); opl_output_rate holds the frontend
+ * rate used only by the output resampler below. */
+#define OPL_NATIVE_RATE 49716u
+static unsigned int opl_output_rate = 22050;
+
+/* 16.16 linear resampler: native-rate mono chip output -> output stereo.
+ * State persists across OPL_Render_Samples calls so the stream is seamless. */
+#define OPL_NSRC_FRAMES 4096
+static int16_t      opl_nsrc[OPL_NSRC_FRAMES];  /* native-rate mono source     */
+static int          opl_nsrc_have = 0;          /* native frames buffered      */
+static int          opl_nsrc_pos  = 0;          /* next unconsumed native frame */
+static unsigned     opl_rs_frac   = 0;          /* 16.16 fractional read cursor */
+static unsigned     opl_rs_step   = 1u << 16;   /* 16.16 native frames/out frame */
+
 
 #define MAX_SOUND_SLICE_TIME 100 /* ms */
 
@@ -96,9 +119,18 @@ static opl_timer_t timer2 = { 3125, 0, 0, 0 };
 
 int OPL_Init (unsigned int rate)
 {
-    opl_sample_rate = rate;
+    opl_output_rate = rate ? rate : OPL_NATIVE_RATE;
+    opl_sample_rate = OPL_NATIVE_RATE;   /* emulate the chip at hardware rate */
     opl_paused = 0;
     pause_offset = 0;
+
+    /* native frames per output frame, 16.16.  When the output rate equals
+     * the native rate this is exactly 1.0 and the resampler is a passthrough
+     * (mono copy, no interpolation error). */
+    opl_rs_step = (unsigned)(((uint64_t)OPL_NATIVE_RATE << 16) / opl_output_rate);
+    opl_rs_frac = 0;
+    opl_nsrc_have = 0;
+    opl_nsrc_pos  = 0;
 
     // Queue structure of callbacks to invoke.
 
@@ -250,7 +282,8 @@ static void FillBuffer(int16_t *buffer, unsigned int nsamples)
     
     Chip__GenerateBlock2(&opl_chip, nsamples, (int32_t *)mix_buffer);
 
-    // Mix into the destination buffer, doubling up into stereo.
+    // OPL output is mono; write one sample per native frame.  The resampler
+    // in OPL_Render_Samples expands to stereo at the output rate.
 
     for (i=0; i<nsamples; ++i)
     {
@@ -260,24 +293,23 @@ static void FillBuffer(int16_t *buffer, unsigned int nsamples)
             sampval = 32767;
         else if (sampval < -32768)
             sampval = -32768;
-        buffer[i * 2] = (int16_t) sampval;
-        buffer[i * 2 + 1] = (int16_t) sampval;
+        buffer[i] = (int16_t) sampval;
     }
 }
 
 
-void OPL_Render_Samples (void *dest, unsigned buffer_len)
+/* Render `native_len` mono samples at the native chip rate, advancing the
+ * MIDI/MUS event queue (also clocked at the native rate) between callbacks.
+ * This is the old OPL_Render_Samples body, minus the stereo doubling, which
+ * the output resampler now handles. */
+static void OPL_Render_Native (int16_t *buffer, unsigned native_len)
 {
     unsigned int filled = 0;
-
-
-    short *buffer = (short *) dest;
-   
 
     // Repeatedly call the OPL emulator update function until the buffer is
     // full.
 
-    while (filled < buffer_len)
+    while (filled < native_len)
     {
         unsigned int next_callback_time;
         unsigned int nsamples;
@@ -289,7 +321,7 @@ void OPL_Render_Samples (void *dest, unsigned buffer_len)
 
         if (opl_paused || OPL_Queue_IsEmpty(callback_queue))
         {
-            nsamples = buffer_len - filled;
+            nsamples = native_len - filled;
         }
         else
         {
@@ -297,22 +329,86 @@ void OPL_Render_Samples (void *dest, unsigned buffer_len)
 
             nsamples = next_callback_time - current_time;
 
-            if (nsamples > buffer_len - filled)
+            if (nsamples > native_len - filled)
             {
-                nsamples = buffer_len - filled;
+                nsamples = native_len - filled;
             }
         }
 
 
-        // Add emulator output to buffer.
+        // Add emulator output to buffer (mono, native rate).
 
-        FillBuffer(buffer + filled * 2, nsamples);
+        FillBuffer(buffer + filled, nsamples);
         filled += nsamples;
 
         // Invoke callbacks for this point in time.
 
         OPL_AdvanceTime(nsamples);
     }
+}
+
+void OPL_Render_Samples (void *dest, unsigned buffer_len)
+{
+    short *out = (short *) dest;
+
+    // Pull `buffer_len` output frames through the 16.16 linear resampler,
+    // generating native-rate mono chip samples on demand and writing stereo
+    // (the OPL is mono; both channels carry the same sample).
+
+    while (buffer_len > 0)
+    {
+        int base;
+
+        // Ensure the current and next native source frame are available.
+        while (opl_nsrc_pos + (int)(opl_rs_frac >> 16) + 1 >= opl_nsrc_have)
+        {
+            int consumed = opl_nsrc_pos + (int)(opl_rs_frac >> 16);
+            int rem;
+
+            if (consumed > 0)
+            {
+                int i;
+                rem = opl_nsrc_have - consumed;
+                if (rem < 0)
+                    rem = 0;
+                // retain the unconsumed tail so interpolation stays seamless
+                for (i = 0; i < rem; i++)
+                    opl_nsrc[i] = opl_nsrc[consumed + i];
+                opl_nsrc_pos = 0;
+                opl_rs_frac &= 0xFFFF;
+            }
+            else
+                rem = opl_nsrc_have;   // nothing consumed yet; keep everything
+
+            // Append-generate native samples; the chip is continuous, so the
+            // new block abuts the retained tail with no discontinuity.
+            OPL_Render_Native(opl_nsrc + rem, (unsigned)(OPL_NSRC_FRAMES - rem));
+            opl_nsrc_have = OPL_NSRC_FRAMES;
+        }
+
+        base = opl_nsrc_pos + (int)(opl_rs_frac >> 16);
+        {
+            unsigned f = opl_rs_frac & 0xFFFF;
+            int a = opl_nsrc[base];
+            int b = (base + 1 < opl_nsrc_have) ? opl_nsrc[base + 1] : a;
+            int s = a + (((b - a) * (int)f) >> 16);
+            out[0] = (short) s;
+            out[1] = (short) s;
+            out += 2;
+        }
+        opl_rs_frac += opl_rs_step;
+        buffer_len--;
+    }
+}
+
+/* Discard any native samples buffered ahead of the output cursor.  Called
+ * when playback (re)starts so a song change cannot leak the tail of the
+ * previous song's audio (up to one native block) into the new one. */
+void OPL_FlushResampler (void)
+{
+    opl_nsrc_have = 0;
+    opl_nsrc_pos  = 0;
+    opl_rs_frac   = 0;
 }
 
 void OPL_WritePort(opl_port_t port, unsigned int value)

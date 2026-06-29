@@ -488,11 +488,8 @@ void I_SetSfxVolume(int volume)
 void I_SetMusicVolume(int volume)
 {
    snd_MusicVolume = volume;
-
-#ifdef MUSIC_SUPPORT
    if (current_player)
       current_player->setvolume(volume);
-#endif
 }
 
 /* Retrieve the raw data lump index
@@ -707,14 +704,12 @@ void I_UpdateSound(void)
       out_frames = SAMPLECOUNT_35;
 
    /* Step 1: music or silence into mixbuffer. */
-#ifdef MUSIC_SUPPORT
    if (music_handle && current_player)
    {
       current_player->render(mixbuffer, out_frames);
       music_samples_played += (uint64_t)out_frames;
    }
    else
-#endif
       memset(mixbuffer, 0, (size_t)out_frames * 2 * sizeof(int16_t));
 
    /* Step 2: gather active SFX channels. */
@@ -940,13 +935,11 @@ void I_PlaySong(int handle, int looping)
   music_last_looping     = looping;
   music_samples_played   = 0;
 
-#ifdef MUSIC_SUPPORT
   if (current_player)
   {
      current_player->play(music_handle, looping);
      current_player->setvolume(snd_MusicVolume);
   }
-#endif
 }
 
 void I_PauseSong (int handle)
@@ -958,11 +951,8 @@ void I_PauseSong (int handle)
 
 void I_ResumeSong (int handle)
 {
-   (void)handle;
-#ifdef MUSIC_SUPPORT
    if (current_player)
       current_player->resume();
-#endif
 }
 
 void I_StopSong(int handle)
@@ -978,9 +968,6 @@ void I_StopSong(int handle)
 
 void I_UnRegisterSong(int handle)
 {
-   (void)handle;
-
-#ifdef MUSIC_SUPPORT
   if (current_player)
   {
     current_player->stop();
@@ -1002,7 +989,6 @@ void I_UnRegisterSong(int handle)
    free(song_data);
    music_handle = NULL;
    song_data    = NULL;
-#endif
 }
 
 /* ------------------------------------------------------------------ */
@@ -1060,7 +1046,6 @@ void I_UnRegisterSong(int handle)
 
 size_t I_MusicSerializeMaxSize(void)
 {
-#ifdef MUSIC_SUPPORT
    size_t total = MUSIC_GENERIC_HDR_SIZE;
    if (current_player && current_player->serialize)
    {
@@ -1069,14 +1054,10 @@ size_t I_MusicSerializeMaxSize(void)
          total += n;
    }
    return total;
-#else
-   return 0;
-#endif
 }
 
 size_t I_MusicSerialize(void *dest, size_t cap)
 {
-#ifdef MUSIC_SUPPORT
    uint8_t *p = (uint8_t*)dest;
    uint32_t magic;
    uint32_t version;
@@ -1110,10 +1091,6 @@ size_t I_MusicSerialize(void *dest, size_t cap)
          total += n;
    }
    return total;
-#else
-   (void)dest; (void)cap;
-   return 0;
-#endif
 }
 
 int I_MusicUnserialize(const void *src, size_t size)
@@ -1121,7 +1098,6 @@ int I_MusicUnserialize(const void *src, size_t size)
    if (size == 0)
       return 1;  /* nothing to restore is success */
 
-#ifdef MUSIC_SUPPORT
    {
       const uint8_t *p = (const uint8_t*)src;
       uint32_t magic;
@@ -1178,20 +1154,13 @@ int I_MusicUnserialize(const void *src, size_t size)
       }
       return 1;
    }
-#else
-   (void)src;
-   return 0;
-#endif
 }
 
 int I_RegisterSong(const void* data, size_t len)
 {
-#if defined(MUSIC_SUPPORT)
   music_player_t *chosen_midi = NULL;
-#endif
   music_handle = NULL;
 
-#if defined(MUSIC_SUPPORT)
   /* Pick the MIDI player according to the user's "MIDI Hardware"
    * menu setting (defaults table in m_misc.c, midi_player_opts in
    * m_menu.c).  Non-MIDI inputs (e.g. MP3 lumps via mp_player)
@@ -1315,7 +1284,6 @@ int I_RegisterSong(const void* data, size_t len)
   /* Failed to load */
   if (!music_handle)
      lprintf(LO_ERROR, "I_RegisterSong: couldn't load music song.\n");
-#endif
 
   return !!music_handle;
 }
@@ -1335,11 +1303,7 @@ int I_QrySongPlaying(int handle)
  * so its tracks must not be torn down. */
 int I_MusicIsMP3(void)
 {
-#if defined(MUSIC_SUPPORT) && defined(HAVE_LIBMAD)
    return current_player == (music_player_t *)&mp_player;
-#else
-   return 0;
-#endif
 }
 
 /* The libretro raw-MIDI player declines to register a song while the
@@ -1353,25 +1317,19 @@ int I_MusicIsMP3(void)
  * the libretro player is the chosen MIDI backend and it is ready now. */
 int I_MidiLibretroReady(void)
 {
-#if defined(MUSIC_SUPPORT)
-   int is_libretro_selected;
 #ifdef HAVE_LIBFLUIDSYNTH
-   is_libretro_selected = (midi_player == 3);
+   int is_libretro_selected = (midi_player == 3);
 #else
-   is_libretro_selected = (midi_player == 2);
+   int is_libretro_selected = (midi_player == 2);
 #endif
-   if (!is_libretro_selected)
-      return 0;
-   return I_LibretroMidiAvailable();
-#else
+   if (is_libretro_selected)
+      return I_LibretroMidiAvailable();
    return 0;
-#endif
 }
 
 // try register external music file (not in WAD)
 int I_RegisterMusicFile( const char* filename, musicinfo_t *song )
 {
-#ifdef MUSIC_SUPPORT
   int len = M_ReadFile(filename, (uint8_t**) &song_data);
   if (len == -1)
   {
@@ -1392,7 +1350,6 @@ int I_RegisterMusicFile( const char* filename, musicinfo_t *song )
   song->data    = 0;
   song->handle  = 0;
   song->lumpnum = 0;
-#endif
   return 0;
 }
 
@@ -1518,7 +1475,6 @@ int I_SetSoundRate(int rate)
    /* SFX: just retune; samples are stored at native rate. */
    I_RecalcSfxSteps();
 
-#ifdef MUSIC_SUPPORT
    /* Music: re-init every synth backend at the new rate so their internal
     * rate-derived tables (OPL envelope/LFO scaling via Chip__Setup, the
     * fluidsynth synth.sample-rate, the stream resampler steps, etc.) are
@@ -1555,7 +1511,6 @@ int I_SetSoundRate(int rate)
          music_players[i]->init(SAMPLERATE);
       }
    }
-#endif
 
    if (log_cb)
       log_cb(RETRO_LOG_INFO, "I_SetSoundRate: output rate %d Hz\n", rate);

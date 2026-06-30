@@ -27,12 +27,9 @@ if __name__ == '__main__':
    # Apply Crowdin API Key
    with open(YAML_PATH, 'r') as crowdin_config_file:
       crowdin_config = crowdin_config_file.read()
-   crowdin_config = re.sub(r'"api_token": "_secret_"',
-                           f'"api_token": "{API_KEY}"',
-                           crowdin_config, 1)
-   crowdin_config = re.sub(r'/_core_name_',
-                           f'/{CORE_NAME}'
-                           , crowdin_config)
+   crowdin_config = crowdin_config.replace('"api_token": "_secret_"',
+                                          f'"api_token": "{API_KEY}"', 1)
+   crowdin_config = crowdin_config.replace('/_core_name_', f'/{CORE_NAME}')
    with open(YAML_PATH, 'w') as crowdin_config_file:
       crowdin_config_file.write(crowdin_config)
 

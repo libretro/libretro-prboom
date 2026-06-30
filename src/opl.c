@@ -35,6 +35,11 @@
 
 #include "i_sound.h" // mus_opl_gain
 
+#include <math.h>
+#ifndef M_PI
+#define M_PI 3.14159265358979323846
+#endif
+
 static int init_stage_reg_writes = 1;
 
 unsigned int opl_sample_rate = 22050;
@@ -61,6 +66,21 @@ static int          opl_nsrc_have = 0;          /* native frames buffered      *
 static int          opl_nsrc_pos  = 0;          /* next unconsumed native frame */
 static unsigned     opl_rs_frac   = 0;          /* 16.16 fractional read cursor */
 static unsigned     opl_rs_step   = 1u << 16;   /* 16.16 native frames/out frame */
+
+/* Windowed-sinc polyphase reconstruction filter for the resampler.  A plain
+ * linear interpolator only gently lowpasses, so when downsampling (output <
+ * native, e.g. 49716->44100 or ->32000) the chip's content above the output
+ * Nyquist folds back in.  This is a Kaiser-windowed sinc with the cutoff
+ * tracked to the output Nyquist on downsample (fc = output/native) and at the
+ * native Nyquist otherwise, evaluated at OPL_RS_NP fractional sub-phases.  At
+ * unity (output == native) the phase-0 row is a unit impulse, so the path
+ * stays a bit-exact passthrough. */
+#define OPL_RS_NZ     16                      /* sinc zero crossings per side  */
+#define OPL_RS_NTAPS  (2 * OPL_RS_NZ)         /* taps per output sample (32)   */
+#define OPL_RS_NP     512                     /* polyphase sub-phases          */
+#define OPL_RS_PSHIFT 7                        /* 16-bit frac -> 9-bit phase idx */
+#define OPL_RS_BETA   7.0                      /* Kaiser window beta            */
+static float        opl_rs_tab[OPL_RS_NP][OPL_RS_NTAPS];
 
 
 #define MAX_SOUND_SLICE_TIME 100 /* ms */
@@ -114,6 +134,73 @@ static opl_timer_t timer2 = { 3125, 0, 0, 0 };
 // Init/shutdown code.
 //
 
+/* Modified Bessel function of the first kind, order 0 (for the Kaiser
+ * window).  Series converges quickly for the small arguments used here. */
+static double opl_i0(double z)
+{
+    double sum = 1.0, term = 1.0, k = 1.0;
+    double zz = z * z / 4.0;
+    do
+    {
+        term *= zz / (k * k);
+        sum  += term;
+        k    += 1.0;
+    } while (term > 1e-12 * sum && k < 200.0);
+    return sum;
+}
+
+/* Build the polyphase Kaiser-windowed-sinc table for the current resample
+ * ratio.  fc is the cutoff as a fraction of the native Nyquist: 1.0 for
+ * unity/upsample, output/native (< 1) for downsample so images above the
+ * output Nyquist are rejected.  A plain linear interpolator only gently
+ * lowpasses, so an aggressive downsample (e.g. 49716->32000) folds the chip's
+ * upper content audibly; this filter pushes that alias well below -50 dB
+ * while keeping a flat passband.  Each phase row is normalized to unity DC
+ * gain, and the phase-0 row is a unit impulse at unity ratio, so the path
+ * stays a bit-exact passthrough when output == native. */
+static void opl_build_resampler_table(double fc)
+{
+    double i0b = opl_i0(OPL_RS_BETA);
+    int p, t;
+
+    for (p = 0; p < OPL_RS_NP; p++)
+    {
+        double f   = (double)p / (double)OPL_RS_NP;  /* fractional delay [0,1) */
+        double sum = 0.0;
+
+        for (t = 0; t < OPL_RS_NTAPS; t++)
+        {
+            double n  = (double)(t - (OPL_RS_NZ - 1)); /* tap offset [-(NZ-1),NZ] */
+            double x  = f - n;                         /* sinc argument           */
+            double wx = x / (double)OPL_RS_NZ;
+            double w, h;
+
+            if (wx <= -1.0 || wx >= 1.0)
+                w = 0.0;
+            else
+                w = opl_i0(OPL_RS_BETA * sqrt(1.0 - wx * wx)) / i0b; /* Kaiser */
+
+            if (x == 0.0)
+                h = fc;
+            else
+            {
+                double a = M_PI * fc * x;
+                h = fc * sin(a) / a;
+            }
+
+            opl_rs_tab[p][t] = (float)(w * h);
+            sum += w * h;
+        }
+
+        if (sum != 0.0)
+        {
+            double inv = 1.0 / sum;
+            for (t = 0; t < OPL_RS_NTAPS; t++)
+                opl_rs_tab[p][t] = (float)((double)opl_rs_tab[p][t] * inv);
+        }
+    }
+}
+
 // Initialize the OPL library.  Returns true if initialized
 // successfully.
 
@@ -131,6 +218,11 @@ int OPL_Init (unsigned int rate)
     opl_rs_frac = 0;
     opl_nsrc_have = 0;
     opl_nsrc_pos  = 0;
+
+    /* cutoff = output Nyquist when downsampling, native Nyquist otherwise */
+    opl_build_resampler_table(opl_output_rate < OPL_NATIVE_RATE
+                              ? (double)opl_output_rate / (double)OPL_NATIVE_RATE
+                              : 1.0);
 
     // Queue structure of callbacks to invoke.
 
@@ -351,47 +443,60 @@ void OPL_Render_Samples (void *dest, unsigned buffer_len)
 {
     short *out = (short *) dest;
 
-    // Pull `buffer_len` output frames through the 16.16 linear resampler,
-    // generating native-rate mono chip samples on demand and writing stereo
-    // (the OPL is mono; both channels carry the same sample).
+    // Pull `buffer_len` output frames through the polyphase windowed-sinc
+    // resampler, generating native-rate mono chip samples on demand and
+    // writing stereo (the OPL is mono; both channels carry the same sample).
 
     while (buffer_len > 0)
     {
-        int base;
+        int ridx = opl_nsrc_pos + (int)(opl_rs_frac >> 16);
 
-        // Ensure the current and next native source frame are available.
-        while (opl_nsrc_pos + (int)(opl_rs_frac >> 16) + 1 >= opl_nsrc_have)
+        // Ensure the filter's history (ridx-(NZ-1)) and look-ahead (ridx+NZ)
+        // are both inside the source buffer.
+        while (ridx + OPL_RS_NZ >= opl_nsrc_have)
         {
-            int consumed = opl_nsrc_pos + (int)(opl_rs_frac >> 16);
-            int rem;
+            int keep_from = ridx - (OPL_RS_NZ - 1);
 
-            if (consumed > 0)
+            if (keep_from > 0)
             {
+                int rem = opl_nsrc_have - keep_from;
                 int i;
-                rem = opl_nsrc_have - consumed;
                 if (rem < 0)
                     rem = 0;
-                // retain the unconsumed tail so interpolation stays seamless
+                // Retain NZ-1 samples of history plus the unconsumed tail so
+                // the filter taps and interpolation stay seamless.
                 for (i = 0; i < rem; i++)
-                    opl_nsrc[i] = opl_nsrc[consumed + i];
-                opl_nsrc_pos = 0;
-                opl_rs_frac &= 0xFFFF;
+                    opl_nsrc[i] = opl_nsrc[keep_from + i];
+                opl_nsrc_pos   = ridx - keep_from;   // fold integer part, keep frac
+                opl_rs_frac   &= 0xFFFF;
+                opl_nsrc_have  = rem;
             }
-            else
-                rem = opl_nsrc_have;   // nothing consumed yet; keep everything
 
             // Append-generate native samples; the chip is continuous, so the
             // new block abuts the retained tail with no discontinuity.
-            OPL_Render_Native(opl_nsrc + rem, (unsigned)(OPL_NSRC_FRAMES - rem));
+            OPL_Render_Native(opl_nsrc + opl_nsrc_have,
+                              (unsigned)(OPL_NSRC_FRAMES - opl_nsrc_have));
             opl_nsrc_have = OPL_NSRC_FRAMES;
+            ridx = opl_nsrc_pos + (int)(opl_rs_frac >> 16);
         }
 
-        base = opl_nsrc_pos + (int)(opl_rs_frac >> 16);
         {
-            unsigned f = opl_rs_frac & 0xFFFF;
-            int a = opl_nsrc[base];
-            int b = (base + 1 < opl_nsrc_have) ? opl_nsrc[base + 1] : a;
-            int s = a + (((b - a) * (int)f) >> 16);
+            const float *k = opl_rs_tab[(opl_rs_frac >> OPL_RS_PSHIFT) & (OPL_RS_NP - 1)];
+            int   base = ridx - (OPL_RS_NZ - 1);
+            float acc  = 0.0f;
+            int   t, s;
+
+            for (t = 0; t < OPL_RS_NTAPS; t++)
+            {
+                int j = base + t;
+                // zero-pad history before the stream start (startup transient)
+                if (j >= 0)
+                    acc += (float)opl_nsrc[j] * k[t];
+            }
+
+            s = (int)(acc < 0.0f ? acc - 0.5f : acc + 0.5f);
+            if (s > 32767)        s = 32767;
+            else if (s < -32768)  s = -32768;
             out[0] = (short) s;
             out[1] = (short) s;
             out += 2;

@@ -39,6 +39,11 @@
 #endif
 #include <fcntl.h>
 
+#ifdef HAVE_MMAP
+#include <sys/mman.h>
+#include <unistd.h>
+#endif
+
 #include "doomstat.h"
 #include "d_net.h"
 #include "doomtype.h"
@@ -47,6 +52,11 @@
 #include "w_wad.h"
 #include "w_pk3.h"
 #include "lprintf.h"
+
+#ifdef HAVE_MMAP
+/* Core option "prboom-mmap_wads" (default off); see libretro.c. */
+extern int prboom_mmap_wads;
+#endif
 
 #include <sys/stat.h>
 
@@ -197,9 +207,43 @@ static void W_AddFile(wadfile_info_t *wadfile)
 #ifndef MEMORY_LOW
    // precache into memory instead of reading from disk
    wadfile->length = filestream_get_size(wadfile->handle);
-   wadfile->data = malloc(wadfile->length);
-   if ( rfread(wadfile->data, wadfile->length, 1, wadfile->handle) != 1)
-      I_Error("W_AddFile: couldn't read wad data");
+   wadfile->data   = NULL;
+#ifdef HAVE_MMAP
+   wadfile->mmapped = 0;
+   /* When the core option is enabled, memory-map the WAD so only the lumps
+    * actually touched are paged in, instead of reading the whole file up
+    * front.  Needs a real filesystem path (need_fullpath cores have one);
+    * any failure -- archives inside a VFS, unmappable paths, an mmap()
+    * error -- falls through to the malloc()+read path below.  The mapping is
+    * PROT_READ: WAD bytes are only ever a memcpy source (W_ReadLump / the
+    * directory parse), never written in place, and the memcache hands lumps
+    * back as private copies. */
+   if (prboom_mmap_wads && wadfile->length > 0)
+   {
+      const char *rp = filestream_get_path(wadfile->handle);
+      if (rp)
+      {
+         int fd = open(rp, O_RDONLY);
+         if (fd >= 0)
+         {
+            void *m = mmap(NULL, (size_t)wadfile->length,
+                           PROT_READ, MAP_PRIVATE, fd, 0);
+            close(fd);
+            if (m != MAP_FAILED)
+            {
+               wadfile->data    = (unsigned char *)m;
+               wadfile->mmapped = 1;
+            }
+         }
+      }
+   }
+#endif
+   if (!wadfile->data)
+   {
+      wadfile->data = malloc(wadfile->length);
+      if ( rfread(wadfile->data, wadfile->length, 1, wadfile->handle) != 1)
+         I_Error("W_AddFile: couldn't read wad data");
+   }
 
    /* PK3/ZIP archive: translate it into a synthesized PWAD image and let
     * the normal directory parse below consume that image.  Detected by
@@ -212,7 +256,15 @@ static void W_AddFile(wadfile_info_t *wadfile)
       if (!image)
          I_Error("W_AddFile: couldn't translate PK3 archive %s",
                  wadfile->name);
-      free(wadfile->data);
+#ifdef HAVE_MMAP
+      if (wadfile->mmapped)
+      {
+         munmap(wadfile->data, (size_t)wadfile->length);
+         wadfile->mmapped = 0;
+      }
+      else
+#endif
+         free(wadfile->data);
       wadfile->data   = image;
       wadfile->length = newlen;
       is_archive      = TRUE;
@@ -569,7 +621,12 @@ void W_Exit(void)
       {
          filestream_close(wadfiles[i].handle);
 #ifndef MEMORY_LOW
-         free(wadfiles[i].data);
+#ifdef HAVE_MMAP
+         if (wadfiles[i].mmapped)
+            munmap(wadfiles[i].data, (size_t)wadfiles[i].length);
+         else
+#endif
+            free(wadfiles[i].data);
          wadfiles[i].data = NULL;
 #endif
          wadfiles[i].handle = NULL;
@@ -600,7 +657,12 @@ void W_ReleaseAllWads(void)
       {
          filestream_close(wadfiles[i].handle);
 #ifndef MEMORY_LOW
-         free(wadfiles[i].data);
+#ifdef HAVE_MMAP
+         if (wadfiles[i].mmapped)
+            munmap(wadfiles[i].data, (size_t)wadfiles[i].length);
+         else
+#endif
+            free(wadfiles[i].data);
          wadfiles[i].data = NULL;
 #endif
          wadfiles[i].handle = NULL;

@@ -5,7 +5,7 @@ CORE_DIR := $(ROOT_DIR)/src
 
 include $(ROOT_DIR)/Makefile.common
 
-COREFLAGS := -DHAVE_LIBMAD $(COREDEFINES) $(INCFLAGS)
+COREFLAGS := -DHAVE_LIBMAD -DHAVE_MMAP $(COREDEFINES) $(INCFLAGS)
 
 GIT_VERSION := " $(shell git rev-parse --short HEAD || echo unknown)"
 ifneq ($(GIT_VERSION)," unknown")

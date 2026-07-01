@@ -82,12 +82,14 @@ ifeq ($(platform), unix)
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,--no-undefined -Wl,--as-needed
    CFLAGS += -std=c99
    CFLAGS += -D_POSIX_C_SOURCE=199309L
+   CFLAGS += -DHAVE_MMAP
 else ifeq ($(platform), linux-portable)
 	EXT    ?= so
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
    fpic := -fPIC -nostdlib
    SHARED := -shared -Wl,--version-script=libretro/link.T
 	LIBS =
+   CFLAGS += -DHAVE_MMAP
 else ifeq ($(platform), osx)
 	EXT    ?= dylib
    TARGET := $(TARGET_NAME)_libretro.$(EXT)
@@ -96,6 +98,7 @@ else ifeq ($(platform), osx)
    OSXVER = `sw_vers -productVersion | cut -d. -f 2`
    OSX_LT_MAVERICKS = `(( $(OSXVER) <= 9)) && echo "YES"`
    LDFLAGS += -framework CoreFoundation
+   CFLAGS += -DHAVE_MMAP
 ifeq ($(OSX_LT_MAVERICKS),YES)
    fpic += -mmacosx-version-min=10.1
 endif
@@ -113,6 +116,7 @@ else ifneq (,$(findstring ios,$(platform)))
    fpic := -fPIC
    LDFLAGS += -framework CoreFoundation
    SHARED := -dynamiclib
+   CFLAGS += -DHAVE_MMAP
 
 ifeq ($(IOSSDK),)
    IOSSDK := $(shell xcodebuild -version -sdk iphoneos Path)

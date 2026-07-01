@@ -196,6 +196,11 @@ dbool   mouse_on;
 extern int wall_decals_enabled;   /* src/r_decal.c -- frontend toggle */
 /* Whether to search for IWADs on parent folders recursively */
 dbool   find_recursive_on;
+#ifdef HAVE_MMAP
+/* Core option "prboom-mmap_wads" (default off): memory-map WAD files in
+ * W_AddFile instead of reading them fully into RAM.  Read by src/w_wad.c. */
+int     prboom_mmap_wads = 0;
+#endif
 
 // System analog stick range is -0x8000 to 0x8000
 #define ANALOG_RANGE 0x8000
@@ -1311,6 +1316,13 @@ static void update_audio_samplerate(void)
 static void update_variables(bool startup)
 {
    struct retro_variable var;
+
+#ifdef HAVE_MMAP
+   var.key   = "prboom-mmap_wads";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      prboom_mmap_wads = !strcmp(var.value, "enabled");
+#endif
 
    if (startup)
    {

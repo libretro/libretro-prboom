@@ -100,6 +100,9 @@ typedef struct {
   unsigned char *data;
   int position;
   int length;
+#ifdef HAVE_MMAP
+  int mmapped;   /* data came from mmap(); munmap() it rather than free() */
+#endif
 #endif
   /* Embedded (baked-in) WAD support.  When embedded_data is non-NULL the
    * wad's bytes live in a const array compiled into the core rather than on

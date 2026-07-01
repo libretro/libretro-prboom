@@ -1992,19 +1992,6 @@ bool retro_load_game(const struct retro_game_info *info)
       }
    }
 
-   /* Hexen player class, from the core option.  d_main only consults -class
-    * when hexen is set, so passing it for Doom/Heretic is harmless. */
-   {
-      struct retro_variable cvar;
-      cvar.key = "prboom-class";
-      cvar.value = NULL;
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &cvar) && cvar.value)
-      {
-         argv[argc++] = strdup("-class");
-         argv[argc++] = strdup(cvar.value);
-      }
-   }
-
    if(info->path)
    {
       wadinfo_t header;

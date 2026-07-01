@@ -195,21 +195,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "-1"
    },
    {
-      "prboom-class",
-      "Player Class (Hexen, Restart Required)",
-      NULL,
-      "Selects the player class for Hexen. Ignored by Doom and Heretic.",
-      NULL,
-      NULL,
-      {
-         { "fighter", "Fighter" },
-         { "cleric",  "Cleric" },
-         { "mage",    "Mage" },
-         { NULL, NULL },
-      },
-      "fighter"
-   },
-   {
       "prboom-sound_samplerate",
       "Sound Samplerate (Hint)",
       "Sound Samplerate (Hint)",

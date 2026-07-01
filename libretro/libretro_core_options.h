@@ -117,12 +117,11 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "disabled"
    },
-#ifdef HAVE_MMAP
    {
       "prboom-mmap_wads",
       "Memory-Map WAD Files (Restart Required)",
       NULL,
-      "Load WAD data by memory-mapping the file instead of reading it fully into RAM. Lowers memory use and speeds up loading of large WADs, since only the lumps actually used are paged in. Falls back to a normal read for archives, or if mapping fails. Leave disabled to perform all WAD file I/O up front at load time.",
+      "Load WAD data by memory-mapping the file instead of reading it fully into RAM. Lowers memory use and speeds up loading of large WADs, since only the lumps actually used are paged in. Falls back to a normal read for archives, if mapping fails, or on builds without memory-mapping support. Leave disabled to perform all WAD file I/O up front at load time.",
       NULL,
       NULL,
       {
@@ -132,7 +131,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       },
       "disabled"
    },
-#endif
    {
       "prboom-analog_deadzone",
       "Analog Deadzone (Percent)",

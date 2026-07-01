@@ -134,6 +134,17 @@ bool Z_Init(void)
    return true;
 }
 
+/* Set an upper bound (in bytes) on the zone before PU_CACHE purging begins;
+ * mirrors the meaning of the compile-time default (0 == unlimited, any other
+ * value is a hard limit). The libretro frontend uses this to size the cache
+ * to the host machine via RETRO_ENVIRONMENT_GET_MEMORY_STATUS. A value of 0
+ * leaves whatever default is already in place. */
+void Z_SetHeapCap(int bytes)
+{
+   if (bytes > 0)
+      memory_size = bytes;
+}
+
 /* Z_Malloc
  * You can pass a NULL user if the tag is < PU_PURGELEVEL.
  *

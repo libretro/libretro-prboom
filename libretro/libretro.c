@@ -857,6 +857,15 @@ void I_LibretroMidiFlush(void)
       midi_iface.flush();
 }
 
+/* Bounds for frontend-driven zone-cache sizing via
+ * RETRO_ENVIRONMENT_GET_MEMORY_STATUS. The lump cache lives on top of the
+ * WAD image (which is loaded separately with malloc), so we take only a
+ * quarter of reported free memory, cap it at 1 GB -- ample for even the
+ * largest PWADs, some of which exceed 600 MB -- and never drop below a
+ * small floor. Non-MEMORY_LOW builds otherwise default to 0 (unlimited). */
+#define ZONE_CAP_BYTES   (1024ULL * 1024ULL * 1024ULL)  /* 1 GB ceiling */
+#define ZONE_FLOOR_BYTES (16ULL   * 1024ULL * 1024ULL)  /* sane minimum */
+
 void retro_init(void)
 {
    struct retro_log_callback log;
@@ -869,6 +878,35 @@ void retro_init(void)
       log_cb = log.log;
    else
       log_cb = NULL;
+
+#ifndef MEMORY_LOW
+   {
+      /* Size the zone-cache limit to the host machine when the frontend can
+       * report its memory, rather than leaving it unbounded. A value of 0
+       * (the compile-time default here) means "no limit"; any positive value
+       * is the size at which Z_Malloc starts purging PU_CACHE. Frontends that
+       * do not implement the query leave that default in place. */
+      struct retro_memory_status memstat;
+      memstat.free = memstat.total = 0;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_MEMORY_STATUS, &memstat) && memstat.free)
+      {
+         unsigned long long budget = memstat.free / 4;
+         if (budget > ZONE_CAP_BYTES)
+            budget = ZONE_CAP_BYTES;
+         if (budget < ZONE_FLOOR_BYTES)
+            budget = ZONE_FLOOR_BYTES;
+         Z_SetHeapCap((int)budget);
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO,
+                   "Frontend reports %llu MB free; capping Doom zone cache at %llu MB.\n",
+                   (unsigned long long)(memstat.free >> 20),
+                   (unsigned long long)(budget >> 20));
+      }
+      else if (log_cb)
+         log_cb(RETRO_LOG_INFO,
+                "No memory-status query; Doom zone cache left unlimited (default).\n");
+   }
+#endif
 
    {
       /* Optional: high-resolution timer for the compile-time render

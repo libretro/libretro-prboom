@@ -69,6 +69,7 @@ void (Z_ChangeTag)(void *ptr, int tag);
  * goes out of scope, or to transfer ownership between structures. */
 void (Z_ChangeUser)(void *ptr, void **user);
 bool (Z_Init)(void);
+void Z_SetHeapCap(int bytes);
 void Z_Close(void);
 void *(Z_Calloc)(size_t n, size_t n2, int tag, void **user);
 void *(Z_Realloc)(void *p, size_t n, int tag, void **user);

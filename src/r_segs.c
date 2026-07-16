@@ -40,6 +40,7 @@
 #include "r_segs.h"
 #include "r_plane.h"
 #include "r_things.h"
+#include "r_dynlight.h"
 #include "u_brightmap.h"
 #include "p_ffloor.h"
 #include "r_draw.h"
@@ -730,6 +731,25 @@ static void R_RenderSegLoop (void)
 
    R_SetDefaultDrawColumnVars(&dcvars);
 
+   /* Dynamic point lights: whether any active light reaches this seg, and the
+    * mid-wall world height used as the lit point for every column (per-column
+    * vertical falloff is a later refinement).  Gating here keeps the
+    * per-column world-position reconstruction off unlit segs. */
+   const int seg_has_dynlight = R_DynLightsActive() && curline &&
+                                R_SegLit(curline);
+   const int seg_dynlight_z = seg_has_dynlight && curline->frontsector
+      ? ((curline->frontsector->floorheight +
+          curline->frontsector->ceilingheight) >> 1) >> FRACBITS
+      : 0;
+   /* seg line in map units, relative to the view origin, for the per-column
+    * ray/line intersection that places each wall column in the world. */
+   const int seg_l1x = seg_has_dynlight ? (curline->v1->x - viewx) >> FRACBITS : 0;
+   const int seg_l1y = seg_has_dynlight ? (curline->v1->y - viewy) >> FRACBITS : 0;
+   const int seg_ldx = seg_has_dynlight ? (curline->v2->x - curline->v1->x) >> FRACBITS : 0;
+   const int seg_ldy = seg_has_dynlight ? (curline->v2->y - curline->v1->y) >> FRACBITS : 0;
+   const int view_mx = viewx >> FRACBITS;
+   const int view_my = viewy >> FRACBITS;
+
    for ( ; rw_x < rw_stopx ; rw_x++)
    {
       /* cache the per-column clip bounds in locals for the body of the
@@ -873,11 +893,41 @@ static void R_RenderSegLoop (void)
          dcvars.texu = texturecolumn; // for filtering -- POPE
          texturecolumn >>= FRACBITS;
 
-         dcvars.colormap = R_ColourMap(rw_lightlevel,rw_scale);
-         /* Only the *_LinearZ dither drawers read nextcolormap; skip the
-          * extra colormap lookup otherwise. */
-         if (z_filter)
-            dcvars.nextcolormap = R_ColourMap(rw_lightlevel+1,rw_scale); // for filtering -- POPE
+         {
+            int ll = rw_lightlevel;
+            /* Dynamic point lights: reconstruct the wall point's world
+             * position for this column and brighten the light level by the
+             * lights reaching it.  Gated on R_SegLit so the per-column
+             * trig runs only for segs a light can actually reach. */
+            if (seg_has_dynlight)
+            {
+               /* intersect the view ray through this column with the seg's
+                * line to get the wall point's world (x,y); exact, integer. */
+               unsigned rang = (viewangle + xtoviewangle[rw_x])
+                               >> ANGLETOFINESHIFT;
+               fixed_t cr = finecosine[rang], sr = finesine[rang];
+               int64_t denom = (int64_t)cr * seg_ldy - (int64_t)sr * seg_ldx;
+               if (denom != 0)
+               {
+                  int64_t num = (int64_t)(seg_l1x * seg_ldy -
+                                              seg_l1y * seg_ldx) << FRACBITS;
+                  int64_t t = num / denom;         /* map units along ray */
+                  if (t > 0)
+                  {
+                     int wx = view_mx + (int)((t * cr) >> FRACBITS);
+                     int wy = view_my + (int)((t * sr) >> FRACBITS);
+                     int bst = R_DynLightBoost(wx, wy, seg_dynlight_z);
+                     ll += bst;
+                     if (ll > 255) ll = 255;
+                  }
+               }
+            }
+            dcvars.colormap = R_ColourMap(ll,rw_scale);
+            /* Only the *_LinearZ dither drawers read nextcolormap; skip the
+             * extra colormap lookup otherwise. */
+            if (z_filter)
+               dcvars.nextcolormap = R_ColourMap(ll+1,rw_scale); // for filtering -- POPE
+         }
          dcvars.z = rw_scale; // for filtering -- POPE
 
          dcvars.x = rw_x;

@@ -44,6 +44,7 @@
 #include "u_brightmap.h"
 #include "r_state.h"
 #include "r_things.h"
+#include "r_dynlight.h"
 #include "r_plane.h"
 #include "r_bsp.h"
 #include "r_draw.h"
@@ -787,6 +788,9 @@ static void R_SetupFrame (player_t *player)
   int cm;
 
   R_InterpolateView (player);
+
+  /* rebuild the GLDEFS point-light list from current mobj positions */
+  R_CollectDynLights();
 
   /* Low-latency turning: the view answers staged turn input every
    * frame instead of waiting for the tic.  The base must be the

@@ -2431,10 +2431,17 @@ static void P_LoadUDMFSectors(void)
     ss->touching_thinglist = NULL;
     ss->nextsec       = -1;
     ss->prevsec       = -1;
-    ss->floor_xoffs   = 0;
-    ss->floor_yoffs   = 0;
-    ss->ceiling_xoffs = 0;
-    ss->ceiling_yoffs = 0;
+    /* Flat panning: the UDMF xpanning/ypanning fields set the floor and
+     * ceiling texture offset directly, the same field the Boom scroller
+     * specials drive at runtime.  GZDoom maps the panning value straight onto
+     * the plane offset with no negation (SetXOffset(floor, value)) and its
+     * software flat drawer uses the same "xoffs + worldX, yoffs - worldY"
+     * convention as r_plane, so a positive value converts to fixed-point map
+     * units unchanged. */
+    ss->floor_xoffs   = (fixed_t)(ms->xpanningfloor   * FRACUNIT);
+    ss->floor_yoffs   = (fixed_t)(ms->ypanningfloor   * FRACUNIT);
+    ss->ceiling_xoffs = (fixed_t)(ms->xpanningceiling * FRACUNIT);
+    ss->ceiling_yoffs = (fixed_t)(ms->ypanningceiling * FRACUNIT);
     ss->heightsec     = -1;
     ss->floorlightsec = -1;
     ss->ceilinglightsec = -1;

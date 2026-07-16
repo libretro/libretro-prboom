@@ -22,9 +22,10 @@
  *     }
  *
  * This module only parses the definitions and resolves each pic to a
- * texture; placing decals on walls when something hits them, and drawing
- * them, are later stages.  Faders / stretchers / combiners / animators
- * (decal animation) are parsed past but not yet acted on. */
+ * texture; placing decals on walls when something hits them
+ * (R_SpawnDecalByName) and drawing them (r_decal.c) are separate stages.
+ * Faders / stretchers / combiners / animators (decal animation) are
+ * parsed past but not yet acted on. */
 
 #ifndef U_DECALDEF_H
 #define U_DECALDEF_H

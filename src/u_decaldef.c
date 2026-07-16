@@ -1,6 +1,7 @@
 /* u_decaldef.c: parse ZDoom DECALDEF definitions.  See u_decaldef.h.
- * This stage builds the decal/decalgroup tables only; placement and
- * rendering come later. */
+ * This stage builds the decal/decalgroup tables; placement is done by
+ * R_SpawnDecalByName (p_map.c hitscan impacts) and rendering by
+ * R_DrawDecalsForSeg (r_decal.c). */
 
 #include <stdlib.h>
 #include <string.h>

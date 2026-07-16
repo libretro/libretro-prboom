@@ -165,6 +165,13 @@ typedef struct
   /* per-sector 3D skybox (SkyPicker 9081): index into the skyboxes[]
    * camera table, or -1 to use the level default sky/skyview. */
   int skybox;
+
+  /* ZDoom UDMF per-plane light: lightfloor/lightceiling adjust the floor and
+   * ceiling plane light relative to lightlevel, or set it absolutely when the
+   * matching *_absolute flag is set.  Zero/!absolute (the binary default, and
+   * Z_Calloc's initial state) leaves plane light equal to sector light. */
+  short lightfloor, lightceiling;
+  byte  lightfloor_absolute, lightceiling_absolute;
 } sector_t;
 
 //

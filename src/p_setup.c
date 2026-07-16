@@ -2476,6 +2476,14 @@ static void P_LoadUDMFSectors(void)
        * losing the friction flag P_GetFriction gates on. */
       ss->special    = (short)(ss->special | 0x0800);
     }
+
+    /* ZDoom per-plane light: lightfloor/lightceiling and their absolute flags
+     * are parsed but were dropped; the renderer (R_FakeFlat) now honours them. */
+    ss->lightfloor            = (short)ms->lightfloor;
+    ss->lightceiling          = (short)ms->lightceiling;
+    ss->lightfloor_absolute   = (ms->flags & UDMF_SECF_LIGHTFLOORABSOLUTE)   ? 1 : 0;
+    ss->lightceiling_absolute = (ms->flags & UDMF_SECF_LIGHTCEILINGABSOLUTE) ? 1 : 0;
+
   }
 }
 

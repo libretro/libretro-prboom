@@ -214,12 +214,31 @@ sector_t *R_FakeFlat(sector_t *sec, sector_t *tempsec,
                      dbool   back)
 {
   if (floorlightlevel)
-    *floorlightlevel = sec->floorlightsec == -1 ?
+  {
+    int fl = sec->floorlightsec == -1 ?
       sec->lightlevel : sectors[sec->floorlightsec].lightlevel;
+    /* ZDoom UDMF per-plane light: absolute replaces, otherwise adds. */
+    if (sec->lightfloor_absolute)
+      fl = sec->lightfloor;
+    else
+      fl += sec->lightfloor;
+    if (fl < 0)   fl = 0;
+    if (fl > 255) fl = 255;
+    *floorlightlevel = fl;
+  }
 
   if (ceilinglightlevel)
-    *ceilinglightlevel = sec->ceilinglightsec == -1 ? // killough 4/11/98
+  {
+    int cl = sec->ceilinglightsec == -1 ? // killough 4/11/98
       sec->lightlevel : sectors[sec->ceilinglightsec].lightlevel;
+    if (sec->lightceiling_absolute)
+      cl = sec->lightceiling;
+    else
+      cl += sec->lightceiling;
+    if (cl < 0)   cl = 0;
+    if (cl > 255) cl = 255;
+    *ceilinglightlevel = cl;
+  }
 
   if (sec->heightsec != -1)
     {

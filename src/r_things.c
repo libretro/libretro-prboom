@@ -39,6 +39,7 @@
 #include "r_segs.h"
 #include "r_draw.h"
 #include "r_things.h"
+#include "r_dynlight.h"
 #include "r_decal.h"
 #include "u_decorate.h"
 #include "r_fps.h"
@@ -912,6 +913,23 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
       fy = thing->y;
       fz = thing->z;
    }
+
+   /* Dynamic point lights: raise the whole sprite's light level by the lights
+    * reaching the thing's centre.  One boost per sprite (a light-varying
+    * sprite drawer for per-column falloff is a later refinement); modifying
+    * the by-value lightlevel here covers both the voxel and patch paths. */
+   if (R_DynLightsActive())
+   {
+      int dyn = R_DynLightBoost(fx >> FRACBITS, fy >> FRACBITS,
+                                (fz + (thing->height >> 1)) >> FRACBITS);
+      if (dyn)
+      {
+         lightlevel += dyn;
+         if (lightlevel > 255)
+            lightlevel = 255;
+      }
+   }
+
    tr_x = fx - viewx;
    tr_y = fy - viewy;
 

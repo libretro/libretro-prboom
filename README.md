@@ -137,8 +137,12 @@ the wad.
   that root in a class with no editor number (brand-new decorations or wholly
   custom behaviors) cannot be aliased and stay unspawned. Arbitrary state logic,
   custom inventory/powerups, and ZDoom-only action functions are not reproduced.
-- **MAPINFO:** only the classic **brace-less** ZDoom syntax is translated; the
-  newer block/`{ }` MAPINFO grammar is not.
+- **MAPINFO:** both the classic **brace-less** and the newer **block/`{ }`**
+  ZDoom syntaxes are translated (`{`/`}` skipped, optional `=`, `;` as a
+  same-line statement separator). A curated subset of keys is consumed
+  (level name, next/secretnext with the EndGame/endbunny sentinels, sky,
+  music incl. `$MUSIC_*` indirection, par, titlepatch, cluster, boss
+  specialactions); unrecognized keys are skipped rather than mapped.
 - **UDMF** consumes only engine-carried fields (the DSDA subset). UDMF-declared
   slopes, 3D floors, and portals are not read from text maps.
 - **GLDEFS:** only skybox-relevant handling; glow/brightmap/light definitions

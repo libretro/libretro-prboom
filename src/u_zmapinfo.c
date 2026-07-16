@@ -17,8 +17,10 @@
  *
  * "lookup" indirections resolve through the wad's LANGUAGE lump (ZDoom
  * string table); keys missing there are left unset so the engine
- * defaults apply.  Only the old (brace-less) MAPINFO syntax is handled;
- * unknown keys are skipped to the end of their line. */
+ * defaults apply.  Both MAPINFO syntaxes are accepted: the old brace-less
+ * form and the new block "map MAPxx \"Name\" { key = value; ... }" grammar
+ * -- '{'/'}' are skipped, '=' is optional, and ';' acts as a same-line
+ * statement separator.  Unknown keys are skipped to the next statement. */
 
 #include <stdlib.h>
 #include <string.h>
@@ -670,10 +672,24 @@ int U_ParseZMapInfo(const char *buffer, size_t length)
       tok = 1;                  /* token already current; reprocess it */
       continue;
     }                 /* already at the next line's first token */
-    /* skip the rest of this line */
-    while ((tok = U_GetNextToken(&s, TRUE) ? 1 : -1) > 0 &&
-           s.tokenLine == line)
-      ;
+    /* Advance to the start of the next statement.  In the brace-less
+     * syntax that is simply the next line's first token.  New-syntax
+     * block bodies may also pack several statements onto one physical
+     * line separated by ';' (e.g. "next = MAP02; par = 30"); treat a
+     * ';' as a statement boundary too and resume with the token right
+     * after it, so the trailing statements are not swallowed with the
+     * rest of the line.  A stray ';' on its own reprocesses harmlessly
+     * (it is not an identifier and matches no key). */
+    while ((tok = U_GetNextToken(&s, TRUE) ? 1 : -1) > 0)
+    {
+      if (s.token == ';')
+      {
+        tok = U_GetNextToken(&s, TRUE) ? 1 : -1;
+        break;              /* current token now begins the next statement */
+      }
+      if (s.tokenLine != line)
+        break;              /* fell onto the next line: that starts a stmt */
+    }
   }
   U_ScanClose(&s);
 

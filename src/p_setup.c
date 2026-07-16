@@ -2796,15 +2796,16 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
     * record sizes and P_SpawnMapThing filters by the positive game-mode bits.
     * Line and sector specials are ZDoom-numbered: the descriptor's executor
     * translates the ZDoom-only action specials onto the Hexen dispatchers,
-    * and P_SpawnSpecials translates the sector specials onto Doom's
-    * (Plane_Align slopes remain unsupported). */
+    * and P_SpawnSpecials translates the sector specials onto Doom's.
+    * Plane_Align (181) slopes are spawned by P_SpawnZDoomSlopes and drawn
+    * as tilted visplanes like any other sloped sector. */
    if ((i = lumpnum + ML_BLOCKMAP + 1) < numlumps
          && !strncasecmp(lumpinfo[i].name, "BEHAVIOR", 8)
          && !hexen)
    {
       lprintf(LO_INFO,
               "P_SetupLevel: %s: ZDoom Doom-in-Hexen format map; "
-              "specials translated (slopes unsupported)\n", lumpname);
+              "specials translated (incl. Plane_Align slopes)\n", lumpname);
       P_ApplyZDoomInDoomMapFormat();
    }
 

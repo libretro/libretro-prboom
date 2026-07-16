@@ -117,6 +117,11 @@ the wad.
 - **Hexen features.** Polyobjects and the Hexen line-special / ACS action set.
 - **3D floors** on binary ZDoom/Hexen maps (`Sector_Set3DFloor`).
 - **3D skyboxes** (`SkyViewpoint` 9080 / `SkyPicker` 9081).
+- **Sloped floors and ceilings.** ZDoom `Plane_Align` (special 181, on binary
+  and Doom-in-Hexen maps) and thing-based **vertex slopes** (slope-vertex things
+  1504 / 1505) are spawned and drawn as **tilted visplanes** in the 8-bit
+  software renderer; the play sim (movement, thing Z, hitscan) follows the
+  slope plane.
 - **DECORATE actor aliasing.** Actor headers (`name`, `: Parent`,
   `replaces`, doomednum) are parsed and resolved to a base-game editor number by
   walking parent/replaces links, so modded things spawn in place and the wad's
@@ -143,15 +148,16 @@ the wad.
   (level name, next/secretnext with the EndGame/endbunny sentinels, sky,
   music incl. `$MUSIC_*` indirection, par, titlepatch, cluster, boss
   specialactions); unrecognized keys are skipped rather than mapped.
-- **UDMF** consumes only engine-carried fields (the DSDA subset). UDMF-declared
-  slopes, 3D floors, and portals are not read from text maps.
+- **UDMF** consumes the engine-carried field subset (the DSDA set) plus line
+  `special` + `arg0..4`, so special-driven features apply on text maps as on
+  binary ones — `Sector_Set3DFloor` (3D floors) and `Plane_Align` (slopes)
+  included. UDMF-native structured portal fields are not read.
 - **GLDEFS:** only skybox-relevant handling; glow/brightmap/light definitions
   are not consumed.
 
 ### Not supported
 
 - **ZScript** — no support. Mods whose gameplay lives in ZScript won't run it.
-- **Slopes** (`Plane_Align` / UDMF) — parsed to inert.
 - **Line / sector portals** — inert.
 - **3D models (MODELDEF), voxels, dynamic/point lights** — out of scope for the
   8-bit software renderer.
@@ -159,7 +165,7 @@ the wad.
 
 The practical result: map-and-resource-driven ZDoom wads — new levels, sprite
 and texture replacements, ACS-scripted set pieces, reskinned monsters, Hexen-
-style hubs, 3D floors and skyboxes — generally play. Wads built around ZScript
+style hubs, 3D floors, slopes and skyboxes — generally play. Wads built around ZScript
 classes or GL-renderer features do not.
 
 ---

@@ -12,9 +12,9 @@
  *     brightmap flat    NAME { ... }
  *     brightmap sprite  NAME { ... }
  *
- * This module only parses those blocks and resolves each to the lump that
- * holds the mask image; building the per-texture mask and applying it in
- * the column drawers is done elsewhere. */
+ * This module parses those blocks, resolves each to the lump that holds the
+ * mask image, and builds the per-texel masks (U_BuildBrightmasks); the
+ * software column/span drawers apply them. */
 
 #ifndef U_BRIGHTMAP_H
 #define U_BRIGHTMAP_H

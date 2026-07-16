@@ -126,6 +126,11 @@ the wad.
   Silverman **KVX** voxel model, rasterised by the software renderer
   (`R_DrawVoxel`) as projected per-voxel splats, with the model's 6-bit
   palette remapped to PLAYPAL.
+- **Brightmaps.** ZDoom GLDEFS `brightmap` blocks for **textures, flats and
+  sprites** are parsed, built into per-texel masks (`U_BuildBrightmasks`) and
+  applied by the software column/span drawers, so masked texels draw at full
+  brightness regardless of sector light — the usual glowing screens, lamps and
+  lava veins.
 - **DECORATE actor aliasing.** Actor headers (`name`, `: Parent`,
   `replaces`, doomednum) are parsed and resolved to a base-game editor number by
   walking parent/replaces links, so modded things spawn in place and the wad's
@@ -156,8 +161,8 @@ the wad.
   `special` + `arg0..4`, so special-driven features apply on text maps as on
   binary ones — `Sector_Set3DFloor` (3D floors) and `Plane_Align` (slopes)
   included. UDMF-native structured portal fields are not read.
-- **GLDEFS:** only skybox-relevant handling; glow/brightmap/light definitions
-  are not consumed.
+- **GLDEFS:** skybox handling and **brightmap** definitions are consumed (see
+  above); sector **glow** and dynamic/point-**light** definitions are not.
 
 ### Not supported
 

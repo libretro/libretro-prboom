@@ -2445,6 +2445,37 @@ static void P_LoadUDMFSectors(void)
     ss->heightsec     = -1;
     ss->floorlightsec = -1;
     ss->ceilinglightsec = -1;
+
+    /* Sector friction: the UDMF frictionfactor is the per-tic momentum
+     * retention in [0,1] -- the same quantity Boom stores as a 16.16 fraction
+     * (ORIG_FRICTION = 0xE800 = 0.90625), so it converts to Boom units with
+     * udmf_to_fixed.  Set friction/movefactor and the FRICTION_MASK special
+     * bit that P_GetFriction gates on; that bit is an independent generalized
+     * modifier, so it does not disturb the sector's ZDoom special type.
+     * movefactor uses the same ice/mud split P_SpawnFriction derives for
+     * linedef-driven friction.  GZDoom activates friction on frictionfactor
+     * alone (SECF_FRICTION), so a present field is enough here too. */
+    if (ms->frictionfactor && *ms->frictionfactor)
+    {
+      int fr = udmf_to_fixed(ms->frictionfactor);
+      int mf;
+      if (fr > FRACUNIT) fr = FRACUNIT;
+      if (fr < 0)        fr = 0;
+      if (fr > ORIG_FRICTION)                    /* ice: retains momentum */
+        mf = ((0x10092 - fr) * 0x70) / 0x158;
+      else                                       /* mud: sheds momentum */
+        mf = ((fr - 0xDB34) * 0xA) / 0x80;
+      if (mf < 32) mf = 32;
+      ss->friction   = fr;
+      ss->movefactor = mf;
+      /* Flag the sector as a friction sector.  P_SpawnSpecials translates a
+       * ZDoom map's sector special, shifting ZDoom's generalized flags down by
+       * 3 (ZDoom friction 0x0800 -> Boom FRICTION_MASK 0x100), so set the
+       * pre-translation ZDoom bit here.  Setting FRICTION_MASK (0x100) directly
+       * would be read as part of ZDoom's damage mask (0x0300) and mistranslated,
+       * losing the friction flag P_GetFriction gates on. */
+      ss->special    = (short)(ss->special | 0x0800);
+    }
   }
 }
 

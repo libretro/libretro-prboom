@@ -54,6 +54,7 @@
 #include "r_draw.h"
 #include "u_brightmap.h"
 #include "r_things.h"
+#include "r_dynlight.h"
 #include "r_sky.h"
 #include "r_plane.h"
 #include "u_zanimdefs.h"
@@ -109,6 +110,8 @@ static const lighttable_t **planezlight;
 static int                  planelightlevel; /* LIGHTLEVELS index of current plane, for Smooth fine weight */
 static int                  planerawlight;   /* raw 0..255 sector light + extralight, for Smooth sub-band base */
 static fixed_t planeheight;
+static fixed_t plane_worldz;    /* current plane's world z (for dynamic-light falloff) */
+static int     plane_dynlit;    /* any GLDEFS point light can reach this plane */
 
 // killough 2/8/98: make variables static
 
@@ -299,6 +302,8 @@ static void R_MapTiltedPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
 // BASIC PRIMITIVE
 //
 
+#define DL_FLAT_CHUNK 8   /* span chunk width (px) for dynamic-light shading */
+
 static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
 {
    fixed_t distance;
@@ -421,6 +426,66 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
    }
 
    dsvars->y = y;
+
+   /* Dynamic point lights on the floor/ceiling.  Split the span into short
+    * chunks, intersect each chunk's view ray with the plane to get its world
+    * point, and re-pick the colourmap for the light-boosted band.  Only when
+    * plane_dynlit; otherwise the single span below runs unchanged. */
+   if (plane_dynlit && !fixedcolormap)
+   {
+      const fixed_t bxf = dsvars->xfrac, byf = dsvars->yfrac;
+      const int wz = plane_worldz >> FRACBITS;
+      int cx;
+      for (cx = x1; cx <= x2; cx += DL_FLAT_CHUNK)
+      {
+         int ex = cx + DL_FLAT_CHUNK - 1;
+         int mid, wx, wy, boost, band;
+         unsigned oidx, ridx;
+         fixed_t oc, hd;
+
+         if (ex > x2) ex = x2;
+         mid  = (cx + ex) >> 1;
+         oidx = (unsigned)xtoviewangle[mid] >> ANGLETOFINESHIFT;
+         oc   = finecosine[oidx];
+         hd   = (oc > 4096) ? FixedDiv(distance, oc) : distance;
+         ridx = (unsigned)(viewangle + xtoviewangle[mid]) >> ANGLETOFINESHIFT;
+         wx   = (viewx + FixedMul(hd, finecosine[ridx])) >> FRACBITS;
+         wy   = (viewy + FixedMul(hd, finesine[ridx]))   >> FRACBITS;
+
+         boost = R_DynLightBoost(wx, wy, wz);
+         band  = planelightlevel + (boost >> LIGHTSEGSHIFT);
+         if (band > LIGHTLEVELS-1) band = LIGHTLEVELS-1;
+         dsvars->colormap = zlight[band][index];
+         if (drawvars.filterz == RDRAW_FILTER_LINEAR)
+            dsvars->nextcolormap =
+               zlight[band][index+1 >= MAXLIGHTZ ? MAXLIGHTZ-1 : index+1];
+         if (r_smooth_shading && fullcolormap)
+         {
+            int raw = planerawlight + boost;
+            int startmap, scale, fine2;
+            if (raw > 255) raw = 255;
+            startmap = ((255 - raw) * 2 * (LIGHTLEVELS-1) * SMOOTH_WEIGHTS)
+                       / (255 * LIGHTLEVELS);
+            scale    = FixedDiv((320/2*FRACUNIT),(index+1)<<LIGHTZSHIFT);
+            fine2    = startmap
+                       - (scale >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))/DISTMAP;
+            if (fine2 < 0)                     fine2 = 0;
+            else if (fine2 > SMOOTH_WEIGHTS-1) fine2 = SMOOTH_WEIGHTS-1;
+            r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine2;
+            r_fine_colormap    = dsvars->colormap;
+         }
+         else
+            r_fine_lightweight = -1;
+
+         dsvars->xfrac = bxf + (fixed_t)((int64_t)(cx - x1) * dsvars->xstep);
+         dsvars->yfrac = byf + (fixed_t)((int64_t)(cx - x1) * dsvars->ystep);
+         dsvars->x1 = cx;
+         dsvars->x2 = ex;
+         R_DrawSpan(dsvars);
+      }
+      return;
+   }
+
    dsvars->x1 = x1;
    dsvars->x2 = x2;
 
@@ -898,6 +963,11 @@ static void R_DoDrawPlane(visplane_t *pl)
          stop = pl->maxx + 1;
          planezlight = zlight[light];
          planelightlevel = light;
+         /* Dynamic point lights: remember the plane's world z and whether any
+          * light can reach it, so R_MapPlane can brighten the floor/ceiling
+          * near lights (per-chunk, gated here to skip the common unlit case). */
+         plane_worldz = pl->height;
+         plane_dynlit = R_DynLightsActive() && R_PlaneLit(pl->height >> FRACBITS);
          /* Smooth mode bases its sub-band darkness on planelightlevel, which
           * is the sector light quantised to LIGHTLEVELS(16) bands.  On maps
           * with many adjacent sectors at slightly different light levels that

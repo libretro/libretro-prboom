@@ -25,4 +25,7 @@ int R_DynLightBoost(int wx, int wy, int wz);
 /* Cheap AABB test: could any active light reach this seg? */
 int R_SegLit(const seg_t *seg);
 
+/* Cheap vertical test: could any active light reach a plane at this z? */
+int R_PlaneLit(int planez);
+
 #endif

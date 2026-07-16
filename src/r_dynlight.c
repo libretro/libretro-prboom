@@ -109,3 +109,16 @@ int R_SegLit(const seg_t *seg)
   }
   return 0;
 }
+
+int R_PlaneLit(int planez)
+{
+  int i;
+  for (i = 0; i < num_active; i++)
+  {
+    int dz = planez - active[i].z;
+    if (dz < 0) dz = -dz;
+    if (dz < active[i].radius)
+      return 1;
+  }
+  return 0;
+}

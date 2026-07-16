@@ -1,6 +1,6 @@
 /* u_voxel.c: load KVX voxel models and resolve ZDoom VOXELDEF bindings.
- * See u_voxel.h for the format.  This stage only builds the models and the
- * sprite->voxel map; rendering is added later. */
+ * See u_voxel.h for the format.  This stage builds the models and the
+ * sprite->voxel map; the models are rasterised by R_DrawVoxel (r_voxel.c). */
 
 #include <stdlib.h>
 #include <string.h>
@@ -151,7 +151,7 @@ static int vox_load_kvx(int lump, voxel_model_t *m)
         int ztop  = m->voxdata[s];
         int zleng = m->voxdata[s + 1];
         int flags = m->voxdata[s + 2];
-        if (s + 4 + zleng > e + 1)         /* truncated slab: stop column */
+        if (s + 3 + zleng > e)             /* truncated slab: stop column */
           break;
         if (sc == slabcap)
         {
@@ -166,10 +166,10 @@ static int vox_load_kvx(int lump, voxel_model_t *m)
         m->slabs[sc].zleng     = (unsigned char)zleng;
         m->slabs[sc].cullflags = (unsigned char)flags;
         m->slabs[sc].pad       = 0;
-        m->slabs[sc].col       = m->voxdata + s + 4;
+        m->slabs[sc].col       = m->voxdata + s + 3;
         sc++;
         c->count++;
-        s += 4 + zleng;
+        s += 3 + zleng;
       }
     }
   }

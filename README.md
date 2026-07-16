@@ -122,6 +122,10 @@ the wad.
   1504 / 1505) are spawned and drawn as **tilted visplanes** in the 8-bit
   software renderer; the play sim (movement, thing Z, hitscan) follows the
   slope plane.
+- **Voxel models.** ZDoom `VOXELDEF` bindings replace a sprite with a Ken
+  Silverman **KVX** voxel model, rasterised by the software renderer
+  (`R_DrawVoxel`) as projected per-voxel splats, with the model's 6-bit
+  palette remapped to PLAYPAL.
 - **DECORATE actor aliasing.** Actor headers (`name`, `: Parent`,
   `replaces`, doomednum) are parsed and resolved to a base-game editor number by
   walking parent/replaces links, so modded things spawn in place and the wad's
@@ -159,7 +163,7 @@ the wad.
 
 - **ZScript** — no support. Mods whose gameplay lives in ZScript won't run it.
 - **Line / sector portals** — inert.
-- **3D models (MODELDEF), voxels, dynamic/point lights** — out of scope for the
+- **3D models (MODELDEF), dynamic/point lights** — out of scope for the
   8-bit software renderer.
 - **Truecolor rendering.**
 

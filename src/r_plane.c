@@ -110,7 +110,6 @@ static const lighttable_t **planezlight;
 static int                  planelightlevel; /* LIGHTLEVELS index of current plane, for Smooth fine weight */
 static int                  planerawlight;   /* raw 0..255 sector light + extralight, for Smooth sub-band base */
 static fixed_t planeheight;
-static fixed_t plane_worldz;    /* current plane's world z (for dynamic-light falloff) */
 static int     plane_dynlit;    /* any GLDEFS point light can reach this plane */
 
 // killough 2/8/98: make variables static
@@ -304,6 +303,18 @@ static void R_MapTiltedPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
 
 #define DL_FLAT_CHUNK 8   /* span chunk width (px) for dynamic-light shading */
 
+/* World (x,y) of the plane point under screen column `col` at this row's
+ * `distance` (the view ray through the column intersected with the plane). */
+static void R_PlaneColumnWorld(int col, fixed_t distance, int *wx, int *wy)
+{
+   unsigned oidx = (unsigned)xtoviewangle[col] >> ANGLETOFINESHIFT;
+   fixed_t  oc   = finecosine[oidx];
+   fixed_t  hd   = (oc > 4096) ? FixedDiv(distance, oc) : distance;
+   unsigned ridx = (unsigned)(viewangle + xtoviewangle[col]) >> ANGLETOFINESHIFT;
+   *wx = (viewx + FixedMul(hd, finecosine[ridx])) >> FRACBITS;
+   *wy = (viewy + FixedMul(hd, finesine[ridx]))   >> FRACBITS;
+}
+
 static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
 {
    fixed_t distance;
@@ -434,25 +445,31 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
    if (plane_dynlit && !fixedcolormap)
    {
       const fixed_t bxf = dsvars->xfrac, byf = dsvars->yfrac;
-      const int wz = plane_worldz >> FRACBITS;
-      int cx;
+      int wx_a, wy_a, wx_b, wy_b, cx;
+
+      /* Span-level cull: if no light on this plane reaches the span, draw it
+       * as one span with the base colourmap (already set) -- this keeps the
+       * common far-from-light span off the chunk path entirely. */
+      R_PlaneColumnWorld(x1, distance, &wx_a, &wy_a);
+      R_PlaneColumnWorld(x2, distance, &wx_b, &wy_b);
+      if (!R_PlaneSpanLit(wx_a, wy_a, wx_b, wy_b))
+      {
+         dsvars->x1 = x1;
+         dsvars->x2 = x2;
+         R_DrawSpan(dsvars);
+         return;
+      }
+
       for (cx = x1; cx <= x2; cx += DL_FLAT_CHUNK)
       {
          int ex = cx + DL_FLAT_CHUNK - 1;
          int mid, wx, wy, boost, band;
-         unsigned oidx, ridx;
-         fixed_t oc, hd;
 
          if (ex > x2) ex = x2;
-         mid  = (cx + ex) >> 1;
-         oidx = (unsigned)xtoviewangle[mid] >> ANGLETOFINESHIFT;
-         oc   = finecosine[oidx];
-         hd   = (oc > 4096) ? FixedDiv(distance, oc) : distance;
-         ridx = (unsigned)(viewangle + xtoviewangle[mid]) >> ANGLETOFINESHIFT;
-         wx   = (viewx + FixedMul(hd, finecosine[ridx])) >> FRACBITS;
-         wy   = (viewy + FixedMul(hd, finesine[ridx]))   >> FRACBITS;
+         mid = (cx + ex) >> 1;
+         R_PlaneColumnWorld(mid, distance, &wx, &wy);
 
-         boost = R_DynLightBoost(wx, wy, wz);
+         boost = R_PlaneBoost(wx, wy);
          band  = planelightlevel + (boost >> LIGHTSEGSHIFT);
          if (band > LIGHTLEVELS-1) band = LIGHTLEVELS-1;
          dsvars->colormap = zlight[band][index];
@@ -963,11 +980,12 @@ static void R_DoDrawPlane(visplane_t *pl)
          stop = pl->maxx + 1;
          planezlight = zlight[light];
          planelightlevel = light;
-         /* Dynamic point lights: remember the plane's world z and whether any
-          * light can reach it, so R_MapPlane can brighten the floor/ceiling
-          * near lights (per-chunk, gated here to skip the common unlit case). */
-         plane_worldz = pl->height;
-         plane_dynlit = R_DynLightsActive() && R_PlaneLit(pl->height >> FRACBITS);
+         /* Dynamic point lights: build the per-plane light sublist (lights
+          * that reach this plane's world z) so R_MapPlane can brighten the
+          * floor/ceiling near lights.  Gated here to skip the common case of
+          * a plane no light reaches. */
+         plane_dynlit = R_DynLightsActive() &&
+                        R_PlanePrepareLights(pl->height >> FRACBITS) > 0;
          /* Smooth mode bases its sub-band darkness on planelightlevel, which
           * is the sector light quantised to LIGHTLEVELS(16) bands.  On maps
           * with many adjacent sectors at slightly different light levels that

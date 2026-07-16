@@ -25,7 +25,11 @@ int R_DynLightBoost(int wx, int wy, int wz);
 /* Cheap AABB test: could any active light reach this seg? */
 int R_SegLit(const seg_t *seg);
 
-/* Cheap vertical test: could any active light reach a plane at this z? */
-int R_PlaneLit(int planez);
+/* Build the per-plane light sublist (lights reaching this z, vertical term
+ * folded into a 2D radius); returns the count.  R_PlaneBoost queries it per
+ * point and R_PlaneSpanLit tests whether a world span segment is reached. */
+int R_PlanePrepareLights(int planez);
+int R_PlaneBoost(int wx, int wy);
+int R_PlaneSpanLit(int wx1, int wy1, int wx2, int wy2);
 
 #endif

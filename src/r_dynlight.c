@@ -11,6 +11,7 @@
 #include "m_fixed.h"
 #include "u_dynlight.h"
 #include "r_state.h"
+#include "r_main.h"
 #include "r_dynlight.h"
 
 extern int numsprites;
@@ -50,6 +51,32 @@ void R_CollectDynLights(void)
     d = U_DynLightForSprite(sprnames[mo->sprite]);
     if (!d || d->size <= 0)
       continue;
+
+    /* View-frustum cull: a light that cannot reach anything on screen is
+     * dead weight in every per-primitive query below.  Transform the light
+     * to view space and drop it when its whole sphere is behind the camera
+     * or well outside the horizontal FOV cone (generous half-angle so a
+     * light grazing the edge, whose radius may still touch a visible
+     * surface, is kept). */
+    {
+      fixed_t trx = mo->x - viewx, trY = mo->y - viewy;
+      fixed_t tz  = FixedMul(trx, viewcos) + FixedMul(trY, viewsin);
+      int     rad = d->size;
+      if ((tz >> FRACBITS) < -rad)
+        continue;                       /* entire sphere behind the view */
+      if (tz > 0)
+      {
+        fixed_t tx  = FixedMul(trx, viewsin) - FixedMul(trY, viewcos);
+        int     txm = tx >> FRACBITS, tzm = tz >> FRACBITS;
+        if (txm < 0) txm = -txm;
+        /* Conservative: only cull when the light's whole sphere clears the
+         * FOV wedge.  The 2*tz wedge (~63 deg half-angle) is wider than any
+         * normal FOV, and the 2*rad margin covers the sphere's reach toward
+         * the frustum edge, so an edge-grazing light is never dropped. */
+        if (txm - 2 * rad > 2 * tzm)
+          continue;
+      }
+    }
 
     if (num_active >= DL_MAX_ACTIVE)
       break;
@@ -110,14 +137,77 @@ int R_SegLit(const seg_t *seg)
   return 0;
 }
 
-int R_PlaneLit(int planez)
+/* Per-plane light sublist.  A flat has a constant world z, so a light's
+ * vertical term (planez - lz)^2 is constant across the whole plane: fold it
+ * into an effective 2D radius r_eff^2 = r^2 - dz^2 once, drop lights that do
+ * not reach the plane, and the per-span work becomes a cheap 2D query over
+ * just the reaching lights. */
+typedef struct
+{
+  int       x, y, reff;
+  long long reff2, r2;
+  int       strength;
+} plane_light_t;
+
+static plane_light_t plane_lights[DL_MAX_ACTIVE];
+static int           num_plane_lights;
+
+int R_PlanePrepareLights(int planez)
 {
   int i;
+  num_plane_lights = 0;
   for (i = 0; i < num_active; i++)
   {
-    int dz = planez - active[i].z;
-    if (dz < 0) dz = -dz;
-    if (dz < active[i].radius)
+    const active_light_t *a = &active[i];
+    long long dz  = planez - a->z;
+    long long dz2 = dz * dz;
+    plane_light_t *p;
+    long long lo, hi;
+
+    if (dz2 >= a->r2)
+      continue;                         /* light never reaches this plane */
+    p = &plane_lights[num_plane_lights++];
+    p->x = a->x; p->y = a->y;
+    p->reff2 = a->r2 - dz2;
+    p->r2 = a->r2;
+    p->strength = a->strength;
+    /* integer sqrt of reff2 for the AABB span test */
+    lo = 0; hi = a->radius;
+    while (lo < hi)
+    {
+      long long m = (lo + hi + 1) >> 1;
+      if (m * m <= p->reff2) lo = m; else hi = m - 1;
+    }
+    p->reff = (int)lo;
+  }
+  return num_plane_lights;
+}
+
+int R_PlaneBoost(int wx, int wy)
+{
+  int i, boost = 0;
+  for (i = 0; i < num_plane_lights; i++)
+  {
+    const plane_light_t *p = &plane_lights[i];
+    int dx = wx - p->x, dy = wy - p->y;
+    long long d2 = (long long)dx * dx + (long long)dy * dy;
+    if (d2 >= p->reff2)
+      continue;
+    boost += (int)((long long)p->strength * (p->reff2 - d2) / p->r2);
+  }
+  return boost;
+}
+
+int R_PlaneSpanLit(int wx1, int wy1, int wx2, int wy2)
+{
+  int i;
+  int lox = wx1 < wx2 ? wx1 : wx2, hix = wx1 < wx2 ? wx2 : wx1;
+  int loy = wy1 < wy2 ? wy1 : wy2, hiy = wy1 < wy2 ? wy2 : wy1;
+  for (i = 0; i < num_plane_lights; i++)
+  {
+    const plane_light_t *p = &plane_lights[i];
+    if (p->x >= lox - p->reff && p->x <= hix + p->reff &&
+        p->y >= loy - p->reff && p->y <= hiy + p->reff)
       return 1;
   }
   return 0;

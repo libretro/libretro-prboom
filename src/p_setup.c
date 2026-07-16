@@ -2653,6 +2653,14 @@ static void P_LoadUDMFThings(void)
     hexen_thing_args[3] = dmt->arg3;
     hexen_thing_args[4] = dmt->arg4;
 
+    /* thing z-offset (items/monsters on 3D floors and ledges, decorations
+     * hung from the ceiling): the binary Hexen loader stages hmt->height the
+     * same way and P_SpawnMapThing adds it to the spawn Z.  UDMF stores it as
+     * text; convert to map units, and reset to 0 when absent so it cannot
+     * inherit a stale value from a previously loaded map. */
+    hexen_thing_height  = dmt->height
+                        ? (short)(udmf_to_fixed(dmt->height) >> FRACBITS) : 0;
+
     /* ZDoom vertex-slope things: record the parsed height at the thing's
      * full-precision vertex coordinate and consume it before the narrow
      * mapthing_t spawn (which would truncate the position and spam

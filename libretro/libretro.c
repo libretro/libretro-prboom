@@ -1654,7 +1654,8 @@ typedef enum
 {
    PWAD_MAP_NONE,        /* no map markers (graphics / sound / DEH-only PWAD) */
    PWAD_MAP_DOOM1,       /* ExMy markers found */
-   PWAD_MAP_DOOM2        /* MAPxx markers found */
+   PWAD_MAP_DOOM2,       /* MAPxx markers found */
+   PWAD_MAP_HERETIC      /* ExMy markers + a Heretic signature (see below) */
 } pwad_map_kind_t;
 
 static pwad_map_kind_t scan_pwad_map_kind(const char *path,
@@ -1667,6 +1668,7 @@ static pwad_map_kind_t scan_pwad_map_kind(const char *path,
    int infotableofs = LONG(header->infotableofs);
    bool saw_exmy    = false;
    bool saw_mapxx   = false;
+   bool saw_heretic = false;
 
    if (numlumps <= 0 || infotableofs <= 0)
       return PWAD_MAP_NONE;
@@ -1703,8 +1705,25 @@ static pwad_map_kind_t scan_pwad_map_kind(const char *path,
                n[4] >= '0' && n[4] <= '9' &&
                (n[5] == '\0' || n[5] == ' '))
          saw_mapxx = true;
+      /* Raven-engine content signatures.  DOOM stores per-level music as
+       * "D_ExMy"; Heretic names it "MUS_ExMy" (MUS_E1M1, ...).  "M_HTIC"
+       * is Heretic's menu title graphic.  Either lump reliably marks a
+       * Heretic-targeted PWAD, even a pure map-replacement pack that
+       * carries no PLAYPAL.  Episode number is deliberately NOT used as a
+       * signal: DOOM's SIGIL (E5) and SIGIL II (E6) live in the ExMy
+       * namespace too, so keying off E5/E6 would mis-route them. */
+      if (n[0] == 'M' && n[1] == 'U' && n[2] == 'S' && n[3] == '_' &&
+          (n[4] == 'E' || n[4] == 'e'))
+         saw_heretic = true;
+      else if (!strncmp(n, "M_HTIC", 6) && (n[6] == '\0' || n[6] == ' '))
+         saw_heretic = true;
    }
    filestream_close(fp);
+   /* Heretic maps live in the ExMy namespace, so require an ExMy marker
+    * before honouring the Heretic signature -- a stray MUS_ lump in an
+    * otherwise MAPxx (Hexen/DOOM 2) PWAD must not be mis-routed here. */
+   if (saw_exmy && saw_heretic)
+      return PWAD_MAP_HERETIC;
    if (saw_mapxx)
       return PWAD_MAP_DOOM2;
    if (saw_exmy)
@@ -1729,6 +1748,13 @@ static char *find_iwad_for_kind(pwad_map_kind_t kind)
    static const char *const doom2_candidates[] = {
       "doom2.wad", "doom2f.wad", "plutonia.wad", "tnt.wad", "freedoom2.wad"
    };
+   /* Heretic IWAD filenames: the full "Shadow of the Serpent Riders"
+    * / registered release is heretic.wad; the E1-only shareware IWAD
+    * ships as heretic1.wad.  blasphem.wad is the Freedoom-style free
+    * Heretic-compatible IWAD. */
+   static const char *const heretic_candidates[] = {
+      "heretic.wad", "heretic1.wad", "blasphem.wad"
+   };
    const char *const *list;
    size_t list_n;
    size_t i;
@@ -1745,6 +1771,11 @@ static char *find_iwad_for_kind(pwad_map_kind_t kind)
    {
       list   = doom2_candidates;
       list_n = sizeof(doom2_candidates)/sizeof(doom2_candidates[0]);
+   }
+   else if (kind == PWAD_MAP_HERETIC)
+   {
+      list   = heretic_candidates;
+      list_n = sizeof(heretic_candidates)/sizeof(heretic_candidates[0]);
    }
    else
       return NULL;
@@ -2129,8 +2160,9 @@ bool retro_load_game(const struct retro_game_info *info)
                log_cb(RETRO_LOG_INFO,
                       "retro_load_game: PWAD '%s' map kind=%s, "
                       "matching IWAD=%s\n", g_basename,
-                      kind == PWAD_MAP_DOOM1 ? "ExMy(DOOM1)" :
-                      kind == PWAD_MAP_DOOM2 ? "MAPxx(DOOM2)" : "none",
+                      kind == PWAD_MAP_DOOM1   ? "ExMy(DOOM1)"   :
+                      kind == PWAD_MAP_DOOM2   ? "MAPxx(DOOM2)"  :
+                      kind == PWAD_MAP_HERETIC ? "ExMy(HERETIC)" : "none",
                       iwad_match ? iwad_match : "(none found)");
 
             /* If the matching-generation probe missed, try the other
@@ -2139,8 +2171,15 @@ bool retro_load_game(const struct retro_game_info *info)
              * WADs hide their maps behind UMAPINFO or non-standard markers)
              * still needs a real IWAD if one exists.  Only fall back to the
              * PLAYPAL standalone-IWAD path when NO standard IWAD is findable
-             * anywhere -- that is the genuine chex.wad case. */
-            if (!iwad_match)
+             * anywhere -- that is the genuine chex.wad case.
+             *
+             * A confirmed Heretic PWAD is excluded from this cross-probe:
+             * its actors, sprites and textures come from heretic.wad, and
+             * pairing it with a DOOM IWAD boots the wrong game and crashes
+             * on the first missing Heretic lump.  If heretic.wad is not
+             * present we fail cleanly with a Heretic-specific message
+             * rather than silently mis-routing to DOOM. */
+            if (!iwad_match && kind != PWAD_MAP_HERETIC)
             {
                iwad_match = find_iwad_for_kind(PWAD_MAP_DOOM2);
                if (!iwad_match)
@@ -2177,7 +2216,16 @@ bool retro_load_game(const struct retro_game_info *info)
             {
                /* No IWAD found and no own palette.  Let the engine's
                 * FindIWADFile auto-detect try; warn for the Doom 1 case. */
-               if (kind == PWAD_MAP_DOOM1 && log_cb)
+               if (kind == PWAD_MAP_HERETIC && log_cb)
+                  log_cb(RETRO_LOG_WARN,
+                         "retro_load_game: PWAD '%s' is a Heretic add-on "
+                         "(ExMy maps with a Heretic signature) but no "
+                         "heretic.wad / heretic1.wad / blasphem.wad found "
+                         "near the PWAD or in the system directory.  Place "
+                         "the Heretic IWAD next to '%s' or use an m3u "
+                         "playlist to name it explicitly.\n",
+                         g_basename, g_basename);
+               else if (kind == PWAD_MAP_DOOM1 && log_cb)
                   log_cb(RETRO_LOG_WARN,
                          "retro_load_game: PWAD '%s' has DOOM 1 (ExMy) "
                          "maps but no doom.wad / doomu.wad / freedoom1.wad / "

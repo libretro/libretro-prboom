@@ -114,27 +114,67 @@ int R_DynLightBoost(int wx, int wy, int wz)
   return boost;
 }
 
-int R_SegLit(const seg_t *seg)
-{
-  int i;
-  int x1, x2, y1, y2;
+/* Per-seg light sublist.  A light whose 2D distance to the wall segment
+ * exceeds its radius is beyond reach at every point on the seg (the wall
+ * point's (x,y) lies on the seg line), so it contributes zero to every column
+ * and can be dropped up front -- the vertical per-band boost then loops only
+ * the lights that actually touch this wall.  Exact: filtering by point-to-
+ * segment distance changes nothing the full loop would have added. */
+static active_light_t seg_lights[DL_MAX_ACTIVE];
+static int            num_seg_lights;
 
+int R_SegPrepareLights(const seg_t *seg)
+{
+  int i, ax, ay, bx, by;
+  int64_t abx, aby, len2;
+
+  num_seg_lights = 0;
   if (!num_active || !seg->v1 || !seg->v2)
     return 0;
 
-  x1 = seg->v1->x >> FRACBITS; x2 = seg->v2->x >> FRACBITS;
-  y1 = seg->v1->y >> FRACBITS; y2 = seg->v2->y >> FRACBITS;
-  if (x1 > x2) { int t = x1; x1 = x2; x2 = t; }
-  if (y1 > y2) { int t = y1; y1 = y2; y2 = t; }
+  ax = seg->v1->x >> FRACBITS; ay = seg->v1->y >> FRACBITS;
+  bx = seg->v2->x >> FRACBITS; by = seg->v2->y >> FRACBITS;
+  abx = bx - ax; aby = by - ay;
+  len2 = abx * abx + aby * aby;
 
   for (i = 0; i < num_active; i++)
   {
     const active_light_t *a = &active[i];
-    if (a->x >= x1 - a->radius && a->x <= x2 + a->radius &&
-        a->y >= y1 - a->radius && a->y <= y2 + a->radius)
-      return 1;
+    int64_t apx = a->x - ax, apy = a->y - ay;
+    int64_t dot = apx * abx + apy * aby;
+    int64_t d2;
+
+    if (len2 == 0 || dot <= 0)
+      d2 = apx * apx + apy * apy;                 /* closest point is v1 */
+    else if (dot >= len2)
+    {
+      int64_t bpx = a->x - bx, bpy = a->y - by;
+      d2 = bpx * bpx + bpy * bpy;                 /* closest point is v2 */
+    }
+    else
+      /* perpendicular foot inside the seg; round the subtracted term up so
+       * the distance is never overestimated (never a false exclusion). */
+      d2 = (apx * apx + apy * apy) - (dot * dot + len2 - 1) / len2;
+
+    if (d2 < a->r2)
+      seg_lights[num_seg_lights++] = *a;
   }
-  return 0;
+  return num_seg_lights;
+}
+
+int R_SegBoost(int wx, int wy, int wz)
+{
+  int i, boost = 0;
+  for (i = 0; i < num_seg_lights; i++)
+  {
+    const active_light_t *a = &seg_lights[i];
+    int dx = wx - a->x, dy = wy - a->y, dz = wz - a->z;
+    int64_t d2 = (int64_t)dx * dx + (int64_t)dy * dy + (int64_t)dz * dz;
+    if (d2 >= a->r2)
+      continue;
+    boost += (int)((int64_t)a->strength * (a->r2 - d2) / a->r2);
+  }
+  return boost;
 }
 
 /* Per-plane light sublist.  A flat has a constant world z, so a light's

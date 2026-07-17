@@ -691,6 +691,40 @@ void R_RenderThickSides(drawseg_t *ds)
 
 static int didsolidcol; /* True if at least one column was marked solid */
 
+#define DL_WALL_CHUNK 8   /* vertical chunk (px) for wall dynamic-light falloff */
+
+/* Emit one wall column split into vertical light bands.  A screen row maps to
+ * a world z (the horizon row is at viewz, stepping by the column's iscale of
+ * world height per pixel), so the point-light boost is evaluated per band and
+ * the wall shows a round pool of light instead of one flat vertical stripe.
+ * The texture source/mapping is unchanged -- only [yl,yh] is subdivided and
+ * the colourmap re-picked per band, exactly as the flat span chunking does. */
+static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
+                                int wx, int wy, int base_ll, fixed_t scale,
+                                int z_filter)
+{
+   const int yl = dc->yl, yh = dc->yh;
+   int cy;
+   for (cy = yl; cy <= yh; cy += DL_WALL_CHUNK)
+   {
+      int ey = cy + DL_WALL_CHUNK - 1;
+      int mid, wz, ll;
+      if (ey > yh) ey = yh;
+      mid = (cy + ey) >> 1;
+      wz  = (int)((viewz + (int64_t)(centery - mid) * dc->iscale) >> FRACBITS);
+      ll  = base_ll + R_SegBoost(wx, wy, wz);
+      if (ll > 255) ll = 255;
+      dc->colormap = R_ColourMap(ll, scale);
+      if (z_filter)
+         dc->nextcolormap = R_ColourMap(ll + 1, scale);
+      dc->yl = cy;
+      dc->yh = ey;
+      R_DrawCmdEmitColumn(dc, cf);
+   }
+   dc->yl = yl;
+   dc->yh = yh;
+}
+
 static void R_RenderSegLoop (void)
 {
    const rpatch_t *tex_patch;
@@ -731,16 +765,11 @@ static void R_RenderSegLoop (void)
 
    R_SetDefaultDrawColumnVars(&dcvars);
 
-   /* Dynamic point lights: whether any active light reaches this seg, and the
-    * mid-wall world height used as the lit point for every column (per-column
-    * vertical falloff is a later refinement).  Gating here keeps the
-    * per-column world-position reconstruction off unlit segs. */
+   /* Dynamic point lights: whether any active light reaches this seg.  Gating
+    * here keeps the per-column world-position reconstruction (and the
+    * per-band vertical falloff at emit time) off unlit segs entirely. */
    const int seg_has_dynlight = R_DynLightsActive() && curline &&
-                                R_SegLit(curline);
-   const int seg_dynlight_z = seg_has_dynlight && curline->frontsector
-      ? ((curline->frontsector->floorheight +
-          curline->frontsector->ceilingheight) >> 1) >> FRACBITS
-      : 0;
+                                R_SegPrepareLights(curline) > 0;
    /* seg line in map units, relative to the view origin, for the per-column
     * ray/line intersection that places each wall column in the world. */
    const int seg_l1x = seg_has_dynlight ? (curline->v1->x - viewx) >> FRACBITS : 0;
@@ -759,6 +788,10 @@ static void R_RenderSegLoop (void)
        * computations from the renderer's hottest loop. */
       int cc_rwx = ceilingclip[rw_x];
       int fc_rwx = floorclip[rw_x];
+      /* Per-column dynamic-light state: whether a light reaches this column's
+       * wall point and, if so, its world (x,y); the vertical falloff is then
+       * applied per tier band in R_EmitLitWallColumn. */
+      int col_lit = 0, col_wx = 0, col_wy = 0;
 
       /* mark floor / ceiling areas */
       int yh = bottomfrac>>heightbits;
@@ -896,9 +929,10 @@ static void R_RenderSegLoop (void)
          {
             int ll = rw_lightlevel;
             /* Dynamic point lights: reconstruct the wall point's world
-             * position for this column and brighten the light level by the
-             * lights reaching it.  Gated on R_SegLit so the per-column
-             * trig runs only for segs a light can actually reach. */
+             * position for this column.  Gated on R_SegPrepareLights so the
+             * trig runs only for segs a light can actually reach.  The boost
+             * itself is applied per vertical band at emit time so the wall
+             * gets a round pool rather than a uniform vertical stripe. */
             if (seg_has_dynlight)
             {
                /* intersect the view ray through this column with the seg's
@@ -914,19 +948,22 @@ static void R_RenderSegLoop (void)
                   int64_t t = num / denom;         /* map units along ray */
                   if (t > 0)
                   {
-                     int wx = view_mx + (int)((t * cr) >> FRACBITS);
-                     int wy = view_my + (int)((t * sr) >> FRACBITS);
-                     int bst = R_DynLightBoost(wx, wy, seg_dynlight_z);
-                     ll += bst;
-                     if (ll > 255) ll = 255;
+                     col_wx  = view_mx + (int)((t * cr) >> FRACBITS);
+                     col_wy  = view_my + (int)((t * sr) >> FRACBITS);
+                     col_lit = 1;
                   }
                }
             }
-            dcvars.colormap = R_ColourMap(ll,rw_scale);
-            /* Only the *_LinearZ dither drawers read nextcolormap; skip the
-             * extra colormap lookup otherwise. */
-            if (z_filter)
-               dcvars.nextcolormap = R_ColourMap(ll+1,rw_scale); // for filtering -- POPE
+            /* Unlit columns keep the single-colourmap fast path; lit columns
+             * defer the colourmap to R_EmitLitWallColumn (per band). */
+            if (!col_lit)
+            {
+               dcvars.colormap = R_ColourMap(ll,rw_scale);
+               /* Only the *_LinearZ dither drawers read nextcolormap; skip the
+                * extra colormap lookup otherwise. */
+               if (z_filter)
+                  dcvars.nextcolormap = R_ColourMap(ll+1,rw_scale); // for filtering -- POPE
+            }
          }
          dcvars.z = rw_scale; // for filtering -- POPE
 
@@ -952,7 +989,11 @@ static void R_RenderSegLoop (void)
             dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
          }
          dcvars.texheight = midtexheight;
-         R_DrawCmdEmitColumn(&dcvars, colfunc);
+         if (col_lit)
+            R_EmitLitWallColumn(&dcvars, colfunc, col_wx, col_wy,
+                                rw_lightlevel, rw_scale, z_filter);
+         else
+            R_DrawCmdEmitColumn(&dcvars, colfunc);
          tex_patch = NULL;
          cc_rwx = viewheight;
          fc_rwx = -1;
@@ -986,7 +1027,11 @@ static void R_RenderSegLoop (void)
                   dcvars.nextsource = R_GetTextureColumn(tex_patch,texturecolumn+1);
                }
                dcvars.texheight = toptexheight;
-               R_DrawCmdEmitColumn(&dcvars, colfunc);
+               if (col_lit)
+                  R_EmitLitWallColumn(&dcvars, colfunc, col_wx, col_wy,
+                                      rw_lightlevel, rw_scale, z_filter);
+               else
+                  R_DrawCmdEmitColumn(&dcvars, colfunc);
                tex_patch = NULL;
                cc_rwx = mid;
             }
@@ -1025,7 +1070,11 @@ static void R_RenderSegLoop (void)
                   dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
                }
                dcvars.texheight = bottomtexheight;
-               R_DrawCmdEmitColumn(&dcvars, colfunc);
+               if (col_lit)
+                  R_EmitLitWallColumn(&dcvars, colfunc, col_wx, col_wy,
+                                      rw_lightlevel, rw_scale, z_filter);
+               else
+                  R_DrawCmdEmitColumn(&dcvars, colfunc);
                tex_patch = NULL;
                fc_rwx = mid;
             }

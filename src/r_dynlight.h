@@ -22,8 +22,10 @@ int R_DynLightsActive(void);
 /* Light-level boost (0..) at a world point given in map units. */
 int R_DynLightBoost(int wx, int wy, int wz);
 
-/* Cheap AABB test: could any active light reach this seg? */
-int R_SegLit(const seg_t *seg);
+/* Build the per-seg light sublist (lights whose reach touches this wall);
+ * returns the count.  R_SegBoost queries it per (x,y,z) wall point. */
+int R_SegPrepareLights(const seg_t *seg);
+int R_SegBoost(int wx, int wy, int wz);
 
 /* Build the per-plane light sublist (lights reaching this z, vertical term
  * folded into a 2D radius); returns the count.  R_PlaneBoost queries it per

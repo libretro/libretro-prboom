@@ -828,8 +828,6 @@ static void R_RenderSegLoop (void)
    const uint8_t  *topmask = toptexture    ? U_BrightmaskForTexture(toptexture)    : NULL;
    const uint8_t  *botmask = bottomtexture ? U_BrightmaskForTexture(bottomtexture) : NULL;
 
-   R_SetDefaultDrawColumnVars(&dcvars);
-
    /* Dynamic point lights: whether any active light reaches this seg.  Gating
     * here keeps the per-column world-position reconstruction (and the
     * per-band vertical falloff at emit time) off unlit segs entirely. */
@@ -843,6 +841,8 @@ static void R_RenderSegLoop (void)
    const int seg_ldy = seg_has_dynlight ? (curline->v2->y - curline->v1->y) >> FRACBITS : 0;
    const int view_mx = viewx >> FRACBITS;
    const int view_my = viewy >> FRACBITS;
+
+   R_SetDefaultDrawColumnVars(&dcvars);
 
    for ( ; rw_x < rw_stopx ; rw_x++)
    {

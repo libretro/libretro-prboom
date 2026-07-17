@@ -25,7 +25,11 @@ int R_DynLightBoost(int wx, int wy, int wz);
 /* Build the per-seg light sublist (lights whose reach touches this wall);
  * returns the count.  R_SegBoost queries it per (x,y,z) wall point. */
 int R_SegPrepareLights(const seg_t *seg);
-int R_SegBoost(int wx, int wy, int wz);
+/* Per-column horizontal filter (call once per wall column) + 1D vertical
+ * boost (call per band).  R_SegColumnPrepare returns the reaching-light count;
+ * zero means the column is unlit and can skip the per-band split entirely. */
+int R_SegColumnPrepare(int wx, int wy);
+int R_SegColumnBoost(int wz);
 
 /* Build the per-plane light sublist (lights reaching this z, vertical term
  * folded into a 2D radius); returns the count.  R_PlaneBoost queries it per

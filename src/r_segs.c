@@ -700,8 +700,7 @@ static int didsolidcol; /* True if at least one column was marked solid */
  * The texture source/mapping is unchanged -- only [yl,yh] is subdivided and
  * the colourmap re-picked per band, exactly as the flat span chunking does. */
 static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
-                                int wx, int wy, int base_ll, fixed_t scale,
-                                int z_filter)
+                                int base_ll, fixed_t scale, int z_filter)
 {
    const int yl = dc->yl, yh = dc->yh;
    int cy;
@@ -712,7 +711,7 @@ static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
       if (ey > yh) ey = yh;
       mid = (cy + ey) >> 1;
       wz  = (int)((viewz + (int64_t)(centery - mid) * dc->iscale) >> FRACBITS);
-      ll  = base_ll + R_SegBoost(wx, wy, wz);
+      ll  = base_ll + R_SegColumnBoost(wz);
       if (ll > 255) ll = 255;
       dc->colormap = R_ColourMap(ll, scale);
       if (z_filter)
@@ -721,9 +720,6 @@ static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
       dc->yh = ey;
       R_DrawCmdEmitColumn(dc, cf);
 
-      /* Colour: record this band's boost-weighted chroma so it can be tinted
-       * onto the framebuffer after the wall columns are flushed (no-op for
-       * white lights, where dl_tint_* stay zero). */
       if (dl_tint_r | dl_tint_g | dl_tint_b)
          R_WallTintRecord(dc->x, cy, ey,
                           dl_tint_r >> DL_TINT_SHIFT,
@@ -959,7 +955,10 @@ static void R_RenderSegLoop (void)
                   {
                      col_wx  = view_mx + (int)((t * cr) >> FRACBITS);
                      col_wy  = view_my + (int)((t * sr) >> FRACBITS);
-                     col_lit = 1;
+                     /* horizontal light filter for this column; if nothing
+                      * reaches it, fall back to the plain single-colourmap
+                      * path (no per-band split). */
+                     col_lit = R_SegColumnPrepare(col_wx, col_wy) > 0;
                   }
                }
             }
@@ -999,8 +998,7 @@ static void R_RenderSegLoop (void)
          }
          dcvars.texheight = midtexheight;
          if (col_lit)
-            R_EmitLitWallColumn(&dcvars, colfunc, col_wx, col_wy,
-                                rw_lightlevel, rw_scale, z_filter);
+            R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter);
          else
             R_DrawCmdEmitColumn(&dcvars, colfunc);
          tex_patch = NULL;
@@ -1037,8 +1035,7 @@ static void R_RenderSegLoop (void)
                }
                dcvars.texheight = toptexheight;
                if (col_lit)
-                  R_EmitLitWallColumn(&dcvars, colfunc, col_wx, col_wy,
-                                      rw_lightlevel, rw_scale, z_filter);
+                  R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter);
                else
                   R_DrawCmdEmitColumn(&dcvars, colfunc);
                tex_patch = NULL;
@@ -1080,8 +1077,7 @@ static void R_RenderSegLoop (void)
                }
                dcvars.texheight = bottomtexheight;
                if (col_lit)
-                  R_EmitLitWallColumn(&dcvars, colfunc, col_wx, col_wy,
-                                      rw_lightlevel, rw_scale, z_filter);
+                  R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter);
                else
                   R_DrawCmdEmitColumn(&dcvars, colfunc);
                tex_patch = NULL;

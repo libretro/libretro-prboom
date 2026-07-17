@@ -1,3 +1,4 @@
+#include <stdlib.h>
 /* r_dynlight.c: collect GLDEFS-bound point lights from the mobjs and shade
  * nearby surfaces brighter.  See r_dynlight.h. */
 
@@ -186,25 +187,66 @@ int R_SegPrepareLights(const seg_t *seg)
   return num_seg_lights;
 }
 
-int R_SegBoost(int wx, int wy, int wz)
+/* Per-column wall lighting.  A wall column has a fixed world (x,y), so filter
+ * the seg's lights by horizontal reach once per column (dropping any the
+ * column is out of range of) and fold the horizontal distance into a vertical
+ * reach r_eff^2 = r^2 - hd^2.  The per-band boost is then a cheap 1D vertical
+ * query over only the reaching lights -- algebraically identical to the full
+ * 3D R_DynLightBoost, but a fraction of the work on tall walls. */
+/* scale = (strength << DL_SCALE_SHIFT) / r2, precomputed per column so the
+ * per-band boost is a multiply-shift instead of a divide (the divide was the
+ * hot loop's dominant cost on tall walls). */
+#define DL_SCALE_SHIFT 20
+typedef struct
 {
-  int i, boost = 0;
-  dl_tint_r = dl_tint_g = dl_tint_b = 0;
+  int       lz;
+  long long reff2, scale;
+  int       cr, cg, cb;
+} seg_col_light_t;
+
+static seg_col_light_t seg_col_lights[DL_MAX_ACTIVE];
+static int             num_seg_col_lights;
+
+int R_SegColumnPrepare(int wx, int wy)
+{
+  int i;
+  num_seg_col_lights = 0;
   for (i = 0; i < num_seg_lights; i++)
   {
     const active_light_t *a = &seg_lights[i];
-    int dx = wx - a->x, dy = wy - a->y, dz = wz - a->z;
-    int64_t d2 = (int64_t)dx * dx + (int64_t)dy * dy + (int64_t)dz * dz;
+    long long dx = wx - a->x, dy = wy - a->y;
+    long long hd2 = dx * dx + dy * dy;
+    seg_col_light_t *c;
+    if (hd2 >= a->r2)
+      continue;                          /* column out of this light's reach */
+    c = &seg_col_lights[num_seg_col_lights++];
+    c->lz = a->z;
+    c->reff2 = a->r2 - hd2;
+    c->scale = ((long long)a->strength << DL_SCALE_SHIFT) / a->r2;
+    c->cr = a->cr; c->cg = a->cg; c->cb = a->cb;
+  }
+  return num_seg_col_lights;
+}
+
+int R_SegColumnBoost(int wz)
+{
+  int i, boost = 0;
+  dl_tint_r = dl_tint_g = dl_tint_b = 0;
+  for (i = 0; i < num_seg_col_lights; i++)
+  {
+    const seg_col_light_t *c = &seg_col_lights[i];
+    long long dz = wz - c->lz;
+    long long dz2 = dz * dz;
     int b;
-    if (d2 >= a->r2)
+    if (dz2 >= c->reff2)
       continue;
-    b = (int)((int64_t)a->strength * (a->r2 - d2) / a->r2);
+    b = (int)(((c->reff2 - dz2) * c->scale) >> DL_SCALE_SHIFT);
     boost += b;
-    if (a->cr | a->cg | a->cb)
+    if (c->cr | c->cg | c->cb)
     {
-      dl_tint_r += b * a->cr;
-      dl_tint_g += b * a->cg;
-      dl_tint_b += b * a->cb;
+      dl_tint_r += b * c->cr;
+      dl_tint_g += b * c->cg;
+      dl_tint_b += b * c->cb;
     }
   }
   return boost;

@@ -60,6 +60,8 @@
 
 #if defined(__SSE2__)
 #include <emmintrin.h>
+#elif defined(__ARM_NEON)
+#include <arm_neon.h>
 #endif
 #include "u_zanimdefs.h"
 #include "v_video.h"
@@ -352,6 +354,34 @@ static void R_TintSpan(int y, int x1, int x2, int ar, int ag, int ab)
          px = _mm_or_si128(_mm_or_si128(_mm_slli_epi16(r, 11),
                                         _mm_slli_epi16(g, 5)), b);
          _mm_storeu_si128((__m128i *)d, px);
+         d += 8;
+         n -= 8;
+      }
+   }
+#elif defined(__ARM_NEON) && !defined(ABGR1555)
+   /* NEON counterpart of the SSE2 path above, same lane arithmetic on
+    * unsigned 16-bit channels (all values <= 126, so signed/unsigned min are
+    * interchangeable); bit-identical to the scalar loop, which finishes
+    * n & 7. */
+   if (n >= 8)
+   {
+      const uint16x8_t vr = vdupq_n_u16((uint16_t)(ar > 31 ? 31 : ar));
+      const uint16x8_t vg = vdupq_n_u16((uint16_t)(ag > 63 ? 63 : ag));
+      const uint16x8_t vb = vdupq_n_u16((uint16_t)(ab > 31 ? 31 : ab));
+      const uint16x8_t m5 = vdupq_n_u16(0x1f);
+      const uint16x8_t m6 = vdupq_n_u16(0x3f);
+      while (n >= 8)
+      {
+         uint16x8_t px = vld1q_u16(d);
+         uint16x8_t r  = vandq_u16(vshrq_n_u16(px, 11), m5);
+         uint16x8_t g  = vandq_u16(vshrq_n_u16(px, 5),  m6);
+         uint16x8_t b  = vandq_u16(px, m5);
+         r = vminq_u16(vaddq_u16(r, vr), m5);
+         g = vminq_u16(vaddq_u16(g, vg), m6);
+         b = vminq_u16(vaddq_u16(b, vb), m5);
+         px = vorrq_u16(vorrq_u16(vshlq_n_u16(r, 11),
+                                  vshlq_n_u16(g, 5)), b);
+         vst1q_u16(d, px);
          d += 8;
          n -= 8;
       }

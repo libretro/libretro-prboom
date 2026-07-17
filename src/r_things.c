@@ -39,6 +39,7 @@
 #include "r_segs.h"
 #include "r_draw.h"
 #include "r_things.h"
+#include "r_plane.h"
 #include "r_dynlight.h"
 #include "r_decal.h"
 #include "u_decorate.h"
@@ -564,6 +565,11 @@ void R_DrawMaskedColumn(
       dcvars->edgeslope = post->slope;
       // Drawn by either R_DrawColumn
       //  or (SHADOW) R_DrawFuzzColumn.
+      /* Default-skybox reveal mask: masked draws (sprites, two-sided mid
+       * textures) cover their pixels so the skybox composite -- which runs
+       * after R_DrawMasked -- cannot paint over them (r_plane.c). */
+      if (sky_reveal_active)
+        R_SkyRevealCoverCol(dcvars->x, dcvars->yl, dcvars->yh);
       dcvars->drawingmasked = 1; // POPE
       colfunc (dcvars);
       dcvars->drawingmasked = 0; // POPE
@@ -642,6 +648,8 @@ static void R_DrawMaskedColumnDirect(const rpatch_t *patch,
        * rare out-of-range frac (oversized/clipped projections). */
       int idx0 = frac >> 16;
       int idxN = (frac + (count - 1) * iscale) >> 16;
+      if (sky_reveal_active)
+        R_SkyRevealCoverCol(x, yl, yh);
       if (count > 0 && idx0 >= 0 && idx0 < spr_th
                     && idxN >= 0 && idxN < spr_th)
       {

@@ -67,4 +67,13 @@ visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel);
  * Returns 1 if any column is covered. */
 int R_CollectSkyboxSpan(int sbidx, short *out_top, short *out_bot);
 
+/* Default-skybox reveal mask (see r_plane.c): per-pixel ground truth of
+ * which sky pixels the main pass left showing the skybox scene. */
+extern int sky_reveal_active;
+extern int sky_row_min, sky_row_max;
+void R_SkyRevealBuild(void);
+void R_SkyRevealCoverCol(int x, int y1, int y2);
+int  R_SkyRevealExtents(short *out_top, short *out_bot);
+int  R_SkyRevealTest(int x, int y);
+
 #endif

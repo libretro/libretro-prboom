@@ -39,6 +39,7 @@
 #include "d_net.h"
 #include "w_wad.h"
 #include "r_main.h"
+#include <stdlib.h>
 #include "r_drawcmd.h"
 #include "r_data.h"
 #include "u_brightmap.h"
@@ -894,47 +895,6 @@ int autodetect_hom = 0;       // killough 2/7/98: HOM autodetection flag
  * SkyViewpoint's location, fixed (no parallax for a plain SkyViewpoint), with
  * the view yaw set to the player's yaw plus the viewpoint's own yaw, same
  * pitch.  The skybox's own sky areas draw the flat sky texture as usual. */
-static void R_RenderSkybox(void)
-{
-  fixed_t savex = viewx, savey = viewy, savez = viewz;
-  angle_t saveang = viewangle;
-  fixed_t savecos = viewcos, savesin = viewsin;
-  subsector_t *sub;
-
-  r_in_skybox = 1;
-
-  viewx = skyview.x;
-  viewy = skyview.y;
-  viewz = skyview.z;
-  viewangle = saveang + skyview.angle;
-  viewsin = finesine[viewangle>>ANGLETOFINESHIFT];
-  viewcos = finecosine[viewangle>>ANGLETOFINESHIFT];
-
-  /* viewplane/segment state is keyed off the camera's subsector */
-  sub = R_PointInSubsector(viewx, viewy);
-  viewplayer = &players[displayplayer];
-  (void)sub;
-
-  R_ClearClipSegs();
-  R_ClearDrawSegs();
-  R_ClearPlanes();
-  R_ClearSprites();
-
-  R_WallTintClear();
-  R_RenderBSPNode(numnodes-1);
-  R_DrawCmdReplay();
-  R_WallTintReplay();
-  R_ResetColumnBuffer();
-  R_DrawPlanes();
-  R_DrawMasked();
-  R_ResetColumnBuffer();
-
-  r_in_skybox = 0;
-
-  viewx = savex; viewy = savey; viewz = savez;
-  viewangle = saveang; viewcos = savecos; viewsin = savesin;
-}
-
 /* Per-sector tagged skyboxes (SkyPicker).  After the main scene draws, the
  * sky pixels of sectors using a tagged skybox still show the default
  * sky/skyview.  For each tagged skybox visible this frame we re-render its
@@ -944,9 +904,14 @@ static void R_RenderSkybox(void)
  * The per-column window [top,bottom] for each tagged skybox is captured
  * from the sky visplanes BEFORE this runs, because the per-skybox render
  * clears the planes. */
+extern int floorclip[], ceilingclip[];   /* r_plane.c */
 static short  sb_top[MAX_SCREENWIDTH];
 static short  sb_bot[MAX_SCREENWIDTH];
 static unsigned short sb_scratch[MAX_SCREENWIDTH * MAX_SCREENHEIGHT];
+
+/* When set, the composite copies only pixels the reveal mask marks (the
+ * default skybox); tagged skyboxes keep their span-based copy. */
+static int sb_use_reveal;
 
 /* render skybox camera `sb` into scratch, then copy its owned sky pixels. */
 static void R_RenderTaggedSkybox(const skybox_t *sb)
@@ -973,6 +938,27 @@ static void R_RenderTaggedSkybox(const skybox_t *sb)
   R_ClearDrawSegs();
   R_ClearPlanes();
   R_ClearSprites();
+
+  /* The composite below copies only the sb_top..sb_bot span of each column
+   * out of the scratch buffer, so columns with no sky span for this skybox
+   * can never contribute a pixel: seal those columns shut before the walk
+   * and the scene renders only the columns the composite can use.  Sealing
+   * is whole-column only -- the clip arrays double as the renderer's
+   * occlusion state, and sealing a PART of a column corrupts portal
+   * clipping for near geometry straddling the window (verified: far
+   * skybox-room walls showed through an occluder).  All-or-nothing per
+   * column has no partial-height interactions, so occlusion inside open
+   * columns is untouched and the output is identical by construction. */
+  {
+    int cx;
+    for (cx = 0; cx < viewwidth; cx++)
+      if (sb_bot[cx] < sb_top[cx])
+      {
+        ceilingclip[cx] = viewheight;
+        floorclip[cx]   = -1;
+      }
+  }
+
   R_WallTintClear();
   R_RenderBSPNode(numnodes-1);
   R_DrawCmdReplay();
@@ -996,10 +982,18 @@ static void R_RenderTaggedSkybox(const skybox_t *sb)
     if (t < 0) t = 0;                       /* clamp to the surface */
     if (b >= SCREENHEIGHT) b = SCREENHEIGHT - 1;
     for (y = t; y <= b; y++)
+    {
+      if (sb_use_reveal && !R_SkyRevealTest(x, y))
+        continue;
       real_tl[y * SURFACE_SHORT_PITCH + x] =
         sb_scratch[y * SURFACE_SHORT_PITCH + x];
+    }
   }
 }
+
+#ifdef PRBOOM_RENDER_PROFILE
+static double rprof_skybox;
+#endif
 
 void R_RenderPlayerView (player_t* player)
 {
@@ -1014,7 +1008,7 @@ void R_RenderPlayerView (player_t* player)
    * -- replacing guesswork about where the frame goes. */
 # define PROF_REPORT 120
   static double acc_bsp = 0.0, acc_planes = 0.0, acc_masked = 0.0,
-                acc_setup = 0.0, acc_wallfill = 0.0,
+                acc_setup = 0.0, acc_wallfill = 0.0, acc_skybox = 0.0,
                 acc_storewall = 0.0, acc_findplane = 0.0, acc_sprproj = 0.0;
   static unsigned prof_frames = 0;
   double t0, t1, t2, t3, t4;
@@ -1027,10 +1021,12 @@ void R_RenderPlayerView (player_t* player)
 
   R_SetupFrame (player);
 
-  /* 3D skybox: render the SkyViewpoint scene first so the main pass's sky
-   * pixels reveal it instead of the flat sky texture. */
-  if (skyview.active)
-    R_RenderSkybox();
+  /* Default 3D skybox: the main pass records which sky pixels it leaves
+   * showing the skybox scene (see the reveal mask in r_plane.c); the scene
+   * itself renders after the planes, clipped and composited to exactly
+   * those pixels. */
+  sky_reveal_active = skyview.active ? 1 : 0;
+
 
   // Clear buffers.
   R_ClearClipSegs ();
@@ -1083,14 +1079,57 @@ void R_RenderPlayerView (player_t* player)
   t3 = I_RenderProfileUsec();
 #endif
 
+    /* Default 3D skybox: derive the reveal mask from the plane pass's
+     * surviving visplanes (see r_plane.c) before masked draws clear their
+     * pixels from it. */
+    if (sky_reveal_active)
+      R_SkyRevealBuild();
+
     R_DrawMasked ();
     R_ResetColumnBuffer();
 
-    /* Per-sector tagged skyboxes (SkyPicker): for each tagged skybox
-     * visible this frame, capture its sky-region span, then re-render that
-     * skybox masked to those pixels.  Spans for all tagged skyboxes are
-     * captured up front because each per-skybox render clears the planes
-     * (destroying the main scene's sky visplanes). */
+    /* Default 3D skybox: the reveal mask now holds exactly the pixels the
+     * plane pass left showing the skybox scene (sky-plane skips minus any
+     * later plane draw over them).  Render the scene sealed to those
+     * columns and composite the masked pixels.  Runs after R_DrawMasked --
+     * masked draws (sprites, mid textures) cover the mask, so the composite
+     * cannot paint over them and the skybox scene's own clears cannot
+     * destroy the main scene's masked state. */
+    if (skyview.active)
+    {
+#ifdef PRBOOM_RENDER_PROFILE
+      unsigned long long skm0 = I_RenderProfileUsec();
+#endif
+      sky_reveal_active = 0;   /* no cover hooks inside the skybox scene */
+      if (R_SkyRevealExtents(sb_top, sb_bot))
+      {
+        skybox_t gsb;
+        gsb.x = skyview.x;
+        gsb.y = skyview.y;
+        gsb.z = skyview.z;
+        gsb.angle = skyview.angle;
+        sb_use_reveal = 1;
+        R_RenderTaggedSkybox(&gsb);
+        sb_use_reveal = 0;
+      }
+#ifdef PRBOOM_RENDER_PROFILE
+      rprof_skybox += I_RenderProfileUsec() - skm0;
+#endif
+    }
+
+
+    /* Skyboxes (default SkyViewpoint and per-sector SkyPicker): after the
+     * main scene draws, its sky pixels are still untouched (see the skip in
+     * R_DrawPlanes).  For each skybox visible this frame -- the default one
+     * included -- capture its sky-region span from the sky visplanes, then
+     * render that skybox's scene clipped to those pixels and composite them.
+     * Rendering after the main pass, against this frame's spans, means a
+     * skybox only ever draws the pixels it will actually show: a view with
+     * little sky pays little, one with none pays nothing.  (The default
+     * skybox used to render the whole viewport up front and be almost
+     * entirely overdrawn.)  Spans for all skyboxes are captured before any
+     * render because each render clears the planes (destroying the main
+     * scene's sky visplanes). */
     if (numskyboxes > 0)
     {
       static short cap_top[16][MAX_SCREENWIDTH];
@@ -1125,6 +1164,7 @@ void R_RenderPlayerView (player_t* player)
 #ifdef PRBOOM_RENDER_PROFILE
   t4 = I_RenderProfileUsec();
   acc_setup  += (t1 - t0);
+  acc_skybox += rprof_skybox; rprof_skybox = 0.0;
   acc_bsp    += (t2 - t1);   /* BSP traversal + wall/clip + visplane build */
   acc_planes += (t3 - t2);   /* floor/ceiling span fill */
   acc_masked += (t4 - t3);   /* sprites + masked midtextures */
@@ -1141,10 +1181,11 @@ void R_RenderPlayerView (player_t* player)
     double sp  = acc_sprproj / n;
     lprintf(LO_INFO,
       "R_RenderProfile (avg over %u frames, us): "
-      "setup %.1f | bsp+walls %.1f [traverse %.1f, storewall %.1f (fill %.1f), "
+      "setup %.1f (skybox %.1f) | bsp+walls %.1f [traverse %.1f, storewall %.1f (fill %.1f), "
       "findplane %.1f, sprproj %.1f] | planes %.1f | masked %.1f | total %.1f\n",
       prof_frames,
       acc_setup / n,
+      acc_skybox / n,
       bsp,
       bsp - sw - fp - sp,       /* pure traversal/clip remainder */
       sw,
@@ -1155,6 +1196,7 @@ void R_RenderPlayerView (player_t* player)
       acc_masked / n,
       (acc_setup + acc_bsp + acc_planes + acc_masked) / n);
     acc_setup = acc_bsp = acc_planes = acc_masked = acc_wallfill = 0.0;
+    acc_skybox = 0.0;
     acc_storewall = acc_findplane = acc_sprproj = 0.0;
     prof_frames = 0;
   }

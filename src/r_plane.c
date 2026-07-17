@@ -953,7 +953,7 @@ static void R_DoDrawPlane(visplane_t *pl)
           * sky pixels showing the skybox scene already rendered underneath
           * rather than overwriting them with the flat sky texture. */
          if (skyview.active && !r_in_skybox)
-            return;
+            return;   /* pixels revealed; the skybox composite covers them */
 
          // killough 10/98: allow skies to come from sidedefs.
          // Allows scrolling and/or animated skies, as well as
@@ -1213,6 +1213,128 @@ static void R_DoDrawPlane(visplane_t *pl)
 // RDrawPlanes
 // At the end of each frame.
 //
+
+
+/* Default-skybox reveal mask.  When a 3D skybox is active, the main pass
+ * SKIPS drawing sky planes; the skybox scene composites into exactly the
+ * pixels the main scene left showing sky.  A skipped sky plane's spans are
+ * not authoritative visibility, though: draw order is -- another plane may
+ * legitimately draw pixels a sky plane also claims (verified on a test
+ * map), and in the old full-viewport pre-pass ordering the sky lost every
+ * such overlap.  Reproduce that exactly by deriving the mask AFTER the
+ * plane pass, from the surviving visplane structures: set the union of sky
+ * plane spans, then clear the union of every other plane's spans.  Nothing
+ * hooks the draw paths, so unlit and skyless scenes pay nothing; the
+ * subtraction pass is gated per column by the sky rows actually claimed,
+ * so it costs one comparison per non-sky span in the common no-overlap
+ * case.  Masked draws (sprites, two-sided mid textures) run after this and
+ * clear their pixels via R_SkyRevealCoverCol -- they are the one draw
+ * class the clip arrays do not order against planes.  Column-major so
+ * per-column span ops are contiguous bytes. */
+#define SKY_REVEAL_STRIDE (MAX_SCREENHEIGHT / 8)
+static uint8_t sky_reveal[MAX_SCREENWIDTH * SKY_REVEAL_STRIDE];
+int sky_reveal_active;   /* set for the main pass while skyview.active */
+int sky_row_min, sky_row_max;   /* row band containing any sky claim */
+
+static void R_SkyRevealSetCol(int x, int y1, int y2)
+{
+  uint8_t *col = sky_reveal + (size_t)x * SKY_REVEAL_STRIDE;
+  int b1 = y1 >> 3, b2 = y2 >> 3, i;
+  uint8_t m1 = (uint8_t)(0xff << (y1 & 7));
+  uint8_t m2 = (uint8_t)(0xff >> (7 - (y2 & 7)));
+  if (b1 == b2) { col[b1] |= (uint8_t)(m1 & m2); return; }
+  col[b1] |= m1;
+  for (i = b1 + 1; i < b2; i++) col[i] = 0xff;
+  col[b2] |= m2;
+}
+
+/* Column-range clear: pixels in [y1,y2] at column x are covered. */
+void R_SkyRevealCoverCol(int x, int y1, int y2)
+{
+  uint8_t *col = sky_reveal + (size_t)x * SKY_REVEAL_STRIDE;
+  int b1, b2, i;
+  uint8_t m1, m2;
+  if (y1 < sky_row_min) y1 = sky_row_min;
+  if (y2 > sky_row_max) y2 = sky_row_max;
+  if (y2 < y1)
+    return;
+  b1 = y1 >> 3; b2 = y2 >> 3;
+  m1 = (uint8_t)(0xff << (y1 & 7));
+  m2 = (uint8_t)(0xff >> (7 - (y2 & 7)));
+  if (b1 == b2) { col[b1] &= (uint8_t)~(m1 & m2); return; }
+  col[b1] &= (uint8_t)~m1;
+  for (i = b1 + 1; i < b2; i++) col[i] = 0;
+  col[b2] &= (uint8_t)~m2;
+}
+
+/* Build the reveal mask from the visplanes left by the plane pass. */
+void R_SkyRevealBuild(void)
+{
+  int i, x;
+  visplane_t *pl;
+  memset(sky_reveal, 0, (size_t)viewwidth * SKY_REVEAL_STRIDE);
+  sky_row_min = viewheight; sky_row_max = -1;
+  /* pass 1: union of skipped sky plane spans */
+  for (i = 0; i < MAXVISPLANES; i++)
+    for (pl = visplanes[i]; pl; pl = pl->next)
+    {
+      if (!(pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT)))
+        continue;
+      for (x = pl->minx; x <= pl->maxx; x++)
+      {
+        int t = (int)pl->top[x], b = (int)pl->bottom[x];
+        if (t == -1 || t > b)
+          continue;
+        if (t < 0) t = 0;
+        if (b >= viewheight) b = viewheight - 1;
+        if (b < t) continue;
+        R_SkyRevealSetCol(x, t, b);
+        if (t < sky_row_min) sky_row_min = t;
+        if (b > sky_row_max) sky_row_max = b;
+      }
+    }
+  if (sky_row_max < sky_row_min)
+    return;   /* no sky this frame */
+  /* pass 2: every other plane's spans cover (draw order: sky loses) */
+  for (i = 0; i < MAXVISPLANES; i++)
+    for (pl = visplanes[i]; pl; pl = pl->next)
+    {
+      if (pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT))
+        continue;
+      for (x = pl->minx; x <= pl->maxx; x++)
+      {
+        int t = (int)pl->top[x], b = (int)pl->bottom[x];
+        if (t == -1 || t > b)
+          continue;
+        R_SkyRevealCoverCol(x, t, b);
+      }
+    }
+}
+
+/* Per-column extents of revealed sky, for sealing the skybox scene render;
+ * returns nonzero when any pixel is revealed. */
+int R_SkyRevealExtents(short *out_top, short *out_bot)
+{
+  int x, any = 0;
+  for (x = 0; x < viewwidth; x++)
+  {
+    const uint8_t *col = sky_reveal + (size_t)x * SKY_REVEAL_STRIDE;
+    int nb = (viewheight + 7) >> 3, i, t = -1, b = -1;
+    for (i = 0; i < nb; i++)
+      if (col[i]) { int bit = 0; while (!(col[i] & (1 << bit))) bit++; t = i * 8 + bit; break; }
+    if (t >= 0)
+      for (i = nb - 1; i >= 0; i--)
+        if (col[i]) { int bit = 7; while (!(col[i] & (1 << bit))) bit--; b = i * 8 + bit; break; }
+    if (t >= 0 && b >= t) { out_top[x] = (short)t; out_bot[x] = (short)b; any = 1; }
+    else { out_top[x] = 1; out_bot[x] = 0; }
+  }
+  return any;
+}
+
+int R_SkyRevealTest(int x, int y)
+{
+  return sky_reveal[(size_t)x * SKY_REVEAL_STRIDE + (y >> 3)] & (1 << (y & 7));
+}
 
 int R_CollectSkyboxSpan(int sbidx, short *out_top, short *out_bot)
 {

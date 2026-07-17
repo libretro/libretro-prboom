@@ -1861,6 +1861,7 @@ typedef enum
    ENTRY_INVALID,
    ENTRY_IWAD,    /* primary IWAD: header == "IWAD", or "PWAD" + PLAYPAL */
    ENTRY_PWAD,    /* genuine add-on PWAD */
+   ENTRY_PK3,     /* PK3/ZIP archive add-on */
    ENTRY_DEH      /* DeHackEd / BEX patch */
 } entry_kind_t;
 
@@ -1879,6 +1880,9 @@ static entry_kind_t classify_entry(const char *path)
    header = get_wadinfo(path);
    if (header.identification[0] == 0)
       return ENTRY_INVALID;
+   if (header.identification[0] == 'P' && header.identification[1] == 'K' &&
+       header.identification[2] == 0x03 && header.identification[3] == 0x04)
+      return ENTRY_PK3;   /* PK3/ZIP add-on archive */
    if (!strncmp(header.identification, "IWAD", 4))
       return ENTRY_IWAD;
    if (!strncmp(header.identification, "PWAD", 4))
@@ -2083,19 +2087,33 @@ bool retro_load_game(const struct retro_game_info *info)
           * points at a custom location. */
          argv[argc++] = strdup("-iwad");
          argv[argc++] = strdup(paths[iwad_idx]);
-         /* Then -file with every PWAD (and any extra IWAD-shape
-          * entries beyond the first) in playlist order. */
-         for (j = 0; j < n; j++)
+         /* Then -file with every PWAD, PK3/ZIP archive (and any extra
+          * IWAD-shape entries beyond the first) in playlist order.  Before
+          * the first archive, a ZDoom base resource (gzdoom.pk3/zdoom.pk3),
+          * if findable, loads first so stock ZDoom assets resolve -- the
+          * same ordering the single-content pk3 path uses. */
          {
-            if (j == iwad_idx) continue;
-            if (kinds[j] == ENTRY_PWAD || kinds[j] == ENTRY_IWAD)
+            int base_emitted = 0;
+            for (j = 0; j < n; j++)
             {
-               if (!file_emitted)
+               if (j == iwad_idx) continue;
+               if (kinds[j] == ENTRY_PWAD || kinds[j] == ENTRY_IWAD ||
+                   kinds[j] == ENTRY_PK3)
                {
-                  argv[argc++] = strdup("-file");
-                  file_emitted = 1;
+                  if (!file_emitted)
+                  {
+                     argv[argc++] = strdup("-file");
+                     file_emitted = 1;
+                  }
+                  if (kinds[j] == ENTRY_PK3 && !base_emitted)
+                  {
+                     char *base = find_base_resource();
+                     if (base)
+                        argv[argc++] = base;  /* heap from FindFileInDir */
+                     base_emitted = 1;
+                  }
+                  argv[argc++] = strdup(paths[j]);
                }
-               argv[argc++] = strdup(paths[j]);
             }
          }
          /* Then -deh with every DEH/BEX patch.  D_DoomMainSetup's

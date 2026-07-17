@@ -132,6 +132,7 @@ void R_DrawCmdReplay(void)
 {
   int i, x;
   int sweep_remaining = 0;
+  int sweep_minx = SCREENWIDTH, sweep_maxx = -1;
 
   /* Solid wall columns cover disjoint pixels (the clip arrays
    * guarantee it), so replay order is free for output correctness.
@@ -174,6 +175,8 @@ void R_DrawCmdReplay(void)
       bucket_head[cx] = i;
     bucket_tail[cx] = i;
     sweep_remaining++;
+    if (cx < sweep_minx) sweep_minx = cx;
+    if (cx > sweep_maxx) sweep_maxx = cx;
   }
 
   /* Each sweep pops at most one record per column, so x-adjacent pops
@@ -186,7 +189,12 @@ void R_DrawCmdReplay(void)
     int run_cls = 0;
     int last_x = -2;
 
-    for (x = 0; x < SCREENWIDTH; x++)
+    /* Only the [sweep_minx, sweep_maxx] band can hold records, and once
+     * sweep_remaining reaches zero no later column can either: bounding
+     * the scan skips provably-empty iterations only.  (Previously every
+     * sweep walked all SCREENWIDTH columns: measured 3 sweeps x 1920
+     * iterations to pop ~2700 records at the zdcmp2 spawn.) */
+    for (x = sweep_minx; x <= sweep_maxx; x++)
     {
       int idx = -1;
       int cls = 0;
@@ -211,6 +219,8 @@ void R_DrawCmdReplay(void)
         run[run_n++] = &cmds[idx].dc;
         run_cls = cls;
         last_x = x;
+        if (!sweep_remaining)
+          break;               /* nothing left anywhere; run flushes below */
       }
     }
     if (run_n)

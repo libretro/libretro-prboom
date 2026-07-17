@@ -445,6 +445,9 @@ typedef struct vissprite_s
    * used only when translucent != 0.  Both 0 for ordinary/vanilla sprites. */
   int            translucent;
   int            alpha;
+  /* Dynamic-light colour tint (565 channel adds), applied to the sprite's
+   * opaque texels in R_DrawVisSprite.  Zero for white light / unlit. */
+  int            tint_r, tint_g, tint_b;
 } vissprite_t;
 
 //

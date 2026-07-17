@@ -197,5 +197,6 @@ void R_SetTransAlpha(int a32);   /* blend weight alpha*32 (0..32) for modes 3/4 
 void R_WallTintClear(void);
 void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab);
 void R_WallTintReplay(void);
+void R_TintLUT(uint16_t *dst, const uint16_t *src, int ar, int ag, int ab);
 
 #endif

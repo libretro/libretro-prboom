@@ -7306,6 +7306,31 @@ void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab)
    t->ar = (short)ar; t->ag = (short)ag; t->ab = (short)ab;
 }
 
+/* Additively tint a 256-entry composed colour LUT toward a light's chroma;
+ * used for sprites, whose opaque texels are looked up through the LUT so a
+ * tinted LUT colours exactly the drawn pixels and skips transparent ones. */
+void R_TintLUT(uint16_t *dst, const uint16_t *src, int ar, int ag, int ab)
+{
+   int i;
+   for (i = 0; i < 256; i++)
+   {
+      unsigned px = src[i];
+#if defined(ABGR1555)
+      int r = (px      ) & 0x1f, g = (px >> 5) & 0x1f, b = (px >> 10) & 0x1f;
+      r += ar;        if (r > 31) r = 31;
+      g += (ag >> 1); if (g > 31) g = 31;
+      b += ab;        if (b > 31) b = 31;
+      dst[i] = (uint16_t)((b << 10) | (g << 5) | r);
+#else
+      int r = (px >> 11) & 0x1f, g = (px >> 5) & 0x3f, b = px & 0x1f;
+      r += ar; if (r > 31) r = 31;
+      g += ag; if (g > 63) g = 63;
+      b += ab; if (b > 31) b = 31;
+      dst[i] = (uint16_t)((r << 11) | (g << 5) | b);
+#endif
+   }
+}
+
 void R_WallTintReplay(void)
 {
    int i;

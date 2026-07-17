@@ -777,6 +777,18 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
       const uint16_t *lut = (run_cls == 1)
           ? R_ComposedPalette()
           : R_ComposedColormap(dcvars.colormap);
+      uint16_t tinted_lut[256];
+      const int spr_tint = (vis->tint_r | vis->tint_g | vis->tint_b);
+
+      /* Coloured light: tint the composed LUT once for the whole sprite, then
+       * route every column through the direct writer so only opaque texels
+       * (which index the LUT) get the colour and transparent posts are left
+       * alone.  White/unlit sprites keep the existing direct/batched split. */
+      if (spr_tint)
+      {
+         R_TintLUT(tinted_lut, lut, vis->tint_r, vis->tint_g, vis->tint_b);
+         lut = tinted_lut;
+      }
 
       /* A previous sprite's tail may still be batched in the temp
        * buffer; its flush must land before any direct writes, not
@@ -804,7 +816,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
          * post for them).  Output is bit-identical either way.  The height
          * test is overflow-safe: spryscale>>8 keeps the product well within
          * 32 bits for any realistic scale/post length. */
-        if (column->numPosts > 1 ||
+        if (spr_tint || column->numPosts > 1 ||
             (column->numPosts == 1 &&
              (((spryscale >> 8) * column->posts[0].length) >> (FRACBITS - 8))
                >= DIRECT_COLUMN_MINPX))
@@ -915,9 +927,10 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    }
 
    /* Dynamic point lights: raise the whole sprite's light level by the lights
-    * reaching the thing's centre.  One boost per sprite (a light-varying
-    * sprite drawer for per-column falloff is a later refinement); modifying
-    * the by-value lightlevel here covers both the voxel and patch paths. */
+    * reaching the thing's centre, and capture their boost-weighted chroma so
+    * the sprite can be tinted toward a coloured light (white lights leave the
+    * tint zero).  One boost per sprite covers the voxel and patch paths. */
+   int spr_tr = 0, spr_tg = 0, spr_tb = 0;
    if (R_DynLightsActive())
    {
       int dyn = R_DynLightBoost(fx >> FRACBITS, fy >> FRACBITS,
@@ -928,6 +941,9 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
          if (lightlevel > 255)
             lightlevel = 255;
       }
+      spr_tr = dl_tint_r >> DL_TINT_SHIFT;
+      spr_tg = dl_tint_g >> DL_TINT_SHIFT;
+      spr_tb = dl_tint_b >> DL_TINT_SHIFT;
    }
 
    tr_x = fx - viewx;
@@ -1038,6 +1054,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
           * camera.  Offset by ANG90 so the KVX +x axis points along the
           * actor's facing. */
          vis->voxangle  = thing->angle;
+         vis->tint_r = vis->tint_g = vis->tint_b = 0;
 
          if (!raven && (thing->flags & MF_SHADOW))
             vis->colormap = NULL;
@@ -1182,6 +1199,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
       vis->startfrac += vis->xiscale*(vis->x1-x1);
    vis->patch = lump;
    vis->voxel = NULL;   /* this vissprite is a billboard, not a voxel */
+   vis->tint_r = vis->tint_g = vis->tint_b = 0;
 
    // get light level
    if (!raven && (thing->flags & MF_SHADOW))
@@ -1195,6 +1213,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    else
    {      // diminished light
       vis->colormap = R_ColourMap(lightlevel,xscale);
+      vis->tint_r = spr_tr; vis->tint_g = spr_tg; vis->tint_b = spr_tb;
    }
 }
 

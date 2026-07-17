@@ -56,7 +56,7 @@ void P_ArchiveSounds(void);
 void P_ArchiveAmbientSound(void);
 void P_UnArchiveAmbientSound(void);
 void P_UnArchiveSounds(void);
-void P_UnArchiveSpecials(void);
+int P_UnArchiveSpecials(void);
 void P_ThinkerToIndex(void); /* phares 9/13/98: save soundtarget in savegame */
 void P_IndexToThinker(void); /* phares 9/13/98: save soundtarget in savegame */
 
@@ -69,6 +69,7 @@ void P_ArchiveMap(void);
 void P_UnArchiveMap(void);
 
 extern uint8_t *save_p;
+void P_SetSaveBufferEnd(const uint8_t *end);
 void CheckSaveGame(size_t,const char*, int);              /* killough */
 #define CheckSaveGame(a) (CheckSaveGame)(a, __FILE__, __LINE__)
 

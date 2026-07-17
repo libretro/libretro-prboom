@@ -2106,6 +2106,10 @@ static int G_DoLoadGameFromSaveBuffer(int length)
 
   gameaction = ga_nothing;
 
+  /* Bound the read: the specials loader uses this to validate records and to
+   * tell a legacy stream from a current one (see p_saveg.c). */
+  P_SetSaveBufferEnd(savebuffer + length);
+
   save_p = savebuffer + SAVESTRINGSIZE;
 
   // CPhipps - read the description field, compare with supported ones
@@ -2235,7 +2239,15 @@ static int G_DoLoadGameFromSaveBuffer(int length)
   P_UnArchiveThinkers ();
   if (hexen)
     P_CreateTIDList (); /* thing IDs hang off the freshly loaded mobjs */
-  P_UnArchiveSpecials ();
+  if (P_UnArchiveSpecials ())
+  {
+    /* The stream desynchronised mid-restore (incompatible save): the world
+     * is half-loaded and must not tick.  Re-initialise the target map fresh
+     * so the game stays runnable after the frontend reports the failure. */
+    P_SetSaveBufferEnd(NULL);
+    G_InitNew (gameskill, gameepisode, gamemap);
+    return -4;
+  }
   P_UnArchiveScripts (); /* hexen ACS script states + map vars (no-op otherwise) */
   P_UnArchiveSounds ();  /* hexen active sound sequences (no-op otherwise) */
   P_UnArchiveAmbientSound ();  /* heretic ambient cursor (no-op otherwise) */
@@ -2299,6 +2311,7 @@ bool G_DoLoadGameFromBuffer(void *data, size_t length)
   savebuffer = data;
 
   err = G_DoLoadGameFromSaveBuffer(length);
+  P_SetSaveBufferEnd(NULL);
 
   // done
   savebuffer = NULL;

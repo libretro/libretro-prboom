@@ -49,6 +49,16 @@
 
 uint8_t *save_p;
 
+/* End of the savegame buffer during a load (NULL outside loads).  Lets the
+ * specials reader bound every record and detect which stream era it is
+ * parsing instead of walking past a mismatched terminator into garbage. */
+static const uint8_t *save_end;
+
+void P_SetSaveBufferEnd(const uint8_t *end)
+{
+  save_end = end;
+}
+
 // Pads save_p to a 4-byte boundary
 //  so that the load/save works on SGI&Gecko.
 #define PADSAVEP()    do { save_p += (4 - ((uintptr_t) save_p & 3)) & 3; } while (0)
@@ -826,6 +836,87 @@ enum {
   tc_endspecials
 } specials_e;
 
+/* The nine ZDoom/Hexen classes above were inserted before tc_endspecials,
+ * which moved the terminator from 11 to 20.  A savegame written before that
+ * (same version header) therefore ends its specials with a byte that now
+ * reads as tc_hexenplat: the loader consumed a garbage plat_t and crashed.
+ * The legacy mapping is total -- classes 0..10 are unchanged and a legacy
+ * save cannot contain the hexen classes -- so old saves remain loadable if
+ * the stream's era is known.  Detect it structurally: dry-walk the stream
+ * under the current enum (fixed-size records, same PADSAVEP arithmetic);
+ * a current-era stream reaches tc_endspecials cleanly, a legacy stream
+ * derails almost immediately (its terminator byte reads a bogus record and
+ * the following bytes stop looking like classes). */
+#define TC_ENDSPECIALS_LEGACY 11
+
+/* tc_scroll and tc_pusher are read (and written) WITHOUT the PADSAVEP
+ * alignment every other class carries -- a historical prboom quirk the
+ * stream walk must mirror exactly. */
+static const uint8_t specials_pads[tc_endspecials] = {
+  1, 1, 1, 1, 1, 1, 1, 1, 0 /* scroll */, 0 /* pusher */, 1,
+  1, 1, 1, 1, 1, 1, 1, 1, 1,
+};
+
+static const size_t specials_size[tc_endspecials] = {
+  sizeof(ceiling_t),     /* tc_ceiling      */
+  sizeof(vldoor_t),      /* tc_door         */
+  sizeof(floormove_t),   /* tc_floor        */
+  sizeof(plat_t),        /* tc_plat         */
+  sizeof(lightflash_t),  /* tc_flash        */
+  sizeof(strobe_t),      /* tc_strobe       */
+  sizeof(glow_t),        /* tc_glow         */
+  sizeof(elevator_t),    /* tc_elevator     */
+  sizeof(scroll_t),      /* tc_scroll       */
+  sizeof(pusher_t),      /* tc_pusher       */
+  sizeof(fireflicker_t), /* tc_flicker      */
+  sizeof(plat_t),        /* tc_hexenplat    */
+  sizeof(pillar_t),      /* tc_pillar       */
+  sizeof(ceiling_t),     /* tc_hexenceiling */
+  sizeof(vldoor_t),      /* tc_hexendoor    */
+  sizeof(light_t),       /* tc_hexenlight   */
+  sizeof(planeWaggle_t), /* tc_floorwaggle  */
+  sizeof(polyevent_t),   /* tc_rotatepoly   */
+  sizeof(polyevent_t),   /* tc_movepoly     */
+  sizeof(polydoor_t),    /* tc_polydoor     */
+};
+
+/* Resolve an archived sector index, rejecting the savegame cleanly when it
+ * is out of range -- a desynchronised stream (e.g. a save written by a build
+ * with different struct layouts) otherwise walks wild pointers and crashes
+ * instead of erroring like the other consistency checks in this path. */
+/* Resolve an archived sector index; NULL marks an out-of-range index (a
+ * desynchronised or incompatible stream) for the caller to reject cleanly. */
+static sector_t *P_SectorFromSaveIndex(intptr_t idx, const char *what)
+{
+  if (idx < 0 || idx >= numsectors)
+  {
+    lprintf(LO_WARN, "P_UnArchiveSpecials: bad sector %ld in %s record "
+            "(incompatible savegame)\n", (long) idx, what);
+    return NULL;
+  }
+  return &sectors[idx];
+}
+
+static int P_SpecialsStreamIsCurrent(void)
+{
+  const uint8_t *p = save_p;
+  long records = 0;
+  while (p < save_end)
+  {
+    uint8_t b = *p++;
+    if (b == tc_endspecials)
+      return 1;
+    if (b > tc_endspecials)
+      return 0;
+    if (specials_pads[b])
+      p += (4 - ((uintptr_t) p & 3)) & 3;   /* PADSAVEP, where the case pads */
+    p += specials_size[b];
+    if (++records > 100000)
+      return 0;
+  }
+  return 0;
+}
+
 //
 // Things to handle:
 //
@@ -1169,12 +1260,38 @@ void P_ArchiveSpecials (void)
 //
 // P_UnArchiveSpecials
 //
-void P_UnArchiveSpecials (void)
+int P_UnArchiveSpecials (void)
 {
   uint8_t tclass;
+  /* Which stream era this save carries (see the comment at the enum): a
+   * pre-hexen-classes save terminates with TC_ENDSPECIALS_LEGACY and cannot
+   * contain the hexen classes; a current save terminates with
+   * tc_endspecials.  Without save_end (no bounded buffer) assume current. */
+  const int current = save_end ? P_SpecialsStreamIsCurrent() : 1;
+  const uint8_t terminator = current ? tc_endspecials : TC_ENDSPECIALS_LEGACY;
 
   // read in saved thinkers
-  while ((tclass = *save_p++) != tc_endspecials)  // killough 2/14/98
+  while ((tclass = *save_p++) != terminator)
+  {
+    if (tclass >= (current ? (uint8_t) tc_endspecials
+                           : (uint8_t) TC_ENDSPECIALS_LEGACY))
+    {
+      lprintf(LO_WARN, "P_UnArchiveSpecials: unknown tclass %i in %s savegame\n",
+              tclass, current ? "current" : "legacy");
+      return -1;
+    }
+    if (save_end)
+    {
+      const uint8_t *rec = save_p;
+      if (specials_pads[tclass])
+        rec += (4 - ((uintptr_t) rec & 3)) & 3;
+      if (rec + specials_size[tclass] > save_end)
+      {
+        lprintf(LO_WARN, "P_UnArchiveSpecials: truncated savegame (tclass %i)\n",
+                tclass);
+        return -1;
+      }
+    }
     switch (tclass)
       {
       case tc_ceiling:
@@ -1183,7 +1300,8 @@ void P_UnArchiveSpecials (void)
           ceiling_t *ceiling = Z_Malloc (sizeof(*ceiling), PU_LEVEL, NULL);
           memcpy (ceiling, save_p, sizeof(*ceiling));
           save_p += sizeof(*ceiling);
-          ceiling->sector = &sectors[(uintptr_t)ceiling->sector];
+          if (!(ceiling->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)ceiling->sector, "ceiling")))
+            return -1;
           ceiling->sector->ceilingdata = ceiling; //jff 2/22/98
 
           if (ceiling->thinker.function.arg1)
@@ -1200,7 +1318,8 @@ void P_UnArchiveSpecials (void)
           vldoor_t *door = Z_Malloc (sizeof(*door), PU_LEVEL, NULL);
           memcpy (door, save_p, sizeof(*door));
           save_p += sizeof(*door);
-          door->sector = &sectors[(uintptr_t)door->sector];
+          if (!(door->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)door->sector, "door")))
+            return -1;
 
           //jff 1/31/98 unarchive line remembered by door as well
           door->line = (intptr_t)door->line!=-1? &lines[(uintptr_t)door->line] : NULL;
@@ -1217,7 +1336,8 @@ void P_UnArchiveSpecials (void)
           floormove_t *floor = Z_Malloc (sizeof(*floor), PU_LEVEL, NULL);
           memcpy (floor, save_p, sizeof(*floor));
           save_p += sizeof(*floor);
-          floor->sector = &sectors[(uintptr_t)floor->sector];
+          if (!(floor->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)floor->sector, "floor")))
+            return -1;
           floor->sector->floordata = floor; //jff 2/22/98
           floor->thinker.function.arg1 = (void (*)(void *))T_MoveFloor;
           P_AddThinker (&floor->thinker);
@@ -1230,7 +1350,8 @@ void P_UnArchiveSpecials (void)
           plat_t *plat = Z_Malloc (sizeof(*plat), PU_LEVEL, NULL);
           memcpy (plat, save_p, sizeof(*plat));
           save_p += sizeof(*plat);
-          plat->sector = &sectors[(uintptr_t)plat->sector];
+          if (!(plat->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)plat->sector, "plat")))
+            return -1;
           plat->sector->floordata = plat; //jff 2/22/98
 
           if (plat->thinker.function.arg1)
@@ -1247,7 +1368,8 @@ void P_UnArchiveSpecials (void)
           lightflash_t *flash = Z_Malloc (sizeof(*flash), PU_LEVEL, NULL);
           memcpy (flash, save_p, sizeof(*flash));
           save_p += sizeof(*flash);
-          flash->sector = &sectors[(uintptr_t)flash->sector];
+          if (!(flash->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)flash->sector, "flash")))
+            return -1;
           flash->thinker.function.arg1 = (void (*)(void *))T_LightFlash;
           P_AddThinker (&flash->thinker);
           break;
@@ -1259,7 +1381,8 @@ void P_UnArchiveSpecials (void)
           strobe_t *strobe = Z_Malloc (sizeof(*strobe), PU_LEVEL, NULL);
           memcpy (strobe, save_p, sizeof(*strobe));
           save_p += sizeof(*strobe);
-          strobe->sector = &sectors[(uintptr_t)strobe->sector];
+          if (!(strobe->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)strobe->sector, "strobe")))
+            return -1;
           strobe->thinker.function.arg1 = (void (*)(void *))T_StrobeFlash;
           P_AddThinker (&strobe->thinker);
           break;
@@ -1271,7 +1394,8 @@ void P_UnArchiveSpecials (void)
           glow_t *glow = Z_Malloc (sizeof(*glow), PU_LEVEL, NULL);
           memcpy (glow, save_p, sizeof(*glow));
           save_p += sizeof(*glow);
-          glow->sector = &sectors[(uintptr_t)glow->sector];
+          if (!(glow->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)glow->sector, "glow")))
+            return -1;
           glow->thinker.function.arg1 = (void (*)(void *))T_Glow;
           P_AddThinker (&glow->thinker);
           break;
@@ -1283,7 +1407,8 @@ void P_UnArchiveSpecials (void)
           fireflicker_t *flicker = Z_Malloc (sizeof(*flicker), PU_LEVEL, NULL);
           memcpy (flicker, save_p, sizeof(*flicker));
           save_p += sizeof(*flicker);
-          flicker->sector = &sectors[(uintptr_t)flicker->sector];
+          if (!(flicker->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)flicker->sector, "flicker")))
+            return -1;
           flicker->thinker.function.arg1 = (void (*)(void *))T_FireFlicker;
           P_AddThinker (&flicker->thinker);
           break;
@@ -1296,7 +1421,8 @@ void P_UnArchiveSpecials (void)
           elevator_t *elevator = Z_Malloc (sizeof(*elevator), PU_LEVEL, NULL);
           memcpy (elevator, save_p, sizeof(*elevator));
           save_p += sizeof(*elevator);
-          elevator->sector = &sectors[(uintptr_t)elevator->sector];
+          if (!(elevator->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)elevator->sector, "elevator")))
+            return -1;
           elevator->sector->floordata = elevator; //jff 2/22/98
           elevator->sector->ceilingdata = elevator; //jff 2/22/98
           elevator->thinker.function.arg1 = (void (*)(void *))T_MoveElevator;
@@ -1331,7 +1457,8 @@ void P_UnArchiveSpecials (void)
           plat_t *plat = Z_Malloc (sizeof(*plat), PU_LEVEL, NULL);
           memcpy (plat, save_p, sizeof(*plat));
           save_p += sizeof(*plat);
-          plat->sector = &sectors[(uintptr_t)plat->sector];
+          if (!(plat->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)plat->sector, "plat")))
+            return -1;
           plat->sector->floordata = plat;
 
           if (plat->thinker.function.arg1)
@@ -1348,7 +1475,8 @@ void P_UnArchiveSpecials (void)
           pillar_t *pillar = Z_Malloc (sizeof(*pillar), PU_LEVEL, NULL);
           memcpy (pillar, save_p, sizeof(*pillar));
           save_p += sizeof(*pillar);
-          pillar->sector = &sectors[(uintptr_t)pillar->sector];
+          if (!(pillar->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)pillar->sector, "pillar")))
+            return -1;
           pillar->sector->floordata = pillar;
           pillar->thinker.function.arg1 = (void (*)(void *))T_HexenBuildPillar;
           P_AddThinker (&pillar->thinker);
@@ -1361,7 +1489,8 @@ void P_UnArchiveSpecials (void)
           ceiling_t *ceiling = Z_Malloc (sizeof(*ceiling), PU_LEVEL, NULL);
           memcpy (ceiling, save_p, sizeof(*ceiling));
           save_p += sizeof(*ceiling);
-          ceiling->sector = &sectors[(uintptr_t)ceiling->sector];
+          if (!(ceiling->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)ceiling->sector, "ceiling")))
+            return -1;
           ceiling->sector->ceilingdata = ceiling;
           if (ceiling->thinker.function.arg1)
             ceiling->thinker.function.arg1 = (void (*)(void *))T_HexenMoveCeiling;
@@ -1376,7 +1505,8 @@ void P_UnArchiveSpecials (void)
           vldoor_t *door = Z_Malloc (sizeof(*door), PU_LEVEL, NULL);
           memcpy (door, save_p, sizeof(*door));
           save_p += sizeof(*door);
-          door->sector = &sectors[(uintptr_t)door->sector];
+          if (!(door->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)door->sector, "door")))
+            return -1;
           door->line = (intptr_t)door->line != -1 ? &lines[(uintptr_t)door->line] : NULL;
           door->sector->ceilingdata = door;
           door->thinker.function.arg1 = (void (*)(void *))T_HexenVerticalDoor;
@@ -1390,7 +1520,8 @@ void P_UnArchiveSpecials (void)
           light_t *light = Z_Malloc (sizeof(*light), PU_LEVEL, NULL);
           memcpy (light, save_p, sizeof(*light));
           save_p += sizeof(*light);
-          light->sector = &sectors[(uintptr_t)light->sector];
+          if (!(light->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)light->sector, "light")))
+            return -1;
           light->thinker.function.arg1 = (void (*)(void *))T_HexenLight;
           P_AddThinker (&light->thinker);
           break;
@@ -1402,7 +1533,8 @@ void P_UnArchiveSpecials (void)
           planeWaggle_t *waggle = Z_Malloc (sizeof(*waggle), PU_LEVEL, NULL);
           memcpy (waggle, save_p, sizeof(*waggle));
           save_p += sizeof(*waggle);
-          waggle->sector = &sectors[(uintptr_t)waggle->sector];
+          if (!(waggle->sector = P_SectorFromSaveIndex((intptr_t)(uintptr_t)waggle->sector, "waggle")))
+            return -1;
           waggle->sector->floordata = waggle;
           waggle->thinker.function.arg1 = (void (*)(void *))T_FloorWaggle;
           P_AddThinker (&waggle->thinker);
@@ -1445,6 +1577,8 @@ void P_UnArchiveSpecials (void)
       default:
         I_Error("P_UnarchiveSpecials: Unknown tclass %i in savegame", tclass);
       }
+  }
+  return 0;
 }
 
 // killough 2/16/98: save/restore random number generator state information

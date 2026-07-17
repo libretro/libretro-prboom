@@ -25,6 +25,7 @@ typedef struct
   int radius;                   /* map units */
   int64_t r2;                 /* radius^2   */
   int strength;                 /* 0..DL_MAX_BOOST */
+  int cr, cg, cb;               /* chroma (colour minus grey) in 565 channels */
 } active_light_t;
 
 static active_light_t active[DL_MAX_ACTIVE];
@@ -92,6 +93,16 @@ void R_CollectDynLights(void)
       a->radius = rad;
       a->r2     = (int64_t)rad * rad;
       a->strength = (int)(d->strength * DL_MAX_BOOST + 0.5f);
+      /* Chroma = colour minus its grey (min) component, in 565 channel units.
+       * A white/grey light has zero chroma, so it adds no tint and leaves the
+       * output identical to the luma-only path; only saturated lights tint. */
+      {
+        float mn = d->r < d->g ? (d->r < d->b ? d->r : d->b)
+                               : (d->g < d->b ? d->g : d->b);
+        a->cr = (int)((d->r - mn) * 31.0f + 0.5f);
+        a->cg = (int)((d->g - mn) * 63.0f + 0.5f);
+        a->cb = (int)((d->b - mn) * 31.0f + 0.5f);
+      }
     }
   }
 }
@@ -191,6 +202,7 @@ typedef struct
   int       x, y, reff;
   long long reff2, r2;
   int       strength;
+  int       cr, cg, cb;         /* chroma, carried from the active light */
 } plane_light_t;
 
 static plane_light_t plane_lights[DL_MAX_ACTIVE];
@@ -215,6 +227,7 @@ int R_PlanePrepareLights(int planez)
     p->reff2 = a->r2 - dz2;
     p->r2 = a->r2;
     p->strength = a->strength;
+    p->cr = a->cr; p->cg = a->cg; p->cb = a->cb;
     /* integer sqrt of reff2 for the AABB span test */
     lo = 0; hi = a->radius;
     while (lo < hi)
@@ -227,17 +240,31 @@ int R_PlanePrepareLights(int planez)
   return num_plane_lights;
 }
 
+/* Boost-weighted chroma accumulated by the most recent R_PlaneBoost call, in
+ * 565 channel units scaled by boost (the caller shifts down to a per-pixel
+ * additive tint).  Stays zero when every contributing light is white. */
+int dl_tint_r, dl_tint_g, dl_tint_b;
+
 int R_PlaneBoost(int wx, int wy)
 {
   int i, boost = 0;
+  dl_tint_r = dl_tint_g = dl_tint_b = 0;
   for (i = 0; i < num_plane_lights; i++)
   {
     const plane_light_t *p = &plane_lights[i];
     int dx = wx - p->x, dy = wy - p->y;
     long long d2 = (long long)dx * dx + (long long)dy * dy;
+    int b;
     if (d2 >= p->reff2)
       continue;
-    boost += (int)((long long)p->strength * (p->reff2 - d2) / p->r2);
+    b = (int)((long long)p->strength * (p->reff2 - d2) / p->r2);
+    boost += b;
+    if (p->cr | p->cg | p->cb)
+    {
+      dl_tint_r += b * p->cr;
+      dl_tint_g += b * p->cg;
+      dl_tint_b += b * p->cb;
+    }
   }
   return boost;
 }

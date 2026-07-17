@@ -315,6 +315,32 @@ static void R_PlaneColumnWorld(int col, fixed_t distance, int *wx, int *wy)
    *wy = (viewy + FixedMul(hd, finesine[ridx]))   >> FRACBITS;
 }
 
+/* Additively push a horizontal run of framebuffer pixels toward a light's
+ * chroma (colour-only tint; the luma boost already brightened them).  ar/ag/ab
+ * are per-pixel channel additions in 565 units. */
+static void R_TintSpan(int y, int x1, int x2, int ar, int ag, int ab)
+{
+   uint16_t *d = drawvars.short_topleft + y * SURFACE_SHORT_PITCH + x1;
+   int n = x2 - x1 + 1;
+   for (; n > 0; n--, d++)
+   {
+      unsigned px = *d;
+#if defined(ABGR1555)
+      int r = (px      ) & 0x1f, g = (px >> 5) & 0x1f, b = (px >> 10) & 0x1f;
+      r += ar; if (r > 31) r = 31;
+      g += (ag >> 1); if (g > 31) g = 31;   /* 555: green is 5 bits */
+      b += ab; if (b > 31) b = 31;
+      *d = (uint16_t)((b << 10) | (g << 5) | r);
+#else
+      int r = (px >> 11) & 0x1f, g = (px >> 5) & 0x3f, b = px & 0x1f;
+      r += ar; if (r > 31) r = 31;
+      g += ag; if (g > 63) g = 63;
+      b += ab; if (b > 31) b = 31;
+      *d = (uint16_t)((r << 11) | (g << 5) | b);
+#endif
+   }
+}
+
 static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
 {
    fixed_t distance;
@@ -499,6 +525,17 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
          dsvars->x1 = cx;
          dsvars->x2 = ex;
          R_DrawSpan(dsvars);
+
+         /* Colour tint: push the just-drawn chunk toward the boost-weighted
+          * chroma of the lights reaching it (no-op for white lights). */
+         if (dl_tint_r | dl_tint_g | dl_tint_b)
+         {
+            int ar = dl_tint_r >> DL_TINT_SHIFT;
+            int ag = dl_tint_g >> DL_TINT_SHIFT;
+            int ab = dl_tint_b >> DL_TINT_SHIFT;
+            if (ar | ag | ab)
+               R_TintSpan(y, cx, ex, ar, ag, ab);
+         }
       }
       return;
    }

@@ -34,4 +34,10 @@ int R_PlanePrepareLights(int planez);
 int R_PlaneBoost(int wx, int wy);
 int R_PlaneSpanLit(int wx1, int wy1, int wx2, int wy2);
 
+/* Boost-weighted chroma from the most recent R_PlaneBoost / R_SegBoost call
+ * (565 channel units * boost).  Zero unless a saturated light contributed;
+ * the surface code shifts these down to a per-pixel additive tint. */
+extern int dl_tint_r, dl_tint_g, dl_tint_b;
+#define DL_TINT_SHIFT 8   /* boost-weighted chroma -> per-pixel channel add */
+
 #endif

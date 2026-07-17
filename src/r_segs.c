@@ -691,7 +691,8 @@ void R_RenderThickSides(drawseg_t *ds)
 
 static int didsolidcol; /* True if at least one column was marked solid */
 
-#define DL_WALL_CHUNK 8   /* vertical chunk (px) for wall dynamic-light falloff */
+#define DL_WALL_CHUNK 8        /* min band height (px) for wall dynamic-light falloff */
+#define MAX_WALL_BANDS 16       /* cap bands/column so tall near walls stay bounded */
 
 /* Emit one wall column split into vertical light bands.  A screen row maps to
  * a world z (the horizon row is at viewz, stepping by the column's iscale of
@@ -703,10 +704,17 @@ static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
                                 int base_ll, fixed_t scale, int z_filter)
 {
    const int yl = dc->yl, yh = dc->yh;
-   int cy;
-   for (cy = yl; cy <= yh; cy += DL_WALL_CHUNK)
+   int cy, step = DL_WALL_CHUNK;
+   /* Fine DL_WALL_CHUNK granularity normally, but cap the band count so an
+    * unusually tall/near column (which would otherwise cost dozens of boost
+    * evals) is bounded; on such columns the wall fills the view and the light
+    * pool is large, so the coarser step is not visible.  Ordinary walls stay
+    * exactly at DL_WALL_CHUNK. */
+   { int h = yh - yl + 1; int s2 = (h + MAX_WALL_BANDS - 1) / MAX_WALL_BANDS;
+     if (s2 > step) step = s2; }
+   for (cy = yl; cy <= yh; cy += step)
    {
-      int ey = cy + DL_WALL_CHUNK - 1;
+      int ey = cy + step - 1;
       int mid, wz, ll;
       if (ey > yh) ey = yh;
       mid = (cy + ey) >> 1;

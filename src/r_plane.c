@@ -472,13 +472,17 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
    {
       const fixed_t bxf = dsvars->xfrac, byf = dsvars->yfrac;
       int wx_a, wy_a, wx_b, wy_b, cx;
+      fixed_t smooth_scale = 0;
+      int run_x1, run_band, run_fine;
 
-      /* Span-level cull: if no light on this plane reaches the span, draw it
-       * as one span with the base colourmap (already set) -- this keeps the
-       * common far-from-light span off the chunk path entirely. */
+      /* Row-level light filter: the span's world points lie on the straight
+       * segment (a,b), so keep only the plane lights that can reach it (exact
+       * point-to-segment distance, small margin for coordinate truncation).
+       * No reaching light -> one span with the base colourmap, off the chunk
+       * path entirely.  This replaces the coarser AABB span cull. */
       R_PlaneColumnWorld(x1, distance, &wx_a, &wy_a);
       R_PlaneColumnWorld(x2, distance, &wx_b, &wy_b);
-      if (!R_PlaneSpanLit(wx_a, wy_a, wx_b, wy_b))
+      if (!R_PlaneRowPrepare(wx_a, wy_a, wx_b, wy_b))
       {
          dsvars->x1 = x1;
          dsvars->x2 = x2;
@@ -486,56 +490,120 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
          return;
       }
 
+      /* Constant per row (index is fixed for this span): hoist the smooth
+       * branch's distance-scale divide out of the chunk loop. */
+      if (r_smooth_shading && fullcolormap)
+         smooth_scale = FixedDiv((320/2*FRACUNIT),(index+1)<<LIGHTZSHIFT);
+
+      /* Walk the chunks, but only issue a draw per *state run*: consecutive
+       * chunks that resolve to the same colourmap band, same smooth weight and
+       * no colour tint draw as one span (identical pixels either way, far
+       * fewer span calls on the long mostly-unlit parts of a lit row).  Tinted
+       * chunks flush individually so the tint keeps its per-chunk footprint. */
+      run_x1 = -1; run_band = -1; run_fine = -1;
       for (cx = x1; cx <= x2; cx += DL_FLAT_CHUNK)
       {
          int ex = cx + DL_FLAT_CHUNK - 1;
-         int mid, wx, wy, boost, band;
+         int mid, wx, wy, boost, band, fine2 = -1, tinted;
 
          if (ex > x2) ex = x2;
          mid = (cx + ex) >> 1;
          R_PlaneColumnWorld(mid, distance, &wx, &wy);
 
-         boost = R_PlaneBoost(wx, wy);
+         boost = R_PlaneRowBoost(wx, wy);
          band  = planelightlevel + (boost >> LIGHTSEGSHIFT);
          if (band > LIGHTLEVELS-1) band = LIGHTLEVELS-1;
-         dsvars->colormap = zlight[band][index];
-         if (drawvars.filterz == RDRAW_FILTER_LINEAR)
-            dsvars->nextcolormap =
-               zlight[band][index+1 >= MAXLIGHTZ ? MAXLIGHTZ-1 : index+1];
          if (r_smooth_shading && fullcolormap)
          {
             int raw = planerawlight + boost;
-            int startmap, scale, fine2;
+            int startmap;
             if (raw > 255) raw = 255;
             startmap = ((255 - raw) * 2 * (LIGHTLEVELS-1) * SMOOTH_WEIGHTS)
                        / (255 * LIGHTLEVELS);
-            scale    = FixedDiv((320/2*FRACUNIT),(index+1)<<LIGHTZSHIFT);
             fine2    = startmap
-                       - (scale >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))/DISTMAP;
+                       - (smooth_scale >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))/DISTMAP;
             if (fine2 < 0)                     fine2 = 0;
             else if (fine2 > SMOOTH_WEIGHTS-1) fine2 = SMOOTH_WEIGHTS-1;
-            r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine2;
+         }
+         tinted = (dl_tint_r | dl_tint_g | dl_tint_b);
+
+         if (!tinted && run_x1 >= 0 && band == run_band && fine2 == run_fine)
+         {
+            /* same draw state, no tint: extend the pending run */
+         }
+         else
+         {
+            if (run_x1 >= 0)
+            {
+               /* flush the pending run [run_x1, cx-1] */
+               dsvars->colormap = zlight[run_band][index];
+               if (drawvars.filterz == RDRAW_FILTER_LINEAR)
+                  dsvars->nextcolormap =
+                     zlight[run_band][index+1 >= MAXLIGHTZ ? MAXLIGHTZ-1 : index+1];
+               if (run_fine >= 0)
+               {
+                  r_fine_lightweight = (SMOOTH_WEIGHTS-1) - run_fine;
+                  r_fine_colormap    = dsvars->colormap;
+               }
+               else
+                  r_fine_lightweight = -1;
+               dsvars->xfrac = bxf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->xstep);
+               dsvars->yfrac = byf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->ystep);
+               dsvars->x1 = run_x1;
+               dsvars->x2 = cx - 1;
+               R_DrawSpan(dsvars);
+               run_x1 = -1;
+            }
+            if (tinted)
+            {
+               /* tinted chunk: draw and tint it individually */
+               int ar = dl_tint_r >> DL_TINT_SHIFT;
+               int ag = dl_tint_g >> DL_TINT_SHIFT;
+               int ab = dl_tint_b >> DL_TINT_SHIFT;
+               dsvars->colormap = zlight[band][index];
+               if (drawvars.filterz == RDRAW_FILTER_LINEAR)
+                  dsvars->nextcolormap =
+                     zlight[band][index+1 >= MAXLIGHTZ ? MAXLIGHTZ-1 : index+1];
+               if (fine2 >= 0)
+               {
+                  r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine2;
+                  r_fine_colormap    = dsvars->colormap;
+               }
+               else
+                  r_fine_lightweight = -1;
+               dsvars->xfrac = bxf + (fixed_t)((int64_t)(cx - x1) * dsvars->xstep);
+               dsvars->yfrac = byf + (fixed_t)((int64_t)(cx - x1) * dsvars->ystep);
+               dsvars->x1 = cx;
+               dsvars->x2 = ex;
+               R_DrawSpan(dsvars);
+               if (ar | ag | ab)
+                  R_TintSpan(y, cx, ex, ar, ag, ab);
+            }
+            else
+            {
+               /* start a new untinted run */
+               run_x1 = cx; run_band = band; run_fine = fine2;
+            }
+         }
+      }
+      if (run_x1 >= 0)
+      {
+         dsvars->colormap = zlight[run_band][index];
+         if (drawvars.filterz == RDRAW_FILTER_LINEAR)
+            dsvars->nextcolormap =
+               zlight[run_band][index+1 >= MAXLIGHTZ ? MAXLIGHTZ-1 : index+1];
+         if (run_fine >= 0)
+         {
+            r_fine_lightweight = (SMOOTH_WEIGHTS-1) - run_fine;
             r_fine_colormap    = dsvars->colormap;
          }
          else
             r_fine_lightweight = -1;
-
-         dsvars->xfrac = bxf + (fixed_t)((int64_t)(cx - x1) * dsvars->xstep);
-         dsvars->yfrac = byf + (fixed_t)((int64_t)(cx - x1) * dsvars->ystep);
-         dsvars->x1 = cx;
-         dsvars->x2 = ex;
+         dsvars->xfrac = bxf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->xstep);
+         dsvars->yfrac = byf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->ystep);
+         dsvars->x1 = run_x1;
+         dsvars->x2 = x2;
          R_DrawSpan(dsvars);
-
-         /* Colour tint: push the just-drawn chunk toward the boost-weighted
-          * chroma of the lights reaching it (no-op for white lights). */
-         if (dl_tint_r | dl_tint_g | dl_tint_b)
-         {
-            int ar = dl_tint_r >> DL_TINT_SHIFT;
-            int ag = dl_tint_g >> DL_TINT_SHIFT;
-            int ab = dl_tint_b >> DL_TINT_SHIFT;
-            if (ar | ag | ab)
-               R_TintSpan(y, cx, ex, ar, ag, ab);
-         }
       }
       return;
    }

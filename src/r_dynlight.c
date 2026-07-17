@@ -1,4 +1,3 @@
-#include <stdlib.h>
 /* r_dynlight.c: collect GLDEFS-bound point lights from the mobjs and shade
  * nearby surfaces brighter.  See r_dynlight.h. */
 
@@ -308,41 +307,84 @@ int dl_tint_r, dl_tint_g, dl_tint_b;
  * column (fast, default), 1 = per-band vertical light pool on walls. */
 int dynlight_wall_falloff = 0;
 
-int R_PlaneBoost(int wx, int wy)
+/* Per-row plane lighting.  A span row's world points lie on the straight
+ * segment (a,b) (planar mapping is linear along the row), so filter the
+ * plane's lights by exact point-to-segment distance once per span and give
+ * the per-chunk boost only the lights that can reach the row (the same
+ * arithmetic as the full loop, just over far fewer lights).  A small margin on
+ * the filter covers the integer truncation of the endpoint/mid world
+ * coordinates, so the chunk-level (d2 >= reff2) test still decides
+ * contribution and the output is bit-identical to the unfiltered loop. */
+#define DL_ROW_MARGIN 4
+typedef struct
 {
-  int i, boost = 0;
-  dl_tint_r = dl_tint_g = dl_tint_b = 0;
+  int       x, y;
+  long long reff2, r2;
+  int       strength, cr, cg, cb;
+} row_light_t;
+
+static row_light_t row_lights[DL_MAX_ACTIVE];
+static int         num_row_lights;
+
+int R_PlaneRowPrepare(int ax, int ay, int bx, int by)
+{
+  int i;
+  long long abx = (long long)bx - ax, aby = (long long)by - ay;
+  long long den = abx * abx + aby * aby;
+  num_row_lights = 0;
   for (i = 0; i < num_plane_lights; i++)
   {
     const plane_light_t *p = &plane_lights[i];
-    int dx = wx - p->x, dy = wy - p->y;
+    long long apx = (long long)p->x - ax, apy = (long long)p->y - ay;
+    long long num = apx * abx + apy * aby;
+    long long d2;
+    row_light_t *r;
+    if (num <= 0 || den == 0)
+      d2 = apx * apx + apy * apy;
+    else if (num >= den)
+    {
+      long long bpx = (long long)p->x - bx, bpy = (long long)p->y - by;
+      d2 = bpx * bpx + bpy * bpy;
+    }
+    else
+      d2 = apx * apx + apy * apy - (num / den) * num
+           - ((num % den) * num) / den;      /* |AP|^2 - num^2/den, no overflow */
+    {
+      long long margin = p->reff + DL_ROW_MARGIN;
+      if (d2 >= margin * margin)
+        continue;
+    }
+    r = &row_lights[num_row_lights++];
+    r->x = p->x; r->y = p->y;
+    r->reff2 = p->reff2;
+    r->r2 = p->r2;
+    r->strength = p->strength;
+    r->cr = p->cr; r->cg = p->cg; r->cb = p->cb;
+  }
+  return num_row_lights;
+}
+
+int R_PlaneRowBoost(int wx, int wy)
+{
+  int i, boost = 0;
+  dl_tint_r = dl_tint_g = dl_tint_b = 0;
+  for (i = 0; i < num_row_lights; i++)
+  {
+    const row_light_t *r = &row_lights[i];
+    int dx = wx - r->x, dy = wy - r->y;
     long long d2 = (long long)dx * dx + (long long)dy * dy;
     int b;
-    if (d2 >= p->reff2)
+    if (d2 >= r->reff2)
       continue;
-    b = (int)((long long)p->strength * (p->reff2 - d2) / p->r2);
+    b = (int)((long long)r->strength * (r->reff2 - d2) / r->r2);
     boost += b;
-    if (p->cr | p->cg | p->cb)
+    if (r->cr | r->cg | r->cb)
     {
-      dl_tint_r += b * p->cr;
-      dl_tint_g += b * p->cg;
-      dl_tint_b += b * p->cb;
+      dl_tint_r += b * r->cr;
+      dl_tint_g += b * r->cg;
+      dl_tint_b += b * r->cb;
     }
   }
   return boost;
 }
 
-int R_PlaneSpanLit(int wx1, int wy1, int wx2, int wy2)
-{
-  int i;
-  int lox = wx1 < wx2 ? wx1 : wx2, hix = wx1 < wx2 ? wx2 : wx1;
-  int loy = wy1 < wy2 ? wy1 : wy2, hiy = wy1 < wy2 ? wy2 : wy1;
-  for (i = 0; i < num_plane_lights; i++)
-  {
-    const plane_light_t *p = &plane_lights[i];
-    if (p->x >= lox - p->reff && p->x <= hix + p->reff &&
-        p->y >= loy - p->reff && p->y <= hiy + p->reff)
-      return 1;
-  }
-  return 0;
-}

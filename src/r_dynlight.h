@@ -32,11 +32,12 @@ int R_SegColumnPrepare(int wx, int wy);
 int R_SegColumnBoost(int wz);
 
 /* Build the per-plane light sublist (lights reaching this z, vertical term
- * folded into a 2D radius); returns the count.  R_PlaneBoost queries it per
- * point and R_PlaneSpanLit tests whether a world span segment is reached. */
+ * folded into a 2D radius); returns the count.  R_PlaneRowPrepare then
+ * filters that set down to the lights reaching one span row (exact
+ * point-to-segment distance) and R_PlaneRowBoost queries those per chunk. */
 int R_PlanePrepareLights(int planez);
-int R_PlaneBoost(int wx, int wy);
-int R_PlaneSpanLit(int wx1, int wy1, int wx2, int wy2);
+int R_PlaneRowPrepare(int ax, int ay, int bx, int by);
+int R_PlaneRowBoost(int wx, int wy);
 
 /* Boost-weighted chroma from the most recent R_PlaneBoost / R_SegBoost call
  * (565 channel units * boost).  Zero unless a saturated light contributed;

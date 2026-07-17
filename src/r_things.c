@@ -1344,6 +1344,13 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    // store information in a vissprite
    vis = &avis;
    vis->mobjflags = MF_PLAYERSPRITE;
+   /* avis is an uninitialised stack vissprite; R_DrawVisSprite reads the
+    * DECORATE render-style fields and the dynamic-light tint, none of which
+    * the weapon uses, so clear them here.  Left as stack garbage, a nonzero
+    * translucent would draw the weapon alpha-blended (often to invisibility). */
+   vis->translucent = 0;
+   vis->alpha       = 0;
+   vis->tint_r = vis->tint_g = vis->tint_b = 0;
    vis->xlat      = NULL;
    // killough 12/98: fix psprite positioning problem
    vis->texturemid = (BASEYCENTER<<FRACBITS) /* +  FRACUNIT/2 */ -

@@ -180,14 +180,23 @@ int R_SegPrepareLights(const seg_t *seg)
 int R_SegBoost(int wx, int wy, int wz)
 {
   int i, boost = 0;
+  dl_tint_r = dl_tint_g = dl_tint_b = 0;
   for (i = 0; i < num_seg_lights; i++)
   {
     const active_light_t *a = &seg_lights[i];
     int dx = wx - a->x, dy = wy - a->y, dz = wz - a->z;
     int64_t d2 = (int64_t)dx * dx + (int64_t)dy * dy + (int64_t)dz * dz;
+    int b;
     if (d2 >= a->r2)
       continue;
-    boost += (int)((int64_t)a->strength * (a->r2 - d2) / a->r2);
+    b = (int)((int64_t)a->strength * (a->r2 - d2) / a->r2);
+    boost += b;
+    if (a->cr | a->cg | a->cb)
+    {
+      dl_tint_r += b * a->cr;
+      dl_tint_g += b * a->cg;
+      dl_tint_b += b * a->cb;
+    }
   }
   return boost;
 }

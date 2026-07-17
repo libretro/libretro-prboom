@@ -920,8 +920,10 @@ static void R_RenderSkybox(void)
   R_ClearPlanes();
   R_ClearSprites();
 
+  R_WallTintClear();
   R_RenderBSPNode(numnodes-1);
   R_DrawCmdReplay();
+  R_WallTintReplay();
   R_ResetColumnBuffer();
   R_DrawPlanes();
   R_DrawMasked();
@@ -971,8 +973,10 @@ static void R_RenderTaggedSkybox(const skybox_t *sb)
   R_ClearDrawSegs();
   R_ClearPlanes();
   R_ClearSprites();
+  R_WallTintClear();
   R_RenderBSPNode(numnodes-1);
   R_DrawCmdReplay();
+  R_WallTintReplay();
   R_ResetColumnBuffer();
   R_DrawPlanes();
   R_DrawMasked();
@@ -1061,10 +1065,12 @@ void R_RenderPlayerView (player_t* player)
 #endif
 
   // The head node is the last node output.
+  R_WallTintClear();
   R_RenderBSPNode (numnodes-1);
 
   /* Rasterize the wall columns the walk recorded (see r_drawcmd.h). */
   R_DrawCmdReplay();
+  R_WallTintReplay();
   R_ResetColumnBuffer();
 
 #ifdef PRBOOM_RENDER_PROFILE

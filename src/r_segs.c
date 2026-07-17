@@ -720,6 +720,15 @@ static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
       dc->yl = cy;
       dc->yh = ey;
       R_DrawCmdEmitColumn(dc, cf);
+
+      /* Colour: record this band's boost-weighted chroma so it can be tinted
+       * onto the framebuffer after the wall columns are flushed (no-op for
+       * white lights, where dl_tint_* stay zero). */
+      if (dl_tint_r | dl_tint_g | dl_tint_b)
+         R_WallTintRecord(dc->x, cy, ey,
+                          dl_tint_r >> DL_TINT_SHIFT,
+                          dl_tint_g >> DL_TINT_SHIFT,
+                          dl_tint_b >> DL_TINT_SHIFT);
    }
    dc->yl = yl;
    dc->yh = yh;

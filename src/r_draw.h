@@ -192,4 +192,10 @@ void R_ResetColumnBuffer(void);
 void R_SetSpriteTranslucency(int mode);
 void R_SetTransAlpha(int a32);   /* blend weight alpha*32 (0..32) for modes 3/4 */
 
+/* Dynamic-light colour tint for wall bands: record lit bands during the BSP
+ * walk, replay the additive chroma over the framebuffer after R_DrawCmdReplay. */
+void R_WallTintClear(void);
+void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab);
+void R_WallTintReplay(void);
+
 #endif

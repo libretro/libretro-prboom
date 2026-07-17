@@ -7272,3 +7272,65 @@ void R_InitBuffer(int width, int height)
   for (i=0; i<FUZZTABLE; i++)
 	  fuzzoffset[i] = fuzzoffset_org[i] * SURFACE_SHORT_PITCH;
 }
+
+/* --- Dynamic-light colour tint for wall bands (see r_dynlight/r_segs) -------
+ * Wall columns are queued and flushed as one batch (R_DrawCmdReplay), but the
+ * BSP clip guarantees each screen pixel is written by exactly one wall column,
+ * so a colour tint recorded per lit band at emit time can be replayed over the
+ * framebuffer afterwards with no overdraw hazard -- and without touching the
+ * batched/quad column flush at all. */
+typedef struct { int x, yl, yh; short ar, ag, ab; } wall_tint_t;
+static wall_tint_t *wall_tints = NULL;
+static int          wall_tint_count = 0, wall_tint_cap = 0;
+
+void R_WallTintClear(void)
+{
+   wall_tint_count = 0;
+}
+
+void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab)
+{
+   wall_tint_t *t;
+   if (yh < yl || (!ar && !ag && !ab))
+      return;
+   if (wall_tint_count == wall_tint_cap)
+   {
+      wall_tint_cap = wall_tint_cap ? wall_tint_cap * 2 : 4096;
+      wall_tints = (wall_tint_t *) realloc(wall_tints,
+                                           wall_tint_cap * sizeof(*wall_tints));
+      if (!wall_tints)
+         I_Error("R_WallTintRecord: allocation failed");
+   }
+   t = &wall_tints[wall_tint_count++];
+   t->x = x; t->yl = yl; t->yh = yh;
+   t->ar = (short)ar; t->ag = (short)ag; t->ab = (short)ab;
+}
+
+void R_WallTintReplay(void)
+{
+   int i;
+   for (i = 0; i < wall_tint_count; i++)
+   {
+      const wall_tint_t *t = &wall_tints[i];
+      uint16_t *d = drawvars.short_topleft + t->yl * SURFACE_SHORT_PITCH + t->x;
+      int n = t->yh - t->yl + 1;
+      int ar = t->ar, ag = t->ag, ab = t->ab;
+      for (; n > 0; n--, d += SURFACE_SHORT_PITCH)
+      {
+         unsigned px = *d;
+#if defined(ABGR1555)
+         int r = (px      ) & 0x1f, g = (px >> 5) & 0x1f, b = (px >> 10) & 0x1f;
+         r += ar;        if (r > 31) r = 31;
+         g += (ag >> 1); if (g > 31) g = 31;
+         b += ab;        if (b > 31) b = 31;
+         *d = (uint16_t)((b << 10) | (g << 5) | r);
+#else
+         int r = (px >> 11) & 0x1f, g = (px >> 5) & 0x3f, b = px & 0x1f;
+         r += ar; if (r > 31) r = 31;
+         g += ag; if (g > 63) g = 63;
+         b += ab; if (b > 31) b = 31;
+         *d = (uint16_t)((r << 11) | (g << 5) | b);
+#endif
+      }
+   }
+}

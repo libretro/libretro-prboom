@@ -61,7 +61,7 @@ void R_CollectDynLights(void)
     {
       fixed_t trx = mo->x - viewx, trY = mo->y - viewy;
       fixed_t tz  = FixedMul(trx, viewcos) + FixedMul(trY, viewsin);
-      int     rad = d->size;
+      int     rad = d->size2 > d->size ? d->size2 : d->size; /* max reach */
       if ((tz >> FRACBITS) < -rad)
         continue;                       /* entire sphere behind the view */
       if (tz > 0)
@@ -82,11 +82,15 @@ void R_CollectDynLights(void)
       break;
     {
       active_light_t *a = &active[num_active++];
+      unsigned seed = (unsigned)(mo->x >> FRACBITS) * 73856093u
+                    ^ (unsigned)(mo->y >> FRACBITS) * 19349663u;
+      int rad = U_DynLightRadius(d, leveltime, seed);
+      if (rad < 1) rad = 1;
       a->x      = mo->x >> FRACBITS;
       a->y      = mo->y >> FRACBITS;
       a->z      = (mo->z + (mo->height >> 1)) >> FRACBITS;
-      a->radius = d->size;
-      a->r2     = (int64_t)d->size * d->size;
+      a->radius = rad;
+      a->r2     = (int64_t)rad * rad;
       a->strength = (int)(d->strength * DL_MAX_BOOST + 0.5f);
     }
   }

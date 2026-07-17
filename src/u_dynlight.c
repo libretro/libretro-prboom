@@ -6,6 +6,8 @@
 
 #include "doomtype.h"
 #include "doomstat.h"
+#include "m_fixed.h"
+#include "tables.h"
 #include "w_wad.h"
 #include "lprintf.h"
 #include "u_scanner.h"
@@ -102,8 +104,8 @@ static void dl_skip_block(u_scanner_t *s)
 }
 
 /* parse a "<kind> NAME { color R G B; size N; ... }" light block; the kind
- * keyword has already been consumed. */
-static void dl_parse_light(u_scanner_t *s)
+ * keyword has already been consumed.  `kind` is the dynlight_kind_t. */
+static void dl_parse_light(u_scanner_t *s, int kind)
 {
   dynlight_def_t d;
   double v0, v1, v2;
@@ -138,7 +140,34 @@ static void dl_parse_light(u_scanner_t *s)
       if (dl_number(s, &v0))
         d.size = (int)v0;
     }
-    /* secondarysize/interval/chance/offset/subtractive/... : ignored */
+    else if (!strcasecmp(s->string, "secondarysize") ||
+             !strcasecmp(s->string, "secondaryradius"))
+    {
+      if (dl_number(s, &v0))
+        d.size2 = (int)v0;
+    }
+    else if (!strcasecmp(s->string, "interval"))   /* pulse: seconds */
+    {
+      if (dl_number(s, &v0))
+        d.interval = (int)(v0 * TICRATE + 0.5);
+    }
+    else if (!strcasecmp(s->string, "chance"))      /* flicker: 0..1 */
+    {
+      if (dl_number(s, &v0))
+        d.chance = (int)(v0 * 360.0 + 0.5);
+    }
+    /* offset/subtractive/attenuate/... : ignored */
+  }
+
+  /* Resolve the animation kind now, folding degenerate cases back to a static
+   * point light so the renderer never has to guard against them. */
+  d.kind = kind;
+  if (kind == DL_PULSE && (d.size2 <= 0 || d.interval <= 0))
+    d.kind = DL_POINT;
+  if (kind == DL_FLICKER)
+  {
+    if (d.size2 <= 0)   d.kind   = DL_POINT;
+    if (d.chance <= 0)  d.chance = 180;   /* GLDEFS default ~50% */
   }
 
   /* luminous strength = brightest channel; skip pure-black lights */
@@ -205,10 +234,12 @@ static void dl_parse_lump(int lump)
   {
     if (s.token != TK_Identifier)
       continue;
-    if (!strcasecmp(s.string, "pointlight") ||
-        !strcasecmp(s.string, "pulselight") ||
-        !strcasecmp(s.string, "flickerlight"))
-      dl_parse_light(&s);
+    if (!strcasecmp(s.string, "pointlight"))
+      dl_parse_light(&s, DL_POINT);
+    else if (!strcasecmp(s.string, "pulselight"))
+      dl_parse_light(&s, DL_PULSE);
+    else if (!strcasecmp(s.string, "flickerlight"))
+      dl_parse_light(&s, DL_FLICKER);
     else if (!strcasecmp(s.string, "object"))
       dl_parse_object(&s);
     else if (U_CheckToken(&s, '{'))
@@ -236,6 +267,28 @@ void U_LoadDynLights(void)
   if (num_binds)
     lprintf(LO_INFO, "U_LoadDynLights: %d lights, %d sprite bindings\n",
             num_defs, num_binds);
+}
+
+int U_DynLightRadius(const dynlight_def_t *d, int tics, unsigned seed)
+{
+  if (d->kind == DL_PULSE)
+  {
+    /* sine oscillation size <-> size2 over `interval` tics (finesine keeps
+     * it integer and deterministic; phase locked to leveltime). */
+    unsigned ang  = ((unsigned)tics * FINEANGLES / (unsigned)d->interval)
+                    & (FINEANGLES - 1);
+    int      sinv = finesine[ang];              /* -FRACUNIT..FRACUNIT     */
+    int      frac = (sinv + FRACUNIT) >> 1;     /* 0..FRACUNIT             */
+    return d->size + (int)(((int64_t)(d->size2 - d->size) * frac) >> FRACBITS);
+  }
+  if (d->kind == DL_FLICKER)
+  {
+    /* per-tic hash of (tics, seed): deterministic, per-light, no game RNG. */
+    unsigned h = (unsigned)tics * 1664525u + seed * 1013904223u;
+    h ^= h >> 15; h *= 2246822519u; h ^= h >> 13;
+    return ((int)(h % 360u) < d->chance) ? d->size : d->size2;
+  }
+  return d->size;
 }
 
 const dynlight_def_t *U_DynLightForSprite(const char *sprname)

@@ -4,8 +4,8 @@
  * ZDoom wads declare light objects in a *DEFS lump:
  *
  *     pointlight NAME   { color R G B; size RADIUS; }
- *     pulselight NAME   { ... }        // parsed as a static light for now
- *     flickerlight NAME { ... }        // ditto
+ *     pulselight NAME   { ... size R; secondarysize R2; interval SECS; }
+ *     flickerlight NAME { ... size R; secondarysize R2; chance C; }
  *
  * and bind them to an actor's sprite frames:
  *
@@ -24,13 +24,31 @@
 
 #include "doomtype.h"
 
+typedef enum
+{
+  DL_POINT = 0,       /* static                                         */
+  DL_PULSE,           /* radius oscillates size<->size2 over interval   */
+  DL_FLICKER          /* radius randomly picks size or size2 per tic    */
+} dynlight_kind_t;
+
 typedef struct
 {
   char  name[64];
   float r, g, b;      /* 0..1 colour                                    */
-  int   size;         /* radius in map units                            */
+  int   size;         /* radius in map units (primary)                  */
   float strength;     /* 0..1 luminous strength (max colour channel)    */
+  int   kind;         /* dynlight_kind_t                                */
+  int   size2;        /* secondary radius (pulse/flicker)               */
+  int   interval;     /* pulse period in tics                           */
+  int   chance;       /* flicker: 0..360 threshold (prob of `size`)     */
 } dynlight_def_t;
+
+/* Current radius of a (possibly animated) light at game tic `tics`.  `seed`
+ * makes flicker independent per light instance; it is ignored for static and
+ * pulse lights.  Deterministic and integer-only: pulse follows finesine over
+ * leveltime, flicker hashes (tics, seed) -- neither touches the game RNG, so
+ * demos and netplay stay in sync. */
+int U_DynLightRadius(const dynlight_def_t *d, int tics, unsigned seed);
 
 /* Parse every *DEFS lump's pointlight/pulselight/flickerlight and object
  * blocks.  Safe to call once after W_Init; a second call is a no-op. */

@@ -56,6 +56,7 @@ void U_LoadDynLights(void);
 
 /* The light bound to a 4-char sprite name, or NULL. */
 const dynlight_def_t *U_DynLightForSprite(const char *sprname);
+const dynlight_def_t *U_DynLightForSpriteNum(int spritenum);
 
 /* True if any light binding was parsed (renderer fast-out). */
 dbool U_DynLightsPresent(void);

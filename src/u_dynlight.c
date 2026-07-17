@@ -302,6 +302,40 @@ const dynlight_def_t *U_DynLightForSprite(const char *sprname)
   return NULL;
 }
 
+/* Per-spritenum binding table.  The per-frame light collection walks every
+ * thinker in the level and used to resolve its sprite by scanning all
+ * bindings with strncasecmp -- on a decoration-heavy map that is
+ * mobjs x bindings string compares per frame, which profiled as two thirds
+ * of the whole game tic (zdcmp2: ~3000 thinkers x 322 bindings).  Resolve
+ * each interned sprite number to its first matching binding once, lazily,
+ * and look lights up by index afterwards.  First-match order preserved. */
+extern int    numsprites;
+extern const char **sprnames;
+
+static const dynlight_def_t **sprite_light;   /* [numsprites], lazily built */
+static int                    sprite_light_n; /* numsprites when built, 0 = stale */
+
+static void U_BuildSpriteLightTable(void)
+{
+  int sp;
+  free(sprite_light);
+  sprite_light = malloc(numsprites * sizeof *sprite_light);
+  for (sp = 0; sp < numsprites; sp++)
+    sprite_light[sp] = sprnames[sp] ? U_DynLightForSprite(sprnames[sp]) : NULL;
+  sprite_light_n = numsprites;
+}
+
+const dynlight_def_t *U_DynLightForSpriteNum(int spritenum)
+{
+  if (!num_binds || numsprites <= 0)
+    return NULL;
+  if (sprite_light_n != numsprites)
+    U_BuildSpriteLightTable();
+  if ((unsigned)spritenum >= (unsigned)sprite_light_n)
+    return NULL;
+  return sprite_light[spritenum];
+}
+
 dbool U_DynLightsPresent(void)
 {
   return num_binds > 0;
@@ -316,5 +350,6 @@ void U_FreeDynLights(void)
 {
   free(defs);  defs = NULL;   num_defs = cap_defs = 0;
   free(binds); binds = NULL;  num_binds = cap_binds = 0;
+  free(sprite_light); sprite_light = NULL; sprite_light_n = 0;
   dl_loaded = false;
 }

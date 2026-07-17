@@ -49,7 +49,7 @@ void R_CollectDynLights(void)
     mo = (const mobj_t *)th;
     if ((unsigned)mo->sprite >= (unsigned)numsprites)
       continue;
-    d = U_DynLightForSprite(sprnames[mo->sprite]);
+    d = U_DynLightForSpriteNum(mo->sprite);
     if (!d || d->size <= 0)
       continue;
 

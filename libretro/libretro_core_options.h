@@ -90,6 +90,20 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "disabled"
    },
    {
+      "prboom-dynlight_wall_falloff",
+      "Dynamic Light Wall Falloff",
+      NULL,
+      "Give GLDEFS point lights a vertical light pool on walls (brightest at the light's height, fading up and down) instead of a single level per wall column. Off by default; the per-band shading is noticeably heavier on tall, close, heavily-lit walls.",
+      NULL,
+      NULL,
+      {
+         { "disabled", NULL },
+         { "enabled",  NULL },
+         { NULL, NULL },
+      },
+      "disabled"
+   },
+   {
       "prboom-find_recursive_on",
       "Look on Parent Folders for IWADs",
       NULL,

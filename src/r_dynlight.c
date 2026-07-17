@@ -304,6 +304,9 @@ int R_PlanePrepareLights(int planez)
  * 565 channel units scaled by boost (the caller shifts down to a per-pixel
  * additive tint).  Stays zero when every contributing light is white. */
 int dl_tint_r, dl_tint_g, dl_tint_b;
+/* Frontend toggle (prboom-dynlight_wall_falloff): 0 = single boost per wall
+ * column (fast, default), 1 = per-band vertical light pool on walls. */
+int dynlight_wall_falloff = 0;
 
 int R_PlaneBoost(int wx, int wy)
 {

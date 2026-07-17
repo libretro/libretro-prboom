@@ -194,6 +194,7 @@ static unsigned doom_devices[1];
 /* Whether mouse active when using Gamepad */
 dbool   mouse_on;
 extern int wall_decals_enabled;   /* src/r_decal.c -- frontend toggle */
+extern int dynlight_wall_falloff; /* src/r_dynlight.c -- frontend toggle */
 /* Whether to search for IWADs on parent folders recursively */
 dbool   find_recursive_on;
 /* Core option "prboom-mmap_wads" (default off): memory-map WAD files in
@@ -1385,6 +1386,11 @@ static void update_variables(bool startup)
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
       wall_decals_enabled = !strcmp(var.value, "enabled") ? 1 : 0;
+
+   var.key = "prboom-dynlight_wall_falloff";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      dynlight_wall_falloff = !strcmp(var.value, "enabled") ? 1 : 0;
 
    var.key = "prboom-find_recursive_on";
    var.value = NULL;

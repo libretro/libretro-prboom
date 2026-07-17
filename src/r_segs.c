@@ -705,6 +705,29 @@ static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
 {
    const int yl = dc->yl, yh = dc->yh;
    int cy, step = DL_WALL_CHUNK;
+
+   /* Falloff disabled (default): one boost for the whole column, sampled at
+    * its mid height -- a single colourmap and one draw command, the cheap
+    * pre-falloff behaviour.  The colour tint still applies, just uniformly up
+    * the column instead of pooling.  This is the fast path that keeps busy,
+    * tall-walled scenes from paying the per-band cost. */
+   if (!dynlight_wall_falloff)
+   {
+      int mid = (yl + yh) >> 1;
+      int wz  = (int)((viewz + (int64_t)(centery - mid) * dc->iscale) >> FRACBITS);
+      int ll  = base_ll + R_SegColumnBoost(wz);
+      if (ll > 255) ll = 255;
+      dc->colormap = R_ColourMap(ll, scale);
+      if (z_filter) dc->nextcolormap = R_ColourMap(ll + 1, scale);
+      R_DrawCmdEmitColumn(dc, cf);
+      if (dl_tint_r | dl_tint_g | dl_tint_b)
+         R_WallTintRecord(dc->x, yl, yh,
+                          dl_tint_r >> DL_TINT_SHIFT,
+                          dl_tint_g >> DL_TINT_SHIFT,
+                          dl_tint_b >> DL_TINT_SHIFT);
+      return;
+   }
+
    /* Fine DL_WALL_CHUNK granularity normally, but cap the band count so an
     * unusually tall/near column (which would otherwise cost dozens of boost
     * evals) is bounded; on such columns the wall fills the view and the light

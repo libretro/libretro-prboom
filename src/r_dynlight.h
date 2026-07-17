@@ -42,6 +42,7 @@ int R_PlaneSpanLit(int wx1, int wy1, int wx2, int wy2);
  * (565 channel units * boost).  Zero unless a saturated light contributed;
  * the surface code shifts these down to a per-pixel additive tint. */
 extern int dl_tint_r, dl_tint_g, dl_tint_b;
+extern int dynlight_wall_falloff;
 #define DL_TINT_SHIFT 8   /* boost-weighted chroma -> per-pixel channel add */
 
 #endif

@@ -57,6 +57,10 @@
 #include "r_dynlight.h"
 #include "r_sky.h"
 #include "r_plane.h"
+
+#if defined(__SSE2__)
+#include <emmintrin.h>
+#endif
 #include "u_zanimdefs.h"
 #include "v_video.h"
 #include "lprintf.h"
@@ -322,6 +326,38 @@ static void R_TintSpan(int y, int x1, int x2, int ar, int ag, int ab)
 {
    uint16_t *d = drawvars.short_topleft + y * SURFACE_SHORT_PITCH + x1;
    int n = x2 - x1 + 1;
+
+#if defined(__SSE2__) && !defined(ABGR1555)
+   /* Vectorised per-channel saturating add on RGB565, eight pixels per
+    * iteration.  Each channel is isolated to the low bits of a 16-bit lane,
+    * added, clamped with an unsigned min against the channel max, and
+    * repacked -- exactly the scalar arithmetic below, so the output is
+    * bit-identical (the scalar tail finishes n & 7). */
+   if (n >= 8)
+   {
+      const __m128i vr = _mm_set1_epi16((short)(ar > 31 ? 31 : ar));
+      const __m128i vg = _mm_set1_epi16((short)(ag > 63 ? 63 : ag));
+      const __m128i vb = _mm_set1_epi16((short)(ab > 31 ? 31 : ab));
+      const __m128i m5 = _mm_set1_epi16(0x1f);
+      const __m128i m6 = _mm_set1_epi16(0x3f);
+      while (n >= 8)
+      {
+         __m128i px = _mm_loadu_si128((const __m128i *)d);
+         __m128i r  = _mm_and_si128(_mm_srli_epi16(px, 11), m5);
+         __m128i g  = _mm_and_si128(_mm_srli_epi16(px, 5),  m6);
+         __m128i b  = _mm_and_si128(px, m5);
+         r = _mm_min_epi16(_mm_add_epi16(r, vr), m5);
+         g = _mm_min_epi16(_mm_add_epi16(g, vg), m6);
+         b = _mm_min_epi16(_mm_add_epi16(b, vb), m5);
+         px = _mm_or_si128(_mm_or_si128(_mm_slli_epi16(r, 11),
+                                        _mm_slli_epi16(g, 5)), b);
+         _mm_storeu_si128((__m128i *)d, px);
+         d += 8;
+         n -= 8;
+      }
+   }
+#endif
+
    for (; n > 0; n--, d++)
    {
       unsigned px = *d;

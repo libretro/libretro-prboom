@@ -48,4 +48,10 @@ void R_DrawCmdAdoptTextureLock(int texnum);
  * then release the adopted texture locks and reset the buffer. */
 void R_DrawCmdReplay(void);
 
+/* The kernel class a column would replay through (0 = its own drawer fn).
+ * Exposed so the emit site can decide, with the same test, whether a colour
+ * tint can ride in dcvars.tint (kernel path) or must be recorded for the
+ * RMW replay pass (fn path). */
+int R_DrawCmdColumnKernelClass(const draw_column_vars_t *dc, R_DrawColumn_f fn);
+
 #endif

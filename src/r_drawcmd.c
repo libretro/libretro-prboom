@@ -91,16 +91,16 @@ static int  bucket_next_cap = 0;
  * the kernel reproduces and its texture height is zero or a power of
  * two (the drawers have a modulo path for other heights that the
  * kernel does not mirror). */
-static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
+int R_DrawCmdColumnKernelClass(const draw_column_vars_t *dc, R_DrawColumn_f fn)
 {
-  int cls = R_WallColumnKernelClass(cmd->fn);
-  int th  = cmd->dc.texheight;
+  int cls = R_WallColumnKernelClass(fn);
+  int th  = dc->texheight;
 
   /* A brightmap column needs the per-texel fullbright select, which lives
    * in the column drawers, not the wall-run quad kernel; route it through
    * its fn() by declaring it unclassed.  Brightmap columns are rare, so
    * the common wall path keeps its quad-flush optimization untouched. */
-  if (cmd->dc.brightmask)
+  if (dc->brightmask)
     return 0;
 
   /* The LinearUV drawers are deliberately not kernel-classed.  A
@@ -121,6 +121,11 @@ static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
   if (cls && (th & (th - 1)) == 0)
     return cls;
   return 0;
+}
+
+static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
+{
+  return R_DrawCmdColumnKernelClass(&cmd->dc, cmd->fn);
 }
 
 void R_DrawCmdReplay(void)

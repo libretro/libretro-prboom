@@ -85,6 +85,12 @@ typedef struct {
   // 1 if R_DrawColumn* is currently drawing a masked column, otherwise 0
   int                 drawingmasked;
   enum sloped_edge_type_e edgetype;
+  /* Dynamic-light colour tint for this column, packed (r<<16)|(g<<8)|b in
+   * 565 channel-add units (each clamped to 255 -- exact, since any add at or
+   * above a channel's max saturates identically).  Zero for untinted columns.
+   * Only the wall-run kernel consumes it (see R_DrawWallColumnRun); columns
+   * that replay through their drawer fn record an RMW tint instead. */
+  unsigned int        tint;
 } draw_column_vars_t;
 
 void R_SetDefaultDrawColumnVars(draw_column_vars_t *dcvars);

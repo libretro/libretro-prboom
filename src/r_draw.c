@@ -6234,6 +6234,8 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
   int                cyl[WALL_RUN_MAX];
   int                cyh[WALL_RUN_MAX];
   const uint16_t    *lut = NULL;
+  const uint16_t    *lanelut[WALL_RUN_MAX];
+  int                lane_mode = 0;
   int                ymin, ymax, dtop, dbot, y, j;
   int                x0 = cols[0]->x;
 
@@ -6271,6 +6273,81 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
         break;
     if (j == n)
       lut = R_GetComposedColormap(cmap[0]);
+  }
+
+  /* Dynamic-light colour tint (dcvars.tint, packed r:g:b channel adds).
+   * The kernel writes exactly lut[texel] per pixel, so folding the tint into
+   * the table -- clamp(lut[i] + tint) per channel -- yields bit-identical
+   * pixels to the old post-pass framebuffer RMW while touching 256 entries
+   * instead of every drawn pixel.  The uniform case (one colormap, one tint
+   * across the run: adjacent wall columns in the same light pool) tints the
+   * shared table once and falls through to the unchanged fast paths below.
+   * Mixed runs resolve a small per-run pool of tinted tables with lane
+   * sharing; if the pool ever overflows, the excess lanes draw untinted and
+   * record the old RMW tint instead (the replay pass runs after this), so the
+   * output cannot change, only the route. */
+  {
+    unsigned tint0 = cols[0]->tint;
+    unsigned anytint = 0;
+    int      same = 1;
+    for (j = 0; j < n; j++)
+    {
+      anytint |= cols[j]->tint;
+      if (cols[j]->tint != tint0)
+        same = 0;
+    }
+    if (anytint)
+    {
+      static uint16_t tintbuf[256];
+      if (lut && same)
+      {
+        R_TintLUT(tintbuf, lut,
+                  (int)(tint0 >> 16) & 255,
+                  (int)(tint0 >> 8) & 255,
+                  (int)tint0 & 255);
+        lut = tintbuf;
+      }
+      else
+      {
+#define WALL_TINT_POOL 8
+        static uint16_t           pool[WALL_TINT_POOL][256];
+        const lighttable_t       *pool_cm[WALL_TINT_POOL];
+        unsigned                  pool_tint[WALL_TINT_POOL];
+        int pooln = 0, k;
+
+        for (j = 0; j < n; j++)
+        {
+          unsigned t = cols[j]->tint;
+          if (!t)
+          {
+            lanelut[j] = NULL;          /* per-pixel defining expression */
+            continue;
+          }
+          for (k = 0; k < pooln; k++)
+            if (pool_cm[k] == cmap[j] && pool_tint[k] == t)
+              break;
+          if (k < pooln)
+            lanelut[j] = pool[k];
+          else if (pooln < WALL_TINT_POOL)
+          {
+            R_TintLUT(pool[pooln], R_GetComposedColormap(cmap[j]),
+                      (int)(t >> 16) & 255, (int)(t >> 8) & 255, (int)t & 255);
+            pool_cm[pooln] = cmap[j];
+            pool_tint[pooln] = t;
+            lanelut[j] = pool[pooln++];
+          }
+          else
+          {
+            /* pool exhausted: draw untinted, tint via the RMW replay pass */
+            lanelut[j] = NULL;
+            R_WallTintRecord(cols[j]->x, cyl[j], cyh[j],
+                             (int)(t >> 16) & 255, (int)(t >> 8) & 255,
+                             (int)t & 255);
+          }
+        }
+        lane_mode = 1;
+      }
+    }
   }
 
   /* Every lane covers one contiguous row interval, so the rows where
@@ -6317,6 +6394,19 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
       row[j] = EXPR;                                       \
       frac[j] += step[j];                                  \
     }                                                      \
+  }
+
+  if (lane_mode)
+  {
+    /* Mixed colormaps/tints: every lane writes through its own resolved
+     * table (or the defining expression when untinted); coverage-tested
+     * everywhere, which is exact for the dense band too. */
+    for (y = ymin; y <= ymax; y++)
+      WALL_RUN_RAGGED_ROW(lanelut[j]
+                          ? lanelut[j][texel]
+                          : (pointz ? V_Palette16[ cmap[j][texel] * 64 + 63 ]
+                                    : R_GetComposedPalette()[texel]))
+    return;
   }
 
   if (dtop > dbot)
@@ -6423,6 +6513,7 @@ void R_SetDefaultDrawColumnVars(draw_column_vars_t *dcvars)
    dcvars->edgeslope     = 0;
    dcvars->drawingmasked = 0;
    dcvars->edgetype      = drawvars.sprite_edges;
+   dcvars->tint          = 0;
 }
 
 //

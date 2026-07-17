@@ -700,6 +700,42 @@ static int didsolidcol; /* True if at least one column was marked solid */
  * the wall shows a round pool of light instead of one flat vertical stripe.
  * The texture source/mapping is unchanged -- only [yl,yh] is subdivided and
  * the colourmap re-picked per band, exactly as the flat span chunking does. */
+/* Route a lit band's colour tint: columns the wall-run kernel will draw get
+ * the tint packed into dcvars.tint (applied through a tinted composed LUT at
+ * draw time -- identical output to the RMW replay, since the kernel writes
+ * exactly lut[texel] and the per-channel saturating add commutes with the
+ * table lookup); columns that replay through their drawer fn keep the
+ * recorded framebuffer RMW pass.  The eligibility test is the replay's own
+ * (R_DrawCmdColumnKernelClass), so emit and replay can never disagree. */
+static void R_RouteWallTint(draw_column_vars_t *dc, R_DrawColumn_f cf,
+                            int yl, int yh)
+{
+   int ar, ag, ab;
+   if (!(dl_tint_r | dl_tint_g | dl_tint_b))
+   {
+      dc->tint = 0;
+      return;
+   }
+   ar = dl_tint_r >> DL_TINT_SHIFT;
+   ag = dl_tint_g >> DL_TINT_SHIFT;
+   ab = dl_tint_b >> DL_TINT_SHIFT;
+   if (R_DrawCmdColumnKernelClass(dc, cf) == 2)
+   {
+      /* clamp to 255 for packing: exact, any add at or past a channel's max
+       * saturates the same */
+      if (ar > 255) ar = 255;
+      if (ag > 255) ag = 255;
+      if (ab > 255) ab = 255;
+      dc->tint = ((unsigned)ar << 16) | ((unsigned)ag << 8) | (unsigned)ab;
+   }
+   else
+   {
+      dc->tint = 0;
+      if (ar | ag | ab)
+         R_WallTintRecord(dc->x, yl, yh, ar, ag, ab);
+   }
+}
+
 static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
                                 int base_ll, fixed_t scale, int z_filter)
 {
@@ -719,12 +755,9 @@ static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
       if (ll > 255) ll = 255;
       dc->colormap = R_ColourMap(ll, scale);
       if (z_filter) dc->nextcolormap = R_ColourMap(ll + 1, scale);
+      R_RouteWallTint(dc, cf, yl, yh);
       R_DrawCmdEmitColumn(dc, cf);
-      if (dl_tint_r | dl_tint_g | dl_tint_b)
-         R_WallTintRecord(dc->x, yl, yh,
-                          dl_tint_r >> DL_TINT_SHIFT,
-                          dl_tint_g >> DL_TINT_SHIFT,
-                          dl_tint_b >> DL_TINT_SHIFT);
+      dc->tint = 0;
       return;
    }
 
@@ -749,14 +782,10 @@ static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
          dc->nextcolormap = R_ColourMap(ll + 1, scale);
       dc->yl = cy;
       dc->yh = ey;
+      R_RouteWallTint(dc, cf, cy, ey);
       R_DrawCmdEmitColumn(dc, cf);
-
-      if (dl_tint_r | dl_tint_g | dl_tint_b)
-         R_WallTintRecord(dc->x, cy, ey,
-                          dl_tint_r >> DL_TINT_SHIFT,
-                          dl_tint_g >> DL_TINT_SHIFT,
-                          dl_tint_b >> DL_TINT_SHIFT);
    }
+   dc->tint = 0;
    dc->yl = yl;
    dc->yh = yh;
 }

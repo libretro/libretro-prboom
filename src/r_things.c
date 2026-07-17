@@ -877,6 +877,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 
 static void R_ProjectSprite (mobj_t* thing, int lightlevel)
 {
+   int spr_tr = 0, spr_tg = 0, spr_tb = 0;
    fixed_t   gzt;               // killough 3/27/98
    fixed_t   tx;
    fixed_t   xscale;
@@ -930,7 +931,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
     * reaching the thing's centre, and capture their boost-weighted chroma so
     * the sprite can be tinted toward a coloured light (white lights leave the
     * tint zero).  One boost per sprite covers the voxel and patch paths. */
-   int spr_tr = 0, spr_tg = 0, spr_tb = 0;
+   spr_tr = spr_tg = spr_tb = 0;
    if (R_DynLightsActive())
    {
       int dyn = R_DynLightBoost(fx >> FRACBITS, fy >> FRACBITS,

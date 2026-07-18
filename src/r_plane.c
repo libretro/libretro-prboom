@@ -57,6 +57,7 @@
 #include "r_drawtc.h"
 #include "vid_mode.h"
 #include "r_dynlight.h"
+#include "p_sectorportal.h"
 #include "u_dynlight.h"
 #include "r_sky.h"
 #include "r_plane.h"
@@ -886,9 +887,17 @@ static void R_DoDrawPlane(visplane_t *pl)
    /* Stacked-sector portal window: the main pass leaves these pixels for the
     * portal composite (mirrors the tagged-skybox skip).  Inside a portal or
     * skybox scene render the window draws its flat normally -- single-depth
-    * portals by construction. */
+    * portals by construction.  A window whose flat has partial opacity
+    * (ZDoom stack alpha 1..254) DOES draw its flat here; the composite then
+    * blends the scene underneath it. */
    if (pl->portal && !r_in_skybox)
-      return;
+   {
+      int secnum = (pl->portal > 0 ? pl->portal : -pl->portal) - 1;
+      const secportal_t *sp = pl->portal > 0 ? &ceilingportals[secnum]
+                                             : &floorportals[secnum];
+      if (sp->alpha <= 0)
+         return;
+   }
 
    if (pl->minx <= pl->maxx)
    {

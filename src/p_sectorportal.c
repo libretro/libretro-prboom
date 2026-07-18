@@ -86,7 +86,6 @@ void P_SpawnSectorPortals(void)
     fixed_t ux, uy, uz, lx, ly, lz, dx, dy, dz;
     int tid = points[i].tid;
     int have_u = 0, have_l = 0;
-    int alpha = 255;
 
     /* process each tid once (when we hit its first occurrence) */
     for (j = 0; j < i; j++)
@@ -108,7 +107,6 @@ void P_SpawnSectorPortals(void)
             (points[j].x == ux && points[j].y < uy))
         { ux = points[j].x; uy = points[j].y; uz = points[j].z; }
         have_u = 1;
-        alpha = points[j].alpha;
       }
       else
       {
@@ -120,6 +118,7 @@ void P_SpawnSectorPortals(void)
     }
     if (!have_u || !have_l)
       continue;                          /* unpaired tid */
+
 
     dx = lx - ux; dy = ly - uy; dz = lz - uz;
 
@@ -138,20 +137,24 @@ void P_SpawnSectorPortals(void)
       {
         /* 9077: the physically UPPER room; its floor is the window,
          * looking down into the partner room (offset toward the 9078) */
+        if (points[j].alpha >= 255)
+          continue;                      /* fully opaque flat: no window */
         floorportals[sec - sectors].active = 1;
         floorportals[sec - sectors].dx = dx;
         floorportals[sec - sectors].dy = dy;
         floorportals[sec - sectors].dz = dz;
-        floorportals[sec - sectors].alpha = alpha;
+        floorportals[sec - sectors].alpha = points[j].alpha;
       }
       else
       {
         /* 9078: the LOWER room; its ceiling looks up into the 9077's room */
+        if (points[j].alpha >= 255)
+          continue;                      /* fully opaque flat: no window */
         ceilingportals[sec - sectors].active = 1;
         ceilingportals[sec - sectors].dx = -dx;
         ceilingportals[sec - sectors].dy = -dy;
         ceilingportals[sec - sectors].dz = -dz;
-        ceilingportals[sec - sectors].alpha = alpha;
+        ceilingportals[sec - sectors].alpha = points[j].alpha;
       }
     }
     pairs++;

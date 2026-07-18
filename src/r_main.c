@@ -940,6 +940,9 @@ static void *R_SkyboxScratch(void)
 /* When set, the composite copies only pixels the reveal mask marks (the
  * default skybox); tagged skyboxes keep their span-based copy. */
 static int sb_use_reveal;
+static int sb_flat_alpha;   /* stacked-portal flat opacity 0..254 at composite
+                             * time: 0 = replace (fast path), else blend the
+                             * scene under the already-drawn flat */
 
 /* stacked-sector portal snapshots (collected pre-composite, rendered post) */
 #define PORTAL_CAP_MAX 16
@@ -1034,11 +1037,39 @@ static void R_RenderCompositeView(fixed_t camx, fixed_t camy, fixed_t camz,
       if (sb_use_reveal && !R_SkyRevealTest(x, y))
         continue;
       if (VID_TRUECOLOR)
-        ((uint32_t *)real_tl_i)[y * SURFACE_SHORT_PITCH + x] =
-          ((const uint32_t *)scratch)[y * SURFACE_SHORT_PITCH + x];
+      {
+        uint32_t *d = &((uint32_t *)real_tl_i)[y * SURFACE_SHORT_PITCH + x];
+        uint32_t  sc = ((const uint32_t *)scratch)[y * SURFACE_SHORT_PITCH + x];
+        if (!sb_flat_alpha)
+          *d = sc;
+        else
+        {
+          /* dst holds the flat drawn at full strength; keep it at alpha and
+           * let the scene show through at (255 - alpha), per channel */
+          uint32_t dv = *d;
+          int a = sb_flat_alpha, w = 255 - a;
+          uint32_t r = (((dv >> 16) & 0xff) * a + ((sc >> 16) & 0xff) * w) / 255;
+          uint32_t g = (((dv >>  8) & 0xff) * a + ((sc >>  8) & 0xff) * w) / 255;
+          uint32_t b = ((dv & 0xff) * a + (sc & 0xff) * w) / 255;
+          *d = (dv & 0xff000000u) | (r << 16) | (g << 8) | b;
+        }
+      }
       else
-        real_tl[y * SURFACE_SHORT_PITCH + x] =
-          ((const uint16_t *)scratch)[y * SURFACE_SHORT_PITCH + x];
+      {
+        uint16_t *d = &real_tl[y * SURFACE_SHORT_PITCH + x];
+        uint16_t  sc = ((const uint16_t *)scratch)[y * SURFACE_SHORT_PITCH + x];
+        if (!sb_flat_alpha)
+          *d = sc;
+        else
+        {
+          uint16_t dv = *d;
+          int a = sb_flat_alpha, w = 255 - a;
+          uint32_t r = (((dv >> 11) & 0x1f) * a + ((sc >> 11) & 0x1f) * w) / 255;
+          uint32_t g = (((dv >>  5) & 0x3f) * a + ((sc >>  5) & 0x3f) * w) / 255;
+          uint32_t b = ((dv & 0x1f) * a + (sc & 0x1f) * w) / 255;
+          *d = (uint16_t)((r << 11) | (g << 5) | b);
+        }
+      }
     }
   }
 }
@@ -1258,8 +1289,10 @@ void R_RenderPlayerView (player_t* player)
         memcpy(sb_top, portal_cap_top[k], sizeof(short) * viewwidth);
         memcpy(sb_bot, portal_cap_bot[k], sizeof(short) * viewwidth);
         sb_use_reveal = 1;
+        sb_flat_alpha = sp->alpha > 0 && sp->alpha < 255 ? sp->alpha : 0;
         R_RenderCompositeView(viewx + sp->dx, viewy + sp->dy,
                               viewz + sp->dz, 0);
+        sb_flat_alpha = 0;
         sb_use_reveal = 0;
       }
     }

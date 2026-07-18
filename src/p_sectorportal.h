@@ -25,7 +25,9 @@
 typedef struct {
   int     active;
   fixed_t dx, dy, dz;   /* added to the viewer position to get the camera */
-  int     alpha;        /* 0..255; 255 = opaque */
+  int     alpha;        /* the FLAT's opacity (ZDoom 9077 arg0): 0 = the
+                         * flat is invisible (pure window), 255 = fully
+                         * opaque (no view through; not activated) */
 } secportal_t;
 
 /* per-sector floor/ceiling portals; indexed by sector number.  Allocated by

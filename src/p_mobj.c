@@ -2517,7 +2517,7 @@ void P_SpawnMapThing (const mapthing_t* mthing)
          * things load. */
         P_AddStackPoint(thingtype == 9077, hexen_thing_tid,
                         mthing->x << FRACBITS, mthing->y << FRACBITS,
-                        thingtype == 9077 ? hexen_thing_args[0] : 255);
+                        hexen_thing_args[0]);
         return;
       }
       if (U_IsInertZDoomThing(thingtype))

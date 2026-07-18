@@ -22,6 +22,9 @@ typedef struct
   angle_t angle;        /* yaw delta from this line to the partner */
   fixed_t ax, ay;       /* this line's anchor vertex */
   fixed_t bx, by;       /* the partner's anchor vertex */
+  fixed_t dz;           /* height shift from the planeanchor argument: 0 for
+                         * no alignment, else what lifts the partner's floor
+                         * or ceiling to meet this side's */
 } lineportal_t;
 
 /* indexed by line number; NULL until a level with portals loads */

@@ -87,6 +87,21 @@ void P_SpawnLinePortals(void)
     lineportals[i].angle  =
       R_PointToAngle2(tg->v2->x, tg->v2->y, tg->v1->x, tg->v1->y) -
       R_PointToAngle2(ln->v1->x, ln->v1->y, ln->v2->x, ln->v2->y);
+    /* planeanchor: "determines how the planes at the other side of the
+     * portal are relative to this line".  0 leaves the partner's heights
+     * alone (its sectors are expected to match), 1 aligns floors and 2
+     * aligns ceilings, which is a shift of the camera's height by the
+     * difference between the two sides' planes. */
+    lineportals[i].dz = 0;
+    if (ln->frontsector && tg->frontsector)
+    {
+      if (ln->args[3] == 1)
+        lineportals[i].dz = tg->frontsector->floorheight -
+                            ln->frontsector->floorheight;
+      else if (ln->args[3] == 2)
+        lineportals[i].dz = tg->frontsector->ceilingheight -
+                            ln->frontsector->ceilingheight;
+    }
     lineportals[i].ax = ln->v1->x;
     lineportals[i].ay = ln->v1->y;
     lineportals[i].bx = tg->v2->x;

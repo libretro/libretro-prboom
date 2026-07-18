@@ -1489,7 +1489,7 @@ void R_RenderPlayerView (player_t* player)
         camx = lp->bx + FixedMul(rx, c) - FixedMul(ry, s2);
         camy = lp->by + FixedMul(rx, s2) + FixedMul(ry, c);
         sb_use_reveal = 1;
-        R_RenderCompositeView(camx, camy, viewz, lp->angle);
+        R_RenderCompositeView(camx, camy, viewz + lp->dz, lp->angle);
         sb_use_reveal = 0;
       }
     }

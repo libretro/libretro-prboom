@@ -109,6 +109,23 @@ void P_SpawnLinePortals(void)
     pairs++;
   }
 
+  /* Line_Horizon (special 9): the line's own front sector's floor and
+   * ceiling are drawn through it to infinity -- the wall becomes an open
+   * vista rather than a window onto a partner.  It reuses the portal
+   * window machinery: same wall claim, different fill.  Special 9 is
+   * Line_Horizon only in the ZDoom line-special namespace; in Doom format
+   * it is vanilla's S1 donut, so this shares the format gate above. */
+  for (i = 0; i < numlines; i++)
+  {
+    const line_t *ln = &lines[i];
+    if (ln->special != 9 || !ln->frontsector)
+      continue;
+    lineportals[i].active  = 1;
+    lineportals[i].horizon = 1;
+    lineportals[i].hsec    = (int)(ln->frontsector - sectors);
+    pairs++;
+  }
+
   line_portals_active = pairs > 0;
   if (pairs)
     lprintf(LO_INFO, "P_SpawnLinePortals: %d line portal(s)\n", pairs);

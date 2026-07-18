@@ -1482,6 +1482,15 @@ void R_RenderPlayerView (player_t* player)
         fixed_t rx, ry, c, s2, camx, camy;
         if (!lp->active || !R_LinePortalSpan(lids[k], sb_top, sb_bot))
           continue;
+        if (lp->horizon)
+        {
+          /* Line_Horizon: no partner and no camera -- the wall shows its
+           * own sector's planes extended to infinity. */
+          sb_use_reveal = 1;
+          R_RenderHorizonView(lp->hsec, 0);
+          sb_use_reveal = 0;
+          continue;
+        }
         c  = finecosine[lp->angle >> ANGLETOFINESHIFT];
         s2 = finesine[lp->angle >> ANGLETOFINESHIFT];
         rx = viewx - lp->ax;

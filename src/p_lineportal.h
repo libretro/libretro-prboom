@@ -25,6 +25,10 @@ typedef struct
   fixed_t dz;           /* height shift from the planeanchor argument: 0 for
                          * no alignment, else what lifts the partner's floor
                          * or ceiling to meet this side's */
+  int     horizon;      /* 1: Line_Horizon -- the wall shows its own front
+                         * sector's planes run to infinity, and there is no
+                         * partner line or camera at all */
+  int     hsec;         /* source sector for the horizon case */
 } lineportal_t;
 
 /* indexed by line number; NULL until a level with portals loads */

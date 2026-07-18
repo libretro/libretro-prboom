@@ -181,9 +181,10 @@ the wad.
 - **GLDEFS:** skybox handling, **brightmap** definitions, dynamic
   point-**light** definitions (with their sprite bindings), and sector
   **glow** blocks are all consumed: glowing flats draw fullbright and light
-  nearby walls, and glowing wall textures (lava falls, waterfalls) pool
-  colour onto the floors and ceilings beside them, with colours taken from
-  the definition or derived from the texture itself.
+  nearby walls, and glowing wall textures (lava falls, waterfalls) draw
+  fullbright themselves and pool colour onto the floors and ceilings beside
+  them, with colours taken from the definition or derived from the texture
+  itself.
 
 ### Not supported
 

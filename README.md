@@ -178,9 +178,12 @@ the wad.
   `special` + `arg0..4`, so special-driven features apply on text maps as on
   binary ones — `Sector_Set3DFloor` (3D floors) and `Plane_Align` (slopes)
   included. UDMF-native structured portal fields are not read.
-- **GLDEFS:** skybox handling, **brightmap** definitions, and dynamic
-  point-**light** definitions (with their sprite bindings) are consumed (see
-  above); sector **glow** definitions are not.
+- **GLDEFS:** skybox handling, **brightmap** definitions, dynamic
+  point-**light** definitions (with their sprite bindings), and sector
+  **glow** blocks are all consumed: glowing flats draw fullbright and light
+  nearby walls, and glowing wall textures (lava falls, waterfalls) pool
+  colour onto the floors and ceilings beside them, with colours taken from
+  the definition or derived from the texture itself.
 
 ### Not supported
 

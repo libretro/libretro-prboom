@@ -39,6 +39,7 @@ uint16_t vid_pq_to_sdr[1024];
 uint16_t vid_sdr_to_pq[1024];
 uint16_t vid_pq_boost[1024];
 int      vid_emit_class = VID_EMIT_2X;
+int      vid_expand_gamut = VID_GAMUT_ACCURATE;
 
 /* ---- SMPTE ST.2084 (PQ) ---------------------------------------------------
  * Absolute luminance, 0..10000 nits, in the normalised 0..1 signal the
@@ -102,15 +103,47 @@ double VID_LinearToSRGB(double l)
   return pow(l, 1.0 / 2.4);
 }
 
-/* Rec.709 -> Rec.2020 primaries.  Applied to linear light before the PQ
- * encode, because HDR10 signals are Rec.2020 and the palette is authored
- * against Rec.709 primaries. */
+/* Rec.709 -> the target primaries, applied to linear light before the PQ
+ * encode.  Which rotation is correct depends on the frontend's "Colour
+ * Boost" setting, because that setting is implemented as a deliberate
+ * mismatch: for anything other than Accurate the frontend rotates SDR
+ * content into a space NARROWER than Rec.2020 (or leaves it in Rec.709
+ * entirely) and then lets the display read it as Rec.2020, and the
+ * resulting over-saturation is the effect the user asked for.
+ *
+ * A core encoding Rec.2020 itself has to make the same choice, or the same
+ * scene changes saturation when the core switches between an SDR format and
+ * HDR10.  Doing the "proper" conversion unconditionally is what makes the
+ * HDR image look washed out beside the SDR one: on Super a saturated red
+ * reaches 1.66 through the SDR path and only 1.0 through ours.
+ *
+ * Matrices are the frontend's own (hdr_common.glsl), so the two agree
+ * exactly rather than approximately. */
 void VID_709To2020(double *r, double *g, double *b)
 {
   double lr = *r, lg = *g, lb = *b;
-  *r = 0.6274040 * lr + 0.3292820 * lg + 0.0433136 * lb;
-  *g = 0.0690970 * lr + 0.9195400 * lg + 0.0113612 * lb;
-  *b = 0.0163916 * lr + 0.0880132 * lg + 0.8955950 * lb;
+
+  switch (vid_expand_gamut)
+  {
+    case VID_GAMUT_EXPANDED:   /* Rec.709 -> a slightly wider space */
+      *r =  0.6274040 * lr +  0.3292820 * lg + 0.0433136 * lb;
+      *g =  0.0457456 * lr +  0.9417770 * lg + 0.0124772 * lb;
+      *b = -0.00121055 * lr + 0.0176041 * lg + 0.9836070 * lb;
+      break;
+    case VID_GAMUT_WIDE:       /* Rec.709 -> DCI-P3 */
+      *r =  0.8215873 * lr +  0.1763479 * lg +  0.0020641 * lb;
+      *g =  0.0328261 * lr +  0.9695096 * lg + -0.0023367 * lb;
+      *b =  0.0188038 * lr +  0.0725063 * lg +  0.9086907 * lb;
+      break;
+    case VID_GAMUT_SUPER:      /* no rotation: stays Rec.709 */
+      break;
+    case VID_GAMUT_ACCURATE:   /* proper Rec.709 -> Rec.2020 */
+    default:
+      *r = 0.6274040 * lr + 0.3292820 * lg + 0.0433136 * lb;
+      *g = 0.0690970 * lr + 0.9195400 * lg + 0.0113612 * lb;
+      *b = 0.0163916 * lr + 0.0880132 * lg + 0.8955950 * lb;
+      break;
+  }
 }
 
 /* Encode one gamma-encoded Rec.709 channel triple, scaled by `emit`, into

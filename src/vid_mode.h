@@ -77,6 +77,15 @@ extern uint16_t vid_sdr_to_pq[1024];    /* 10-bit gamma -> PQ code at paper whit
 extern uint16_t vid_pq_boost[1024];     /* PQ code -> same colour, N x brighter  */
 extern int      vid_emit_class;         /* strength of the emissive boost        */
 
+/* Frontend "Colour Boost".  Mirrors RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT;
+ * the core must apply the same rotation the frontend applies to SDR content
+ * or saturation changes when switching between an SDR format and HDR10. */
+#define VID_GAMUT_ACCURATE 0
+#define VID_GAMUT_EXPANDED 1
+#define VID_GAMUT_WIDE     2
+#define VID_GAMUT_SUPER    3
+extern int      vid_expand_gamut;
+
 /* Emissive classes.  The renderer tags a colour table entry with one of
  * these; the palette build multiplies that entry's luminance before the PQ
  * encode.  Class 0 is ordinary content at exactly paper white. */

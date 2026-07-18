@@ -1357,6 +1357,14 @@ static void I_NegotiatePixelFormat(void)
             vid_paper_white_nits = nits;
          else
             vid_paper_white_nits = 200.0f;
+         {
+            unsigned gamut = VID_GAMUT_ACCURATE;
+            if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
+               vid_expand_gamut = (int)gamut;
+            else
+               vid_expand_gamut = VID_GAMUT_ACCURATE;
+         }
+
          var.key   = "prboom-hdr_emissive";
          var.value = NULL;
          vid_emit_class = VID_EMIT_2X;
@@ -1577,7 +1585,9 @@ void I_SafeExit(int rc);
 static void I_PollHDRPaperWhite(void)
 {
    static unsigned counter = 0;
-   float nits = 0.0f;
+   float    nits  = 0.0f;
+   unsigned gamut = (unsigned)vid_expand_gamut;
+   int      dirty = 0;
 
    if (!VID_HDR)
       return;
@@ -1585,18 +1595,31 @@ static void I_PollHDRPaperWhite(void)
       return;
    counter = 0;
 
-   if (!environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &nits)
-         || nits <= 0.0f)
-      return;
-   if (nits == vid_paper_white_nits)
+   if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &nits)
+         && nits > 0.0f && nits != vid_paper_white_nits)
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_INFO,
+                "HDR paper white changed: %.0f -> %.0f nits; rebuilding "
+                "colour tables.\n", vid_paper_white_nits, nits);
+      vid_paper_white_nits = nits;
+      dirty = 1;
+   }
+
+   if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut)
+         && (int)gamut != vid_expand_gamut)
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_INFO,
+                "HDR colour boost changed: %d -> %u; rebuilding colour "
+                "tables.\n", vid_expand_gamut, gamut);
+      vid_expand_gamut = (int)gamut;
+      dirty = 1;
+   }
+
+   if (!dirty)
       return;
 
-   if (log_cb)
-      log_cb(RETRO_LOG_INFO,
-             "HDR paper white changed: %.0f -> %.0f nits; rebuilding "
-             "colour tables.\n", vid_paper_white_nits, nits);
-
-   vid_paper_white_nits = nits;
    VID_BuildHDRTables();
    /* Re-derives the palette at the new luminance; the freed/realloc'd table
     * moves V_PaletteTC, which invalidates the composed-LUT caches. */

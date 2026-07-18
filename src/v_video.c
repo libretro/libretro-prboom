@@ -1256,15 +1256,18 @@ void V_UpdateTrueColorPalette(void) {
    * the tables also moves the V_PaletteTC pointer, which is what the
    * composed-LUT caches key on, so they rebuild too. */
   static float paperWhiteOnLastPaletteGeneration = -1.0f;
+  static int   gamutOnLastPaletteGeneration      = -1;
 
   if (usegammaOnLastPaletteGeneration != usegamma
-      || (VID_HDR && paperWhiteOnLastPaletteGeneration != vid_paper_white_nits)) {
+      || (VID_HDR && (paperWhiteOnLastPaletteGeneration != vid_paper_white_nits
+                   || gamutOnLastPaletteGeneration      != vid_expand_gamut))) {
     if (Palettes16) free(Palettes16);
     Palettes16 = NULL;
     if (PalettesTC) free(PalettesTC);
     PalettesTC = NULL;
     usegammaOnLastPaletteGeneration = usegamma;
     paperWhiteOnLastPaletteGeneration = vid_paper_white_nits;
+    gamutOnLastPaletteGeneration      = vid_expand_gamut;
   }
   
   if (!Palettes16)

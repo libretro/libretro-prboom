@@ -42,7 +42,8 @@
 /* set per subsector: the true sector index before any FakeFlat rewrite */
 int r_real_secnum = -1;
 #include "r_things.h"
-#include "r_bsp.h" // cph - sanity checking
+#include "r_bsp.h"
+#include "p_lineportal.h"
 #include "p_ffloor.h"
 #include "v_video.h"
 #include "lprintf.h"
@@ -145,6 +146,13 @@ static void R_RecalcLineFlags(void)
         frontsector->ceilingpic!=skyflatnum)
     )
       )
+    linedef->r_flags = RF_CLOSED;
+  else if (line_portals_active && lineportals &&
+           lineportals[linedef - lines].active)
+    /* A visual line portal's opening shows its partner's surroundings, not
+     * the sector behind it, so the line blocks the view exactly as a closed
+     * door does -- otherwise the back sector draws through the window and
+     * the composite has nothing left to paint into. */
     linedef->r_flags = RF_CLOSED;
   else {
     // Reject empty lines used for triggers

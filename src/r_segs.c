@@ -1325,6 +1325,17 @@ static void R_RenderSegLoop (void)
       }
 
       /* store the cached clip bounds back for this column */
+      /* Two-sided visual line portal: the window is the opening between the
+       * upper and lower texture bands, which is exactly the span the clip
+       * arrays now bound.  Claim it and seal the column, so nothing behind
+       * the line can draw into the window. */
+      if (seg_lineportal >= 0 && backsector && cc_rwx + 1 <= fc_rwx - 1)
+      {
+         R_LinePortalClaim(rw_x, cc_rwx + 1, fc_rwx - 1, seg_lineportal);
+         cc_rwx = viewheight;
+         fc_rwx = -1;
+      }
+
       ceilingclip[rw_x] = cc_rwx;
       floorclip[rw_x]   = fc_rwx;
 

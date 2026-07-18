@@ -184,17 +184,23 @@ the wad.
   fullbright themselves and pool colour onto the floors and ceilings beside
   them, with colours taken from the definition or derived from the texture
   itself.
-- **Sector portals (look-only):** stacked sectors — either
-  `UpperStackLookOnly`/`LowerStackLookOnly` thing pairs or `Sector_SetPortal`
-  (line special 57, view type) — render as windows in a floor or ceiling.
-  The linked region is drawn from the viewer displaced by the pair's offset
-  and composited into the window's visible pixels, so sprites and geometry
-  in front of a window occlude it correctly and things inside the viewed
-  region are drawn.  One portal depth: a window seen through a window draws
-  its own flat.  The opacity argument selects the window flat's own
-  transparency — unset or zero is a clear window, 255 leaves the flat solid
-  and no window at all, and values between blend the view through against
-  the flat.
+- **Sector portals (look-only):** a floor or ceiling can be a window onto
+  somewhere else.  Authored either as `UpperStackLookOnly`/
+  `LowerStackLookOnly` thing pairs (stacked sectors) or with
+  `Sector_SetPortal` (line special 57), whose **view** (0), **copied** (1),
+  **skybox** (2) and **horizon** (4) types all resolve; the Eternity
+  `Portal_Horizon*` line types convert to the last of these.  A view portal
+  shows the linked region drawn from the viewer displaced by the pair's
+  offset; a copied portal hands an existing window to sectors that need
+  their own tag, such as a lift; a skybox portal shows a `SkyCamCompat`
+  camera's surroundings on any plane, with or without the sky flat; and a
+  horizon portal extends a sector's own floor and ceiling to infinity.
+  Windows composite into their visible pixels only, so geometry and sprites
+  in front of one occlude it correctly, and things inside a viewed region
+  are drawn.  One portal depth: a window seen through a window draws its own
+  flat.  The opacity argument selects the window flat's own transparency —
+  unset or zero is a clear window, 255 leaves the flat solid and no window
+  at all, and values between blend the view through against the flat.
 
 ### Colour depth
 
@@ -238,11 +244,11 @@ Changing the option requires a restart.
 ### Not supported
 
 - **ZScript** — no support. Mods whose gameplay lives in ZScript won't run it.
-- **Portals other than look-only sector windows** — line portals, the
-  remaining `Sector_SetPortal` types (copied, skybox, plane, horizon, line)
-  and structured UDMF portal fields are inert, as is ACS portal activation.
-  Movement is never linked through a portal: the sector windows described
-  above are view-only.
+- **Line portals, interactive portals and plane portals** — `Sector_SetPortal`
+  types 3 (plane), 5 (copy to line) and 6 (interactive) are inert, as are
+  line portals proper, structured UDMF portal fields and ACS portal
+  activation.  Movement is never linked through a portal: the sector windows
+  described above are view-only.
 - **3D models (MODELDEF)** — out of scope for the 8-bit software renderer.
 
 The practical result: map-and-resource-driven ZDoom wads — new levels, sprite

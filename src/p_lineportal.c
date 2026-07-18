@@ -48,14 +48,28 @@ void P_SpawnLinePortals(void)
     if (ln->special != 156 || ln->args[2] != 0)
       continue;                          /* not a visual line portal */
 
-    /* the exit line, by line id.  The tag hash is not built this early, so
-     * the scan is direct (see p_sectorportal.c for the same trap). */
+    /* The exit line, by line id.  Where that id lives depends on the map
+     * format: UDMF gives every linedef an id, which the loader keeps in
+     * tag, while Hexen-format linedefs have no tag field at all -- there a
+     * line announces its own id either in this special's `thisline`
+     * argument or with Line_SetIdentification (121), whose arg0 is the id.
+     * Matching only on tag would pair nothing on a Hexen map.
+     *
+     * The scan is direct because the tag hash is not built this early (see
+     * p_sectorportal.c for the same trap). */
     for (j = 0; j < numlines; j++)
-      if (j != i && lines[j].tag == ln->args[0])
+    {
+      const line_t *cand = &lines[j];
+      if (j == i)
+        continue;
+      if (cand->tag == ln->args[0] ||
+          (cand->special == 156 && cand->args[1] == ln->args[0]) ||
+          (cand->special == 121 && cand->args[0] == ln->args[0]))
       {
-        tg = &lines[j];
+        tg = cand;
         break;
       }
+    }
     if (!tg)
       continue;
 

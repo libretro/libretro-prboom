@@ -248,20 +248,28 @@ static void P_SpawnSkyboxPortals(int *pairs)
 }
 
 
-/* Sector_SetPortal type 4: horizon portal.  "Renders the linedef's
- * frontsector's planes into infinity at the planes' heights."  The tagged
- * sectors' selected plane becomes a window onto that sector's floor and
- * ceiling with no bound -- the classic ocean or desert horizon. */
+/* Sector_SetPortal types 3 and 4: planes rendered into infinity.
+ *
+ * Type 4 (horizon) uses the source sector's plane heights as they are: the
+ * classic ocean or desert horizon.  Type 3 (fixed plane) measures those
+ * heights from the camera instead -- per Eternity, whose Portal_Plane*
+ * specials map here, "if the special line front sector has a ceiling height
+ * of 64, the plane will always render at 64 units above the camera height"
+ * -- and anchors the flat's texture to the camera, so the surface is
+ * identical from anywhere in the level. */
 static void P_SpawnHorizonPortals(int *pairs)
 {
   int i;
   for (i = 0; i < numlines; i++)
   {
     const line_t *ln = &lines[i];
-    int tag, plane, alpha, s, fsec;
+    int tag, plane, alpha, s, fsec, fixedplane;
 
-    if (ln->special != 57 || ln->args[1] != 4 || !ln->frontsector)
+    if (ln->special != 57 || !ln->frontsector)
       continue;
+    if (ln->args[1] != 3 && ln->args[1] != 4)
+      continue;
+    fixedplane = (ln->args[1] == 3);
 
     fsec  = (int)(ln->frontsector - sectors);
     tag   = ln->args[0];
@@ -280,6 +288,7 @@ static void P_SpawnHorizonPortals(int *pairs)
       {
         floorportals[s].active  = 1;
         floorportals[s].horizon = 1;
+        floorportals[s].hfixed  = fixedplane;
         floorportals[s].hsec    = fsec;
         floorportals[s].alpha   = alpha;
         (*pairs)++;
@@ -288,6 +297,7 @@ static void P_SpawnHorizonPortals(int *pairs)
       {
         ceilingportals[s].active  = 1;
         ceilingportals[s].horizon = 1;
+        ceilingportals[s].hfixed  = fixedplane;
         ceilingportals[s].hsec    = fsec;
         ceilingportals[s].alpha   = alpha;
         (*pairs)++;

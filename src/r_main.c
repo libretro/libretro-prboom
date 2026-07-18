@@ -954,6 +954,7 @@ static int sb_flat_alpha;   /* stacked-portal flat opacity 0..254 at composite
  * loses spans and the window renders with holes. */
 #define PORTAL_ID_MAX 96
 static int     portal_cap_hor[PORTAL_CAP_MAX];
+static int     portal_cap_hfix[PORTAL_CAP_MAX];
 static int     portal_cap_hsec[PORTAL_CAP_MAX];
 static int     portal_cap_abs[PORTAL_CAP_MAX];
 static angle_t portal_cap_ang[PORTAL_CAP_MAX];
@@ -1058,13 +1059,14 @@ static void R_RenderCompositeView(fixed_t camx, fixed_t camy, fixed_t camz,
  * on its own.  The floor takes the rows below the horizon and the ceiling
  * those above; a plane on the wrong side of the viewer (a floor above the
  * eye, say) simply contributes nothing. */
-static void R_RenderHorizonView(int secnum)
+static void R_RenderHorizonView(int secnum, int fixedplane)
 {
   unsigned short *real_tl   = drawvars.short_topleft;
   unsigned int   *real_tl_i = drawvars.int_topleft;
   void           *scratch   = R_SkyboxScratch();
   const sector_t *sec;
   visplane_t     *plf, *plc;
+  fixed_t         fh, ch, xo, yo;
   int             x, horizon;
 
   if (!scratch || (unsigned)secnum >= (unsigned)numsectors)
@@ -1079,13 +1081,20 @@ static void R_RenderHorizonView(int secnum)
   R_ClearPlanes();
   R_ClearSprites();
 
-  plf = sec->floorheight < viewz
-      ? R_FindPlane(sec->floorheight, sec->floorpic, sec->lightlevel,
-                    0, 0, NULL, -1, 0)
+  /* type 3 measures the source heights from the camera and pins the flat's
+   * texture to it (xfrac adds viewx, yfrac subtracts viewy -- see
+   * R_MapPlane), so the surface never shifts as the viewer moves; type 4
+   * uses the heights as they stand in the level. */
+  fh = fixedplane ? viewz + sec->floorheight   : sec->floorheight;
+  ch = fixedplane ? viewz + sec->ceilingheight : sec->ceilingheight;
+  xo = fixedplane ? -viewx : 0;
+  yo = fixedplane ?  viewy : 0;
+
+  plf = fh < viewz
+      ? R_FindPlane(fh, sec->floorpic, sec->lightlevel, xo, yo, NULL, -1, 0)
       : NULL;
-  plc = sec->ceilingheight > viewz
-      ? R_FindPlane(sec->ceilingheight, sec->ceilingpic, sec->lightlevel,
-                    0, 0, NULL, -1, 0)
+  plc = ch > viewz
+      ? R_FindPlane(ch, sec->ceilingpic, sec->lightlevel, xo, yo, NULL, -1, 0)
       : NULL;
 
   for (x = 0; x < viewwidth; x++)
@@ -1317,6 +1326,7 @@ void R_RenderPlayerView (player_t* player)
               portal_cap_abs[g] == sp->absolute &&
               portal_cap_ang[g] == sp->angle &&
               portal_cap_hor[g] == sp->horizon &&
+              portal_cap_hfix[g] == sp->hfixed &&
               portal_cap_hsec[g] == sp->hsec)
             break;
         if (g == n_portal_caps)
@@ -1324,6 +1334,7 @@ void R_RenderPlayerView (player_t* player)
           if (n_portal_caps == PORTAL_CAP_MAX)
             continue;
           portal_cap_hor[g]   = sp->horizon;
+          portal_cap_hfix[g]  = sp->hfixed;
           portal_cap_hsec[g]  = sp->hsec;
           portal_cap_abs[g]   = sp->absolute;
           portal_cap_ang[g]   = sp->angle;
@@ -1435,7 +1446,7 @@ void R_RenderPlayerView (player_t* player)
         /* absolute cameras (skybox portals) sit at a fixed spot and turn
          * with the viewer; displacement portals ride the viewer */
         if (portal_cap_hor[k])
-          R_RenderHorizonView(portal_cap_hsec[k]);
+          R_RenderHorizonView(portal_cap_hsec[k], portal_cap_hfix[k]);
         else if (portal_cap_abs[k])
           R_RenderCompositeView(portal_cap_dx[k], portal_cap_dy[k],
                                 portal_cap_dz[k], portal_cap_ang[k]);

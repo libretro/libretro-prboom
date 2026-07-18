@@ -25,7 +25,12 @@
  * region of the level, offset by (dx,dy,dz) from the viewer. */
 typedef struct {
   int     active;
-  int     horizon;      /* 1: Sector_SetPortal type 4 -- the window shows
+  int     hfixed;       /* with horizon: 1 = Sector_SetPortal type 3, the
+                         * plane sits at the source height measured from the
+                         * CAMERA and its texture is anchored to the camera,
+                         * so the surface never shifts as the viewer moves */
+  int     horizon;      /* 1: Sector_SetPortal type 4 (or type 3 with
+                         * hfixed) -- the window shows
                          * sector `hsec`'s planes extended to infinity, and
                          * there is no camera at all */
   int     hsec;

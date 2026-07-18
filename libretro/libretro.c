@@ -1359,10 +1359,17 @@ static void I_NegotiatePixelFormat(void)
             vid_paper_white_nits = 200.0f;
          {
             unsigned gamut = VID_GAMUT_ACCURATE;
+            unsigned out   = VID_HDROUT_HDR10;
             if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
                vid_expand_gamut = (int)gamut;
             else
                vid_expand_gamut = VID_GAMUT_ACCURATE;
+            /* Older frontends predate the query; HDR10 is the mode that needs
+             * no compensation, so it is the safe assumption. */
+            if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE, &out))
+               vid_hdr_output = (int)out;
+            else
+               vid_hdr_output = VID_HDROUT_HDR10;
          }
 
          var.key   = "prboom-hdr_emissive";
@@ -1385,9 +1392,10 @@ static void I_NegotiatePixelFormat(void)
              * from one built before the setting existed. */
             log_cb(RETRO_LOG_INFO,
                    "Color Format: HDR10, paper white %.0f nits, emissive "
-                   "%.0fx, colour boost %s.\n",
+                   "%.0fx, colour boost %s, output %s.\n",
                    vid_paper_white_nits, vid_emit_scale[vid_emit_class],
-                   gamut_name[vid_expand_gamut & 3]);
+                   gamut_name[vid_expand_gamut & 3],
+                   (vid_hdr_output == VID_HDROUT_SCRGB) ? "scRGB" : "HDR10");
          }
       }
    }
@@ -1614,6 +1622,20 @@ static void I_PollHDRPaperWhite(void)
                 "colour tables.\n", vid_paper_white_nits, nits);
       vid_paper_white_nits = nits;
       dirty = 1;
+   }
+
+   {
+      unsigned out = (unsigned)vid_hdr_output;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE, &out)
+            && (int)out != vid_hdr_output)
+      {
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO,
+                   "HDR output mode changed: %d -> %u; rebuilding colour "
+                   "tables.\n", vid_hdr_output, out);
+         vid_hdr_output = (int)out;
+         dirty = 1;
+      }
    }
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut)

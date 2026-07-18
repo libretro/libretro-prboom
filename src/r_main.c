@@ -945,7 +945,14 @@ static int sb_flat_alpha;   /* stacked-portal flat opacity 0..254 at composite
                              * scene under the already-drawn flat */
 
 /* stacked-sector portal snapshots (collected pre-composite, rendered post) */
+/* Distinct displacements rendered per frame (each costs one scene render). */
 #define PORTAL_CAP_MAX 16
+/* Portal-plane ids collected per frame.  This is NOT the same budget: one
+ * logical window contributes an id per sector it spans (zdcmp2's largest
+ * carries 26), and they all collapse into a single group, so the id list
+ * must be able to hold every visible piece of every window or the grouping
+ * loses spans and the window renders with holes. */
+#define PORTAL_ID_MAX 96
 static fixed_t portal_cap_dx[PORTAL_CAP_MAX];
 static fixed_t portal_cap_dy[PORTAL_CAP_MAX];
 static fixed_t portal_cap_dz[PORTAL_CAP_MAX];
@@ -1188,8 +1195,8 @@ void R_RenderPlayerView (player_t* player)
     n_portal_caps = 0;
     if (sector_portals_active && (floorportals || ceilingportals))
     {
-      int pids[PORTAL_CAP_MAX];
-      int npids = R_CollectPortalIds(pids, PORTAL_CAP_MAX);
+      int pids[PORTAL_ID_MAX];
+      int npids = R_CollectPortalIds(pids, PORTAL_ID_MAX);
       int k;
       for (k = 0; k < npids; k++)
       {

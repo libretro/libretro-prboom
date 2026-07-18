@@ -1376,9 +1376,19 @@ static void I_NegotiatePixelFormat(void)
             else                                vid_emit_class = VID_EMIT_2X;
          }
          if (log_cb)
+         {
+            static const char *gamut_name[4] =
+               { "Accurate", "Expanded", "Wide", "Super" };
+            /* Name the colour boost explicitly: getting it wrong desaturates
+             * the image by ~40% against the SDR formats, and without it in
+             * the log there is no way to tell a core that read the setting
+             * from one built before the setting existed. */
             log_cb(RETRO_LOG_INFO,
-                   "Color Format: HDR10, paper white %.0f nits, emissive %.0fx.\n",
-                   vid_paper_white_nits, vid_emit_scale[vid_emit_class]);
+                   "Color Format: HDR10, paper white %.0f nits, emissive "
+                   "%.0fx, colour boost %s.\n",
+                   vid_paper_white_nits, vid_emit_scale[vid_emit_class],
+                   gamut_name[vid_expand_gamut & 3]);
+         }
       }
    }
 

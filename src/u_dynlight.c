@@ -10,6 +10,8 @@
 #include "m_fixed.h"
 #include "tables.h"
 #include "w_wad.h"
+#include "r_data.h"
+#include "r_patch.h"
 #include "lprintf.h"
 #include "u_scanner.h"
 #include "u_dynlight.h"
@@ -412,6 +414,72 @@ int U_GlowColor(const void *gd)
 int U_GlowHeight(const void *gd)
 {
   return ((const glowdef_t *) gd)->height;
+}
+
+
+/* Wall-texture glow resolution: walls{} entries matched to texture numbers,
+ * lazily like the flat table.  u_glow_walls_present gates the whole line
+ * pipeline off when no wall entries bind. */
+extern int numtextures;
+static const glowdef_t **glow_wtex_tab;
+static int               glow_wtex_n;
+int u_glow_walls_present;
+
+static void glow_build_wtex_tab(void)
+{
+  int i;
+  free(glow_wtex_tab);
+  glow_wtex_tab = (const glowdef_t **) calloc(numtextures,
+                                              sizeof(*glow_wtex_tab));
+  glow_wtex_n = numtextures;
+  u_glow_walls_present = 0;
+  for (i = 0; i < num_glow_defs; i++)
+  {
+    glowdef_t *g = &glow_defs[i];
+    int tx;
+    if (!g->is_wall)
+      continue;
+    tx = R_CheckTextureNumForName(g->name);
+    if (tx <= 0 || tx >= numtextures)
+      continue;
+    if (g->r < 0)
+    {
+      /* derive from the texture's average colour via its composite pixels
+       * (matters: a blue waterfall must glow blue, lava orange) */
+      const rpatch_t *p = R_CacheTextureCompositePatchNum(tx);
+      if (p && p->pixels && p->width > 0 && p->height > 0)
+      {
+        glow_resolve_color(g, p->pixels, p->width * p->height);
+        R_UnlockTextureCompositePatchNum(tx);
+      }
+      if (g->r < 0)
+        continue;
+    }
+    glow_wtex_tab[tx] = g;
+    u_glow_walls_present = 1;
+  }
+}
+
+/* Presence gate that also triggers the lazy bind (the flag is only known
+ * once walls{} names have been matched against the level's textures). */
+int U_GlowWallsPresent(void)
+{
+  if (!num_glow_defs || numtextures <= 0)
+    return 0;
+  if (glow_wtex_n != numtextures)
+    glow_build_wtex_tab();
+  return u_glow_walls_present;
+}
+
+const void *U_GlowForWallTexture(int texnum)
+{
+  if (!num_glow_defs || numtextures <= 0)
+    return NULL;
+  if (glow_wtex_n != numtextures)
+    glow_build_wtex_tab();
+  if ((unsigned) texnum >= (unsigned) glow_wtex_n)
+    return NULL;
+  return glow_wtex_tab[texnum];
 }
 
 static void dl_parse_lump(int lump)

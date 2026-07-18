@@ -119,6 +119,7 @@ static int                  planerawlight;   /* raw 0..255 sector light + extral
 static fixed_t planeheight;
 static int     plane_dynlit;    /* any GLDEFS point light can reach this plane */
 static int     plane_glowing;   /* GLDEFS glow flat: draws undimmed */
+static int     plane_wallglow;  /* GLDEFS glowing wall lines pool onto this plane */
 
 // killough 2/8/98: make variables static
 
@@ -538,7 +539,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
     * chunks, intersect each chunk's view ray with the plane to get its world
     * point, and re-pick the colourmap for the light-boosted band.  Only when
     * plane_dynlit; otherwise the single span below runs unchanged. */
-   if (plane_dynlit && !fixedcolormap)
+   if ((plane_dynlit || plane_wallglow) && !fixedcolormap)
    {
       const fixed_t bxf = dsvars->xfrac, byf = dsvars->yfrac;
       int wx_a, wy_a, wx_b, wy_b, cx;
@@ -552,12 +553,20 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
        * path entirely.  This replaces the coarser AABB span cull. */
       R_PlaneColumnWorld(x1, distance, &wx_a, &wy_a);
       R_PlaneColumnWorld(x2, distance, &wx_b, &wy_b);
-      if (!R_PlaneRowPrepare(wx_a, wy_a, wx_b, wy_b))
       {
-         dsvars->x1 = x1;
-         dsvars->x2 = x2;
-         R_DrawSpan(dsvars);
-         return;
+         int row_pts = plane_dynlit
+                     ? R_PlaneRowPrepare(wx_a, wy_a, wx_b, wy_b) : 0;
+         int row_gl  = plane_wallglow
+                     ? R_PlaneGlowRowPrepare(wx_a, wy_a, wx_b, wy_b) : 0;
+         if (!row_pts && !row_gl)
+         {
+            dsvars->x1 = x1;
+            dsvars->x2 = x2;
+            R_DrawSpan(dsvars);
+            return;
+         }
+         if (!plane_dynlit)
+            R_PlaneRowPrepare(wx_a, wy_a, wx_b, wy_b);   /* clear stale point set */
       }
 
       /* Constant per row (index is fixed for this span): hoist the smooth
@@ -581,6 +590,8 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
          R_PlaneColumnWorld(mid, distance, &wx, &wy);
 
          boost = R_PlaneRowBoost(wx, wy);
+         if (plane_wallglow)
+            boost += R_PlaneGlowRowBoost(wx, wy);
          band  = planelightlevel + (boost >> LIGHTSEGSHIFT);
          if (band > LIGHTLEVELS-1) band = LIGHTLEVELS-1;
          if (r_smooth_shading && fullcolormap)
@@ -746,6 +757,7 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
       new_pl->yoffs = pl->yoffs;
       new_pl->slope = pl->slope;
       new_pl->skybox = pl->skybox;
+      new_pl->wallglow = pl->wallglow;
       new_pl->minx = start;
       new_pl->maxx = stop;
       new_pl->modified = 0;
@@ -815,6 +827,7 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
    check->modified = 0;
    check->translucent = 0;
    check->skybox = skybox;
+   check->wallglow = 0;
 
    memset (check->top, 0xff, sizeof check->top);
 
@@ -1160,6 +1173,8 @@ static void R_DoDrawPlane(visplane_t *pl)
           * floor/ceiling near lights.  Gated here to skip the common case of
           * a plane no light reaches. */
          plane_glowing = u_glow_present && U_GlowForFlat(pl->picnum) != NULL;
+         plane_wallglow = pl->wallglow &&
+                          R_PlaneGlowPrepare(pl->height >> FRACBITS) > 0;
          plane_dynlit = R_DynLightsActive() &&
                         R_PlanePrepareLights(pl->height >> FRACBITS) > 0;
          /* Smooth mode bases its sub-band darkness on planelightlevel, which

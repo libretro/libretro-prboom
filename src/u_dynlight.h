@@ -69,6 +69,10 @@ extern int u_glow_present;
 /* Glow definition for a flat picnum (sector floorpic/ceilingpic), or NULL.
  * Opaque handle; colour as 0xRRGGBB and fade height via the accessors. */
 const void *U_GlowForFlat(int flatpic);
+/* Wall-texture glow: any walls{} entries bound, and the def for a texture. */
+extern int u_glow_walls_present;
+int U_GlowWallsPresent(void);
+const void *U_GlowForWallTexture(int texnum);
 int U_GlowColor(const void *gd);
 int U_GlowHeight(const void *gd);
 

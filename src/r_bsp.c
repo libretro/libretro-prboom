@@ -36,6 +36,7 @@
 #include "r_main.h"
 #include "r_segs.h"
 #include "r_plane.h"
+#include "r_dynlight.h"
 #include "r_things.h"
 #include "r_bsp.h" // cph - sanity checking
 #include "p_ffloor.h"
@@ -693,6 +694,14 @@ static void R_Subsector(int num)
   // Either you must pass the fake sector and handle validcount here, on the
   // real sector, or you must account for the lighting in some other way,
   // like passing it as an argument.
+
+  /* GLDEFS wall glow: tag the planes of glowing sectors (see r_dynlight) */
+  if ((floorplane || ceilingplane) &&
+      R_SectorWallGlow((int)(frontsector - sectors)))
+  {
+    if (floorplane)   floorplane->wallglow = 1;
+    if (ceilingplane) ceilingplane->wallglow = 1;
+  }
 
   R_AddSprites(sub, (floorlightlevel+ceilinglightlevel)/2);
 

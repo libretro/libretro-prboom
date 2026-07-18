@@ -38,6 +38,13 @@ int R_SegColumnBoost(int wz);
 int R_PlanePrepareLights(int planez);
 int R_PlaneRowPrepare(int ax, int ay, int bx, int by);
 int R_PlaneRowBoost(int wx, int wy);
+/* GLDEFS wall glow (glowing wall textures pooling onto flats): per-plane
+ * collection by plane height, per-row conservative filter, per-chunk
+ * point-to-segment boost.  Call GlowRowBoost after RowBoost (tint zeroing). */
+int R_SectorWallGlow(int secnum);
+int R_PlaneGlowPrepare(int planez);
+int R_PlaneGlowRowPrepare(int ax, int ay, int bx, int by);
+int R_PlaneGlowRowBoost(int wx, int wy);
 
 /* Boost-weighted chroma from the most recent R_PlaneBoost / R_SegBoost call
  * (565 channel units * boost).  Zero unless a saturated light contributed;

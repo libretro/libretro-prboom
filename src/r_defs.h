@@ -514,6 +514,7 @@ typedef struct visplane
   byte modified;              // set when a seg actually writes a span here
   byte translucent;           // 3D-floor water surface: blend 50/50 on draw
   int skybox;                 /* per-sector 3D skybox index, or -1 (default) */
+  byte wallglow;              /* a GLDEFS-glowing wall line pools onto this plane */
   unsigned int pad1;          // leave pads for [minx-1]/[maxx+1]
   unsigned int top[MAX_SCREENWIDTH];
   unsigned int pad2, pad3;    // killough 2/8/98, 4/25/98

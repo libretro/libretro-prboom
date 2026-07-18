@@ -188,13 +188,16 @@ the wad.
   somewhere else.  Authored either as `UpperStackLookOnly`/
   `LowerStackLookOnly` thing pairs (stacked sectors) or with
   `Sector_SetPortal` (line special 57), whose **view** (0), **copied** (1),
-  **skybox** (2) and **horizon** (4) types all resolve; the Eternity
-  `Portal_Horizon*` line types convert to the last of these.  A view portal
+  **skybox** (2), **fixed plane** (3) and **horizon** (4) types all resolve;
+  the Eternity `Portal_Plane*` and `Portal_Horizon*` line types convert to
+  the last two.  A view portal
   shows the linked region drawn from the viewer displaced by the pair's
   offset; a copied portal hands an existing window to sectors that need
   their own tag, such as a lift; a skybox portal shows a `SkyCamCompat`
   camera's surroundings on any plane, with or without the sky flat; and a
-  horizon portal extends a sector's own floor and ceiling to infinity.
+  horizon portal extends a sector's own floor and ceiling to infinity; and a
+  fixed plane portal does the same but measured from the camera, so the
+  surface looks identical from anywhere in the level.
   Windows composite into their visible pixels only, so geometry and sprites
   in front of one occlude it correctly, and things inside a viewed region
   are drawn.  One portal depth: a window seen through a window draws its own
@@ -244,10 +247,9 @@ Changing the option requires a restart.
 ### Not supported
 
 - **ZScript** — no support. Mods whose gameplay lives in ZScript won't run it.
-- **Line portals, interactive portals and plane portals** — `Sector_SetPortal`
-  types 3 (plane), 5 (copy to line) and 6 (interactive) are inert, as are
-  line portals proper, structured UDMF portal fields and ACS portal
-  activation.  Movement is never linked through a portal: the sector windows
+- **Line portals and interactive portals** — `Sector_SetPortal` types 5
+  (copy to line) and 6 (interactive) are inert, as are line portals proper,
+  structured UDMF portal fields and ACS portal activation.  Movement is never linked through a portal: the sector windows
   described above are view-only.
 - **3D models (MODELDEF)** — out of scope for the 8-bit software renderer.
 

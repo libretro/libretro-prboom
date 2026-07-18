@@ -1684,22 +1684,6 @@ enum retro_mod
 #define RETRO_ENVIRONMENT_SET_HW_RENDER_CONTEXT_NEGOTIATION_INTERFACE (43 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 
 /**
- * Notifies the frontend of any quirks associated with serialization.
- *
- * Should be set in either \c retro_init or \c retro_load_game, but not both.
- * @param[in, out] data <tt>uint64_t *</tt>.
- * Pointer to the core's serialization quirks.
- * The frontend will set the flags of the quirks it supports
- * and clear the flags of those it doesn't.
- * Behavior is undefined if \c NULL.
- * @return \c true if this environment call is supported.
- * @see retro_serialize
- * @see retro_unserialize
- * @see RETRO_SERIALIZATION_QUIRK
- */
-#define RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS 44
-
-/**
  * The frontend will try to use a "shared" context when setting up a hardware context.
  * Mostly applicable to OpenGL.
  *
@@ -2714,6 +2698,22 @@ enum retro_mod
  * @see retro_memory_status
  */
 #define RETRO_ENVIRONMENT_GET_MEMORY_STATUS (86 | RETRO_ENVIRONMENT_EXPERIMENTAL)
+
+/**
+ * Notifies the frontend of any quirks associated with serialization.
+ *
+ * Should be set in either \c retro_init or \c retro_load_game, but not both.
+ * @param[in, out] data <tt>uint64_t *</tt>.
+ * Pointer to the core's serialization quirks.
+ * The frontend will set the flags of the quirks it supports
+ * and clear the flags of those it doesn't.
+ * Behavior is undefined if \c NULL.
+ * @return \c true if this environment call is supported.
+ * @see retro_serialize
+ * @see retro_unserialize
+ * @see RETRO_SERIALIZATION_QUIRK
+ */
+#define RETRO_ENVIRONMENT_SET_SERIALIZATION_QUIRKS 87
 
 /**
  * Result of \c RETRO_ENVIRONMENT_GET_MEMORY_STATUS.
@@ -4374,6 +4374,9 @@ struct retro_log_callback
 /** Indicates CPU support for the AVX512 instruction set. */
 #define RETRO_SIMD_AVX512   (1 << 22)
 
+/** Indicates CPU support for the LZCNT instruction (x86 ABM / ARM CLZ). */
+#define RETRO_SIMD_LZCNT    (1 << 23)
+
 /** @} */
 
 /**
@@ -5804,6 +5807,20 @@ enum retro_pixel_format
     * as it is available on a variety of devices and APIs.
     */
    RETRO_PIXEL_FORMAT_RGB565   = 2,
+
+   /**
+    * XRGB2101010, native endian.
+    * 32-bit packed: 2 ignored high bits followed by 10-bit R, G, B
+    * (i.e. bits [29:20]=R, [19:10]=G, [9:0]=B; the top 2 bits are ignored).
+    * Intended for cores that decode 10-bit-per-channel content (e.g. HDR10
+    * sources) and want to pass it through without narrowing to 8 bits.
+    *
+    * A frontend is not required to render this natively: if the active video
+    * driver does not support a 10-bit source surface, the frontend transparently
+    * down-converts to XRGB8888, so a core may rely on SET_PIXEL_FORMAT accepting
+    * this value but should not assume the display path is 10-bit end to end.
+    */
+   RETRO_PIXEL_FORMAT_XRGB2101010 = 3,
 
    /** Defined to ensure that <tt>sizeof(retro_pixel_format) == sizeof(int)</tt>. Do not use. */
    RETRO_PIXEL_FORMAT_UNKNOWN  = INT_MAX
@@ -7713,6 +7730,9 @@ typedef void (RETRO_CALLCONV *retro_input_poll_t)(void);
  *
  * @param port Which player 'port' to query.
  * @param device Which device to query for. Will be masked with \c RETRO_DEVICE_MASK.
+ * @warning Poll with a base device ID only; passing an ID created via
+ * \c RETRO_DEVICE_SUBCLASS is reserved for future definition, and the masking
+ * noted above is a frontend convenience that must not be relied upon.
  * @param index The input index to retrieve.
  * The exact semantics depend on the device type given in \c device.
  * @param id The ID of which value to query, like \c RETRO_DEVICE_ID_JOYPAD_B.

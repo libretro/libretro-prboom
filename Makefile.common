@@ -36,7 +36,9 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/formats/wav/rwav.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_zlib.c \
-				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c
+				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c \
+				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_deflate.c \
+				 $(LIBRETRO_COMM_DIR)/encodings/encoding_deflate.c
 
 SOURCES_C += $(DEPS_DIR)/miniz/miniz.c \
 				 $(DEPS_DIR)/stb/stb_vorbis_impl.c \

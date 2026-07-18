@@ -77,21 +77,6 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "16bits"
    },
    {
-      "prboom-diminished_lighting",
-      "Diminished Lighting",
-      NULL,
-      "How distance light is applied. 'Classic' snaps it to the 32 discrete colormaps the DOS engine used, giving the original banded look. 'Smooth' shades continuously, removing the band edges. 'Auto' uses Classic at 16-bit and Smooth at 24/30-bit, where the banded path would discard most of the extra colour precision.",
-      NULL,
-      NULL,
-      {
-         { "auto",    "Auto" },
-         { "classic", "Classic (banded)" },
-         { "smooth",  "Smooth" },
-         { NULL, NULL },
-      },
-      "auto"
-   },
-   {
       "prboom-mouse_on",
       "Mouse Active When Using Gamepad",
       NULL,

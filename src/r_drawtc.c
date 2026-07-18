@@ -337,179 +337,13 @@ static const lighttable_t *tc_composed_cm  = NULL;
 static const uint32_t     *tc_composed_pal = NULL;
 static uint32_t            tc_composed_lut[256];
 
-/* Smooth (CRY-style) distance shading.
- *
- * The Atari Jaguar port of Doom applied distance light entirely as a
- * continuous luma (Y) bias in the blitter (the B_IINC register), leaving
- * each texel's hue/saturation untouched -- one fresh 0..255 light value
- * per wall column, interpolated linearly with depth, with no quantisation
- * to a fixed set of light maps.  The DOS/PC engine instead snaps distance
- * light to one of NUMCOLORMAPS (32) discrete colormaps, each of which also
- * re-points the texel to the nearest palette index; that double snap is
- * what produces the characteristic light banding on walls and floors.
- *
- * V_PaletteTC already stores every palette colour expanded across
- * VID_NUMCOLORWEIGHTS (64) continuous luma weights, computed in RGB space
- * and packed to 565 -- structurally identical to the Jaguar's per-column
- * Y value, only precomputed into a table rather than applied by hardware.
- * The point path normally ignores that ramp: it reads weight 63 (full
- * bright) and takes all its distance light from colormap[i]'s index snap.
- *
- * Smooth mode keeps the SAME single-lookup inner loop (so the per-pixel
- * cost is identical to the banded point path) but builds the 256-entry
- * table differently: it recovers the colormap's distance-light level from
- * its offset against the active base (fullcolormap; sector and fixed
- * colormaps are all expressed as fullcolormap + level*256), maps that
- * 0..(NUMCOLORMAPS-1) level onto the 64-weight luma axis, and reads
- * V_PaletteTC[ texel*64 + weight ].  Distance darkening now scales luma
- * continuously, like CRY, instead of snapping the palette index.  The
- * texel's own colormap remap (translations, invuln inversion baked into
- * colormap[i]) is preserved; only the brightness selection changes. */
-
-/* Fine (sub-band) light weight side channel for Smooth mode.
- *
- * The band-level Smooth path recovers light from the colormap pointer,
- * which the renderer has already snapped to one of NUMCOLORMAPS (32)
- * bands -- so it cannot represent light variation finer than 32 steps even
- * though V_PaletteTC carries 64 luma weights.  R_ColourMap (walls/sprites)
- * and the plane light selection (floors/ceilings) additionally publish the
- * light level here at the full 0..(VID_NUMCOLORWEIGHTS-1) resolution,
- * computed from the same formulas at 2x granularity (63 = brightest, 0 =
- * darkest), so band boundaries still agree with Default.  When >= 0 the
- * Smooth LUT uses it directly; -1 means "no fine value published, fall
- * back to band recovery" (e.g. the patch/HUD path, or a fixedcolormap).
- *
- * This is the "keep all the precision until the final step" refinement the
- * R_ColourMap comment anticipates.  Capping at 64 matches what the weight
- * ramp can actually express, which also bounds the composed-LUT rebuild
- * rate: at most VID_NUMCOLORWEIGHTS distinct tables per frame rather than
- * the unbounded per-column rebuilds a finer-than-ramp value would force. */
-static int tc_composed_weight = -2; /* cache key companion; -2 = never built */
-
-/* Private fine luma ramp for Smooth shading: [colour][SMOOTH_WEIGHTS].
- * Rebuilt lazily when the active palette (V_PaletteTC) changes -- gamma swap,
- * invuln flash, palette blend -- so it always matches the rest of the
- * renderer's colours.  Each colour's full-bright RGB565 is taken from
- * V_PaletteTC at its top weight, decomposed to channels, and rescaled across
- * SMOOTH_WEIGHTS steps the same way V_PaletteTC scales across its 64 -- just
- * finer.  Only the composed-LUT build reads this; the shared V_PaletteTC and
- * every per-pixel path that strides it are left exactly as they were. */
-static uint32_t       tc_smooth_ramp[256 * SMOOTH_WEIGHTS];
-static const uint32_t *tc_smooth_ramp_pal = NULL;
-
-static void R_BuildSmoothRampTC(void)
-{
-   int i, w;
-   /* V_PaletteTC field layout depends on the active format; the ramp is
-    * shared code compiled once, so branch at runtime (built rarely). */
-   const int rs   = (vid_mode == VID_MODE2101010) ? 20  : 16;
-   const int gs   = (vid_mode == VID_MODE2101010) ? 10  : 8;
-   const int cmax = (vid_mode == VID_MODE2101010) ? 1023 : 255;
-   for (i = 0; i < 256; i++)
-   {
-      /* Full-bright pixel of this palette entry (weight 63 in V_PaletteTC),
-       * decomposed by the active truecolor field layout. */
-      uint32_t full = V_PaletteTC[ i*VID_NUMCOLORWEIGHTS + (VID_NUMCOLORWEIGHTS-1) ];
-      int r = (int)((full >> rs) & cmax);
-      int g = (int)((full >> gs) & cmax);
-      int b = (int)( full        & cmax);
-      uint32_t *row = &tc_smooth_ramp[i * SMOOTH_WEIGHTS];
-      for (w = 0; w < SMOOTH_WEIGHTS; w++)
-      {
-         /* (channel * t + 0.5) rounded to nearest, in integer math. */
-         int nr = (r * w + (SMOOTH_WEIGHTS-1)/2) / (SMOOTH_WEIGHTS-1);
-         int ng = (g * w + (SMOOTH_WEIGHTS-1)/2) / (SMOOTH_WEIGHTS-1);
-         int nb = (b * w + (SMOOTH_WEIGHTS-1)/2) / (SMOOTH_WEIGHTS-1);
-         row[w] = ((uint32_t)nr << rs) | ((uint32_t)ng << gs) | (uint32_t)nb;
-      }
-   }
-   tc_smooth_ramp_pal = V_PaletteTC;
-}
-
 static INLINE const uint32_t *R_GetComposedColormapTC(const lighttable_t *colormap)
 {
-   /* The fine weight is only valid for the exact colormap pointer it was
-    * published against (R_ColourMap / the plane span setup).  Sprite paths
-    * that assign vis->colormap directly -- spectre NULL, fixedcolormap,
-    * FF_FULLBRIGHT -> fullcolormap -- never publish a fine weight, so the
-    * pointer check rejects a stale value and falls back to band recovery. */
-   int fine = (r_smooth_shading && colormap == r_fine_colormap)
-              ? r_fine_lightweight : -1;
-   /* In Smooth mode the fine weight participates in the cache key, since two
-    * columns sharing a colormap band can still differ in sub-band light. */
-   int want_weight = (r_smooth_shading) ? fine : -2;
-
-   if (colormap != tc_composed_cm || V_PaletteTC != tc_composed_pal
-       || want_weight != tc_composed_weight)
+   if (colormap != tc_composed_cm || V_PaletteTC != tc_composed_pal)
    {
       int i;
-
-      if (r_smooth_shading && fullcolormap)
-      {
-         int  weight;
-         long off  = (long)(colormap - fullcolormap);
-         int  band = (int)(off >> 8);
-         /* A distance-light band is colormap == fullcolormap + level*256 for
-          * level in [0, NUMCOLORMAPS).  Anything else -- the invulnerability /
-          * light-amp INVERSECOLORMAP (level == NUMCOLORMAPS), a sector map we
-          * can't express as a band offset, or a misaligned pointer -- is NOT a
-          * distance fade and must be drawn through its own map at full bright,
-          * exactly as the banded point path does. */
-         int is_band = (off >= 0) && ((off & 255) == 0)
-                       && band >= 0 && band < NUMCOLORMAPS;
-
-         if (tc_smooth_ramp_pal != V_PaletteTC)
-            R_BuildSmoothRampTC();
-
-         if (is_band && fine >= 0)
-         {
-            /* Sub-band precision published by the light-selection chokepoint
-             * (already at SMOOTH_WEIGHTS resolution). */
-            weight = fine;
-         }
-         else if (is_band)
-         {
-            /* Sprite/patch at a distance band, no fine value: map the band
-             * level 0..31 onto the 0..(SMOOTH_WEIGHTS-1) ramp. */
-            weight = (NUMCOLORMAPS-1 - band) * (SMOOTH_WEIGHTS-1)
-                     / (NUMCOLORMAPS-1);
-         }
-         else
-         {
-            /* Not a distance band (invuln inverse map, etc.): full bright. */
-            weight = SMOOTH_WEIGHTS-1;
-         }
-
-         if (weight < 0)                       weight = 0;
-         else if (weight > SMOOTH_WEIGHTS-1)    weight = SMOOTH_WEIGHTS-1;
-
-         /* Distance darkening is applied ENTIRELY through the luma weight (the
-          * CRY way), so for a distance band the texel is looked up through the
-          * UNDIMMED base map (band 0 = fullcolormap), NOT the dimmed band the
-          * renderer selected.  Indexing the dimmed band AND applying the weight
-          * darkens twice -- an over-dark, blotchy image.  For a non-band map
-          * (invuln) the special remap must be preserved, so fall back to the
-          * shared V_PaletteTC at full weight (the point-path output).  For a
-          * distance band, index the private fine ramp by the undimmed texel. */
-         if (is_band)
-         {
-            for (i = 0; i < 256; i++)
-               tc_composed_lut[i] = tc_smooth_ramp[ fullcolormap[i]*SMOOTH_WEIGHTS + weight ];
-         }
-         else
-         {
-            for (i = 0; i < 256; i++)
-               tc_composed_lut[i] = V_PaletteTC[ colormap[i]*VID_NUMCOLORWEIGHTS + (VID_NUMCOLORWEIGHTS-1) ];
-         }
-
-         tc_composed_weight = want_weight;
-      }
-      else
-      {
-         for (i = 0; i < 256; i++)
-            tc_composed_lut[i] = V_PaletteTC[ colormap[i]*64 + (64-1) ];
-         tc_composed_weight = -2;
-      }
+      for (i = 0; i < 256; i++)
+         tc_composed_lut[i] = V_PaletteTC[ colormap[i]*64 + (64-1) ];
       tc_composed_cm  = colormap;
       tc_composed_pal = V_PaletteTC;
    }
@@ -6369,18 +6203,6 @@ void R_WaterDarkenColumnTC(int x, int yl, int yh, int surf_y)
 {
   if (vid_mode == VID_MODE2101010) R_WaterDarkenColumnA2(x, yl, yh, surf_y);
   else                             R_WaterDarkenColumn8888(x, yl, yh, surf_y);
-}
-
-/* --- composed-LUT cache invalidation --------------------------------------
- * The composed table is keyed on (colormap, palette, fine weight).  Flipping
- * the shading mode changes none of those, so without an explicit drop the
- * next lookup would reuse a table built under the old mode.  r_draw.c clears
- * its own trio in R_ApplyDiminishedLighting and calls this for ours. */
-void R_InvalidateComposedTC(void)
-{
-  tc_composed_cm     = NULL;
-  tc_composed_pal    = NULL;
-  tc_composed_weight = -2;
 }
 
 /* --- buffer init (fuzz offset table, keyed to the current pitch) ---------- */

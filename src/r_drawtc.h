@@ -44,9 +44,6 @@ void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int poi
 const uint32_t *R_ComposedColormapTC(const lighttable_t *colormap);
 const uint32_t *R_ComposedPaletteTC(void);
 
-/* Drop the composed-LUT cache (shading-mode change). */
-void R_InvalidateComposedTC(void);
-
 /* Batch buffer lifecycle. */
 void R_ResetColumnBufferTC(void);
 void R_InitBufferTC(void);

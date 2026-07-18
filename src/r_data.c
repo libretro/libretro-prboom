@@ -608,10 +608,7 @@ static INLINE int between(int l,int u,int x)
 const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
 {
   if (fixedcolormap)
-  {
-     r_fine_lightweight = -1; /* fixed map: no distance fade, use band recovery */
      return fixedcolormap;
-  }
 
   if (curline)
   {
@@ -636,26 +633,13 @@ const lighttable_t* R_ColourMap(int lightlevel, fixed_t spryscale)
    * against slight light level variations.
    */
   {
-   /* The returned pointer is still snapped to one of NUMCOLORMAPS bands
-    * (everything downstream assumes that).  But for Smooth shading we also
-    * publish the same darkness value at SMOOTH_WEIGHTS resolution -- the very
-    * "keep all the precision until the final step" refinement noted above --
-    * computed by scaling the identical band formula by SMOOTH_WEIGHTS instead
-    * of NUMCOLORMAPS, so the two agree exactly at band boundaries.  The
-    * distance term's shift is reduced by log2(SMOOTH_WEIGHTS/NUMCOLORMAPS)
-    * (= 3 for 256/32) to match the finer scale. */
+   /* The returned pointer is snapped to one of NUMCOLORMAPS bands;
+    * everything downstream assumes that. */
    int band = between(0,NUMCOLORMAPS-1,
          ((256-lightlevel)*2*NUMCOLORMAPS/256) - 4
          - (FixedMul(spryscale,pspriteiscale)/2 >> LIGHTSCALESHIFT)
          );
-   int fine = between(0,SMOOTH_WEIGHTS-1,
-         ((256-lightlevel)*2*SMOOTH_WEIGHTS/256) - 4*(SMOOTH_WEIGHTS/NUMCOLORMAPS)
-         - (FixedMul(spryscale,pspriteiscale)/2 >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))
-         );
-   /* fine 'darkness' 0=bright..max=dark -> weight max=bright..0=dark */
-   r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine;
-   r_fine_colormap    = fullcolormap + band*256;
-   return r_fine_colormap;
+   return fullcolormap + band*256;
   }
 }
 

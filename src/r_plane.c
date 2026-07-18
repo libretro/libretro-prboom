@@ -117,7 +117,6 @@ static int spanstart[MAX_SCREENHEIGHT];                // killough 2/8/98
 
 static const lighttable_t **planezlight;
 static int                  planelightlevel; /* LIGHTLEVELS index of current plane, for Smooth fine weight */
-static int                  planerawlight;   /* raw 0..255 sector light + extralight, for Smooth sub-band base */
 static fixed_t planeheight;
 static int     plane_dynlit;    /* any GLDEFS point light can reach this plane */
 static int     plane_glowing;   /* GLDEFS glow flat: draws undimmed */
@@ -264,31 +263,9 @@ static void R_MapTiltedPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
          dsvars->z = distance;
          dsvars->colormap = plane_glowing && fullcolormap
                           ? fullcolormap : planezlight[index];
-         if (r_smooth_shading && fullcolormap)
-         {
-            /* Continuous base darkness from the raw 0..255 sector light
-             * (planerawlight) instead of the 16-band planelightlevel.  This
-             * agrees with the band formula at band centres but interpolates
-             * between them, so adjacent sectors with close light levels no
-             * longer snap to different bands (the floor light banding). */
-            int startmap = ((255 - planerawlight) * 2 * (LIGHTLEVELS-1)
-                            * SMOOTH_WEIGHTS) / (255 * LIGHTLEVELS);
-            int scale    = FixedDiv((320/2*FRACUNIT),((int)index+1)<<LIGHTZSHIFT);
-            int fine2    = startmap
-                         - (scale >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))/DISTMAP;
-            if (fine2 < 0)                       fine2 = 0;
-            else if (fine2 > SMOOTH_WEIGHTS-1)   fine2 = SMOOTH_WEIGHTS-1;
-            r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine2;
-            r_fine_colormap    = dsvars->colormap;
-         }
-         else
-            r_fine_lightweight = -1;
       }
       else
-      {
          dsvars->z = 0;
-         r_fine_lightweight = -1;
-      }
 
       dsvars->y = y;
       dsvars->x1 = cx1;
@@ -503,41 +480,9 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
       dsvars->colormap = plane_glowing && fullcolormap
                        ? fullcolormap : planezlight[index];
 
-      /* Smooth shading: publish the distance darkness at 64-step resolution.
-       * R_InitLightTables baked planezlight at NUMCOLORMAPS (32) granularity
-       * via:  level = startmap - (scale>>LIGHTSCALESHIFT)/DISTMAP, with
-       *       startmap = ((LIGHTLEVELS-1-light)*2)*NUMCOLORMAPS/LIGHTLEVELS
-       * and scale = FixedDiv(320/2*FRACUNIT,(index+1)<<LIGHTZSHIFT).
-       * Recompute the same value with NUMCOLORMAPS replaced by SMOOTH_WEIGHTS
-       * so the darkness index carries sub-band precision while agreeing with
-       * Default at the band centres.  Mapped to a 0..(SMOOTH_WEIGHTS-1)
-       * weight (max = brightest). */
-      if (r_smooth_shading && fullcolormap)
-      {
-         /* Continuous base darkness from the raw 0..255 sector light
-          * (planerawlight) instead of the 16-band planelightlevel, so
-          * adjacent sectors with close light levels no longer snap to
-          * different bands (the floor light banding).  Agrees with the band
-          * formula at band centres. */
-         int startmap = ((255 - planerawlight) * 2 * (LIGHTLEVELS-1)
-                         * SMOOTH_WEIGHTS) / (255 * LIGHTLEVELS);
-         int scale    = FixedDiv((320/2*FRACUNIT),(index+1)<<LIGHTZSHIFT);
-         /* Both halves scaled to SMOOTH_WEIGHTS resolution: startmap via the
-          * *SMOOTH_WEIGHTS factor above, and the distance term via the shift
-          * reduced by log2(SMOOTH_WEIGHTS/NUMCOLORMAPS)=SMOOTH_WEIGHTS_SHIFT,
-          * so fine agrees with the 32-band zlight at the band centres. */
-         int fine2    = startmap - (scale >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))/DISTMAP;
-         if (fine2 < 0)                       fine2 = 0;
-         else if (fine2 > SMOOTH_WEIGHTS-1)   fine2 = SMOOTH_WEIGHTS-1;
-         r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine2;
-         r_fine_colormap    = dsvars->colormap;
-      }
-      else
-         r_fine_lightweight = -1;
-
       /* nextcolormap is only read by the *_LinearZ span drawers, which are
        * selected by filterz (NOT filterfloor: PointUV_LinearZ reads it too,
-       * and filterz goes LINEAR whenever diminished_lighting is on).  Skip
+       * and filterz can be set LINEAR by config).  Skip
        * the extra table index only when filterz is not LINEAR. */
       if (drawvars.filterz == RDRAW_FILTER_LINEAR)
          dsvars->nextcolormap = planezlight[index+1 >= MAXLIGHTZ ? MAXLIGHTZ-1 : index+1];
@@ -557,8 +502,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
    {
       const fixed_t bxf = dsvars->xfrac, byf = dsvars->yfrac;
       int wx_a, wy_a, wx_b, wy_b, cx;
-      fixed_t smooth_scale = 0;
-      int run_x1, run_band, run_fine;
+      int run_x1, run_band;
 
       /* Row-level light filter: the span's world points lie on the straight
        * segment (a,b), so keep only the plane lights that can reach it (exact
@@ -583,21 +527,16 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
             R_PlaneRowPrepare(wx_a, wy_a, wx_b, wy_b);   /* clear stale point set */
       }
 
-      /* Constant per row (index is fixed for this span): hoist the smooth
-       * branch's distance-scale divide out of the chunk loop. */
-      if (r_smooth_shading && fullcolormap)
-         smooth_scale = FixedDiv((320/2*FRACUNIT),(index+1)<<LIGHTZSHIFT);
-
       /* Walk the chunks, but only issue a draw per *state run*: consecutive
-       * chunks that resolve to the same colourmap band, same smooth weight and
-       * no colour tint draw as one span (identical pixels either way, far
+       * chunks that resolve to the same colourmap band and no colour tint
+       * draw as one span (identical pixels either way, far
        * fewer span calls on the long mostly-unlit parts of a lit row).  Tinted
        * chunks flush individually so the tint keeps its per-chunk footprint. */
-      run_x1 = -1; run_band = -1; run_fine = -1;
+      run_x1 = -1; run_band = -1;
       for (cx = x1; cx <= x2; cx += DL_FLAT_CHUNK)
       {
          int ex = cx + DL_FLAT_CHUNK - 1;
-         int mid, wx, wy, boost, band, fine2 = -1, tinted;
+         int mid, wx, wy, boost, band, tinted;
 
          if (ex > x2) ex = x2;
          mid = (cx + ex) >> 1;
@@ -608,21 +547,9 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
             boost += R_PlaneGlowRowBoost(wx, wy);
          band  = planelightlevel + (boost >> LIGHTSEGSHIFT);
          if (band > LIGHTLEVELS-1) band = LIGHTLEVELS-1;
-         if (r_smooth_shading && fullcolormap)
-         {
-            int raw = planerawlight + boost;
-            int startmap;
-            if (raw > 255) raw = 255;
-            startmap = ((255 - raw) * 2 * (LIGHTLEVELS-1) * SMOOTH_WEIGHTS)
-                       / (255 * LIGHTLEVELS);
-            fine2    = startmap
-                       - (smooth_scale >> (LIGHTSCALESHIFT-SMOOTH_WEIGHTS_SHIFT))/DISTMAP;
-            if (fine2 < 0)                     fine2 = 0;
-            else if (fine2 > SMOOTH_WEIGHTS-1) fine2 = SMOOTH_WEIGHTS-1;
-         }
          tinted = (dl_tint_r | dl_tint_g | dl_tint_b);
 
-         if (!tinted && run_x1 >= 0 && band == run_band && fine2 == run_fine)
+         if (!tinted && run_x1 >= 0 && band == run_band)
          {
             /* same draw state, no tint: extend the pending run */
          }
@@ -635,13 +562,6 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
                if (drawvars.filterz == RDRAW_FILTER_LINEAR)
                   dsvars->nextcolormap =
                      zlight[run_band][index+1 >= MAXLIGHTZ ? MAXLIGHTZ-1 : index+1];
-               if (run_fine >= 0)
-               {
-                  r_fine_lightweight = (SMOOTH_WEIGHTS-1) - run_fine;
-                  r_fine_colormap    = dsvars->colormap;
-               }
-               else
-                  r_fine_lightweight = -1;
                dsvars->xfrac = bxf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->xstep);
                dsvars->yfrac = byf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->ystep);
                dsvars->x1 = run_x1;
@@ -659,13 +579,6 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
                if (drawvars.filterz == RDRAW_FILTER_LINEAR)
                   dsvars->nextcolormap =
                      zlight[band][index+1 >= MAXLIGHTZ ? MAXLIGHTZ-1 : index+1];
-               if (fine2 >= 0)
-               {
-                  r_fine_lightweight = (SMOOTH_WEIGHTS-1) - fine2;
-                  r_fine_colormap    = dsvars->colormap;
-               }
-               else
-                  r_fine_lightweight = -1;
                dsvars->xfrac = bxf + (fixed_t)((int64_t)(cx - x1) * dsvars->xstep);
                dsvars->yfrac = byf + (fixed_t)((int64_t)(cx - x1) * dsvars->ystep);
                dsvars->x1 = cx;
@@ -677,7 +590,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
             else
             {
                /* start a new untinted run */
-               run_x1 = cx; run_band = band; run_fine = fine2;
+               run_x1 = cx; run_band = band;
             }
          }
       }
@@ -687,13 +600,6 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
          if (drawvars.filterz == RDRAW_FILTER_LINEAR)
             dsvars->nextcolormap =
                zlight[run_band][index+1 >= MAXLIGHTZ ? MAXLIGHTZ-1 : index+1];
-         if (run_fine >= 0)
-         {
-            r_fine_lightweight = (SMOOTH_WEIGHTS-1) - run_fine;
-            r_fine_colormap    = dsvars->colormap;
-         }
-         else
-            r_fine_lightweight = -1;
          dsvars->xfrac = bxf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->xstep);
          dsvars->yfrac = byf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->ystep);
          dsvars->x1 = run_x1;
@@ -1210,9 +1116,6 @@ static void R_DoDrawPlane(visplane_t *pl)
           * Keep the raw 0..255 sector light (plus extralight, in the same
           * LIGHTSEGSHIFT units the band uses) so the Smooth path can place the
           * base darkness continuously between bands instead. */
-         planerawlight = pl->lightlevel + (extralight << LIGHTSEGSHIFT);
-         if (planerawlight < 0)        planerawlight = 0;
-         else if (planerawlight > 255) planerawlight = 255;
          pl->top[pl->minx-1] = pl->top[stop] = 0xffffffffu; // dropoff overflow
 
          if (pl->slope)

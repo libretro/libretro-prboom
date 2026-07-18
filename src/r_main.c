@@ -620,7 +620,10 @@ void R_Init (void)
   /* Patch cache is live now, so the brightmap masks (which read both the
    * mask patches and the composite texture dimensions) can be baked. */
   U_BuildBrightmasks();
-  R_ApplyDiminishedLighting(); /* sync General>Video setting into filterz */
+  /* Distance light is always point-sampled: the ordered-dither ("Dithered")
+   * mode that used a LINEAR filterz was removed, so a config still holding
+   * that value must not resurrect a drawer set nothing else selects. */
+  drawvars.filterz = RDRAW_FILTER_POINT;
 }
 
 /* R_Deinit

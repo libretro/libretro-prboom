@@ -42,8 +42,6 @@ You still need a valid IWAD — the engine provides the code, not the game data.
   floors, ceilings and sprites are brightened — and colour-tinted — by
   nearby `pointlight` / `pulselight` / `flickerlight` definitions, with
   per-view light culling to keep it cheap
-- **Smooth diminished lighting** (a 256-step light ramp in place of the
-  vanilla 32 light levels), removing distance-banding on walls and floors
 - **Wall bullet decals** (optional; off by default to match ZDoom mods that
   place their own)
 - Translucency, deep water, independent floor/ceiling lighting, animated and
@@ -193,13 +191,18 @@ The **Color Format** core option selects the output pixel format: `16bits`
 (XRGB8888) or `30bits (HDR)` (XRGB2101010). The truecolor formats are native
 pipelines, not a conversion stage — the palette, light ramps and composed
 colour tables are built at the output's channel width, so nothing is
-quantised to 565 on the way. This mainly removes the banding the 16-bit
-light ramp introduces in distance shading and in smooth gradients: a
-256-step shading ramp resolves to roughly 17 levels per channel at 16 bits,
-about 135 at 24, and near the full 256 at 30 — the gap being widest in dark
-colours, where the banding is most visible. Full-colour art (PNG title
-cards, the help screen, the intermission backdrop) is also blitted without
-losing precision.
+quantised to 565 on the way.
+
+Distance light still snaps to the 32 colormaps the DOS engine used, so a
+lit wall resolves to the same set of palette colours in every format; what
+changes is that those colours are exact rather than rounded to 5/6/5, and
+that everything computed *between* them keeps its precision. The visible
+wins are therefore in blended and full-colour content rather than in flat
+distance shading: translucent and additive surfaces, filtered (bilinear)
+texture sampling, coloured dynamic-light tints and the underwater volume
+all blend at 8 or 10 bits per channel instead of 5/6, and native-colour art
+(PNG title cards, the help screen, the intermission backdrop) is blitted
+losslessly instead of being narrowed to 565.
 
 `30bits` is used only when the frontend reports that it can present a
 10-bit surface natively; otherwise the core falls back to `24bits`, which

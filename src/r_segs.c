@@ -1694,17 +1694,8 @@ void R_StoreWallRange(const int start, const int stop)
          rw_bottomtexturemid += FixedMod(sidedef->rowoffset, textureheight[bottomtexture]);
       }
 
-      /* Allocate space for masked texture tables.
-       *
-       * The per-column clip arrays this reserves are also what
-       * R_RenderThickSides needs to draw a back sector's 3D floor slab
-       * faces: it bails out when a drawseg has no sprtopclip.  Keying the
-       * allocation on the midtexture alone therefore threw away every slab
-       * face on a two-sided line without one, which is most of them -- the
-       * wall then shows the back sector's plain upper/lower tiers as an
-       * unbroken surface instead of the stacked slabs with gaps between
-       * them. */
-      if (sidedef->midtexture || (backsector && backsector->ffloors))
+      // allocate space for masked texture tables
+      if (sidedef->midtexture)    // masked midtexture
       {
          maskedtexture = TRUE;
          ds_p->maskedtexturecol = maskedtexturecol = lastopening - rw_x;

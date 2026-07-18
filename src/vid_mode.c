@@ -77,23 +77,29 @@ double VID_PQDecode(double signal)
   return PQ_MAXNITS * pow(num / den, 1.0 / PQ_M1);
 }
 
-/* sRGB transfer, used to move between the engine's gamma-encoded colours and
- * the linear light PQ needs.  The palette is already gamma-corrected by the
- * engine's own table, so this is the display transfer only. */
+/* Display transfer, used to move between the engine's gamma-encoded colours
+ * and the linear light PQ needs.  The palette is already gamma-corrected by
+ * the engine's own table, so this is the display transfer only.
+ *
+ * This must be the SAME curve the frontend applies to SDR content, or an HDR
+ * frame will not match the SDR one: RetroArch's HDR composition linearises
+ * with a pure 2.4 power (pow(sdr, 2.4), identically in the Vulkan and D3D
+ * shaders), so that is what we invert here.  The sRGB piecewise curve is the
+ * tempting choice and is wrong for this purpose -- its linear toe near black
+ * lifts a 0.05 code by 5x and a 0.02 code by 18x, which lands as raised
+ * blacks and flat contrast while highlights stay put. */
 double VID_SRGBToLinear(double c)
 {
-  if (c <= 0.04045)
-    return c / 12.92;
-  return pow((c + 0.055) / 1.055, 2.4);
+  if (c <= 0.0)
+    return 0.0;
+  return pow(c, 2.4);
 }
 
 double VID_LinearToSRGB(double l)
 {
   if (l <= 0.0)
     return 0.0;
-  if (l <= 0.0031308)
-    return l * 12.92;
-  return 1.055 * pow(l, 1.0 / 2.4) - 0.055;
+  return pow(l, 1.0 / 2.4);
 }
 
 /* Rec.709 -> Rec.2020 primaries.  Applied to linear light before the PQ

@@ -6,6 +6,7 @@
 #include "r_main.h"
 #include "lprintf.h"
 #include "p_sectorportal.h"
+#include "map_format.h"
 
 secportal_t *floorportals   = NULL;
 secportal_t *ceilingportals = NULL;
@@ -248,6 +249,66 @@ static void P_SpawnSkyboxPortals(int *pairs)
 }
 
 
+
+/* Eternity's classic-format portal line types.
+ *
+ * Doom-format maps built for Eternity carry these numbered specials instead
+ * of Sector_SetPortal, with the sector tag in the linedef's tag field.  The
+ * GZDoom wiki lists the exact conversions; the ones whose target types this
+ * core renders are translated here into the same (tag, type, plane, misc,
+ * opacity) arguments the Hexen/UDMF path uses, so an Eternity map gets the
+ * same windows without the resolvers below needing to know about it.
+ *
+ * The anchored types (295-299, 344-347) convert to view portals whose
+ * partner line is found by the same misc 0/1 pairing, and the skybox types
+ * (290-292) to skybox portals; the line-transfer type (289) and the
+ * interactive variants (358+) target features this core does not render and
+ * are left alone. */
+static void P_TranslateEternityPortalLines(void)
+{
+  static const struct { short special; short type, plane, misc; } conv[] =
+  {
+    { 283, 3, 1, 0 },   /* Portal_PlaneCeiling          */
+    { 284, 3, 0, 0 },   /* Portal_PlaneFloor            */
+    { 285, 3, 2, 0 },   /* Portal_PlaneFloorCeiling     */
+    { 286, 4, 1, 0 },   /* Portal_HorizonCeiling        */
+    { 287, 4, 0, 0 },   /* Portal_HorizonFloor          */
+    { 288, 4, 2, 0 },   /* Portal_HorizonFloorCeiling   */
+    { 290, 2, 1, 1 },   /* Portal_SkyboxCeiling         */
+    { 291, 2, 0, 1 },   /* Portal_SkyboxFloor           */
+    { 292, 2, 2, 1 },   /* Portal_SkyboxFloorCeiling    */
+    { 295, 0, 1, 1 },   /* Portal_AnchoredCeiling       */
+    { 296, 0, 0, 1 },   /* Portal_AnchoredFloor         */
+    { 297, 0, 2, 1 },   /* Portal_AnchoredFloorCeiling  */
+    { 298, 0, 1, 0 },   /* Portal_AnchorLine            */
+    { 299, 0, 0, 0 },   /* Portal_AnchorLineFloor       */
+    { 344, 0, 1, 1 },   /* Portal_AnchoredCeiling (alt) */
+    { 345, 0, 0, 1 },   /* Portal_AnchoredFloor   (alt) */
+    { 346, 0, 1, 0 },   /* Portal_AnchorLine      (alt) */
+    { 347, 0, 0, 0 }    /* Portal_AnchorLineFloor (alt) */
+  };
+  int i, k, n = (int)(sizeof(conv) / sizeof(conv[0]));
+
+  if (map_format.hexen)
+    return;                              /* args come from the map already */
+
+  for (i = 0; i < numlines; i++)
+  {
+    line_t *ln = &lines[i];
+    for (k = 0; k < n; k++)
+      if (ln->special == conv[k].special)
+      {
+        ln->args[0] = ln->tag;
+        ln->args[1] = conv[k].type;
+        ln->args[2] = conv[k].plane;
+        ln->args[3] = conv[k].misc;
+        ln->args[4] = 0;
+        ln->special = 57;
+        break;
+      }
+  }
+}
+
 /* Sector_SetPortal types 3 and 4: planes rendered into infinity.
  *
  * Type 4 (horizon) uses the source sector's plane heights as they are: the
@@ -385,6 +446,7 @@ void P_SpawnSectorPortals(void)
   /* line-special portals need no stack things, so they resolve regardless */
   if (!numpoints)
   {
+    P_TranslateEternityPortalLines();
     P_SpawnLinePortals(&pairs);
     P_SpawnSkyboxPortals(&pairs);
     P_SpawnHorizonPortals(&pairs);
@@ -492,6 +554,7 @@ void P_SpawnSectorPortals(void)
     pairs++;
   }
 
+  P_TranslateEternityPortalLines();
   P_SpawnLinePortals(&pairs);
   P_SpawnSkyboxPortals(&pairs);
   P_SpawnHorizonPortals(&pairs);

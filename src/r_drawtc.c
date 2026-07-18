@@ -151,25 +151,37 @@ static void (*tc_tl_flush_quad)(void)  = R_FlushQuadTC;
 
 /* ---- water volume LUTs (built lazily; shared by both formats) ------------ */
 #define TC_MAXWATERDEPTH 4096
-static unsigned char tc_water_keep_lut[TC_MAXWATERDEPTH];
-static unsigned char tc_water_bl_lut[TC_MAXWATERDEPTH];
+static unsigned char  tc_water_keep_lut[TC_MAXWATERDEPTH];
+/* Additive blue lift, in the ACTIVE format's channel units (up to 10 bits,
+ * so this is wider than the 16-bit renderer's byte table). */
+static unsigned short tc_water_bl_lut[TC_MAXWATERDEPTH];
 static int           tc_water_lut_ready = 0;
 static const signed char tc_water_ripple[8] = { 0, 2, 3, 2, 0, -2, -3, -2 };
 
 static void R_BuildWaterLUTTC(void)
 {
+   /* Same curve as the 16-bit build, but evaluated against the output's own
+    * blue maximum instead of 31.  Scaling a 5-bit curve up afterwards would
+    * leave the surface falloff stepping in 1/31 increments (multiples of 8
+    * at 8bpc, 33 at 10bpc) -- visible banding on a large, smooth water
+    * volume, which is exactly what truecolor is here to avoid.  `keep` is a
+    * multiplicative /32 factor, so it needs no rescale: the product carries
+    * the destination's full precision already. */
+   const int mx = (vid_mode == VID_MODE2101010) ? 1023 : 255;
+   const int lo = (2 * mx) / 31;                 /* deep: faint constant blue */
    int depth;
    for (depth = 0; depth < TC_MAXWATERDEPTH; depth++)
    {
       int keep = 26 - (depth / 3);
       int bl;
       if (keep < 11) keep = 11;
-      if (depth < 6)        bl = 16;
-      else if (depth < 56)  bl = 16 - ((depth - 6) / 4);
-      else                  bl = 2;
-      if (bl < 2) bl = 2;
+      if (depth < 6)        bl = (16 * mx) / 31;                 /* lit surface line */
+      else if (depth < 56)  bl = ((16 * mx) / 31)
+                                 - (((depth - 6) * mx) / (4 * 31));
+      else                  bl = lo;
+      if (bl < lo) bl = lo;
       tc_water_keep_lut[depth] = (unsigned char)keep;
-      tc_water_bl_lut[depth]   = (unsigned char)bl;
+      tc_water_bl_lut[depth]   = (unsigned short)bl;
    }
    tc_water_lut_ready = 1;
 }
@@ -195,32 +207,24 @@ void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab);
 #define RDF_GSHIFT  8
 #define RDF_CMAX    255
 #define RDF_M5050   0x00FEFEFEu
-#define RDF_UP53    3
-#define RDF_UP62    2
 #include "r_drawtcfmt.inl"
 #undef RDF
 #undef RDF_RSHIFT
 #undef RDF_GSHIFT
 #undef RDF_CMAX
 #undef RDF_M5050
-#undef RDF_UP53
-#undef RDF_UP62
 
 #define RDF(name)   name##A2
 #define RDF_RSHIFT  20
 #define RDF_GSHIFT  10
 #define RDF_CMAX    1023
 #define RDF_M5050   0x3FEFFBFEu
-#define RDF_UP53    5
-#define RDF_UP62    4
 #include "r_drawtcfmt.inl"
 #undef RDF
 #undef RDF_RSHIFT
 #undef RDF_GSHIFT
 #undef RDF_CMAX
 #undef RDF_M5050
-#undef RDF_UP53
-#undef RDF_UP62
 
 /* =========================================================================
  *  Dispatch thunks: pick the per-format kernel from vid_mode.
@@ -5555,9 +5559,9 @@ void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int poi
       if (lut && same)
       {
         R_TintLUTTC(tintbuf, lut,
-                  (int)(tint0 >> 16) & 255,
-                  (int)(tint0 >> 8) & 255,
-                  (int)tint0 & 255);
+                  (int)(tint0 >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
+                  (int)(tint0 >> VID_TINT_BITS) & VID_TINT_MASK,
+                  (int)tint0 & VID_TINT_MASK);
         lut = tintbuf;
       }
       else
@@ -5584,7 +5588,9 @@ void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int poi
           else if (pooln < WALL_TINT_POOL)
           {
             R_TintLUTTC(pool[pooln], R_GetComposedColormapTC(cmap[j]),
-                      (int)(t >> 16) & 255, (int)(t >> 8) & 255, (int)t & 255);
+                      (int)(t >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
+                      (int)(t >> VID_TINT_BITS) & VID_TINT_MASK,
+                      (int)t & VID_TINT_MASK);
             pool_cm[pooln] = cmap[j];
             pool_tint[pooln] = t;
             lanelut[j] = pool[pooln++];
@@ -5594,8 +5600,9 @@ void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int poi
             /* pool exhausted: draw untinted, tint via the RMW replay pass */
             lanelut[j] = NULL;
             R_WallTintRecord(cols[j]->x, cyl[j], cyh[j],
-                             (int)(t >> 16) & 255, (int)(t >> 8) & 255,
-                             (int)t & 255);
+                             (int)(t >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
+                             (int)(t >> VID_TINT_BITS) & VID_TINT_MASK,
+                             (int)t & VID_TINT_MASK);
           }
         }
         lane_mode = 1;

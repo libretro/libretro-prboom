@@ -41,6 +41,7 @@
 #include "r_plane.h"
 #include "r_things.h"
 #include "r_dynlight.h"
+#include "vid_mode.h"
 #include "u_dynlight.h"
 #include "u_brightmap.h"
 #include "p_ffloor.h"
@@ -773,12 +774,15 @@ static void R_RouteWallTint(draw_column_vars_t *dc, R_DrawColumn_f cf,
    ab = dl_tint_b >> DL_TINT_SHIFT;
    if (R_DrawCmdColumnKernelClass(dc, cf) == 2)
    {
-      /* clamp to 255 for packing: exact, any add at or past a channel's max
-       * saturates the same */
-      if (ar > 255) ar = 255;
-      if (ag > 255) ag = 255;
-      if (ab > 255) ab = 255;
-      dc->tint = ((unsigned)ar << 16) | ((unsigned)ag << 8) | (unsigned)ab;
+      /* Clamp to the channel maximum before packing: exact, since any add
+       * at or past a channel's max saturates identically.  Carried at
+       * VID_TINT_BITS per channel so a 10-bit amount fits unchanged. */
+      if (ar > VID_CMAX_R) ar = VID_CMAX_R;
+      if (ag > VID_CMAX_G) ag = VID_CMAX_G;
+      if (ab > VID_CMAX_B) ab = VID_CMAX_B;
+      dc->tint = ((unsigned)ar << (2*VID_TINT_BITS))
+               | ((unsigned)ag << VID_TINT_BITS)
+               | (unsigned)ab;
    }
    else
    {

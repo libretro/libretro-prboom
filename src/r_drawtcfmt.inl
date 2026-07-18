@@ -29,8 +29,6 @@
  *        RDF_CMAX      channel maximum    (255 / 1023)
  *        RDF_M5050     50/50 blend mask: all channel bits except each
  *                      field's lowest (0x00FEFEFE / 0x3FEFFBFE)
- *        RDF_UP53      shift widening a 5-bit 565 unit to this channel (3 / 5)
- *        RDF_UP62      shift widening a 6-bit 565 unit to this channel (2 / 4)
  *
  *      The scalar functions are the bit-exact references; every vector
  *      kernel reproduces them lane-for-lane (the same discipline the
@@ -715,13 +713,13 @@ static void RDF(R_DrawSpanTL)(draw_span_vars_t *dsvars)
 
 /* ---- submerged-water volume shading -------------------------------------- */
 
-/* keep is the scene fraction /32; bl is an additive blue in 565-blue units,
- * widened to this format's channel. */
+/* keep is the scene fraction /32; bluelift is an additive blue ALREADY in
+ * this format's channel units (see R_BuildWaterLUTTC). */
 static INLINE uint32_t RDF(tc_waterdarken1_)(uint32_t d, int keep, int bluelift)
 {
    int nr = (((int)((d >> RDF_RSHIFT) & RDF_CMAX)) * keep) >> 5;
    int ng = (((int)((d >> RDF_GSHIFT) & RDF_CMAX)) * keep) >> 5;
-   int nb = ((((int)( d               & RDF_CMAX)) * keep) >> 5) + (bluelift << RDF_UP53);
+   int nb = ((((int)( d               & RDF_CMAX)) * keep) >> 5) + bluelift;
    if (nb > RDF_CMAX) nb = RDF_CMAX;
    return ((uint32_t)nr << RDF_RSHIFT) | ((uint32_t)ng << RDF_GSHIFT) | (uint32_t)nb;
 }
@@ -740,7 +738,7 @@ static void RDF(R_WaterDarkenSpan)(int y, int x1, int x2, int surf_y)
 #if defined(WALL_RUN_SSE2)
    {
       const __m128i vkeep = _mm_set1_epi32(keep);
-      const __m128i vbl   = _mm_set1_epi32(bl << RDF_UP53);
+      const __m128i vbl   = _mm_set1_epi32(bl);
       while (n >= 4)
       {
          __m128i d = _mm_loadu_si128((const __m128i *)dest);
@@ -755,7 +753,7 @@ static void RDF(R_WaterDarkenSpan)(int y, int x1, int x2, int surf_y)
 #elif defined(WALL_RUN_NEON)
    {
       const uint32x4_t vkeep = vdupq_n_u32((uint32_t)keep);
-      const uint32x4_t vbl   = vdupq_n_u32((uint32_t)(bl << RDF_UP53));
+      const uint32x4_t vbl   = vdupq_n_u32((uint32_t)bl);
       const uint32x4_t cm    = vdupq_n_u32(RDF_CMAX);
       while (n >= 4)
       {
@@ -859,17 +857,20 @@ static void RDF(R_WaterDarkenColumn)(int x, int yl, int yh, int surf_y)
 
 /* ---- dynamic-light tints, view tint, flat average ------------------------ */
 
-/* Additively tint a 256-entry composed LUT toward a light's chroma; the
- * ar/ag/ab inputs are in 565 channel units (see r_dynlight.c). */
+/* Additively tint a 256-entry composed LUT toward a light's chroma.  The
+ * ar/ag/ab inputs already carry THIS format's channel units (r_dynlight.c
+ * scales the light's chroma to VID_CMAX_*), so they are added as-is -- no
+ * upscale from 565, which would quantise every tint to a multiple of 8 or
+ * 32 and band the light's falloff. */
 static void RDF(R_TintLUT)(uint32_t *dst, const uint32_t *src, int ar, int ag, int ab)
 {
    int i;
    for (i = 0; i < 256; i++)
    {
       uint32_t px = src[i];
-      int r = (int)((px >> RDF_RSHIFT) & RDF_CMAX) + (ar << RDF_UP53);
-      int g = (int)((px >> RDF_GSHIFT) & RDF_CMAX) + (ag << RDF_UP62);
-      int b = (int)( px               & RDF_CMAX) + (ab << RDF_UP53);
+      int r = (int)((px >> RDF_RSHIFT) & RDF_CMAX) + ar;
+      int g = (int)((px >> RDF_GSHIFT) & RDF_CMAX) + ag;
+      int b = (int)( px               & RDF_CMAX) + ab;
       if (r > RDF_CMAX) r = RDF_CMAX;
       if (g > RDF_CMAX) g = RDF_CMAX;
       if (b > RDF_CMAX) b = RDF_CMAX;
@@ -885,9 +886,9 @@ static void RDF(R_WallTintRun)(int x, int yl, int yh, int ar, int ag, int ab)
    for (; n > 0; n--, d += SURFACE_SHORT_PITCH)
    {
       uint32_t px = *d;
-      int r = (int)((px >> RDF_RSHIFT) & RDF_CMAX) + (ar << RDF_UP53);
-      int g = (int)((px >> RDF_GSHIFT) & RDF_CMAX) + (ag << RDF_UP62);
-      int b = (int)( px               & RDF_CMAX) + (ab << RDF_UP53);
+      int r = (int)((px >> RDF_RSHIFT) & RDF_CMAX) + ar;
+      int g = (int)((px >> RDF_GSHIFT) & RDF_CMAX) + ag;
+      int b = (int)( px               & RDF_CMAX) + ab;
       if (r > RDF_CMAX) r = RDF_CMAX;
       if (g > RDF_CMAX) g = RDF_CMAX;
       if (b > RDF_CMAX) b = RDF_CMAX;
@@ -900,7 +901,7 @@ static void RDF(R_TintSpan)(int y, int x1, int x2, int ar, int ag, int ab)
 {
    uint32_t *d = ((uint32_t *)drawvars.int_topleft) + y * SURFACE_SHORT_PITCH + x1;
    int n = x2 - x1 + 1;
-   int wr = ar << RDF_UP53, wg = ag << RDF_UP62, wb = ab << RDF_UP53;
+   int wr = ar, wg = ag, wb = ab;
    if (wr > RDF_CMAX) wr = RDF_CMAX;
    if (wg > RDF_CMAX) wg = RDF_CMAX;
    if (wb > RDF_CMAX) wb = RDF_CMAX;

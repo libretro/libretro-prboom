@@ -6330,9 +6330,9 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
       if (lut && same)
       {
         R_TintLUT(tintbuf, lut,
-                  (int)(tint0 >> 16) & 255,
-                  (int)(tint0 >> 8) & 255,
-                  (int)tint0 & 255);
+                  (int)(tint0 >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
+                  (int)(tint0 >> VID_TINT_BITS) & VID_TINT_MASK,
+                  (int)tint0 & VID_TINT_MASK);
         lut = tintbuf;
       }
       else
@@ -6359,7 +6359,9 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
           else if (pooln < WALL_TINT_POOL)
           {
             R_TintLUT(pool[pooln], R_GetComposedColormap(cmap[j]),
-                      (int)(t >> 16) & 255, (int)(t >> 8) & 255, (int)t & 255);
+                      (int)(t >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
+                      (int)(t >> VID_TINT_BITS) & VID_TINT_MASK,
+                      (int)t & VID_TINT_MASK);
             pool_cm[pooln] = cmap[j];
             pool_tint[pooln] = t;
             lanelut[j] = pool[pooln++];
@@ -6369,8 +6371,9 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
             /* pool exhausted: draw untinted, tint via the RMW replay pass */
             lanelut[j] = NULL;
             R_WallTintRecord(cols[j]->x, cyl[j], cyh[j],
-                             (int)(t >> 16) & 255, (int)(t >> 8) & 255,
-                             (int)t & 255);
+                             (int)(t >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
+                             (int)(t >> VID_TINT_BITS) & VID_TINT_MASK,
+                             (int)t & VID_TINT_MASK);
           }
         }
         lane_mode = 1;

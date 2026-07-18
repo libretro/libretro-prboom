@@ -13,6 +13,7 @@
 #include "r_state.h"
 #include "r_main.h"
 #include "r_dynlight.h"
+#include "vid_mode.h"
 
 extern int numsprites;
 
@@ -93,15 +94,23 @@ void R_CollectDynLights(void)
       a->radius = rad;
       a->r2     = (int64_t)rad * rad;
       a->strength = (int)(d->strength * DL_MAX_BOOST + 0.5f);
-      /* Chroma = colour minus its grey (min) component, in 565 channel units.
-       * A white/grey light has zero chroma, so it adds no tint and leaves the
-       * output identical to the luma-only path; only saturated lights tint. */
+      /* Chroma = colour minus its grey (min) component, in the ACTIVE
+       * format's channel units.  A white/grey light has zero chroma, so it
+       * adds no tint and leaves the output identical to the luma-only path;
+       * only saturated lights tint.
+       *
+       * Scaling to the output's own maxima (rather than always to 565's
+       * 31/63 and multiplying back up in the kernels) is what lets a
+       * coloured light's falloff resolve smoothly in truecolor: quantising
+       * here would pin every tint to a multiple of 8 at 8bpc, or 32 at
+       * 10bpc, and band the very gradient the tint exists to produce.
+       * vid_mode is fixed for the session before any light is registered. */
       {
         float mn = d->r < d->g ? (d->r < d->b ? d->r : d->b)
                                : (d->g < d->b ? d->g : d->b);
-        a->cr = (int)((d->r - mn) * 31.0f + 0.5f);
-        a->cg = (int)((d->g - mn) * 63.0f + 0.5f);
-        a->cb = (int)((d->b - mn) * 31.0f + 0.5f);
+        a->cr = (int)((d->r - mn) * (float)VID_CMAX_R + 0.5f);
+        a->cg = (int)((d->g - mn) * (float)VID_CMAX_G + 0.5f);
+        a->cb = (int)((d->b - mn) * (float)VID_CMAX_B + 0.5f);
       }
     }
   }

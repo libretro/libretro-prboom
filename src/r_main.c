@@ -946,7 +946,10 @@ static int sb_flat_alpha;   /* stacked-portal flat opacity 0..254 at composite
 
 /* stacked-sector portal snapshots (collected pre-composite, rendered post) */
 #define PORTAL_CAP_MAX 16
-static int   portal_cap_id[PORTAL_CAP_MAX];
+static fixed_t portal_cap_dx[PORTAL_CAP_MAX];
+static fixed_t portal_cap_dy[PORTAL_CAP_MAX];
+static fixed_t portal_cap_dz[PORTAL_CAP_MAX];
+static int     portal_cap_alpha[PORTAL_CAP_MAX];
 static short portal_cap_top[PORTAL_CAP_MAX][MAX_SCREENWIDTH];
 static short portal_cap_bot[PORTAL_CAP_MAX][MAX_SCREENWIDTH];
 static int   n_portal_caps;
@@ -1190,14 +1193,46 @@ void R_RenderPlayerView (player_t* player)
       int k;
       for (k = 0; k < npids; k++)
       {
-        if (!R_CollectPortalSpan(pids[k], sb_top, sb_bot))
+        int id = pids[k];
+        int secnum = (id > 0 ? id : -id) - 1;
+        const secportal_t *sp = id > 0 ? &ceilingportals[secnum]
+                                       : &floorportals[secnum];
+        int g, x;
+        if (!sp->active)
           continue;
-        portal_cap_id[n_portal_caps] = pids[k];
-        memcpy(portal_cap_top[n_portal_caps], sb_top,
-               sizeof(short) * viewwidth);
-        memcpy(portal_cap_bot[n_portal_caps], sb_bot,
-               sizeof(short) * viewwidth);
-        n_portal_caps++;
+        if (!R_CollectPortalSpan(id, sb_top, sb_bot))
+          continue;
+        /* A window spanning many sectors yields one id per sector, but they
+         * all show the same scene from the same translated camera -- so
+         * group by displacement (and blend weight) and union the spans.
+         * Without this a 26-sector window would drive 26 full scene
+         * renders per frame instead of one. */
+        for (g = 0; g < n_portal_caps; g++)
+          if (portal_cap_dx[g] == sp->dx && portal_cap_dy[g] == sp->dy &&
+              portal_cap_dz[g] == sp->dz && portal_cap_alpha[g] == sp->alpha)
+            break;
+        if (g == n_portal_caps)
+        {
+          if (n_portal_caps == PORTAL_CAP_MAX)
+            continue;
+          portal_cap_dx[g]    = sp->dx;
+          portal_cap_dy[g]    = sp->dy;
+          portal_cap_dz[g]    = sp->dz;
+          portal_cap_alpha[g] = sp->alpha;
+          memcpy(portal_cap_top[g], sb_top, sizeof(short) * viewwidth);
+          memcpy(portal_cap_bot[g], sb_bot, sizeof(short) * viewwidth);
+          n_portal_caps++;
+        }
+        else
+        {
+          for (x = 0; x < viewwidth; x++)
+          {
+            if (sb_top[x] < portal_cap_top[g][x])
+              portal_cap_top[g][x] = sb_top[x];
+            if (sb_bot[x] > portal_cap_bot[g][x])
+              portal_cap_bot[g][x] = sb_bot[x];
+          }
+        }
       }
     }
 
@@ -1280,18 +1315,14 @@ void R_RenderPlayerView (player_t* player)
       int k;
       for (k = 0; k < n_portal_caps; k++)
       {
-        int id = portal_cap_id[k];
-        int secnum = (id > 0 ? id : -id) - 1;
-        const secportal_t *sp = id > 0 ? &ceilingportals[secnum]
-                                       : &floorportals[secnum];
-        if (!sp->active)
-          continue;
         memcpy(sb_top, portal_cap_top[k], sizeof(short) * viewwidth);
         memcpy(sb_bot, portal_cap_bot[k], sizeof(short) * viewwidth);
         sb_use_reveal = 1;
-        sb_flat_alpha = sp->alpha > 0 && sp->alpha < 255 ? sp->alpha : 0;
-        R_RenderCompositeView(viewx + sp->dx, viewy + sp->dy,
-                              viewz + sp->dz, 0);
+        sb_flat_alpha = portal_cap_alpha[k] > 0 && portal_cap_alpha[k] < 255
+                      ? portal_cap_alpha[k] : 0;
+        R_RenderCompositeView(viewx + portal_cap_dx[k],
+                              viewy + portal_cap_dy[k],
+                              viewz + portal_cap_dz[k], 0);
         sb_flat_alpha = 0;
         sb_use_reveal = 0;
       }

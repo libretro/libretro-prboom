@@ -142,6 +142,71 @@ static void P_SpawnLinePortals(int *pairs)
   }
 }
 
+
+/* Sector_SetPortal type 1: copied portal.
+ *
+ * "Copies the given portal to all sectors tagged with 'tag' or the line's
+ * front sector if 'tag' is 0.  Use this for sectors which need to have a
+ * different tag, such as a lift, yet should share the portal."  misc names
+ * the tag of the portal to copy; plane selects floor (0), ceiling (1), both
+ * (2), or -- for this type only -- 3, meaning copy whichever plane the
+ * source carries.
+ *
+ * Runs after the view-portal pass so the descriptors it copies exist. */
+static void P_CopyLinePortals(int *pairs)
+{
+  int i;
+  for (i = 0; i < numlines; i++)
+  {
+    const line_t *ln = &lines[i];
+    const secportal_t *srcf = NULL, *srcc = NULL;
+    int tag, srctag, plane, s;
+
+    if (ln->special != 57 || ln->args[1] != 1)
+      continue;
+
+    tag    = ln->args[0];
+    plane  = ln->args[2];
+    srctag = ln->args[3];
+
+    /* the portal being copied: the first tagged sector that carries one on
+     * a plane this copy wants */
+    for (s = 0; s < numsectors; s++)
+    {
+      if (sectors[s].tag != srctag)
+        continue;
+      if (!srcf && (plane == 0 || plane == 2 || plane == 3) &&
+          floorportals[s].active)
+        srcf = &floorportals[s];
+      if (!srcc && (plane == 1 || plane == 2 || plane == 3) &&
+          ceilingportals[s].active)
+        srcc = &ceilingportals[s];
+    }
+    if (!srcf && !srcc)
+      continue;                          /* nothing to copy */
+
+    for (s = 0; s < numsectors; s++)
+    {
+      /* a sector may not copy onto itself, and the source sectors keep
+       * their own descriptors */
+      if (tag ? sectors[s].tag != tag : &sectors[s] != ln->frontsector)
+        continue;
+      if (sectors[s].tag == srctag)
+        continue;
+      if (srcf && !floorportals[s].active)
+      {
+        floorportals[s] = *srcf;
+        (*pairs)++;
+      }
+      if (srcc && !ceilingportals[s].active)
+      {
+        ceilingportals[s] = *srcc;
+        (*pairs)++;
+      }
+    }
+  }
+}
+
 void P_SpawnSectorPortals(void)
 {
   int i, j, pairs = 0;
@@ -158,6 +223,7 @@ void P_SpawnSectorPortals(void)
   if (!numpoints)
   {
     P_SpawnLinePortals(&pairs);
+    P_CopyLinePortals(&pairs);
     sector_portals_active = pairs > 0;
     if (pairs)
       lprintf(LO_INFO, "P_SpawnSectorPortals: %d sector portal window(s)\n",
@@ -262,6 +328,7 @@ void P_SpawnSectorPortals(void)
   }
 
   P_SpawnLinePortals(&pairs);
+  P_CopyLinePortals(&pairs);
 
   sector_portals_active = pairs > 0;
   if (pairs)

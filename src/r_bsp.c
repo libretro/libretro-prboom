@@ -37,6 +37,10 @@
 #include "r_segs.h"
 #include "r_plane.h"
 #include "r_dynlight.h"
+#include "p_sectorportal.h"
+
+/* set per subsector: the true sector index before any FakeFlat rewrite */
+int r_real_secnum = -1;
 #include "r_things.h"
 #include "r_bsp.h" // cph - sanity checking
 #include "p_ffloor.h"
@@ -525,6 +529,11 @@ static void R_Subsector(int num)
 
   sub = &subsectors[num];
   frontsector = sub->sector;
+  /* identity-keyed lookups (stacked-sector portals, wall glow) must use the
+   * REAL sector: frontsector may be rewritten to &tempsec by R_FakeFlat or
+   * the 3D-floor override below, and a pointer difference against that
+   * stack copy indexes wildly out of the per-sector tables. */
+  r_real_secnum = (int)(sub->sector - sectors);
   count = sub->numlines;
   line = &segs[sub->firstline];
 
@@ -606,7 +615,11 @@ static void R_Subsector(int num)
                 frontsector->floor_xoffs,       // killough 3/7/98
                 frontsector->floor_yoffs,
                 frontsector->floor_slope,
-                frontsector->floorpic == skyflatnum ? frontsector->skybox : -1
+                frontsector->floorpic == skyflatnum ? frontsector->skybox : -1,
+                floorportals &&
+                (unsigned)r_real_secnum < (unsigned)numsectors &&
+                floorportals[r_real_secnum].active
+                  ? -r_real_secnum - 1 : 0
                 ) : NULL;
 
   ceilingplane = frontsector->ceiling_slope ||    /* sloped: never cull */
@@ -622,7 +635,11 @@ static void R_Subsector(int num)
                 frontsector->ceiling_xoffs,     // killough 3/7/98
                 frontsector->ceiling_yoffs,
                 frontsector->ceiling_slope,
-                frontsector->ceilingpic == skyflatnum ? frontsector->skybox : -1
+                frontsector->ceilingpic == skyflatnum ? frontsector->skybox : -1,
+                ceilingportals &&
+                (unsigned)r_real_secnum < (unsigned)numsectors &&
+                ceilingportals[r_real_secnum].active
+                  ? r_real_secnum + 1 : 0
                 ) : NULL;
 
   /* ZDoom swimmable 3D floors (water) AND translucent solid/render-only
@@ -697,7 +714,7 @@ static void R_Subsector(int num)
 
   /* GLDEFS wall glow: tag the planes of glowing sectors (see r_dynlight) */
   if ((floorplane || ceilingplane) &&
-      R_SectorWallGlow((int)(frontsector - sectors)))
+      R_SectorWallGlow(r_real_secnum))
   {
     if (floorplane)   floorplane->wallglow = 1;
     if (ceilingplane) ceilingplane->wallglow = 1;

@@ -56,7 +56,7 @@ visplane_t *R_FindPlane(
   fixed_t xoffs,                /* killough 2/28/98: add x-y offsets */
   fixed_t yoffs,
   const secplane_t *slope,      /* tilted plane or NULL */
-  int skybox);                  /* per-sector 3D skybox index, or -1 */
+  int skybox, int portal);                  /* per-sector 3D skybox index, or -1 */
 
 visplane_t *R_CheckPlane(visplane_t *pl, int start, int stop);
 visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop);
@@ -66,6 +66,8 @@ visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel);
  * visplanes using skybox index sbidx, into caller arrays sized viewwidth.
  * Returns 1 if any column is covered. */
 int R_CollectSkyboxSpan(int sbidx, short *out_top, short *out_bot);
+int R_CollectPortalIds(int *out_ids, int maxids);
+int R_CollectPortalSpan(int portal, short *out_top, short *out_bot);
 
 /* Default-skybox reveal mask (see r_plane.c): per-pixel ground truth of
  * which sky pixels the main pass left showing the skybox scene. */

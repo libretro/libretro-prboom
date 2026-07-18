@@ -52,6 +52,7 @@
 #include "r_drawtc.h"
 #include "vid_mode.h"
 #include "p_skybox.h"
+#include "p_sectorportal.h"
 #include "p_ffloor.h"
 #include "m_bbox.h"
 #include "r_sky.h"
@@ -938,7 +939,13 @@ static void *R_SkyboxScratch(void)
 static int sb_use_reveal;
 
 /* render skybox camera `sb` into scratch, then copy its owned sky pixels. */
-static void R_RenderTaggedSkybox(const skybox_t *sb)
+/* Render the level from (camx,camy,camz, view angle + angdelta) into the
+ * scratch buffer, sealed to the sb_top/sb_bot column spans, and composite
+ * those spans back into the frame.  The shared core of tagged 3D skyboxes
+ * and stacked-sector portals; r_in_skybox suppresses nested skyboxes and
+ * portal windows inside the scene, so recursion depth is one. */
+static void R_RenderCompositeView(fixed_t camx, fixed_t camy, fixed_t camz,
+                                  angle_t angdelta)
 {
   fixed_t savex = viewx, savey = viewy, savez = viewz;
   angle_t saveang = viewangle;
@@ -951,15 +958,15 @@ static void R_RenderTaggedSkybox(const skybox_t *sb)
   if (!scratch)
     return;
 
-  /* render the skybox scene into the scratch buffer */
+  /* render the scene into the scratch buffer */
   drawvars.short_topleft = (unsigned short *)scratch;
   drawvars.int_topleft   = (unsigned int   *)scratch;
 
   r_in_skybox = 1;
-  viewx = sb->x;
-  viewy = sb->y;
-  viewz = sb->z;
-  viewangle = saveang + sb->angle;
+  viewx = camx;
+  viewy = camy;
+  viewz = camz;
+  viewangle = saveang + angdelta;
   viewsin = finesine[viewangle>>ANGLETOFINESHIFT];
   viewcos = finecosine[viewangle>>ANGLETOFINESHIFT];
   viewplayer = &players[displayplayer];
@@ -1026,6 +1033,11 @@ static void R_RenderTaggedSkybox(const skybox_t *sb)
   }
 }
 
+static void R_RenderTaggedSkybox(const skybox_t *sb)
+{
+  R_RenderCompositeView(sb->x, sb->y, sb->z, sb->angle);
+}
+
 #ifdef PRBOOM_RENDER_PROFILE
 static double rprof_skybox;
 #endif
@@ -1060,7 +1072,7 @@ void R_RenderPlayerView (player_t* player)
    * showing the skybox scene (see the reveal mask in r_plane.c); the scene
    * itself renders after the planes, clipped and composited to exactly
    * those pixels. */
-  sky_reveal_active = skyview.active ? 1 : 0;
+  sky_reveal_active = (skyview.active || sector_portals_active) ? 1 : 0;
 
 
   // Clear buffers.
@@ -1189,6 +1201,33 @@ void R_RenderPlayerView (player_t* player)
           sb_bot[x] = cap_bot[k][x];
         }
         R_RenderTaggedSkybox(&skyboxes[used[k]]);
+      }
+    }
+
+    /* Stacked-sector portals: each portal window renders the level from the
+     * viewer translated by the portal offset, sealed to the window's spans,
+     * and composites into exactly those pixels.  Same machinery as tagged
+     * skyboxes; single depth (portal windows inside the scene draw their
+     * flats).  Zero cost without portal planes this frame. */
+    if (floorportals || ceilingportals)
+    {
+      int pids[16];
+      int npids = R_CollectPortalIds(pids, 16);
+      int k;
+      for (k = 0; k < npids; k++)
+      {
+        int id = pids[k];
+        int secnum = (id > 0 ? id : -id) - 1;
+        const secportal_t *sp = id > 0 ? &ceilingportals[secnum]
+                                       : &floorportals[secnum];
+        if (!sp->active)
+          continue;
+        if (!R_CollectPortalSpan(id, sb_top, sb_bot))
+          continue;
+        sb_use_reveal = 1;
+        R_RenderCompositeView(viewx + sp->dx, viewy + sp->dy,
+                              viewz + sp->dz, 0);
+        sb_use_reveal = 0;
       }
     }
 

@@ -30,6 +30,8 @@ typedef struct {
  * P_SpawnSectorPortals, freed by P_ClearSectorPortals. */
 extern secportal_t *floorportals;
 extern secportal_t *ceilingportals;
+/* any resolved pairings on this level (renderer gate) */
+extern int sector_portals_active;
 
 /* record an UpperStackLookOnly (9077) / LowerStackLookOnly (9078) at load */
 void P_AddStackPoint(int upper, int tid, fixed_t x, fixed_t y, int alpha);

@@ -771,6 +771,7 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
       new_pl->yoffs = pl->yoffs;
       new_pl->slope = pl->slope;
       new_pl->skybox = pl->skybox;
+      new_pl->portal = pl->portal;
       new_pl->wallglow = pl->wallglow;
       new_pl->minx = start;
       new_pl->maxx = stop;
@@ -790,22 +791,22 @@ static visplane_t *R_FindPlane_impl(fixed_t height, int picnum, int lightlevel,
                         int skybox);
 visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
                         fixed_t xoffs, fixed_t yoffs, const secplane_t *slope,
-                        int skybox)
+                        int skybox, int portal)
 {
    extern double prof_findplane_usec;
    visplane_t *r;
    double _t0 = I_RenderProfileUsec();
-   r = R_FindPlane_impl(height, picnum, lightlevel, xoffs, yoffs, slope, skybox);
+   r = R_FindPlane_impl(height, picnum, lightlevel, xoffs, yoffs, slope, skybox, portal);
    prof_findplane_usec += (I_RenderProfileUsec() - _t0);
    return r;
 }
 static visplane_t *R_FindPlane_impl(fixed_t height, int picnum, int lightlevel,
                         fixed_t xoffs, fixed_t yoffs, const secplane_t *slope,
-                        int skybox)
+                        int skybox, int portal)
 #else
 visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
                         fixed_t xoffs, fixed_t yoffs, const secplane_t *slope,
-                        int skybox)
+                        int skybox, int portal)
 #endif
 {
    visplane_t *check;
@@ -825,7 +826,8 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
             yoffs == check->yoffs &&
             !check->translucent &&        /* water planes never merge with opaque */
             slope == check->slope &&      /* tilted planes never merge with flat */
-            skybox == check->skybox)      /* different skyboxes never merge */
+            skybox == check->skybox &&    /* different skyboxes never merge */
+            portal == check->portal)      /* portal windows never merge across */
          return check;
 
    check = new_visplane(hash);         // killough
@@ -841,6 +843,7 @@ visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
    check->modified = 0;
    check->translucent = 0;
    check->skybox = skybox;
+   check->portal = portal;
    check->wallglow = 0;
 
    memset (check->top, 0xff, sizeof check->top);
@@ -870,6 +873,8 @@ visplane_t *R_FindWaterPlane(fixed_t height, int picnum, int lightlevel)
    check->modified = 0;
    check->translucent = 1;
    check->skybox = -1;
+   check->portal = 0;
+   check->wallglow = 0;
 
    memset (check->top, 0xff, sizeof check->top);
 
@@ -970,6 +975,13 @@ static void R_DoDrawPlane(visplane_t *pl)
    R_SetDefaultDrawColumnVars(&dcvars);
 
    if (!pl->modified)
+      return;
+
+   /* Stacked-sector portal window: the main pass leaves these pixels for the
+    * portal composite (mirrors the tagged-skybox skip).  Inside a portal or
+    * skybox scene render the window draws its flat normally -- single-depth
+    * portals by construction. */
+   if (pl->portal && !r_in_skybox)
       return;
 
    if (pl->minx <= pl->maxx)
@@ -1308,11 +1320,13 @@ void R_SkyRevealBuild(void)
   visplane_t *pl;
   memset(sky_reveal, 0, (size_t)viewwidth * SKY_REVEAL_STRIDE);
   sky_row_min = viewheight; sky_row_max = -1;
-  /* pass 1: union of skipped sky plane spans */
+  /* pass 1: union of the skipped windows -- sky plane spans (when the
+   * default skybox is active) and stacked-sector portal plane spans */
   for (i = 0; i < MAXVISPLANES; i++)
     for (pl = visplanes[i]; pl; pl = pl->next)
     {
-      if (!(pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT)))
+      int is_sky = (pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT));
+      if (!((is_sky && skyview.active) || pl->portal))
         continue;
       for (x = pl->minx; x <= pl->maxx; x++)
       {
@@ -1329,11 +1343,12 @@ void R_SkyRevealBuild(void)
     }
   if (sky_row_max < sky_row_min)
     return;   /* no sky this frame */
-  /* pass 2: every other plane's spans cover (draw order: sky loses) */
+  /* pass 2: every other plane's spans cover (draw order: windows lose) */
   for (i = 0; i < MAXVISPLANES; i++)
     for (pl = visplanes[i]; pl; pl = pl->next)
     {
-      if (pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT))
+      int is_sky = (pl->picnum == skyflatnum || (pl->picnum & PL_SKYFLAT));
+      if ((is_sky && skyview.active) || pl->portal)
         continue;
       for (x = pl->minx; x <= pl->maxx; x++)
       {
@@ -1388,6 +1403,52 @@ int R_CollectSkyboxSpan(int sbidx, short *out_top, short *out_bot)
         int b = (int)pl->bottom[x];
         /* top[x] == -1 (0xffffffff fill) is the "no span" sentinel, exactly
          * as the sky column draw tests it; skip those columns. */
+        if (t == -1 || t > b)
+          continue;
+        if (t < out_top[x]) out_top[x] = (short)t;
+        if (b > out_bot[x]) out_bot[x] = (short)b;
+        any = 1;
+      }
+    }
+  return any;
+}
+
+/* Collect the distinct stacked-sector portal ids present this frame (up to
+ * maxids), and the merged column spans of one id -- the portal-pass
+ * mirrors of the tagged-skybox collectors. */
+int R_CollectPortalIds(int *out_ids, int maxids)
+{
+  int i, n = 0;
+  visplane_t *pl;
+  for (i = 0; i < MAXVISPLANES; i++)
+    for (pl = visplanes[i]; pl; pl = pl->next)
+    {
+      int k;
+      if (!pl->modified || !pl->portal)
+        continue;
+      for (k = 0; k < n; k++)
+        if (out_ids[k] == pl->portal)
+          break;
+      if (k == n && n < maxids)
+        out_ids[n++] = pl->portal;
+    }
+  return n;
+}
+
+int R_CollectPortalSpan(int portal, short *out_top, short *out_bot)
+{
+  int x, any = 0, i;
+  visplane_t *pl;
+  for (x = 0; x < viewwidth; x++) { out_top[x] = 32767; out_bot[x] = -1; }
+  for (i = 0; i < MAXVISPLANES; i++)
+    for (pl = visplanes[i]; pl; pl = pl->next)
+    {
+      if (!pl->modified || pl->portal != portal)
+        continue;
+      for (x = pl->minx; x <= pl->maxx; x++)
+      {
+        int t = (int)pl->top[x];
+        int b = (int)pl->bottom[x];
         if (t == -1 || t > b)
           continue;
         if (t < out_top[x]) out_top[x] = (short)t;

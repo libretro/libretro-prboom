@@ -9,6 +9,7 @@
 
 secportal_t *floorportals   = NULL;
 secportal_t *ceilingportals = NULL;
+int sector_portals_active   = 0;
 
 /* pending stack points recorded during thing-load */
 typedef struct {
@@ -24,6 +25,7 @@ static int        pointalloc = 0;
 
 void P_ClearSectorPortals(void)
 {
+  sector_portals_active = 0;
   free(floorportals);   floorportals = NULL;
   free(ceilingportals); ceilingportals = NULL;
   free(points);         points = NULL; numpoints = 0; pointalloc = 0;
@@ -152,6 +154,7 @@ void P_SpawnSectorPortals(void)
     pairs++;
   }
 
+  sector_portals_active = pairs > 0;
   if (pairs)
     lprintf(LO_INFO, "P_SpawnSectorPortals: %d stacked-sector pairing(s)\n",
             pairs);

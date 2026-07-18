@@ -1,13 +1,15 @@
 /* p_sectorportal.h: stacked-sector "look only" portals (rooms over rooms).
  *
  * Legacy ZDoom stacked sectors are set up with a matching tid pair:
- *   - UpperStackLookOnly (9077) sits in the LOWER room; that room's ceiling
- *     becomes a window looking UP into the upper room.
- *   - LowerStackLookOnly (9078) sits in the UPPER room; that room's floor
+ *   - UpperStackLookOnly (9077) sits in the UPPER room; that room's floor
  *     becomes a window looking DOWN into the lower room.
- * The two are linked by a shared tid.  Looking through one plane shows the
- * other room, translated by the offset between the two anchor things; the
- * portal is view-only (no movement through it).
+ *   - LowerStackLookOnly (9078) sits in the LOWER room; that room's
+ *     ceiling becomes a window looking UP into the upper room.
+ * (Verified against real content: in every zdcmp2 pairing the 9077's room
+ * floor sits above the 9078's.)  The two are linked by a shared tid.
+ * Looking through one plane shows the other room, translated by the offset
+ * between the two anchor things; the portal is view-only (no movement
+ * through it).
  *
  * Recorded at thing-load time and resolved once afterwards (the partner may
  * load later), filling per-sector floor/ceiling portal descriptors.

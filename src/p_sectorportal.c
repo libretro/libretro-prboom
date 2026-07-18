@@ -136,19 +136,22 @@ void P_SpawnSectorPortals(void)
       sec = ss->sector;
       if (points[j].upper)
       {
-        ceilingportals[sec - sectors].active = 1;
-        ceilingportals[sec - sectors].dx = dx;
-        ceilingportals[sec - sectors].dy = dy;
-        ceilingportals[sec - sectors].dz = dz;
-        ceilingportals[sec - sectors].alpha = alpha;
+        /* 9077: the physically UPPER room; its floor is the window,
+         * looking down into the partner room (offset toward the 9078) */
+        floorportals[sec - sectors].active = 1;
+        floorportals[sec - sectors].dx = dx;
+        floorportals[sec - sectors].dy = dy;
+        floorportals[sec - sectors].dz = dz;
+        floorportals[sec - sectors].alpha = alpha;
       }
       else
       {
-        floorportals[sec - sectors].active = 1;
-        floorportals[sec - sectors].dx = -dx;
-        floorportals[sec - sectors].dy = -dy;
-        floorportals[sec - sectors].dz = -dz;
-        floorportals[sec - sectors].alpha = alpha;
+        /* 9078: the LOWER room; its ceiling looks up into the 9077's room */
+        ceilingportals[sec - sectors].active = 1;
+        ceilingportals[sec - sectors].dx = -dx;
+        ceilingportals[sec - sectors].dy = -dy;
+        ceilingportals[sec - sectors].dz = -dz;
+        ceilingportals[sec - sectors].alpha = alpha;
       }
     }
     pairs++;

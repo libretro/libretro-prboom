@@ -265,6 +265,7 @@ static fixed_t R_ScaleFromGlobalAngle(angle_t visangle)
 void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
 {
    int water_seg = 0;
+   int glow_bright = 0;
    fixed_t water_surfz = 0;
    int      texnum;
    sector_t tempsec;      // killough 4/13/98
@@ -336,6 +337,13 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
    }
 
    dcvars.texturemid += curline->sidedef->rowoffset;
+
+   /* GLDEFS wall glow: a glow-listed texture is itself a light source, so
+    * draw it through the undimmed base colormap -- otherwise a lava fall in
+    * a dark hall renders dimmer than the pool it casts.  One table lookup
+    * per masked range, gated off entirely when no walls{} entries bind. */
+   glow_bright = u_glow_walls_present && !fixedcolormap && fullcolormap &&
+                 U_GlowForWallTexture(texnum) != NULL;
 
    if (fixedcolormap)
    {
@@ -485,8 +493,10 @@ void R_RenderMaskedSegRange(drawseg_t *ds, int x1, int x2)
 
       if (!fixedcolormap)
          dcvars.z = spryscale; // for filtering -- POPE
-      dcvars.colormap = R_ColourMap(rw_lightlevel,spryscale);
-      dcvars.nextcolormap = R_ColourMap(rw_lightlevel+1,spryscale); // for filtering -- POPE
+      dcvars.colormap = glow_bright ? fullcolormap
+                                    : R_ColourMap(rw_lightlevel,spryscale);
+      dcvars.nextcolormap = glow_bright ? fullcolormap
+                                        : R_ColourMap(rw_lightlevel+1,spryscale); // for filtering -- POPE
 
       // killough 3/2/98:
       //
@@ -713,6 +723,7 @@ static int didsolidcol; /* True if at least one column was marked solid */
  * colour components and fade heights.  NULL/zeroed when the seg is unlit by
  * glow; the emitter's fast path stays untouched then. */
 static const void *seg_glow_f, *seg_glow_c;
+static int seg_bright_mid, seg_bright_top, seg_bright_bot;
 static int seg_glow_fz, seg_glow_cz;
 static int seg_glow_fr, seg_glow_fg, seg_glow_fb, seg_glow_fh;
 static int seg_glow_cr, seg_glow_cg, seg_glow_cb, seg_glow_ch;
@@ -910,6 +921,13 @@ static void R_RenderSegLoop (void)
     * u_glow_present keeps this at one global test on unglowing wads; the two
     * table lookups per seg only run when any glow definitions exist. */
    seg_glow_f = seg_glow_c = NULL;
+   seg_bright_mid = seg_bright_top = seg_bright_bot = 0;
+   if (u_glow_walls_present && !fixedcolormap && fullcolormap)
+   {
+      seg_bright_mid = midtexture    && U_GlowForWallTexture(midtexture) != NULL;
+      seg_bright_top = toptexture    && U_GlowForWallTexture(toptexture) != NULL;
+      seg_bright_bot = bottomtexture && U_GlowForWallTexture(bottomtexture) != NULL;
+   }
    if (u_glow_present && frontsector)
    {
       seg_glow_f = U_GlowForFlat(frontsector->floorpic);
@@ -1149,7 +1167,14 @@ static void R_RenderSegLoop (void)
             dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
          }
          dcvars.texheight = midtexheight;
-         if (col_lit || seg_glow_f || seg_glow_c)
+         if (seg_bright_mid)
+         {
+            dcvars.colormap = fullcolormap;
+            if (z_filter)
+               dcvars.nextcolormap = fullcolormap;
+            R_DrawCmdEmitColumn(&dcvars, colfunc);
+         }
+         else if (col_lit || seg_glow_f || seg_glow_c)
             R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter, col_lit);
          else
             R_DrawCmdEmitColumn(&dcvars, colfunc);
@@ -1186,7 +1211,14 @@ static void R_RenderSegLoop (void)
                   dcvars.nextsource = R_GetTextureColumn(tex_patch,texturecolumn+1);
                }
                dcvars.texheight = toptexheight;
-               if (col_lit || seg_glow_f || seg_glow_c)
+               if (seg_bright_top)
+               {
+                  dcvars.colormap = fullcolormap;
+                  if (z_filter)
+                     dcvars.nextcolormap = fullcolormap;
+                  R_DrawCmdEmitColumn(&dcvars, colfunc);
+               }
+               else if (col_lit || seg_glow_f || seg_glow_c)
                   R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter, col_lit);
                else
                   R_DrawCmdEmitColumn(&dcvars, colfunc);
@@ -1228,7 +1260,14 @@ static void R_RenderSegLoop (void)
                   dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
                }
                dcvars.texheight = bottomtexheight;
-               if (col_lit || seg_glow_f || seg_glow_c)
+               if (seg_bright_bot)
+               {
+                  dcvars.colormap = fullcolormap;
+                  if (z_filter)
+                     dcvars.nextcolormap = fullcolormap;
+                  R_DrawCmdEmitColumn(&dcvars, colfunc);
+               }
+               else if (col_lit || seg_glow_f || seg_glow_c)
                   R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter, col_lit);
                else
                   R_DrawCmdEmitColumn(&dcvars, colfunc);

@@ -27,7 +27,8 @@ You still need a valid IWAD — the engine provides the code, not the game data.
 - **IWAD / PWAD** `.wad` files, including multi-PWAD load orders
 - **PK3 / ZIP** archives (`.pk3`, `.zip`) with ZDoom folder-namespace layout
 - **DeHackEd / BEX** patches (`.deh`, `.bex`), standalone or in-wad (`DEHACKED`)
-- **`.lmp`** demos and **`.m3u`** playlists for multi-file sets
+- **`.lmp`** demos and **`.m3u`** playlists for multi-file sets — playlist
+  entries may freely mix WADs, PK3/ZIP archives, and DEH/BEX patches
 - Embedded `prboom.wad` resource lump is baked into the core
 
 ## Feature highlights
@@ -35,7 +36,14 @@ You still need a valid IWAD — the engine provides the code, not the game data.
 ### Rendering
 - Selectable internal resolution well beyond the original 320×200
 - Hor+ **widescreen** with an in-menu aspect-ratio selector
-- Per-sector **3D skyboxes** (SkyViewpoint / SkyPicker)
+- Per-sector **3D skyboxes** (SkyViewpoint / SkyPicker), rendered only into
+  the sky pixels actually visible each frame
+- **GLDEFS dynamic point lights**, drawn by the software renderer: walls,
+  floors, ceilings and sprites are brightened — and colour-tinted — by
+  nearby `pointlight` / `pulselight` / `flickerlight` definitions, with
+  per-view light culling to keep it cheap
+- **Smooth diminished lighting** (a 256-step light ramp in place of the
+  vanilla 32 light levels), removing distance-banding on walls and floors
 - **Wall bullet decals** (optional; off by default to match ZDoom mods that
   place their own)
 - Translucency, deep water, independent floor/ceiling lighting, animated and
@@ -71,7 +79,9 @@ You still need a valid IWAD — the engine provides the code, not the game data.
 - Frontend memory-status reporting used to size the zone cache
 - Optional **memory-mapped WAD loading** (see core options) to cut load time
   and memory use on large wads
-- Savestates and the standard libretro option/variable interfaces
+- Savestates and the standard libretro option/variable interfaces;
+  savestates from incompatible core builds are rejected cleanly (the game
+  keeps running) instead of crashing
 
 ## Core options
 
@@ -83,6 +93,7 @@ You still need a valid IWAD — the engine provides the code, not the game data.
 | Memory-Map WAD Files *(restart)* | Load wads by `mmap` instead of a full read; falls back to a normal read where mapping is unavailable. Default off. |
 | Sound Sample Rate | Audio/resampler output rate. |
 | Wall Bullet Decals | Stamp hitscan scuff marks on walls. Default off. |
+| Dynamic Light Wall Falloff | Vertical falloff bands for point-light wall illumination (softer, slightly costlier). Default off. |
 | Mouse Active When Using Gamepad | Allow mouse input on a gamepad device. |
 | Analog Deadzone (Percent) | Gamepad stick deadzone. |
 | Look on Parent Folders for IWADs | Scan parent folders for IWADs (disable for SIGIL). |
@@ -126,6 +137,12 @@ the wad.
   Silverman **KVX** voxel model, rasterised by the software renderer
   (`R_DrawVoxel`) as projected per-voxel splats, with the model's 6-bit
   palette remapped to PLAYPAL.
+- **Dynamic point lights.** ZDoom GLDEFS `pointlight` / `pulselight` /
+  `flickerlight` definitions and their `object`/sprite bindings light the
+  world from within the software renderer: reached walls, flats and sprites
+  get a light-level boost and a colour tint toward the light's RGB, with
+  pulse/flicker animation, per-view culling, and an optional vertical
+  falloff on walls (core option).
 - **Brightmaps.** ZDoom GLDEFS `brightmap` blocks for **textures, flats and
   sprites** are parsed, built into per-texel masks (`U_BuildBrightmasks`) and
   applied by the software column/span drawers, so masked texels draw at full
@@ -161,15 +178,15 @@ the wad.
   `special` + `arg0..4`, so special-driven features apply on text maps as on
   binary ones — `Sector_Set3DFloor` (3D floors) and `Plane_Align` (slopes)
   included. UDMF-native structured portal fields are not read.
-- **GLDEFS:** skybox handling and **brightmap** definitions are consumed (see
-  above); sector **glow** and dynamic/point-**light** definitions are not.
+- **GLDEFS:** skybox handling, **brightmap** definitions, and dynamic
+  point-**light** definitions (with their sprite bindings) are consumed (see
+  above); sector **glow** definitions are not.
 
 ### Not supported
 
 - **ZScript** — no support. Mods whose gameplay lives in ZScript won't run it.
 - **Line / sector portals** — inert.
-- **3D models (MODELDEF), dynamic/point lights** — out of scope for the
-  8-bit software renderer.
+- **3D models (MODELDEF)** — out of scope for the 8-bit software renderer.
 - **Truecolor rendering.**
 
 The practical result: map-and-resource-driven ZDoom wads — new levels, sprite

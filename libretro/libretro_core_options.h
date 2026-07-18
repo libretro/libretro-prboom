@@ -65,16 +65,32 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "prboom-color_format",
       "Color Format (Restart Required)",
       NULL,
-      "Output colour depth. '16bits' is the classic RGB565 renderer. '24bits' renders in full 8-bit-per-channel truecolor, which removes the banding the 16-bit light ramp introduces in distance shading and smooth gradients. '30bits' renders at 10 bits per channel for finer gradients still; it is used only when the frontend can actually present a 10-bit surface, otherwise the core falls back to 24bits automatically.",
+      "Output colour depth. '16bits' is the classic RGB565 renderer. '24bits' renders in full 8-bit-per-channel truecolor, which removes the banding the 16-bit light ramp introduces in distance shading and smooth gradients. '30bits' outputs true HDR10 -- PQ-encoded Rec.2020 at 10 bits per channel, carrying absolute luminance -- so emissive content can be rendered brighter than SDR white on an HDR display. It requires a frontend that presents HDR10 natively; otherwise the core falls back to 24bits automatically.",
       NULL,
       NULL,
       {
          { "16bits",             NULL },
          { "24bits (truecolor)", NULL },
-         { "30bits (HDR)",       NULL },
+         { "30bits (HDR)",       "30bits (HDR10)" },
          { NULL, NULL },
       },
       "16bits"
+   },
+   {
+      "prboom-hdr_emissive",
+      "HDR Emissive Boost",
+      NULL,
+      "How far above SDR white self-illuminated content (muzzle flashes, plasma, rockets, explosions, powerups and brightmapped texels) is rendered when the Color Format is 30bits. Higher values glow harder. Only affects HDR10 output; ignored in 16- and 24-bit modes.",
+      NULL,
+      NULL,
+      {
+         { "off", "Off" },
+         { "2x",  "2x" },
+         { "4x",  "4x" },
+         { "8x",  "8x" },
+         { NULL, NULL },
+      },
+      "2x"
    },
    {
       "prboom-mouse_on",

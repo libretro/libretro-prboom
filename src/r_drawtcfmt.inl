@@ -36,55 +36,93 @@
  *
  *-----------------------------------------------------------------------------*/
 
+
+/* ---- channel conversion for the blend kernels ----------------------------
+ * XRGB8888 blends its stored values directly.  HDR10 stores PQ-encoded
+ * absolute luminance, which must NOT be blended as-is: PQ is far more
+ * non-linear than the gamma encoding the engine has always blended in, so
+ * mixing codes directly lands a 50/50 blend roughly 63% dark instead of the
+ * ~38% the SDR paths give.  Converting each channel to its gamma-encoded
+ * equivalent, running the identical integer arithmetic, and converting back
+ * keeps translucency, fuzz, water and light tints looking the same in every
+ * colour format.  Values above paper white have no gamma equivalent and
+ * clamp, so a blended pixel stops being emissive -- which is what should
+ * happen when a glowing surface is seen through glass. */
+#ifdef RDF_HDR
+#define RDF_HDRMAX 1023
+#define RDF_DEC(c) ((int)vid_pq_to_sdr[(c)])
+#define RDF_ENC(c) ((int)vid_sdr_to_pq[(c) < 0 ? 0 : ((c) > 1023 ? 1023 : (c))])
+#else
+#define RDF_HDRMAX RDF_CMAX
+#define RDF_DEC(c) (c)
+#define RDF_ENC(c) (c)
+#endif
+
 /* ---- scalar blend references --------------------------------------------- */
 
 static INLINE uint32_t RDF(tc_blend5050_)(uint32_t s, uint32_t d)
 {
+#ifdef RDF_HDR
+  int sr = RDF_DEC((s >> RDF_RSHIFT) & RDF_CMAX), dr = RDF_DEC((d >> RDF_RSHIFT) & RDF_CMAX);
+  int sg = RDF_DEC((s >> RDF_GSHIFT) & RDF_CMAX), dg = RDF_DEC((d >> RDF_GSHIFT) & RDF_CMAX);
+  int sb = RDF_DEC( s                & RDF_CMAX), db = RDF_DEC( d                & RDF_CMAX);
+  return ((uint32_t)RDF_ENC((sr + dr) >> 1) << RDF_RSHIFT)
+       | ((uint32_t)RDF_ENC((sg + dg) >> 1) << RDF_GSHIFT)
+       |  (uint32_t)RDF_ENC((sb + db) >> 1);
+#else
   return (((s & RDF_M5050) >> 1) + ((d & RDF_M5050) >> 1));
+#endif
 }
 
 /* dst + (src-dst)*a/32 per channel, a in 0..32 (alpha glass).  Convex, so
  * the result never leaves [0, RDF_CMAX] and needs no clamp. */
 static INLINE uint32_t RDF(tc_lerpa_)(uint32_t s, uint32_t d, int a)
 {
-  int dr = (int)((d >> RDF_RSHIFT) & RDF_CMAX);
-  int dg = (int)((d >> RDF_GSHIFT) & RDF_CMAX);
-  int db = (int)( d                & RDF_CMAX);
-  int r  = dr + ((((int)((s >> RDF_RSHIFT) & RDF_CMAX) - dr) * a) >> 5);
-  int g  = dg + ((((int)((s >> RDF_GSHIFT) & RDF_CMAX) - dg) * a) >> 5);
-  int b  = db + ((((int)( s                & RDF_CMAX) - db) * a) >> 5);
-  return ((uint32_t)r << RDF_RSHIFT) | ((uint32_t)g << RDF_GSHIFT) | (uint32_t)b;
+  int dr = RDF_DEC((d >> RDF_RSHIFT) & RDF_CMAX);
+  int dg = RDF_DEC((d >> RDF_GSHIFT) & RDF_CMAX);
+  int db = RDF_DEC( d                & RDF_CMAX);
+  int r  = dr + (((RDF_DEC((s >> RDF_RSHIFT) & RDF_CMAX) - dr) * a) >> 5);
+  int g  = dg + (((RDF_DEC((s >> RDF_GSHIFT) & RDF_CMAX) - dg) * a) >> 5);
+  int b  = db + (((RDF_DEC( s                & RDF_CMAX) - db) * a) >> 5);
+  return ((uint32_t)RDF_ENC(r) << RDF_RSHIFT) | ((uint32_t)RDF_ENC(g) << RDF_GSHIFT) | (uint32_t)RDF_ENC(b);
 }
 
 /* dst += src*a/32 per channel, saturating (additive light beam). */
 static INLINE uint32_t RDF(tc_adda_)(uint32_t s, uint32_t d, int a)
 {
-  int r = (int)((d >> RDF_RSHIFT) & RDF_CMAX) + ((((int)((s >> RDF_RSHIFT) & RDF_CMAX)) * a) >> 5);
-  int g = (int)((d >> RDF_GSHIFT) & RDF_CMAX) + ((((int)((s >> RDF_GSHIFT) & RDF_CMAX)) * a) >> 5);
-  int b = (int)( d                & RDF_CMAX) + ((((int)( s                & RDF_CMAX)) * a) >> 5);
-  if (r > RDF_CMAX) r = RDF_CMAX;
-  if (g > RDF_CMAX) g = RDF_CMAX;
-  if (b > RDF_CMAX) b = RDF_CMAX;
-  return ((uint32_t)r << RDF_RSHIFT) | ((uint32_t)g << RDF_GSHIFT) | (uint32_t)b;
+  int mx = RDF_HDRMAX;
+  int r = RDF_DEC((d >> RDF_RSHIFT) & RDF_CMAX) + ((RDF_DEC((s >> RDF_RSHIFT) & RDF_CMAX) * a) >> 5);
+  int g = RDF_DEC((d >> RDF_GSHIFT) & RDF_CMAX) + ((RDF_DEC((s >> RDF_GSHIFT) & RDF_CMAX) * a) >> 5);
+  int b = RDF_DEC( d                & RDF_CMAX) + ((RDF_DEC( s                & RDF_CMAX) * a) >> 5);
+  if (r > mx) r = mx;
+  if (g > mx) g = mx;
+  if (b > mx) b = mx;
+  return ((uint32_t)RDF_ENC(r) << RDF_RSHIFT) | ((uint32_t)RDF_ENC(g) << RDF_GSHIFT) | (uint32_t)RDF_ENC(b);
 }
 
 /* (c*15 + o)/16 per channel -- the fuzz darken toward o (o = 0: 94% keep). */
 static INLINE uint32_t RDF(tc_blend9406_)(uint32_t c, uint32_t o)
 {
-  int r = ((int)((c >> RDF_RSHIFT) & RDF_CMAX) * 15 + (int)((o >> RDF_RSHIFT) & RDF_CMAX)) >> 4;
-  int g = ((int)((c >> RDF_GSHIFT) & RDF_CMAX) * 15 + (int)((o >> RDF_GSHIFT) & RDF_CMAX)) >> 4;
-  int b = ((int)( c                & RDF_CMAX) * 15 + (int)( o                & RDF_CMAX)) >> 4;
-  return ((uint32_t)r << RDF_RSHIFT) | ((uint32_t)g << RDF_GSHIFT) | (uint32_t)b;
+  int r = (RDF_DEC((c >> RDF_RSHIFT) & RDF_CMAX) * 15 + RDF_DEC((o >> RDF_RSHIFT) & RDF_CMAX)) >> 4;
+  int g = (RDF_DEC((c >> RDF_GSHIFT) & RDF_CMAX) * 15 + RDF_DEC((o >> RDF_GSHIFT) & RDF_CMAX)) >> 4;
+  int b = (RDF_DEC( c                & RDF_CMAX) * 15 + RDF_DEC( o                & RDF_CMAX)) >> 4;
+  return ((uint32_t)RDF_ENC(r) << RDF_RSHIFT) | ((uint32_t)RDF_ENC(g) << RDF_GSHIFT) | (uint32_t)RDF_ENC(b);
 }
 
 /* ---- vector helpers -------------------------------------------------------
+ * Compiled only for the non-HDR instantiation: the HDR kernels convert each
+ * channel through a lookup table, and neither SSE2 nor baseline NEON has a
+ * gather, so those paths run scalar.  Only read-modify-write blends are
+ * affected -- opaque drawing, which is the overwhelming majority of pixels,
+ * goes through the composed colour table and is untouched.
+ * ---- vector helpers -------------------------------------------------------
  * Channel-planar arithmetic on four 32-bit pixels per vector.  A channel is
  * isolated into the LOW 16 bits of each 32-bit lane (value <= 1023, so it
  * fits with the high half zero); channel * alpha (<= 1023*32 = 32736) then
  * fits int16, letting mullo_epi16 produce the exact product in the lane's
  * low half.  For the signed LERP diff, the low half carries the two's-
  * complement value and a shift-pair re-sign-extends the product. */
-#if defined(WALL_RUN_SSE2)
+#if defined(WALL_RUN_SSE2) && !defined(RDF_HDR)
 
 #define RDF_XR(v) _mm_and_si128(_mm_srli_epi32(v, RDF_RSHIFT), _mm_set1_epi32(RDF_CMAX))
 #define RDF_XG(v) _mm_and_si128(_mm_srli_epi32(v, RDF_GSHIFT), _mm_set1_epi32(RDF_CMAX))
@@ -103,7 +141,7 @@ static INLINE uint32_t RDF(tc_blend9406_)(uint32_t c, uint32_t o)
           v = _mm_or_si128(_mm_and_si128(_gt, _mm_set1_epi32(RDF_CMAX)), \
                            _mm_andnot_si128(_gt, v)); }
 
-#elif defined(WALL_RUN_NEON)
+#elif defined(WALL_RUN_NEON) && !defined(RDF_HDR)
 
 #define RDF_XR(v) vandq_u32(vshrq_n_u32(v, RDF_RSHIFT), vdupq_n_u32(RDF_CMAX))
 #define RDF_XG(v) vandq_u32(vshrq_n_u32(v, RDF_GSHIFT), vdupq_n_u32(RDF_CMAX))
@@ -198,7 +236,7 @@ static void RDF(R_FlushQuadTL)(void)
    /* One row (4 pixels = one full vector) per step: the transpose buffer
     * row is contiguous, the packed mask/shift/add is the scalar
     * tc_blend5050_ per 32-bit lane -- bit-identical output. */
-#if defined(WALL_RUN_SSE2)
+#if defined(WALL_RUN_SSE2) && !defined(RDF_HDR)
    {
       const __m128i mask = _mm_set1_epi32((int)RDF_M5050);
       while (count > 0)
@@ -215,7 +253,7 @@ static void RDF(R_FlushQuadTL)(void)
          count--;
       }
    }
-#elif defined(WALL_RUN_NEON)
+#elif defined(WALL_RUN_NEON) && !defined(RDF_HDR)
    {
       const uint32x4_t mask = vdupq_n_u32(RDF_M5050);
       while (count > 0)
@@ -318,7 +356,7 @@ static void RDF(R_FlushQuadADD)(void)
    uint32_t *dest   = ((uint32_t *)drawvars.int_topleft) + tc_commontop * SURFACE_SHORT_PITCH + tc_startx;
    int        count = tc_commonbot - tc_commontop + 1;
 
-#if defined(WALL_RUN_SSE2)
+#if defined(WALL_RUN_SSE2) && !defined(RDF_HDR)
    {
       /* alpha in the low 16 bits of each 32-bit lane; the channels sit in
        * the low half too, so mullo_epi16 yields the exact product. */
@@ -337,7 +375,7 @@ static void RDF(R_FlushQuadADD)(void)
          count--;
       }
    }
-#elif defined(WALL_RUN_NEON)
+#elif defined(WALL_RUN_NEON) && !defined(RDF_HDR)
    {
       const uint32x4_t va = vdupq_n_u32((uint32_t)tc_tl_alpha);
       const uint32x4_t cm = vdupq_n_u32(RDF_CMAX);
@@ -435,7 +473,7 @@ static void RDF(R_FlushQuadLERP)(void)
    uint32_t *dest   = ((uint32_t *)drawvars.int_topleft) + tc_commontop * SURFACE_SHORT_PITCH + tc_startx;
    int        count = tc_commonbot - tc_commontop + 1;
 
-#if defined(WALL_RUN_SSE2)
+#if defined(WALL_RUN_SSE2) && !defined(RDF_HDR)
    {
       const __m128i va = _mm_set1_epi32(tc_tl_alpha);
       while (count > 0)
@@ -452,7 +490,7 @@ static void RDF(R_FlushQuadLERP)(void)
          count--;
       }
    }
-#elif defined(WALL_RUN_NEON)
+#elif defined(WALL_RUN_NEON) && !defined(RDF_HDR)
    {
       const int32x4_t va = vdupq_n_s32(tc_tl_alpha);
       while (count > 0)
@@ -602,7 +640,7 @@ static void RDF(R_DrawSpanTL)(draw_span_vars_t *dsvars)
    uint32_t *dest = ((uint32_t *)drawvars.int_topleft) + dsvars->y * SCREENWIDTH + dsvars->x1;
    const uint32_t *lut = R_GetComposedColormapTC(dsvars->colormap);
 
-#if defined(WALL_RUN_SSE2)
+#if defined(WALL_RUN_SSE2) && !defined(RDF_HDR)
    if (count >= 8)
    {
       unsigned blocks = count >> 2;
@@ -648,7 +686,7 @@ static void RDF(R_DrawSpanTL)(draw_span_vars_t *dsvars)
       yfrac += (fixed_t)consumed * ystep;
       count -= consumed;
    }
-#elif defined(WALL_RUN_NEON)
+#elif defined(WALL_RUN_NEON) && !defined(RDF_HDR)
    if (count >= 8)
    {
       unsigned blocks = count >> 2;
@@ -717,11 +755,11 @@ static void RDF(R_DrawSpanTL)(draw_span_vars_t *dsvars)
  * this format's channel units (see R_BuildWaterLUTTC). */
 static INLINE uint32_t RDF(tc_waterdarken1_)(uint32_t d, int keep, int bluelift)
 {
-   int nr = (((int)((d >> RDF_RSHIFT) & RDF_CMAX)) * keep) >> 5;
-   int ng = (((int)((d >> RDF_GSHIFT) & RDF_CMAX)) * keep) >> 5;
-   int nb = ((((int)( d               & RDF_CMAX)) * keep) >> 5) + bluelift;
-   if (nb > RDF_CMAX) nb = RDF_CMAX;
-   return ((uint32_t)nr << RDF_RSHIFT) | ((uint32_t)ng << RDF_GSHIFT) | (uint32_t)nb;
+   int nr = (RDF_DEC((d >> RDF_RSHIFT) & RDF_CMAX) * keep) >> 5;
+   int ng = (RDF_DEC((d >> RDF_GSHIFT) & RDF_CMAX) * keep) >> 5;
+   int nb = ((RDF_DEC( d               & RDF_CMAX) * keep) >> 5) + bluelift;
+   if (nb > RDF_HDRMAX) nb = RDF_HDRMAX;
+   return ((uint32_t)RDF_ENC(nr) << RDF_RSHIFT) | ((uint32_t)RDF_ENC(ng) << RDF_GSHIFT) | (uint32_t)RDF_ENC(nb);
 }
 
 static void RDF(R_WaterDarkenSpan)(int y, int x1, int x2, int surf_y)
@@ -735,7 +773,7 @@ static void RDF(R_WaterDarkenSpan)(int y, int x1, int x2, int surf_y)
    if (depth >= TC_MAXWATERDEPTH) depth = TC_MAXWATERDEPTH - 1;
    keep = tc_water_keep_lut[depth];
    bl   = tc_water_bl_lut[depth];
-#if defined(WALL_RUN_SSE2)
+#if defined(WALL_RUN_SSE2) && !defined(RDF_HDR)
    {
       const __m128i vkeep = _mm_set1_epi32(keep);
       const __m128i vbl   = _mm_set1_epi32(bl);
@@ -750,7 +788,7 @@ static void RDF(R_WaterDarkenSpan)(int y, int x1, int x2, int surf_y)
          dest += 4; n -= 4;
       }
    }
-#elif defined(WALL_RUN_NEON)
+#elif defined(WALL_RUN_NEON) && !defined(RDF_HDR)
    {
       const uint32x4_t vkeep = vdupq_n_u32((uint32_t)keep);
       const uint32x4_t vbl   = vdupq_n_u32((uint32_t)bl);
@@ -793,19 +831,19 @@ static void RDF(R_WaterSurfaceBand)(int x, int yl, int yh, int surf_line, int ba
       fade += rip;
       if (fade <= 0) continue;
       d = *dest;
-      r = (int)((d >> RDF_RSHIFT) & RDF_CMAX);
-      g = (int)((d >> RDF_GSHIFT) & RDF_CMAX);
-      b = (int)( d                & RDF_CMAX);
+      r = RDF_DEC((d >> RDF_RSHIFT) & RDF_CMAX);
+      g = RDF_DEC((d >> RDF_GSHIFT) & RDF_CMAX);
+      b = RDF_DEC( d                & RDF_CMAX);
       b += (fade * (RDF_T5(29) - b)) >> 5;
       g += (fade * (RDF_T6(22) - g)) >> 6;
       r += (fade * (RDF_T5(10) - r)) >> 6;
-      if (b > RDF_CMAX) b = RDF_CMAX;
+      if (b > RDF_HDRMAX) b = RDF_HDRMAX;
       if (b < 0)  b = 0;
-      if (g > RDF_CMAX) g = RDF_CMAX;
+      if (g > RDF_HDRMAX) g = RDF_HDRMAX;
       if (g < 0)  g = 0;
-      if (r > RDF_CMAX) r = RDF_CMAX;
+      if (r > RDF_HDRMAX) r = RDF_HDRMAX;
       if (r < 0)  r = 0;
-      *dest = ((uint32_t)r << RDF_RSHIFT) | ((uint32_t)g << RDF_GSHIFT) | (uint32_t)b;
+      *dest = ((uint32_t)RDF_ENC(r) << RDF_RSHIFT) | ((uint32_t)RDF_ENC(g) << RDF_GSHIFT) | (uint32_t)RDF_ENC(b);
    }
 }
 
@@ -818,9 +856,9 @@ static void RDF(R_WaterSurfaceLift)(int x, int y0, int y1, int bandtop)
    for (y = y0; y <= y1; y++, dest += SURFACE_SHORT_PITCH)
    {
       uint32_t d = *dest;
-      int r = (int)((d >> RDF_RSHIFT) & RDF_CMAX);
-      int g = (int)((d >> RDF_GSHIFT) & RDF_CMAX);
-      int b = (int)( d                & RDF_CMAX);
+      int r = RDF_DEC((d >> RDF_RSHIFT) & RDF_CMAX);
+      int g = RDF_DEC((d >> RDF_GSHIFT) & RDF_CMAX);
+      int b = RDF_DEC( d                & RDF_CMAX);
       int row  = y - bandtop;
       int fade = 14 - (row * 9) / span;
       if (fade < 4)
@@ -828,13 +866,13 @@ static void RDF(R_WaterSurfaceLift)(int x, int y0, int y1, int bandtop)
       b += (fade * (RDF_T5(31) - b)) >> 5;
       g += (fade * (RDF_T6(26) - g)) >> 6;
       r += (fade * (RDF_T5(8)  - r)) >> 6;
-      if (b > RDF_CMAX) b = RDF_CMAX;
+      if (b > RDF_HDRMAX) b = RDF_HDRMAX;
       if (b < 0)  b = 0;
-      if (g > RDF_CMAX) g = RDF_CMAX;
+      if (g > RDF_HDRMAX) g = RDF_HDRMAX;
       if (g < 0)  g = 0;
-      if (r > RDF_CMAX) r = RDF_CMAX;
+      if (r > RDF_HDRMAX) r = RDF_HDRMAX;
       if (r < 0)  r = 0;
-      *dest = ((uint32_t)r << RDF_RSHIFT) | ((uint32_t)g << RDF_GSHIFT) | (uint32_t)b;
+      *dest = ((uint32_t)RDF_ENC(r) << RDF_RSHIFT) | ((uint32_t)RDF_ENC(g) << RDF_GSHIFT) | (uint32_t)RDF_ENC(b);
    }
 }
 
@@ -868,13 +906,13 @@ static void RDF(R_TintLUT)(uint32_t *dst, const uint32_t *src, int ar, int ag, i
    for (i = 0; i < 256; i++)
    {
       uint32_t px = src[i];
-      int r = (int)((px >> RDF_RSHIFT) & RDF_CMAX) + ar;
-      int g = (int)((px >> RDF_GSHIFT) & RDF_CMAX) + ag;
-      int b = (int)( px               & RDF_CMAX) + ab;
-      if (r > RDF_CMAX) r = RDF_CMAX;
-      if (g > RDF_CMAX) g = RDF_CMAX;
-      if (b > RDF_CMAX) b = RDF_CMAX;
-      dst[i] = ((uint32_t)r << RDF_RSHIFT) | ((uint32_t)g << RDF_GSHIFT) | (uint32_t)b;
+      int r = RDF_DEC((px >> RDF_RSHIFT) & RDF_CMAX) + ar;
+      int g = RDF_DEC((px >> RDF_GSHIFT) & RDF_CMAX) + ag;
+      int b = RDF_DEC( px               & RDF_CMAX) + ab;
+      if (r > RDF_HDRMAX) r = RDF_HDRMAX;
+      if (g > RDF_HDRMAX) g = RDF_HDRMAX;
+      if (b > RDF_HDRMAX) b = RDF_HDRMAX;
+      dst[i] = ((uint32_t)RDF_ENC(r) << RDF_RSHIFT) | ((uint32_t)RDF_ENC(g) << RDF_GSHIFT) | (uint32_t)RDF_ENC(b);
    }
 }
 
@@ -886,13 +924,13 @@ static void RDF(R_WallTintRun)(int x, int yl, int yh, int ar, int ag, int ab)
    for (; n > 0; n--, d += SURFACE_SHORT_PITCH)
    {
       uint32_t px = *d;
-      int r = (int)((px >> RDF_RSHIFT) & RDF_CMAX) + ar;
-      int g = (int)((px >> RDF_GSHIFT) & RDF_CMAX) + ag;
-      int b = (int)( px               & RDF_CMAX) + ab;
-      if (r > RDF_CMAX) r = RDF_CMAX;
-      if (g > RDF_CMAX) g = RDF_CMAX;
-      if (b > RDF_CMAX) b = RDF_CMAX;
-      *d = ((uint32_t)r << RDF_RSHIFT) | ((uint32_t)g << RDF_GSHIFT) | (uint32_t)b;
+      int r = RDF_DEC((px >> RDF_RSHIFT) & RDF_CMAX) + ar;
+      int g = RDF_DEC((px >> RDF_GSHIFT) & RDF_CMAX) + ag;
+      int b = RDF_DEC( px               & RDF_CMAX) + ab;
+      if (r > RDF_HDRMAX) r = RDF_HDRMAX;
+      if (g > RDF_HDRMAX) g = RDF_HDRMAX;
+      if (b > RDF_HDRMAX) b = RDF_HDRMAX;
+      *d = ((uint32_t)RDF_ENC(r) << RDF_RSHIFT) | ((uint32_t)RDF_ENC(g) << RDF_GSHIFT) | (uint32_t)RDF_ENC(b);
    }
 }
 
@@ -906,7 +944,7 @@ static void RDF(R_TintSpan)(int y, int x1, int x2, int ar, int ag, int ab)
    if (wg > RDF_CMAX) wg = RDF_CMAX;
    if (wb > RDF_CMAX) wb = RDF_CMAX;
 
-#if defined(WALL_RUN_SSE2)
+#if defined(WALL_RUN_SSE2) && !defined(RDF_HDR)
    if (n >= 4)
    {
       const __m128i vr = _mm_set1_epi32(wr);
@@ -924,7 +962,7 @@ static void RDF(R_TintSpan)(int y, int x1, int x2, int ar, int ag, int ab)
          n -= 4;
       }
    }
-#elif defined(WALL_RUN_NEON)
+#elif defined(WALL_RUN_NEON) && !defined(RDF_HDR)
    if (n >= 4)
    {
       const uint32x4_t vr = vdupq_n_u32((uint32_t)wr);
@@ -947,13 +985,13 @@ static void RDF(R_TintSpan)(int y, int x1, int x2, int ar, int ag, int ab)
    for (; n > 0; n--, d++)
    {
       uint32_t px = *d;
-      int r = (int)((px >> RDF_RSHIFT) & RDF_CMAX) + wr;
-      int g = (int)((px >> RDF_GSHIFT) & RDF_CMAX) + wg;
-      int b = (int)( px               & RDF_CMAX) + wb;
-      if (r > RDF_CMAX) r = RDF_CMAX;
-      if (g > RDF_CMAX) g = RDF_CMAX;
-      if (b > RDF_CMAX) b = RDF_CMAX;
-      *d = ((uint32_t)r << RDF_RSHIFT) | ((uint32_t)g << RDF_GSHIFT) | (uint32_t)b;
+      int r = RDF_DEC((px >> RDF_RSHIFT) & RDF_CMAX) + wr;
+      int g = RDF_DEC((px >> RDF_GSHIFT) & RDF_CMAX) + wg;
+      int b = RDF_DEC( px               & RDF_CMAX) + wb;
+      if (r > RDF_HDRMAX) r = RDF_HDRMAX;
+      if (g > RDF_HDRMAX) g = RDF_HDRMAX;
+      if (b > RDF_HDRMAX) b = RDF_HDRMAX;
+      *d = ((uint32_t)RDF_ENC(r) << RDF_RSHIFT) | ((uint32_t)RDF_ENC(g) << RDF_GSHIFT) | (uint32_t)RDF_ENC(b);
    }
 }
 
@@ -962,11 +1000,11 @@ static void RDF(R_TintView)(uint32_t color)
 {
    uint32_t *base = (uint32_t *)drawvars.int_topleft;
    int y;
-#if defined(WALL_RUN_SSE2)
+#if defined(WALL_RUN_SSE2) && !defined(RDF_HDR)
    const __m128i vcol = _mm_set1_epi32((int)color);
    const __m128i mlow = _mm_set1_epi32((int)RDF_M5050);
    const __m128i vch  = _mm_srli_epi32(_mm_and_si128(vcol, mlow), 1);
-#elif defined(WALL_RUN_NEON)
+#elif defined(WALL_RUN_NEON) && !defined(RDF_HDR)
    const uint32x4_t vcol = vdupq_n_u32(color);
    const uint32x4_t mlow = vdupq_n_u32(RDF_M5050);
    const uint32x4_t vch  = vshrq_n_u32(vandq_u32(vcol, mlow), 1);
@@ -976,14 +1014,14 @@ static void RDF(R_TintView)(uint32_t color)
    {
       uint32_t *row = base + y * SCREENWIDTH;
       int x = 0;
-#if defined(WALL_RUN_SSE2)
+#if defined(WALL_RUN_SSE2) && !defined(RDF_HDR)
       for (; x + 4 <= viewwidth; x += 4)
       {
          __m128i px = _mm_loadu_si128((const __m128i *)(row + x));
          __m128i bl = _mm_add_epi32(vch, _mm_srli_epi32(_mm_and_si128(px, mlow), 1));
          _mm_storeu_si128((__m128i *)(row + x), bl);
       }
-#elif defined(WALL_RUN_NEON)
+#elif defined(WALL_RUN_NEON) && !defined(RDF_HDR)
       for (; x + 4 <= viewwidth; x += 4)
       {
          uint32x4_t px = vld1q_u32(row + x);
@@ -1017,9 +1055,9 @@ static uint32_t RDF(R_FlatAverageColor)(int picnum)
    for (i = 0; i < 4096; i += 7)
    {
       uint32_t c = VID_PALTC(flat[i], VID_NUMCOLORWEIGHTS - 1);
-      sr += (c >> RDF_RSHIFT) & RDF_CMAX;
-      sg += (c >> RDF_GSHIFT) & RDF_CMAX;
-      sb +=  c                & RDF_CMAX;
+      sr += RDF_DEC((c >> RDF_RSHIFT) & RDF_CMAX);
+      sg += RDF_DEC((c >> RDF_GSHIFT) & RDF_CMAX);
+      sb += RDF_DEC( c                & RDF_CMAX);
       n++;
    }
 
@@ -1028,15 +1066,15 @@ static uint32_t RDF(R_FlatAverageColor)(int picnum)
 
    if (!n)
       n = 1;
-   lastcol = ((uint32_t)(sr / n) << RDF_RSHIFT) |
-             ((uint32_t)(sg / n) << RDF_GSHIFT) |
-              (uint32_t)(sb / n);
+   lastcol = ((uint32_t)RDF_ENC((int)(sr / n)) << RDF_RSHIFT) |
+             ((uint32_t)RDF_ENC((int)(sg / n)) << RDF_GSHIFT) |
+              (uint32_t)RDF_ENC((int)(sb / n));
    lastpic = picnum;
    lastpal = V_PaletteTC;
    return lastcol;
 }
 
-#if defined(WALL_RUN_SSE2) || defined(WALL_RUN_NEON)
+#if (defined(WALL_RUN_SSE2) || defined(WALL_RUN_NEON)) && !defined(RDF_HDR)
 #undef RDF_XR
 #undef RDF_XG
 #undef RDF_XB

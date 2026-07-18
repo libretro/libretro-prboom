@@ -829,7 +829,23 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
        * route every column through the direct writer so only opaque texels
        * (which index the LUT) get the colour and transparent posts are left
        * alone.  White/unlit sprites keep the existing direct/batched split. */
-      if (spr_tint)
+      /* HDR10: a self-illuminated sprite -- muzzle flash, plasma, rocket,
+       * explosion, powerup -- is exactly the content that should sit above
+       * SDR white, so boost its colour table once for the whole sprite. */
+      if (tc && VID_HDR && vis->emissive && vid_emit_class != VID_EMIT_NONE)
+      {
+         int bi;
+         for (bi = 0; bi < 256; bi++)
+         {
+            uint32_t px = lutTC[bi];
+            tinted_lutTC[bi] =
+               ((uint32_t)vid_pq_boost[(px >> 20) & 1023] << 20)
+             | ((uint32_t)vid_pq_boost[(px >> 10) & 1023] << 10)
+             |  (uint32_t)vid_pq_boost[ px        & 1023];
+         }
+         lutTC = tinted_lutTC;
+      }
+      else if (spr_tint)
       {
          if (tc)
          {
@@ -1110,13 +1126,17 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
           * actor's facing. */
          vis->voxangle  = thing->angle;
          vis->tint_r = vis->tint_g = vis->tint_b = 0;
+         vis->emissive = 0;
 
          if (!raven && (thing->flags & MF_SHADOW))
             vis->colormap = NULL;
          else if (fixedcolormap)
             vis->colormap = fixedcolormap;
          else if (thing->frame & FF_FULLBRIGHT)
-            vis->colormap = fullcolormap;
+         {
+            vis->colormap  = fullcolormap;
+            vis->emissive  = 1;
+         }
          else
             vis->colormap = R_ColourMap(lightlevel, xscale);
          return;
@@ -1255,6 +1275,7 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    vis->patch = lump;
    vis->voxel = NULL;   /* this vissprite is a billboard, not a voxel */
    vis->tint_r = vis->tint_g = vis->tint_b = 0;
+   vis->emissive = 0;
 
    // get light level
    if (!raven && (thing->flags & MF_SHADOW))
@@ -1264,7 +1285,10 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
    else if (fixedcolormap)
       vis->colormap = fixedcolormap;      // fixed map
    else if (thing->frame & FF_FULLBRIGHT)
+   {
       vis->colormap = fullcolormap;     // full bright  // killough 3/20/98
+      vis->emissive = 1;
+   }
    else
    {      // diminished light
       vis->colormap = R_ColourMap(lightlevel,xscale);
@@ -1406,6 +1430,7 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    vis->translucent = 0;
    vis->alpha       = 0;
    vis->tint_r = vis->tint_g = vis->tint_b = 0;
+   vis->emissive = 0;
    vis->xlat      = NULL;
    // killough 12/98: fix psprite positioning problem
    vis->texturemid = (BASEYCENTER<<FRACBITS) /* +  FRACUNIT/2 */ -
@@ -1481,7 +1506,10 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
    else if (fixedcolormap)
       vis->colormap = fixedcolormap;           // fixed color
    else if (psp->state->frame & FF_FULLBRIGHT)
+   {
       vis->colormap = fullcolormap;            // full bright // killough 3/20/98
+      vis->emissive = 1;                       /* muzzle flash and friends */
+   }
    else
       // add a fudge factor to better match the original game
       vis->colormap = R_ColourMap(lightlevel,

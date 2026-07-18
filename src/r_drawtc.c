@@ -113,6 +113,28 @@ typedef enum
    COL_FLEXADD
 } columntype_e;
 
+/* Fill a 256-entry fullbright table from `src`, applying the emissive boost
+ * in HDR10 mode.  Brightmapped texels ignore distance light because they
+ * emit their own, so in HDR they belong above SDR white -- that is what
+ * makes them actually glow rather than merely be the brightest thing that
+ * is not glowing.  In every other format this is a plain copy. */
+static INLINE void R_FillBrightLUTTC(uint32_t *dst, const uint32_t *src)
+{
+   if (VID_HDR && vid_emit_class != VID_EMIT_NONE)
+   {
+      int i;
+      for (i = 0; i < 256; i++)
+      {
+         uint32_t px = src[i];
+         dst[i] = ((uint32_t)vid_pq_boost[(px >> 20) & 1023] << 20)
+                | ((uint32_t)vid_pq_boost[(px >> 10) & 1023] << 10)
+                |  (uint32_t)vid_pq_boost[ px        & 1023];
+      }
+   }
+   else
+      memcpy(dst, src, 256 * sizeof(uint32_t));
+}
+
 /* ---- batch/blit state (referenced by the .inl and the body) -------------- */
 static int      tc_temp_x = 0;
 static int      tc_tempyl[4], tc_tempyh[4];
@@ -173,7 +195,7 @@ static void R_BuildWaterLUTTC(void)
     * volume, which is exactly what truecolor is here to avoid.  `keep` is a
     * multiplicative /32 factor, so it needs no rescale: the product carries
     * the destination's full precision already. */
-   const int mx = (vid_mode == VID_MODE2101010) ? 1023 : 255;
+   const int mx = (vid_mode == VID_MODEHDR10) ? 1023 : 255;
    const int lo = (2 * mx) / 31;                 /* deep: faint constant blue */
    int depth;
    for (depth = 0; depth < TC_MAXWATERDEPTH; depth++)
@@ -225,12 +247,14 @@ void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab);
 #define RDF_GSHIFT  10
 #define RDF_CMAX    1023
 #define RDF_M5050   0x3FEFFBFEu
+#define RDF_HDR     1
 #include "r_drawtcfmt.inl"
 #undef RDF
 #undef RDF_RSHIFT
 #undef RDF_GSHIFT
 #undef RDF_CMAX
 #undef RDF_M5050
+#undef RDF_HDR
 
 /* =========================================================================
  *  Dispatch thunks: pick the per-format kernel from vid_mode.
@@ -238,7 +262,7 @@ void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab);
 
 #define TC_THUNK(name) \
   static void name(void) { \
-    if (vid_mode == VID_MODE2101010) name##A2(); else name##8888(); }
+    if (vid_mode == VID_MODEHDR10) name##A2(); else name##8888(); }
 
 TC_THUNK(R_FlushWholeTL)   TC_THUNK(R_FlushHTTL)   TC_THUNK(R_FlushQuadTL)
 TC_THUNK(R_FlushWholeADD)  TC_THUNK(R_FlushHTADD)  TC_THUNK(R_FlushQuadADD)
@@ -250,7 +274,7 @@ TC_THUNK(R_FlushWholeFuzz) TC_THUNK(R_FlushHTFuzz) TC_THUNK(R_FlushQuadFuzz)
  * The body's R_DrawSpanTC references this name. */
 static void R_DrawSpanTC_TL(draw_span_vars_t *dsvars)
 {
-  if (vid_mode == VID_MODE2101010) R_DrawSpanTLA2(dsvars);
+  if (vid_mode == VID_MODEHDR10) R_DrawSpanTLA2(dsvars);
   else                             R_DrawSpanTL8888(dsvars);
 }
 
@@ -860,7 +884,7 @@ static void R_DrawColumnTC_PointUV_PointZ(draw_column_vars_t *dcvars)
          unsigned heightmask = dcvars->texheight ? dcvars->texheight - 1 : 0;
          int npot = (dcvars->texheight &&
                      (dcvars->texheight & heightmask)) ? 1 : 0;
-         memcpy(lut_bright, bsrc, sizeof(lut_bright));
+         R_FillBrightLUTTC(lut_bright, bsrc);
          /* re-fetch the distance table: the snapshot above may have
           * replaced it in the shared cache */
          lut = R_GetComposedColormapTC(dcvars->colormap);
@@ -5628,7 +5652,7 @@ static void R_DrawSpanTC_PointUV_PointZ(draw_span_vars_t *dsvars)
       const uint32_t *bsrc = R_GetComposedColormapTC(fullcolormap
                                                    ? fullcolormap
                                                    : dsvars->colormap);
-      memcpy(lut_bright, bsrc, sizeof(lut_bright));
+      R_FillBrightLUTTC(lut_bright, bsrc);
       lut = R_GetComposedColormapTC(dsvars->colormap);
 
 #if defined(__SSE2__)
@@ -6151,57 +6175,57 @@ const uint32_t *R_ComposedPaletteTC(void)
 /* --- underwater tint + flat average --------------------------------------- */
 uint32_t R_FlatAverageColorTC(int picnum)
 {
-  return (vid_mode == VID_MODE2101010) ? R_FlatAverageColorA2(picnum)
+  return (vid_mode == VID_MODEHDR10) ? R_FlatAverageColorA2(picnum)
                                        : R_FlatAverageColor8888(picnum);
 }
 
 void R_TintViewTC(uint32_t color)
 {
-  if (vid_mode == VID_MODE2101010) R_TintViewA2(color);
+  if (vid_mode == VID_MODEHDR10) R_TintViewA2(color);
   else                             R_TintView8888(color);
 }
 
 /* --- dynamic-light tints -------------------------------------------------- */
 void R_TintLUTTC(uint32_t *dst, const uint32_t *src, int ar, int ag, int ab)
 {
-  if (vid_mode == VID_MODE2101010) R_TintLUTA2(dst, src, ar, ag, ab);
+  if (vid_mode == VID_MODEHDR10) R_TintLUTA2(dst, src, ar, ag, ab);
   else                             R_TintLUT8888(dst, src, ar, ag, ab);
 }
 
 void R_WallTintRunTC(int x, int yl, int yh, int ar, int ag, int ab)
 {
-  if (vid_mode == VID_MODE2101010) R_WallTintRunA2(x, yl, yh, ar, ag, ab);
+  if (vid_mode == VID_MODEHDR10) R_WallTintRunA2(x, yl, yh, ar, ag, ab);
   else                             R_WallTintRun8888(x, yl, yh, ar, ag, ab);
 }
 
 void R_TintSpanTC(int y, int x1, int x2, int ar, int ag, int ab)
 {
-  if (vid_mode == VID_MODE2101010) R_TintSpanA2(y, x1, x2, ar, ag, ab);
+  if (vid_mode == VID_MODEHDR10) R_TintSpanA2(y, x1, x2, ar, ag, ab);
   else                             R_TintSpan8888(y, x1, x2, ar, ag, ab);
 }
 
 /* --- water volume shading ------------------------------------------------- */
 void R_WaterDarkenSpanTC(int y, int x1, int x2, int surf_y)
 {
-  if (vid_mode == VID_MODE2101010) R_WaterDarkenSpanA2(y, x1, x2, surf_y);
+  if (vid_mode == VID_MODEHDR10) R_WaterDarkenSpanA2(y, x1, x2, surf_y);
   else                             R_WaterDarkenSpan8888(y, x1, x2, surf_y);
 }
 
 void R_WaterSurfaceBandTC(int x, int yl, int yh, int surf_line, int band_h)
 {
-  if (vid_mode == VID_MODE2101010) R_WaterSurfaceBandA2(x, yl, yh, surf_line, band_h);
+  if (vid_mode == VID_MODEHDR10) R_WaterSurfaceBandA2(x, yl, yh, surf_line, band_h);
   else                             R_WaterSurfaceBand8888(x, yl, yh, surf_line, band_h);
 }
 
 void R_WaterSurfaceLiftTC(int x, int y0, int y1, int bandtop)
 {
-  if (vid_mode == VID_MODE2101010) R_WaterSurfaceLiftA2(x, y0, y1, bandtop);
+  if (vid_mode == VID_MODEHDR10) R_WaterSurfaceLiftA2(x, y0, y1, bandtop);
   else                             R_WaterSurfaceLift8888(x, y0, y1, bandtop);
 }
 
 void R_WaterDarkenColumnTC(int x, int yl, int yh, int surf_y)
 {
-  if (vid_mode == VID_MODE2101010) R_WaterDarkenColumnA2(x, yl, yh, surf_y);
+  if (vid_mode == VID_MODEHDR10) R_WaterDarkenColumnA2(x, yl, yh, surf_y);
   else                             R_WaterDarkenColumn8888(x, yl, yh, surf_y);
 }
 

@@ -1328,11 +1328,14 @@ static void I_NegotiatePixelFormat(void)
       if (!strcmp(var.value, "24bits (truecolor)"))
          want = VID_MODE8888;
       else if (!strcmp(var.value, "30bits (HDR)"))
-         want = VID_MODE2101010;
+         want = VID_MODEHDR10;
    }
 
-   if (want == VID_MODE2101010)
+   if (want == VID_MODEHDR10)
    {
+      /* HDR10 output is only worth attempting when the frontend can present
+       * a 10-bit source end to end; PQ samples narrowed to 8 bits, or shown
+       * on an SDR path, look badly wrong rather than merely coarse. */
       bool tenbit = false;
       if (!environ_cb(RETRO_ENVIRONMENT_GET_SCREEN_10BPC_CAPABLE, &tenbit)
             || !tenbit)
@@ -1340,17 +1343,42 @@ static void I_NegotiatePixelFormat(void)
          want = VID_MODE8888;
          if (log_cb)
             log_cb(RETRO_LOG_INFO,
-                   "Color Format: 30-bit requested, but the frontend does "
+                   "Color Format: HDR10 requested, but the frontend does "
                    "not present a 10-bit source natively -- using 24-bit "
-                   "truecolor instead (rounds rather than truncates).\n");
+                   "truecolor instead.\n");
+      }
+      else
+      {
+         /* Absolute luminance means the core has to know where the user
+          * puts SDR white; everything ordinary is mapped there. */
+         float nits = 0.0f;
+         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &nits)
+               && nits > 0.0f)
+            vid_paper_white_nits = nits;
+         else
+            vid_paper_white_nits = 200.0f;
+         var.key   = "prboom-hdr_emissive";
+         var.value = NULL;
+         vid_emit_class = VID_EMIT_2X;
+         if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+         {
+            if      (!strcmp(var.value, "off")) vid_emit_class = VID_EMIT_NONE;
+            else if (!strcmp(var.value, "4x"))  vid_emit_class = VID_EMIT_4X;
+            else if (!strcmp(var.value, "8x"))  vid_emit_class = VID_EMIT_8X;
+            else                                vid_emit_class = VID_EMIT_2X;
+         }
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO,
+                   "Color Format: HDR10, paper white %.0f nits, emissive %.0fx.\n",
+                   vid_paper_white_nits, vid_emit_scale[vid_emit_class]);
       }
    }
 
    /* Ask for the chosen format, degrading if the frontend refuses it. */
    for (;;)
    {
-      if (want == VID_MODE2101010)
-         fmt = RETRO_PIXEL_FORMAT_XRGB2101010;
+      if (want == VID_MODEHDR10)
+         fmt = RETRO_PIXEL_FORMAT_HDR10_2101010;
       else if (want == VID_MODE8888)
          fmt = RETRO_PIXEL_FORMAT_XRGB8888;
       else
@@ -1359,13 +1387,12 @@ static void I_NegotiatePixelFormat(void)
       if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
          break;
 
-      if (want == VID_MODE2101010)
+      if (want == VID_MODEHDR10)
       {
          want = VID_MODE8888;
          if (log_cb)
             log_cb(RETRO_LOG_WARN,
-                   "Frontend rejected XRGB2101010; falling back to "
-                   "XRGB8888.\n");
+                   "Frontend rejected HDR10; falling back to XRGB8888.\n");
       }
       else if (want == VID_MODE8888)
       {
@@ -1391,9 +1418,14 @@ static void I_NegotiatePixelFormat(void)
    vid_mode       = want;
    vid_pixelbytes = (want == VID_MODE565) ? 2 : 4;
 
+   /* The PQ <-> gamma tables the blend kernels use depend on paper white,
+    * so build them once the format and that value are both settled. */
+   if (want == VID_MODEHDR10)
+      VID_BuildHDRTables();
+
    if (log_cb)
       log_cb(RETRO_LOG_INFO, "Color Format: %s (%d bytes/pixel).\n",
-             (want == VID_MODE2101010) ? "30-bit XRGB2101010"
+             (want == VID_MODEHDR10) ? "HDR10 (PQ Rec.2020, 10bpc)"
              : (want == VID_MODE8888)  ? "24-bit XRGB8888"
                                        : "16-bit RGB565",
              vid_pixelbytes);
@@ -3677,8 +3709,8 @@ dbool   I_StartDisplay(void)
       fb.width        = SCREENWIDTH;
       fb.height       = SCREENHEIGHT;
       fb.pitch        = 0;
-      fb.format       = (vid_mode == VID_MODE2101010)
-                        ? RETRO_PIXEL_FORMAT_XRGB2101010
+      fb.format       = (vid_mode == VID_MODEHDR10)
+                        ? RETRO_PIXEL_FORMAT_HDR10_2101010
                         : (vid_mode == VID_MODE8888)
                           ? RETRO_PIXEL_FORMAT_XRGB8888
                           : RETRO_PIXEL_FORMAT_RGB565;

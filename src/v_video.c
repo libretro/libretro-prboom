@@ -861,7 +861,7 @@ static void V_DrawRGBAFullScreenTC(int scrn, const unsigned *argb,
   uint32_t *surf   = (uint32_t *)screens[scrn].data;
   int sx_step      = (aw << 16) / SCREENWIDTH;
   int sy_step      = (ah << 16) / SCREENHEIGHT;
-  const int deep   = (vid_mode == VID_MODE2101010);
+  const int deep   = (vid_mode == VID_MODEHDR10);
   int oy;
 
   for (oy = 0; oy < SCREENHEIGHT; oy++)
@@ -1161,17 +1161,22 @@ static uint32_t *BlendPalTC[2];
 static INLINE uint32_t V_PackTC(int r, int g, int b, float t,
                                 float roundUpR, float roundUpG, float roundUpB)
 {
-  if (vid_mode == VID_MODE2101010)
+  if (vid_mode == VID_MODEHDR10)
   {
-    /* widen 8 -> 10 bits by bit replication (0 -> 0, 255 -> 1023), then
-     * scale, so the ramp is computed at the full output precision */
-    int r10 = (r << 2) | (r >> 6);
-    int g10 = (g << 2) | (g >> 6);
-    int b10 = (b << 2) | (b >> 6);
-    int nr  = (int)(r10 * t + roundUpR);
-    int ng  = (int)(g10 * t + roundUpG);
-    int nb  = (int)(b10 * t + roundUpB);
-    return ((uint32_t)nr << 20) | ((uint32_t)ng << 10) | (uint32_t)nb;
+    /* HDR10: the sample is absolute luminance, not a display-referred
+     * value.  Build the colour the SDR path would have produced, then state
+     * what it means in nits -- ordinary content sits exactly at the
+     * frontend's paper white, which is what makes an HDR frame match the
+     * SDR one everywhere except where the renderer marks a colour emissive. */
+    int    er, eg, eb;
+    double sr = ((double)r * t + roundUpR) / 255.0;
+    double sg = ((double)g * t + roundUpG) / 255.0;
+    double sb = ((double)b * t + roundUpB) / 255.0;
+    if (sr < 0.0) sr = 0.0; else if (sr > 1.0) sr = 1.0;
+    if (sg < 0.0) sg = 0.0; else if (sg > 1.0) sg = 1.0;
+    if (sb < 0.0) sb = 0.0; else if (sb > 1.0) sb = 1.0;
+    VID_EncodeHDR10(sr, sg, sb, 1.0, &er, &eg, &eb);
+    return ((uint32_t)er << 20) | ((uint32_t)eg << 10) | (uint32_t)eb;
   }
   else
   {

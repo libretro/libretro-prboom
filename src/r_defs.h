@@ -448,6 +448,9 @@ typedef struct vissprite_s
   /* Dynamic-light colour tint (565 channel adds), applied to the sprite's
    * opaque texels in R_DrawVisSprite.  Zero for white light / unlit. */
   int            tint_r, tint_g, tint_b;
+  /* Self-illuminated (FF_FULLBRIGHT): ignores distance light because it
+   * emits.  In HDR10 output this is what gets pushed above SDR white. */
+  int            emissive;
 } vissprite_t;
 
 //

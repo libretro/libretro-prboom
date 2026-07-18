@@ -188,27 +188,38 @@ the wad.
 
 The **Color Format** core option selects the output pixel format: `16bits`
 (RGB565, the default and the historical renderer), `24bits (truecolor)`
-(XRGB8888) or `30bits (HDR)` (XRGB2101010). The truecolor formats are native
-pipelines, not a conversion stage — the palette, light ramps and composed
-colour tables are built at the output's channel width, so nothing is
-quantised to 565 on the way.
+(XRGB8888) or `30bits (HDR10)`. The truecolor formats are native pipelines,
+not a conversion stage — the palette and composed colour tables are built at
+the output's channel width, so nothing is quantised to 565 on the way.
 
-Distance light still snaps to the 32 colormaps the DOS engine used, so a
-lit wall resolves to the same set of palette colours in every format; what
+Distance light still snaps to the 32 colormaps the DOS engine used, so a lit
+wall resolves to the same set of palette colours in every format; what
 changes is that those colours are exact rather than rounded to 5/6/5, and
-that everything computed *between* them keeps its precision. The visible
-wins are therefore in blended and full-colour content rather than in flat
-distance shading: translucent and additive surfaces, filtered (bilinear)
-texture sampling, coloured dynamic-light tints and the underwater volume
-all blend at 8 or 10 bits per channel instead of 5/6, and native-colour art
-(PNG title cards, the help screen, the intermission backdrop) is blitted
-losslessly instead of being narrowed to 565.
+that everything computed *between* them keeps its precision — translucent
+and additive surfaces, filtered texture sampling, coloured dynamic-light
+tints and the underwater volume all blend at 8 or 10 bits per channel
+instead of 5/6, and native-colour art is blitted losslessly.
 
-`30bits` is used only when the frontend reports that it can present a
-10-bit surface natively; otherwise the core falls back to `24bits`, which
-rounds rather than truncates and so looks better than a narrowed 10-bit
-frame. Note that XRGB2101010 is deeper-precision SDR — the core emits no
-HDR transfer function or metadata.
+`30bits` is genuine HDR, not a wider SDR container. The surface carries
+PQ-encoded Rec.2020 samples at absolute luminance, so the core — not the
+frontend — decides how bright each pixel is. Ordinary content is mapped to
+the frontend's paper white setting, which makes an HDR frame match the SDR
+one everywhere except where the renderer marks a colour emissive:
+self-illuminated sprites (muzzle flashes, plasma, rockets, explosions,
+powerups) and brightmapped texels are pushed above SDR white, so they
+actually glow on an HDR display. **HDR Emissive Boost** sets how far (off,
+2x, 4x or 8x paper white).
+
+Because PQ is strongly non-linear, the read-modify-write blend kernels
+convert each channel to its gamma-encoded equivalent, run the same integer
+arithmetic the SDR paths use, and convert back — so translucency, fuzz,
+water and light tints look identical in every format. Blending clears the
+emissive scale, which is what you want: a highlight seen through glass is no
+longer a highlight.
+
+HDR10 requires a frontend that presents it natively; PQ samples read as SDR
+look badly wrong, so the format is refused rather than silently narrowed and
+the core falls back to `24bits`.
 
 Changing the option requires a restart.
 

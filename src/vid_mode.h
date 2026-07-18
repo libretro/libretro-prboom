@@ -29,27 +29,72 @@
  *                          truecolor code executes.
  *      VID_MODE8888     -- XRGB8888.  32-bit surface, palette and light
  *                          LUTs carry full 8-bit channels.
- *      VID_MODE2101010  -- XRGB2101010 (RETRO_PIXEL_FORMAT_XRGB2101010).
- *                          32-bit surface, LUTs carry 10-bit channels;
- *                          smooth-shading gradients resolve 4x finer
- *                          than 8-bit output can express.
+ *      VID_MODEHDR10    -- HDR10 (RETRO_PIXEL_FORMAT_HDR10_2101010): the
+ *                          same 10-bit-per-channel layout, but the samples
+ *                          are PQ-encoded Rec.2020 absolute luminance, so
+ *                          the core decides how bright each pixel is and
+ *                          emissive content can exceed SDR white.
  *
  *-----------------------------------------------------------------------------*/
 
 #ifndef __VID_MODE_H__
 #define __VID_MODE_H__
 
+#include <stdint.h>
+
 enum vid_mode_e
 {
   VID_MODE565 = 0,
   VID_MODE8888,
-  VID_MODE2101010
+  VID_MODEHDR10        /* PQ-encoded Rec.2020, 10bpc -- absolute luminance */
 };
 
 extern int vid_mode;        /* enum vid_mode_e; set once at load */
 extern int vid_pixelbytes;  /* 2 for VID_MODE565, else 4 */
 
 #define VID_TRUECOLOR (vid_mode != VID_MODE565)
+#define VID_HDR       (vid_mode == VID_MODEHDR10)
+
+/* ---- HDR10 output ---------------------------------------------------------
+ * In HDR mode the surface carries absolute luminance, PQ-encoded over
+ * Rec.2020, so the core -- not the frontend -- decides how bright each pixel
+ * is.  Ordinary image content is mapped to `vid_paper_white_nits` so it looks
+ * exactly as it does in SDR; anything the renderer marks as emissive is
+ * scaled above that and genuinely glows on an HDR display.
+ *
+ * Because PQ is strongly non-linear, blending encoded samples directly would
+ * be far more wrong than the gamma-space blending the SDR paths do (a 50/50
+ * mix lands ~63% dark instead of ~38%).  The read-modify-write kernels
+ * therefore convert through vid_pq_to_sdr[] / vid_sdr_to_pq[], which are
+ * inverses over the SDR range: blends run on the same 10-bit gamma-encoded
+ * values the XRGB8888 path uses, so translucency, fuzz, water and light
+ * tints look identical in every format.  Blending clears the emissive scale,
+ * which is what you want -- a highlight seen through glass is no longer a
+ * highlight. */
+extern float vid_paper_white_nits;      /* frontend's SDR white, default 200 */
+extern uint16_t vid_pq_to_sdr[1024];    /* PQ code -> 10-bit gamma (clamped)  */
+extern uint16_t vid_sdr_to_pq[1024];    /* 10-bit gamma -> PQ code at paper white */
+extern uint16_t vid_pq_boost[1024];     /* PQ code -> same colour, N x brighter  */
+extern int      vid_emit_class;         /* strength of the emissive boost        */
+
+/* Emissive classes.  The renderer tags a colour table entry with one of
+ * these; the palette build multiplies that entry's luminance before the PQ
+ * encode.  Class 0 is ordinary content at exactly paper white. */
+#define VID_EMIT_NONE  0
+#define VID_EMIT_2X    1
+#define VID_EMIT_4X    2
+#define VID_EMIT_8X    3
+extern const float vid_emit_scale[4];
+
+/* Colour-space helpers (vid_mode.c).  Build-time only -- no per-pixel use. */
+double VID_PQEncode(double nits);
+double VID_PQDecode(double signal);
+double VID_SRGBToLinear(double c);
+double VID_LinearToSRGB(double l);
+void   VID_709To2020(double *r, double *g, double *b);
+void   VID_EncodeHDR10(double r, double g, double b, double emit,
+                       int *or_, int *og, int *ob);
+void   VID_BuildHDRTables(void);
 
 /* ---- 32-bit channel layout ------------------------------------------------
  * XRGB8888:    R at 16 (8 bits), G at 8 (8 bits), B at 0 (8 bits)
@@ -66,9 +111,9 @@ extern int vid_pixelbytes;  /* 2 for VID_MODE565, else 4 */
  * multiplied back up (which lands on every 8th or 32nd code value and bands
  * exactly where a coloured light's falloff should be smoothest). */
 #define VID_CMAX_R (vid_mode == VID_MODE565 ? 31 \
-                   : (vid_mode == VID_MODE2101010 ? 1023 : 255))
+                   : (vid_mode == VID_MODEHDR10 ? 1023 : 255))
 #define VID_CMAX_G (vid_mode == VID_MODE565 ? 63 \
-                   : (vid_mode == VID_MODE2101010 ? 1023 : 255))
+                   : (vid_mode == VID_MODEHDR10 ? 1023 : 255))
 #define VID_CMAX_B VID_CMAX_R
 
 /* Per-channel field width used to CARRY such an amount between the producer

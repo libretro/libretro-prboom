@@ -2027,7 +2027,7 @@ static const zacs_fon2_t *zacs_fon2_get(int lump)
  * point: XRGB8888 matches the 8-bit source exactly, and XRGB2101010 widens
  * the 8-bit source once by bit replication ((c<<2)|(c>>6), exact at both
  * ends) and keeps the whole blend at 10 bits. */
-static INLINE int zacs_tc_deep(void)   { return vid_mode == VID_MODE2101010; }
+static INLINE int zacs_tc_deep(void)   { return vid_mode == VID_MODEHDR10; }
 static INLINE int zacs_tc_max(void)    { return zacs_tc_deep() ? 1023 : 255; }
 /* widen an 8-bit source channel to the active format's channel width */
 static INLINE int zacs_tc_src8(int c)  { return zacs_tc_deep() ? ((c << 2) | (c >> 6)) : c; }

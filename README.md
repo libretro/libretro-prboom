@@ -175,7 +175,8 @@ the wad.
 - **UDMF** consumes the engine-carried field subset (the DSDA set) plus line
   `special` + `arg0..4`, so special-driven features apply on text maps as on
   binary ones — `Sector_Set3DFloor` (3D floors) and `Plane_Align` (slopes)
-  included. UDMF-native structured portal fields are not read.
+  included. UDMF-native structured portal fields are not read (portals are
+  taken from the thing pairs and line specials described below).
 - **GLDEFS:** skybox handling, **brightmap** definitions, dynamic
   point-**light** definitions (with their sprite bindings), and sector
   **glow** blocks are all consumed: glowing flats draw fullbright and light
@@ -183,6 +184,17 @@ the wad.
   fullbright themselves and pool colour onto the floors and ceilings beside
   them, with colours taken from the definition or derived from the texture
   itself.
+- **Sector portals (look-only):** stacked sectors — either
+  `UpperStackLookOnly`/`LowerStackLookOnly` thing pairs or `Sector_SetPortal`
+  (line special 57, view type) — render as windows in a floor or ceiling.
+  The linked region is drawn from the viewer displaced by the pair's offset
+  and composited into the window's visible pixels, so sprites and geometry
+  in front of a window occlude it correctly and things inside the viewed
+  region are drawn.  One portal depth: a window seen through a window draws
+  its own flat.  The opacity argument selects the window flat's own
+  transparency — unset or zero is a clear window, 255 leaves the flat solid
+  and no window at all, and values between blend the view through against
+  the flat.
 
 ### Colour depth
 
@@ -226,18 +238,11 @@ Changing the option requires a restart.
 ### Not supported
 
 - **ZScript** — no support. Mods whose gameplay lives in ZScript won't run it.
-- **Stacked sectors** (`UpperStackLookOnly`/`LowerStackLookOnly` thing
-  pairs) render as look-only windows: the linked region is drawn from the
-  viewer translated by the pair's offset and composited into the window's
-  visible pixels, one portal depth (windows seen through a window draw
-  their flats).  The stack things' opacity argument is honored: an unset
-  or zero argument gives a fully transparent window flat, 255 disables the
-  window, and values between draw the flat blended over the view through.
-  Movement through the stack is not linked.  `Sector_SetPortal` (line
-  special 57) view portals resolve to the same windows, so maps using the
-  non-deprecated authoring form work too; its other portal types (copied,
-  skybox, plane, horizon, line) remain inert, as does ACS activation.
-- **Line portals and structured UDMF portal fields** — inert.
+- **Portals other than look-only sector windows** — line portals, the
+  remaining `Sector_SetPortal` types (copied, skybox, plane, horizon, line)
+  and structured UDMF portal fields are inert, as is ACS portal activation.
+  Movement is never linked through a portal: the sector windows described
+  above are view-only.
 - **3D models (MODELDEF)** — out of scope for the 8-bit software renderer.
 
 The practical result: map-and-resource-driven ZDoom wads — new levels, sprite

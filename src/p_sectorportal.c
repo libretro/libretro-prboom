@@ -247,6 +247,55 @@ static void P_SpawnSkyboxPortals(int *pairs)
   }
 }
 
+
+/* Sector_SetPortal type 4: horizon portal.  "Renders the linedef's
+ * frontsector's planes into infinity at the planes' heights."  The tagged
+ * sectors' selected plane becomes a window onto that sector's floor and
+ * ceiling with no bound -- the classic ocean or desert horizon. */
+static void P_SpawnHorizonPortals(int *pairs)
+{
+  int i;
+  for (i = 0; i < numlines; i++)
+  {
+    const line_t *ln = &lines[i];
+    int tag, plane, alpha, s, fsec;
+
+    if (ln->special != 57 || ln->args[1] != 4 || !ln->frontsector)
+      continue;
+
+    fsec  = (int)(ln->frontsector - sectors);
+    tag   = ln->args[0];
+    plane = ln->args[2];
+    alpha = ln->args[4];
+    if (alpha >= 255)
+      continue;
+
+    for (s = 0; s < numsectors; s++)
+    {
+      if (tag ? sectors[s].tag != tag : &sectors[s] != ln->frontsector)
+        continue;
+      if (s == fsec)
+        continue;
+      if (plane == 0 || plane == 2)
+      {
+        floorportals[s].active  = 1;
+        floorportals[s].horizon = 1;
+        floorportals[s].hsec    = fsec;
+        floorportals[s].alpha   = alpha;
+        (*pairs)++;
+      }
+      if (plane == 1 || plane == 2)
+      {
+        ceilingportals[s].active  = 1;
+        ceilingportals[s].horizon = 1;
+        ceilingportals[s].hsec    = fsec;
+        ceilingportals[s].alpha   = alpha;
+        (*pairs)++;
+      }
+    }
+  }
+}
+
 /* Sector_SetPortal type 1: copied portal.
  *
  * "Copies the given portal to all sectors tagged with 'tag' or the line's
@@ -328,6 +377,7 @@ void P_SpawnSectorPortals(void)
   {
     P_SpawnLinePortals(&pairs);
     P_SpawnSkyboxPortals(&pairs);
+    P_SpawnHorizonPortals(&pairs);
     P_CopyLinePortals(&pairs);
     sector_portals_active = pairs > 0;
     if (pairs)
@@ -434,6 +484,7 @@ void P_SpawnSectorPortals(void)
 
   P_SpawnLinePortals(&pairs);
   P_SpawnSkyboxPortals(&pairs);
+  P_SpawnHorizonPortals(&pairs);
   P_CopyLinePortals(&pairs);
 
   sector_portals_active = pairs > 0;

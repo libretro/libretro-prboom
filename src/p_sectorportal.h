@@ -25,6 +25,10 @@
  * region of the level, offset by (dx,dy,dz) from the viewer. */
 typedef struct {
   int     active;
+  int     horizon;      /* 1: Sector_SetPortal type 4 -- the window shows
+                         * sector `hsec`'s planes extended to infinity, and
+                         * there is no camera at all */
+  int     hsec;
   int     absolute;     /* 1: dx/dy/dz are an absolute camera position and
                          * `angle` a yaw delta -- Sector_SetPortal type 2
                          * (skybox portals).  0: they are a displacement. */

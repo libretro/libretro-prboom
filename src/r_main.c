@@ -953,6 +953,8 @@ static int sb_flat_alpha;   /* stacked-portal flat opacity 0..254 at composite
  * must be able to hold every visible piece of every window or the grouping
  * loses spans and the window renders with holes. */
 #define PORTAL_ID_MAX 96
+static int     portal_cap_hor[PORTAL_CAP_MAX];
+static int     portal_cap_hsec[PORTAL_CAP_MAX];
 static int     portal_cap_abs[PORTAL_CAP_MAX];
 static angle_t portal_cap_ang[PORTAL_CAP_MAX];
 static fixed_t portal_cap_dx[PORTAL_CAP_MAX];
@@ -969,6 +971,10 @@ static int   n_portal_caps;
  * those spans back into the frame.  The shared core of tagged 3D skyboxes
  * and stacked-sector portals; r_in_skybox suppresses nested skyboxes and
  * portal windows inside the scene, so recursion depth is one. */
+static void R_CompositeScratchSpans(const void *scratch,
+                                    unsigned short *real_tl,
+                                    unsigned int *real_tl_i);
+
 static void R_RenderCompositeView(fixed_t camx, fixed_t camy, fixed_t camz,
                                   angle_t angdelta)
 {
@@ -978,7 +984,6 @@ static void R_RenderCompositeView(fixed_t camx, fixed_t camy, fixed_t camz,
   unsigned short *real_tl   = drawvars.short_topleft;
   unsigned int   *real_tl_i = drawvars.int_topleft;
   void           *scratch   = R_SkyboxScratch();
-  int x, y;
 
   if (!scratch)
     return;
@@ -1036,7 +1041,97 @@ static void R_RenderCompositeView(fixed_t camx, fixed_t camy, fixed_t camz,
   drawvars.short_topleft = real_tl;
   drawvars.int_topleft   = real_tl_i;
 
-  /* composite: copy only the captured sky region from scratch to real */
+  R_CompositeScratchSpans(scratch, real_tl, real_tl_i);
+}
+
+/* Copy the sb_top..sb_bot span of every column out of the scratch buffer,
+ * honouring the reveal mask and the stacked-portal flat blend.  Shared by
+ * the scene composite above and the horizon composite below. */
+
+/* Sector_SetPortal type 4: horizon portal.
+ *
+ * "Renders the linedef's frontsector's planes into infinity at the planes'
+ * heights."  There is no scene to walk: the window shows one sector's floor
+ * and ceiling as unbounded planes, which the standard flat mapper already
+ * draws correctly -- its per-row distance grows without bound as a row
+ * approaches the horizon, so a visplane spanning the window's rows converges
+ * on its own.  The floor takes the rows below the horizon and the ceiling
+ * those above; a plane on the wrong side of the viewer (a floor above the
+ * eye, say) simply contributes nothing. */
+static void R_RenderHorizonView(int secnum)
+{
+  unsigned short *real_tl   = drawvars.short_topleft;
+  unsigned int   *real_tl_i = drawvars.int_topleft;
+  void           *scratch   = R_SkyboxScratch();
+  const sector_t *sec;
+  visplane_t     *plf, *plc;
+  int             x, horizon;
+
+  if (!scratch || (unsigned)secnum >= (unsigned)numsectors)
+    return;
+  sec     = &sectors[secnum];
+  horizon = centery;
+
+  drawvars.short_topleft = (unsigned short *)scratch;
+  drawvars.int_topleft   = (unsigned int   *)scratch;
+
+  r_in_skybox = 1;
+  R_ClearPlanes();
+  R_ClearSprites();
+
+  plf = sec->floorheight < viewz
+      ? R_FindPlane(sec->floorheight, sec->floorpic, sec->lightlevel,
+                    0, 0, NULL, -1, 0)
+      : NULL;
+  plc = sec->ceilingheight > viewz
+      ? R_FindPlane(sec->ceilingheight, sec->ceilingpic, sec->lightlevel,
+                    0, 0, NULL, -1, 0)
+      : NULL;
+
+  for (x = 0; x < viewwidth; x++)
+  {
+    int t = sb_top[x], b = sb_bot[x];
+    if (b < t)
+      continue;
+    if (t < 0) t = 0;
+    if (b >= viewheight) b = viewheight - 1;
+
+    if (plc && t < horizon)
+    {
+      int cb = b < horizon - 1 ? b : horizon - 1;
+      plc->top[x]    = (unsigned short)t;
+      plc->bottom[x] = (unsigned short)cb;
+      plc->modified  = 1;
+      if (x < plc->minx) plc->minx = x;
+      if (x > plc->maxx) plc->maxx = x;
+    }
+    if (plf && b > horizon)
+    {
+      int ft = t > horizon + 1 ? t : horizon + 1;
+      plf->top[x]    = (unsigned short)ft;
+      plf->bottom[x] = (unsigned short)b;
+      plf->modified  = 1;
+      if (x < plf->minx) plf->minx = x;
+      if (x > plf->maxx) plf->maxx = x;
+    }
+  }
+
+  R_ResetColumnBuffer();
+  R_DrawPlanes();
+  R_ResetColumnBuffer();
+  r_in_skybox = 0;
+
+  drawvars.short_topleft = real_tl;
+  drawvars.int_topleft   = real_tl_i;
+
+  R_CompositeScratchSpans(scratch, real_tl, real_tl_i);
+}
+
+static void R_CompositeScratchSpans(const void *scratch,
+                                    unsigned short *real_tl,
+                                    unsigned int *real_tl_i)
+{
+  int x, y;
   for (x = 0; x < viewwidth; x++)
   {
     int t = sb_top[x], b = sb_bot[x];
@@ -1220,12 +1315,16 @@ void R_RenderPlayerView (player_t* player)
           if (portal_cap_dx[g] == sp->dx && portal_cap_dy[g] == sp->dy &&
               portal_cap_dz[g] == sp->dz && portal_cap_alpha[g] == sp->alpha &&
               portal_cap_abs[g] == sp->absolute &&
-              portal_cap_ang[g] == sp->angle)
+              portal_cap_ang[g] == sp->angle &&
+              portal_cap_hor[g] == sp->horizon &&
+              portal_cap_hsec[g] == sp->hsec)
             break;
         if (g == n_portal_caps)
         {
           if (n_portal_caps == PORTAL_CAP_MAX)
             continue;
+          portal_cap_hor[g]   = sp->horizon;
+          portal_cap_hsec[g]  = sp->hsec;
           portal_cap_abs[g]   = sp->absolute;
           portal_cap_ang[g]   = sp->angle;
           portal_cap_dx[g]    = sp->dx;
@@ -1335,7 +1434,9 @@ void R_RenderPlayerView (player_t* player)
                       ? portal_cap_alpha[k] : 0;
         /* absolute cameras (skybox portals) sit at a fixed spot and turn
          * with the viewer; displacement portals ride the viewer */
-        if (portal_cap_abs[k])
+        if (portal_cap_hor[k])
+          R_RenderHorizonView(portal_cap_hsec[k]);
+        else if (portal_cap_abs[k])
           R_RenderCompositeView(portal_cap_dx[k], portal_cap_dy[k],
                                 portal_cap_dz[k], portal_cap_ang[k]);
         else

@@ -204,6 +204,17 @@ the wad.
   flat.  The opacity argument selects the window flat's own transparency —
   unset or zero is a clear window, 255 leaves the flat solid and no window
   at all, and values between blend the view through against the flat.
+- **Line portals (look-only):** `Line_SetPortal` (line special 156, visual
+  type) turns a wall into a window onto its partner line's surroundings.
+  The view is taken from the viewer's own position carried through to the
+  partner line — offset, rotated by the angle between the two lines — so a
+  pair at any relative angle works, and the window turns with the player.
+  Both one-sided lines (the whole wall becomes the window) and two-sided
+  ones (the opening between the upper and lower textures) are supported,
+  with the surrounding textures still drawn.  Geometry and sprites in front
+  of a portal occlude it correctly.  One portal depth, as with sector
+  portals, and actors do not move through: the teleporter, interactive and
+  static types are ignored.
 
 ### Colour depth
 
@@ -247,10 +258,11 @@ Changing the option requires a restart.
 ### Not supported
 
 - **ZScript** — no support. Mods whose gameplay lives in ZScript won't run it.
-- **Line portals and interactive portals** — `Sector_SetPortal` types 5
-  (copy to line) and 6 (interactive) are inert, as are line portals proper,
-  structured UDMF portal fields and ACS portal activation.  Movement is never linked through a portal: the sector windows
-  described above are view-only.
+- **Interactive portals** — nothing moves through a portal: `Line_SetPortal`
+  types 1-3 (teleporter, interactive, static) and `Sector_SetPortal` types 5
+  (copy to line) and 6 (interactive) are inert, as are structured UDMF
+  portal fields and ACS portal activation.  The portals described above are
+  view-only.
 - **3D models (MODELDEF)** — out of scope for the 8-bit software renderer.
 
 The practical result: map-and-resource-driven ZDoom wads — new levels, sprite

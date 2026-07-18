@@ -41,6 +41,7 @@
 #include "r_plane.h"
 #include "r_things.h"
 #include "r_dynlight.h"
+#include "u_dynlight.h"
 #include "u_brightmap.h"
 #include "p_ffloor.h"
 #include "r_draw.h"
@@ -707,6 +708,46 @@ static int didsolidcol; /* True if at least one column was marked solid */
  * table lookup); columns that replay through their drawer fn keep the
  * recorded framebuffer RMW pass.  The eligibility test is the replay's own
  * (R_DrawCmdColumnKernelClass), so emit and replay can never disagree. */
+/* Per-seg GLDEFS flat-glow state (set in R_RenderSegLoop's prologue): the
+ * front sector's glowing floor/ceiling, plane heights in map units, glow
+ * colour components and fade heights.  NULL/zeroed when the seg is unlit by
+ * glow; the emitter's fast path stays untouched then. */
+static const void *seg_glow_f, *seg_glow_c;
+static int seg_glow_fz, seg_glow_cz;
+static int seg_glow_fr, seg_glow_fg, seg_glow_fb, seg_glow_fh;
+static int seg_glow_cr, seg_glow_cg, seg_glow_cb, seg_glow_ch;
+
+/* Per-band glow contribution at world height wz: light-level boost added to
+ * *ll and colour adds (DL_TINT_SHIFT units) into the tint accumulators.
+ * Weight falls linearly from the plane over the def's height. */
+static void R_GlowBandBoost(int wz, int *ll, int *tr, int *tg, int *tb)
+{
+   if (seg_glow_f)
+   {
+      int dz = wz - seg_glow_fz;
+      if (dz >= 0 && dz < seg_glow_fh)
+      {
+         int w = ((seg_glow_fh - dz) << 8) / seg_glow_fh;   /* 0..256 */
+         *ll += (176 * w) >> 8;
+         *tr += (seg_glow_fr * w) >> 1;   /* w/256 * col * 128, tint units */
+         *tg += (seg_glow_fg * w) >> 1;
+         *tb += (seg_glow_fb * w) >> 1;
+      }
+   }
+   if (seg_glow_c)
+   {
+      int dz = seg_glow_cz - wz;
+      if (dz >= 0 && dz < seg_glow_ch)
+      {
+         int w = ((seg_glow_ch - dz) << 8) / seg_glow_ch;
+         *ll += (176 * w) >> 8;
+         *tr += (seg_glow_cr * w) >> 1;
+         *tg += (seg_glow_cg * w) >> 1;
+         *tb += (seg_glow_cb * w) >> 1;
+      }
+   }
+}
+
 static void R_RouteWallTint(draw_column_vars_t *dc, R_DrawColumn_f cf,
                             int yl, int yh)
 {
@@ -737,21 +778,36 @@ static void R_RouteWallTint(draw_column_vars_t *dc, R_DrawColumn_f cf,
 }
 
 static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
-                                int base_ll, fixed_t scale, int z_filter)
+                                int base_ll, fixed_t scale, int z_filter,
+                                int lit)
 {
    const int yl = dc->yl, yh = dc->yh;
    int cy, step = DL_WALL_CHUNK;
+
+   /* GLDEFS flat glow: does this column reach into a glowing plane's fade
+    * band at all?  Columns outside every band -- the vast majority even on
+    * glowing segs -- keep the single-band fast path below. */
+   int column_glow = 0;
+   if (seg_glow_f || seg_glow_c)
+   {
+      int wz_top = (int)((viewz + (int64_t)(centery - yl) * dc->iscale) >> FRACBITS);
+      int wz_bot = (int)((viewz + (int64_t)(centery - yh) * dc->iscale) >> FRACBITS);
+      column_glow = (seg_glow_f && wz_bot <  seg_glow_fz + seg_glow_fh) ||
+                    (seg_glow_c && wz_top >  seg_glow_cz - seg_glow_ch);
+   }
 
    /* Falloff disabled (default): one boost for the whole column, sampled at
     * its mid height -- a single colourmap and one draw command, the cheap
     * pre-falloff behaviour.  The colour tint still applies, just uniformly up
     * the column instead of pooling.  This is the fast path that keeps busy,
     * tall-walled scenes from paying the per-band cost. */
-   if (!dynlight_wall_falloff)
+   if (!dynlight_wall_falloff && !column_glow)
    {
       int mid = (yl + yh) >> 1;
       int wz  = (int)((viewz + (int64_t)(centery - mid) * dc->iscale) >> FRACBITS);
-      int ll  = base_ll + R_SegColumnBoost(wz);
+      int ll  = base_ll + (lit ? R_SegColumnBoost(wz) : 0);
+      if (!lit)
+         dl_tint_r = dl_tint_g = dl_tint_b = 0;
       if (ll > 255) ll = 255;
       dc->colormap = R_ColourMap(ll, scale);
       if (z_filter) dc->nextcolormap = R_ColourMap(ll + 1, scale);
@@ -775,7 +831,15 @@ static void R_EmitLitWallColumn(draw_column_vars_t *dc, R_DrawColumn_f cf,
       if (ey > yh) ey = yh;
       mid = (cy + ey) >> 1;
       wz  = (int)((viewz + (int64_t)(centery - mid) * dc->iscale) >> FRACBITS);
-      ll  = base_ll + R_SegColumnBoost(wz);
+      ll  = base_ll + (lit ? R_SegColumnBoost(wz) : 0);
+      if (!lit)
+         dl_tint_r = dl_tint_g = dl_tint_b = 0;
+      if (column_glow)
+      {
+         int gtr = 0, gtg = 0, gtb = 0;
+         R_GlowBandBoost(wz, &ll, &gtr, &gtg, &gtb);
+         dl_tint_r += gtr; dl_tint_g += gtg; dl_tint_b += gtb;
+      }
       if (ll > 255) ll = 255;
       dc->colormap = R_ColourMap(ll, scale);
       if (z_filter)
@@ -841,6 +905,34 @@ static void R_RenderSegLoop (void)
    const int seg_ldy = seg_has_dynlight ? (curline->v2->y - curline->v1->y) >> FRACBITS : 0;
    const int view_mx = viewx >> FRACBITS;
    const int view_my = viewy >> FRACBITS;
+
+   /* GLDEFS flat glow: glowing floor/ceiling of the seg's front sector.
+    * u_glow_present keeps this at one global test on unglowing wads; the two
+    * table lookups per seg only run when any glow definitions exist. */
+   seg_glow_f = seg_glow_c = NULL;
+   if (u_glow_present && frontsector)
+   {
+      seg_glow_f = U_GlowForFlat(frontsector->floorpic);
+      seg_glow_c = U_GlowForFlat(frontsector->ceilingpic);
+      if (seg_glow_f)
+      {
+         int col = U_GlowColor(seg_glow_f);
+         seg_glow_fz = frontsector->floorheight >> FRACBITS;
+         seg_glow_fh = U_GlowHeight(seg_glow_f);
+         seg_glow_fr = (col >> 16) & 0xff;
+         seg_glow_fg = (col >> 8) & 0xff;
+         seg_glow_fb = col & 0xff;
+      }
+      if (seg_glow_c)
+      {
+         int col = U_GlowColor(seg_glow_c);
+         seg_glow_cz = frontsector->ceilingheight >> FRACBITS;
+         seg_glow_ch = U_GlowHeight(seg_glow_c);
+         seg_glow_cr = (col >> 16) & 0xff;
+         seg_glow_cg = (col >> 8) & 0xff;
+         seg_glow_cb = col & 0xff;
+      }
+   }
 
    R_SetDefaultDrawColumnVars(&dcvars);
 
@@ -1057,8 +1149,8 @@ static void R_RenderSegLoop (void)
             dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
          }
          dcvars.texheight = midtexheight;
-         if (col_lit)
-            R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter);
+         if (col_lit || seg_glow_f || seg_glow_c)
+            R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter, col_lit);
          else
             R_DrawCmdEmitColumn(&dcvars, colfunc);
          tex_patch = NULL;
@@ -1094,8 +1186,8 @@ static void R_RenderSegLoop (void)
                   dcvars.nextsource = R_GetTextureColumn(tex_patch,texturecolumn+1);
                }
                dcvars.texheight = toptexheight;
-               if (col_lit)
-                  R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter);
+               if (col_lit || seg_glow_f || seg_glow_c)
+                  R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter, col_lit);
                else
                   R_DrawCmdEmitColumn(&dcvars, colfunc);
                tex_patch = NULL;
@@ -1136,8 +1228,8 @@ static void R_RenderSegLoop (void)
                   dcvars.nextsource = R_GetTextureColumn(tex_patch, texturecolumn+1);
                }
                dcvars.texheight = bottomtexheight;
-               if (col_lit)
-                  R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter);
+               if (col_lit || seg_glow_f || seg_glow_c)
+                  R_EmitLitWallColumn(&dcvars, colfunc, rw_lightlevel, rw_scale, z_filter, col_lit);
                else
                   R_DrawCmdEmitColumn(&dcvars, colfunc);
                tex_patch = NULL;

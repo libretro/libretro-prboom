@@ -64,4 +64,12 @@ dbool U_DynLightsPresent(void);
 int  U_DynLightCount(void);
 void U_FreeDynLights(void);
 
+/* GLDEFS glow: any glow definitions loaded (renderer zero-cost gate). */
+extern int u_glow_present;
+/* Glow definition for a flat picnum (sector floorpic/ceilingpic), or NULL.
+ * Opaque handle; colour as 0xRRGGBB and fade height via the accessors. */
+const void *U_GlowForFlat(int flatpic);
+int U_GlowColor(const void *gd);
+int U_GlowHeight(const void *gd);
+
 #endif

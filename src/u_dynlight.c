@@ -3,6 +3,7 @@
 
 #include <stdlib.h>
 #include <string.h>
+#include <ctype.h>
 
 #include "doomtype.h"
 #include "doomstat.h"
@@ -226,6 +227,193 @@ static void dl_parse_object(u_scanner_t *s)
   }
 }
 
+
+/* --- GLDEFS glow -------------------------------------------------------- */
+/* A texture in a glow block emits light onto nearby geometry: a glowing
+ * FLAT brightens (and colour-tints) wall pixels near its plane, fading over
+ * `height` map units, and draws fullbright itself; a glowing WALL texture
+ * brightens the floor/ceiling near its line.  Colour comes from the Texture
+ * form when given, otherwise from the texture's average colour. */
+typedef struct
+{
+  char name[9];
+  int  is_wall;          /* from the walls{} list (vs flats{} / Texture) */
+  int  r, g, b;          /* 0-255; -1 = derive from the texture's average */
+  int  height;           /* fade distance, map units */
+} glowdef_t;
+
+static glowdef_t *glow_defs;
+static int        num_glow_defs, cap_glow_defs;
+int u_glow_present;      /* any defs loaded: the renderer's zero-cost gate */
+
+static glowdef_t *glow_add(const char *name, int is_wall)
+{
+  glowdef_t *g;
+  if (num_glow_defs == cap_glow_defs)
+  {
+    cap_glow_defs = cap_glow_defs ? cap_glow_defs * 2 : 16;
+    glow_defs = (glowdef_t *) realloc(glow_defs,
+                                      cap_glow_defs * sizeof(*glow_defs));
+  }
+  g = &glow_defs[num_glow_defs++];
+  memset(g, 0, sizeof(*g));
+  strncpy(g->name, name, 8);
+  g->is_wall = is_wall;
+  g->r = g->g = g->b = -1;
+  g->height = 128;
+  return g;
+}
+
+/* "RRGGBB" / "RR GG BB" hex colour string -> 0-255 components */
+static int glow_parse_color(const char *str, int *r, int *g, int *b)
+{
+  char hex[7];
+  int  n = 0, i;
+  for (i = 0; str[i] && n < 6; i++)
+    if (isxdigit((unsigned char)str[i]))
+      hex[n++] = str[i];
+  if (n != 6)
+    return 0;
+  hex[6] = 0;
+  for (i = 0; i < 6; i++)
+  {
+    int v = hex[i] <= '9' ? hex[i] - '0' : (tolower(hex[i]) - 'a') + 10;
+    if (i < 2) *r = (i & 1) ? *r | v : v << 4;
+    else if (i < 4) *g = (i & 1) ? *g | v : v << 4;
+    else *b = (i & 1) ? *b | v : v << 4;
+  }
+  return 1;
+}
+
+/* parse a glow block; the "glow" keyword has been consumed */
+static void dl_parse_glow(u_scanner_t *s)
+{
+  if (!U_CheckToken(s, '{'))
+    return;
+  while (U_GetNextToken(s, TRUE) && s->token != '}')
+  {
+    if (s->token != TK_Identifier && s->token != TK_StringConst)
+      continue;
+    if (!strcasecmp(s->string, "flats") || !strcasecmp(s->string, "walls"))
+    {
+      int is_wall = (tolower((unsigned char)s->string[0]) == 'w');
+      if (!U_CheckToken(s, '{'))
+        continue;
+      while (U_GetNextToken(s, TRUE) && s->token != '}')
+        if (s->token == TK_Identifier || s->token == TK_StringConst)
+          glow_add(s->string, is_wall);
+    }
+    else if (!strcasecmp(s->string, "texture"))
+    {
+      /* Texture "NAME", "RRGGBB" [, height] -- commas optional */
+      glowdef_t *g = NULL;
+      if (U_GetNextToken(s, TRUE) &&
+          (s->token == TK_Identifier || s->token == TK_StringConst))
+        g = glow_add(s->string, 0);
+      if (!g)
+        continue;
+      (void) U_CheckToken(s, ',');
+      if (U_GetNextToken(s, TRUE) && s->token == TK_StringConst)
+      {
+        int r = 0, gg = 0, b = 0;
+        if (glow_parse_color(s->string, &r, &gg, &b))
+        {
+          g->r = r; g->g = gg; g->b = b;
+        }
+      }
+      if (U_CheckToken(s, ','))
+      {
+        double h;
+        if (dl_number(s, &h) && h > 0)
+          g->height = (int) h;
+      }
+    }
+    else if (U_CheckToken(s, '{'))
+      dl_skip_block(s);          /* unknown nested block */
+  }
+}
+
+
+/* Lazy per-picnum glow resolution.  Flat table indexed by flat picnum
+ * (sector floorpic/ceilingpic); wall table by texture number.  Rebuilt when
+ * the counts change (wad load); colour derivation happens here so parse
+ * order vs texture init doesn't matter. */
+extern int numflats, firstflat;
+static const glowdef_t **glow_flat_tab;
+static int               glow_flat_n;
+static const glowdef_t **glow_wall_tab;
+static int               glow_wall_n;
+
+static void glow_resolve_color(glowdef_t *g, const uint8_t *texels, int count)
+{
+  const uint8_t *pal = (const uint8_t *) W_CacheLumpName("PLAYPAL");
+  unsigned long sr = 0, sg = 0, sb = 0;
+  int i, n = 0;
+  for (i = 0; i < count; i += 7)
+  {
+    const uint8_t *c = pal + texels[i] * 3;
+    sr += c[0]; sg += c[1]; sb += c[2];
+    n++;
+  }
+  W_UnlockLumpNum(W_GetNumForName("PLAYPAL"));
+  if (!n) { g->r = g->g = g->b = 255; return; }
+  g->r = (int)(sr / n); g->g = (int)(sg / n); g->b = (int)(sb / n);
+}
+
+static void glow_build_flat_tab(void)
+{
+  int i;
+  free(glow_flat_tab);
+  glow_flat_tab = (const glowdef_t **) calloc(numflats, sizeof(*glow_flat_tab));
+  glow_flat_n = numflats;
+  for (i = 0; i < num_glow_defs; i++)
+  {
+    glowdef_t *g = &glow_defs[i];
+    int lump, fl;
+    if (g->is_wall)
+      continue;
+    lump = (W_CheckNumForName)(g->name, ns_flats);
+    if (lump < 0)
+      lump = W_CheckNumForName(g->name);   /* pk3-routed / global flats */
+    if (lump < 0)
+      continue;
+    fl = lump - firstflat;
+    if (fl < 0 || fl >= numflats)
+      continue;
+    if (g->r < 0)
+    {
+      glow_resolve_color(g, (const uint8_t *) W_CacheLumpNum(lump), 4096);
+      W_UnlockLumpNum(lump);
+    }
+    if (g->r < 0)
+      continue;
+    glow_flat_tab[fl] = g;
+  }
+
+}
+
+const void *U_GlowForFlat(int flatpic)
+{
+  if (!num_glow_defs || numflats <= 0)
+    return NULL;
+  if (glow_flat_n != numflats)
+    glow_build_flat_tab();
+  if ((unsigned) flatpic >= (unsigned) glow_flat_n)
+    return NULL;
+  return glow_flat_tab[flatpic];
+}
+
+/* accessors for the renderer (keeps glowdef_t private to this TU) */
+int U_GlowColor(const void *gd)
+{
+  const glowdef_t *g = (const glowdef_t *) gd;
+  return (g->r << 16) | (g->g << 8) | g->b;
+}
+int U_GlowHeight(const void *gd)
+{
+  return ((const glowdef_t *) gd)->height;
+}
+
 static void dl_parse_lump(int lump)
 {
   u_scanner_t s = U_ScanOpen(W_CacheLumpNum(lump), W_LumpLength(lump),
@@ -242,8 +430,10 @@ static void dl_parse_lump(int lump)
       dl_parse_light(&s, DL_FLICKER);
     else if (!strcasecmp(s.string, "object"))
       dl_parse_object(&s);
+    else if (!strcasecmp(s.string, "glow"))
+      dl_parse_glow(&s);
     else if (U_CheckToken(&s, '{'))
-      dl_skip_block(&s);         /* skybox / glow / brightmap / ... */
+      dl_skip_block(&s);         /* skybox / brightmap / material / ... */
   }
   U_ScanClose(&s);
   W_UnlockLumpNum(lump);
@@ -264,6 +454,9 @@ void U_LoadDynLights(void)
       dl_parse_lump(lump);
   }
 
+  u_glow_present = (num_glow_defs > 0);
+  if (num_glow_defs)
+    lprintf(LO_INFO, "U_LoadDynLights: %d glow textures\n", num_glow_defs);
   if (num_binds)
     lprintf(LO_INFO, "U_LoadDynLights: %d lights, %d sprite bindings\n",
             num_defs, num_binds);

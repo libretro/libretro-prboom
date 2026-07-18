@@ -49,6 +49,8 @@
 #include "r_plane.h"
 #include "r_bsp.h"
 #include "r_draw.h"
+#include "r_drawtc.h"
+#include "vid_mode.h"
 #include "p_skybox.h"
 #include "p_ffloor.h"
 #include "m_bbox.h"
@@ -782,7 +784,10 @@ void R_SetupFreelook(void)
 // R_SetupFrame
 //
 static int      view_underwater;
-static uint16_t view_underwater_color;
+/* Underwater tint colour, in the ACTIVE surface format.  In truecolor the
+ * flat's mean is accumulated over V_PaletteTC's native channels, so the
+ * tint is not first collapsed to 565 and re-expanded. */
+static uint32_t view_underwater_color;
 
 static void R_SetupFrame (player_t *player)
 {
@@ -873,7 +878,9 @@ static void R_SetupFrame (player_t *player)
       if (viewz >= ff->model->floorheight && viewz <= ff->model->ceilingheight)
       {
         view_underwater = 1;
-        view_underwater_color = R_FlatAverageColor565(ff->model->floorpic);
+        view_underwater_color = VID_TRUECOLOR
+                                ? R_FlatAverageColorTC(ff->model->floorpic)
+                                : (uint32_t)R_FlatAverageColor565(ff->model->floorpic);
         break;
       }
     }
@@ -907,7 +914,24 @@ int autodetect_hom = 0;       // killough 2/7/98: HOM autodetection flag
 extern int floorclip[], ceilingclip[];   /* r_plane.c */
 static short  sb_top[MAX_SCREENWIDTH];
 static short  sb_bot[MAX_SCREENWIDTH];
-static unsigned short sb_scratch[MAX_SCREENWIDTH * MAX_SCREENHEIGHT];
+/* Skybox render scratch, one full surface.  Allocated on first use at the
+ * active pixel width rather than kept as a fixed 16-bit static: truecolor
+ * needs 4 bytes per pixel, and sizing it lazily also keeps the 16-bit build
+ * from carrying the buffer at all until a tagged skybox is actually used. */
+static void *sb_scratch = NULL;
+
+static void *R_SkyboxScratch(void)
+{
+  static size_t sb_scratch_bytes = 0;
+  size_t want = (size_t)MAX_SCREENWIDTH * MAX_SCREENHEIGHT * SURFACE_PIXEL_DEPTH;
+  if (!sb_scratch || sb_scratch_bytes != want)
+  {
+    free(sb_scratch);
+    sb_scratch = malloc(want);
+    sb_scratch_bytes = sb_scratch ? want : 0;
+  }
+  return sb_scratch;
+}
 
 /* When set, the composite copies only pixels the reveal mask marks (the
  * default skybox); tagged skyboxes keep their span-based copy. */
@@ -919,11 +943,17 @@ static void R_RenderTaggedSkybox(const skybox_t *sb)
   fixed_t savex = viewx, savey = viewy, savez = viewz;
   angle_t saveang = viewangle;
   fixed_t savecos = viewcos, savesin = viewsin;
-  unsigned short *real_tl = drawvars.short_topleft;
+  unsigned short *real_tl   = drawvars.short_topleft;
+  unsigned int   *real_tl_i = drawvars.int_topleft;
+  void           *scratch   = R_SkyboxScratch();
   int x, y;
 
+  if (!scratch)
+    return;
+
   /* render the skybox scene into the scratch buffer */
-  drawvars.short_topleft = sb_scratch;
+  drawvars.short_topleft = (unsigned short *)scratch;
+  drawvars.int_topleft   = (unsigned int   *)scratch;
 
   r_in_skybox = 1;
   viewx = sb->x;
@@ -972,6 +1002,7 @@ static void R_RenderTaggedSkybox(const skybox_t *sb)
   viewx = savex; viewy = savey; viewz = savez;
   viewangle = saveang; viewcos = savecos; viewsin = savesin;
   drawvars.short_topleft = real_tl;
+  drawvars.int_topleft   = real_tl_i;
 
   /* composite: copy only the captured sky region from scratch to real */
   for (x = 0; x < viewwidth; x++)
@@ -985,8 +1016,12 @@ static void R_RenderTaggedSkybox(const skybox_t *sb)
     {
       if (sb_use_reveal && !R_SkyRevealTest(x, y))
         continue;
-      real_tl[y * SURFACE_SHORT_PITCH + x] =
-        sb_scratch[y * SURFACE_SHORT_PITCH + x];
+      if (VID_TRUECOLOR)
+        ((uint32_t *)real_tl_i)[y * SURFACE_SHORT_PITCH + x] =
+          ((const uint32_t *)scratch)[y * SURFACE_SHORT_PITCH + x];
+      else
+        real_tl[y * SURFACE_SHORT_PITCH + x] =
+          ((const uint16_t *)scratch)[y * SURFACE_SHORT_PITCH + x];
     }
   }
 }
@@ -1159,7 +1194,12 @@ void R_RenderPlayerView (player_t* player)
 
     /* Underwater: blend the finished view toward the water colour. */
     if (view_underwater)
-      R_TintView(view_underwater_color);
+    {
+      if (VID_TRUECOLOR)
+        R_TintViewTC(view_underwater_color);
+      else
+        R_TintView((uint16_t)view_underwater_color);
+    }
 
 #ifdef PRBOOM_RENDER_PROFILE
   t4 = I_RenderProfileUsec();

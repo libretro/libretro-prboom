@@ -186,12 +186,34 @@ the wad.
   them, with colours taken from the definition or derived from the texture
   itself.
 
+### Colour depth
+
+The **Color Format** core option selects the output pixel format: `16bits`
+(RGB565, the default and the historical renderer), `24bits (truecolor)`
+(XRGB8888) or `30bits (HDR)` (XRGB2101010). The truecolor formats are native
+pipelines, not a conversion stage — the palette, light ramps and composed
+colour tables are built at the output's channel width, so nothing is
+quantised to 565 on the way. This mainly removes the banding the 16-bit
+light ramp introduces in distance shading and in smooth gradients: a
+256-step shading ramp resolves to roughly 17 levels per channel at 16 bits,
+about 135 at 24, and near the full 256 at 30 — the gap being widest in dark
+colours, where the banding is most visible. Full-colour art (PNG title
+cards, the help screen, the intermission backdrop) is also blitted without
+losing precision.
+
+`30bits` is used only when the frontend reports that it can present a
+10-bit surface natively; otherwise the core falls back to `24bits`, which
+rounds rather than truncates and so looks better than a narrowed 10-bit
+frame. Note that XRGB2101010 is deeper-precision SDR — the core emits no
+HDR transfer function or metadata.
+
+Changing the option requires a restart.
+
 ### Not supported
 
 - **ZScript** — no support. Mods whose gameplay lives in ZScript won't run it.
 - **Line / sector portals** — inert.
 - **3D models (MODELDEF)** — out of scope for the 8-bit software renderer.
-- **Truecolor rendering.**
 
 The practical result: map-and-resource-driven ZDoom wads — new levels, sprite
 and texture replacements, ACS-scripted set pieces, reskinned monsters, Hexen-

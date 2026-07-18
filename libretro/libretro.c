@@ -31,6 +31,7 @@
 #endif
 
 #include "libretro_core_options.h"
+#include "../src/vid_mode.h"
 
 /* prboom includes */
 
@@ -936,32 +937,10 @@ void retro_init(void)
          midi_iface_valid = false;
    }
 
-   /* Negotiate pixel format with the frontend.  The renderer is
-    * hardcoded to write 16-bit pixels via VID_PAL16 -- the
-    * surface depth is fixed at SURFACE_PIXEL_DEPTH=2 and every
-    * draw column / span helper writes uint16_t directly.  We
-    * cannot fall through to XRGB1555 silently if RGB565 is
-    * rejected; the output would be unspecified-format garbage
-    * (with the wrong red/blue channel widths and an alpha bit
-    * smeared across the green LSB).  Log a hard error so the
-    * user sees a visible diagnostic instead of a corrupted
-    * screen. */
-   {
-      enum retro_pixel_format rgb565 = RETRO_PIXEL_FORMAT_RGB565;
-      if (!environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &rgb565))
-      {
-         if (log_cb)
-            log_cb(RETRO_LOG_ERROR,
-                   "Frontend rejected RGB565 pixel format -- this "
-                   "core requires it.  Update RetroArch or your "
-                   "frontend to a build that supports RGB565.\n");
-      }
-      else if (log_cb)
-      {
-         log_cb(RETRO_LOG_DEBUG,
-                "Frontend accepted RGB565 pixel format.\n");
-      }
-   }
+   /* Pixel format is negotiated in retro_load_game, once the "Color
+    * Format" core option has been read -- it must be settled before any
+    * surface, palette or lookup table is built, and retro_init runs before
+    * the frontend can answer GET_VARIABLE. */
 
    if (environ_cb(RETRO_ENVIRONMENT_GET_INPUT_BITMASKS, NULL))
       libretro_supports_bitmasks = true;
@@ -1312,6 +1291,112 @@ static void update_audio_samplerate(void)
     * upcoming I_InitSound/I_InitMusic.  I_SetSoundRate clamps, no-ops when
     * unchanged, and re-tunes SFX + music as needed. */
    I_SetSoundRate(chosen);
+}
+
+/*
+ * I_NegotiatePixelFormat
+ *
+ * Settle the output pixel format for the whole session, from the "Color
+ * Format" core option.  Must run before update_variables() computes
+ * SCREENPITCH and before any surface, palette or lookup table is built --
+ * SURFACE_PIXEL_DEPTH is derived from the result.
+ *
+ * The 30-bit path is gated on RETRO_ENVIRONMENT_GET_SCREEN_10BPC_CAPABLE
+ * rather than on SET_PIXEL_FORMAT alone.  SET_PIXEL_FORMAT accepts
+ * XRGB2101010 unconditionally and the frontend silently narrows the frame
+ * to 8 bits when the active video driver cannot present a 10-bit surface,
+ * so acceptance says nothing about what reaches the display.  Worse, that
+ * narrowing truncates, while our own XRGB8888 path rounds -- so on a
+ * non-capable driver the 10-bit renderer is not merely wasted work, it is
+ * measurably worse output than just rendering 24-bit.  Query the real
+ * capability and drop to 24-bit when it is not there.
+ *
+ * An older frontend that does not recognise the call returns false, which
+ * the libretro contract defines as "no guarantee of native 10-bit" -- the
+ * safe default, and the same branch we take for a non-capable driver.
+ */
+static void I_NegotiatePixelFormat(void)
+{
+   struct retro_variable var;
+   enum retro_pixel_format fmt;
+   int want = VID_MODE565;
+
+   var.key   = "prboom-color_format";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      if (!strcmp(var.value, "24bits (truecolor)"))
+         want = VID_MODE8888;
+      else if (!strcmp(var.value, "30bits (HDR)"))
+         want = VID_MODE2101010;
+   }
+
+   if (want == VID_MODE2101010)
+   {
+      bool tenbit = false;
+      if (!environ_cb(RETRO_ENVIRONMENT_GET_SCREEN_10BPC_CAPABLE, &tenbit)
+            || !tenbit)
+      {
+         want = VID_MODE8888;
+         if (log_cb)
+            log_cb(RETRO_LOG_INFO,
+                   "Color Format: 30-bit requested, but the frontend does "
+                   "not present a 10-bit source natively -- using 24-bit "
+                   "truecolor instead (rounds rather than truncates).\n");
+      }
+   }
+
+   /* Ask for the chosen format, degrading if the frontend refuses it. */
+   for (;;)
+   {
+      if (want == VID_MODE2101010)
+         fmt = RETRO_PIXEL_FORMAT_XRGB2101010;
+      else if (want == VID_MODE8888)
+         fmt = RETRO_PIXEL_FORMAT_XRGB8888;
+      else
+         fmt = RETRO_PIXEL_FORMAT_RGB565;
+
+      if (environ_cb(RETRO_ENVIRONMENT_SET_PIXEL_FORMAT, &fmt))
+         break;
+
+      if (want == VID_MODE2101010)
+      {
+         want = VID_MODE8888;
+         if (log_cb)
+            log_cb(RETRO_LOG_WARN,
+                   "Frontend rejected XRGB2101010; falling back to "
+                   "XRGB8888.\n");
+      }
+      else if (want == VID_MODE8888)
+      {
+         want = VID_MODE565;
+         if (log_cb)
+            log_cb(RETRO_LOG_WARN,
+                   "Frontend rejected XRGB8888; falling back to RGB565.\n");
+      }
+      else
+      {
+         /* RGB565 refused: the renderer cannot produce anything else that
+          * is guaranteed, so log loudly rather than emitting pixels in an
+          * unspecified format (wrong channel widths, smeared alpha). */
+         if (log_cb)
+            log_cb(RETRO_LOG_ERROR,
+                   "Frontend rejected RGB565 pixel format -- this core "
+                   "requires it.  Update RetroArch or your frontend to a "
+                   "build that supports RGB565.\n");
+         break;
+      }
+   }
+
+   vid_mode       = want;
+   vid_pixelbytes = (want == VID_MODE565) ? 2 : 4;
+
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO, "Color Format: %s (%d bytes/pixel).\n",
+             (want == VID_MODE2101010) ? "30-bit XRGB2101010"
+             : (want == VID_MODE8888)  ? "24-bit XRGB8888"
+                                       : "16-bit RGB565",
+             vid_pixelbytes);
 }
 
 static void update_variables(bool startup)
@@ -2010,6 +2095,11 @@ bool retro_load_game(const struct retro_game_info *info)
    }
    else if (log_cb)
       log_cb(RETRO_LOG_INFO, "Rumble environment not supported.\n");
+
+   /* Settle the pixel format first: update_variables() derives SCREENPITCH
+    * from SURFACE_PIXEL_DEPTH, and everything allocated below is sized by
+    * it. */
+   I_NegotiatePixelFormat();
 
    update_variables(true);
 
@@ -3587,14 +3677,20 @@ dbool   I_StartDisplay(void)
       fb.width        = SCREENWIDTH;
       fb.height       = SCREENHEIGHT;
       fb.pitch        = 0;
-      fb.format       = RETRO_PIXEL_FORMAT_RGB565;
+      fb.format       = (vid_mode == VID_MODE2101010)
+                        ? RETRO_PIXEL_FORMAT_XRGB2101010
+                        : (vid_mode == VID_MODE8888)
+                          ? RETRO_PIXEL_FORMAT_XRGB8888
+                          : RETRO_PIXEL_FORMAT_RGB565;
       fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
       fb.memory_flags = 0;
 
+      {
+      const enum retro_pixel_format want_fmt = fb.format;
       if (environ_cb(RETRO_ENVIRONMENT_GET_CURRENT_SOFTWARE_FRAMEBUFFER,
                      &fb)
             && fb.data
-            && fb.format == RETRO_PIXEL_FORMAT_RGB565
+            && fb.format == want_fmt
             && fb.pitch  == (size_t)SCREENPITCH)
       {
          /* Repoint screens[0] and the renderer's cached top-left
@@ -3613,11 +3709,11 @@ dbool   I_StartDisplay(void)
           * to copy into the differently-strided destination
           * itself.
           *
-          * Format must be RGB565 -- frontends are allowed to
-          * return a different format than SET_PIXEL_FORMAT
-          * negotiated, e.g. when running with a HW backend that
-          * needs an internal conversion stage.  We can only
-          * direct-render when the formats agree. */
+          * Format must match the one we negotiated -- frontends
+          * are allowed to return a different format than
+          * SET_PIXEL_FORMAT settled on, e.g. when running with a
+          * HW backend that needs an internal conversion stage.
+          * We can only direct-render when the formats agree. */
          direct_fb_data         = (unsigned char *)fb.data;
          direct_fb_pitch        = (unsigned int)fb.pitch;
          screens[0].data        = direct_fb_data;
@@ -3633,6 +3729,7 @@ dbool   I_StartDisplay(void)
             sw_fb_checked = true;
             have_sw_fb    = true;
          }
+      }
       }
    }
 

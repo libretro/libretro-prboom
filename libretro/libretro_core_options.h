@@ -62,6 +62,21 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "320x200"
    },
    {
+      "prboom-color_format",
+      "Color Format (Restart Required)",
+      NULL,
+      "Output colour depth. '16bits' is the classic RGB565 renderer. '24bits' renders in full 8-bit-per-channel truecolor, which removes the banding the 16-bit light ramp introduces in distance shading and smooth gradients. '30bits' renders at 10 bits per channel for finer gradients still; it is used only when the frontend can actually present a 10-bit surface, otherwise the core falls back to 24bits automatically.",
+      NULL,
+      NULL,
+      {
+         { "16bits",             NULL },
+         { "24bits (truecolor)", NULL },
+         { "30bits (HDR)",       NULL },
+         { NULL, NULL },
+      },
+      "16bits"
+   },
+   {
       "prboom-mouse_on",
       "Mouse Active When Using Gamepad",
       NULL,

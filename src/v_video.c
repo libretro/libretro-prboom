@@ -45,6 +45,7 @@
 #include "r_filter.h"
 #include "lprintf.h"
 #include "u_png.h"
+#include "vid_mode.h"
 
 /* SIMD guards for the native-colour full-screen blit (V_DrawRGBAFullScreen).
  * Same guard shape as the renderer's column blenders. */
@@ -303,6 +304,10 @@ void V_CopyRect(int srcx, int srcy, int srcscrn, int width,
 
 // FIXME: restore v_video.inl
 #define GETCOL16(col) (VID_PAL16(col, VID_COLORWEIGHTMASK))
+/* Truecolor twin: the palette index is looked up straight in V_PaletteTC, so
+ * the flat lands on the surface at the format's full channel width -- there
+ * is no 565 stage anywhere on this path. */
+#define GETCOLTC(col) (VID_PALTC(col, VID_COLORWEIGHTMASK))
 
 // draw a stretched 64x64 flat to the top left corner of the screen
 #define V_DRAWFLAT(SCRN, TYPE, GETCOL) { \
@@ -382,7 +387,10 @@ void V_DrawBackground(const char* flatname, int scrn)
 
   /* V_DrawBlock(0, 0, scrn, 64, 64, src, 0); */
 
-  V_DRAWFLAT(scrn, int16_t, GETCOL16);
+  if (VID_TRUECOLOR)
+    V_DRAWFLAT(scrn, uint32_t, GETCOLTC)
+  else
+    V_DRAWFLAT(scrn, int16_t, GETCOL16);
 
   /* end V_DrawBlock */
 
@@ -828,6 +836,124 @@ void V_DrawNumPatchFS(int x, int y, int scrn, int lump,
 }
 
 /*
+ * V_DrawRGBAFullScreenTC
+ *
+ * Truecolor blit of a native-colour full-screen image.  This is the single
+ * biggest quantisation win in the 2D layer: the source is a 24/32-bit PNG
+ * (full-colour title cards, the help screen, the intermission backdrop), so
+ * the RGB565 path discards 3/2/3 bits per channel and visibly bands images
+ * that were authored smooth.  Here the source bytes reach the surface with
+ * no precision lost and no intermediate format:
+ *
+ *   XRGB8888    -- a pure channel reorder (source 0xAABBGGRR -> 0x00RRGGBB).
+ *                  No arithmetic at all, so the blit is bit-lossless.
+ *   XRGB2101010 -- each 8-bit channel widened to 10 by bit replication,
+ *                  (c<<2)|(c>>6), which maps 0->0 and 255->1023 exactly and
+ *                  is the correct one-step expansion (NOT a narrow-then-
+ *                  widen round trip).
+ *
+ * Sampling stays point/nearest, matching the 16-bit path, so geometry is
+ * identical -- only the colour precision changes.
+ */
+static void V_DrawRGBAFullScreenTC(int scrn, const unsigned *argb,
+                                   int aw, int ah)
+{
+  uint32_t *surf   = (uint32_t *)screens[scrn].data;
+  int sx_step      = (aw << 16) / SCREENWIDTH;
+  int sy_step      = (ah << 16) / SCREENHEIGHT;
+  const int deep   = (vid_mode == VID_MODE2101010);
+  int oy;
+
+  for (oy = 0; oy < SCREENHEIGHT; oy++)
+  {
+    int srcy = (oy * sy_step) >> 16;
+    const unsigned *srow;
+    uint32_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    int ox = 0, sx = 0;
+    if (srcy >= ah) srcy = ah - 1;
+    srow = argb + (size_t)srcy * aw;
+
+#if defined(V_ARGB_SSE2) || defined(V_ARGB_NEON)
+    /* Four pixels per pass: gather the (strided) source texels, then do the
+     * reorder / widen in vector lanes.  Bit-identical to the scalar tail. */
+    for (; ox + 4 <= SCREENWIDTH; ox += 4)
+    {
+      V_ARGB_ALIGN16 uint32_t sp[4];
+      int j;
+      for (j = 0; j < 4; j++, sx += sx_step)
+        sp[j] = srow[sx >> 16];
+#if defined(V_ARGB_SSE2)
+      {
+        __m128i s  = _mm_load_si128((const __m128i *)sp);
+        __m128i m8 = _mm_set1_epi32(0xff);
+        __m128i o;
+        if (deep)
+        {
+          __m128i r = _mm_and_si128(s, m8);
+          __m128i g = _mm_and_si128(_mm_srli_epi32(s, 8), m8);
+          __m128i b = _mm_and_si128(_mm_srli_epi32(s, 16), m8);
+          r = _mm_or_si128(_mm_slli_epi32(r, 2), _mm_srli_epi32(r, 6));
+          g = _mm_or_si128(_mm_slli_epi32(g, 2), _mm_srli_epi32(g, 6));
+          b = _mm_or_si128(_mm_slli_epi32(b, 2), _mm_srli_epi32(b, 6));
+          o = _mm_or_si128(_mm_or_si128(_mm_slli_epi32(r, 20),
+                                        _mm_slli_epi32(g, 10)), b);
+        }
+        else
+        {
+          /* (r<<16) | g | (b>>16) -- swap the R and B bytes, drop alpha */
+          o = _mm_or_si128(
+                _mm_or_si128(_mm_slli_epi32(_mm_and_si128(s, m8), 16),
+                             _mm_and_si128(s, _mm_set1_epi32(0xff00))),
+                _mm_and_si128(_mm_srli_epi32(s, 16), m8));
+        }
+        _mm_storeu_si128((__m128i *)(row + ox), o);
+      }
+#else /* V_ARGB_NEON */
+      {
+        uint32x4_t s  = vld1q_u32(sp);
+        uint32x4_t m8 = vdupq_n_u32(0xff);
+        uint32x4_t o;
+        if (deep)
+        {
+          uint32x4_t r = vandq_u32(s, m8);
+          uint32x4_t g = vandq_u32(vshrq_n_u32(s, 8), m8);
+          uint32x4_t b = vandq_u32(vshrq_n_u32(s, 16), m8);
+          r = vorrq_u32(vshlq_n_u32(r, 2), vshrq_n_u32(r, 6));
+          g = vorrq_u32(vshlq_n_u32(g, 2), vshrq_n_u32(g, 6));
+          b = vorrq_u32(vshlq_n_u32(b, 2), vshrq_n_u32(b, 6));
+          o = vorrq_u32(vorrq_u32(vshlq_n_u32(r, 20),
+                                  vshlq_n_u32(g, 10)), b);
+        }
+        else
+        {
+          o = vorrq_u32(
+                vorrq_u32(vshlq_n_u32(vandq_u32(s, m8), 16),
+                          vandq_u32(s, vdupq_n_u32(0xff00))),
+                vandq_u32(vshrq_n_u32(s, 16), m8));
+        }
+        vst1q_u32(row + ox, o);
+      }
+#endif
+    }
+#endif
+
+    for (; ox < SCREENWIDTH; ox++, sx += sx_step)
+    {
+      unsigned p = srow[sx >> 16];
+      int r = (int)(p & 0xff);
+      int g = (int)((p >> 8) & 0xff);
+      int b = (int)((p >> 16) & 0xff);
+      if (deep)
+        row[ox] = ((uint32_t)((r << 2) | (r >> 6)) << 20) |
+                  ((uint32_t)((g << 2) | (g >> 6)) << 10) |
+                   (uint32_t)((b << 2) | (b >> 6));
+      else
+        row[ox] = ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+    }
+  }
+}
+
+/*
  * V_DrawRGBAFullScreen
  *
  * Draw a full-screen art lump from its native-colour image, when one was
@@ -851,6 +977,12 @@ int V_DrawRGBAFullScreen(int scrn, int lump)
   argb = U_PNGCacheRGBA(lump, &aw, &ah);
   if (!argb || aw <= 0 || ah <= 0)
     return 0;
+
+  if (VID_TRUECOLOR)
+  {
+    V_DrawRGBAFullScreenTC(scrn, argb, aw, ah);
+    return 1;
+  }
 
   surf    = (uint16_t *)screens[scrn].data;
   sx_step = (aw << 16) / SCREENWIDTH;
@@ -1005,6 +1137,51 @@ uint16_t *V_Palette16 = NULL;
 static uint16_t *Palettes16 = NULL;
 static int currentPaletteIndex = 0;
 
+/* ---- truecolor palette (XRGB8888 / XRGB2101010) --------------------------
+ * Built in lockstep with the 16-bit palette by every path that produces one
+ * (PLAYPAL expansion, raw-palette swap, pain/bonus blend), so the two always
+ * describe the same colours.  V_Palette16 stays the cache key everywhere it
+ * already is -- it changes exactly when V_PaletteTC does -- so the flat /
+ * fullscreen / composed-LUT caches need no changes.
+ *
+ * Layout matches V_Palette16: [colour*VID_NUMCOLORWEIGHTS + weight], each
+ * entry premultiplied by weight/(VID_NUMCOLORWEIGHTS-1) so the filtered
+ * paths can sum four taps.  Channels are the format's native width (8 or
+ * 10 bits), which is the whole point: the light ramp and the composed LUTs
+ * resolve gradients at full output precision instead of 5/6 bits. */
+uint32_t *V_PaletteTC = NULL;
+static uint32_t *PalettesTC   = NULL;
+static uint32_t *RawPaletteTC = NULL;
+static uint32_t *BlendPalTC[2];
+
+/* Pack one gamma-corrected 8-bit colour at weight t into the active format.
+ * roundUp reproduces the 16-bit builder's DONT_ROUND_ABOVE behaviour: very
+ * bright colours are not rounded up, so the four-tap filtered sum cannot
+ * overflow a channel field into its neighbour. */
+static INLINE uint32_t V_PackTC(int r, int g, int b, float t,
+                                float roundUpR, float roundUpG, float roundUpB)
+{
+  if (vid_mode == VID_MODE2101010)
+  {
+    /* widen 8 -> 10 bits by bit replication (0 -> 0, 255 -> 1023), then
+     * scale, so the ramp is computed at the full output precision */
+    int r10 = (r << 2) | (r >> 6);
+    int g10 = (g << 2) | (g >> 6);
+    int b10 = (b << 2) | (b >> 6);
+    int nr  = (int)(r10 * t + roundUpR);
+    int ng  = (int)(g10 * t + roundUpG);
+    int nb  = (int)(b10 * t + roundUpB);
+    return ((uint32_t)nr << 20) | ((uint32_t)ng << 10) | (uint32_t)nb;
+  }
+  else
+  {
+    int nr = (int)(r * t + roundUpR);
+    int ng = (int)(g * t + roundUpG);
+    int nb = (int)(b * t + roundUpB);
+    return ((uint32_t)nr << 16) | ((uint32_t)ng << 8) | (uint32_t)nb;
+  }
+}
+
 #define DONT_ROUND_ABOVE 220
 //
 // V_UpdateTrueColorPalette
@@ -1071,6 +1248,8 @@ void V_UpdateTrueColorPalette(void) {
   if (usegammaOnLastPaletteGeneration != usegamma) {
     if (Palettes16) free(Palettes16);
     Palettes16 = NULL;
+    if (PalettesTC) free(PalettesTC);
+    PalettesTC = NULL;
     usegammaOnLastPaletteGeneration = usegamma;      
   }
   
@@ -1078,6 +1257,8 @@ void V_UpdateTrueColorPalette(void) {
   {
      // set short palette
      Palettes16 = malloc(genPals*256*sizeof(uint16_t)*VID_NUMCOLORWEIGHTS);
+     if (VID_TRUECOLOR && !PalettesTC)
+        PalettesTC = malloc(genPals*256*sizeof(uint32_t)*VID_NUMCOLORWEIGHTS);
      for (p=0; p<genPals; p++)
      {
         for (i=0; i<256; i++)
@@ -1111,6 +1292,9 @@ void V_UpdateTrueColorPalette(void) {
            for (w=0; w<VID_NUMCOLORWEIGHTS; w++)
            {
               float t = (float)(w)/(float)(VID_NUMCOLORWEIGHTS-1);
+              if (PalettesTC)
+                 PalettesTC[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] =
+                    V_PackTC(r, g, b, t, roundUpR, roundUpG, roundUpB);
 #if defined(ABGR1555)
               int nr  = (int)((r>>3)*t+roundUpR);
               int ng  = (int)((g>>3)*t+roundUpG);
@@ -1132,7 +1316,9 @@ void V_UpdateTrueColorPalette(void) {
   }
 
   V_Palette16 = Palettes16 + paletteNum*256*VID_NUMCOLORWEIGHTS;
-   
+  if (PalettesTC)
+    V_PaletteTC = PalettesTC + paletteNum*256*VID_NUMCOLORWEIGHTS;
+
   W_UnlockLumpNum(pplump);
   W_UnlockLumpNum(gtlump);
 }
@@ -1146,6 +1332,9 @@ void V_DestroyTrueColorPalette(void)
     if (Palettes16) free(Palettes16);
     Palettes16 = NULL;
     V_Palette16 = NULL;
+    if (PalettesTC) free(PalettesTC);
+    PalettesTC = NULL;
+    V_PaletteTC = NULL;
 }
 
 //
@@ -1176,6 +1365,12 @@ void V_SetRawPalette(const char *lump_name)
     if (!RawPalette16)
       return;
   }
+  if (VID_TRUECOLOR && !RawPaletteTC)
+  {
+    RawPaletteTC = (uint32_t*)malloc(256 * sizeof(uint32_t) * VID_NUMCOLORWEIGHTS);
+    if (!RawPaletteTC)
+      return;
+  }
 
   gtlump = (W_CheckNumForName)("GAMMATBL", ns_prboom);
   pal    = (const uint8_t *)W_CacheLumpNum(lump);
@@ -1195,6 +1390,9 @@ void V_SetRawPalette(const char *lump_name)
     for (w = 0; w < VID_NUMCOLORWEIGHTS; w++)
     {
       float t = (float)(w)/(float)(VID_NUMCOLORWEIGHTS-1);
+      if (RawPaletteTC)
+        RawPaletteTC[i*VID_NUMCOLORWEIGHTS + w] =
+          V_PackTC(r, g, b, t, roundUpR, roundUpG, roundUpB);
 #if defined(ABGR1555)
       int nr = (int)((r>>3)*t+roundUpR);
       int ng = (int)((g>>3)*t+roundUpG);
@@ -1214,6 +1412,8 @@ void V_SetRawPalette(const char *lump_name)
   W_UnlockLumpNum(lump);
 
   V_Palette16 = RawPalette16;
+  if (RawPaletteTC)
+    V_PaletteTC = RawPaletteTC;
 }
 
 /* V_SetPaletteBlend: point V_Palette16 at a scratch palette mixing two
@@ -1245,6 +1445,8 @@ void V_SetPaletteBlend(int pal1, int pal2, fixed_t t)
       usegamma == last_gamma && BlendPal16[blend_flip])
   {
     V_Palette16 = BlendPal16[blend_flip];
+    if (BlendPalTC[blend_flip])
+      V_PaletteTC = BlendPalTC[blend_flip];
     return;
   }
   last_pal1 = pal1; last_pal2 = pal2; last_t = t; last_gamma = usegamma;
@@ -1263,6 +1465,9 @@ void V_SetPaletteBlend(int pal1, int pal2, fixed_t t)
   if (!BlendPal16[blend_flip])
     BlendPal16[blend_flip] =
       malloc(256 * sizeof(uint16_t) * VID_NUMCOLORWEIGHTS);
+  if (VID_TRUECOLOR && !BlendPalTC[blend_flip])
+    BlendPalTC[blend_flip] =
+      malloc(256 * sizeof(uint32_t) * VID_NUMCOLORWEIGHTS);
   dst = BlendPal16[blend_flip];
 
   for (i = 0; i < 256; i++)
@@ -1289,6 +1494,9 @@ void V_SetPaletteBlend(int pal1, int pal2, fixed_t t)
     for (w = 0; w < VID_NUMCOLORWEIGHTS; w++)
     {
       float wt = (float) (w) / (float) (VID_NUMCOLORWEIGHTS - 1);
+      if (BlendPalTC[blend_flip])
+        BlendPalTC[blend_flip][i * VID_NUMCOLORWEIGHTS + w] =
+          V_PackTC(r, g, b, wt, roundUpR, roundUpG, roundUpB);
 #if defined(ABGR1555)
       int nr = (int) ((r >> 3) * wt + roundUpR);
       int ng = (int) ((g >> 3) * wt + roundUpG);
@@ -1306,6 +1514,8 @@ void V_SetPaletteBlend(int pal1, int pal2, fixed_t t)
   if (gtlump != -1)
     W_UnlockLumpNum(gtlump);
   V_Palette16 = BlendPal16[blend_flip];
+  if (BlendPalTC[blend_flip])
+    V_PaletteTC = BlendPalTC[blend_flip];
   }
 }
 
@@ -1319,6 +1529,8 @@ void V_RestorePalette(void)
 {
   if (Palettes16)
     V_Palette16 = Palettes16 + currentPaletteIndex*256*VID_NUMCOLORWEIGHTS;
+  if (PalettesTC)
+    V_PaletteTC = PalettesTC + currentPaletteIndex*256*VID_NUMCOLORWEIGHTS;
 }
 
 //
@@ -1354,14 +1566,31 @@ void V_SetPalette(int pal)
 // doesn't matter in practice.
 void V_FillRect(int x, int y, int width, int height, uint8_t colour)
 {
-  uint16_t *dest = (uint16_t*)screens[0].data + x + y * SURFACE_SHORT_PITCH;
-  uint16_t  c    = VID_PAL16(colour, VID_COLORWEIGHTMASK);
-  int       i;
-  while (height--)
+  int i;
+  if (VID_TRUECOLOR)
   {
-    for (i = 0; i < width; i++)
-      dest[i] = c;
-    dest += SURFACE_SHORT_PITCH;
+    /* Palette index -> V_PaletteTC directly: full channel width, no 565
+     * intermediate.  V_DrawRawScreen paints whole raw images through this,
+     * so it is a real image path, not just a background fill. */
+    uint32_t *dest = (uint32_t*)screens[0].data + x + y * SURFACE_SHORT_PITCH;
+    uint32_t  c    = VID_PALTC(colour, VID_COLORWEIGHTMASK);
+    while (height--)
+    {
+      for (i = 0; i < width; i++)
+        dest[i] = c;
+      dest += SURFACE_SHORT_PITCH;
+    }
+    return;
+  }
+  {
+    uint16_t *dest = (uint16_t*)screens[0].data + x + y * SURFACE_SHORT_PITCH;
+    uint16_t  c    = VID_PAL16(colour, VID_COLORWEIGHTMASK);
+    while (height--)
+    {
+      for (i = 0; i < width; i++)
+        dest[i] = c;
+      dest += SURFACE_SHORT_PITCH;
+    }
   }
 }
 
@@ -1406,6 +1635,11 @@ void V_FreeScreens(void) {
 
 void V_PlotPixel(int scrn, int x, int y, uint8_t color)
 {
+   if (VID_TRUECOLOR)
+   {
+      ((uint32_t*)screens[scrn].data)[x + SURFACE_SHORT_PITCH *y] = VID_PALTC(color, VID_COLORWEIGHTMASK);
+      return;
+   }
    ((uint16_t*)screens[scrn].data)[x + SURFACE_SHORT_PITCH *y] = VID_PAL16(color, VID_COLORWEIGHTMASK);
 }
 

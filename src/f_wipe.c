@@ -135,10 +135,14 @@ static int wipe_doMelt(int ticks)
        * screen rather than relying on previous frames' writes. */
       for (y = 0; y < SCREENHEIGHT; y++)
       {
-         uint16_t *drow =
-            (uint16_t *)(wipe_scr.data + (size_t)y * SURFACE_BYTE_PITCH);
-         const uint16_t *erow =
-            (const uint16_t *)(wipe_scr_end.data + (size_t)y * SURFACE_BYTE_PITCH);
+         /* Byte-addressed: the melt is a pure copy with no colour maths,
+          * so the same loop serves every surface width -- pixel offsets
+          * just scale by SURFACE_PIXEL_DEPTH.  Nothing here converts
+          * between formats. */
+         uint8_t *drow =
+            wipe_scr.data + (size_t)y * SURFACE_BYTE_PITCH;
+         const uint8_t *erow =
+            wipe_scr_end.data + (size_t)y * SURFACE_BYTE_PITCH;
 
          i = 0;
          while (i < SCREENWIDTH)
@@ -157,7 +161,8 @@ static int wipe_doMelt(int ticks)
                      break;
                   run++;
                }
-               memcpy(&drow[i], &erow[i],
+               memcpy(drow + (size_t)i * SURFACE_PIXEL_DEPTH,
+                      erow + (size_t)i * SURFACE_PIXEL_DEPTH,
                       (size_t)(run - i) * SURFACE_PIXEL_DEPTH);
                i = run;
             }
@@ -165,10 +170,12 @@ static int wipe_doMelt(int ticks)
             {
                /* Start-screen pixel, scrolled down by the boundary:
                 * dest row y reads source row y - b. */
-               const uint16_t *srow =
-                  (const uint16_t *)(wipe_scr_start.data
-                     + (size_t)(y - b) * SURFACE_BYTE_PITCH);
-               drow[i] = srow[i];
+               const uint8_t *srow =
+                  wipe_scr_start.data
+                     + (size_t)(y - b) * SURFACE_BYTE_PITCH;
+               memcpy(drow + (size_t)i * SURFACE_PIXEL_DEPTH,
+                      srow + (size_t)i * SURFACE_PIXEL_DEPTH,
+                      SURFACE_PIXEL_DEPTH);
                i++;
             }
          }

@@ -27,6 +27,8 @@
 #include "u_voxel.h"
 #include "r_things.h"
 #include "r_voxel.h"
+#include "r_drawtc.h"
+#include "vid_mode.h"
 
 /* exported from r_draw.c: palette index + light colormap -> screen pixel */
 extern const uint16_t *R_ComposedColormap(const lighttable_t *colormap);
@@ -59,8 +61,16 @@ static dbool vox_zbuf_ensure(int npix)
 void R_DrawVoxel(vissprite_t *vis)
 {
   const voxel_model_t *vox = (const voxel_model_t *)vis->voxel;
-  const uint16_t      *lut;
-  uint16_t            *fb = drawvars.short_topleft;
+  /* One rasteriser for both surface widths: the geometry, z-buffer and
+   * clipping are identical, only the colour table and the store differ.
+   * The truecolor table is the composed TC LUT built from V_PaletteTC, so
+   * a voxel texel reaches the surface at full channel width with no 565
+   * stage on the way. */
+  const int            tc  = VID_TRUECOLOR;
+  const uint16_t      *lut = NULL;
+  const uint32_t      *lutTC = NULL;
+  void                *fb = tc ? (void *)drawvars.int_topleft
+                               : (void *)drawvars.short_topleft;
   int      npix  = SCREENWIDTH * viewheight;
   fixed_t  scale = FRACUNIT;             /* world units per voxel (1.0)     */
   int x, y;
@@ -70,7 +80,10 @@ void R_DrawVoxel(vissprite_t *vis)
   if (!vox_zbuf_ensure(npix))
     return;
 
-  lut = R_ComposedColormap(vis->colormap ? vis->colormap : fullcolormap);
+  if (tc)
+    lutTC = R_ComposedColormapTC(vis->colormap ? vis->colormap : fullcolormap);
+  else
+    lut   = R_ComposedColormap(vis->colormap ? vis->colormap : fullcolormap);
   vox_zbuf_stamp++;
 
   /* model-yaw rotation of the horizontal cells into world space */
@@ -137,7 +150,8 @@ void R_DrawVoxel(vissprite_t *vis)
               FixedMul(((vox->zsiz - (zc + 1)) << FRACBITS), scale);
             int syt = (centeryfrac - FixedMul(wz_hi - viewz, xscale)) >> FRACBITS;
             int syb = (centeryfrac - FixedMul(wz_lo - viewz, xscale)) >> FRACBITS;
-            uint16_t px = lut[vox->pal_remap[sl->col[k]]];
+            unsigned texel = vox->pal_remap[sl->col[k]];
+            uint32_t px = tc ? lutTC[texel] : (uint32_t)lut[texel];
 
             if (syt > syb) { int t = syt; syt = syb; syb = t; }
             if (syb == syt) syb++;          /* at least one row per voxel */
@@ -161,7 +175,10 @@ void R_DrawVoxel(vissprite_t *vis)
                   continue;
                 vox_zbuf_seen[off] = vox_zbuf_stamp;
                 vox_zbuf[off]      = tz;
-                fb[yy * SURFACE_SHORT_PITCH + xx] = px;
+                if (tc)
+                  ((uint32_t *)fb)[yy * SURFACE_SHORT_PITCH + xx] = px;
+                else
+                  ((uint16_t *)fb)[yy * SURFACE_SHORT_PITCH + xx] = (uint16_t)px;
               }
             }
           }

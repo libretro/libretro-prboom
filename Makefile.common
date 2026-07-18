@@ -114,6 +114,8 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/r_bsp.c \
 				 $(CORE_DIR)/r_data.c \
 				 $(CORE_DIR)/r_draw.c \
+				 $(CORE_DIR)/r_drawtc.c \
+				 $(CORE_DIR)/vid_mode.c \
 				 $(CORE_DIR)/r_main.c \
 				 $(CORE_DIR)/r_plane.c \
 				 $(CORE_DIR)/r_drawcmd.c \

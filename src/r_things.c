@@ -41,6 +41,8 @@
 #include "r_things.h"
 #include "r_plane.h"
 #include "r_dynlight.h"
+#include "r_drawtc.h"
+#include "vid_mode.h"
 #include "r_decal.h"
 #include "u_decorate.h"
 #include "r_fps.h"
@@ -598,11 +600,18 @@ void R_DrawMaskedColumn(
  * fractionally negative first-row frac (FixedDiv-rounded iscale) can
  * reach.  Both styles reduce to index mod texheight for the values a
  * post produces. */
+/* The post walk, clipping and frac arithmetic are width-independent, so a
+ * single copy serves both surfaces; only the colour table and the store
+ * differ.  `lutTC` is the composed truecolor table (built from V_PaletteTC),
+ * so an opaque sprite texel is written at the surface's full channel width
+ * without passing through a 565 value at any point. */
 static void R_DrawMaskedColumnDirect(const rpatch_t *patch,
                                      draw_column_vars_t *dcvars,
                                      const rcolumn_t *column,
-                                     const uint16_t *lut)
+                                     const uint16_t *lut,
+                                     const uint32_t *lutTC)
 {
+  const int tc = (lutTC != NULL);
   const fixed_t iscale = dcvars->iscale;
   const int     spr_th = patch->height;
   const int     x      = dcvars->x;
@@ -636,8 +645,10 @@ static void R_DrawMaskedColumnDirect(const rpatch_t *patch,
       const uint8_t *source = column->pixels + post->topdelta;
       fixed_t frac = (dcvars->texturemid - (post->topdelta << FRACBITS))
                    + (yl - centery) * iscale;
-      uint16_t *dest = drawvars.short_topleft
-                     + yl * SURFACE_SHORT_PITCH + x;
+      uint16_t *dest   = drawvars.short_topleft
+                       + yl * SURFACE_SHORT_PITCH + x;
+      uint32_t *destTC = ((uint32_t *)drawvars.int_topleft)
+                       + yl * SURFACE_SHORT_PITCH + x;
       int count = yh - yl + 1;
       /* iscale (= FRACUNIT/scale) is always positive, so frac is monotonic
        * over the run: if the first and last texel indices both fall inside
@@ -653,26 +664,47 @@ static void R_DrawMaskedColumnDirect(const rpatch_t *patch,
       if (count > 0 && idx0 >= 0 && idx0 < spr_th
                     && idxN >= 0 && idxN < spr_th)
       {
-        while (count--)
-        {
-          *dest = lut[ source[frac >> 16] ];
-          dest += SURFACE_SHORT_PITCH;
-          frac += iscale;
-        }
+        if (tc)
+          while (count--)
+          {
+            *destTC = lutTC[ source[frac >> 16] ];
+            destTC += SURFACE_SHORT_PITCH;
+            frac   += iscale;
+          }
+        else
+          while (count--)
+          {
+            *dest = lut[ source[frac >> 16] ];
+            dest += SURFACE_SHORT_PITCH;
+            frac += iscale;
+          }
       }
       else
       {
-        while (count--)
-        {
-          int idx = frac >> 16;
-          while (idx < 0)
-            idx += spr_th;
-          while (idx >= spr_th)
-            idx -= spr_th;
-          *dest = lut[ source[idx] ];
-          dest += SURFACE_SHORT_PITCH;
-          frac += iscale;
-        }
+        if (tc)
+          while (count--)
+          {
+            int idx = frac >> 16;
+            while (idx < 0)
+              idx += spr_th;
+            while (idx >= spr_th)
+              idx -= spr_th;
+            *destTC = lutTC[ source[idx] ];
+            destTC += SURFACE_SHORT_PITCH;
+            frac   += iscale;
+          }
+        else
+          while (count--)
+          {
+            int idx = frac >> 16;
+            while (idx < 0)
+              idx += spr_th;
+            while (idx >= spr_th)
+              idx -= spr_th;
+            *dest = lut[ source[idx] ];
+            dest += SURFACE_SHORT_PITCH;
+            frac += iscale;
+          }
       }
     }
   }
@@ -782,10 +814,15 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
         !(raven && (vis->mobjflags & (MF_SHADOW | MF_ALTSHADOW)) &&
           vis->colormap))
     {
-      const uint16_t *lut = (run_cls == 1)
-          ? R_ComposedPalette()
-          : R_ComposedColormap(dcvars.colormap);
+      const int tc = VID_TRUECOLOR;
+      const uint16_t *lut = tc ? NULL
+          : ((run_cls == 1) ? R_ComposedPalette()
+                            : R_ComposedColormap(dcvars.colormap));
+      const uint32_t *lutTC = !tc ? NULL
+          : ((run_cls == 1) ? R_ComposedPaletteTC()
+                            : R_ComposedColormapTC(dcvars.colormap));
       uint16_t tinted_lut[256];
+      uint32_t tinted_lutTC[256];
       const int spr_tint = (vis->tint_r | vis->tint_g | vis->tint_b);
 
       /* Coloured light: tint the composed LUT once for the whole sprite, then
@@ -794,8 +831,17 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
        * alone.  White/unlit sprites keep the existing direct/batched split. */
       if (spr_tint)
       {
-         R_TintLUT(tinted_lut, lut, vis->tint_r, vis->tint_g, vis->tint_b);
-         lut = tinted_lut;
+         if (tc)
+         {
+            R_TintLUTTC(tinted_lutTC, lutTC,
+                        vis->tint_r, vis->tint_g, vis->tint_b);
+            lutTC = tinted_lutTC;
+         }
+         else
+         {
+            R_TintLUT(tinted_lut, lut, vis->tint_r, vis->tint_g, vis->tint_b);
+            lut = tinted_lut;
+         }
       }
 
       /* A previous sprite's tail may still be batched in the temp
@@ -830,7 +876,7 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
                >= DIRECT_COLUMN_MINPX))
         {
           dcvars.texheight = patch->height;
-          R_DrawMaskedColumnDirect(patch, &dcvars, column, lut);
+          R_DrawMaskedColumnDirect(patch, &dcvars, column, lut, lutTC);
         }
         else
         {

@@ -37,6 +37,7 @@
 #include "p_spec.h"
 #include "p_tick.h"
 #include "map_format.h"
+#include "vid_mode.h"
 #include "r_state.h"
 #include "r_sky.h"
 #include "r_main.h"
@@ -2018,11 +2019,64 @@ static const zacs_fon2_t *zacs_fon2_get(int lump)
   return f;
 }
 
+/* ---- truecolor helpers for the ACS overlay compositors -------------------
+ * The RGB565 paths below have to expand the destination's 5/6/5 channels up
+ * to 8 bits, blend, and re-narrow on store -- a quantising round trip forced
+ * purely by the surface format.  Both truecolor formats blend in the
+ * destination's OWN channel width instead, so nothing is narrowed at any
+ * point: XRGB8888 matches the 8-bit source exactly, and XRGB2101010 widens
+ * the 8-bit source once by bit replication ((c<<2)|(c>>6), exact at both
+ * ends) and keeps the whole blend at 10 bits. */
+static INLINE int zacs_tc_deep(void)   { return vid_mode == VID_MODE2101010; }
+static INLINE int zacs_tc_max(void)    { return zacs_tc_deep() ? 1023 : 255; }
+/* widen an 8-bit source channel to the active format's channel width */
+static INLINE int zacs_tc_src8(int c)  { return zacs_tc_deep() ? ((c << 2) | (c >> 6)) : c; }
+static INLINE void zacs_tc_unpack(uint32_t d, int *r, int *g, int *b)
+{
+  if (zacs_tc_deep())
+  { *r = (int)((d >> 20) & 0x3ff); *g = (int)((d >> 10) & 0x3ff); *b = (int)(d & 0x3ff); }
+  else
+  { *r = (int)((d >> 16) & 0xff);  *g = (int)((d >> 8) & 0xff);   *b = (int)(d & 0xff); }
+}
+static INLINE uint32_t zacs_tc_pack(int r, int g, int b)
+{
+  if (zacs_tc_deep())
+    return ((uint32_t)r << 20) | ((uint32_t)g << 10) | (uint32_t)b;
+  return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
+}
+/* Alpha-composite an 8-bit ARGB source texel over one destination pixel,
+ * entirely in the destination's channel width.  `a` is 0..256. */
+static INLINE uint32_t zacs_tc_over(uint32_t d, int sr8, int sg8, int sb8, int a)
+{
+  int dr, dg, db, ia, mx = zacs_tc_max();
+  int sr = zacs_tc_src8(sr8), sg = zacs_tc_src8(sg8), sb = zacs_tc_src8(sb8);
+  zacs_tc_unpack(d, &dr, &dg, &db);
+  ia = 256 - (a > 256 ? 256 : a);
+  dr = (sr * a + dr * ia) >> 8;
+  dg = (sg * a + dg * ia) >> 8;
+  db = (sb * a + db * ia) >> 8;
+  if (dr > mx) dr = mx;
+  if (dg > mx) dg = mx;
+  if (db > mx) db = mx;
+  return zacs_tc_pack(dr, dg, db);
+}
+/* Blend two pixels already in the destination format (palette source). */
+static INLINE uint32_t zacs_tc_mix(uint32_t s, uint32_t d, int alpha)
+{
+  int sr, sg, sb, dr, dg, db, ia = 256 - alpha;
+  zacs_tc_unpack(s, &sr, &sg, &sb);
+  zacs_tc_unpack(d, &dr, &dg, &db);
+  return zacs_tc_pack((sr * alpha + dr * ia) >> 8,
+                      (sg * alpha + dg * ia) >> 8,
+                      (sb * alpha + db * ia) >> 8);
+}
+
 /* Draw FON2 glyph `gi` scaled into (dx,dy,dw,dh), recoloured through trans. */
 static void zacs_fon2_blit(const zacs_fon2_t *f, int gi, int dx, int dy,
                            int dw, int dh, const uint8_t *trans)
 {
-  uint16_t *surf;
+  uint8_t *surf;
+  const int tc = VID_TRUECOLOR;
   int gw, x0, x1, y0, y1, ox, oy, sx_step, sy_step;
   const uint8_t *gp;
   if (!f || gi < 0 || gi >= f->count || dw <= 0 || dh <= 0)
@@ -2031,7 +2085,7 @@ static void zacs_fon2_blit(const zacs_fon2_t *f, int gi, int dx, int dy,
   if (gw <= 0)
     return;
   gp = f->pix + f->goff[gi];
-  surf = (uint16_t *)screens[0].data;
+  surf = (uint8_t *)screens[0].data;
   sx_step = (gw << 16) / dw;
   sy_step = (f->height << 16) / dh;
   x0 = dx < 0 ? 0 : dx;
@@ -2041,7 +2095,7 @@ static void zacs_fon2_blit(const zacs_fon2_t *f, int gi, int dx, int dy,
   for (oy = y0; oy < y1; oy++)
   {
     int srcy = ((oy - dy) * sy_step) >> 16;
-    uint16_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    uint8_t *row = surf + (size_t)oy * SURFACE_BYTE_PITCH;
     if (srcy < 0) srcy = 0; else if (srcy >= f->height) srcy = f->height - 1;
     for (ox = x0; ox < x1; ox++)
     {
@@ -2053,7 +2107,10 @@ static void zacs_fon2_blit(const zacs_fon2_t *f, int gi, int dx, int dy,
         continue;                    /* transparent */
       if (trans)
         idx = trans[(unsigned char)idx];
-      row[ox] = VID_PAL16((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
+      if (tc)
+        ((uint32_t *)row)[ox] = VID_PALTC((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
+      else
+        ((uint16_t *)row)[ox] = VID_PAL16((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
     }
   }
 }
@@ -2823,7 +2880,8 @@ static void zacs_blit_scaled_indexed(int lump, int dx, int dy, int dw, int dh,
                                      int alpha)
 {
   const rpatch_t *patch;
-  uint16_t *surf;
+  uint8_t *surf;
+  const int tc = VID_TRUECOLOR;
   int ox, oy, sw, sh;
   int x0, x1, y0, y1;
   int sx_step, sy_step, sx_start;
@@ -2837,7 +2895,7 @@ static void zacs_blit_scaled_indexed(int lump, int dx, int dy, int dw, int dh,
     R_UnlockPatchNum(lump);
     return;
   }
-  surf = (uint16_t *)screens[0].data;
+  surf = (uint8_t *)screens[0].data;
   sx_step = (sw << 16) / dw;
   sy_step = (sh << 16) / dh;
   x0 = dx < 0 ? 0 : dx;
@@ -2849,7 +2907,7 @@ static void zacs_blit_scaled_indexed(int lump, int dx, int dy, int dw, int dh,
   for (oy = y0; oy < y1; oy++)
   {
     int srcy = ((oy - dy) * sy_step) >> 16;
-    uint16_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    uint8_t *row = surf + (size_t)oy * SURFACE_BYTE_PITCH;
     int sx = sx_start;
     if (srcy < 0) srcy = 0; else if (srcy >= sh) srcy = sh - 1;
     for (ox = x0; ox < x1; ox++, sx += sx_step)
@@ -2868,20 +2926,32 @@ static void zacs_blit_scaled_indexed(int lump, int dx, int dy, int dw, int dh,
       }
       if (idx < 0)
         continue;
+      if (tc)
       {
+        /* Source comes straight from V_PaletteTC, so it is already in the
+         * destination's channel width -- the blend runs at 8 or 10 bits with
+         * no expand/narrow step. */
+        uint32_t *rowTC = (uint32_t *)row;
+        uint32_t sp = VID_PALTC((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
+        rowTC[ox] = (alpha >= 256) ? sp
+                                   : zacs_tc_mix(sp, rowTC[ox], alpha);
+      }
+      else
+      {
+        uint16_t *row16 = (uint16_t *)row;
         uint16_t s = VID_PAL16((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
         if (alpha >= 256)
-          row[ox] = s;
+          row16[ox] = s;
         else
         {
-          uint16_t d = row[ox];
+          uint16_t d = row16[ox];
           int sr = (s >> 11) & 0x1f, sg = (s >> 5) & 0x3f, sb = s & 0x1f;
           int dr = (d >> 11) & 0x1f, dg = (d >> 5) & 0x3f, db = d & 0x1f;
           int ia = 256 - alpha;
           int rr = (sr * alpha + dr * ia) >> 8;
           int rg = (sg * alpha + dg * ia) >> 8;
           int rb = (sb * alpha + db * ia) >> 8;
-          row[ox] = (uint16_t)((rr << 11) | (rg << 5) | rb);
+          row16[ox] = (uint16_t)((rr << 11) | (rg << 5) | rb);
         }
       }
     }
@@ -2898,7 +2968,8 @@ static void zacs_blit_glyph_scaled(int lump, int dx, int dy, int dw, int dh,
                                    const uint8_t *trans)
 {
   const rpatch_t *patch;
-  uint16_t *surf;
+  uint8_t *surf;
+  const int tc = VID_TRUECOLOR;
   int ox, oy, sw, sh;
   int x0, x1, y0, y1;
   int sx_step, sy_step, sx_start;
@@ -2912,7 +2983,7 @@ static void zacs_blit_glyph_scaled(int lump, int dx, int dy, int dw, int dh,
     R_UnlockPatchNum(lump);
     return;
   }
-  surf = (uint16_t *)screens[0].data;
+  surf = (uint8_t *)screens[0].data;
   sx_step = (sw << 16) / dw;
   sy_step = (sh << 16) / dh;
   x0 = dx < 0 ? 0 : dx;
@@ -2924,7 +2995,7 @@ static void zacs_blit_glyph_scaled(int lump, int dx, int dy, int dw, int dh,
   for (oy = y0; oy < y1; oy++)
   {
     int srcy = ((oy - dy) * sy_step) >> 16;
-    uint16_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    uint8_t *row = surf + (size_t)oy * SURFACE_BYTE_PITCH;
     int sx = sx_start;
     if (srcy < 0) srcy = 0; else if (srcy >= sh) srcy = sh - 1;
     for (ox = x0; ox < x1; ox++, sx += sx_step)
@@ -2945,7 +3016,10 @@ static void zacs_blit_glyph_scaled(int lump, int dx, int dy, int dw, int dh,
         continue;
       if (trans)
         idx = trans[(unsigned char)idx];
-      row[ox] = VID_PAL16((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
+      if (tc)
+        ((uint32_t *)row)[ox] = VID_PALTC((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
+      else
+        ((uint16_t *)row)[ox] = VID_PAL16((unsigned char)idx, VID_NUMCOLORWEIGHTS - 1);
     }
   }
   R_UnlockPatchNum(lump);
@@ -3102,6 +3176,27 @@ static zacs_scaled_t *zacs_scaled_build(int slot, int lump,
 
 /* Composite one contiguous ARGB source row over a surface row, with a global
  * fade alpha (0..256).  Shared scalar tail used by the SIMD path below. */
+/* Truecolor twin of the scalar composite tail: same alpha maths, run at the
+ * destination's channel width so the 565 expand-blend-narrow round trip
+ * disappears (in XRGB8888 the source's 8 bits land byte-exact). */
+static void zacs_composite_tailTC(uint32_t *row, const unsigned *srow,
+                                  int ox, int x1, int alpha)
+{
+  for (; ox < x1; ox++)
+  {
+    unsigned p = srow[ox];
+    int a = (int)(p >> 24);
+    if (!a)
+      continue;
+    a = (a * alpha) >> 8;
+    if (a <= 0)
+      continue;
+    row[ox] = zacs_tc_over(row[ox], (int)(p & 0xff),
+                           (int)((p >> 8) & 0xff),
+                           (int)((p >> 16) & 0xff), a);
+  }
+}
+
 static void zacs_composite_tail(uint16_t *row, const unsigned *srow,
                                 int ox, int x1, int alpha)
 {
@@ -3140,7 +3235,8 @@ static void zacs_composite_tail(uint16_t *row, const unsigned *srow,
 static void zacs_composite_scaled(const zacs_scaled_t *sc, int dx, int dy,
                                   int alpha)
 {
-  uint16_t *surf = (uint16_t *)screens[0].data;
+  uint8_t *surf = (uint8_t *)screens[0].data;
+  const int tc = VID_TRUECOLOR;
   int oy, y0, y1;
   if (sc->empty || alpha <= 0)
     return;
@@ -3149,11 +3245,11 @@ static void zacs_composite_scaled(const zacs_scaled_t *sc, int dx, int dy,
   {
     int dyy = dy + oy;
     const unsigned *srow;
-    uint16_t *row;
+    uint8_t *row;
     int ox = sc->bx0, x1 = sc->bx1;
     if (dyy < 0 || dyy >= SCREENHEIGHT)
       continue;
-    row  = surf + (size_t)dyy * SURFACE_SHORT_PITCH;
+    row  = surf + (size_t)dyy * SURFACE_BYTE_PITCH;
     srow = sc->argb + (size_t)oy * sc->dw;
     /* clip the image-space x span [ox,x1) so dx+x lands inside the surface */
     if (dx + ox < 0)           ox = -dx;
@@ -3162,6 +3258,11 @@ static void zacs_composite_scaled(const zacs_scaled_t *sc, int dx, int dy,
       continue;
 
 #if defined(ZACS_BLIT_SSE2) || defined(ZACS_BLIT_NEON)
+    /* The vector block below is written against the 565 destination layout.
+     * Truecolor takes the scalar TC tail for the whole span: this is a HUD
+     * overlay composited over a small bounding box once per tic, not a
+     * per-frame hot path, so it is not worth a second vector kernel. */
+    if (!tc)
     for (; ox + 8 <= x1; ox += 8)
     {
       ZACS_ALIGN16 uint32_t sp[8];
@@ -3192,7 +3293,7 @@ static void zacs_composite_scaled(const zacs_scaled_t *sc, int dx, int dy,
                                      _mm_and_si128(_mm_srli_epi32(s1, 16), m8));
         __m128i a  = _mm_load_si128((const __m128i *)av);
         __m128i ia = _mm_sub_epi16(_mm_set1_epi16(256), a);
-        __m128i d  = _mm_loadu_si128((const __m128i *)(row + dox));
+        __m128i d  = _mm_loadu_si128((const __m128i *)((uint16_t *)row + dox));
         __m128i dr = _mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(d, 11),
                                     _mm_set1_epi16(0x1F)), 3);
         __m128i dg = _mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(d, 5),
@@ -3210,7 +3311,7 @@ static void zacs_composite_scaled(const zacs_scaled_t *sc, int dx, int dy,
                        _mm_srli_epi16(rb, 3));
         __m128i keep = _mm_cmpeq_epi16(a, _mm_setzero_si128());
         o = _mm_or_si128(_mm_and_si128(keep, d), _mm_andnot_si128(keep, o));
-        _mm_storeu_si128((__m128i *)(row + dox), o);
+        _mm_storeu_si128((__m128i *)((uint16_t *)row + dox), o);
       }
 #else /* ZACS_BLIT_NEON */
       {
@@ -3226,7 +3327,7 @@ static void zacs_composite_scaled(const zacs_scaled_t *sc, int dx, int dy,
                           vmovn_u32(vandq_u32(vshrq_n_u32(s1, 16), vdupq_n_u32(0xff))));
         uint16x8_t a  = vld1q_u16(av);
         uint16x8_t ia = vsubq_u16(vdupq_n_u16(256), a);
-        uint16x8_t d  = vld1q_u16(row + dox);
+        uint16x8_t d  = vld1q_u16((uint16_t *)row + dox);
         uint16x8_t dr = vshlq_n_u16(vandq_u16(vshrq_n_u16(d, 11),
                                     vdupq_n_u16(0x1F)), 3);
         uint16x8_t dg = vshlq_n_u16(vandq_u16(vshrq_n_u16(d, 5),
@@ -3244,13 +3345,16 @@ static void zacs_composite_scaled(const zacs_scaled_t *sc, int dx, int dy,
                           vshrq_n_u16(rb, 3));
         uint16x8_t keep = vceqq_u16(a, vdupq_n_u16(0));
         o = vbslq_u16(keep, d, o);
-        vst1q_u16(row + dox, o);
+        vst1q_u16((uint16_t *)row + dox, o);
       }
 #endif
     }
 #endif
     /* scalar tail composites the remaining pixels at surface offset dx+ox */
-    zacs_composite_tail(row + dx, srow, ox, x1, alpha);
+    if (tc)
+      zacs_composite_tailTC((uint32_t *)row + dx, srow, ox, x1, alpha);
+    else
+      zacs_composite_tail((uint16_t *)row + dx, srow, ox, x1, alpha);
   }
 }
 
@@ -3287,10 +3391,11 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
 
   /* Fallback: cache allocation failed -- resample-and-composite directly. */
   {
-  uint16_t *surf;
+  uint8_t *surf;
+  const int tc = VID_TRUECOLOR;
   int ox, oy, x0, x1, y0, y1;
   int sx_step, sy_step, sx_start;
-  surf    = (uint16_t *)screens[0].data;
+  surf    = (uint8_t *)screens[0].data;
   sx_step = (aw << 16) / dw;
   sy_step = (ah << 16) / dh;
   x0 = dx < 0 ? 0 : dx;
@@ -3302,7 +3407,7 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
   for (oy = y0; oy < y1; oy++)
   {
     int srcy = ((oy - dy) * sy_step) >> 16;
-    uint16_t *row = surf + (size_t)oy * SURFACE_SHORT_PITCH;
+    uint8_t *row = surf + (size_t)oy * SURFACE_BYTE_PITCH;
     const unsigned *srow;
     int sx = sx_start;
     ox = x0;
@@ -3312,7 +3417,9 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
 #if defined(ZACS_BLIT_SSE2) || defined(ZACS_BLIT_NEON)
     /* Eight output pixels per pass: gather the (strided) source texels and
      * fold the fade into each texel's alpha scalar, then run the 8-bit channel
-     * LERP and 565 pack in vector lanes.  Bit-identical to the scalar tail. */
+     * LERP and 565 pack in vector lanes.  Bit-identical to the scalar tail.
+     * Truecolor uses the scalar path (uncached fallback, rarely reached). */
+    if (!tc)
     for (; ox + 8 <= x1; ox += 8)
     {
       ZACS_ALIGN16 uint32_t sp[8];
@@ -3343,7 +3450,7 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
                                      _mm_and_si128(_mm_srli_epi32(s1, 16), m8));
         __m128i a  = _mm_load_si128((const __m128i *)av);
         __m128i ia = _mm_sub_epi16(_mm_set1_epi16(256), a);
-        __m128i d  = _mm_loadu_si128((const __m128i *)(row + ox));
+        __m128i d  = _mm_loadu_si128((const __m128i *)((uint16_t *)row + ox));
         __m128i dr = _mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(d, 11),
                                     _mm_set1_epi16(0x1F)), 3);
         __m128i dg = _mm_slli_epi16(_mm_and_si128(_mm_srli_epi16(d, 5),
@@ -3362,7 +3469,7 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
         /* a==0 texels keep the destination pixel untouched */
         __m128i keep = _mm_cmpeq_epi16(a, _mm_setzero_si128());
         o = _mm_or_si128(_mm_and_si128(keep, d), _mm_andnot_si128(keep, o));
-        _mm_storeu_si128((__m128i *)(row + ox), o);
+        _mm_storeu_si128((__m128i *)((uint16_t *)row + ox), o);
       }
 #else /* ZACS_BLIT_NEON */
       {
@@ -3378,7 +3485,7 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
                           vmovn_u32(vandq_u32(vshrq_n_u32(s1, 16), vdupq_n_u32(0xff))));
         uint16x8_t a  = vld1q_u16(av);
         uint16x8_t ia = vsubq_u16(vdupq_n_u16(256), a);
-        uint16x8_t d  = vld1q_u16(row + ox);
+        uint16x8_t d  = vld1q_u16((uint16_t *)row + ox);
         uint16x8_t dr = vshlq_n_u16(vandq_u16(vshrq_n_u16(d, 11),
                                     vdupq_n_u16(0x1F)), 3);
         uint16x8_t dg = vshlq_n_u16(vandq_u16(vshrq_n_u16(d, 5),
@@ -3396,7 +3503,7 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
                           vshrq_n_u16(rb, 3));
         uint16x8_t keep = vceqq_u16(a, vdupq_n_u16(0));
         o = vbslq_u16(keep, d, o);
-        vst1q_u16(row + ox, o);
+        vst1q_u16((uint16_t *)row + ox, o);
       }
 #endif
     }
@@ -3412,11 +3519,20 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
       a = (a * alpha) >> 8;
       if (a <= 0)
         continue;
+      if (tc)
       {
+        uint32_t *rowTC = (uint32_t *)row;
+        rowTC[ox] = zacs_tc_over(rowTC[ox], (int)(p & 0xff),
+                                 (int)((p >> 8) & 0xff),
+                                 (int)((p >> 16) & 0xff), a);
+      }
+      else
+      {
+        uint16_t *row16 = (uint16_t *)row;
         int sr = (int)(p & 0xff);              /* R in low byte */
         int sg = (int)((p >> 8) & 0xff);
         int sb = (int)((p >> 16) & 0xff);
-        uint16_t d = row[ox];
+        uint16_t d = row16[ox];
         int dr = ((d >> 11) & 0x1f) << 3;
         int dg = ((d >> 5)  & 0x3f) << 2;
         int db = (d & 0x1f) << 3;
@@ -3427,7 +3543,7 @@ static void zacs_blit_scaled(int lump, int dx, int dy, int dw, int dh,
         if (rr > 255) rr = 255;
         if (rg > 255) rg = 255;
         if (rb > 255) rb = 255;
-        row[ox] = (uint16_t)(((rr >> 3) << 11) | ((rg >> 2) << 5) | (rb >> 3));
+        row16[ox] = (uint16_t)(((rr >> 3) << 11) | ((rg >> 2) << 5) | (rb >> 3));
       }
     }
   }

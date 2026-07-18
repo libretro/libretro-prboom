@@ -54,6 +54,8 @@
 #include "r_draw.h"
 #include "u_brightmap.h"
 #include "r_things.h"
+#include "r_drawtc.h"
+#include "vid_mode.h"
 #include "r_dynlight.h"
 #include "u_dynlight.h"
 #include "r_sky.h"
@@ -330,8 +332,20 @@ static void R_PlaneColumnWorld(int col, fixed_t distance, int *wx, int *wy)
  * are per-pixel channel additions in 565 units. */
 static void R_TintSpan(int y, int x1, int x2, int ar, int ag, int ab)
 {
-   uint16_t *d = drawvars.short_topleft + y * SURFACE_SHORT_PITCH + x1;
-   int n = x2 - x1 + 1;
+   uint16_t *d;
+   int n;
+
+   if (VID_TRUECOLOR)
+   {
+      /* Same saturating channel add, done at the surface's native width:
+       * the tint is widened from its 565 units once, inside the kernel, so
+       * the destination pixel is never narrowed to 565 and back. */
+      R_TintSpanTC(y, x1, x2, ar, ag, ab);
+      return;
+   }
+
+   d = drawvars.short_topleft + y * SURFACE_SHORT_PITCH + x1;
+   n = x2 - x1 + 1;
 
 #if defined(__SSE2__) && !defined(ABGR1555)
    /* Vectorised per-channel saturating add on RGB565, eight pixels per

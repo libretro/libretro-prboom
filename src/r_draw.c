@@ -44,6 +44,8 @@
 #include "g_game.h"
 #include "am_map.h"
 #include "lprintf.h"
+#include "r_drawtc.h"
+#include "vid_mode.h"
 
 /* Wall-run kernel vector paths (see R_DrawWallColumnRun): vectorize
  * the per-lane frac mask/shift/step arithmetic of the dense band and
@@ -396,11 +398,21 @@ const uint16_t *R_ComposedPalette(void)
 
 void R_SetTransAlpha(int a32)
 {
+  if (VID_TRUECOLOR)
+  {
+    R_SetTransAlphaTC(a32);
+    return;
+  }
   tl_alpha = a32 < 0 ? 0 : (a32 > 32 ? 32 : a32);
 }
 
 void R_SetSpriteTranslucency(int mode)
 {
+  if (VID_TRUECOLOR)
+  {
+    R_SetSpriteTranslucencyTC(mode);
+    return;
+  }
   if (mode == 4)
   {
     /* per-alpha lerp: dst + (src-dst)*tl_alpha/32 (ZDoom alpha glass) */
@@ -611,6 +623,11 @@ static void R_FlushColumns(void)
 //
 void R_ResetColumnBuffer(void)
 {
+   if (VID_TRUECOLOR)
+   {
+      R_ResetColumnBufferTC();
+      return;
+   }
    // haleyjd 10/06/05: this must not be done if temp_x == 0!
    if(temp_x)
       R_FlushColumns();
@@ -6176,7 +6193,10 @@ static R_DrawColumn_f drawcolumnfuncs[RDRAW_FILTER_MAXFILTERS][RDRAW_FILTER_MAXF
 R_DrawColumn_f R_GetDrawColumnFunc(enum column_pipeline_e type,
                                    enum draw_filter_type_e filter,
                                    enum draw_filter_type_e filterz) {
-  R_DrawColumn_f result = drawcolumnfuncs[filterz][filter][type];
+  R_DrawColumn_f result;
+  if (VID_TRUECOLOR)
+    return R_GetDrawColumnFuncTC(type, filter, filterz);
+  result = drawcolumnfuncs[filterz][filter][type];
   if (result == NULL)
     I_Error("R_GetDrawColumnFunc: undefined function (%d, %d, %d)",
             type, filter, filterz);
@@ -6190,6 +6210,8 @@ R_DrawColumn_f R_GetDrawColumnFunc(enum column_pipeline_e type,
  * replay individually. */
 int R_WallColumnKernelClass(R_DrawColumn_f fn)
 {
+  if (VID_TRUECOLOR)
+    return R_WallColumnKernelClassTC(fn);
   if (fn == R_DrawColumn16_PointUV)
     return 1;
   if (fn == R_DrawColumn16_PointUV_PointZ)
@@ -6238,6 +6260,12 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
   int                lane_mode = 0;
   int                ymin, ymax, dtop, dbot, y, j;
   int                x0 = cols[0]->x;
+
+  if (VID_TRUECOLOR)
+  {
+    R_DrawWallColumnRunTC(cols, n, pointz);
+    return;
+  }
 
   ymin = cols[0]->yl;
   ymax = cols[0]->yh;
@@ -7235,7 +7263,10 @@ static R_DrawSpan_f drawspanfuncs[RDRAW_FILTER_MAXFILTERS][RDRAW_FILTER_MAXFILTE
 
 R_DrawSpan_f R_GetDrawSpanFunc(enum draw_filter_type_e filter,
                                enum draw_filter_type_e filterz) {
-  R_DrawSpan_f result = drawspanfuncs[filterz][filter];
+  R_DrawSpan_f result;
+  if (VID_TRUECOLOR)
+    return R_GetDrawSpanFuncTC(filter, filterz);
+  result = drawspanfuncs[filterz][filter];
   if (result == NULL)
     I_Error("R_GetDrawSpanFunc: undefined function (%d, %d)",
             filter, filterz);
@@ -7243,6 +7274,10 @@ R_DrawSpan_f R_GetDrawSpanFunc(enum draw_filter_type_e filter,
 }
 
 void R_DrawSpan(draw_span_vars_t *dsvars) {
+  if (VID_TRUECOLOR) {
+    R_DrawSpanTC(dsvars);
+    return;
+  }
   if (r_span_translucent) {
     R_DrawSpan16_TL(dsvars);
     return;
@@ -7362,6 +7397,9 @@ void R_InitBuffer(int width, int height)
 
   for (i=0; i<FUZZTABLE; i++)
 	  fuzzoffset[i] = fuzzoffset_org[i] * SURFACE_SHORT_PITCH;
+
+  if (VID_TRUECOLOR)
+    R_InitBufferTC();
 }
 
 /* --- Dynamic-light colour tint for wall bands (see r_dynlight/r_segs) -------
@@ -7425,6 +7463,18 @@ void R_TintLUT(uint16_t *dst, const uint16_t *src, int ar, int ag, int ab)
 void R_WallTintReplay(void)
 {
    int i;
+   if (VID_TRUECOLOR)
+   {
+      /* Same records, replayed through the truecolor saturating-add kernel
+       * (the recorded ar/ag/ab stay in 565 channel units; the TC kernel
+       * widens them to the active channel width). */
+      for (i = 0; i < wall_tint_count; i++)
+      {
+         const wall_tint_t *t = &wall_tints[i];
+         R_WallTintRunTC(t->x, t->yl, t->yh, t->ar, t->ag, t->ab);
+      }
+      return;
+   }
    for (i = 0; i < wall_tint_count; i++)
    {
       const wall_tint_t *t = &wall_tints[i];

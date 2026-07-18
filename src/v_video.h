@@ -97,8 +97,12 @@ typedef enum
 // contains the weighted versions of each palette color for filtering
 // operations
 extern uint16_t *V_Palette16;
+/* Truecolor palette, same [colour*64 + weight] layout with the active
+ * 32-bit format's native channel width.  NULL unless VID_TRUECOLOR. */
+extern uint32_t *V_PaletteTC;
 
 #define VID_PAL16(color, weight) V_Palette16[ (color)*VID_NUMCOLORWEIGHTS + (weight) ]
+#define VID_PALTC(color, weight) V_PaletteTC[ (color)*VID_NUMCOLORWEIGHTS + (weight) ]
 
 //jff 4/24/98 loads color translation lumps
 void V_InitColorTranslation(void);

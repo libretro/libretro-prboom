@@ -10,7 +10,14 @@
 #include <compat/msvc.h>
 #endif
 
-#define SURFACE_PIXEL_DEPTH 2
+/* Bytes per surface pixel.  Runtime, not a constant: the "Color Format"
+ * core option selects RGB565 (2) or a 32-bit truecolor format (4) once at
+ * load, before any surface is allocated.  vid_pixelbytes lives in
+ * vid_mode.c and stays 2 until the libretro layer negotiates otherwise, so
+ * every consumer that predates the option behaves exactly as before.
+ * Only used in ordinary expressions -- never in preprocessor arithmetic. */
+extern int vid_pixelbytes;
+#define SURFACE_PIXEL_DEPTH vid_pixelbytes
 extern int SCREENWIDTH;
 extern int SCREENHEIGHT;
 extern int SCREENPITCH;

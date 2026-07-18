@@ -86,16 +86,6 @@ extern int      vid_emit_class;         /* strength of the emissive boost       
 #define VID_GAMUT_SUPER    3
 extern int      vid_expand_gamut;
 
-/* Which HDR swapchain the frontend is presenting with.  The two accept the
- * same PQ frame but differ in what they do to its primaries: HDR10 presents
- * them unchanged, scRGB applies Rec.2020 -> Rec.709 on the way.  Since the
- * gamut choice is ours to make, we have to compensate for that rotation or
- * it silently undoes it. */
-#define VID_HDROUT_OFF   0
-#define VID_HDROUT_HDR10 1
-#define VID_HDROUT_SCRGB 2
-extern int      vid_hdr_output;
-
 /* Emissive classes.  The renderer tags a colour table entry with one of
  * these; the palette build multiplies that entry's luminance before the PQ
  * encode.  Class 0 is ordinary content at exactly paper white. */

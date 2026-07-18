@@ -40,7 +40,6 @@ uint16_t vid_sdr_to_pq[1024];
 uint16_t vid_pq_boost[1024];
 int      vid_emit_class = VID_EMIT_2X;
 int      vid_expand_gamut = VID_GAMUT_ACCURATE;
-int      vid_hdr_output   = VID_HDROUT_HDR10;
 
 /* ---- SMPTE ST.2084 (PQ) ---------------------------------------------------
  * Absolute luminance, 0..10000 nits, in the normalised 0..1 signal the
@@ -159,22 +158,6 @@ void VID_EncodeHDR10(double r, double g, double b, double emit,
   int    v;
 
   VID_709To2020(&lr, &lg, &lb);
-
-  /* The scRGB path decodes our samples and then rotates Rec.2020 -> Rec.709
-   * before handing them to the display.  Everything above chose the primaries
-   * deliberately -- on "Super" that means leaving the colour in Rec.709 so the
-   * display's Rec.2020 interpretation produces the boost the user asked for --
-   * and that rotation would undo exactly that choice, desaturating the image
-   * and pulling saturated channels negative.  Pre-apply the inverse so the
-   * frontend's rotation lands back on what we intended.  HDR10 output presents
-   * the samples unchanged and needs none of this. */
-  if (vid_hdr_output == VID_HDROUT_SCRGB)
-  {
-    double rr = 0.6274040 * lr + 0.3292820 * lg + 0.0433136 * lb;
-    double rg = 0.0690970 * lr + 0.9195400 * lg + 0.0113612 * lb;
-    double rb = 0.0163916 * lr + 0.0880132 * lg + 0.8955950 * lb;
-    lr = rr; lg = rg; lb = rb;
-  }
 
   v = (int)(VID_PQEncode(lr) * 1023.0 + 0.5); *or_ = v < 0 ? 0 : (v > 1023 ? 1023 : v);
   v = (int)(VID_PQEncode(lg) * 1023.0 + 0.5); *og  = v < 0 ? 0 : (v > 1023 ? 1023 : v);

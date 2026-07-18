@@ -953,6 +953,8 @@ static int sb_flat_alpha;   /* stacked-portal flat opacity 0..254 at composite
  * must be able to hold every visible piece of every window or the grouping
  * loses spans and the window renders with holes. */
 #define PORTAL_ID_MAX 96
+static int     portal_cap_abs[PORTAL_CAP_MAX];
+static angle_t portal_cap_ang[PORTAL_CAP_MAX];
 static fixed_t portal_cap_dx[PORTAL_CAP_MAX];
 static fixed_t portal_cap_dy[PORTAL_CAP_MAX];
 static fixed_t portal_cap_dz[PORTAL_CAP_MAX];
@@ -1216,12 +1218,16 @@ void R_RenderPlayerView (player_t* player)
          * renders per frame instead of one. */
         for (g = 0; g < n_portal_caps; g++)
           if (portal_cap_dx[g] == sp->dx && portal_cap_dy[g] == sp->dy &&
-              portal_cap_dz[g] == sp->dz && portal_cap_alpha[g] == sp->alpha)
+              portal_cap_dz[g] == sp->dz && portal_cap_alpha[g] == sp->alpha &&
+              portal_cap_abs[g] == sp->absolute &&
+              portal_cap_ang[g] == sp->angle)
             break;
         if (g == n_portal_caps)
         {
           if (n_portal_caps == PORTAL_CAP_MAX)
             continue;
+          portal_cap_abs[g]   = sp->absolute;
+          portal_cap_ang[g]   = sp->angle;
           portal_cap_dx[g]    = sp->dx;
           portal_cap_dy[g]    = sp->dy;
           portal_cap_dz[g]    = sp->dz;
@@ -1327,9 +1333,15 @@ void R_RenderPlayerView (player_t* player)
         sb_use_reveal = 1;
         sb_flat_alpha = portal_cap_alpha[k] > 0 && portal_cap_alpha[k] < 255
                       ? portal_cap_alpha[k] : 0;
-        R_RenderCompositeView(viewx + portal_cap_dx[k],
-                              viewy + portal_cap_dy[k],
-                              viewz + portal_cap_dz[k], 0);
+        /* absolute cameras (skybox portals) sit at a fixed spot and turn
+         * with the viewer; displacement portals ride the viewer */
+        if (portal_cap_abs[k])
+          R_RenderCompositeView(portal_cap_dx[k], portal_cap_dy[k],
+                                portal_cap_dz[k], portal_cap_ang[k]);
+        else
+          R_RenderCompositeView(viewx + portal_cap_dx[k],
+                                viewy + portal_cap_dy[k],
+                                viewz + portal_cap_dz[k], 0);
         sb_flat_alpha = 0;
         sb_use_reveal = 0;
       }

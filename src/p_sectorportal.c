@@ -11,6 +11,37 @@ secportal_t *floorportals   = NULL;
 secportal_t *ceilingportals = NULL;
 int sector_portals_active   = 0;
 
+/* SkyCamCompat cameras, recorded at thing-spawn time and matched to
+ * Sector_SetPortal type-2 lines by the sector they stand in. */
+typedef struct
+{
+  fixed_t x, y, z;
+  angle_t angle;
+  int     secnum;
+} skycam_t;
+
+static skycam_t *skycams;
+static int       numskycams, skycamalloc;
+
+void P_AddSkyCam(fixed_t x, fixed_t y, fixed_t z, angle_t angle, int secnum)
+{
+  if (numskycams == skycamalloc)
+  {
+    int na = skycamalloc ? skycamalloc * 2 : 8;
+    skycam_t *g = (skycam_t *)realloc(skycams, (size_t)na * sizeof(*g));
+    if (!g)
+      return;
+    skycams = g;
+    skycamalloc = na;
+  }
+  skycams[numskycams].x      = x;
+  skycams[numskycams].y      = y;
+  skycams[numskycams].z      = z;
+  skycams[numskycams].angle  = angle;
+  skycams[numskycams].secnum = secnum;
+  numskycams++;
+}
+
 /* pending stack points recorded during thing-load */
 typedef struct {
   int     upper;        /* 1 = UpperStackLookOnly (9077), 0 = Lower (9078) */
@@ -26,6 +57,9 @@ static int        pointalloc = 0;
 void P_ClearSectorPortals(void)
 {
   sector_portals_active = 0;
+  free(skycams);
+  skycams = NULL;
+  numskycams = skycamalloc = 0;
   free(floorportals);   floorportals = NULL;
   free(ceilingportals); ceilingportals = NULL;
   free(points);         points = NULL; numpoints = 0; pointalloc = 0;
@@ -143,6 +177,76 @@ static void P_SpawnLinePortals(int *pairs)
 }
 
 
+
+/* Sector_SetPortal type 2: skybox portal.
+ *
+ * "The linedef's front sector is the skybox and must contain a SkyCamCompat
+ * object.  The sky from this skybox will be visible on the concerned plane
+ * of all tagged sectors; even if the sky flat is not used."  So unlike the
+ * SkyViewpoint/SkyPicker path -- which only reaches planes that carry the
+ * sky flat -- this turns an ordinary floor or ceiling into a window onto
+ * the skybox scene.  The camera is absolute rather than a displacement,
+ * which is the one thing the descriptor has to carry differently. */
+static void P_SpawnSkyboxPortals(int *pairs)
+{
+  int i;
+  for (i = 0; i < numlines; i++)
+  {
+    const line_t *ln = &lines[i];
+    const skycam_t *cam = NULL;
+    int tag, plane, alpha, s, k, fsec;
+
+    if (ln->special != 57 || ln->args[1] != 2 || !ln->frontsector)
+      continue;
+
+    fsec = (int)(ln->frontsector - sectors);
+    for (k = 0; k < numskycams; k++)
+      if (skycams[k].secnum == fsec)
+      {
+        cam = &skycams[k];
+        break;
+      }
+    if (!cam)
+      continue;                          /* no SkyCamCompat in that sector */
+
+    tag   = ln->args[0];
+    plane = ln->args[2];
+    alpha = ln->args[4];
+    if (alpha >= 255)
+      continue;
+
+    for (s = 0; s < numsectors; s++)
+    {
+      if (tag ? sectors[s].tag != tag : &sectors[s] != ln->frontsector)
+        continue;
+      if (s == fsec)
+        continue;                        /* the skybox never looks at itself */
+      if (plane == 0 || plane == 2)
+      {
+        floorportals[s].active   = 1;
+        floorportals[s].absolute = 1;
+        floorportals[s].angle    = cam->angle;
+        floorportals[s].dx       = cam->x;
+        floorportals[s].dy       = cam->y;
+        floorportals[s].dz       = cam->z;
+        floorportals[s].alpha    = alpha;
+        (*pairs)++;
+      }
+      if (plane == 1 || plane == 2)
+      {
+        ceilingportals[s].active   = 1;
+        ceilingportals[s].absolute = 1;
+        ceilingportals[s].angle    = cam->angle;
+        ceilingportals[s].dx       = cam->x;
+        ceilingportals[s].dy       = cam->y;
+        ceilingportals[s].dz       = cam->z;
+        ceilingportals[s].alpha    = alpha;
+        (*pairs)++;
+      }
+    }
+  }
+}
+
 /* Sector_SetPortal type 1: copied portal.
  *
  * "Copies the given portal to all sectors tagged with 'tag' or the line's
@@ -223,6 +327,7 @@ void P_SpawnSectorPortals(void)
   if (!numpoints)
   {
     P_SpawnLinePortals(&pairs);
+    P_SpawnSkyboxPortals(&pairs);
     P_CopyLinePortals(&pairs);
     sector_portals_active = pairs > 0;
     if (pairs)
@@ -328,6 +433,7 @@ void P_SpawnSectorPortals(void)
   }
 
   P_SpawnLinePortals(&pairs);
+  P_SpawnSkyboxPortals(&pairs);
   P_CopyLinePortals(&pairs);
 
   sector_portals_active = pairs > 0;

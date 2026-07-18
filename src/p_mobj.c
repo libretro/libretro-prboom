@@ -2501,6 +2501,19 @@ void P_SpawnMapThing (const mapthing_t* mthing)
         }
         return;
       }
+      if (thingtype == 9083 || thingtype == 5006)
+      {
+        /* SkyCamCompat: an Eternity-style skybox camera.  Sector_SetPortal
+         * type 2 names its sector rather than a tid, so record the position
+         * and let the portal resolver match it by sector. */
+        fixed_t sx = mthing->x << FRACBITS;
+        fixed_t sy = mthing->y << FRACBITS;
+        subsector_t *ss = R_PointInSubsector(sx, sy);
+        P_AddSkyCam(sx, sy, ss->sector->floorheight + (41 << FRACBITS),
+                    ANG45 * (mthing->angle / 45),
+                    ss->sector ? (int)(ss->sector - sectors) : -1);
+        return;
+      }
       if (thingtype == 9081)
       {
         /* SkyPicker: this sector shows the skybox whose SkyViewpoint tid is

@@ -19,11 +19,16 @@
 #define P_SECTORPORTAL_H
 
 #include "m_fixed.h"
+#include "tables.h"   /* angle_t */
 
 /* a resolved sector portal: viewing this sector's plane shows another
  * region of the level, offset by (dx,dy,dz) from the viewer. */
 typedef struct {
   int     active;
+  int     absolute;     /* 1: dx/dy/dz are an absolute camera position and
+                         * `angle` a yaw delta -- Sector_SetPortal type 2
+                         * (skybox portals).  0: they are a displacement. */
+  angle_t angle;        /* yaw delta, absolute cameras only */
   fixed_t dx, dy, dz;   /* added to the viewer position to get the camera */
   int     alpha;        /* the FLAT's opacity (ZDoom 9077 arg0): 0 = the
                          * flat is invisible (pure window), 255 = fully
@@ -36,6 +41,9 @@ extern secportal_t *floorportals;
 extern secportal_t *ceilingportals;
 /* any resolved pairings on this level (renderer gate) */
 extern int sector_portals_active;
+
+/* SkyCamCompat cameras (Sector_SetPortal type 2 names them by sector). */
+void P_AddSkyCam(fixed_t x, fixed_t y, fixed_t z, angle_t angle, int secnum);
 
 /* record an UpperStackLookOnly (9077) / LowerStackLookOnly (9078) at load */
 void P_AddStackPoint(int upper, int tid, fixed_t x, fixed_t y, int alpha);

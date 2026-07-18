@@ -938,6 +938,13 @@ static void *R_SkyboxScratch(void)
  * default skybox); tagged skyboxes keep their span-based copy. */
 static int sb_use_reveal;
 
+/* stacked-sector portal snapshots (collected pre-composite, rendered post) */
+#define PORTAL_CAP_MAX 16
+static int   portal_cap_id[PORTAL_CAP_MAX];
+static short portal_cap_top[PORTAL_CAP_MAX][MAX_SCREENWIDTH];
+static short portal_cap_bot[PORTAL_CAP_MAX][MAX_SCREENWIDTH];
+static int   n_portal_caps;
+
 /* render skybox camera `sb` into scratch, then copy its owned sky pixels. */
 /* Render the level from (camx,camy,camz, view angle + angdelta) into the
  * scratch buffer, sealed to the sb_top/sb_bot column spans, and composite
@@ -1135,6 +1142,31 @@ void R_RenderPlayerView (player_t* player)
     R_DrawMasked ();
     R_ResetColumnBuffer();
 
+    /* Stacked-sector portals, collection phase: the composite renders below
+     * (default skybox, tagged skyboxes) each call R_ClearPlanes for their
+     * scene walk, destroying the main scene's visplanes -- so the portal
+     * windows' ids and spans must be snapshotted NOW, exactly as the tagged
+     * skybox block snapshots its spans.  The renders happen after the
+     * skybox composites. */
+    n_portal_caps = 0;
+    if (sector_portals_active && (floorportals || ceilingportals))
+    {
+      int pids[PORTAL_CAP_MAX];
+      int npids = R_CollectPortalIds(pids, PORTAL_CAP_MAX);
+      int k;
+      for (k = 0; k < npids; k++)
+      {
+        if (!R_CollectPortalSpan(pids[k], sb_top, sb_bot))
+          continue;
+        portal_cap_id[n_portal_caps] = pids[k];
+        memcpy(portal_cap_top[n_portal_caps], sb_top,
+               sizeof(short) * viewwidth);
+        memcpy(portal_cap_bot[n_portal_caps], sb_bot,
+               sizeof(short) * viewwidth);
+        n_portal_caps++;
+      }
+    }
+
     /* Default 3D skybox: the reveal mask now holds exactly the pixels the
      * plane pass left showing the skybox scene (sky-plane skips minus any
      * later plane draw over them).  Render the scene sealed to those
@@ -1204,26 +1236,24 @@ void R_RenderPlayerView (player_t* player)
       }
     }
 
-    /* Stacked-sector portals: each portal window renders the level from the
-     * viewer translated by the portal offset, sealed to the window's spans,
-     * and composites into exactly those pixels.  Same machinery as tagged
-     * skyboxes; single depth (portal windows inside the scene draw their
-     * flats).  Zero cost without portal planes this frame. */
-    if (floorportals || ceilingportals)
+    /* Stacked-sector portals, render phase: for each snapshotted window,
+     * render the level from the viewer translated by the portal offset,
+     * sealed to the cached spans, and composite into the window's surviving
+     * (reveal-tested) pixels.  Same machinery as tagged skyboxes; single
+     * depth (portal windows inside the scene draw their flats).  Zero cost
+     * without portal planes this frame. */
     {
-      int pids[16];
-      int npids = R_CollectPortalIds(pids, 16);
       int k;
-      for (k = 0; k < npids; k++)
+      for (k = 0; k < n_portal_caps; k++)
       {
-        int id = pids[k];
+        int id = portal_cap_id[k];
         int secnum = (id > 0 ? id : -id) - 1;
         const secportal_t *sp = id > 0 ? &ceilingportals[secnum]
                                        : &floorportals[secnum];
         if (!sp->active)
           continue;
-        if (!R_CollectPortalSpan(id, sb_top, sb_bot))
-          continue;
+        memcpy(sb_top, portal_cap_top[k], sizeof(short) * viewwidth);
+        memcpy(sb_bot, portal_cap_bot[k], sizeof(short) * viewwidth);
         sb_use_reveal = 1;
         R_RenderCompositeView(viewx + sp->dx, viewy + sp->dy,
                               viewz + sp->dz, 0);

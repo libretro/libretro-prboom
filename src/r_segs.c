@@ -43,6 +43,7 @@
 #include "r_dynlight.h"
 #include "vid_mode.h"
 #include "u_dynlight.h"
+#include "p_sectorportal.h"
 #include "u_brightmap.h"
 #include "p_ffloor.h"
 #include "r_draw.h"
@@ -1611,6 +1612,30 @@ void R_StoreWallRange(const int start, const int stop)
          // killough 4/17/98: draw ceilings if different light levels
          || backsector->ceilinglightsec != frontsector->ceilinglightsec
          ;
+
+      /* Stacked-sector portals: a window's edge is invisible to the classic
+       * property comparison -- by design the window's heights, pics and
+       * light match its neighbours -- but the window plane no longer merges
+       * with theirs (portal id is part of the visplane identity), so
+       * without a mark here the window plane never receives spans and the
+       * neighbour plane paints the flat over the window.  Force the mark
+       * whenever the two REAL sectors differ and either side is portaled;
+       * curline's sectors are used because the frontsector/backsector
+       * globals may have been rewritten by R_FakeFlat. */
+      if (sector_portals_active && curline->backsector)
+      {
+         int fs = (int)(curline->frontsector - sectors);
+         int bs = (int)(curline->backsector - sectors);
+         if (fs != bs &&
+             (unsigned)fs < (unsigned)numsectors &&
+             (unsigned)bs < (unsigned)numsectors)
+         {
+            if (ceilingportals[fs].active | ceilingportals[bs].active)
+               markceiling = TRUE;
+            if (floorportals[fs].active | floorportals[bs].active)
+               markfloor = TRUE;
+         }
+      }
 
       if (backsector->ceilingheight <= frontsector->floorheight
             || backsector->floorheight >= frontsector->ceilingheight)

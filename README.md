@@ -219,8 +219,10 @@ Changing the option requires a restart.
   pairs) render as look-only windows: the linked region is drawn from the
   viewer translated by the pair's offset and composited into the window's
   visible pixels, one portal depth (windows seen through a window draw
-  their flats).  The window is drawn opaque regardless of the alpha
-  argument, and movement through the stack is not linked.
+  their flats).  The stack things' opacity argument is honored: an unset
+  or zero argument gives a fully transparent window flat, 255 disables the
+  window, and values between draw the flat blended over the view through.
+  Movement through the stack is not linked.
 - **Line portals and structured UDMF portal fields** — inert.
 - **3D models (MODELDEF)** — out of scope for the 8-bit software renderer.
 

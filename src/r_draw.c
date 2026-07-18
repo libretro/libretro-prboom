@@ -550,6 +550,18 @@ draw_vars_t drawvars = {
  * savegame- and netgame-neutral. */
 int diminished_lighting = 0;
 
+/* Frontend override for the shading mode (prboom-diminished_lighting):
+ *   0 = auto    -- follow diminished_lighting, except in truecolor where
+ *                  Smooth is used: the banded path snaps distance light to
+ *                  32 colormaps, which throws away most of the precision a
+ *                  24/30-bit surface exists to carry (measured: ~2% more
+ *                  distinct colours in a scene versus ~60-90% with Smooth),
+ *                  and it is not even cheaper.
+ *   1 = classic -- always banded, whatever the surface format
+ *   2 = smooth  -- always smooth
+ * 16-bit output under `auto` behaves exactly as before. */
+int dl_shading_mode = 0;
+
 void R_ApplyDiminishedLighting(void)
 {
    /* Migrate old 3-state configs (0 Default / 1 Dithered / 2 Smooth) to the
@@ -561,7 +573,13 @@ void R_ApplyDiminishedLighting(void)
       diminished_lighting = 1;
 
    drawvars.filterz = RDRAW_FILTER_POINT;
-   r_smooth_shading  = (diminished_lighting == 1);
+
+   if (dl_shading_mode == 1)
+      r_smooth_shading = 0;
+   else if (dl_shading_mode == 2)
+      r_smooth_shading = 1;
+   else
+      r_smooth_shading = VID_TRUECOLOR ? 1 : (diminished_lighting == 1);
 
    /* The composed LUT is cached on (colormap ptr, V_Palette16); neither
     * changes when only the shading mode flips, so force a rebuild on the
@@ -570,6 +588,8 @@ void R_ApplyDiminishedLighting(void)
    composed_cm  = NULL;
    composed_pal = NULL;
    composed_weight = -2;
+   if (VID_TRUECOLOR)
+      R_InvalidateComposedTC();
 }
 
 //

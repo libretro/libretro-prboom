@@ -6371,6 +6371,18 @@ void R_WaterDarkenColumnTC(int x, int yl, int yh, int surf_y)
   else                             R_WaterDarkenColumn8888(x, yl, yh, surf_y);
 }
 
+/* --- composed-LUT cache invalidation --------------------------------------
+ * The composed table is keyed on (colormap, palette, fine weight).  Flipping
+ * the shading mode changes none of those, so without an explicit drop the
+ * next lookup would reuse a table built under the old mode.  r_draw.c clears
+ * its own trio in R_ApplyDiminishedLighting and calls this for ours. */
+void R_InvalidateComposedTC(void)
+{
+  tc_composed_cm     = NULL;
+  tc_composed_pal    = NULL;
+  tc_composed_weight = -2;
+}
+
 /* --- buffer init (fuzz offset table, keyed to the current pitch) ---------- */
 /* Mirror of r_draw.c's R_InitBuffer for the fuzz-offset scaling; the
  * short/int topleft latch is done once in r_draw.c's R_InitBuffer (it sets

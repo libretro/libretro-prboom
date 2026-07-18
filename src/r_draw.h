@@ -133,6 +133,7 @@ typedef struct {
 
 extern draw_vars_t drawvars;
 
+extern int dl_shading_mode;           /* frontend override: 0 auto, 1 classic, 2 smooth */
 extern int diminished_lighting;       /* General > Video menu setting; applied via R_ApplyDiminishedLighting (r_main.h) */
 /* Smooth shading uses a PRIVATE luma ramp finer than VID_NUMCOLORWEIGHTS (64),
  * so distance gradients band far less at high output resolutions, WITHOUT

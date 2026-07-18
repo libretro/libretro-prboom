@@ -1403,6 +1403,26 @@ static void update_variables(bool startup)
 {
    struct retro_variable var;
 
+   {
+      /* Shading mode.  Applied on every read, not just at startup, so the
+       * frontend can flip it live; R_ApplyDiminishedLighting re-resolves
+       * r_smooth_shading and drops the composed-LUT caches for whichever
+       * renderer is active. */
+      int prev = dl_shading_mode;
+      var.key   = "prboom-diminished_lighting";
+      var.value = NULL;
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      {
+         if (!strcmp(var.value, "classic"))     dl_shading_mode = 1;
+         else if (!strcmp(var.value, "smooth")) dl_shading_mode = 2;
+         else                                   dl_shading_mode = 0;
+      }
+      else
+         dl_shading_mode = 0;
+      if (!startup && dl_shading_mode != prev)
+         R_ApplyDiminishedLighting();
+   }
+
    var.key   = "prboom-mmap_wads";
    var.value = NULL;
    if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)

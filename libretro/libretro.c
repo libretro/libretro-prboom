@@ -1568,8 +1568,46 @@ static void update_variables(bool startup)
 
 void I_SafeExit(int rc);
 
+/* Paper white is a frontend setting, not a core option, so no variable-update
+ * notification arrives when the user moves it.  Poll it instead -- the env
+ * call is cheap and once a second is far finer than anyone can drag a slider
+ * -- and rebuild the colour tables when it actually changes.  Without this an
+ * HDR session keeps encoding to whatever the value was at load, so the whole
+ * image sits at the wrong brightness until the core is reloaded. */
+static void I_PollHDRPaperWhite(void)
+{
+   static unsigned counter = 0;
+   float nits = 0.0f;
+
+   if (!VID_HDR)
+      return;
+   if (++counter < 35)          /* ~1s at 35Hz */
+      return;
+   counter = 0;
+
+   if (!environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &nits)
+         || nits <= 0.0f)
+      return;
+   if (nits == vid_paper_white_nits)
+      return;
+
+   if (log_cb)
+      log_cb(RETRO_LOG_INFO,
+             "HDR paper white changed: %.0f -> %.0f nits; rebuilding "
+             "colour tables.\n", vid_paper_white_nits, nits);
+
+   vid_paper_white_nits = nits;
+   VID_BuildHDRTables();
+   /* Re-derives the palette at the new luminance; the freed/realloc'd table
+    * moves V_PaletteTC, which invalidates the composed-LUT caches. */
+   if (W_CheckNumForName("PLAYPAL") >= 0)
+      V_UpdateTrueColorPalette();
+}
+
 void retro_run(void)
 {
+   I_PollHDRPaperWhite();
+
 #ifdef ACS_SELFTEST
   /* Fire once the world is actually in play, so a real player actor exists for
    * the conversation trigger to act on (players[0].mo is NULL before that). */

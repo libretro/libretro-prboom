@@ -1250,12 +1250,21 @@ void V_UpdateTrueColorPalette(void) {
   int numPals = W_LumpLength(pplump) / (3*256);
   int genPals = (numPals < V_NUM_STD_PALETTES) ? V_NUM_STD_PALETTES : numPals;
 
-  if (usegammaOnLastPaletteGeneration != usegamma) {
+  /* HDR10 bakes absolute luminance into the palette, so the frontend's
+   * paper white is part of the build inputs exactly as gamma is: if the user
+   * moves it, every colour is now stating the wrong brightness.  Dropping
+   * the tables also moves the V_PaletteTC pointer, which is what the
+   * composed-LUT caches key on, so they rebuild too. */
+  static float paperWhiteOnLastPaletteGeneration = -1.0f;
+
+  if (usegammaOnLastPaletteGeneration != usegamma
+      || (VID_HDR && paperWhiteOnLastPaletteGeneration != vid_paper_white_nits)) {
     if (Palettes16) free(Palettes16);
     Palettes16 = NULL;
     if (PalettesTC) free(PalettesTC);
     PalettesTC = NULL;
-    usegammaOnLastPaletteGeneration = usegamma;      
+    usegammaOnLastPaletteGeneration = usegamma;
+    paperWhiteOnLastPaletteGeneration = vid_paper_white_nits;
   }
   
   if (!Palettes16)

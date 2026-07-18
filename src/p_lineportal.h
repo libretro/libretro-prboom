@@ -6,7 +6,8 @@
  * offset from this line's anchor, rotated by the angle between the lines and
  * planted at the partner's anchor.
  *
- * Only the visual type is rendered -- actors do not move through these.
+ * Line_SetPortal types 0-3 all render this window; they differ only in what
+ * actors may do with it, and the movement half is not implemented.
  */
 #ifndef P_LINEPORTAL_H
 #define P_LINEPORTAL_H

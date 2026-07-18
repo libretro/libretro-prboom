@@ -45,8 +45,14 @@ void P_SpawnLinePortals(void)
     const line_t *ln = &lines[i];
     const line_t *tg = NULL;
 
-    if (ln->special != 156 || ln->args[2] != 0)
-      continue;                          /* not a visual line portal */
+    /* Types 0-3 all show the partner's surroundings; they differ only in
+     * what actors may do with the opening.  Type 1 is "visual plus simple
+     * teleporter", type 2 adds interaction on top of that, and type 3 is
+     * the linked/static portal -- so all four render the same window here,
+     * and only the movement half goes unimplemented.  Type 4 is reserved
+     * for XLAT with different parameter use, so it is left alone. */
+    if (ln->special != 156 || (unsigned)ln->args[2] > 3u)
+      continue;
 
     /* The exit line, by line id.  Where that id lives depends on the map
      * format: UDMF gives every linedef an id, which the loader keeps in

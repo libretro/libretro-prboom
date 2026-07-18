@@ -1639,6 +1639,8 @@ static void I_PollHDRPaperWhite(void)
 
 void retro_run(void)
 {
+   bool updated = false;
+
    I_PollHDRPaperWhite();
 
 #ifdef ACS_SELFTEST
@@ -1650,8 +1652,6 @@ void retro_run(void)
     { acs_st_done = 1; ZACS_ConversationSelfTest(); }
   }
 #endif
-
-   bool updated = false;
 
    in_retro_run = true;
 
@@ -2542,7 +2542,11 @@ bool retro_load_game(const struct retro_game_info *info)
       }
 
       /* Get save directory */
-      if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, &base_save_dir) && base_save_dir)
+      /* environ_cb takes void*, and handing it a const char** drops the
+       * qualifier: MSVC reports that as C4090.  The cast is explicit so the
+       * intent is visible and the warning does not fire. */
+      if (environ_cb(RETRO_ENVIRONMENT_GET_SAVE_DIRECTORY, (void *)&base_save_dir) &&
+          base_save_dir)
       {
          if (base_save_dir && strlen(base_save_dir) > 0)
          {

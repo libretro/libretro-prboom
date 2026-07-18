@@ -1309,20 +1309,21 @@ void V_UpdateTrueColorPalette(void) {
            for (w=0; w<VID_NUMCOLORWEIGHTS; w++)
            {
               float t = (float)(w)/(float)(VID_NUMCOLORWEIGHTS-1);
+              int nr, ng, nb;
               if (PalettesTC)
                  PalettesTC[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] =
                     V_PackTC(r, g, b, t, roundUpR, roundUpG, roundUpB);
 #if defined(ABGR1555)
-              int nr  = (int)((r>>3)*t+roundUpR);
-              int ng  = (int)((g>>3)*t+roundUpG);
-              int nb  = (int)((b>>3)*t+roundUpB);
+              nr  = (int)((r>>3)*t+roundUpR);
+              ng  = (int)((g>>3)*t+roundUpG);
+              nb  = (int)((b>>3)*t+roundUpB);
               Palettes16[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] = (
                     (nb<<10) | (ng<<5) | nr
                     );
 #else
-              int nr  = (int)((r>>3)*t+roundUpR);
-              int ng  = (int)((g>>2)*t+roundUpG);
-              int nb  = (int)((b>>3)*t+roundUpB);
+              nr  = (int)((r>>3)*t+roundUpR);
+              ng  = (int)((g>>2)*t+roundUpG);
+              nb  = (int)((b>>3)*t+roundUpB);
               Palettes16[((p*256+i)*VID_NUMCOLORWEIGHTS)+w] = (
                     (nr<<11) | (ng<<5) | nb
                     );
@@ -1407,18 +1408,19 @@ void V_SetRawPalette(const char *lump_name)
     for (w = 0; w < VID_NUMCOLORWEIGHTS; w++)
     {
       float t = (float)(w)/(float)(VID_NUMCOLORWEIGHTS-1);
+      int nr, ng, nb;
       if (RawPaletteTC)
         RawPaletteTC[i*VID_NUMCOLORWEIGHTS + w] =
           V_PackTC(r, g, b, t, roundUpR, roundUpG, roundUpB);
 #if defined(ABGR1555)
-      int nr = (int)((r>>3)*t+roundUpR);
-      int ng = (int)((g>>3)*t+roundUpG);
-      int nb = (int)((b>>3)*t+roundUpB);
+      nr = (int)((r>>3)*t+roundUpR);
+      ng = (int)((g>>3)*t+roundUpG);
+      nb = (int)((b>>3)*t+roundUpB);
       RawPalette16[i*VID_NUMCOLORWEIGHTS + w] = (uint16_t)((nb<<10)|(ng<<5)|nr);
 #else
-      int nr = (int)((r>>3)*t+roundUpR);
-      int ng = (int)((g>>2)*t+roundUpG);
-      int nb = (int)((b>>3)*t+roundUpB);
+      nr = (int)((r>>3)*t+roundUpR);
+      ng = (int)((g>>2)*t+roundUpG);
+      nb = (int)((b>>3)*t+roundUpB);
       RawPalette16[i*VID_NUMCOLORWEIGHTS + w] = (uint16_t)((nr<<11)|(ng<<5)|nb);
 #endif
     }
@@ -1511,18 +1513,19 @@ void V_SetPaletteBlend(int pal1, int pal2, fixed_t t)
     for (w = 0; w < VID_NUMCOLORWEIGHTS; w++)
     {
       float wt = (float) (w) / (float) (VID_NUMCOLORWEIGHTS - 1);
+      int nr, ng, nb;
       if (BlendPalTC[blend_flip])
         BlendPalTC[blend_flip][i * VID_NUMCOLORWEIGHTS + w] =
           V_PackTC(r, g, b, wt, roundUpR, roundUpG, roundUpB);
 #if defined(ABGR1555)
-      int nr = (int) ((r >> 3) * wt + roundUpR);
-      int ng = (int) ((g >> 3) * wt + roundUpG);
-      int nb = (int) ((b >> 3) * wt + roundUpB);
+      nr = (int) ((r >> 3) * wt + roundUpR);
+      ng = (int) ((g >> 3) * wt + roundUpG);
+      nb = (int) ((b >> 3) * wt + roundUpB);
       dst[i * VID_NUMCOLORWEIGHTS + w] = (uint16_t) ((nb << 10) | (ng << 5) | nr);
 #else
-      int nr = (int) ((r >> 3) * wt + roundUpR);
-      int ng = (int) ((g >> 2) * wt + roundUpG);
-      int nb = (int) ((b >> 3) * wt + roundUpB);
+      nr = (int) ((r >> 3) * wt + roundUpR);
+      ng = (int) ((g >> 2) * wt + roundUpG);
+      nb = (int) ((b >> 3) * wt + roundUpB);
       dst[i * VID_NUMCOLORWEIGHTS + w] = (uint16_t) ((nr << 11) | (ng << 5) | nb);
 #endif
     }

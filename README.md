@@ -233,7 +233,10 @@ Changing the option requires a restart.
   their flats).  The stack things' opacity argument is honored: an unset
   or zero argument gives a fully transparent window flat, 255 disables the
   window, and values between draw the flat blended over the view through.
-  Movement through the stack is not linked.
+  Movement through the stack is not linked.  `Sector_SetPortal` (line
+  special 57) view portals resolve to the same windows, so maps using the
+  non-deprecated authoring form work too; its other portal types (copied,
+  skybox, plane, horizon, line) remain inert, as does ACS activation.
 - **Line portals and structured UDMF portal fields** — inert.
 - **3D models (MODELDEF)** — out of scope for the 8-bit software renderer.
 

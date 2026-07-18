@@ -336,15 +336,14 @@ static void dl_parse_glow(u_scanner_t *s)
 }
 
 
-/* Lazy per-picnum glow resolution.  Flat table indexed by flat picnum
- * (sector floorpic/ceilingpic); wall table by texture number.  Rebuilt when
- * the counts change (wad load); colour derivation happens here so parse
- * order vs texture init doesn't matter. */
+/* Lazy per-picnum glow resolution: flat table indexed by flat picnum
+ * (sector floorpic/ceilingpic), rebuilt when the count changes (wad load).
+ * Colour derivation happens here so parse order vs texture init does not
+ * matter.  The wall side lives further down in glow_wtex_tab, which is
+ * keyed by texture number. */
 extern int numflats, firstflat;
 static const glowdef_t **glow_flat_tab;
 static int               glow_flat_n;
-static const glowdef_t **glow_wall_tab;
-static int               glow_wall_n;
 
 static void glow_resolve_color(glowdef_t *g, const uint8_t *texels, int count)
 {

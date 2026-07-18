@@ -204,17 +204,22 @@ the wad.
   flat.  The opacity argument selects the window flat's own transparency —
   unset or zero is a clear window, 255 leaves the flat solid and no window
   at all, and values between blend the view through against the flat.
-- **Line portals (look-only):** `Line_SetPortal` (line special 156, visual
-  type) turns a wall into a window onto its partner line's surroundings.
-  The view is taken from the viewer's own position carried through to the
-  partner line — offset, rotated by the angle between the two lines — so a
-  pair at any relative angle works, and the window turns with the player.
-  Both one-sided lines (the whole wall becomes the window) and two-sided
-  ones (the opening between the upper and lower textures) are supported,
-  with the surrounding textures still drawn.  Geometry and sprites in front
-  of a portal occlude it correctly.  One portal depth, as with sector
-  portals, and actors do not move through: the teleporter, interactive and
-  static types are ignored.
+- **Line portals (look-only):** `Line_SetPortal` (line special 156) turns a
+  wall into a window onto its partner line's surroundings.  The view is
+  taken from the viewer's own position carried through to the partner line
+  — offset, rotated by the angle between the two lines — so a pair at any
+  relative angle works, and the window turns with the player.  The
+  `planeanchor` argument is honoured, shifting the view to match the
+  partner's floor or ceiling where the two sides differ in height.  Both
+  one-sided lines (the whole wall becomes the window) and two-sided ones
+  (the opening between the upper and lower textures) are supported, with
+  the surrounding textures still drawn, and the exit line is found however
+  the map format names it — a UDMF line id, `Line_SetPortal`'s own
+  `thisline` argument, or `Line_SetIdentification`.  Geometry and sprites
+  in front of a portal occlude it correctly.  Types 0-3 all render this
+  window, since the visual half is common to them; what the interactive
+  types add on top is not implemented, so nothing moves through a portal.
+  One portal depth, as with sector portals.
 
 ### Colour depth
 

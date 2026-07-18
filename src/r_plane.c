@@ -1272,6 +1272,106 @@ void R_SkyRevealBuild(void)
     }
 }
 
+
+/* ------------------------------------------------------------------------
+ * Visual line portal claims.
+ *
+ * A portal line's wall columns are claimed during the seg pass rather than
+ * from a visplane, so they get their own per-column record: which portal
+ * owns the column and the wall's row range there.  One portal per column is
+ * enough -- portal walls are solid, so a nearer one has already clipped a
+ * farther one out of the column by the time either is drawn.
+ *
+ * The rows also join the sky reveal mask, which is what lets sprites and
+ * mid textures drawn afterwards cover portal pixels: they clear their own
+ * spans from the mask, and the composite writes only what survives.
+ * -------------------------------------------------------------------- */
+static short lp_top[MAX_SCREENWIDTH];
+static short lp_bot[MAX_SCREENWIDTH];
+static int   lp_id[MAX_SCREENWIDTH];
+int          lp_any;
+
+void R_LinePortalClearClaims(void)
+{
+  int x;
+  for (x = 0; x < viewwidth; x++)
+  {
+    lp_id[x]  = -1;
+    lp_top[x] = 1;
+    lp_bot[x] = 0;
+  }
+  lp_any = 0;
+}
+
+void R_LinePortalClaim(int x, int y1, int y2, int portal)
+{
+  if ((unsigned)x >= (unsigned)viewwidth)
+    return;
+  if (y1 < 0) y1 = 0;
+  if (y2 >= viewheight) y2 = viewheight - 1;
+  if (y2 < y1)
+    return;
+  lp_id[x]  = portal;
+  lp_top[x] = (short)y1;
+  lp_bot[x] = (short)y2;
+  lp_any    = 1;
+}
+
+/* Add the claims to the reveal mask, after the plane-driven build has
+ * cleared and filled it. */
+void R_LinePortalReveal(void)
+{
+  int x;
+  if (!lp_any)
+    return;
+  for (x = 0; x < viewwidth; x++)
+  {
+    if (lp_id[x] < 0 || lp_bot[x] < lp_top[x])
+      continue;
+    R_SkyRevealSetCol(x, lp_top[x], lp_bot[x]);
+    if (lp_top[x] < sky_row_min) sky_row_min = lp_top[x];
+    if (lp_bot[x] > sky_row_max) sky_row_max = lp_bot[x];
+  }
+}
+
+/* Per-column extents of one portal's claim; nonzero if it has any. */
+int R_LinePortalSpan(int portal, short *out_top, short *out_bot)
+{
+  int x, any = 0;
+  for (x = 0; x < viewwidth; x++)
+    if (lp_id[x] == portal && lp_bot[x] >= lp_top[x])
+    {
+      out_top[x] = lp_top[x];
+      out_bot[x] = lp_bot[x];
+      any = 1;
+    }
+    else
+    {
+      out_top[x] = 1;
+      out_bot[x] = 0;
+    }
+  return any;
+}
+
+/* The distinct portals claimed this frame. */
+int R_LinePortalIds(int *out_ids, int maxids)
+{
+  int x, i, n = 0;
+  if (!lp_any)
+    return 0;
+  for (x = 0; x < viewwidth && n < maxids; x++)
+  {
+    if (lp_id[x] < 0)
+      continue;
+    for (i = 0; i < n; i++)
+      if (out_ids[i] == lp_id[x])
+        break;
+    if (i == n)
+      out_ids[n++] = lp_id[x];
+  }
+  return n;
+}
+
 /* Per-column extents of revealed sky, for sealing the skybox scene render;
  * returns nonzero when any pixel is revealed. */
 int R_SkyRevealExtents(short *out_top, short *out_bot)

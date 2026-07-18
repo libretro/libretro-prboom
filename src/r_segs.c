@@ -44,6 +44,7 @@
 #include "vid_mode.h"
 #include "u_dynlight.h"
 #include "p_sectorportal.h"
+#include "p_lineportal.h"
 #include "u_brightmap.h"
 #include "p_ffloor.h"
 #include "r_draw.h"
@@ -66,6 +67,7 @@ static dbool    maskedtexture;
 static int      toptexture;
 static int      bottomtexture;
 static int      midtexture;
+static int      seg_lineportal;   /* line index of this seg's portal, or -1 */
 
 dbool           r_wiggle_fix = 0;
 
@@ -959,6 +961,18 @@ static void R_RenderSegLoop (void)
 
    R_SetDefaultDrawColumnVars(&dcvars);
 
+   /* Visual line portals: a portal line's wall is a window, claimed per
+    * column below.  Portal scenes render one depth only, so a portal line
+    * seen through a portal draws its own texture. */
+   seg_lineportal = -1;
+   if (line_portals_active && lineportals && !r_in_skybox && curline &&
+       curline->linedef)
+   {
+      int lnum = (int)(curline->linedef - lines);
+      if ((unsigned)lnum < (unsigned)numlines && lineportals[lnum].active)
+         seg_lineportal = lnum;
+   }
+
    for ( ; rw_x < rw_stopx ; rw_x++)
    {
       /* cache the per-column clip bounds in locals for the body of the
@@ -1155,7 +1169,17 @@ static void R_RenderSegLoop (void)
       }
 
       // draw the wall tiers
-      if (midtexture)
+      if (midtexture && seg_lineportal >= 0)
+      {
+         /* Visual line portal: this wall is a window.  Claim the column for
+          * the composite instead of drawing the texture -- the wall still
+          * seals the column below (cc/fc are set to the closed values by the
+          * one-sided path), so everything behind it stays hidden and the
+          * claim is already clipped by anything nearer. */
+         if (yl <= yh)
+            R_LinePortalClaim(rw_x, yl, yh, seg_lineportal);
+      }
+      else if (midtexture)
       {
 
          dcvars.yl = yl;     // single sided line

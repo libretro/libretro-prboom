@@ -65,6 +65,7 @@
 #include "p_vslope.h"
 #include "p_skybox.h"
 #include "p_sectorportal.h"
+#include "p_lineportal.h"
 #include "miniz.h"
 #include "p_tick.h"
 #include "p_enemy.h"
@@ -2871,6 +2872,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
                                  * this level's */
    P_ClearSkyboxes();           /* and last level's skybox cameras/pickers */
    P_ClearSectorPortals();      /* and last level's stacked-sector portals */
+   P_ClearLinePortals();
 
    if (udmf_level)
    {
@@ -3041,6 +3043,7 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
     * things (in any order) have loaded; fills sector->skybox */
    P_SpawnSkyboxes();
    P_SpawnSectorPortals();
+   P_SpawnLinePortals();
 
    if (map_format.polyobjs)
       /* spawn and place the polyobjects; UDMF maps have no binary THINGS

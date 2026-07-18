@@ -53,6 +53,7 @@
 #include "vid_mode.h"
 #include "p_skybox.h"
 #include "p_sectorportal.h"
+#include "p_lineportal.h"
 #include "p_ffloor.h"
 #include "m_bbox.h"
 #include "r_sky.h"
@@ -1229,7 +1230,10 @@ void R_RenderPlayerView (player_t* player)
    * showing the skybox scene (see the reveal mask in r_plane.c); the scene
    * itself renders after the planes, clipped and composited to exactly
    * those pixels. */
-  sky_reveal_active = (skyview.active || sector_portals_active) ? 1 : 0;
+  sky_reveal_active = (skyview.active || sector_portals_active ||
+                       line_portals_active) ? 1 : 0;
+  if (line_portals_active)
+    R_LinePortalClearClaims();
 
 
   // Clear buffers.
@@ -1287,7 +1291,10 @@ void R_RenderPlayerView (player_t* player)
      * surviving visplanes (see r_plane.c) before masked draws clear their
      * pixels from it. */
     if (sky_reveal_active)
+    {
       R_SkyRevealBuild();
+      R_LinePortalReveal();
+    }
 
     R_DrawMasked ();
     R_ResetColumnBuffer();
@@ -1455,6 +1462,34 @@ void R_RenderPlayerView (player_t* player)
                                 viewy + portal_cap_dy[k],
                                 viewz + portal_cap_dz[k], 0);
         sb_flat_alpha = 0;
+        sb_use_reveal = 0;
+      }
+    }
+
+    /* Visual line portals: each claimed portal line renders the level from
+     * the viewer transformed into its partner line's frame -- the offset
+     * from this line's anchor, rotated by the angle between the lines and
+     * planted at the partner's anchor -- sealed to the wall columns the seg
+     * pass claimed and composited into the pixels that survived. */
+    if (line_portals_active && lineportals && lp_any)
+    {
+      int lids[PORTAL_CAP_MAX];
+      int nl = R_LinePortalIds(lids, PORTAL_CAP_MAX);
+      int k;
+      for (k = 0; k < nl; k++)
+      {
+        const lineportal_t *lp = &lineportals[lids[k]];
+        fixed_t rx, ry, c, s2, camx, camy;
+        if (!lp->active || !R_LinePortalSpan(lids[k], sb_top, sb_bot))
+          continue;
+        c  = finecosine[lp->angle >> ANGLETOFINESHIFT];
+        s2 = finesine[lp->angle >> ANGLETOFINESHIFT];
+        rx = viewx - lp->ax;
+        ry = viewy - lp->ay;
+        camx = lp->bx + FixedMul(rx, c) - FixedMul(ry, s2);
+        camy = lp->by + FixedMul(rx, s2) + FixedMul(ry, c);
+        sb_use_reveal = 1;
+        R_RenderCompositeView(camx, camy, viewz, lp->angle);
         sb_use_reveal = 0;
       }
     }

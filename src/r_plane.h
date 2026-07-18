@@ -78,4 +78,12 @@ void R_SkyRevealCoverCol(int x, int y1, int y2);
 int  R_SkyRevealExtents(short *out_top, short *out_bot);
 int  R_SkyRevealTest(int x, int y);
 
+/* visual line portal claims (see r_plane.c) */
+extern int lp_any;
+void R_LinePortalClearClaims(void);
+void R_LinePortalClaim(int x, int y1, int y2, int portal);
+void R_LinePortalReveal(void);
+int  R_LinePortalSpan(int portal, short *out_top, short *out_bot);
+int  R_LinePortalIds(int *out_ids, int maxids);
+
 #endif

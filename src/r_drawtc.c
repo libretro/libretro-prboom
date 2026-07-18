@@ -73,6 +73,12 @@
 /* Shared globals owned by r_draw.c. */
 extern uint8_t *translationtables;
 
+#ifdef PRBOOM_RENDER_PROFILE
+/* Wall-fill accumulator, defined in r_draw.c: both renderers report into the
+ * same counter so a profile build reads the same way whichever is active. */
+extern double prof_wallfill_usec;
+#endif
+
 /* ---- filtered-tap macros (TC edition) -----------------------------------
  * Identical structure to filter_getFilteredForColumn16 / ...ForSpan16 in
  * r_filter.h, but summing VID_PALTC (32-bit premultiplied) terms.  The

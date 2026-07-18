@@ -788,7 +788,7 @@ visplane_t *R_DupPlane(const visplane_t *pl, int start, int stop)
 #ifdef PRBOOM_RENDER_PROFILE
 static visplane_t *R_FindPlane_impl(fixed_t height, int picnum, int lightlevel,
                         fixed_t xoffs, fixed_t yoffs, const secplane_t *slope,
-                        int skybox);
+                        int skybox, int portal);
 visplane_t *R_FindPlane(fixed_t height, int picnum, int lightlevel,
                         fixed_t xoffs, fixed_t yoffs, const secplane_t *slope,
                         int skybox, int portal)

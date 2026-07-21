@@ -18,7 +18,6 @@
 
 #include <stdlib.h>
 #include <string.h>
-#include <math.h>
 #include <ctype.h>
 
 #include "doomstat.h"
@@ -6264,7 +6263,18 @@ static void T_ZACSThinker(zacs_inst_t *inst)
         /* ---- pure math ACSF ------------------------------------------
          * Self-contained numeric helpers (no map/actor state).  Sqrt is an
          * integer square root; FixedSqrt operates on 16.16 fixed-point;
-         * VectorLength returns the 16.16 magnitude of a 2D fixed vector. */
+         * VectorLength returns the 16.16 magnitude of a 2D fixed vector.
+         * All three share the bit-by-bit integer square root: exact floor,
+         * no libm, no double.  For the fixed-point pair the argument is
+         * widened so the result lands directly in 16.16:
+         *   FixedSqrt(x)       = isqrt64((uint64)x << 16)
+         *     since trunc(2^16 * sqrt(x / 2^16)) = floor(sqrt(x * 2^16))
+         *   VectorLength(x, y) = isqrt64(x*x + y*y)  (64-bit products)
+         *     since trunc(2^16 * sqrt((x^2+y^2) / 2^32)) = floor(sqrt(x^2+y^2))
+         * The previous double path was deterministic (IEEE sqrt is
+         * correctly rounded) but not exact: the double could round up
+         * across an integer boundary before the trunc, and VectorLength's
+         * x*x + y*y needs up to 63 significand bits, beyond double's 53. */
         case 48:                          /* ACSF_Sqrt(n) */
         {
           unsigned int v = (argc > 0 && a[0] > 0) ? (unsigned int)a[0] : 0;
@@ -6280,17 +6290,29 @@ static void T_ZACSThinker(zacs_inst_t *inst)
           break;
         }
         case 49:                          /* ACSF_FixedSqrt(n) */
-        {
-          double v = (argc > 0) ? a[0] / 65536.0 : 0.0;
-          if (v < 0.0) v = 0.0;
-          r = (int)(sqrt(v) * 65536.0);
-          break;
-        }
         case 50:                          /* ACSF_VectorLength(x, y) */
         {
-          double x = (argc > 0) ? a[0] / 65536.0 : 0.0;
-          double y = (argc > 1) ? a[1] / 65536.0 : 0.0;
-          r = (int)(sqrt(x * x + y * y) * 65536.0);
+          uint64_t v;
+          uint64_t x = 0, b2 = (uint64_t)1 << 62;
+
+          if (func == 49)
+            v = (argc > 0 && a[0] > 0) ? ((uint64_t)(unsigned int)a[0] << 16) : 0;
+          else
+          {
+            int64_t px = (argc > 0) ? (int64_t)a[0] : 0;
+            int64_t py = (argc > 1) ? (int64_t)a[1] : 0;
+            /* px*px + py*py <= 2 * (2^31)^2 = 2^63: fits uint64 */
+            v = (uint64_t)(px * px) + (uint64_t)(py * py);
+          }
+
+          while (b2 > v) b2 >>= 2;
+          while (b2)
+          {
+            if (v >= x + b2) { v -= x + b2; x = (x >> 1) + b2; }
+            else x >>= 1;
+            b2 >>= 2;
+          }
+          r = (int)(uint32_t)x;
           break;
         }
 

@@ -772,10 +772,11 @@ void I_UpdateSound(void)
    /* Step 1: music into the canonical buffer.
     *
     * When float output is active and the current backend renders float
-    * natively (Ogg via stb_vorbis, MIDI via fluidsynth), it writes
-    * straight into fmixbuffer, skipping the int16->float widen below.
-    * Integer-native backends (OPL/MOD/MP3/FLAC) have render_float == NULL,
-    * so they render int16 into mixbuffer and get widened in Step 1b. */
+    * natively (Ogg via stb_vorbis, MIDI via fluidsynth, OPL via its float
+    * FIR resampler), it writes straight into fmixbuffer, skipping the
+    * int16->float widen below.  Integer-native backends (MOD/MP3) have
+    * render_float == NULL, so they render int16 into mixbuffer and get
+    * widened in Step 1b. */
    if (music_handle && current_player &&
        use_float_output && current_player->render_float)
    {

@@ -1387,6 +1387,13 @@ void I_OPL_RenderSamples (void *dest, unsigned nsamp)
     OPL_Render_Samples (dest, nsamp);
 }
 
+/* Float lane: the resampler's FIR accumulator is already float, so emit it
+ * directly instead of round->int16->widen in the caller. */
+static void I_OPL_RenderSamplesFloat (void *dest, unsigned nsamp)
+{
+    OPL_Render_Samples_Float (dest, nsamp);
+}
+
 // State save/restore -----------------------------------------------------
 //
 // We capture the per-track MIDI iterator position plus the small amount
@@ -1544,5 +1551,6 @@ const music_player_t opl_synth_player =
   I_OPL_StopSong,
   I_OPL_RenderSamples,
   I_OPL_SerializeState,
-  I_OPL_UnserializeState
+  I_OPL_UnserializeState,
+  I_OPL_RenderSamplesFloat
 };

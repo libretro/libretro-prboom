@@ -299,31 +299,36 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step,
 
         /* RWAV gives 8-bit unsigned or 16-bit signed PCM, interleaved per
          * channel.  Convert to signed-16-bit mono: 8-bit is centre-128
-         * like DMX ((s - 128) << 8); multi-channel is averaged down. */
+         * like DMX ((s - 128) << 8); multi-channel is averaged down with
+         * round-half-away (plain acc/ch truncates toward zero, a signal-
+         * correlated half-LSB bias; mono, the common case, divides by 1
+         * and is untouched). */
         if (wav.bitspersample == 8)
         {
             const uint8_t *src = (const uint8_t*)wav.samples;
             unsigned       ch  = wav.numchannels;
+            int            h   = (int)ch / 2;
             for (n = 0; n < wav.numsamples; n++)
             {
                 int acc = 0;
                 unsigned c;
                 for (c = 0; c < ch; c++)
                     acc += ((int)src[n * ch + c] - 128) << 8;
-                out_data[n] = (int16_t)(acc / (int)ch);
+                out_data[n] = (int16_t)((acc >= 0 ? acc + h : acc - h) / (int)ch);
             }
         }
         else /* 16-bit (rwav only ever yields 8 or 16) */
         {
             const int16_t *src = (const int16_t*)wav.samples;
             unsigned        ch = wav.numchannels;
+            int             h  = (int)ch / 2;
             for (n = 0; n < wav.numsamples; n++)
             {
                 int acc = 0;
                 unsigned c;
                 for (c = 0; c < ch; c++)
                     acc += src[n * ch + c];
-                out_data[n] = (int16_t)(acc / (int)ch);
+                out_data[n] = (int16_t)((acc >= 0 ? acc + h : acc - h) / (int)ch);
             }
         }
         out_data[wav.numsamples] = out_data[wav.numsamples - 1];

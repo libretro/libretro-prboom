@@ -689,8 +689,7 @@ dbool   I_SoundIsPlaying (int handle)
  */
 /* Per-chunk inner mix. Both variants advance channel state identically
  * (the interpolation/stepping lives in mix_inner.h, included once each); they
- * differ only in accumulator type, seed, and clamp/store. mix_chunk_s16
- * expands to the exact arithmetic the int16 path used before this change. */
+ * differ only in accumulator type, seed, and clamp/store. */
 static void mix_chunk_s16(int16_t *out, int chunk,
                           channel_t **active, int n_active)
 {
@@ -851,8 +850,7 @@ void I_UpdateSound(void)
 
          /* Mix this chunk into the active output format.  Both variants
           * step channel state identically; only seed/add/store differ
-          * (see mix_inner.h).  The int16 variant is byte-identical to the
-          * loop this replaced. */
+          * (see mix_inner.h). */
          if (use_float_output)
             mix_chunk_f32(fmixbuffer + (size_t)base * 2, chunk, active, n_active);
          else

@@ -18,7 +18,13 @@
    {
       channel_t *c = active[j];
       int        a = c->cur[0];
-      int        s = a + ((((int)c->cur[1] - a) * (int)(c->frac >> 8)) >> 8);
+      /* 15-bit lerp weight: the widest that keeps the product in int32
+       * for the worst-case delta (65535 * 32767 < 2^31).  The previous
+       * 8-bit weight ((frac>>8)>>8) truncated the interpolant by up to
+       * delta/256 -- as much as ~244 LSB on full-scale 8-bit DMX deltas
+       * and ~255 LSB on 16-bit WAV/Ogg SFX; this form is within 1 LSB of
+       * the exact 64-bit lerp across the entire delta/frac space. */
+      int        s = a + ((((int)c->cur[1] - a) * (int)(c->frac >> 1)) >> 15);
       c->frac += c->step_fx;
       c->cur  += c->frac >> 16;
       c->frac &= 0xffff;

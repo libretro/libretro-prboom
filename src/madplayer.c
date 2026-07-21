@@ -62,7 +62,8 @@ const music_player_t mp_player =
   NULL,
   NULL,
   NULL,  /* serialize */
-  NULL   /* unserialize */
+  NULL,  /* unserialize */
+  NULL   /* render_float */
 };
 
 #else // HAVE_LIBMAD
@@ -225,15 +226,35 @@ static INLINE short mp_fixtoshort (mad_fixed_t f)
   return (short) f;
 }
 
-static void mp_render_ex (void *dest, unsigned nsamp)
+/* Float twin of mp_fixtoshort: clamp in the fixed domain, then scale to
+ * normalized [-1,1] with the 0-15 volume folded into one multiply.  Keeps
+ * libmad's full 28-bit synthesis resolution instead of dropping 12 bits
+ * (plus the truncating /15) through the int16 lane. */
+static INLINE float mp_fixtofloat (mad_fixed_t f)
+{
+  if (f < -MAD_F_ONE)
+    f = -MAD_F_ONE;
+  if (f > MAD_F_ONE)
+    f = MAD_F_ONE;
+  return (float) f * ((float) mp_volume *
+                      (1.0f / (15.0f * (float) MAD_F_ONE)));
+}
+
+/* Shared decode/frame-pump body for both output formats (the flplayer
+ * fl_render_core pattern): the libmad frame walk, error handling and
+ * leftover-cursor state are single-sourced; only the per-sample
+ * conversion and the write width differ.  is_float == 0 expands to the
+ * exact arithmetic the int16 path used before this change. */
+static void mp_render_core (void *dest, unsigned nsamp, int is_float)
 {
   short *sout = (short *) dest;
+  float *fout = (float *) dest;
 
   int localerrors = 0;
 
   if (!mp_playing || mp_paused)
   {
-    memset (dest, 0, nsamp * 4);
+    memset (dest, 0, nsamp * (is_float ? 8 : 4));
     return;
   }
 
@@ -242,12 +263,21 @@ static void mp_render_ex (void *dest, unsigned nsamp)
     // write any leftover data from last MP3 frame
     while (mp_leftoversamps > 0 && nsamp > 0)
     {
-      short s = mp_fixtoshort (Synth.pcm.samples[0][mp_leftoversamppos]);
-      *sout++ = s;
-      if (Synth.pcm.channels == 2)
-        s = mp_fixtoshort (Synth.pcm.samples[1][mp_leftoversamppos]);
+      mad_fixed_t l = Synth.pcm.samples[0][mp_leftoversamppos];
       // if mono, just duplicate the first channel again
-      *sout++ = s;
+      mad_fixed_t r = (Synth.pcm.channels == 2)
+                    ? Synth.pcm.samples[1][mp_leftoversamppos] : l;
+
+      if (is_float)
+      {
+        *fout++ = mp_fixtofloat (l);
+        *fout++ = mp_fixtofloat (r);
+      }
+      else
+      {
+        *sout++ = mp_fixtoshort (l);
+        *sout++ = mp_fixtoshort (r);
+      }
 
       mp_leftoversamps -= 1;
       mp_leftoversamppos += 1;
@@ -270,7 +300,8 @@ static void mp_render_ex (void *dest, unsigned nsamp)
         {
           lprintf (LO_WARN, "mad_frame_decode: Lots of errors.  Most recent %s\n", mad_stream_errorstr (&Stream));
           mp_playing = 0;
-          memset (sout, 0, nsamp * 4);
+          memset (is_float ? (void *) fout : (void *) sout, 0,
+                  nsamp * (is_float ? 8 : 4));
           return;
         }
       }  
@@ -287,7 +318,8 @@ static void mp_render_ex (void *dest, unsigned nsamp)
         else
         { // stop
           mp_playing = 0;
-          memset (sout, 0, nsamp * 4);
+          memset (is_float ? (void *) fout : (void *) sout, 0,
+                  nsamp * (is_float ? 8 : 4));
           return;
         }
       }
@@ -295,7 +327,8 @@ static void mp_render_ex (void *dest, unsigned nsamp)
       { // oh well.
         lprintf (LO_WARN, "mad_frame_decode: Unrecoverable error %s\n", mad_stream_errorstr (&Stream));
         mp_playing = 0;
-        memset (sout, 0, nsamp * 4);
+        memset (is_float ? (void *) fout : (void *) sout, 0,
+                nsamp * (is_float ? 8 : 4));
         return;
       }
     }
@@ -309,12 +342,115 @@ static void mp_render_ex (void *dest, unsigned nsamp)
   // NOT REACHED
 }
 
-void I_ResampleStream (void *dest, unsigned nsamp, void (*proc)(void *dest, unsigned nsamp),
-      unsigned sratein, unsigned srateout);
+static void mp_render_ex (void *dest, unsigned nsamp)
+{
+  mp_render_core (dest, nsamp, 0);
+}
+
+static void mp_render_ex_f (void *dest, unsigned nsamp)
+{
+  mp_render_core (dest, nsamp, 1);
+}
+
+/* Linear stream resampler, moved here from libretro_sound.c
+ * (I_ResampleStream): this was its only caller, reached through an extern
+ * prototype declared in this .c file.  16-bit signed interleaved stereo;
+ * body unchanged.  The (unsigned) promotion of the int16 samples is
+ * deliberate: for negative samples the weighted sum wraps mod 2^32, the
+ * logical >>16 keeps bits 16..31, and the int16 store truncates to exactly
+ * the arithmetic-shift result -- defined behavior, bit-correct, but floor
+ * rather than round. */
+static void mp_resample_stream (void *dest, unsigned nsamp,
+      void (*proc)(void *dest, unsigned nsamp),
+      unsigned sratein, unsigned srateout)
+{
+   unsigned i;
+   int                   j   = 0;
+   int16_t           *sout   = dest;
+   static int16_t     *sin   = NULL;
+   static unsigned sinsamp   = 0;
+   static unsigned remainder = 0;
+   unsigned step             = (sratein << 16) / (unsigned) srateout;
+   unsigned nreq             = (step * nsamp + remainder) >> 16;
+
+   if (nreq > sinsamp)
+   {
+      sin = realloc(sin, (nreq + 1) * 4);
+      if (!sinsamp) // avoid pop when first starting stream
+         sin[0] = sin[1] = 0;
+      sinsamp = nreq;
+   }
+
+   proc (sin + 2, nreq);
+
+   for (i = 0; i < nsamp; i++)
+   {
+      *sout++ = ((unsigned) sin[j + 0] * (0x10000 - remainder) +
+            (unsigned) sin[j + 2] * remainder) >> 16;
+      *sout++ = ((unsigned) sin[j + 1] * (0x10000 - remainder) +
+            (unsigned) sin[j + 3] * remainder) >> 16;
+      remainder += step;
+      j += remainder >> 16 << 1;
+      remainder &= 0xffff;
+   }
+   sin[0] = sin[nreq * 2];
+   sin[1] = sin[nreq * 2 + 1];
+}
+
+/* Float twin: same cursor arithmetic and edge-carry scheme, but the source,
+ * interpolation and output stay float end to end -- no int16 quantization
+ * between the 28-bit libmad synth and the float mixer.  Separate static
+ * state from the s16 lane; only one lane is active per session (the output
+ * format is negotiated once at init). */
+static void mp_resample_stream_f (void *dest, unsigned nsamp,
+      void (*proc)(void *dest, unsigned nsamp),
+      unsigned sratein, unsigned srateout)
+{
+   unsigned i;
+   int                   j   = 0;
+   float             *sout   = dest;
+   static float       *sin   = NULL;
+   static unsigned sinsamp   = 0;
+   static unsigned remainder = 0;
+   unsigned step             = (sratein << 16) / (unsigned) srateout;
+   unsigned nreq             = (step * nsamp + remainder) >> 16;
+
+   if (nreq > sinsamp)
+   {
+      sin = realloc(sin, (nreq + 1) * 2 * sizeof(float));
+      if (!sinsamp) /* avoid pop when first starting stream */
+         sin[0] = sin[1] = 0.0f;
+      sinsamp = nreq;
+   }
+
+   proc (sin + 2, nreq);
+
+   for (i = 0; i < nsamp; i++)
+   {
+      float w1 = (float) remainder * (1.0f / 65536.0f);
+      float w0 = 1.0f - w1;
+
+      *sout++ = sin[j + 0] * w0 + sin[j + 2] * w1;
+      *sout++ = sin[j + 1] * w0 + sin[j + 3] * w1;
+      remainder += step;
+      j += remainder >> 16 << 1;
+      remainder &= 0xffff;
+   }
+   sin[0] = sin[nreq * 2];
+   sin[1] = sin[nreq * 2 + 1];
+}
 
 static void mp_render (void *dest, unsigned nsamp)
 { 
-  I_ResampleStream (dest, nsamp, mp_render_ex, Header.samplerate, mp_samplerate_target);
+  mp_resample_stream (dest, nsamp, mp_render_ex, Header.samplerate, mp_samplerate_target);
+}
+
+/* Float render lane (render_float): decode at 28-bit fixed, convert once to
+ * float, resample in float.  The s16 lane quantizes to int16 before its
+ * resampler and is then widened by the mixer -- a round-trip this skips. */
+static void mp_render_float (void *dest, unsigned nsamp)
+{
+  mp_resample_stream_f (dest, nsamp, mp_render_ex_f, Header.samplerate, mp_samplerate_target);
 }
 
 /* Save/restore playback position so a save state (and runahead and rewind,
@@ -428,7 +564,8 @@ const music_player_t mp_player =
   mp_stop,
   mp_render,
   mp_serialize,
-  mp_unserialize
+  mp_unserialize,
+  mp_render_float
 };
 
 #endif // HAVE_LIBMAD

@@ -773,7 +773,7 @@ void I_UpdateSound(void)
     * When float output is active and the current backend renders float
     * natively (Ogg via stb_vorbis, MIDI via fluidsynth, OPL via its float
     * FIR resampler), it writes straight into fmixbuffer, skipping the
-    * int16->float widen below.  Integer-native backends (MOD/MP3) have
+    * int16->float widen below.  Integer-native backends (MOD) have
     * render_float == NULL, so they render int16 into mixbuffer and get
     * widened in Step 1b. */
    if (music_handle && current_player &&
@@ -1411,44 +1411,6 @@ int I_RegisterMusicFile( const char* filename, musicinfo_t *song )
   song->handle  = 0;
   song->lumpnum = 0;
   return 0;
-}
-
-/* NSM helper routine for some of the streaming audio.
- * Assumes 16bit signed interleaved stereo. */
-void I_ResampleStream (void *dest, unsigned nsamp, void (*proc)(void *dest, unsigned nsamp),
-      unsigned sratein, unsigned srateout)
-{
-   unsigned i;
-   int                   j   = 0;
-   int16_t           *sout   = dest;
-   static int16_t     *sin   = NULL;
-   static unsigned sinsamp   = 0;
-   static unsigned remainder = 0;
-   unsigned step             = (sratein << 16) / (unsigned) srateout;
-   unsigned nreq             = (step * nsamp + remainder) >> 16;
-
-   if (nreq > sinsamp)
-   {
-      sin = realloc(sin, (nreq + 1) * 4);
-      if (!sinsamp) // avoid pop when first starting stream
-         sin[0] = sin[1] = 0;
-      sinsamp = nreq;
-   }
-
-   proc (sin + 2, nreq);
-
-   for (i = 0; i < nsamp; i++)
-   {
-      *sout++ = ((unsigned) sin[j + 0] * (0x10000 - remainder) +
-            (unsigned) sin[j + 2] * remainder) >> 16;
-      *sout++ = ((unsigned) sin[j + 1] * (0x10000 - remainder) +
-            (unsigned) sin[j + 3] * remainder) >> 16;
-      remainder += step;
-      j += remainder >> 16 << 1;
-      remainder &= 0xffff;
-   }
-   sin[0] = sin[nreq * 2];
-   sin[1] = sin[nreq * 2 + 1];
 }
 
 void I_InitMusic(void)

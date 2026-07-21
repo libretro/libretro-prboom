@@ -61,11 +61,15 @@ You still need a valid IWAD — the engine provides the code, not the game data.
 - **LANGUAGE** string-table lookups feeding the above
 
 ### Audio & music
-- **OPL3** emulation (DOSBox/Nuked-derived `dbopl`) for authentic AdLib MIDI
-- **FluidSynth** SoundFont playback
-- **Native MIDI** out to the frontend
-- **MUS→MIDI** conversion, plus high-quality resampling with a selectable
-  output sample rate
+- **OPL2** emulation (DOSBox-derived `dbopl`) for authentic AdLib MIDI,
+  clocked at the chip's true hardware rate and band-limited to the output
+- **FluidSynth** SoundFont playback, **native MIDI** out to the frontend,
+  and streamed **MP3**, **Ogg Vorbis**, and ProTracker **MOD** music lumps
+- **Float audio output** negotiated with the frontend where supported, with
+  a quantization-free path from every synth/decoder that has one
+- **MUS→MIDI** conversion, selectable output sample rate, and per-backend
+  music position save/restore so runahead and rewind stay seamless
+- Full detail in [Sound system](#sound-system) below
 
 ### Input
 - Gamepad, mouse, and keyboard; analog stick with configurable deadzone
@@ -96,6 +100,93 @@ You still need a valid IWAD — the engine provides the code, not the game data.
 | Analog Deadzone (Percent) | Gamepad stick deadzone. |
 | Look on Parent Folders for IWADs | Scan parent folders for IWADs (disable for SIGIL). |
 | Rumble Effects | Haptic feedback on rumble pads. |
+
+---
+
+## Sound system
+
+The audio path has been reworked end to end around two rules: **quantize
+once** (nothing is narrowed to int16 and widened again mid-pipeline) and
+**verify empirically** (every change is A/B'd against the previous output,
+bit-exactly where the change claims equivalence).
+
+### Output pipeline
+
+- The core negotiates **float32 output** with the frontend
+  (`RETRO_ENVIRONMENT_GET_AUDIO_SAMPLE_BATCH_FLOAT`) and falls back to
+  int16 everywhere else.  On the float lane, backends with a
+  higher-precision native stage hand their samples over without ever
+  touching int16; on the int16 lane the arithmetic is unchanged from the
+  classic path.
+- **Selectable output rate** — 32, 44.1, 48, or 96 kHz — applied at
+  runtime: the SFX step tables are retuned in place, the synth backends
+  are re-initialised at the new rate, and the current song resumes from
+  its saved sample position.  Higher rates lower latency and push
+  aliasing images above the audible band.
+- **Deterministic frame pacing**: the mixer runs once per `retro_run`,
+  producing frames from a 16.16 fixed-point accumulator so the long-run
+  average is exactly `sample_rate / fps` with no drift and no frontend
+  resampler engagement.
+
+### Music backends
+
+The MIDI synth (OPL, FluidSynth, or raw MIDI out to the frontend) is
+chosen by the *MIDI Hardware* menu setting; non-MIDI lumps are
+autodetected by decode attempt.
+
+- **OPL2 (`dbopl`)** — the chip is emulated at its true hardware rate
+  (14.318 MHz / 288 ≈ 49716 Hz) so envelopes, vibrato/tremolo and phase
+  accumulators advance exactly as on real silicon, then the mono chip
+  output is band-limited to the frontend rate through a **polyphase
+  Kaiser-windowed-sinc resampler** (32 taps × 512 phases, cutoff tracked
+  to the output Nyquist on downsample; unity ratio is a bit-exact
+  passthrough).  The raw 32-bit chip sum feeds the filter directly —
+  gain is applied in float to the filtered sample and the result is
+  quantized exactly once at emission, so hot passages are no longer
+  hard-clipped per native sample ahead of the filter.
+- **FluidSynth** — SoundFont MIDI with volume folded into the synth
+  gain; renders int16 or float natively per the negotiated lane.
+- **MP3 (libmad)** — the decoder's 28-bit fixed-point synthesis is kept
+  at full precision until a single conversion; the float lane converts
+  fixed→float once and resamples in float, skipping the int16 narrowing
+  the classic lane performs.
+- **Ogg Vorbis (stb_vorbis)** — float-native decode, interpolation and
+  volume on the float lane; int16 mirror lane for classic output.
+- **ProTracker MOD (pocketmod)** — deliberately **integer-only**: the
+  decoder was rewritten to emit interleaved s16 directly with
+  deterministic fixed-point arithmetic, so its output is reproducible
+  bit-for-bit across platforms.
+- **Raw MIDI out** — event stream handed to the frontend's MIDI
+  interface for external hardware/soft synths.
+
+### Sound effects
+
+- Sources: classic **DMX** 8-bit lumps, **WAV** (8/16-bit; multi-channel
+  lumps are averaged to mono with proper rounding), and **Ogg** lumps
+  from pk3s.
+- Samples are stored at their **native rate** and resampled per-channel
+  at mix time with 16.16 stepping — a quarter of the resident memory of
+  the old upsample-at-load scheme, and no per-lump resample pass at
+  startup.
+- The per-channel **linear interpolation carries a 15-bit weight**,
+  within 1 LSB of the exact 64-bit result across the whole sample/cursor
+  space (the historical 8-bit weight truncated by up to ~250 LSB).  Both
+  output lanes share the single interpolation body.
+- 32 mixing channels; the mixer collects active channels into a compact
+  list and mixes in chunks bounded by the nearest channel end, so the
+  inner loop runs with no per-sample end-of-data checks.  Vanilla-style
+  random pitch variation (and the Heretic/Hexen jitter) is applied
+  through a libm-free step table.
+
+### Save states, runahead, rewind
+
+Every music backend serializes its own playback position — OPL per-track
+MIDI iterator positions, FluidSynth event-index replay, Ogg decoder
+sample-offset seek, MP3 frame byte-offset plus intra-frame cursor, MOD
+channel state — so per-frame save/restore (runahead, rewind) resumes
+music in place instead of re-decoding from the start.  Backends without
+a fast path fall back to a generic render-replay driven by a
+samples-played counter.
 
 ---
 

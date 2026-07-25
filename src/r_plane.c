@@ -62,7 +62,7 @@
 #include "r_sky.h"
 #include "r_plane.h"
 #include "r_drawcmd.h"
-#include "r_wallmt.h"
+#include "r_rendermt.h"
 
 #if defined(__SSE2__)
 #include <emmintrin.h>
@@ -1714,12 +1714,12 @@ void R_DrawPlanes (void)
     nslices = R_PlaneBuildSlices(nthreads);
     R_PlaneOrderSpans(nslices);
 
-    if (nslices > 1 && R_WallMTEnsure(nthreads - 1))
+    if (nslices > 1 && R_RenderMTEnsure(nthreads - 1))
     {
-      R_WallMTRun(R_PlaneSliceFill, plane_slices,
+      R_RenderMTRun(R_PlaneSliceFill, plane_slices,
                   sizeof(plane_slices[0]), nslices - 1);
       R_PlaneSliceFill(&plane_slices[nslices - 1]);
-      R_WallMTWait();
+      R_RenderMTWait();
     }
     else
     {

@@ -15,9 +15,9 @@
  *  GNU General Public License for more details.
  *
  * DESCRIPTION:
- *      Worker pool for the threaded wall replay.  The single translation
- *      unit permitted to include libretro-common's threading headers; see
- *      r_wallmt.h for why that matters.
+ *      Worker pool shared by the threaded renderer passes.  The single
+ *      translation unit permitted to include libretro-common's threading
+ *      headers; see r_rendermt.h for why that matters.
  *
  *      Built with Z_ZONE_NO_ALLOC_OVERRIDE (set in Makefile.common), so the
  *      zone's malloc/free macros are inactive here.  That is required twice
@@ -28,7 +28,7 @@
  *-----------------------------------------------------------------------------
  */
 
-#include "r_wallmt.h"
+#include "r_rendermt.h"
 
 #include <stdint.h>
 
@@ -59,7 +59,7 @@
  * *both* threaded stages slower than single-threaded.  Beyond eight there is
  * nothing to gain on any scene tested and a large amount to lose, so the
  * ceiling is set where the measurements stop improving. */
-#define WALLMT_MAX  8
+#define RENDERMT_MAX  8
 /* Bounded spin on the completion count before falling back to the condvar.
  * The previous budget of 20000 flat iterations was self-defeating: at ~35
  * cycles per pause that is about 150us of spinning at 4.7GHz -- comparable
@@ -68,21 +68,21 @@
  * invalidating the counter it was waiting for.  Slices are balanced to
  * within a couple of percent, so the real wait is short; a small budget with
  * a doubling backoff catches it while touching the line far less often. */
-#define WALLMT_SPIN      1024
-#define WALLMT_BACKOFF_MAX 64
+#define RENDERMT_SPIN      1024
+#define RENDERMT_BACKOFF_MAX 64
 
 #if defined(__i386__) || defined(__x86_64__)
-#define WALLMT_RELAX() __builtin_ia32_pause()
+#define RENDERMT_RELAX() __builtin_ia32_pause()
 #elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
 #include <intrin.h>
-#define WALLMT_RELAX() _mm_pause()
+#define RENDERMT_RELAX() _mm_pause()
 #elif defined(__aarch64__) || defined(__arm__)
-#define WALLMT_RELAX() __asm__ __volatile__("yield" ::: "memory")
+#define RENDERMT_RELAX() __asm__ __volatile__("yield" ::: "memory")
 #else
-#define WALLMT_RELAX() ((void)0)
+#define RENDERMT_RELAX() ((void)0)
 #endif
 
-static sthread_t         *mt_thread[WALLMT_MAX];
+static sthread_t         *mt_thread[RENDERMT_MAX];
 static slock_t           *mt_lock;
 static scond_t           *mt_go;
 static scond_t           *mt_done;
@@ -92,12 +92,12 @@ static int                mt_nthreads;
 static int                mt_nactive;
 static int                mt_quit;
 static unsigned           mt_generation;
-static wallmt_fn          mt_fn;
+static rendermt_fn          mt_fn;
 static char              *mt_base;
 static size_t             mt_elem;
 static retro_atomic_int_t mt_pending;
 
-static void wallmt_worker(void *arg)
+static void rendermt_worker(void *arg)
 {
    int      me   = (int)(intptr_t)arg;
    unsigned seen = 0;
@@ -129,7 +129,7 @@ static void wallmt_worker(void *arg)
    }
 }
 
-static void wallmt_teardown(void)
+static void rendermt_teardown(void)
 {
    int i;
 
@@ -152,18 +152,18 @@ static void wallmt_teardown(void)
    mt_quit = 0;
 }
 
-int R_WallMTEnsure(int workers)
+int R_RenderMTEnsure(int workers)
 {
    int i;
 
    if (workers < 1)
       return 0;
-   if (workers > WALLMT_MAX)
-      workers = WALLMT_MAX;
+   if (workers > RENDERMT_MAX)
+      workers = RENDERMT_MAX;
    if (mt_nthreads == workers)
       return 1;
 
-   wallmt_teardown();
+   rendermt_teardown();
 
    if (!mt_lock && !(mt_lock = slock_new()))
       return 0;
@@ -177,11 +177,11 @@ int R_WallMTEnsure(int workers)
 
    for (i = 0; i < workers; i++)
    {
-      mt_thread[i] = sthread_create(wallmt_worker, (void *)(intptr_t)i);
+      mt_thread[i] = sthread_create(rendermt_worker, (void *)(intptr_t)i);
       if (!mt_thread[i])
       {
          mt_nthreads = i;
-         wallmt_teardown();
+         rendermt_teardown();
          return 0;
       }
    }
@@ -189,7 +189,7 @@ int R_WallMTEnsure(int workers)
    return 1;
 }
 
-void R_WallMTRun(wallmt_fn fn, void *base, size_t elemsize, int n)
+void R_RenderMTRun(rendermt_fn fn, void *base, size_t elemsize, int n)
 {
    if (!fn || n < 1 || n > mt_nthreads)
       return;
@@ -207,9 +207,9 @@ void R_WallMTRun(wallmt_fn fn, void *base, size_t elemsize, int n)
    slock_unlock(mt_lock);
 }
 
-void R_WallMTWait(void)
+void R_RenderMTWait(void)
 {
-   int spins   = WALLMT_SPIN;
+   int spins   = RENDERMT_SPIN;
    int backoff = 1;
 
    if (mt_nthreads < 1)
@@ -221,9 +221,9 @@ void R_WallMTWait(void)
       if (retro_atomic_load_acquire_int(&mt_pending) == 0)
          return;
       for (k = 0; k < backoff; k++)
-         WALLMT_RELAX();
+         RENDERMT_RELAX();
       spins -= backoff;
-      if (backoff < WALLMT_BACKOFF_MAX)
+      if (backoff < RENDERMT_BACKOFF_MAX)
          backoff <<= 1;
    }
 
@@ -233,27 +233,27 @@ void R_WallMTWait(void)
    slock_unlock(mt_lock);
 }
 
-void R_WallMTShutdown(void)
+void R_RenderMTShutdown(void)
 {
-   wallmt_teardown();
+   rendermt_teardown();
    if (mt_done) { scond_free(mt_done); mt_done = NULL; }
    if (mt_go)   { scond_free(mt_go);   mt_go   = NULL; }
    if (mt_lock) { slock_free(mt_lock); mt_lock = NULL; }
 }
 
-void R_WallMTTintLockInit(void)
+void R_RenderMTTintLockInit(void)
 {
    if (!wall_tint_lock)
       wall_tint_lock = slock_new();
 }
 
-void R_WallMTTintLock(void)
+void R_RenderMTTintLock(void)
 {
    if (wall_tint_lock)
       slock_lock(wall_tint_lock);
 }
 
-void R_WallMTTintUnlock(void)
+void R_RenderMTTintUnlock(void)
 {
    if (wall_tint_lock)
       slock_unlock(wall_tint_lock);
@@ -261,13 +261,13 @@ void R_WallMTTintUnlock(void)
 
 #else /* !HAVE_THREADS */
 
-int  R_WallMTEnsure(int workers) { (void)workers; return 0; }
-void R_WallMTRun(wallmt_fn fn, void *base, size_t elemsize, int n)
+int  R_RenderMTEnsure(int workers) { (void)workers; return 0; }
+void R_RenderMTRun(rendermt_fn fn, void *base, size_t elemsize, int n)
                                  { (void)fn; (void)base; (void)elemsize; (void)n; }
-void R_WallMTWait(void)          { }
-void R_WallMTShutdown(void)                 { }
-void R_WallMTTintLockInit(void)             { }
-void R_WallMTTintLock(void)                 { }
-void R_WallMTTintUnlock(void)               { }
+void R_RenderMTWait(void)          { }
+void R_RenderMTShutdown(void)                 { }
+void R_RenderMTTintLockInit(void)             { }
+void R_RenderMTTintLock(void)                 { }
+void R_RenderMTTintUnlock(void)               { }
 
 #endif

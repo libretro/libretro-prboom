@@ -34,7 +34,7 @@
  *-----------------------------------------------------------------------------*/
 
 #include "doomstat.h"
-#include "r_wallmt.h"
+#include "r_rendermt.h"
 #include "w_wad.h"
 #include "r_main.h"
 #include "i_system.h"
@@ -7249,7 +7249,7 @@ void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab)
    wall_tint_t *t;
    if (yh < yl || (!ar && !ag && !ab))
       return;
-   R_WallMTTintLock();
+   R_RenderMTTintLock();
    if (wall_tint_count == wall_tint_cap)
    {
       wall_tint_cap = wall_tint_cap ? wall_tint_cap * 2 : 4096;
@@ -7261,7 +7261,7 @@ void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab)
    t = &wall_tints[wall_tint_count++];
    t->x = x; t->yl = yl; t->yh = yh;
    t->ar = (short)ar; t->ag = (short)ag; t->ab = (short)ab;
-   R_WallMTTintUnlock();
+   R_RenderMTTintUnlock();
 }
 
 /* Additively tint a 256-entry composed colour LUT toward a light's chroma;

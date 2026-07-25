@@ -27,7 +27,7 @@
 #include "lprintf.h"
 #include "doomstat.h"
 
-#include "r_wallmt.h"
+#include "r_rendermt.h"
 
 #define WALL_RUN_MAX 64
 
@@ -188,7 +188,7 @@ void R_SetRenderThreads(int n)
   if (n < 1)               n = 1;
   if (n > WALL_MAX_SLICES) n = WALL_MAX_SLICES;
   render_threads = n;
-  R_WallMTTintLockInit();
+  R_RenderMTTintLockInit();
 }
 
 int R_GetRenderThreads(void)
@@ -198,7 +198,7 @@ int R_GetRenderThreads(void)
 
 void R_WallReplayShutdown(void)
 {
-  R_WallMTShutdown();
+  R_RenderMTShutdown();
 }
 
 /* One slice's sweep: the single-threaded sweep scoped to a column range,
@@ -385,14 +385,14 @@ void R_DrawCmdReplay(void)
 
     /* Size the pool to the option, not to this frame's slice count: the
      * plane pass shares it and sizes its own dispatch independently. */
-    if (nslices > 1 && R_WallMTEnsure(render_threads - 1))
+    if (nslices > 1 && R_RenderMTEnsure(render_threads - 1))
     {
       /* Slices 0..n-2 go to the pool; this thread takes the last one
        * rather than blocking on a join it could have spent rasterising. */
-      R_WallMTRun(R_WallSliceSweep, wall_slices,
+      R_RenderMTRun(R_WallSliceSweep, wall_slices,
                   sizeof(wall_slices[0]), nslices - 1);
       R_WallSliceSweep(&wall_slices[nslices - 1]);
-      R_WallMTWait();
+      R_RenderMTWait();
     }
     else
     {

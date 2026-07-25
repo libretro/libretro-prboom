@@ -280,6 +280,29 @@ static void R_SpanDeferUnlock(int lump)
   span_locks[span_lock_count++] = lump;
 }
 
+/* Sky columns use the wall column kernels, not the span kernels, so they go
+ * into the wall draw-record list rather than the span list.  Two reasons.
+ * They were the one thing left in the recording phase still writing pixels,
+ * which is what kept that phase from being threadable at all; and the column
+ * drawers batch through shared state (temp_x, tempyl[], tempyh[], temptype),
+ * so drawing them inline could never have been made concurrent without
+ * contextualising that as well.  Replaying them through the wall list threads
+ * the sky fill for free and takes it out of the serial plane time it was
+ * hiding in.
+ *
+ * Ordering: sky and flat planes are separate visplanes, and visplanes are
+ * disjoint in screen space, so the two never share a pixel.  Deferring the
+ * flats already moved them relative to the sky when the span list landed and
+ * has been bit-identical throughout; this puts the sky on the same footing
+ * rather than introducing a new reordering. */
+static void R_SkyEmit(draw_column_vars_t *dcvars, R_DrawColumn_f colfunc)
+{
+  if (span_recording)
+    R_DrawCmdEmitColumn(dcvars, colfunc);
+  else
+    colfunc(dcvars);
+}
+
 /* Every R_DrawSpan call in the plane path goes through here. */
 static void R_SpanEmit(draw_span_vars_t *dv)
 {
@@ -1242,7 +1265,7 @@ static void R_DoDrawPlane(visplane_t *pl)
                      dcvars.source = R_GetPatchColumn(hacked, ((an + xtoviewangle[x])^flip) >> ANGLETOSKYSHIFT)->pixels;
                      dcvars.prevsource = R_GetPatchColumn(hacked, ((an + xtoviewangle[xm1])^flip) >> ANGLETOSKYSHIFT)->pixels;
                      dcvars.nextsource = R_GetPatchColumn(hacked, ((an + xtoviewangle[x+1])^flip) >> ANGLETOSKYSHIFT)->pixels;
-                     colfunc(&dcvars);
+                     R_SkyEmit(&dcvars, colfunc);
                   }
                }
 
@@ -1272,7 +1295,7 @@ static void R_DoDrawPlane(visplane_t *pl)
                dcvars.source = R_GetTextureColumn(tex_patch, ((an + xtoviewangle[x])^flip) >> ANGLETOSKYSHIFT);
                dcvars.prevsource = R_GetTextureColumn(tex_patch, ((an + xtoviewangle[xm1])^flip) >> ANGLETOSKYSHIFT);
                dcvars.nextsource = R_GetTextureColumn(tex_patch, ((an + xtoviewangle[x+1])^flip) >> ANGLETOSKYSHIFT);
-               colfunc(&dcvars);
+               R_SkyEmit(&dcvars, colfunc);
             }
 
          R_UnlockTextureCompositePatchNum(texture);
@@ -1711,6 +1734,11 @@ void R_DrawPlanes (void)
 
     /* Generation is done; from here the recorded spans are pure data. */
     span_recording = 0;
+
+    /* Sky columns recorded above ride the wall replay, which is threaded and
+     * already knows how to split a column list by screen column. */
+    R_DrawCmdReplay();
+
     nslices = R_PlaneBuildSlices(nthreads);
     R_PlaneOrderSpans(nslices);
 

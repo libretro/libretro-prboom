@@ -25,3 +25,28 @@ uint64_t cpu_features_get(void)
 #endif
    return flags;
 }
+
+/* cpu_features_get_core_amount: libretro-common declares it in
+ * features/features_cpu.h but the full features_cpu.c is not vendored (see
+ * above).  The threaded wall replay only needs it to size "Auto", so a small
+ * portable query is enough; anything unknown answers 1, which selects the
+ * single-threaded path. */
+#if defined(_WIN32)
+#include <windows.h>
+#elif defined(HAVE_UNISTD_H) || defined(__unix__) || defined(__APPLE__) || defined(__linux__)
+#include <unistd.h>
+#endif
+
+unsigned cpu_features_get_core_amount(void)
+{
+#if defined(_WIN32)
+   SYSTEM_INFO si;
+   GetSystemInfo(&si);
+   return (unsigned)si.dwNumberOfProcessors;
+#elif defined(_SC_NPROCESSORS_ONLN)
+   long n = sysconf(_SC_NPROCESSORS_ONLN);
+   return n > 0 ? (unsigned)n : 1;
+#else
+   return 1;
+#endif
+}

@@ -234,6 +234,23 @@ endif
 # See https://doom.fandom.com/wiki/Zone_memory
 ifneq (,$(findstring msvc,$(platform)))
 else
+
+# Threaded rendering support.  rthreads carries backends for every console
+# target libretro builds for (Win32/Xbox/PS2/PS3/PSP/Vita/3DS/Switch/GEKKO/
+# Orbis/Android/Apple/Haiku/BSD/Emscripten), so this is on by default; a
+# platform without a usable backend opts out with HAVE_THREADS=0 and the
+# renderer falls back to the single-threaded path with the core option
+# forced off.
+ifneq ($(HAVE_THREADS), 0)
+SOURCES_C += $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c \
+             $(LIBRETRO_COMM_DIR)/rthreads/tpool.c
+INCFLAGS  += -DHAVE_THREADS
+# These two allocate and free off the main thread; keep them on the C library
+# allocator rather than the (non-thread-safe) zone.  See src/z_zone.h.
+$(LIBRETRO_COMM_DIR)/rthreads/rthreads.o: override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
+$(LIBRETRO_COMM_DIR)/rthreads/tpool.o:    override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
+endif
+
 INCFLAGS += -include z_zone.h
 endif
 

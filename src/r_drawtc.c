@@ -377,6 +377,14 @@ const uint32_t *R_ScratchComposedColormapTC(wallscratch_t *ws,
    return ws->lut_tc;
 }
 
+const uint32_t *R_SpanComposedColormapTC(const draw_span_vars_t *dsvars,
+                                         const lighttable_t *colormap)
+{
+   if (dsvars->ws)
+      return R_ScratchComposedColormapTC(dsvars->ws, colormap);
+   return R_GetComposedColormapTC(colormap);
+}
+
 const uint32_t *R_ScratchComposedPaletteTC(wallscratch_t *ws)
 {
    if (V_PaletteTC != ws->nolight_pal_tc)
@@ -5663,7 +5671,7 @@ static void R_DrawSpanTC_PointUV_PointZ(draw_span_vars_t *dsvars)
    /* Shared composed colormap+palette table (see R_GetComposedColormapTC):
     * collapses V_PaletteTC[colormap[texel]*64+63] to one lookup, rebuilt
     * only when the colormap pointer or V_PaletteTC changes. */
-   const uint32_t *lut = R_GetComposedColormapTC(dsvars->colormap);
+   const uint32_t *lut = R_SpanComposedColormapTC(dsvars, dsvars->colormap);
 
    /* Brightmap path: where the 64x64 row-major mask is set, the texel is
     * drawn through the undimmed base map (fullcolormap) instead of the
@@ -5676,11 +5684,11 @@ static void R_DrawSpanTC_PointUV_PointZ(draw_span_vars_t *dsvars)
    {
       const uint8_t  *mask = dsvars->brightmask;
       uint32_t        lut_bright[256];
-      const uint32_t *bsrc = R_GetComposedColormapTC(fullcolormap
+      const uint32_t *bsrc = R_SpanComposedColormapTC(dsvars, fullcolormap
                                                    ? fullcolormap
                                                    : dsvars->colormap);
       R_FillBrightLUTTC(lut_bright, bsrc);
-      lut = R_GetComposedColormapTC(dsvars->colormap);
+      lut = R_SpanComposedColormapTC(dsvars, dsvars->colormap);
 
 #if defined(__SSE2__)
       /* Same spot-index vectorisation as the non-brightmap path: four

@@ -61,6 +61,8 @@
 #include "u_dynlight.h"
 #include "r_sky.h"
 #include "r_plane.h"
+#include "r_drawcmd.h"
+#include "r_wallmt.h"
 
 #if defined(__SSE2__)
 #include <emmintrin.h>
@@ -202,6 +204,156 @@ static double R_TiltedHit(int x, int y, double *wx, double *wy)
 
 #define TILT_CHUNK 8
 
+/* ---------------------------------------------------------------------------
+ * Threaded opaque plane fill.
+ *
+ * Planes are the largest single stage in the frame at high resolutions (560us
+ * of 1255us measured at 1920x1200), and unlike the wall replay they cannot be
+ * split by column: R_MakeSpans tracks open spans in spanstart[y] as x
+ * advances, so span *generation* is inherently sequential in x and slicing by
+ * column would cut spans mid-flight.
+ *
+ * Rows are the right axis instead.  Spans are horizontal, and every piece of
+ * plane state is row-indexed -- spanstart[], cachedheight[], cacheddistance[],
+ * cachedxstep[], cachedystep[] are all [MAX_SCREENHEIGHT] -- so partitioning
+ * by row makes all of it disjoint with no contextualisation at all.
+ *
+ * Generation therefore stays serial (it only walks top[]/bottom[], which is
+ * cheap) and records each span; the recorded list is then split by row and
+ * filled in parallel.  A record is just a copy of draw_span_vars_t, which
+ * already carries y, x1 and x2.
+ *
+ * Ordering is exact: spans for one row always land in one worker and are
+ * replayed in generation order, and different rows never share a pixel.
+ *
+ * Only the opaque pass is threaded.  A translucent plane additionally runs
+ * R_WaterSurfaceLift over its columns afterwards -- a per-column read-modify-
+ * write that must follow that plane's own spans and that crosses row ranges,
+ * so it does not fit this decomposition.  Translucent planes stay serial;
+ * they are a small part of the cost.
+ * ------------------------------------------------------------------------ */
+#define PLANE_MAX_SLICES 16
+/* Same reasoning as the wall floor: a row band has to carry enough pixels to
+ * be worth a wakeup and a join. */
+#define PLANE_MIN_SLICE_PX 65536L
+
+typedef struct
+{
+  int            ylo, yhi;   /* inclusive row range owned by this slice */
+  wallscratch_t *ws;         /* worker-private composed tables */
+} planeslice_t;
+
+static draw_span_vars_t *span_cmds  = NULL;
+static int               span_count = 0;
+static int               span_cap   = 0;
+static int               span_recording = 0;
+static long              span_row_px[MAX_SCREENHEIGHT];
+static long              span_total_px = 0;
+static planeslice_t      plane_slices[PLANE_MAX_SLICES];
+static wallscratch_t     plane_scratch[PLANE_MAX_SLICES];
+
+/* Flats stay locked until the deferred spans have been filled: R_DoDrawPlane
+ * unlocks its flat as soon as it has generated the plane's spans, which would
+ * leave dsvars.source dangling once the fill is postponed. */
+static int *span_locks     = NULL;
+static int  span_lock_count = 0;
+static int  span_lock_cap   = 0;
+
+static void R_SpanDeferUnlock(int lump)
+{
+  if (span_lock_count == span_lock_cap)
+  {
+    span_lock_cap = span_lock_cap ? span_lock_cap * 2 : 64;
+    span_locks = (int *) realloc(span_locks, span_lock_cap * sizeof(int));
+    if (!span_locks)
+      I_Error("R_SpanDeferUnlock: allocation failed");
+  }
+  span_locks[span_lock_count++] = lump;
+}
+
+/* Every R_DrawSpan call in the plane path goes through here. */
+static void R_SpanEmit(draw_span_vars_t *dv)
+{
+  if (!span_recording)
+  {
+    R_DrawSpan(dv);
+    return;
+  }
+  if (span_count == span_cap)
+  {
+    span_cap = span_cap ? span_cap * 2 : 4096;
+    span_cmds = (draw_span_vars_t *) realloc(span_cmds,
+                                             span_cap * sizeof(*span_cmds));
+    if (!span_cmds)
+      I_Error("R_SpanEmit: failed to grow the span list");
+  }
+  span_cmds[span_count++] = *dv;
+  if (dv->y >= 0 && dv->y < MAX_SCREENHEIGHT)
+  {
+    long px = dv->x2 - dv->x1 + 1;
+    span_row_px[dv->y] += px;
+    span_total_px      += px;
+  }
+}
+
+static void R_PlaneSliceFill(void *arg)
+{
+  const planeslice_t *sl = (const planeslice_t *)arg;
+  int i;
+  /* Scanning the whole list per slice keeps generation order within a row
+   * without a bucketing pass; at a few thousand spans the scan is noise
+   * against the fill. */
+  for (i = 0; i < span_count; i++)
+    if (span_cmds[i].y >= sl->ylo && span_cmds[i].y <= sl->yhi)
+    {
+      /* Draw from a stack copy carrying this worker's scratch, so the shared
+       * record list stays read-only for the whole fill. */
+      draw_span_vars_t dv = span_cmds[i];
+      dv.ws = sl->ws;
+      R_DrawSpan(&dv);
+    }
+}
+
+/* Split [0, viewheight) into row bands of roughly equal pixel count. */
+static int R_PlaneBuildSlices(int want)
+{
+  long target, acc = 0;
+  int  n = 0, start = 0, y;
+
+  if (want < 1)                want = 1;
+  if (want > PLANE_MAX_SLICES) want = PLANE_MAX_SLICES;
+  if (want > 1)
+  {
+    long affordable = span_total_px / PLANE_MIN_SLICE_PX;
+    if (affordable < 1)
+      affordable = 1;
+    if ((long)want > affordable)
+      want = (int)affordable;
+  }
+
+  if (want > 1 && span_total_px > 0)
+  {
+    target = span_total_px / want;
+    for (y = 0; y < viewheight; y++)
+    {
+      acc += span_row_px[y];
+      if (n < want - 1 && acc >= target && (viewheight - 1 - y) >= (want - n - 1))
+      {
+        plane_slices[n].ylo = start;
+        plane_slices[n].yhi = y;
+        plane_slices[n].ws  = &plane_scratch[n];
+        n++;
+        start = y + 1;
+        acc = 0;
+      }
+    }
+  }
+  plane_slices[n].ylo = start;
+  plane_slices[n].yhi = viewheight - 1;
+  plane_slices[n].ws  = &plane_scratch[n];
+  return n + 1;
+}
+
 static void R_MapTiltedPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
 {
    /* The flat-plane mapper (R_MapPlane) caches per-row xstep/ystep keyed on
@@ -271,7 +423,7 @@ static void R_MapTiltedPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
       dsvars->y = y;
       dsvars->x1 = cx1;
       dsvars->x2 = cx2;
-      R_DrawSpan(dsvars);
+      R_SpanEmit(dsvars);
       cx1 = cx2 + 1;
    }
 }
@@ -521,7 +673,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
          {
             dsvars->x1 = x1;
             dsvars->x2 = x2;
-            R_DrawSpan(dsvars);
+            R_SpanEmit(dsvars);
             return;
          }
          if (!plane_dynlit)
@@ -567,7 +719,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
                dsvars->yfrac = byf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->ystep);
                dsvars->x1 = run_x1;
                dsvars->x2 = cx - 1;
-               R_DrawSpan(dsvars);
+               R_SpanEmit(dsvars);
                run_x1 = -1;
             }
             if (tinted)
@@ -584,7 +736,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
                dsvars->yfrac = byf + (fixed_t)((int64_t)(cx - x1) * dsvars->ystep);
                dsvars->x1 = cx;
                dsvars->x2 = ex;
-               R_DrawSpan(dsvars);
+               R_SpanEmit(dsvars);
                if (ar | ag | ab)
                   R_TintSpan(y, cx, ex, ar, ag, ab);
             }
@@ -605,7 +757,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
          dsvars->yfrac = byf + (fixed_t)((int64_t)(run_x1 - x1) * dsvars->ystep);
          dsvars->x1 = run_x1;
          dsvars->x2 = x2;
-         R_DrawSpan(dsvars);
+         R_SpanEmit(dsvars);
       }
       return;
    }
@@ -613,7 +765,7 @@ static void R_MapPlane(int y, int x1, int x2, draw_span_vars_t *dsvars)
    dsvars->x1 = x1;
    dsvars->x2 = x2;
 
-   R_DrawSpan(dsvars);
+   R_SpanEmit(dsvars);
 }
 
 //
@@ -1081,6 +1233,8 @@ static void R_DoDrawPlane(visplane_t *pl)
          int stop, light;
          draw_span_vars_t dsvars;
 
+         dsvars.ws = NULL;   /* serial path uses the shared composed cache */
+
          /* Synthetic flats (textures on floors) live outside the lump
           * range and the animation translation table. */
          if (R_IsSyntheticFlat(pl->picnum))
@@ -1162,7 +1316,14 @@ static void R_DoDrawPlane(visplane_t *pl)
          tilt_plane = NULL;
 
          if (!R_IsSyntheticFlat(pl->picnum))
-            W_UnlockLumpNum(firstflat + flattranslation[pl->picnum]);
+         {
+            /* When the fill is deferred the flat has to stay resident: the
+             * recorded spans still point into it. */
+            if (span_recording)
+               R_SpanDeferUnlock(firstflat + flattranslation[pl->picnum]);
+            else
+               W_UnlockLumpNum(firstflat + flattranslation[pl->picnum]);
+         }
       }
    }
 }
@@ -1475,6 +1636,16 @@ void R_DrawPlanes (void)
 {
   int i;
   visplane_t *pl;
+  int nthreads = R_GetRenderThreads();
+
+  if (nthreads > 1)
+  {
+    span_count      = 0;
+    span_lock_count = 0;
+    span_total_px   = 0;
+    memset(span_row_px, 0, (size_t)viewheight * sizeof(span_row_px[0]));
+    span_recording  = 1;
+  }
 
   /* Opaque planes first, then translucent 3D-floor water surfaces, so the
    * water blends over the floor (and submerged walls) already in the
@@ -1483,6 +1654,34 @@ void R_DrawPlanes (void)
      for (pl=visplanes[i]; pl; pl=pl->next)
         if (!pl->translucent)
            R_DoDrawPlane(pl);
+
+  if (span_recording)
+  {
+    int nslices;
+
+    /* Generation is done; from here the recorded spans are pure data. */
+    span_recording = 0;
+    nslices = R_PlaneBuildSlices(nthreads);
+
+    if (nslices > 1 && R_WallMTEnsure(nthreads - 1))
+    {
+      R_WallMTRun(R_PlaneSliceFill, plane_slices,
+                  sizeof(plane_slices[0]), nslices - 1);
+      R_PlaneSliceFill(&plane_slices[nslices - 1]);
+      R_WallMTWait();
+    }
+    else
+    {
+      int k;
+      for (k = 0; k < nslices; k++)
+        R_PlaneSliceFill(&plane_slices[k]);
+    }
+
+    for (i = 0; i < span_lock_count; i++)
+      W_UnlockLumpNum(span_locks[i]);
+    span_lock_count = 0;
+    span_count      = 0;
+  }
 
   for (i=0;i<MAXVISPLANES;i++)
      for (pl=visplanes[i]; pl; pl=pl->next)

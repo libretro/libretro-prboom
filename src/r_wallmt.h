@@ -50,8 +50,11 @@ int  R_WallMTEnsure(int workers);
 /* Run fn() on `n` work items in parallel, item i being
  * (char *)base + i * elemsize.  Slots are fixed -- worker i always takes
  * item i -- so there is no queue, no allocation and no contended lock to
- * acquire work; a dispatch is one broadcast and a join.  `n` must be the
- * worker count last passed to R_WallMTEnsure.  Returns immediately; pair
+ * acquire work; a dispatch is one broadcast and a join.  `n` may be fewer
+ * than the pool size: workers above n wake and go straight back to sleep.
+ * That matters because the wall and plane passes share one pool and size
+ * their dispatches independently -- sizing the pool to each in turn would
+ * tear it down and rebuild it twice a frame.  Returns immediately; pair
  * with R_WallMTWait.  The caller is expected to process a further item
  * itself in between rather than idle. */
 void R_WallMTRun(wallmt_fn fn, void *base, size_t elemsize, int n);

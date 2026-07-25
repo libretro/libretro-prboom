@@ -383,7 +383,9 @@ void R_DrawCmdReplay(void)
     nslices = R_WallBuildSlices(sweep_minx, sweep_maxx,
                                 render_threads, total_px);
 
-    if (nslices > 1 && R_WallMTEnsure(nslices - 1))
+    /* Size the pool to the option, not to this frame's slice count: the
+     * plane pass shares it and sizes its own dispatch independently. */
+    if (nslices > 1 && R_WallMTEnsure(render_threads - 1))
     {
       /* Slices 0..n-2 go to the pool; this thread takes the last one
        * rather than blocking on a join it could have spent rasterising. */

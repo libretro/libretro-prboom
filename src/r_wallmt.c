@@ -78,6 +78,7 @@ static scond_t           *mt_done;
 static slock_t           *wall_tint_lock;
 
 static int                mt_nthreads;
+static int                mt_nactive;
 static int                mt_quit;
 static unsigned           mt_generation;
 static wallmt_fn          mt_fn;
@@ -103,7 +104,8 @@ static void wallmt_worker(void *arg)
       seen = mt_generation;
       slock_unlock(mt_lock);
 
-      mt_fn(mt_base + (size_t)me * mt_elem);
+      if (me < mt_nactive)
+         mt_fn(mt_base + (size_t)me * mt_elem);
 
       /* Signal under the lock so a caller that has already checked the
        * count and is about to wait cannot miss the wakeup. */
@@ -178,14 +180,17 @@ int R_WallMTEnsure(int workers)
 
 void R_WallMTRun(wallmt_fn fn, void *base, size_t elemsize, int n)
 {
-   if (!fn || n < 1 || n != mt_nthreads)
+   if (!fn || n < 1 || n > mt_nthreads)
       return;
 
    slock_lock(mt_lock);
-   mt_fn   = fn;
-   mt_base = (char *)base;
-   mt_elem = elemsize;
-   retro_atomic_store_release_int(&mt_pending, n);
+   mt_fn      = fn;
+   mt_base    = (char *)base;
+   mt_elem    = elemsize;
+   mt_nactive = n;
+   /* Every worker wakes and decrements; those at or above n simply have no
+    * item to run.  Counting all of them keeps the join a single compare. */
+   retro_atomic_store_release_int(&mt_pending, mt_nthreads);
    mt_generation++;
    scond_broadcast(mt_go);
    slock_unlock(mt_lock);

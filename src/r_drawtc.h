@@ -42,6 +42,8 @@ struct wallscratch_s;
 const uint32_t *R_ScratchComposedColormapTC(struct wallscratch_s *ws,
                                             const lighttable_t *colormap);
 const uint32_t *R_ScratchComposedPaletteTC(struct wallscratch_s *ws);
+const uint32_t *R_SpanComposedColormapTC(const draw_span_vars_t *dsvars,
+                                         const lighttable_t *colormap);
 void R_DrawWallColumnRunTC(struct wallscratch_s *ws,
                            const draw_column_vars_t *const *cols,
                            int n, int pointz);

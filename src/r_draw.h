@@ -110,6 +110,13 @@ typedef struct {
   const uint8_t       *brightmask;
   const lighttable_t  *colormap;
   const lighttable_t  *nextcolormap;
+  /* Worker-private composed tables when the plane fill is threaded, NULL on
+   * the serial path.  The composed colormap cache is a single entry keyed on
+   * the colormap pointer, so two workers resolving different colormaps would
+   * each rewrite the other's table and be handed the wrong colours -- a data
+   * race that is also a correctness bug.  Set by the plane replay; every
+   * record belongs to exactly one worker. */
+  struct wallscratch_s *ws;
 } draw_span_vars_t;
 
 typedef struct {
@@ -184,6 +191,11 @@ typedef struct wallscratch_s
 const uint16_t *R_ScratchComposedColormap(wallscratch_t *ws,
                                           const lighttable_t *colormap);
 const uint16_t *R_ScratchComposedPalette(wallscratch_t *ws);
+
+/* Resolve through the span's worker scratch when it has one, else through
+ * the shared cache. */
+const uint16_t *R_SpanComposedColormap(const draw_span_vars_t *dsvars,
+                                       const lighttable_t *colormap);
 
 void R_DrawWallColumnRun(wallscratch_t *ws,
                          const draw_column_vars_t *const *cols,

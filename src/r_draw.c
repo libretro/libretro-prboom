@@ -183,6 +183,15 @@ static INLINE const uint16_t *R_GetComposedPalette(void)
    return composed_nolight_lut;
 }
 
+const uint16_t *R_SpanComposedColormap(const draw_span_vars_t *dsvars,
+                                       const lighttable_t *colormap)
+{
+   if (dsvars->ws)
+      return R_ScratchComposedColormap(dsvars->ws, colormap);
+   return R_GetComposedColormap(colormap);
+}
+
+
 // Color tables for different players,
 //  translate a limited part to another
 //  (color ramps used for  suit colors).
@@ -6444,7 +6453,7 @@ static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
    /* Shared composed colormap+palette table (see R_GetComposedColormap):
     * collapses V_Palette16[colormap[texel]*64+63] to one lookup, rebuilt
     * only when the colormap pointer or V_Palette16 changes. */
-   const uint16_t *lut = R_GetComposedColormap(dsvars->colormap);
+   const uint16_t *lut = R_SpanComposedColormap(dsvars, dsvars->colormap);
 
    /* Brightmap path: where the 64x64 row-major mask is set, the texel is
     * drawn through the undimmed base map (fullcolormap) instead of the
@@ -6457,11 +6466,11 @@ static void R_DrawSpan16_PointUV_PointZ(draw_span_vars_t *dsvars)
    {
       const uint8_t  *mask = dsvars->brightmask;
       uint16_t        lut_bright[256];
-      const uint16_t *bsrc = R_GetComposedColormap(fullcolormap
+      const uint16_t *bsrc = R_SpanComposedColormap(dsvars, fullcolormap
                                                    ? fullcolormap
                                                    : dsvars->colormap);
       memcpy(lut_bright, bsrc, sizeof(lut_bright));
-      lut = R_GetComposedColormap(dsvars->colormap);
+      lut = R_SpanComposedColormap(dsvars, dsvars->colormap);
 
 #if defined(__SSE2__)
       /* Same spot-index vectorisation as the non-brightmap path: four
@@ -6928,7 +6937,7 @@ static void R_DrawSpan16_TL(draw_span_vars_t *dsvars)
    const fixed_t ystep = dsvars->ystep;
    const uint8_t *source = dsvars->source;
    uint16_t *dest = drawvars.short_topleft + dsvars->y * SCREENWIDTH + dsvars->x1;
-   const uint16_t *lut = R_GetComposedColormap(dsvars->colormap);
+   const uint16_t *lut = R_SpanComposedColormap(dsvars, dsvars->colormap);
 
 #if defined(__SSE2__)
    if (count >= 8)

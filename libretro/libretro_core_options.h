@@ -62,6 +62,24 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "320x200"
    },
    {
+      "prboom-render_threads",
+      "Threaded Wall Rendering",
+      NULL,
+      "Rasterize wall columns across several CPU threads. The scene traversal stays single-threaded and only the pixel filling is split, so the image produced is identical to the single-threaded renderer -- unlike the screenspace-split used by other ports, this cannot split or drop sprites at a thread boundary. Wall filling is the largest single cost at high internal resolutions, so the benefit grows with resolution; at 320x200 there is little to gain. 'Auto' uses the number of CPU cores available.",
+      NULL,
+      NULL,
+      {
+         { "OFF",  "Off (single-threaded)" },
+         { "Auto", NULL },
+         { "2",    "2 threads" },
+         { "4",    "4 threads" },
+         { "8",    "8 threads" },
+         { "16",   "16 threads" },
+         { NULL, NULL },
+      },
+      "OFF"
+   },
+   {
       "prboom-color_format",
       "Color Format (Restart Required)",
       NULL,

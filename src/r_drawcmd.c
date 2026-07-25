@@ -27,6 +27,11 @@
 #include "lprintf.h"
 #include "doomstat.h"
 
+#ifdef HAVE_THREADS
+#include <rthreads/rthreads.h>
+#include <rthreads/tpool.h>
+#endif
+
 #define WALL_RUN_MAX 64
 
 typedef struct
@@ -128,15 +133,217 @@ static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
   return R_DrawCmdColumnKernelClass(&cmd->dc, cmd->fn);
 }
 
-/* Single scratch for the serial replay; the threaded replay gives each
- * worker its own (see R_DrawWallColumnRun). */
-static wallscratch_t wall_scratch_main;
+/* ---------------------------------------------------------------------------
+ * Threaded replay.
+ *
+ * The BSP walk stays single-threaded and produces one complete command list;
+ * only the rasterisation of that list is split.  That is deliberate.  The
+ * screenspace-BSP-split used by Rum and Raisin and Eternity parallelises the
+ * walk as well, but it duplicates traversal, sprite projection and visplane
+ * management in every thread -- which is why that design needs roughly four
+ * cores before it pays -- and it can split or drop a sprite straddling a
+ * slice boundary, because each thread decides that sprite's visibility on
+ * its own.  Here the walk measures ~2.5% of frame time, so parallelising it
+ * would buy almost nothing, while leaving it alone keeps the threaded output
+ * bit-identical to the single-threaded output.  That is testable, and tested.
+ *
+ * Ownership: wall columns are disjoint in x and every dependency in the
+ * kernel is vertical.  bucket_head/bucket_tail/bucket_stamp are indexed by
+ * x, bucket_next by record index, and each record belongs to exactly one
+ * column, so a slice owns its columns outright -- no two slices touch the
+ * same bucket entry or the same framebuffer pixel.
+ *
+ * Slices are cut by equal *pixels* rather than equal columns.  The whole
+ * command list exists before dispatch, so the exact per-column pixel count
+ * is known and one prefix sum splits the work evenly: no inter-frame
+ * feedback loop (Rum and Raisin) and no assuming the scene is spread evenly
+ * across the screen (Eternity splits columns equally).
+ * ------------------------------------------------------------------------ */
+#define WALL_MAX_SLICES 16
+
+typedef struct
+{
+  int            xlo, xhi;    /* inclusive column range owned by this slice */
+  int            remaining;   /* records bucketed within that range         */
+  long           px;          /* pixels in that range (diagnostic)          */
+  wallscratch_t *ws;
+} wallslice_t;
+
+static wallscratch_t wall_scratch[WALL_MAX_SLICES];
+static wallslice_t   wall_slices[WALL_MAX_SLICES];
+static int           col_count[MAX_SCREENWIDTH];
+static int           col_px[MAX_SCREENWIDTH];
+static unsigned      col_stamp[MAX_SCREENWIDTH];
+
+/* Requested worker count, 1 = single-threaded.  Set from the core option. */
+static int render_threads = 1;
+
+void R_SetRenderThreads(int n)
+{
+  if (n < 1)               n = 1;
+  if (n > WALL_MAX_SLICES) n = WALL_MAX_SLICES;
+  render_threads = n;
+#ifdef HAVE_THREADS
+  R_WallTintLockInit();
+#endif
+}
+
+int R_GetRenderThreads(void)
+{
+  return render_threads;
+}
+
+#ifdef HAVE_THREADS
+static tpool_t *wall_pool      = NULL;
+static int      wall_pool_size = 0;
+
+/* Pool sized to the worker count (one fewer than the slice count: the
+ * calling thread takes the last slice itself).  Rebuilt only when the
+ * requested size changes, never per frame. */
+static int R_WallPoolEnsure(int workers)
+{
+  if (workers < 1)
+    return 0;
+  if (wall_pool && wall_pool_size == workers)
+    return 1;
+  if (wall_pool)
+  {
+    tpool_destroy(wall_pool);
+    wall_pool = NULL;
+    wall_pool_size = 0;
+  }
+  wall_pool = tpool_create((size_t)workers);
+  if (!wall_pool)
+    return 0;
+  wall_pool_size = workers;
+  return 1;
+}
+
+void R_WallReplayShutdown(void)
+{
+  if (wall_pool)
+  {
+    tpool_destroy(wall_pool);
+    wall_pool = NULL;
+    wall_pool_size = 0;
+  }
+}
+#else
+void R_WallReplayShutdown(void) { }
+#endif
+
+/* One slice's sweep: the single-threaded sweep scoped to a column range,
+ * with a private record count and a private scratch. */
+static void R_WallSliceSweep(void *arg)
+{
+  wallslice_t *sl        = (wallslice_t *)arg;
+  int          remaining = sl->remaining;
+  int          x;
+
+  while (remaining > 0)
+  {
+    const draw_column_vars_t *run[WALL_RUN_MAX];
+    int run_n   = 0;
+    int run_cls = 0;
+    int last_x  = -2;
+
+    for (x = sl->xlo; x <= sl->xhi; x++)
+    {
+      int idx = -1;
+      int cls = 0;
+
+      if (bucket_stamp[x] == bucket_epoch && bucket_head[x] >= 0)
+      {
+        idx = bucket_head[x];
+        bucket_head[x] = bucket_next[idx];
+        remaining--;
+        cls = R_DrawCmdKernelClass(&cmds[idx]);
+      }
+
+      if (run_n &&
+          (idx < 0 || x != last_x + 1 || cls != run_cls ||
+           run_n == WALL_RUN_MAX))
+      {
+        R_DrawWallColumnRun(sl->ws, run, run_n, run_cls == 2);
+        run_n = 0;
+      }
+      if (idx >= 0)
+      {
+        run[run_n++] = &cmds[idx].dc;
+        run_cls = cls;
+        last_x  = x;
+        if (!remaining)
+          break;
+      }
+    }
+    if (run_n)
+      R_DrawWallColumnRun(sl->ws, run, run_n, run_cls == 2);
+  }
+}
+
+/* Cut [minx,maxx] into at most `want` ranges of roughly equal pixel count.
+ * Returns the number of slices produced (always >= 1). */
+static int R_WallBuildSlices(int minx, int maxx, int want, long totalpx)
+{
+  long target;
+  long acc   = 0;
+  int  n     = 0;
+  int  start = minx;
+  int  x, c;
+
+  if (want < 1)               want = 1;
+  if (want > WALL_MAX_SLICES) want = WALL_MAX_SLICES;
+
+  if (want > 1 && totalpx > 0)
+  {
+    target = totalpx / want;
+    for (x = minx; x <= maxx; x++)
+    {
+      if (col_stamp[x] == bucket_epoch)
+        acc += col_px[x];
+      /* Close a slice once it holds its share, but never leave fewer
+       * columns behind than there are slices still to fill. */
+      if (n < want - 1 && acc >= target && (maxx - x) >= (want - n - 1))
+      {
+        wall_slices[n].xlo = start;
+        wall_slices[n].xhi = x;
+        wall_slices[n].remaining = 0;
+        wall_slices[n].px = 0;
+        for (c = start; c <= x; c++)
+          if (col_stamp[c] == bucket_epoch)
+          {
+            wall_slices[n].remaining += col_count[c];
+            wall_slices[n].px        += col_px[c];
+          }
+        wall_slices[n].ws = &wall_scratch[n];
+        n++;
+        start = x + 1;
+        acc = 0;
+      }
+    }
+  }
+
+  wall_slices[n].xlo = start;
+  wall_slices[n].xhi = maxx;
+  wall_slices[n].remaining = 0;
+  wall_slices[n].px = 0;
+  for (c = start; c <= maxx; c++)
+    if (col_stamp[c] == bucket_epoch)
+    {
+      wall_slices[n].remaining += col_count[c];
+      wall_slices[n].px        += col_px[c];
+    }
+  wall_slices[n].ws = &wall_scratch[n];
+  return n + 1;
+}
 
 void R_DrawCmdReplay(void)
 {
-  int i, x;
-  int sweep_remaining = 0;
-  int sweep_minx = SCREENWIDTH, sweep_maxx = -1;
+  int  i;
+  int  sweep_remaining = 0;
+  int  sweep_minx = SCREENWIDTH, sweep_maxx = -1;
+  long total_px = 0;
+  int  nslices;
 
   /* Solid wall columns cover disjoint pixels (the clip arrays
    * guarantee it), so replay order is free for output correctness.
@@ -178,57 +385,42 @@ void R_DrawCmdReplay(void)
     else
       bucket_head[cx] = i;
     bucket_tail[cx] = i;
+    if (col_stamp[cx] != bucket_epoch)
+    {
+      col_stamp[cx] = bucket_epoch;
+      col_count[cx] = 0;
+      col_px[cx]    = 0;
+    }
+    col_count[cx]++;
+    col_px[cx] += cmds[i].dc.yh - cmds[i].dc.yl + 1;
+    total_px   += cmds[i].dc.yh - cmds[i].dc.yl + 1;
     sweep_remaining++;
     if (cx < sweep_minx) sweep_minx = cx;
     if (cx > sweep_maxx) sweep_maxx = cx;
   }
 
-  /* Each sweep pops at most one record per column, so x-adjacent pops
-   * form runs of strictly ascending x; a column with several tier
-   * records feeds one to each sweep. */
-  while (sweep_remaining > 0)
+  /* Nothing bucketed: no slices to build and no threads to wake. */
+  if (sweep_remaining > 0)
   {
-    const draw_column_vars_t *run[WALL_RUN_MAX];
-    int run_n = 0;
-    int run_cls = 0;
-    int last_x = -2;
+    nslices = R_WallBuildSlices(sweep_minx, sweep_maxx,
+                                render_threads, total_px);
 
-    /* Only the [sweep_minx, sweep_maxx] band can hold records, and once
-     * sweep_remaining reaches zero no later column can either: bounding
-     * the scan skips provably-empty iterations only.  (Previously every
-     * sweep walked all SCREENWIDTH columns: measured 3 sweeps x 1920
-     * iterations to pop ~2700 records at the zdcmp2 spawn.) */
-    for (x = sweep_minx; x <= sweep_maxx; x++)
+#ifdef HAVE_THREADS
+    if (nslices > 1 && R_WallPoolEnsure(nslices - 1))
     {
-      int idx = -1;
-      int cls = 0;
-
-      if (bucket_stamp[x] == bucket_epoch && bucket_head[x] >= 0)
-      {
-        idx = bucket_head[x];
-        bucket_head[x] = bucket_next[idx];
-        sweep_remaining--;
-        cls = R_DrawCmdKernelClass(&cmds[idx]);
-      }
-
-      if (run_n &&
-          (idx < 0 || x != last_x + 1 || cls != run_cls ||
-           run_n == WALL_RUN_MAX))
-      {
-        R_DrawWallColumnRun(&wall_scratch_main, run, run_n, run_cls == 2);
-        run_n = 0;
-      }
-      if (idx >= 0)
-      {
-        run[run_n++] = &cmds[idx].dc;
-        run_cls = cls;
-        last_x = x;
-        if (!sweep_remaining)
-          break;               /* nothing left anywhere; run flushes below */
-      }
+      /* Slices 0..n-2 go to the pool; this thread takes the last one
+       * rather than blocking on a join it could have spent rasterising. */
+      for (i = 0; i < nslices - 1; i++)
+        tpool_add_work(wall_pool, R_WallSliceSweep, &wall_slices[i]);
+      R_WallSliceSweep(&wall_slices[nslices - 1]);
+      tpool_wait(wall_pool);
     }
-    if (run_n)
-      R_DrawWallColumnRun(&wall_scratch_main, run, run_n, run_cls == 2);
+    else
+#endif
+    {
+      for (i = 0; i < nslices; i++)
+        R_WallSliceSweep(&wall_slices[i]);
+    }
   }
   cmd_count = 0;
 

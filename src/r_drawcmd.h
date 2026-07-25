@@ -48,6 +48,13 @@ void R_DrawCmdAdoptTextureLock(int texnum);
  * then release the adopted texture locks and reset the buffer. */
 void R_DrawCmdReplay(void);
 
+/* Threaded wall replay (see r_drawcmd.c).  R_SetRenderThreads takes the
+ * worker count from the core option; 1 is the single-threaded path.
+ * R_WallReplayShutdown tears the pool down at core unload. */
+void R_SetRenderThreads(int n);
+int  R_GetRenderThreads(void);
+void R_WallReplayShutdown(void);
+
 /* The kernel class a column would replay through (0 = its own drawer fn).
  * Exposed so the emit site can decide, with the same test, whether a colour
  * tint can ride in dcvars.tint (kernel path) or must be recorded for the

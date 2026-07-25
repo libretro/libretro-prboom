@@ -30,6 +30,8 @@
    #define DIR_SLASH '/'
 #endif
 
+#include "r_drawcmd.h"
+#include <features/features_cpu.h>
 #include "libretro_core_options.h"
 #include "../src/vid_mode.h"
 
@@ -950,6 +952,9 @@ void retro_init(void)
 
 void retro_deinit(void)
 {
+   /* Joins and releases the wall-replay workers, if any were started. */
+   R_WallReplayShutdown();
+
    libretro_supports_bitmasks = false;
    have_sw_fb                 = false;
    sw_fb_checked              = false;
@@ -1452,6 +1457,29 @@ static void I_NegotiatePixelFormat(void)
 static void update_variables(bool startup)
 {
    struct retro_variable var;
+
+   /* Threaded wall rasterization.  Live-changeable: the replay reads the
+    * worker count once per frame and the pool is only rebuilt when the
+    * count actually changes. */
+   var.key   = "prboom-render_threads";
+   var.value = NULL;
+   if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+   {
+      int nthreads;
+      if (!strcmp(var.value, "OFF"))
+         nthreads = 1;
+      else if (!strcmp(var.value, "Auto"))
+      {
+         nthreads = (int)cpu_features_get_core_amount();
+         if (nthreads < 1)
+            nthreads = 1;
+      }
+      else
+         nthreads = atoi(var.value);
+      R_SetRenderThreads(nthreads);
+   }
+   else
+      R_SetRenderThreads(1);
 
    var.key   = "prboom-mmap_wads";
    var.value = NULL;

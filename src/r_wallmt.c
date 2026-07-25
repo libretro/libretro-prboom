@@ -54,11 +54,22 @@
  * workers are still running when the caller arrives and a condition
  * variable round trip costs more than the wait itself. */
 
-#define WALLMT_MAX  16
+/* Eight, not sixteen.  Measured on a 16-core 9950X3D at 1920x1200: four
+ * threads gave 1.97x and eight 1.92x, while sixteen came in at 0.74x with
+ * *both* threaded stages slower than single-threaded.  Beyond eight there is
+ * nothing to gain on any scene tested and a large amount to lose, so the
+ * ceiling is set where the measurements stop improving. */
+#define WALLMT_MAX  8
 /* Bounded spin on the completion count before falling back to the condvar.
- * Sized to cover the tail of a slice, not a whole frame -- if the spin is
- * exhausted the wait was long enough that parking is the cheaper option. */
-#define WALLMT_SPIN 20000
+ * The previous budget of 20000 flat iterations was self-defeating: at ~35
+ * cycles per pause that is about 150us of spinning at 4.7GHz -- comparable
+ * to the whole parallel saving -- and every iteration re-read the same line
+ * the workers were issuing fetch_sub on, so the caller was actively
+ * invalidating the counter it was waiting for.  Slices are balanced to
+ * within a couple of percent, so the real wait is short; a small budget with
+ * a doubling backoff catches it while touching the line far less often. */
+#define WALLMT_SPIN      1024
+#define WALLMT_BACKOFF_MAX 64
 
 #if defined(__i386__) || defined(__x86_64__)
 #define WALLMT_RELAX() __builtin_ia32_pause()
@@ -198,16 +209,22 @@ void R_WallMTRun(wallmt_fn fn, void *base, size_t elemsize, int n)
 
 void R_WallMTWait(void)
 {
-   int spins = WALLMT_SPIN;
+   int spins   = WALLMT_SPIN;
+   int backoff = 1;
 
    if (mt_nthreads < 1)
       return;
 
-   while (spins-- > 0)
+   while (spins > 0)
    {
+      int k;
       if (retro_atomic_load_acquire_int(&mt_pending) == 0)
          return;
-      WALLMT_RELAX();
+      for (k = 0; k < backoff; k++)
+         WALLMT_RELAX();
+      spins -= backoff;
+      if (backoff < WALLMT_BACKOFF_MAX)
+         backoff <<= 1;
    }
 
    slock_lock(mt_lock);

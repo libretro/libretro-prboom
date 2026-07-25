@@ -232,7 +232,7 @@ static double R_TiltedHit(int x, int y, double *wx, double *wy)
  * so it does not fit this decomposition.  Translucent planes stay serial;
  * they are a small part of the cost.
  * ------------------------------------------------------------------------ */
-#define PLANE_MAX_SLICES 16
+#define PLANE_MAX_SLICES 8
 /* Same reasoning as the wall floor: a row band has to carry enough pixels to
  * be worth a wakeup and a join. */
 #define PLANE_MIN_SLICE_PX 65536L
@@ -240,7 +240,8 @@ static double R_TiltedHit(int x, int y, double *wx, double *wy)
 typedef struct
 {
   int            ylo, yhi;   /* inclusive row range owned by this slice */
-  wallscratch_t *ws;         /* worker-private composed tables */
+  int            first, last;/* [first,last) into span_order                */
+  wallscratch_t *ws;         /* worker-private composed tables              */
 } planeslice_t;
 
 static draw_span_vars_t *span_cmds  = NULL;
@@ -251,6 +252,14 @@ static long              span_row_px[MAX_SCREENHEIGHT];
 static long              span_total_px = 0;
 static planeslice_t      plane_slices[PLANE_MAX_SLICES];
 static wallscratch_t     plane_scratch[PLANE_MAX_SLICES];
+/* Span indices grouped by row band.  Without this each worker scanned the
+ * whole list to find its own spans, which is O(spans x workers): at eight
+ * workers and ~3200 spans that is 25000 wasted compares a frame, and it
+ * showed up as plane dispatch costing about twice per thread what the wall
+ * dispatch does.  One stable counting pass replaces it. */
+static int              *span_order     = NULL;
+static int               span_order_cap = 0;
+static int               span_band[MAX_SCREENHEIGHT];
 
 /* Flats stay locked until the deferred spans have been filled: R_DoDrawPlane
  * unlocks its flat as soon as it has generated the plane's spans, which would
@@ -299,19 +308,60 @@ static void R_SpanEmit(draw_span_vars_t *dv)
 static void R_PlaneSliceFill(void *arg)
 {
   const planeslice_t *sl = (const planeslice_t *)arg;
-  int i;
-  /* Scanning the whole list per slice keeps generation order within a row
-   * without a bucketing pass; at a few thousand spans the scan is noise
-   * against the fill. */
+  int k;
+
+  for (k = sl->first; k < sl->last; k++)
+  {
+    /* Draw from a stack copy carrying this worker's scratch, so the shared
+     * record list stays read-only for the whole fill. */
+    draw_span_vars_t dv = span_cmds[span_order[k]];
+    dv.ws = sl->ws;
+    R_DrawSpan(&dv);
+  }
+}
+
+/* Group span indices by band, preserving generation order within each. */
+static void R_PlaneOrderSpans(int nslices)
+{
+  int counts[PLANE_MAX_SLICES];
+  int cursor[PLANE_MAX_SLICES];
+  int n, y, i, acc;
+
+  if (span_order_cap < span_count)
+  {
+    span_order_cap = span_count < 4096 ? 4096 : span_count;
+    span_order = (int *) realloc(span_order, span_order_cap * sizeof(int));
+    if (!span_order)
+      I_Error("R_PlaneOrderSpans: allocation failed");
+  }
+
+  for (n = 0; n < nslices; n++)
+    counts[n] = 0;
+  for (n = 0; n < nslices; n++)
+    for (y = plane_slices[n].ylo; y <= plane_slices[n].yhi; y++)
+      if (y >= 0 && y < MAX_SCREENHEIGHT)
+        span_band[y] = n;
+
   for (i = 0; i < span_count; i++)
-    if (span_cmds[i].y >= sl->ylo && span_cmds[i].y <= sl->yhi)
-    {
-      /* Draw from a stack copy carrying this worker's scratch, so the shared
-       * record list stays read-only for the whole fill. */
-      draw_span_vars_t dv = span_cmds[i];
-      dv.ws = sl->ws;
-      R_DrawSpan(&dv);
-    }
+  {
+    y = span_cmds[i].y;
+    if (y >= 0 && y < MAX_SCREENHEIGHT)
+      counts[span_band[y]]++;
+  }
+  acc = 0;
+  for (n = 0; n < nslices; n++)
+  {
+    plane_slices[n].first = acc;
+    cursor[n] = acc;
+    acc += counts[n];
+    plane_slices[n].last = acc;
+  }
+  for (i = 0; i < span_count; i++)
+  {
+    y = span_cmds[i].y;
+    if (y >= 0 && y < MAX_SCREENHEIGHT)
+      span_order[cursor[span_band[y]]++] = i;
+  }
 }
 
 /* Split [0, viewheight) into row bands of roughly equal pixel count. */
@@ -1662,6 +1712,7 @@ void R_DrawPlanes (void)
     /* Generation is done; from here the recorded spans are pure data. */
     span_recording = 0;
     nslices = R_PlaneBuildSlices(nthreads);
+    R_PlaneOrderSpans(nslices);
 
     if (nslices > 1 && R_WallMTEnsure(nthreads - 1))
     {

@@ -156,7 +156,7 @@ static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
  * feedback loop (Rum and Raisin) and no assuming the scene is spread evenly
  * across the screen (Eternity splits columns equally).
  * ------------------------------------------------------------------------ */
-#define WALL_MAX_SLICES 16
+#define WALL_MAX_SLICES 8
 
 /* A slice has to carry enough pixels to be worth a wakeup and a join.  This
  * is a floor that stops a light frame -- mostly sky, or a corridor with

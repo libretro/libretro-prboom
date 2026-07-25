@@ -850,7 +850,16 @@ void V_DrawNumPatchFS(int x, int y, int scrn, int lump,
  *   XRGB2101010 -- each 8-bit channel widened to 10 by bit replication,
  *                  (c<<2)|(c>>6), which maps 0->0 and 255->1023 exactly and
  *                  is the correct one-step expansion (NOT a narrow-then-
- *                  widen round trip).
+ *                  widen round trip) -- and then converted from gamma to
+ *                  PQ through vid_sdr_to_pq[].  The widen alone is a range
+ *                  expansion, not a transfer function change: the surface
+ *                  is PQ-encoded absolute luminance, so writing a gamma
+ *                  code into it states a wildly different brightness than
+ *                  intended.  White went out as PQ 1023, which is 10000
+ *                  nits rather than paper white, and mid grey landed about
+ *                  four times too bright.  Everything else reaching this
+ *                  surface converts (V_PackTC via VID_EncodeHDR10); this
+ *                  path did not.
  *
  * Sampling stays point/nearest, matching the 16-bit path, so geometry is
  * identical -- only the colour precision changes.
@@ -875,7 +884,11 @@ static void V_DrawRGBAFullScreenTC(int scrn, const unsigned *argb,
 
 #if defined(V_ARGB_SSE2) || defined(V_ARGB_NEON)
     /* Four pixels per pass: gather the (strided) source texels, then do the
-     * reorder / widen in vector lanes.  Bit-identical to the scalar tail. */
+     * reorder / widen in vector lanes.  Bit-identical to the scalar tail.
+     * HDR10 needs a per-channel table lookup that does not vectorise, and
+     * these blits are a handful of full-screen images, so that format takes
+     * the scalar path. */
+    if (!deep)
     for (; ox + 4 <= SCREENWIDTH; ox += 4)
     {
       V_ARGB_ALIGN16 uint32_t sp[4];
@@ -944,9 +957,9 @@ static void V_DrawRGBAFullScreenTC(int scrn, const unsigned *argb,
       int g = (int)((p >> 8) & 0xff);
       int b = (int)((p >> 16) & 0xff);
       if (deep)
-        row[ox] = ((uint32_t)((r << 2) | (r >> 6)) << 20) |
-                  ((uint32_t)((g << 2) | (g >> 6)) << 10) |
-                   (uint32_t)((b << 2) | (b >> 6));
+        row[ox] = ((uint32_t)vid_sdr_to_pq[(r << 2) | (r >> 6)] << 20) |
+                  ((uint32_t)vid_sdr_to_pq[(g << 2) | (g >> 6)] << 10) |
+                   (uint32_t)vid_sdr_to_pq[(b << 2) | (b >> 6)];
       else
         row[ox] = ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
     }

@@ -2025,7 +2025,16 @@ static const zacs_fon2_t *zacs_fon2_get(int lump)
  * destination's OWN channel width instead, so nothing is narrowed at any
  * point: XRGB8888 matches the 8-bit source exactly, and XRGB2101010 widens
  * the 8-bit source once by bit replication ((c<<2)|(c>>6), exact at both
- * ends) and keeps the whole blend at 10 bits. */
+ * ends) and keeps the whole blend at 10 bits.
+ *
+ * HDR10 additionally needs the blend to happen in the right space.  The
+ * surface holds PQ-encoded absolute luminance while the source is gamma
+ * encoded, so compositing them directly mixes two transfer functions --
+ * and PQ is far enough from gamma that a half-and-half blend lands nowhere
+ * near half way (the same trap r_drawtcfmt.inl documents for the renderer's
+ * blend kernels).  The destination is therefore decoded to 10-bit gamma on
+ * unpack and re-encoded on pack, so every compositor between them works in
+ * the same space the source already uses and the arithmetic is unchanged. */
 static INLINE int zacs_tc_deep(void)   { return vid_mode == VID_MODEHDR10; }
 static INLINE int zacs_tc_max(void)    { return zacs_tc_deep() ? 1023 : 255; }
 /* widen an 8-bit source channel to the active format's channel width */
@@ -2033,14 +2042,18 @@ static INLINE int zacs_tc_src8(int c)  { return zacs_tc_deep() ? ((c << 2) | (c 
 static INLINE void zacs_tc_unpack(uint32_t d, int *r, int *g, int *b)
 {
   if (zacs_tc_deep())
-  { *r = (int)((d >> 20) & 0x3ff); *g = (int)((d >> 10) & 0x3ff); *b = (int)(d & 0x3ff); }
+  { *r = (int)vid_pq_to_sdr[(d >> 20) & 0x3ff];
+    *g = (int)vid_pq_to_sdr[(d >> 10) & 0x3ff];
+    *b = (int)vid_pq_to_sdr[ d        & 0x3ff]; }
   else
   { *r = (int)((d >> 16) & 0xff);  *g = (int)((d >> 8) & 0xff);   *b = (int)(d & 0xff); }
 }
 static INLINE uint32_t zacs_tc_pack(int r, int g, int b)
 {
   if (zacs_tc_deep())
-    return ((uint32_t)r << 20) | ((uint32_t)g << 10) | (uint32_t)b;
+    return ((uint32_t)vid_sdr_to_pq[r < 0 ? 0 : (r > 1023 ? 1023 : r)] << 20)
+         | ((uint32_t)vid_sdr_to_pq[g < 0 ? 0 : (g > 1023 ? 1023 : g)] << 10)
+         |  (uint32_t)vid_sdr_to_pq[b < 0 ? 0 : (b > 1023 ? 1023 : b)];
   return ((uint32_t)r << 16) | ((uint32_t)g << 8) | (uint32_t)b;
 }
 /* Alpha-composite an 8-bit ARGB source texel over one destination pixel,

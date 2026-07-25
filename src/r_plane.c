@@ -280,6 +280,12 @@ static void R_SpanDeferUnlock(int lump)
   span_locks[span_lock_count++] = lump;
 }
 
+/* Which planes the current pass should touch.  Sky columns are emitted
+ * before the wall replay so that walls and sky share one dispatch instead of
+ * needing two; the flat pass that follows must then leave them alone. */
+static int plane_pass_sky_only = 0;
+static int plane_pass_skip_sky = 0;
+
 /* Sky columns use the wall column kernels, not the span kernels, so they go
  * into the wall draw-record list rather than the span list.  Two reasons.
  * They were the one thing left in the recording phase still writing pixels,
@@ -1126,7 +1132,17 @@ static void R_DoDrawPlane(visplane_t *pl)
 
    if (pl->minx <= pl->maxx)
    {
-      if (pl->picnum == skyflatnum || pl->picnum & PL_SKYFLAT)
+      const int is_sky = (pl->picnum == skyflatnum || pl->picnum & PL_SKYFLAT);
+
+      /* The sky pass runs ahead of the wall replay so its columns ride that
+       * dispatch; the flat pass then skips them.  Both filters are inert
+       * unless the threaded path split the two. */
+      if (plane_pass_sky_only && !is_sky)
+         return;
+      if (plane_pass_skip_sky && is_sky)
+         return;
+
+      if (is_sky)
       { // sky flat
          int texture;
          const rpatch_t *tex_patch;
@@ -1705,6 +1721,29 @@ int R_CollectPortalSpan(int portal, short *out_top, short *out_bot)
   return any;
 }
 
+/* Emit every sky visplane's columns into the wall draw-record list.  Called
+ * after the BSP walk and before R_DrawCmdReplay, so walls and sky are
+ * rasterised by a single dispatch: giving sky its own replay cost a third
+ * wake-and-join every frame, which at eight threads was enough to make eight
+ * slower than four. */
+void R_DrawPlanesEmitSky (void)
+{
+  int i;
+  visplane_t *pl;
+
+  if (R_GetRenderThreads() <= 1)
+    return;
+
+  span_recording      = 1;   /* routes R_SkyEmit to the record list */
+  plane_pass_sky_only = 1;
+  for (i=0;i<MAXVISPLANES;i++)
+     for (pl=visplanes[i]; pl; pl=pl->next)
+        if (!pl->translucent)
+           R_DoDrawPlane(pl);
+  plane_pass_sky_only = 0;
+  span_recording      = 0;
+}
+
 void R_DrawPlanes (void)
 {
   int i;
@@ -1713,6 +1752,7 @@ void R_DrawPlanes (void)
 
   if (nthreads > 1)
   {
+    plane_pass_skip_sky = 1;   /* already emitted with the walls */
     span_count      = 0;
     span_lock_count = 0;
     span_total_px   = 0;
@@ -1734,11 +1774,6 @@ void R_DrawPlanes (void)
 
     /* Generation is done; from here the recorded spans are pure data. */
     span_recording = 0;
-
-    /* Sky columns recorded above ride the wall replay, which is threaded and
-     * already knows how to split a column list by screen column. */
-    R_DrawCmdReplay();
-
     nslices = R_PlaneBuildSlices(nthreads);
     R_PlaneOrderSpans(nslices);
 
@@ -1760,6 +1795,7 @@ void R_DrawPlanes (void)
       W_UnlockLumpNum(span_locks[i]);
     span_lock_count = 0;
     span_count      = 0;
+    plane_pass_skip_sky = 0;
   }
 
   for (i=0;i<MAXVISPLANES;i++)

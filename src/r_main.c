@@ -1272,6 +1272,10 @@ void R_RenderPlayerView (player_t* player)
   R_WallTintClear();
   R_RenderBSPNode (numnodes-1);
 
+  /* Sky visplanes are complete once the walk is; emitting their columns here
+   * lets one replay cover walls and sky together. */
+  R_DrawPlanesEmitSky();
+
   /* Rasterize the wall columns the walk recorded (see r_drawcmd.h). */
   R_DrawCmdReplay();
   R_WallTintReplay();

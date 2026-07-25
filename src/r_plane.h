@@ -48,6 +48,9 @@ extern fixed_t yslope[], distscale[];
 void R_InitPlanes(void);
 void R_ClearPlanes(void);
 void R_DrawPlanes (void);
+/* Emits sky visplane columns into the wall draw-record list.  Call after the
+ * BSP walk and before R_DrawCmdReplay so both share one dispatch. */
+void R_DrawPlanesEmitSky (void);
 
 visplane_t *R_FindPlane(
   fixed_t height,

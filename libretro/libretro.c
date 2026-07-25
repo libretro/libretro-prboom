@@ -1470,9 +1470,16 @@ static void update_variables(bool startup)
          nthreads = 1;
       else if (!strcmp(var.value, "Auto"))
       {
+         /* Capped well below the core count on purpose.  Measured on a
+          * 16-core 9950X3D at 1920x1200, the replay peaked at 4 threads and
+          * was a net loss at 16; the wide end of the range is where
+          * dispatch cost starts to dominate, so "Auto" stays out of it.
+          * Anyone wanting the wide end can still select it explicitly. */
          nthreads = (int)cpu_features_get_core_amount();
          if (nthreads < 1)
             nthreads = 1;
+         if (nthreads > 8)
+            nthreads = 8;
       }
       else
          nthreads = atoi(var.value);

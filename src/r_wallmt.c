@@ -30,53 +30,193 @@
 
 #include "r_wallmt.h"
 
+#include <stdint.h>
+
 #ifdef HAVE_THREADS
 
 #include <rthreads/rthreads.h>
-#include <rthreads/tpool.h>
+#include <retro_atomic.h>
 
-static tpool_t *wall_pool      = NULL;
-static int      wall_pool_size = 0;
-static slock_t *wall_tint_lock = NULL;
+/* tpool was the first implementation and it did not survive measurement.
+ * Per dispatch it heap-allocated a record per work item and funnelled every
+ * submission and every worker acquisition through one shared mutex --
+ * roughly N allocations and 45 contended lock acquisitions per frame for
+ * about a millisecond of work.  On a dual-CCD part that mutex line
+ * ping-pongs between chiplets, and the cost grew with thread count: on a
+ * 9950X3D at 1920x1200 the replay peaked at 4 threads (1.16x) and was a net
+ * *loss* at 16 (0.77x), implying on the order of 90us of dispatch overhead
+ * per thread per frame.
+ *
+ * Slots are fixed instead: worker i always runs item i, so there is no
+ * queue to guard, nothing to allocate, and no lock to take in order to find
+ * work.  A dispatch is one broadcast; a completion is one atomic decrement.
+ * The join spins briefly before parking, because at these frame times the
+ * workers are still running when the caller arrives and a condition
+ * variable round trip costs more than the wait itself. */
+
+#define WALLMT_MAX  16
+/* Bounded spin on the completion count before falling back to the condvar.
+ * Sized to cover the tail of a slice, not a whole frame -- if the spin is
+ * exhausted the wait was long enough that parking is the cheaper option. */
+#define WALLMT_SPIN 20000
+
+#if defined(__i386__) || defined(__x86_64__)
+#define WALLMT_RELAX() __builtin_ia32_pause()
+#elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
+#include <intrin.h>
+#define WALLMT_RELAX() _mm_pause()
+#elif defined(__aarch64__) || defined(__arm__)
+#define WALLMT_RELAX() __asm__ __volatile__("yield" ::: "memory")
+#else
+#define WALLMT_RELAX() ((void)0)
+#endif
+
+static sthread_t         *mt_thread[WALLMT_MAX];
+static slock_t           *mt_lock;
+static scond_t           *mt_go;
+static scond_t           *mt_done;
+static slock_t           *wall_tint_lock;
+
+static int                mt_nthreads;
+static int                mt_quit;
+static unsigned           mt_generation;
+static wallmt_fn          mt_fn;
+static char              *mt_base;
+static size_t             mt_elem;
+static retro_atomic_int_t mt_pending;
+
+static void wallmt_worker(void *arg)
+{
+   int      me   = (int)(intptr_t)arg;
+   unsigned seen = 0;
+
+   for (;;)
+   {
+      slock_lock(mt_lock);
+      while (!mt_quit && mt_generation == seen)
+         scond_wait(mt_go, mt_lock);
+      if (mt_quit)
+      {
+         slock_unlock(mt_lock);
+         return;
+      }
+      seen = mt_generation;
+      slock_unlock(mt_lock);
+
+      mt_fn(mt_base + (size_t)me * mt_elem);
+
+      /* Signal under the lock so a caller that has already checked the
+       * count and is about to wait cannot miss the wakeup. */
+      if (retro_atomic_fetch_sub_int(&mt_pending, 1) == 1)
+      {
+         slock_lock(mt_lock);
+         scond_signal(mt_done);
+         slock_unlock(mt_lock);
+      }
+   }
+}
+
+static void wallmt_teardown(void)
+{
+   int i;
+
+   if (mt_nthreads > 0)
+   {
+      slock_lock(mt_lock);
+      mt_quit = 1;
+      mt_generation++;
+      scond_broadcast(mt_go);
+      slock_unlock(mt_lock);
+
+      for (i = 0; i < mt_nthreads; i++)
+         if (mt_thread[i])
+         {
+            sthread_join(mt_thread[i]);
+            mt_thread[i] = NULL;
+         }
+      mt_nthreads = 0;
+   }
+   mt_quit = 0;
+}
 
 int R_WallMTEnsure(int workers)
 {
+   int i;
+
    if (workers < 1)
       return 0;
-   if (wall_pool && wall_pool_size == workers)
+   if (workers > WALLMT_MAX)
+      workers = WALLMT_MAX;
+   if (mt_nthreads == workers)
       return 1;
-   if (wall_pool)
-   {
-      tpool_destroy(wall_pool);
-      wall_pool      = NULL;
-      wall_pool_size = 0;
-   }
-   if (!(wall_pool = tpool_create((size_t)workers)))
+
+   wallmt_teardown();
+
+   if (!mt_lock && !(mt_lock = slock_new()))
       return 0;
-   wall_pool_size = workers;
+   if (!mt_go   && !(mt_go   = scond_new()))
+      return 0;
+   if (!mt_done && !(mt_done = scond_new()))
+      return 0;
+
+   retro_atomic_store_release_int(&mt_pending, 0);
+   mt_generation = 0;
+
+   for (i = 0; i < workers; i++)
+   {
+      mt_thread[i] = sthread_create(wallmt_worker, (void *)(intptr_t)i);
+      if (!mt_thread[i])
+      {
+         mt_nthreads = i;
+         wallmt_teardown();
+         return 0;
+      }
+   }
+   mt_nthreads = workers;
    return 1;
 }
 
-void R_WallMTSubmit(wallmt_fn fn, void *arg)
+void R_WallMTRun(wallmt_fn fn, void *base, size_t elemsize, int n)
 {
-   if (wall_pool)
-      tpool_add_work(wall_pool, fn, arg);
+   if (!fn || n < 1 || n != mt_nthreads)
+      return;
+
+   slock_lock(mt_lock);
+   mt_fn   = fn;
+   mt_base = (char *)base;
+   mt_elem = elemsize;
+   retro_atomic_store_release_int(&mt_pending, n);
+   mt_generation++;
+   scond_broadcast(mt_go);
+   slock_unlock(mt_lock);
 }
 
 void R_WallMTWait(void)
 {
-   if (wall_pool)
-      tpool_wait(wall_pool);
+   int spins = WALLMT_SPIN;
+
+   if (mt_nthreads < 1)
+      return;
+
+   while (spins-- > 0)
+   {
+      if (retro_atomic_load_acquire_int(&mt_pending) == 0)
+         return;
+      WALLMT_RELAX();
+   }
+
+   slock_lock(mt_lock);
+   while (retro_atomic_load_acquire_int(&mt_pending) != 0)
+      scond_wait(mt_done, mt_lock);
+   slock_unlock(mt_lock);
 }
 
 void R_WallMTShutdown(void)
 {
-   if (wall_pool)
-   {
-      tpool_destroy(wall_pool);
-      wall_pool      = NULL;
-      wall_pool_size = 0;
-   }
+   wallmt_teardown();
+   if (mt_done) { scond_free(mt_done); mt_done = NULL; }
+   if (mt_go)   { scond_free(mt_go);   mt_go   = NULL; }
+   if (mt_lock) { slock_free(mt_lock); mt_lock = NULL; }
 }
 
 void R_WallMTTintLockInit(void)
@@ -99,9 +239,10 @@ void R_WallMTTintUnlock(void)
 
 #else /* !HAVE_THREADS */
 
-int  R_WallMTEnsure(int workers)            { (void)workers; return 0; }
-void R_WallMTSubmit(wallmt_fn fn, void *arg){ (void)fn; (void)arg; }
-void R_WallMTWait(void)                     { }
+int  R_WallMTEnsure(int workers) { (void)workers; return 0; }
+void R_WallMTRun(wallmt_fn fn, void *base, size_t elemsize, int n)
+                                 { (void)fn; (void)base; (void)elemsize; (void)n; }
+void R_WallMTWait(void)          { }
 void R_WallMTShutdown(void)                 { }
 void R_WallMTTintLockInit(void)             { }
 void R_WallMTTintLock(void)                 { }

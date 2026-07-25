@@ -158,6 +158,14 @@ static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
  * ------------------------------------------------------------------------ */
 #define WALL_MAX_SLICES 16
 
+/* A slice has to carry enough pixels to be worth a wakeup and a join.  This
+ * is a floor that stops a light frame -- mostly sky, or a corridor with
+ * little wall area -- from being split across every available worker and
+ * spending more time dispatching than rasterising.  It is deliberately low:
+ * the intent is to rule out the degenerate case, not to second-guess an
+ * explicit thread count. */
+#define WALL_MIN_SLICE_PX 65536L
+
 typedef struct
 {
   int            xlo, xhi;    /* inclusive column range owned by this slice */
@@ -254,6 +262,15 @@ static int R_WallBuildSlices(int minx, int maxx, int want, long totalpx)
 
   if (want < 1)               want = 1;
   if (want > WALL_MAX_SLICES) want = WALL_MAX_SLICES;
+
+  if (want > 1)
+  {
+    long affordable = totalpx / WALL_MIN_SLICE_PX;
+    if (affordable < 1)
+      affordable = 1;
+    if ((long)want > affordable)
+      want = (int)affordable;
+  }
 
   if (want > 1 && totalpx > 0)
   {
@@ -370,8 +387,8 @@ void R_DrawCmdReplay(void)
     {
       /* Slices 0..n-2 go to the pool; this thread takes the last one
        * rather than blocking on a join it could have spent rasterising. */
-      for (i = 0; i < nslices - 1; i++)
-        R_WallMTSubmit(R_WallSliceSweep, &wall_slices[i]);
+      R_WallMTRun(R_WallSliceSweep, wall_slices,
+                  sizeof(wall_slices[0]), nslices - 1);
       R_WallSliceSweep(&wall_slices[nslices - 1]);
       R_WallMTWait();
     }

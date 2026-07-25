@@ -38,6 +38,8 @@
 #ifndef __R_WALLMT__
 #define __R_WALLMT__
 
+#include <stddef.h>
+
 typedef void (*wallmt_fn)(void *arg);
 
 /* Bring the pool up to `workers` threads, rebuilding it only when that
@@ -45,10 +47,16 @@ typedef void (*wallmt_fn)(void *arg);
  * zero means the caller must run its work serially. */
 int  R_WallMTEnsure(int workers);
 
-/* Queue one work item.  Only valid after a successful R_WallMTEnsure. */
-void R_WallMTSubmit(wallmt_fn fn, void *arg);
+/* Run fn() on `n` work items in parallel, item i being
+ * (char *)base + i * elemsize.  Slots are fixed -- worker i always takes
+ * item i -- so there is no queue, no allocation and no contended lock to
+ * acquire work; a dispatch is one broadcast and a join.  `n` must be the
+ * worker count last passed to R_WallMTEnsure.  Returns immediately; pair
+ * with R_WallMTWait.  The caller is expected to process a further item
+ * itself in between rather than idle. */
+void R_WallMTRun(wallmt_fn fn, void *base, size_t elemsize, int n);
 
-/* Block until every queued item of this dispatch has finished. */
+/* Block until the dispatch has finished. */
 void R_WallMTWait(void);
 
 /* Join and release the workers.  Safe to call when no pool exists. */

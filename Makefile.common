@@ -119,6 +119,7 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/r_main.c \
 				 $(CORE_DIR)/r_plane.c \
 				 $(CORE_DIR)/r_drawcmd.c \
+				 $(CORE_DIR)/r_wallmt.c \
 				 $(CORE_DIR)/r_segs.c \
 				 $(CORE_DIR)/r_sky.c \
 				 $(CORE_DIR)/r_things.c \
@@ -245,11 +246,17 @@ ifneq ($(HAVE_THREADS), 0)
 SOURCES_C += $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c \
              $(LIBRETRO_COMM_DIR)/rthreads/tpool.c
 INCFLAGS  += -DHAVE_THREADS
-# These two allocate and free off the main thread; keep them on the C library
-# allocator rather than the (non-thread-safe) zone.  See src/z_zone.h.
+endif
+
+# These allocate or free off the main thread, and rthreads.h drags in
+# windows.h on Win32; both are incompatible with the zone allocator macros
+# that z_zone.h force-includes everywhere, so they opt out of them.  Applied
+# with `override` so a command-line CFLAGS (sanitizer or profiling build)
+# cannot silently drop it.  r_wallmt.c is the only prboom translation unit
+# that includes the threading headers -- see src/r_wallmt.h.
 $(LIBRETRO_COMM_DIR)/rthreads/rthreads.o: override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
 $(LIBRETRO_COMM_DIR)/rthreads/tpool.o:    override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
-endif
+$(CORE_DIR)/r_wallmt.o:                   override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
 
 INCFLAGS += -include z_zone.h
 endif

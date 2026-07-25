@@ -27,10 +27,7 @@
 #include "lprintf.h"
 #include "doomstat.h"
 
-#ifdef HAVE_THREADS
-#include <rthreads/rthreads.h>
-#include <rthreads/tpool.h>
-#endif
+#include "r_wallmt.h"
 
 #define WALL_RUN_MAX 64
 
@@ -183,9 +180,7 @@ void R_SetRenderThreads(int n)
   if (n < 1)               n = 1;
   if (n > WALL_MAX_SLICES) n = WALL_MAX_SLICES;
   render_threads = n;
-#ifdef HAVE_THREADS
-  R_WallTintLockInit();
-#endif
+  R_WallMTTintLockInit();
 }
 
 int R_GetRenderThreads(void)
@@ -193,44 +188,10 @@ int R_GetRenderThreads(void)
   return render_threads;
 }
 
-#ifdef HAVE_THREADS
-static tpool_t *wall_pool      = NULL;
-static int      wall_pool_size = 0;
-
-/* Pool sized to the worker count (one fewer than the slice count: the
- * calling thread takes the last slice itself).  Rebuilt only when the
- * requested size changes, never per frame. */
-static int R_WallPoolEnsure(int workers)
-{
-  if (workers < 1)
-    return 0;
-  if (wall_pool && wall_pool_size == workers)
-    return 1;
-  if (wall_pool)
-  {
-    tpool_destroy(wall_pool);
-    wall_pool = NULL;
-    wall_pool_size = 0;
-  }
-  wall_pool = tpool_create((size_t)workers);
-  if (!wall_pool)
-    return 0;
-  wall_pool_size = workers;
-  return 1;
-}
-
 void R_WallReplayShutdown(void)
 {
-  if (wall_pool)
-  {
-    tpool_destroy(wall_pool);
-    wall_pool = NULL;
-    wall_pool_size = 0;
-  }
+  R_WallMTShutdown();
 }
-#else
-void R_WallReplayShutdown(void) { }
-#endif
 
 /* One slice's sweep: the single-threaded sweep scoped to a column range,
  * with a private record count and a private scratch. */
@@ -405,18 +366,16 @@ void R_DrawCmdReplay(void)
     nslices = R_WallBuildSlices(sweep_minx, sweep_maxx,
                                 render_threads, total_px);
 
-#ifdef HAVE_THREADS
-    if (nslices > 1 && R_WallPoolEnsure(nslices - 1))
+    if (nslices > 1 && R_WallMTEnsure(nslices - 1))
     {
       /* Slices 0..n-2 go to the pool; this thread takes the last one
        * rather than blocking on a join it could have spent rasterising. */
       for (i = 0; i < nslices - 1; i++)
-        tpool_add_work(wall_pool, R_WallSliceSweep, &wall_slices[i]);
+        R_WallMTSubmit(R_WallSliceSweep, &wall_slices[i]);
       R_WallSliceSweep(&wall_slices[nslices - 1]);
-      tpool_wait(wall_pool);
+      R_WallMTWait();
     }
     else
-#endif
     {
       for (i = 0; i < nslices; i++)
         R_WallSliceSweep(&wall_slices[i]);

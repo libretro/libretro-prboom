@@ -185,10 +185,6 @@ const uint16_t *R_ScratchComposedColormap(wallscratch_t *ws,
                                           const lighttable_t *colormap);
 const uint16_t *R_ScratchComposedPalette(wallscratch_t *ws);
 
-#ifdef HAVE_THREADS
-void R_WallTintLockInit(void);
-#endif
-
 void R_DrawWallColumnRun(wallscratch_t *ws,
                          const draw_column_vars_t *const *cols,
                          int n, int pointz);

@@ -34,9 +34,7 @@
  *-----------------------------------------------------------------------------*/
 
 #include "doomstat.h"
-#ifdef HAVE_THREADS
-#include <rthreads/rthreads.h>
-#endif
+#include "r_wallmt.h"
 #include "w_wad.h"
 #include "r_main.h"
 #include "i_system.h"
@@ -7224,14 +7222,6 @@ void R_InitBuffer(int width, int height)
  * batched/quad column flush at all. */
 typedef struct { int x, yl, yh; short ar, ag, ab; } wall_tint_t;
 static wall_tint_t *wall_tints = NULL;
-#ifdef HAVE_THREADS
-static slock_t     *wall_tint_lock = NULL;
-void R_WallTintLockInit(void)
-{
-   if (!wall_tint_lock)
-      wall_tint_lock = slock_new();
-}
-#endif
 static int          wall_tint_count = 0, wall_tint_cap = 0;
 
 void R_WallTintClear(void)
@@ -7250,10 +7240,7 @@ void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab)
    wall_tint_t *t;
    if (yh < yl || (!ar && !ag && !ab))
       return;
-#ifdef HAVE_THREADS
-   if (wall_tint_lock)
-      slock_lock(wall_tint_lock);
-#endif
+   R_WallMTTintLock();
    if (wall_tint_count == wall_tint_cap)
    {
       wall_tint_cap = wall_tint_cap ? wall_tint_cap * 2 : 4096;
@@ -7265,10 +7252,7 @@ void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab)
    t = &wall_tints[wall_tint_count++];
    t->x = x; t->yl = yl; t->yh = yh;
    t->ar = (short)ar; t->ag = (short)ag; t->ab = (short)ab;
-#ifdef HAVE_THREADS
-   if (wall_tint_lock)
-      slock_unlock(wall_tint_lock);
-#endif
+   R_WallMTTintUnlock();
 }
 
 /* Additively tint a 256-entry composed colour LUT toward a light's chroma;

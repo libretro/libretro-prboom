@@ -710,6 +710,323 @@ static void R_DrawMaskedColumnDirect(const rpatch_t *patch,
   }
 }
 
+/* ---------------------------------------------------------------------------
+ * Magnified sprite rasteriser.
+ *
+ * R_DrawMaskedColumnDirect walks the framebuffer down a column, so every
+ * store jumps SURFACE_SHORT_PITCH bytes and lands on its own cache line.  At
+ * 2560 wide that is a 5120-byte stride: a 1580-row column touches roughly
+ * 100KB of lines to deposit 3KB of pixels, none of it resident in a 48KB L1.
+ * The arithmetic is not the cost -- eliminating every redundant colormap
+ * lookup while keeping the strided store measures 1.03x -- the store order
+ * is.
+ *
+ * When a sprite is magnified (at least two screen pixels per texel on both
+ * axes) the point-sampled image is a grid of solid rectangles, so the same
+ * pixels can be laid down in row order instead: build one texel row into a
+ * scratch buffer, then replicate it down the band of screen rows that share
+ * it, one contiguous copy per opaque span.  Each framebuffer line is then
+ * touched exactly once.
+ *
+ * Bit-exactness with the column path turns on one subtlety.  The texel
+ * selected for a given screen row is identical either way -- a post's
+ * topdelta cancels, since (g - k*FRACUNIT)>>FRACBITS == (g>>FRACBITS) - k --
+ * but the row *extents* are not: the column path derives them forward from
+ * the post (ceil of topscreen), and deriving them backwards from the row
+ * instead over-paints at post edges.  The bands below therefore come from
+ * that same forward arithmetic.  For the same reason a run must hold one
+ * clip pair as well as one texture column: mfloorclip/mceilingclip vary per
+ * screen column, and taking the pair from the run's first column silently
+ * mis-clips the rest of it.
+ *
+ * Opacity comes from the posts, never from the pixel data: r_patch.c fills
+ * transparent texels with neighbour colours for the filtered paths, so the
+ * 0xff sentinel in patch->pixels is long gone by the time this runs.
+ * ------------------------------------------------------------------------ */
+
+/* Minimum vertical magnification (screen rows per texel, 16.16) for the row
+ * sweep to pay off.  Measured crossover against the column path is 1.8x;
+ * below it the per-row template rebuild dominates and the column path wins,
+ * above it the gap widens quickly.  Held at 2.0x for margin. */
+#ifndef MAGNIFIED_SPRITE_MINSCALE
+#define MAGNIFIED_SPRITE_MINSCALE (2*FRACUNIT)
+#endif
+
+/* One entry per run of screen columns sharing a texture column and a clip
+ * pair; a run is at minimum one column wide, so the sprite's screen width
+ * bounds every array.  Alongside screen_buf (SURFACE_PIXEL_DEPTH *
+ * MAX_SCREENWIDTH * MAX_SCREENHEIGHT) this is noise. */
+static const rcolumn_t *spr_run_col[MAX_SCREENWIDTH];
+static int              spr_run_xa [MAX_SCREENWIDTH];
+static int              spr_run_xb [MAX_SCREENWIDTH];
+static int              spr_run_pi [MAX_SCREENWIDTH];
+static int              spr_run_y0 [MAX_SCREENWIDTH];
+static int              spr_run_y1 [MAX_SCREENWIDTH];
+static int              spr_span_a [MAX_SCREENWIDTH];
+static int              spr_span_b [MAX_SCREENWIDTH];
+static uint16_t         spr_row16  [MAX_SCREENWIDTH];
+static uint32_t         spr_row32  [MAX_SCREENWIDTH];
+
+/* Screen band [*y0,*y1] covered by post `pi` of `column`, clipped exactly as
+ * R_DrawMaskedColumnDirect clips it for screen column `xa`.
+ *
+ * Returns 1 with the band set; 0 when the post contributes no pixels at all
+ * (the column path draws nothing for it either, so skipping is exact); or
+ * -1 when the texel range it would sample leaves the column, which is the
+ * case the column path services with its wrapping fallback and this one
+ * declines outright. */
+static int R_SpritePostBand(const rcolumn_t *column, int pi, int xa,
+                            fixed_t texmid, fixed_t iscale, int spr_th,
+                            int *y0, int *y1)
+{
+  const rpost_t *post         = &column->posts[pi];
+  int            topscreen    = sprtopscreen + spryscale * post->topdelta;
+  int            bottomscreen = topscreen + spryscale * post->length;
+  int            yl           = (topscreen + FRACUNIT - 1) >> FRACBITS;
+  int            yh           = (bottomscreen - 1) >> FRACBITS;
+  fixed_t        frac;
+  int            count, i0, iN;
+
+  if (yh >= mfloorclip[xa])
+    yh = mfloorclip[xa] - 1;
+  if (yl <= mceilingclip[xa])
+    yl = mceilingclip[xa] + 1;
+  if (yl < 0)
+    yl = 0;
+  if (yl > yh || yh >= viewheight)
+    return 0;
+
+  frac  = (texmid - (post->topdelta << FRACBITS)) + (yl - centery) * iscale;
+  count = yh - yl + 1;
+  i0    = frac >> FRACBITS;
+  iN    = (frac + (count - 1) * iscale) >> FRACBITS;
+  if (i0 < 0 || i0 >= spr_th || iN < 0 || iN >= spr_th)
+    return -1;
+  /* The sweep indexes patch->pixels absolutely (by texel row), where the
+   * column path indexes it relative to topdelta; decline any post whose
+   * absolute range would leave the column rather than read past it. */
+  if (i0 + post->topdelta >= spr_th || iN + post->topdelta >= spr_th)
+    return -1;
+
+  *y0 = yl;
+  *y1 = yh;
+  return 1;
+}
+
+/* Returns 1 when the sprite was drawn here, 0 when the caller should fall
+ * through to the column path.  Output is identical to that path. */
+static int R_DrawSpriteMagnified(const rpatch_t *patch,
+                                 draw_column_vars_t *dcvars,
+                                 const vissprite_t *vis,
+                                 fixed_t startfrac,
+                                 const uint16_t *lut,
+                                 const uint32_t *lutTC)
+{
+  const int     tc      = (lutTC != NULL);
+  const fixed_t iscale  = dcvars->iscale;
+  const fixed_t texmid  = dcvars->texturemid;
+  const fixed_t xiscale = vis->xiscale;
+  const int     spr_th  = patch->height;
+  int           nrun    = 0;
+  int           ymin    = viewheight;
+  int           ymax    = -1;
+  int           x, r, y, pi, y0, y1;
+  fixed_t       xfrac;
+
+  /* Gate: at least two screen pixels per texel on both axes. */
+  if (spryscale < MAGNIFIED_SPRITE_MINSCALE)
+    return 0;
+  if (xiscale > (FRACUNIT/2) || xiscale < -(FRACUNIT/2))
+    return 0;
+  if (vis->x2 < vis->x1 || iscale <= 0 || spr_th <= 0)
+    return 0;
+
+  /* 1. Segment the sprite into runs of constant texture column and clip
+   *    pair.  A flipped sprite steps xiscale negative; the equality test
+   *    below is direction-agnostic. */
+  xfrac = startfrac;
+  x     = vis->x1;
+  while (x <= vis->x2)
+  {
+    int     u   = xfrac >> FRACBITS;
+    int     xe  = x;
+    int     mfc = mfloorclip[x];
+    int     mcc = mceilingclip[x];
+    fixed_t xn  = xfrac;
+
+    while (xe + 1 <= vis->x2)
+    {
+      fixed_t t = xn + xiscale;
+      if ((t >> FRACBITS) != u)
+        break;
+      if (mfloorclip[xe + 1] != mfc || mceilingclip[xe + 1] != mcc)
+        break;
+      xn = t;
+      xe++;
+    }
+
+    spr_run_col[nrun] = R_GetPatchColumnClamped(patch, u);
+    spr_run_xa [nrun] = x;
+    spr_run_xb [nrun] = xe;
+    spr_run_pi [nrun] = 0;
+    spr_run_y0 [nrun] = 0;
+    spr_run_y1 [nrun] = -1;
+    nrun++;
+
+    x     = xe + 1;
+    xfrac = xn + xiscale;
+  }
+
+  /* 2. Validate every post up front and take the sprite's screen extent.  A
+   *    single declining post sends the whole sprite back to the column path,
+   *    which keeps this all-or-nothing and so trivially exact. */
+  for (r = 0; r < nrun; r++)
+  {
+    const rcolumn_t *column = spr_run_col[r];
+    for (pi = 0; pi < column->numPosts; pi++)
+    {
+      int ok;
+      ok = R_SpritePostBand(column, pi, spr_run_xa[r], texmid, iscale,
+                                spr_th, &y0, &y1);
+      if (ok < 0)
+        return 0;
+      if (!ok)
+        continue;
+      if (y0 < ymin) ymin = y0;
+      if (y1 > ymax) ymax = y1;
+    }
+  }
+  if (ymax < ymin)
+    return 0;
+
+  /* 3. Skybox reveal mask: the column path covers per post per column, so
+   *    cover the same spans here before any pixels land. */
+  if (sky_reveal_active)
+    for (r = 0; r < nrun; r++)
+    {
+      const rcolumn_t *column = spr_run_col[r];
+      for (pi = 0; pi < column->numPosts; pi++)
+        if (R_SpritePostBand(column, pi, spr_run_xa[r], texmid, iscale,
+                             spr_th, &y0, &y1) == 1)
+        {
+          for (x = spr_run_xa[r]; x <= spr_run_xb[r]; x++)
+            R_SkyRevealCoverCol(x, y0, y1);
+        }
+    }
+
+  /* 4. Sweep.  The template is rebuilt only when the texel row changes or a
+   *    post band opens or closes; between those it is pure replication. */
+  y = ymin;
+  while (y <= ymax)
+  {
+    fixed_t f     = texmid + (y - centery) * iscale;
+    int     v     = f >> FRACBITS;
+    int     nsp   = 0;
+    int     ynext;
+    int     span;
+    fixed_t delta;
+    int     k, s;
+
+    /* Screen rows sharing texel row v.  One 32-bit divide per texel row --
+     * at most patch->height of them per sprite, against millions of pixels
+     * -- so this is not worth strength-reducing.  Floor can fall one short;
+     * correct upward. */
+    delta = (fixed_t)((v + 1) << FRACBITS) - f;
+    span  = delta / iscale;
+    if (span < 1)
+      span = 1;
+    while (((f + span * iscale) >> FRACBITS) <= v)
+      span++;
+    ynext = y + span;
+
+    for (r = 0; r < nrun; r++)
+    {
+      const rcolumn_t *column = spr_run_col[r];
+      int              xa     = spr_run_xa[r];
+      int              xb     = spr_run_xb[r];
+      int              on     = 0;
+      int              xx;
+
+      /* Advance this run's band cursor to the first band ending at or below
+       * y.  Cursors only move forward, so the whole sweep costs one pass
+       * over each run's post list. */
+      while (spr_run_y1[r] < y && spr_run_pi[r] < column->numPosts)
+      {
+        if (R_SpritePostBand(column, spr_run_pi[r], xa, texmid, iscale,
+                             spr_th, &spr_run_y0[r], &spr_run_y1[r]) != 1)
+          spr_run_y1[r] = -1;
+        spr_run_pi[r]++;
+      }
+
+      if (spr_run_y1[r] >= y)
+      {
+        if (y >= spr_run_y0[r])
+        {
+          on = 1;
+          if (spr_run_y1[r] + 1 < ynext)
+            ynext = spr_run_y1[r] + 1;   /* band closes here */
+        }
+        else if (spr_run_y0[r] < ynext)
+          ynext = spr_run_y0[r];         /* band opens here */
+      }
+
+      if (!on)
+        continue;
+
+      if (nsp && spr_span_b[nsp - 1] == xa - 1)
+        spr_span_b[nsp - 1] = xb;
+      else
+      {
+        spr_span_a[nsp] = xa;
+        spr_span_b[nsp] = xb;
+        nsp++;
+      }
+
+      if (tc)
+      {
+        uint32_t col = lutTC[column->pixels[v]];
+        for (xx = xa; xx <= xb; xx++)
+          spr_row32[xx] = col;
+      }
+      else
+      {
+        uint16_t col = lut[column->pixels[v]];
+        for (xx = xa; xx <= xb; xx++)
+          spr_row16[xx] = col;
+      }
+    }
+
+    if (ynext > ymax + 1)
+      ynext = ymax + 1;
+    if (ynext <= y)
+      ynext = y + 1;
+
+    for (k = y; k < ynext; k++)
+    {
+      if (tc)
+      {
+        uint32_t *row = ((uint32_t *)drawvars.int_topleft)
+                      + (size_t)k * SURFACE_SHORT_PITCH;
+        for (s = 0; s < nsp; s++)
+          memcpy(row + spr_span_a[s], spr_row32 + spr_span_a[s],
+                 (size_t)(spr_span_b[s] - spr_span_a[s] + 1) * 4);
+      }
+      else
+      {
+        uint16_t *row = drawvars.short_topleft
+                      + (size_t)k * SURFACE_SHORT_PITCH;
+        for (s = 0; s < nsp; s++)
+          memcpy(row + spr_span_a[s], spr_row16 + spr_span_a[s],
+                 (size_t)(spr_span_b[s] - spr_span_a[s] + 1) * 2);
+      }
+    }
+
+    y = ynext;
+  }
+
+  return 1;
+}
+
 static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
 {
   int      texturecolumn;
@@ -864,47 +1181,55 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
        * buffer; its flush must land before any direct writes, not
        * after. */
       R_ResetColumnBuffer();
-      for (dcvars.x=vis->x1 ; dcvars.x<=vis->x2 ; dcvars.x++, frac += vis->xiscale)
+      /* Close sprites are the pathological case for the column path: every
+       * store strides a full scanline.  When the projection is magnified
+       * enough for a row sweep to pay off, R_DrawSpriteMagnified lays the
+       * same pixels down in row order instead and reports back; anything it
+       * declines falls through here unchanged. */
+      if (!R_DrawSpriteMagnified(patch, &dcvars, vis, frac, lut, lutTC))
       {
-        const rcolumn_t *column;
-
-        texturecolumn = frac>>FRACBITS;
-        column = R_GetPatchColumnClamped(patch, texturecolumn);
-
-        /* Single-post columns batch well in the temp machinery (four
-         * adjacent columns flush as 4-wide rows); a column's second
-         * post fails the batcher's x-continuity test and forces a
-         * flush per post, so multi-post columns go direct.  The two
-         * paths never touch the same pixels -- columns are disjoint
-         * in x -- so they interleave safely within a sprite. */
-        /* Tall columns: the temp-buffer batcher writes every pixel twice
-         * (colfunc -> short_tempbuf, then R_FlushWhole16 -> framebuffer),
-         * which the 4-wide flush only amortises for short runs.  A close
-         * sprite's columns are hundreds of pixels tall, so the second pass
-         * dominates; send those straight to the single-pass direct writer.
-         * Multi-post columns already go direct (the batcher flushes per
-         * post for them).  Output is bit-identical either way.  The height
-         * test is overflow-safe: spryscale>>8 keeps the product well within
-         * 32 bits for any realistic scale/post length. */
-        if (spr_tint || column->numPosts > 1 ||
-            (column->numPosts == 1 &&
-             (((spryscale >> 8) * column->posts[0].length) >> (FRACBITS - 8))
-               >= DIRECT_COLUMN_MINPX))
+        for (dcvars.x=vis->x1 ; dcvars.x<=vis->x2 ; dcvars.x++, frac += vis->xiscale)
         {
-          dcvars.texheight = patch->height;
-          R_DrawMaskedColumnDirect(patch, &dcvars, column, lut, lutTC);
-        }
-        else
-        {
-          dcvars.texu = frac;
-          R_DrawMaskedColumn(
-            patch,
-            colfunc,
-            &dcvars,
-            column,
-            R_GetPatchColumnClamped(patch, texturecolumn-1),
-            R_GetPatchColumnClamped(patch, texturecolumn+1)
-          );
+          const rcolumn_t *column;
+
+          texturecolumn = frac>>FRACBITS;
+          column = R_GetPatchColumnClamped(patch, texturecolumn);
+
+          /* Single-post columns batch well in the temp machinery (four
+           * adjacent columns flush as 4-wide rows); a column's second
+           * post fails the batcher's x-continuity test and forces a
+           * flush per post, so multi-post columns go direct.  The two
+           * paths never touch the same pixels -- columns are disjoint
+           * in x -- so they interleave safely within a sprite. */
+          /* Tall columns: the temp-buffer batcher writes every pixel twice
+           * (colfunc -> short_tempbuf, then R_FlushWhole16 -> framebuffer),
+           * which the 4-wide flush only amortises for short runs.  A close
+           * sprite's columns are hundreds of pixels tall, so the second pass
+           * dominates; send those straight to the single-pass direct writer.
+           * Multi-post columns already go direct (the batcher flushes per
+           * post for them).  Output is bit-identical either way.  The height
+           * test is overflow-safe: spryscale>>8 keeps the product well within
+           * 32 bits for any realistic scale/post length. */
+          if (spr_tint || column->numPosts > 1 ||
+              (column->numPosts == 1 &&
+               (((spryscale >> 8) * column->posts[0].length) >> (FRACBITS - 8))
+                 >= DIRECT_COLUMN_MINPX))
+          {
+            dcvars.texheight = patch->height;
+            R_DrawMaskedColumnDirect(patch, &dcvars, column, lut, lutTC);
+          }
+          else
+          {
+            dcvars.texu = frac;
+            R_DrawMaskedColumn(
+              patch,
+              colfunc,
+              &dcvars,
+              column,
+              R_GetPatchColumnClamped(patch, texturecolumn-1),
+              R_GetPatchColumnClamped(patch, texturecolumn+1)
+            );
+          }
         }
       }
     }

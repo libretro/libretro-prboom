@@ -89,9 +89,8 @@ void Z_SetPurgeLimit(int size);
  * The zone is not thread safe -- one global block list, no locking -- so any
  * TU whose allocations can happen off the main thread must opt out and use
  * the C library directly.  rthreads does exactly that: thread_wrap frees its
- * own argument block on the spawned thread, and tpool allocates and frees a
- * work record per submission from its workers.  Both raced against main-
- * thread zone traffic (caught by ThreadSanitizer) before this guard existed.
+ * own argument block on the spawned thread, which raced against main-thread
+ * zone traffic (caught by ThreadSanitizer) before this guard existed.
  * Objects needing it set Z_ZONE_NO_ALLOC_OVERRIDE in Makefile.common. */
 #ifndef Z_ZONE_NO_ALLOC_OVERRIDE
 #define malloc(n)          Z_Malloc(n,PU_STATIC,0)

@@ -35,6 +35,7 @@
 #include "dsda_hacked.h"
 #include "w_wad.h"
 #include "r_main.h"
+#include "i_system.h"
 #include "r_bsp.h"
 #include "r_segs.h"
 #include "r_draw.h"

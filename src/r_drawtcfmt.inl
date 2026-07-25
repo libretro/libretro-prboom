@@ -48,6 +48,17 @@
  * colour format.  Values above paper white have no gamma equivalent and
  * clamp, so a blended pixel stops being emissive -- which is what should
  * happen when a glowing surface is seen through glass. */
+/* The template is included once per pixel format, so these have to be
+ * redefined on each pass.  Without the undefs the second inclusion tries to
+ * redefine macros the first left behind: GCC warns and lets the new
+ * definition win, which happens to be the HDR one and happens to be right,
+ * but a compiler that kept the first definition instead would silently give
+ * the HDR10 kernels the SDR passthrough conversions -- blending PQ codes
+ * directly, which is exactly what the comment above says must not happen. */
+#undef RDF_HDRMAX
+#undef RDF_DEC
+#undef RDF_ENC
+
 #ifdef RDF_HDR
 #define RDF_HDRMAX 1023
 #define RDF_DEC(c) ((int)vid_pq_to_sdr[(c)])

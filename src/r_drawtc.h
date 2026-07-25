@@ -38,7 +38,13 @@ void R_DrawSpanTC(draw_span_vars_t *dsvars);
 
 /* Wall-run kernel + classification (draw-record replay). */
 int  R_WallColumnKernelClassTC(R_DrawColumn_f fn);
-void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int pointz);
+struct wallscratch_s;
+const uint32_t *R_ScratchComposedColormapTC(struct wallscratch_s *ws,
+                                            const lighttable_t *colormap);
+const uint32_t *R_ScratchComposedPaletteTC(struct wallscratch_s *ws);
+void R_DrawWallColumnRunTC(struct wallscratch_s *ws,
+                           const draw_column_vars_t *const *cols,
+                           int n, int pointz);
 
 /* Composed colour tables (direct sprite/voxel paths). */
 const uint32_t *R_ComposedColormapTC(const lighttable_t *colormap);

@@ -128,6 +128,10 @@ static int R_DrawCmdKernelClass(const drawcmd_t *cmd)
   return R_DrawCmdColumnKernelClass(&cmd->dc, cmd->fn);
 }
 
+/* Single scratch for the serial replay; the threaded replay gives each
+ * worker its own (see R_DrawWallColumnRun). */
+static wallscratch_t wall_scratch_main;
+
 void R_DrawCmdReplay(void)
 {
   int i, x;
@@ -211,7 +215,7 @@ void R_DrawCmdReplay(void)
           (idx < 0 || x != last_x + 1 || cls != run_cls ||
            run_n == WALL_RUN_MAX))
       {
-        R_DrawWallColumnRun(run, run_n, run_cls == 2);
+        R_DrawWallColumnRun(&wall_scratch_main, run, run_n, run_cls == 2);
         run_n = 0;
       }
       if (idx >= 0)
@@ -224,7 +228,7 @@ void R_DrawCmdReplay(void)
       }
     }
     if (run_n)
-      R_DrawWallColumnRun(run, run_n, run_cls == 2);
+      R_DrawWallColumnRun(&wall_scratch_main, run, run_n, run_cls == 2);
   }
   cmd_count = 0;
 

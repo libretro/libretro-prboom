@@ -361,6 +361,33 @@ static const lighttable_t *tc_composed_cm  = NULL;
 static const uint32_t     *tc_composed_pal = NULL;
 static uint32_t            tc_composed_lut[256];
 
+/* Worker-private composed-table caches; see R_ScratchComposedColormap. */
+const uint32_t *R_ScratchComposedColormapTC(wallscratch_t *ws,
+                                            const lighttable_t *colormap)
+{
+   if (colormap != ws->cm_tc || V_PaletteTC != ws->pal_tc)
+   {
+      int i;
+      for (i = 0; i < 256; i++)
+         ws->lut_tc[i] = V_PaletteTC[ colormap[i]*64 + (64-1) ];
+      ws->cm_tc  = colormap;
+      ws->pal_tc = V_PaletteTC;
+   }
+   return ws->lut_tc;
+}
+
+const uint32_t *R_ScratchComposedPaletteTC(wallscratch_t *ws)
+{
+   if (V_PaletteTC != ws->nolight_pal_tc)
+   {
+      int i;
+      for (i = 0; i < 256; i++)
+         ws->nolight_lut_tc[i] = V_PaletteTC[ i*64 + (64-1) ];
+      ws->nolight_pal_tc = V_PaletteTC;
+   }
+   return ws->nolight_lut_tc;
+}
+
 static INLINE const uint32_t *R_GetComposedColormapTC(const lighttable_t *colormap)
 {
    if (colormap != tc_composed_cm || V_PaletteTC != tc_composed_pal)
@@ -5345,7 +5372,9 @@ int R_WallColumnKernelClassTC(R_DrawColumn_f fn)
  * shape a vector version of this kernel wants). */
 #define WALL_RUN_MAX 64
 
-void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int pointz)
+void R_DrawWallColumnRunTC(wallscratch_t *ws,
+                           const draw_column_vars_t *const *cols,
+                           int n, int pointz)
 {
   const uint8_t     *src[WALL_RUN_MAX];
   const lighttable_t *cmap[WALL_RUN_MAX];
@@ -5386,14 +5415,14 @@ void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int poi
    * to the table's defining expression per pixel,
    * V_PaletteTC[colormap[texel]*64 + 63], the same values either way. */
   if (!pointz)
-    lut = R_GetComposedPaletteTC();
+    lut = R_ScratchComposedPaletteTC(ws);
   else
   {
     for (j = 1; j < n; j++)
       if (cmap[j] != cmap[0])
         break;
     if (j == n)
-      lut = R_GetComposedColormapTC(cmap[0]);
+      lut = R_ScratchComposedColormapTC(ws, cmap[0]);
   }
 
   /* Dynamic-light colour tint (dcvars.tint, packed r:g:b channel adds).
@@ -5419,19 +5448,16 @@ void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int poi
     }
     if (anytint)
     {
-      static uint32_t tintbuf[256];
       if (lut && same)
       {
-        R_TintLUTTC(tintbuf, lut,
+        R_TintLUTTC(ws->tintbuf_tc, lut,
                   (int)(tint0 >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
                   (int)(tint0 >> VID_TINT_BITS) & VID_TINT_MASK,
                   (int)tint0 & VID_TINT_MASK);
-        lut = tintbuf;
+        lut = ws->tintbuf_tc;
       }
       else
       {
-#define WALL_TINT_POOL 8
-        static uint32_t           pool[WALL_TINT_POOL][256];
         const lighttable_t       *pool_cm[WALL_TINT_POOL];
         unsigned                  pool_tint[WALL_TINT_POOL];
         int pooln = 0, k;
@@ -5448,16 +5474,16 @@ void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int poi
             if (pool_cm[k] == cmap[j] && pool_tint[k] == t)
               break;
           if (k < pooln)
-            lanelut[j] = pool[k];
+            lanelut[j] = ws->pool_tc[k];
           else if (pooln < WALL_TINT_POOL)
           {
-            R_TintLUTTC(pool[pooln], R_GetComposedColormapTC(cmap[j]),
+            R_TintLUTTC(ws->pool_tc[pooln], R_ScratchComposedColormapTC(ws, cmap[j]),
                       (int)(t >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
                       (int)(t >> VID_TINT_BITS) & VID_TINT_MASK,
                       (int)t & VID_TINT_MASK);
             pool_cm[pooln] = cmap[j];
             pool_tint[pooln] = t;
-            lanelut[j] = pool[pooln++];
+            lanelut[j] = ws->pool_tc[pooln++];
           }
           else
           {
@@ -5529,7 +5555,7 @@ void R_DrawWallColumnRunTC(const draw_column_vars_t *const *cols, int n, int poi
       WALL_RUN_RAGGED_ROW(lanelut[j]
                           ? lanelut[j][texel]
                           : (pointz ? V_PaletteTC[ cmap[j][texel] * 64 + 63 ]
-                                    : R_GetComposedPaletteTC()[texel]))
+                                    : R_ScratchComposedPaletteTC(ws)[texel]))
     return;
   }
 

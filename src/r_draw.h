@@ -144,7 +144,54 @@ typedef void (*R_DrawColumn_f)(draw_column_vars_t *dcvars);
 int R_WallColumnKernelClass(R_DrawColumn_f fn);
 const uint16_t *R_ComposedColormap(const lighttable_t *colormap);
 const uint16_t *R_ComposedPalette(void);
-void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int pointz);
+/* Per-worker scratch for the wall-run kernel.
+ *
+ * The kernel resolves a composed colour table per run and, for dynamic
+ * light tints, builds tinted tables from it.  Single-threaded those lived
+ * in file-scope caches; with the replay split across workers two threads
+ * resolving different colormaps would each rewrite the other's table and
+ * hand back a pointer to the wrong colours -- a data race that is also a
+ * correctness bug.  Each worker therefore carries its own tables.  The
+ * caches keep their single-entry keying: adjacent wall columns share a
+ * light band, so the hit rate is unchanged within a worker's column range.
+ *
+ * Roughly 17KB per worker, private to that worker for the whole replay. */
+#define WALL_TINT_POOL 8
+
+typedef struct wallscratch_s
+{
+   /* 16bpp composed colormap+palette cache */
+   const lighttable_t *cm;
+   const uint16_t     *pal;
+   uint16_t            lut[256];
+   /* 16bpp composed palette (no colormap) cache */
+   const uint16_t     *nolight_pal;
+   uint16_t            nolight_lut[256];
+   /* 16bpp tint tables */
+   uint16_t            tintbuf[256];
+   uint16_t            pool[WALL_TINT_POOL][256];
+   /* truecolor equivalents (r_drawtc.c) */
+   const lighttable_t *cm_tc;
+   const uint32_t     *pal_tc;
+   uint32_t            lut_tc[256];
+   const uint32_t     *nolight_pal_tc;
+   uint32_t            nolight_lut_tc[256];
+   uint32_t            tintbuf_tc[256];
+   uint32_t            pool_tc[WALL_TINT_POOL][256];
+} wallscratch_t;
+
+/* Resolve the composed tables through a worker's private cache. */
+const uint16_t *R_ScratchComposedColormap(wallscratch_t *ws,
+                                          const lighttable_t *colormap);
+const uint16_t *R_ScratchComposedPalette(wallscratch_t *ws);
+
+#ifdef HAVE_THREADS
+void R_WallTintLockInit(void);
+#endif
+
+void R_DrawWallColumnRun(wallscratch_t *ws,
+                         const draw_column_vars_t *const *cols,
+                         int n, int pointz);
 R_DrawColumn_f R_GetDrawColumnFunc(enum column_pipeline_e type,
                                    enum draw_filter_type_e filter,
                                    enum draw_filter_type_e filterz);

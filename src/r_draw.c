@@ -34,6 +34,9 @@
  *-----------------------------------------------------------------------------*/
 
 #include "doomstat.h"
+#ifdef HAVE_THREADS
+#include <rthreads/rthreads.h>
+#endif
 #include "w_wad.h"
 #include "r_main.h"
 #include "i_system.h"
@@ -117,6 +120,35 @@ int  viewheight;
 static const lighttable_t *composed_cm  = NULL;
 static const uint16_t     *composed_pal = NULL;
 static uint16_t            composed_lut[256];
+
+/* Worker-private variants of the composed-table caches below.  Same keying
+ * and same values; the storage is the caller's so concurrent workers cannot
+ * clobber each other's table. */
+const uint16_t *R_ScratchComposedColormap(wallscratch_t *ws,
+                                          const lighttable_t *colormap)
+{
+   if (colormap != ws->cm || V_Palette16 != ws->pal)
+   {
+      int i;
+      for (i = 0; i < 256; i++)
+         ws->lut[i] = V_Palette16[ colormap[i]*64 + (64-1) ];
+      ws->cm  = colormap;
+      ws->pal = V_Palette16;
+   }
+   return ws->lut;
+}
+
+const uint16_t *R_ScratchComposedPalette(wallscratch_t *ws)
+{
+   if (V_Palette16 != ws->nolight_pal)
+   {
+      int i;
+      for (i = 0; i < 256; i++)
+         ws->nolight_lut[i] = V_Palette16[ i*64 + (64-1) ];
+      ws->nolight_pal = V_Palette16;
+   }
+   return ws->nolight_lut;
+}
 
 static INLINE const uint16_t *R_GetComposedColormap(const lighttable_t *colormap)
 {
@@ -6026,7 +6058,9 @@ int R_WallColumnKernelClass(R_DrawColumn_f fn)
  * shape a vector version of this kernel wants). */
 #define WALL_RUN_MAX 64
 
-void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int pointz)
+void R_DrawWallColumnRun(wallscratch_t *ws,
+                         const draw_column_vars_t *const *cols,
+                         int n, int pointz)
 {
   const uint8_t     *src[WALL_RUN_MAX];
   const lighttable_t *cmap[WALL_RUN_MAX];
@@ -6043,7 +6077,7 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
 
   if (VID_TRUECOLOR)
   {
-    R_DrawWallColumnRunTC(cols, n, pointz);
+    R_DrawWallColumnRunTC(ws, cols, n, pointz);
     return;
   }
 
@@ -6073,14 +6107,14 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
    * to the table's defining expression per pixel,
    * V_Palette16[colormap[texel]*64 + 63], the same values either way. */
   if (!pointz)
-    lut = R_GetComposedPalette();
+    lut = R_ScratchComposedPalette(ws);
   else
   {
     for (j = 1; j < n; j++)
       if (cmap[j] != cmap[0])
         break;
     if (j == n)
-      lut = R_GetComposedColormap(cmap[0]);
+      lut = R_ScratchComposedColormap(ws, cmap[0]);
   }
 
   /* Dynamic-light colour tint (dcvars.tint, packed r:g:b channel adds).
@@ -6106,19 +6140,16 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
     }
     if (anytint)
     {
-      static uint16_t tintbuf[256];
       if (lut && same)
       {
-        R_TintLUT(tintbuf, lut,
+        R_TintLUT(ws->tintbuf, lut,
                   (int)(tint0 >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
                   (int)(tint0 >> VID_TINT_BITS) & VID_TINT_MASK,
                   (int)tint0 & VID_TINT_MASK);
-        lut = tintbuf;
+        lut = ws->tintbuf;
       }
       else
       {
-#define WALL_TINT_POOL 8
-        static uint16_t           pool[WALL_TINT_POOL][256];
         const lighttable_t       *pool_cm[WALL_TINT_POOL];
         unsigned                  pool_tint[WALL_TINT_POOL];
         int pooln = 0, k;
@@ -6135,16 +6166,16 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
             if (pool_cm[k] == cmap[j] && pool_tint[k] == t)
               break;
           if (k < pooln)
-            lanelut[j] = pool[k];
+            lanelut[j] = ws->pool[k];
           else if (pooln < WALL_TINT_POOL)
           {
-            R_TintLUT(pool[pooln], R_GetComposedColormap(cmap[j]),
+            R_TintLUT(ws->pool[pooln], R_ScratchComposedColormap(ws, cmap[j]),
                       (int)(t >> (2*VID_TINT_BITS)) & VID_TINT_MASK,
                       (int)(t >> VID_TINT_BITS) & VID_TINT_MASK,
                       (int)t & VID_TINT_MASK);
             pool_cm[pooln] = cmap[j];
             pool_tint[pooln] = t;
-            lanelut[j] = pool[pooln++];
+            lanelut[j] = ws->pool[pooln++];
           }
           else
           {
@@ -6216,7 +6247,7 @@ void R_DrawWallColumnRun(const draw_column_vars_t *const *cols, int n, int point
       WALL_RUN_RAGGED_ROW(lanelut[j]
                           ? lanelut[j][texel]
                           : (pointz ? V_Palette16[ cmap[j][texel] * 64 + 63 ]
-                                    : R_GetComposedPalette()[texel]))
+                                    : R_ScratchComposedPalette(ws)[texel]))
     return;
   }
 
@@ -7193,6 +7224,14 @@ void R_InitBuffer(int width, int height)
  * batched/quad column flush at all. */
 typedef struct { int x, yl, yh; short ar, ag, ab; } wall_tint_t;
 static wall_tint_t *wall_tints = NULL;
+#ifdef HAVE_THREADS
+static slock_t     *wall_tint_lock = NULL;
+void R_WallTintLockInit(void)
+{
+   if (!wall_tint_lock)
+      wall_tint_lock = slock_new();
+}
+#endif
 static int          wall_tint_count = 0, wall_tint_cap = 0;
 
 void R_WallTintClear(void)
@@ -7200,11 +7239,21 @@ void R_WallTintClear(void)
    wall_tint_count = 0;
 }
 
+/* Reached only when a run exhausts its tint pool (more than WALL_TINT_POOL
+ * distinct colormap/tint pairs across 64 lanes), which is rare.  Under the
+ * threaded replay several workers can reach it at once, so the append is
+ * serialised.  Records from different workers land at disjoint columns and
+ * each worker's own records keep their relative order, so the replayed
+ * result does not depend on the interleaving. */
 void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab)
 {
    wall_tint_t *t;
    if (yh < yl || (!ar && !ag && !ab))
       return;
+#ifdef HAVE_THREADS
+   if (wall_tint_lock)
+      slock_lock(wall_tint_lock);
+#endif
    if (wall_tint_count == wall_tint_cap)
    {
       wall_tint_cap = wall_tint_cap ? wall_tint_cap * 2 : 4096;
@@ -7216,6 +7265,10 @@ void R_WallTintRecord(int x, int yl, int yh, int ar, int ag, int ab)
    t = &wall_tints[wall_tint_count++];
    t->x = x; t->yl = yl; t->yh = yh;
    t->ar = (short)ar; t->ag = (short)ag; t->ab = (short)ab;
+#ifdef HAVE_THREADS
+   if (wall_tint_lock)
+      slock_unlock(wall_tint_lock);
+#endif
 }
 
 /* Additively tint a 256-entry composed colour LUT toward a light's chroma;

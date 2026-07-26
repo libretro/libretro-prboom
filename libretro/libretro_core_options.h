@@ -65,7 +65,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "prboom-render_threads",
       "Threaded Rendering",
       NULL,
-      "Fill walls and floors/ceilings across several CPU threads. Scene traversal stays single-threaded and only the pixel filling is split, so the image is identical to the single-threaded renderer -- unlike the screenspace split used by other ports, this cannot split or drop a sprite at a thread boundary. Filling is the bulk of the frame at high internal resolutions, so the benefit grows with resolution; at 320x200 there is little to gain. 'Auto' uses the number of CPU cores available, up to 8. Past 8 threads the cost of handing out work exceeds what it saves, so 8 is the ceiling.",
+      "Fill walls and floors/ceilings across several CPU threads. Scene traversal stays single-threaded and only the pixel filling is split, so the image is identical to the single-threaded renderer -- unlike the screenspace split used by other ports, this cannot split or drop a sprite at a thread boundary. Filling is the bulk of the frame at high internal resolutions, so the benefit grows with resolution; at 320x200 there is little to gain. 'Auto' uses up to 4 threads, which measured fastest and steadiest on a 16-core test system; higher counts spend more on handing out work than they save and vary more between runs. 8 is selectable if it suits your CPU.",
       NULL,
       NULL,
       {

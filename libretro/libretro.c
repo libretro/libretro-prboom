@@ -1470,16 +1470,20 @@ static void update_variables(bool startup)
          nthreads = 1;
       else if (!strcmp(var.value, "Auto"))
       {
-         /* Capped well below the core count on purpose.  Measured on a
-          * 16-core 9950X3D at 1920x1200, the replay peaked at 4 threads and
-          * was a net loss at 16; the wide end of the range is where
-          * dispatch cost starts to dominate, so "Auto" stays out of it.
-          * Anyone wanting the wide end can still select it explicitly. */
+         /* Four, not the core count.  Measured on a 16-core 9950X3D at
+          * 2560x1600 over several samples per setting, medians were 902us at
+          * four threads, 946us at eight and 960us at Auto-as-eight, so four
+          * was simply the fastest configuration -- and far the steadiest, at
+          * 3.2% spread against 9.7-15%.  The eight-thread samples were not
+          * scattered around a mean but split into two clusters about 91us
+          * apart, which is what thread placement across two CCDs looks like;
+          * four threads fit on one and do not show it.  Eight and the rest
+          * remain selectable explicitly. */
          nthreads = (int)cpu_features_get_core_amount();
          if (nthreads < 1)
             nthreads = 1;
-         if (nthreads > 8)
-            nthreads = 8;
+         if (nthreads > 4)
+            nthreads = 4;
       }
       else
          nthreads = atoi(var.value);

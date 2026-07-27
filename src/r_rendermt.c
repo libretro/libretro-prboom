@@ -76,7 +76,17 @@
 #elif defined(_MSC_VER) && (defined(_M_IX86) || defined(_M_X64))
 #include <intrin.h>
 #define RENDERMT_RELAX() _mm_pause()
-#elif defined(__aarch64__) || defined(__arm__)
+#elif defined(__aarch64__)
+#define RENDERMT_RELAX() __asm__ __volatile__("yield" ::: "memory")
+/* YIELD is an ARMv6K addition.  Older 32-bit cores -- armv5te on Miyoo, and
+ * anything else built for arm926ej-s or below -- reject the mnemonic at
+ * assembly time, so the hint has to be gated rather than emitted for every
+ * __arm__ target.  GCC and clang both define __ARM_ARCH; __ARM_ARCH_6*K* is
+ * checked as well because plain armv6 (no K) is 6 but has no YIELD. */
+#elif defined(__arm__) && (defined(__ARM_ARCH_6K__)  || \
+                           defined(__ARM_ARCH_6KZ__) || \
+                           defined(__ARM_ARCH_6ZK__) || \
+                           (defined(__ARM_ARCH) && __ARM_ARCH >= 7))
 #define RENDERMT_RELAX() __asm__ __volatile__("yield" ::: "memory")
 #else
 #define RENDERMT_RELAX() ((void)0)

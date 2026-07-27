@@ -679,6 +679,24 @@ SHARED=
 fpic=
 endif
 
+# rthreads uses its pthreads backend on every hosted non-Win32 target.  On
+# glibc before 2.34 and on the musl-based handheld toolchains, pthread_create,
+# pthread_join, pthread_detach, pthread_mutex_trylock and pthread_cancel live
+# in libpthread rather than libc, and the shared-object link lines here use
+# --no-undefined, so the library has to be requested explicitly or the link
+# fails.  Skipped where LIBS is deliberately empty (Win32/MSVC, linux-portable
+# with -nostdlib) and for the console targets, which archive a .a and are
+# linked by the frontend.
+ifneq ($(HAVE_THREADS), 0)
+ifneq ($(STATIC_LINKING), 1)
+ifeq (,$(findstring msvc,$(platform)))
+ifneq ($(LIBS),)
+LIBS += -lpthread
+endif
+endif
+endif
+endif
+
 LDFLAGS += $(LIBS)
 
 CFLAGS += -DHAVE_LIBMAD

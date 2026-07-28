@@ -3646,14 +3646,7 @@ void I_FinishUpdate (void)
 
    if (direct_fb_data)
    {
-      /* Direct-render: the renderer wrote pixels straight into
-       * the frontend's buffer in place; just hand it back.  Per
-       * libretro.h the pointer must match exactly what
-       * GET_CURRENT_SOFTWARE_FRAMEBUFFER returned, hence the
-       * stored pitch / pointer rather than recomputing. */
-      video_cb(direct_fb_data, SCREENWIDTH, SCREENHEIGHT,
-               direct_fb_pitch);
-      /* Issue #183: snapshot the just-presented frame into the
+      /* Issue #183: snapshot the finished frame into the
        * persistent screen_buf.  D_Display's wipe_StartScreen runs
        * BEFORE the next I_StartDisplay rebinds screens[0] to a
        * fresh frontend FB; at that point screens[0].data is
@@ -3664,6 +3657,24 @@ void I_FinishUpdate (void)
        * (whether called here or after I_StartDisplay) sees
        * uninitialised buffer content.
        *
+       * The snapshot MUST happen before video_cb.  Here the
+       * mapping is provably live (the renderer just wrote the
+       * frame through it); after video_cb it may not be.
+       * RetroArch's Vulkan driver services deferred swapchain
+       * work inside the frame call (vulkan_frame ->
+       * vulkan_check_swapchain -> vulkan_deinit_textures), which
+       * unmaps and frees the per-frame staging texture backing
+       * this very pointer whenever a resize / swapchain
+       * invalidation is pending (rotation, split view, menu
+       * driver churn).  Desktop drivers typically keep the freed
+       * suballocation's pages resident so a stale read only
+       * returns garbage, but MoltenVK backs each VkDeviceMemory
+       * with its own MTLBuffer and vkFreeMemory really unmaps:
+       * reading direct_fb_data after video_cb segfaults inside
+       * memcpy on iOS (five identical TestFlight crash reports,
+       * _platform_memmove reading SCREENPITCH*SCREENHEIGHT =
+       * 0x1f400 bytes from an unmapped source under retro_run).
+       *
        * Cost: one read + one write of SCREENPITCH*SCREENHEIGHT
        * bytes per frame.  ~128 KB at 320x200 RGB565.  At 35 Hz
        * that's ~4.5 MB/s of cache-friendly streaming memcpy;
@@ -3671,6 +3682,14 @@ void I_FinishUpdate (void)
        * renderer at all. */
       memcpy(screen_buf, direct_fb_data,
              SCREENPITCH * SCREENHEIGHT);
+      /* Direct-render: the renderer wrote pixels straight into
+       * the frontend's buffer in place; just hand it back.  Per
+       * libretro.h the pointer must match exactly what
+       * GET_CURRENT_SOFTWARE_FRAMEBUFFER returned, hence the
+       * stored pitch / pointer rather than recomputing.  This is
+       * the last touch of direct_fb_data this frame. */
+      video_cb(direct_fb_data, SCREENWIDTH, SCREENHEIGHT,
+               direct_fb_pitch);
       direct_fb_data  = NULL;
       direct_fb_pitch = 0;
       /* Restore screens[0] / drawvars to the heap fallback so any
@@ -3828,7 +3847,11 @@ dbool   I_StartDisplay(void)
                         : (vid_mode == VID_MODE8888)
                           ? RETRO_PIXEL_FORMAT_XRGB8888
                           : RETRO_PIXEL_FORMAT_RGB565;
-      fb.access_flags = RETRO_MEMORY_ACCESS_WRITE;
+      /* WRITE for the renderer, READ for the wipe snapshot in
+       * I_FinishUpdate (memcpy back into screen_buf).  Frontends
+       * may use the READ bit to prefer host-cached memory. */
+      fb.access_flags = RETRO_MEMORY_ACCESS_WRITE
+                      | RETRO_MEMORY_ACCESS_READ;
       fb.memory_flags = 0;
 
       {

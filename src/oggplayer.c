@@ -1,13 +1,12 @@
 /* Ogg Vorbis music player backend.
  *
  * Many modern mods ship their music as Ogg Vorbis (.ogg) lumps under music/
- * rather than MIDI/MUS, MP3 or tracker modules.  This wraps the core's private
- * stb_vorbis decoder (deps/stb/stb_vorbis_impl.c, exported with a prb_ prefix
- * so it does not clash with the host RetroArch's own copy) in the engine's
- * music_player_t interface, so an Ogg lump autodetects and plays alongside the
- * other backends.
+ * rather than MIDI/MUS, MP3 or tracker modules.  This wraps libretro-common's
+ * rvorbis decoder (libretro/libretro-common/formats/vorbis/rvorbis.c) in the
+ * engine's music_player_t interface, so an Ogg lump autodetects and plays
+ * alongside the other backends.
  *
- * stb_vorbis decodes interleaved signed-16 stereo at the stream's own sample
+ * rvorbis decodes interleaved signed-16 stereo at the stream's own sample
  * rate; the engine mixer wants interleaved signed-16 stereo at the rate passed
  * to init().  render() pulls a burst of source frames and linearly resamples
  * them to the output rate (a 16.16 fractional step, the same scheme the sfx
@@ -20,32 +19,9 @@
 #include "lprintf.h"
 #include "musicplayer.h"
 
-/* stb_vorbis (prb_-prefixed; see deps/stb/stb_vorbis_impl.c).  Only the few
- * entry points the streaming music path needs are declared here. */
-typedef struct stb_vorbis stb_vorbis;
-typedef struct
-{
-  unsigned int sample_rate;
-  int          channels;
-  unsigned int setup_memory_required;
-  unsigned int setup_temp_memory_required;
-  unsigned int temp_memory_required;
-  int          max_frame_size;
-} prb_stb_vorbis_info;
+#include <formats/rvorbis.h>
 
-extern stb_vorbis *prb_stb_vorbis_open_memory(const unsigned char *data, int len,
-                                              int *error, void *alloc);
-extern prb_stb_vorbis_info prb_stb_vorbis_get_info(stb_vorbis *f);
-extern int  prb_stb_vorbis_get_samples_short_interleaved(stb_vorbis *f, int channels,
-                                                         short *buffer, int num_shorts);
-extern int  prb_stb_vorbis_get_samples_float_interleaved(stb_vorbis *f, int channels,
-                                                         float *buffer, int num_floats);
-extern int  prb_stb_vorbis_seek_start(stb_vorbis *f);
-extern int  prb_stb_vorbis_seek(stb_vorbis *f, unsigned int sample_number);
-extern int  prb_stb_vorbis_get_sample_offset(stb_vorbis *f);
-extern void prb_stb_vorbis_close(stb_vorbis *f);
-
-static stb_vorbis  *ogg_v;
+static rvorbis     *ogg_v;
 static const void  *ogg_data;       /* the lump (owned by the caller) */
 static int          ogg_len;
 static int          ogg_rate;       /* engine output rate */
@@ -68,10 +44,15 @@ static int          ogg_src_have;   /* frames currently in ogg_src           */
 static int          ogg_src_pos;    /* next unconsumed source frame          */
 static unsigned     ogg_frac;       /* 16.16 fractional position within src  */
 static unsigned     ogg_step;       /* 16.16 src-frames per output frame      */
+/* Frames the decoder has delivered since the last (re)start or seek --
+ * the decoder-side position rvorbis has no getter for.  Serialized so a
+ * save state can re-seek to the same spot (accuracy within one decode
+ * burst, matching what stb_vorbis's get_sample_offset used to give). */
+static unsigned     ogg_decode_pos;
 
 static const char *ogg_name(void)
 {
-  return "stb_vorbis Ogg player";
+  return "rvorbis Ogg player";
 }
 
 static int ogg_init(int samplerate)
@@ -84,7 +65,7 @@ static void ogg_close_stream(void)
 {
   if (ogg_v)
   {
-    prb_stb_vorbis_close(ogg_v);
+    rvorbis_close(ogg_v);
     ogg_v = NULL;
   }
 }
@@ -114,7 +95,7 @@ static void ogg_resume(void)
 static const void *ogg_registersong(const void *data, unsigned len)
 {
   const unsigned char *d = (const unsigned char *)data;
-  prb_stb_vorbis_info info;
+  rvorbis_info info;
   int err = 0;
 
   /* Ogg streams start with the "OggS" capture pattern. */
@@ -122,11 +103,11 @@ static const void *ogg_registersong(const void *data, unsigned len)
     return NULL;
 
   ogg_close_stream();
-  ogg_v = prb_stb_vorbis_open_memory(d, (int)len, &err, NULL);
+  ogg_v = rvorbis_open_memory(d, (int)len, &err, NULL);
   if (!ogg_v)
     return NULL;
 
-  info         = prb_stb_vorbis_get_info(ogg_v);
+  info         = rvorbis_get_info(ogg_v);
   ogg_src_rate = info.sample_rate ? (int)info.sample_rate : ogg_rate;
   ogg_channels = info.channels > 0 ? info.channels : 2;
   ogg_step     = (unsigned)(((unsigned long long)ogg_src_rate << 16) /
@@ -138,6 +119,7 @@ static const void *ogg_registersong(const void *data, unsigned len)
   ogg_src_have = 0;
   ogg_src_pos  = 0;
   ogg_frac     = 0;
+  ogg_decode_pos = 0;
   return data;
 }
 
@@ -156,10 +138,11 @@ static void ogg_play(const void *handle, int looping)
   ogg_playing = 1;
   ogg_paused  = 0;
   if (ogg_v)
-    prb_stb_vorbis_seek_start(ogg_v);
+    rvorbis_seek_start(ogg_v);
   ogg_src_have = 0;
   ogg_src_pos  = 0;
   ogg_frac     = 0;
+  ogg_decode_pos = 0;
 }
 
 static void ogg_stop(void)
@@ -169,7 +152,7 @@ static void ogg_stop(void)
 
 /* Refill ogg_src with up to OGG_SRC_FRAMES interleaved-stereo source frames.
  * Returns the number of frames available (0 at end of stream when not
- * looping).  stb_vorbis returns however many it decoded; on 0 we either seek
+ * looping).  rvorbis returns however many it decoded; on 0 we either seek
  * back (loop) or report end. */
 static int ogg_fill(void)
 {
@@ -178,20 +161,22 @@ static int ogg_fill(void)
   ogg_src_have = 0;
   if (!ogg_v)
     return 0;
-  got = prb_stb_vorbis_get_samples_short_interleaved(ogg_v, 2, ogg_src,
-                                                     OGG_SRC_FRAMES * 2);
+  got = rvorbis_get_samples_s16_interleaved(ogg_v, 2, (int16_t *)ogg_src,
+                                            OGG_SRC_FRAMES * 2);
   if (got <= 0)
   {
     if (ogg_looping)
     {
-      prb_stb_vorbis_seek_start(ogg_v);
-      got = prb_stb_vorbis_get_samples_short_interleaved(ogg_v, 2, ogg_src,
-                                                         OGG_SRC_FRAMES * 2);
+      rvorbis_seek_start(ogg_v);
+      ogg_decode_pos = 0;
+      got = rvorbis_get_samples_s16_interleaved(ogg_v, 2, (int16_t *)ogg_src,
+                                                OGG_SRC_FRAMES * 2);
     }
     if (got <= 0)
       return 0;
   }
-  ogg_src_have = got;   /* get_samples_short_interleaved returns frames */
+  ogg_src_have    = got;   /* get_samples_s16_interleaved returns frames */
+  ogg_decode_pos += (unsigned)got;
   return got;
 }
 
@@ -205,20 +190,22 @@ static int ogg_fill_f(void)
   ogg_src_have = 0;
   if (!ogg_v)
     return 0;
-  got = prb_stb_vorbis_get_samples_float_interleaved(ogg_v, 2, ogg_srcf,
-                                                     OGG_SRC_FRAMES * 2);
+  got = rvorbis_get_samples_float_interleaved(ogg_v, 2, ogg_srcf,
+                                              OGG_SRC_FRAMES * 2);
   if (got <= 0)
   {
     if (ogg_looping)
     {
-      prb_stb_vorbis_seek_start(ogg_v);
-      got = prb_stb_vorbis_get_samples_float_interleaved(ogg_v, 2, ogg_srcf,
-                                                         OGG_SRC_FRAMES * 2);
+      rvorbis_seek_start(ogg_v);
+      ogg_decode_pos = 0;
+      got = rvorbis_get_samples_float_interleaved(ogg_v, 2, ogg_srcf,
+                                                  OGG_SRC_FRAMES * 2);
     }
     if (got <= 0)
       return 0;
   }
-  ogg_src_have = got;   /* get_samples_float_interleaved returns frames */
+  ogg_src_have    = got;   /* get_samples_float_interleaved returns frames */
+  ogg_decode_pos += (unsigned)got;
   return got;
 }
 
@@ -319,9 +306,9 @@ static size_t ogg_serialize(void *dest, size_t cap)
 
   if (!ogg_v || !ogg_playing)
     return 0;                 /* nothing playing -> no state to record */
-  off = prb_stb_vorbis_get_sample_offset(ogg_v);
+  off = (int)ogg_decode_pos;
   if (off < 0)
-    return 0;                 /* position unknown -> let the generic layer cope */
+    return 0;                 /* implausible position -> let the generic layer cope */
   if (!dest)
     return need;              /* size-query mode */
   if (cap < need)
@@ -348,8 +335,9 @@ static int ogg_unserialize(const void *src, size_t size)
   if (off < 0)                                      return 0;
 
   ogg_looping = (hdr[2] != 0);
-  if (!prb_stb_vorbis_seek(ogg_v, (unsigned)off))
+  if (!rvorbis_seek(ogg_v, (unsigned)off))
     return 0;                 /* seek failed -> defer to render-replay */
+  ogg_decode_pos = (unsigned)off;
   /* drop the resampler buffer so render() refills from the sought position */
   ogg_src_have = 0;
   ogg_src_pos  = 0;

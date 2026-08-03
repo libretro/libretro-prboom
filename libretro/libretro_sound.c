@@ -11,15 +11,80 @@
 #include "libretro.h"
 
 #include <formats/rwav.h>
+#include <formats/rvorbis.h>
 
-/* stb_vorbis in-memory Ogg decoder (deps/stb/stb_vorbis_impl.c).  Declared
- * here rather than pulling the whole header; returns the sample count per
- * channel and a malloc'd interleaved int16 buffer, or a negative count on
- * error.  The decoder's public symbols are prb_-prefixed so they do not clash
- * with the stock stb_vorbis a statically linked RetroArch already exports. */
-extern int prb_stb_vorbis_decode_memory(const unsigned char *mem, int len,
-                                     int *channels, int *sample_rate,
-                                     short **output);
+/* Whole-lump Ogg Vorbis decode to interleaved s16 -- the contract the
+ * old stb_vorbis_decode_memory call had: returns the frame count per
+ * channel and a malloc'd interleaved int16 buffer, or a negative count
+ * on error.  Decodes with libretro-common's rvorbis. */
+static int I_OggDecodeMemory(const unsigned char *mem, int len,
+                             int *channels, int *sample_rate,
+                             short **output)
+{
+   rvorbis      *v;
+   rvorbis_info  info;
+   int           err = 0;
+   unsigned int  total;
+   size_t        cap_frames, have = 0;
+   int16_t      *pcm;
+
+   *output = NULL;
+   v = rvorbis_open_memory(mem, len, &err, NULL);
+   if (!v)
+      return -1;
+   info         = rvorbis_get_info(v);
+   *channels    = info.channels;
+   *sample_rate = (int)info.sample_rate;
+   if (info.channels < 1)
+   {
+      rvorbis_close(v);
+      return -1;
+   }
+
+   /* A well-formed Ogg states its length on the last page's granule;
+    * allocate exactly, falling back to grow-by-doubling when the stream
+    * does not say. */
+   total      = rvorbis_stream_length_in_samples(v);
+   cap_frames = total ? (size_t)total : 4096;
+   pcm        = malloc(cap_frames * (size_t)info.channels * sizeof(int16_t));
+   if (!pcm)
+   {
+      rvorbis_close(v);
+      return -1;
+   }
+
+   for (;;)
+   {
+      int got;
+      if (have == cap_frames)
+      {
+         int16_t *np;
+         cap_frames *= 2;
+         np = realloc(pcm, cap_frames * (size_t)info.channels * sizeof(int16_t));
+         if (!np)
+         {
+            free(pcm);
+            rvorbis_close(v);
+            return -1;
+         }
+         pcm = np;
+      }
+      got = rvorbis_get_samples_s16_interleaved(v, info.channels,
+            pcm + have * (size_t)info.channels,
+            (int)((cap_frames - have) * (size_t)info.channels));
+      if (got <= 0)
+         break;
+      have += (size_t)got;
+   }
+   rvorbis_close(v);
+   if (!have)
+   {
+      free(pcm);
+      return -1;
+   }
+   *output = (short *)pcm;
+   return (int)have;
+}
 
 
 #include "../src/i_sound.h"
@@ -180,7 +245,7 @@ static const music_player_t *music_players[] =
   &mp_player, // madplayer.h
 #endif
   &mod_player, // modplayer.h (ProTracker .MOD via pocketmod)
-  &ogg_player, // oggplayer.h (Ogg Vorbis via stb_vorbis)
+  &ogg_player, // oggplayer.h (Ogg Vorbis via rvorbis)
   NULL
 };
 #define NUM_MUS_PLAYERS ((int)(sizeof (music_players) / sizeof (music_player_t *) - 1))
@@ -344,7 +409,7 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step,
     }
 
     /* Some ZDoom-based mods ship sound effects as Ogg Vorbis lumps.  Detect
-     * the "OggS" magic and decode with stb_vorbis into the same output
+     * the "OggS" magic and decode with rvorbis into the same output
      * contract as the WAV path: native-rate signed-16-bit mono PCM with one
      * duplicated trailing sample for the mixer's cur[1] fetch and a 16.16
      * *step from the source rate. */
@@ -357,8 +422,8 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step,
         int      samples;
         unsigned int ogg_rate;
 
-        samples = prb_stb_vorbis_decode_memory(sfxlump_data, sfxlump_len,
-                                           &channels, &rate, &pcm);
+        samples = I_OggDecodeMemory(sfxlump_data, sfxlump_len,
+                                    &channels, &rate, &pcm);
         if (samples <= 0 || !pcm || channels < 1)
         {
             if (pcm) free(pcm);
@@ -374,7 +439,7 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step,
             return 0;
         }
 
-        /* stb_vorbis yields interleaved signed-16 per channel; average to
+        /* rvorbis yields interleaved signed-16 per channel; average to
          * mono to match the mixer's single-channel sample store. */
         if (channels == 1)
         {
@@ -776,7 +841,7 @@ void I_UpdateSound(void)
    /* Step 1: music into the canonical buffer.
     *
     * When float output is active and the current backend renders float
-    * natively (Ogg via stb_vorbis, MIDI via fluidsynth, OPL via its float
+    * natively (Ogg via rvorbis, MIDI via fluidsynth, OPL via its float
     * FIR resampler), it writes straight into fmixbuffer, skipping the
     * int16->float widen below.  Integer-native backends (MOD) have
     * render_float == NULL, so they render int16 into mixbuffer and get

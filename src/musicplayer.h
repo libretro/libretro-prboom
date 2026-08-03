@@ -111,7 +111,7 @@ typedef struct
   // contract as render().  Leave NULL for integer-native backends
   // (MOD) -- the caller renders them via render() and widens to
   // float.  Implementing this lets backends with a float-native
-  // stage (Ogg via stb_vorbis, MIDI via fluidsynth, OPL via its
+  // stage (Ogg via rvorbis, MIDI via fluidsynth, OPL via its
   // float FIR resampler, MP3 via libmad's 28-bit synth) skip a
   // float->int16->float round-trip and feed the float mixer
   // directly.

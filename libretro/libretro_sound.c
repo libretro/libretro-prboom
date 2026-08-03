@@ -241,9 +241,7 @@ static const music_player_t *music_players[] =
 #endif
   &opl_synth_player, // oplplayer.h
   &libretro_midi_player, // libretro_midiout.h (raw MIDI to the frontend)
-#ifdef HAVE_LIBMAD
-  &mp_player, // madplayer.h
-#endif
+  &mp_player, // madplayer.h (MP3 via rmp3)
   &mod_player, // modplayer.h (ProTracker .MOD via pocketmod)
   &ogg_player, // oggplayer.h (Ogg Vorbis via rvorbis)
   NULL
@@ -1166,9 +1164,9 @@ void I_UnRegisterSong(int handle)
  * resumes at the right position instead of drifting past it.  The
  * cross-backend path is also the only available option for backends
  * whose internal state cannot be event-replayed, MP3 being the
- * motivating case (libmad's decoder state is opaque, so re-decoding
- * from the start to the saved sample count is the only way to
- * resume cleanly).
+ * motivating case (the decoder's bit-reservoir state is not
+ * addressable, so re-decoding from the start to the saved sample
+ * count is the only way to resume cleanly).
  */
 #define MUSIC_GENERIC_MAGIC     0x474D5553u   /* 'GMUS' */
 #define MUSIC_GENERIC_VERSION   1u

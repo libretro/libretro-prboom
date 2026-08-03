@@ -2,13 +2,13 @@ DEPS_DIR           = $(ROOT_DIR)/deps
 LIBRETRO_DIR       = $(ROOT_DIR)/libretro
 LIBRETRO_COMM_DIR  = $(ROOT_DIR)/libretro/libretro-common
 
-INCFLAGS    = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(DEPS_DIR)/libmad -I$(DEPS_DIR)/miniz -I$(LIBRETRO_COMM_DIR)/include
+INCFLAGS    = -I$(ROOT_DIR) -I$(CORE_DIR) -I$(DEPS_DIR)/miniz -I$(LIBRETRO_COMM_DIR)/include
 
 ifneq (,$(findstring msvc2003,$(platform)))
 INCFLAGS += -I$(LIBRETRO_COMM_DIR)/include/compat/msvc
 endif
 
-COREDEFINES = -DFPM_DEFAULT \
+COREDEFINES = \
               -DHAVE_RVORBIS -DHAVE_RMP3 -DHAVE_RMODTRACKER -DHAVE_RWAV \
               -DHAVE_RPNG -DHAVE_RJPEG
 
@@ -50,15 +50,7 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c \
 				 $(LIBRETRO_COMM_DIR)/memmap/memmap.c
 
-SOURCES_C += $(DEPS_DIR)/miniz/miniz.c \
-				 $(DEPS_DIR)/libmad/bit.c \
-				 $(DEPS_DIR)/libmad/frame.c \
-				 $(DEPS_DIR)/libmad/huffman.c \
-				 $(DEPS_DIR)/libmad/layer3.c \
-				 $(DEPS_DIR)/libmad/layer12.c \
-				 $(DEPS_DIR)/libmad/stream.c \
-				 $(DEPS_DIR)/libmad/synth.c \
-				 $(DEPS_DIR)/libmad/timer.c
+SOURCES_C += $(DEPS_DIR)/miniz/miniz.c
 
 SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/i_cpu_features.c \

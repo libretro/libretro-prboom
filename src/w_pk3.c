@@ -187,87 +187,121 @@ static int pk3_zip_open(pk3_zip_t *z, const unsigned char *zip, int zip_len)
   return 1;
 }
 
-/* Extract one member to a fresh malloc'd buffer of exactly usize bytes
- * (usize 0 returns a 1-byte allocation so the pointer is non-NULL) and
- * verify the CRC.  Returns NULL on any inconsistency. */
-static unsigned char *pk3_zip_extract(pk3_zip_t *z, const pk3_zent_t *e)
+/* Resolve a member's data offset from its local file header.
+ * Returns 1 and writes *doff on success. */
+static int pk3_zip_locate(const pk3_zip_t *z, const pk3_zent_t *e,
+                          unsigned *doff)
 {
   const unsigned char *zip = z->zip;
-  unsigned             nlen, elen, doff;
-  unsigned char       *out;
+  unsigned             nlen, elen, off;
 
   if ((int64_t)e->lho + 30 > (int64_t)z->zip_len ||
       pk3_rd32(zip + e->lho) != 0x04034b50u)
-    return NULL;
+    return 0;
   nlen = pk3_rd16(zip + e->lho + 26);
   elen = pk3_rd16(zip + e->lho + 28);
-  doff = e->lho + 30 + nlen + elen;
-  if ((int64_t)doff + e->csize > (int64_t)z->zip_len)
-    return NULL;
+  off  = e->lho + 30 + nlen + elen;
+  if ((int64_t)off + e->csize > (int64_t)z->zip_len)
+    return 0;
+  if (e->method == 0 && e->csize != e->usize)          /* stored: sizes lie */
+    return 0;
+  if (e->method != 0 && e->method != 8)                /* unsupported */
+    return 0;
+  *doff = off;
+  return 1;
+}
 
-  out = malloc(e->usize ? e->usize : 1);
-  if (!out)
-    return NULL;
+/* Decompress a member's raw DEFLATE stream into dst, writing at most cap
+ * bytes.  With cap == usize the whole stream must arrive (END seen and
+ * exactly usize bytes written); with cap < usize this is a prefix decode
+ * that succeeds as soon as cap bytes exist.  Returns 1 on success. */
+static int pk3_zip_inflate(pk3_zip_t *z, const unsigned char *in,
+                           size_t in_len, unsigned char *dst,
+                           unsigned cap, unsigned usize)
+{
+  size_t wrote_total = 0;
+  int    r;
 
-  if (e->method == 0)                                  /* stored */
+  if (!z->inflate)
+    z->inflate = rinflate_new(-15);                    /* raw DEFLATE */
+  else
+    rinflate_reset(z->inflate, -15);
+  if (!z->inflate)
+    return 0;
+  rinflate_set_out(z->inflate, dst, cap);
+  for (;;)
   {
-    if (e->csize != e->usize)
-    {
-      free(out);
-      return NULL;
-    }
-    memcpy(out, zip + doff, e->usize);
+    size_t rd = 0, wr = 0;
+    rinflate_set_in(z->inflate, in, in_len);
+    r            = rinflate_process(z->inflate, &rd, &wr);
+    in          += rd;
+    in_len      -= rd;
+    wrote_total += wr;
+    if (cap < usize && wrote_total >= cap)             /* prefix satisfied */
+      return 1;
+    if (r == RDEFLATE_PROCESS_END)
+      break;
+    if (r != RDEFLATE_PROCESS_NEXT || (rd == 0 && wr == 0))
+      return 0;                       /* malformed, or truncated/overlong */
   }
-  else if (e->method == 8)                             /* deflate */
-  {
-    const unsigned char *in     = zip + doff;
-    size_t               in_len = e->csize, wrote_total = 0;
-    int                  r;
+  return wrote_total == cap;
+}
 
-    if (!z->inflate)
-      z->inflate = rinflate_new(-15);                  /* raw DEFLATE */
-    else
-      rinflate_reset(z->inflate, -15);
-    if (!z->inflate)
-    {
-      free(out);
-      return NULL;
-    }
-    rinflate_set_out(z->inflate, out, e->usize);
-    for (;;)
-    {
-      size_t rd = 0, wr = 0;
-      rinflate_set_in(z->inflate, in, in_len);
-      r            = rinflate_process(z->inflate, &rd, &wr);
-      in          += rd;
-      in_len      -= rd;
-      wrote_total += wr;
-      if (r == RDEFLATE_PROCESS_END)
-        break;
-      if (r != RDEFLATE_PROCESS_NEXT || (rd == 0 && wr == 0))
-      {
-        free(out);                    /* malformed, or truncated/overlong */
-        return NULL;
-      }
-    }
-    if (wrote_total != e->usize)
-    {
-      free(out);
-      return NULL;
-    }
-  }
-  else                                                 /* unsupported */
-  {
-    free(out);
-    return NULL;
-  }
+/* Extract one member into dst (exactly usize bytes of room) and verify
+ * the directory CRC over the result.  Returns 1 on success; dst contents
+ * are undefined on failure. */
+static int pk3_zip_extract_to(pk3_zip_t *z, const pk3_zent_t *e,
+                              unsigned char *dst)
+{
+  unsigned doff;
 
-  if (encoding_crc32(0, out, e->usize) != e->crc)
+  if (!pk3_zip_locate(z, e, &doff))
+    return 0;
+  if (e->method == 0)
+  {
+    if (e->usize)
+      memcpy(dst, z->zip + doff, e->usize);
+  }
+  else if (!pk3_zip_inflate(z, z->zip + doff, e->csize,
+                            dst, e->usize, e->usize))
+    return 0;
+  return encoding_crc32(0, dst, e->usize) == e->crc;
+}
+
+/* Extract one member to a fresh malloc'd buffer of exactly usize bytes
+ * (usize 0 returns a 1-byte allocation so the pointer is non-NULL).
+ * Returns NULL on any inconsistency. */
+static unsigned char *pk3_zip_extract(pk3_zip_t *z, const pk3_zent_t *e)
+{
+  unsigned char *out = malloc(e->usize ? e->usize : 1);
+
+  if (out && !pk3_zip_extract_to(z, e, out))
   {
     free(out);
     return NULL;
   }
   return out;
+}
+
+/* Decode just the first min(usize, cap) bytes of a member into dst for
+ * format sniffing: stored members copy in place, deflated members run a
+ * capped prefix inflate.  No CRC check -- the full extraction verifies.
+ * Returns the byte count on success, -1 on any inconsistency. */
+static int pk3_zip_sniff(pk3_zip_t *z, const pk3_zent_t *e,
+                         unsigned char *dst, unsigned cap)
+{
+  unsigned doff, need = e->usize < cap ? e->usize : cap;
+
+  if (!pk3_zip_locate(z, e, &doff))
+    return -1;
+  if (!need)
+    return 0;
+  if (e->method == 0)
+    memcpy(dst, z->zip + doff, need);
+  else if (!pk3_zip_inflate(z, z->zip + doff, e->csize,
+                            dst, need, e->usize))
+    return -1;
+  return (int)need;
 }
 
 /* ---- full-path registry -------------------------------------------------
@@ -385,70 +419,6 @@ dbool W_IsPK3(const unsigned char *data, int length)
          data[2] == 0x03 && data[3] == 0x04;
 }
 
-/* ---- synthesized-directory builder -------------------------------------- */
-
-typedef struct
-{
-  unsigned char *data;     /* growing lump data area (past the header)   */
-  int            data_len;
-  int            data_cap;
-  filelump_t    *dir;      /* growing directory                          */
-  int            dir_len;
-  int            dir_cap;
-} pk3_build_t;
-
-static int pk3_grow(pk3_build_t *b, int add)
-{
-  if (b->data_len + add > b->data_cap)
-  {
-    int cap = b->data_cap ? b->data_cap : 1 << 20;
-    while (b->data_len + add > cap)
-      cap = cap << 1;
-    b->data = realloc(b->data, cap);
-    if (!b->data)
-      return 0;
-    b->data_cap = cap;
-  }
-  return 1;
-}
-
-/* Append one lump.  data may be NULL for zero-size markers. */
-static int pk3_add_lump(pk3_build_t *b, const char *name,
-                        const void *data, int size)
-{
-  filelump_t *fl;
-
-  if (size && !pk3_grow(b, size))
-    return 0;
-  if (b->dir_len == b->dir_cap)
-  {
-    b->dir_cap = b->dir_cap ? b->dir_cap * 2 : 256;
-    b->dir = realloc(b->dir, b->dir_cap * sizeof(filelump_t));
-    if (!b->dir)
-      return 0;
-  }
-  fl = &b->dir[b->dir_len++];
-  /* +12: lump data is laid out after the wadinfo_t header */
-  fl->filepos = LONG(b->data_len + 12);
-  fl->size    = LONG(size);
-  /* filelump_t names are 8 bytes, NUL-padded but not NUL-terminated,
-   * which is exactly the case -Wstringop-truncation flags strncpy for;
-   * zero-fill and copy the clamped length instead. */
-  {
-    size_t n = strlen(name);
-    if (n > 8)
-      n = 8;
-    memset(fl->name, 0, 8);
-    memcpy(fl->name, name, n);
-  }
-  if (size)
-  {
-    memcpy(b->data + b->data_len, data, size);
-    b->data_len += size;
-  }
-  return 1;
-}
-
 /* ZDoom lump naming: basename, up to the first '.', uppercased, max 8. */
 static void pk3_lump_name(char out[9], const char *path)
 {
@@ -528,55 +498,6 @@ static dbool pk3_is_wad_image(const unsigned char *d, int len)
       (int64_t)infotableofs + (int64_t)numlumps * 16 > (int64_t)len)
     return FALSE;
   return TRUE;
-}
-
-/* Expand a root-level .wad member: append its lumps verbatim. */
-static int pk3_add_inner_wad(pk3_build_t *b, const char *member,
-                             const unsigned char *wad, int len)
-{
-  wadinfo_t  header;
-  filelump_t fl;
-  int        i, numlumps, infotableofs;
-
-  if (len < (int)sizeof(wadinfo_t))
-    return 0;
-  memcpy(&header, wad, sizeof(header));
-  if (strncmp(header.identification, "IWAD", 4) &&
-      strncmp(header.identification, "PWAD", 4))
-  {
-    lprintf(LO_WARN, "W_TranslatePK3: %s is not a wad, skipped\n", member);
-    return 1;     /* tolerated, not fatal */
-  }
-  numlumps     = LONG(header.numlumps);
-  infotableofs = LONG(header.infotableofs);
-  if (numlumps < 0 ||
-      infotableofs < 0 ||
-      (int64_t)infotableofs + (int64_t)numlumps * 16 > (int64_t)len)
-  {
-    lprintf(LO_WARN, "W_TranslatePK3: %s has a corrupt directory, skipped\n",
-            member);
-    return 1;
-  }
-  for (i = 0; i < numlumps; i++)
-  {
-    char name[9];
-    int  pos, size;
-
-    memcpy(&fl, wad + infotableofs + i * 16, sizeof(fl));
-    pos  = LONG(fl.filepos);
-    size = LONG(fl.size);
-    if (size < 0 || pos < 0 || (int64_t)pos + size > (int64_t)len)
-    {
-      lprintf(LO_WARN, "W_TranslatePK3: %s lump %d out of bounds, skipped\n",
-              member, i);
-      continue;
-    }
-    memset(name, 0, sizeof(name));
-    strncpy(name, fl.name, 8);
-    if (!pk3_add_lump(b, name, wad + pos, size))
-      return 0;
-  }
-  return 1;
 }
 
 /* ---- archive walk -------------------------------------------------------- */
@@ -670,18 +591,190 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
   return PK3_PASS_GLOBAL;
 }
 
+/* ---- exact-size image emission -------------------------------------------
+ *
+ * The central directory names every member's uncompressed size up front,
+ * so the PWAD image is assembled in place with no intermediate copies:
+ * one walk in measure mode totals the data bytes and an upper bound on
+ * the directory entries, the image is allocated at exactly that size,
+ * and a second walk in emit mode extracts every member directly into
+ * its final position (deflated members inflate straight into the image,
+ * stored members are one memcpy from the archive).  Peak memory is the
+ * source archive plus the image itself -- the old flow held every
+ * extracted member and a doubling scratch buffer besides.
+ *
+ * Both walks run the same code; only c->image selects the mode.  A
+ * member that fails extraction in emit mode (late CRC mismatch) keeps
+ * its planned data bytes as a hole, so every later member's position
+ * still matches the measured layout, and only its directory entry is
+ * dropped (the directory is written compactly, so numlumps just ends
+ * up smaller than measured). */
+
+typedef struct
+{
+  signed char    pass;     /* PK3_PASS_*, or -1 = skip                   */
+  unsigned char  is_wad;   /* root-level wad image, expanded lump-wise   */
+  unsigned char *wad;      /* held bytes for is_wad members              */
+} pk3_plan_t;
+
+typedef struct
+{
+  pk3_zip_t        *z;
+  const pk3_plan_t *plan;
+  unsigned char    *image;    /* NULL = measure mode                     */
+  filelump_t       *dir;      /* NULL in measure mode                    */
+  int               data_len; /* data bytes accounted (holes included)   */
+  int               dir_len;  /* entries emitted (measure: upper bound)  */
+} pk3_emit_t;
+
+/* Append one directory entry at the current data offset. */
+static void pk3_emit_dir(pk3_emit_t *c, const char *name, int size)
+{
+  if (c->dir)
+  {
+    filelump_t *fl = &c->dir[c->dir_len];
+    size_t      n  = strlen(name);
+
+    /* +12: lump data is laid out after the wadinfo_t header */
+    fl->filepos = LONG(c->data_len + 12);
+    fl->size    = LONG(size);
+    /* filelump_t names are 8 bytes, NUL-padded but not NUL-terminated,
+     * which is exactly the case -Wstringop-truncation flags strncpy
+     * for; zero-fill and copy the clamped length instead. */
+    if (n > 8)
+      n = 8;
+    memset(fl->name, 0, 8);
+    memcpy(fl->name, name, n);
+  }
+  c->dir_len++;
+}
+
+/* Append one lump from bytes already in memory (markers pass NULL/0). */
+static void pk3_emit_copy(pk3_emit_t *c, const char *name,
+                          const void *data, int size)
+{
+  pk3_emit_dir(c, name, size);
+  if (c->image && size)
+    memcpy(c->image + 12 + c->data_len, data, size);
+  c->data_len += size;
+}
+
+/* Append one archive member, extracting it directly into the image. */
+static void pk3_emit_member(pk3_emit_t *c, int i, const char *name)
+{
+  const pk3_zent_t *e = &c->z->ent[i];
+
+  if (!c->image)
+    pk3_emit_dir(c, name, (int)e->usize);
+  else if (pk3_zip_extract_to(c->z, e, c->image + 12 + c->data_len))
+  {
+    /* record this member's full archive path against the data offset it
+     * occupies, so a later full-path lookup can pick it out of any
+     * same-basename collision. */
+    pk3_path_record(e->name, c->data_len + 12);
+    pk3_emit_dir(c, name, (int)e->usize);
+  }
+  else
+    lprintf(LO_WARN, "W_TranslatePK3: failed to extract %s\n", e->name);
+  c->data_len += (int)e->usize;      /* hole kept on failure: layout holds */
+}
+
+/* Expand a root-level .wad member: append its lumps verbatim.  The wad
+ * image itself was validated by pk3_is_wad_image before being held, so
+ * only per-lump bounds can still be bad here. */
+static void pk3_emit_inner_wad(pk3_emit_t *c, const char *member,
+                               const unsigned char *wad, int len)
+{
+  wadinfo_t  header;
+  filelump_t fl;
+  int        i, numlumps, infotableofs;
+
+  memcpy(&header, wad, sizeof(header));
+  numlumps     = LONG(header.numlumps);
+  infotableofs = LONG(header.infotableofs);
+  for (i = 0; i < numlumps; i++)
+  {
+    char name[9];
+    int  pos, size;
+
+    memcpy(&fl, wad + infotableofs + i * 16, sizeof(fl));
+    pos  = LONG(fl.filepos);
+    size = LONG(fl.size);
+    if (size < 0 || pos < 0 || (int64_t)pos + size > (int64_t)len)
+    {
+      if (c->image)
+        lprintf(LO_WARN, "W_TranslatePK3: %s lump %d out of bounds, skipped\n",
+                member, i);
+      continue;
+    }
+    memset(name, 0, sizeof(name));
+    strncpy(name, fl.name, 8);
+    pk3_emit_copy(c, name, wad + pos, size);
+  }
+}
+
+/* One full walk over the classified members in emission order.  Emission
+ * order: root files + inner wads (zip order), then the sprite, flat and
+ * texture marker groups, then the deferred quarantine.  Reordering
+ * across folders is safe -- only same-name precedence matters to the
+ * lump hash, and names cannot collide across these groups once the
+ * deferred formats are quarantined. */
+static void pk3_emit_walk(pk3_emit_t *c)
+{
+  int pass, i;
+
+  for (pass = PK3_PASS_ROOT; pass <= PK3_PASS_DEFERRED; pass++)
+  {
+    int emitted = 0;
+
+    for (i = 0; i < c->z->n; i++)
+    {
+      const pk3_plan_t *p = &c->plan[i];
+      char              name[9];
+
+      if (p->pass != pass)
+        continue;
+      if (p->is_wad)
+      {
+        pk3_emit_inner_wad(c, c->z->ent[i].name, p->wad,
+                           (int)c->z->ent[i].usize);
+        continue;
+      }
+      if (!emitted)
+      {
+        /* open this pass's marker group */
+        if (pass == PK3_PASS_SPRITES)  pk3_emit_copy(c, "SS_START", NULL, 0);
+        if (pass == PK3_PASS_FLATS)    pk3_emit_copy(c, "FF_START", NULL, 0);
+        if (pass == PK3_PASS_TEXTURES) pk3_emit_copy(c, "TX_START", NULL, 0);
+        if (pass == PK3_PASS_DEFERRED) pk3_emit_copy(c, "PD_START", NULL, 0);
+        emitted = 1;
+      }
+      pk3_lump_name(name, c->z->ent[i].name);
+      pk3_emit_member(c, i, name);
+    }
+
+    if (emitted)
+    {
+      if (pass == PK3_PASS_SPRITES)  pk3_emit_copy(c, "SS_END", NULL, 0);
+      if (pass == PK3_PASS_FLATS)    pk3_emit_copy(c, "FF_END", NULL, 0);
+      if (pass == PK3_PASS_TEXTURES) pk3_emit_copy(c, "TX_END", NULL, 0);
+      if (pass == PK3_PASS_DEFERRED) pk3_emit_copy(c, "PD_END", NULL, 0);
+    }
+  }
+}
+
 unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
                               int *out_length, const char *archive_name)
 {
-  pk3_zip_t       z;
-  pk3_build_t     b;
-  unsigned char  *image;
-  unsigned char **data;    /* per-entry extracted bytes, NULL once emitted */
-  signed char    *epass;   /* per-entry pass, -1 = skip                    */
-  wadinfo_t       header;
-  int             pass, i, image_len;
+  pk3_zip_t      z;
+  pk3_plan_t    *plan;
+  pk3_emit_t     measure, emit;
+  unsigned char *image = NULL;
+  unsigned char  sniff[16];   /* >= sizeof(wadinfo_t); every sniffer reads
+                                 at most 12 bytes (pk3_is_wad_image) */
+  wadinfo_t      header;
+  int            i, image_len;
 
-  memset(&b, 0, sizeof(b));
   if (!pk3_zip_open(&z, zip, zip_length))
   {
     lprintf(LO_WARN, "W_TranslatePK3: %s: not a readable ZIP archive\n",
@@ -689,139 +782,122 @@ unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
     return NULL;
   }
 
-  data  = calloc(z.n ? z.n : 1, sizeof(*data));
-  epass = malloc(z.n ? z.n : 1);
-  if (!data || !epass)
+  plan = calloc(z.n ? z.n : 1, sizeof(*plan));
+  if (!plan)
     goto oom;
 
-  /* Extract and classify every member exactly once up front.  The pass of
-   * a member depends on its bytes (format sniff), so classification and
-   * extraction cannot be separated; holding all members briefly costs no
-   * more peak memory than the synthesized image itself will. */
+  /* Classify every member from a prefix decode: the sniffers only read
+   * the first bytes, so deflated members run a capped inflate into a
+   * 16-byte scratch instead of a full extraction.  Length semantics are
+   * preserved by passing the true uncompressed size (pk3_is_wad_image
+   * bounds its directory against it). */
   for (i = 0; i < z.n; i++)
   {
     const pk3_zent_t *e = &z.ent[i];
+    char              name[9];
+    int               got;
 
-    epass[i] = -1;
+    plan[i].pass = -1;
     if (e->is_dir || e->usize > 0x7fffffffu)
       continue;
-    data[i] = pk3_zip_extract(&z, e);
-    if (!data[i])
+    got = pk3_zip_sniff(&z, e, sniff, sizeof(sniff));
+    if (got < 0)
     {
       lprintf(LO_WARN, "W_TranslatePK3: %s: failed to extract %s\n",
               archive_name, e->name);
       continue;
     }
-    epass[i] = (signed char)pk3_pass_of(e->name, data[i], (int)e->usize);
-  }
+    pk3_lump_name(name, e->name);
+    if (!name[0])
+      continue;
+    plan[i].pass = (signed char)pk3_pass_of(e->name, sniff, (int)e->usize);
 
-  /* Emission order: root files + inner wads (zip order), then the
-   * sprite and flat marker groups, then the deferred quarantine.
-   * Reordering across folders is safe -- only same-name precedence
-   * matters to the lump hash, and names cannot collide across these
-   * groups once the deferred formats are quarantined. */
-  for (pass = PK3_PASS_ROOT; pass <= PK3_PASS_DEFERRED; pass++)
-  {
-    int emitted = 0;
-
-    for (i = 0; i < z.n; i++)
+    /* Root-level wad images are the one case that needs full bytes early:
+     * their internal directory drives the layout.  Hold them extracted
+     * (and CRC-verified) until the emit walk copies their lumps out. */
+    if (plan[i].pass == PK3_PASS_ROOT && pk3_is_wad_image(sniff, (int)e->usize))
     {
-      const pk3_zent_t *e = &z.ent[i];
-      char              name[9];
-
-      if (epass[i] != pass)
-        continue;
-
-      pk3_lump_name(name, e->name);
-      if (!name[0])
+      plan[i].wad = pk3_zip_extract(&z, e);
+      if (!plan[i].wad)
       {
-        free(data[i]);
-        data[i] = NULL;
+        lprintf(LO_WARN, "W_TranslatePK3: %s: failed to extract %s\n",
+                archive_name, e->name);
+        plan[i].pass = -1;
         continue;
       }
-
-      if (pass == PK3_PASS_ROOT && pk3_is_wad_image(data[i], (int)e->usize))
-      {
-        if (!pk3_add_inner_wad(&b, e->name, data[i], (int)e->usize))
-          goto oom;
-      }
-      else
-      {
-        if (!emitted)
-        {
-          /* open this pass's marker group */
-          if (pass == PK3_PASS_SPRITES  && !pk3_add_lump(&b, "SS_START", NULL, 0)) goto oom;
-          if (pass == PK3_PASS_FLATS    && !pk3_add_lump(&b, "FF_START", NULL, 0)) goto oom;
-          if (pass == PK3_PASS_TEXTURES && !pk3_add_lump(&b, "TX_START", NULL, 0)) goto oom;
-          if (pass == PK3_PASS_DEFERRED && !pk3_add_lump(&b, "PD_START", NULL, 0)) goto oom;
-        }
-        /* record this member's full archive path against the data offset it
-         * is about to occupy, so a later full-path lookup can pick it out of
-         * any same-basename collision (filepos mirrors pk3_add_lump). */
-        pk3_path_record(e->name, b.data_len + 12);
-        if (!pk3_add_lump(&b, name, data[i], (int)e->usize))
-          goto oom;
-        emitted = 1;
-      }
-      free(data[i]);
-      data[i] = NULL;
-    }
-
-    if (emitted)
-    {
-      int ok = 1;
-      if (pass == PK3_PASS_SPRITES)  ok = pk3_add_lump(&b, "SS_END", NULL, 0);
-      if (pass == PK3_PASS_FLATS)    ok = pk3_add_lump(&b, "FF_END", NULL, 0);
-      if (pass == PK3_PASS_TEXTURES) ok = pk3_add_lump(&b, "TX_END", NULL, 0);
-      if (pass == PK3_PASS_DEFERRED) ok = pk3_add_lump(&b, "PD_END", NULL, 0);
-      if (!ok)
-        goto oom;
+      plan[i].is_wad = 1;
     }
   }
 
-  free(data);
-  free(epass);
+  /* Measure walk: exact data size and an upper bound on directory
+   * entries (emit-time extraction failures only ever shrink it). */
+  memset(&measure, 0, sizeof(measure));
+  measure.z    = &z;
+  measure.plan = plan;
+  pk3_emit_walk(&measure);
 
-  /* assemble: header + lump data + directory */
-  image_len = 12 + b.data_len + b.dir_len * 16;
-  image = malloc(image_len);
+  if ((int64_t)12 + measure.data_len + (int64_t)measure.dir_len * 16
+      > 0x7fffffff)
+    goto oom;                        /* image would overflow int offsets */
+  image = malloc((size_t)12 + measure.data_len
+                 + (size_t)measure.dir_len * 16);
   if (!image)
-  {
-    free(b.data);
-    free(b.dir);
-    pk3_zip_close(&z);
-    return NULL;
-  }
-  memcpy(header.identification, "PWAD", 4);
-  header.numlumps     = LONG(b.dir_len);
-  header.infotableofs = LONG(12 + b.data_len);
-  memcpy(image, &header, 12);
-  if (b.data_len)
-    memcpy(image + 12, b.data, b.data_len);
-  if (b.dir_len)
-    memcpy(image + 12 + b.data_len, b.dir, b.dir_len * 16);
-  free(b.data);
-  free(b.dir);
+    goto oom;
 
-  /* the image is now the wadfile's data buffer: resolve each recorded path's
-   * data address against it so W_PK3LumpForPath can match lumps later. */
+  /* Emit walk: extract every member straight into its final position.
+   * The directory is assembled in a small aligned side buffer (writing
+   * filelump_t structs at an arbitrary data offset would be misaligned)
+   * and copied to its slot once the walk is done. */
+  emit       = measure;
+  emit.image = image;
+  emit.dir   = calloc(measure.dir_len ? measure.dir_len : 1,
+                      sizeof(filelump_t));
+  if (!emit.dir)
+    goto oom;
+  emit.data_len = 0;
+  emit.dir_len  = 0;
+  pk3_emit_walk(&emit);
+
+  memcpy(header.identification, "PWAD", 4);
+  header.numlumps     = LONG(emit.dir_len);
+  header.infotableofs = LONG(12 + measure.data_len);
+  memcpy(image, &header, 12);
+  if (emit.dir_len)
+    memcpy(image + 12 + measure.data_len, emit.dir,
+           (size_t)emit.dir_len * 16);
+  free(emit.dir);
+  image_len = 12 + measure.data_len + emit.dir_len * 16;
+  if (emit.dir_len < measure.dir_len)
+  {
+    /* return the slack from dropped entries; keep the old block if the
+     * allocator declines */
+    unsigned char *shrunk = realloc(image, image_len);
+    if (shrunk)
+      image = shrunk;
+  }
+
+  for (i = 0; i < z.n; i++)
+    free(plan[i].wad);
+  free(plan);
+
+  /* the image is now the wadfile's data buffer: resolve each recorded
+   * path's data address against it so W_PK3LumpForPath can match lumps
+   * later. */
   pk3_path_bind(image);
 
   lprintf(LO_INFO,
           "W_TranslatePK3: %s: %d lumps synthesized from %d archive members\n",
-          archive_name, b.dir_len, z.n);
+          archive_name, emit.dir_len, z.n);
   *out_length = image_len;
   pk3_zip_close(&z);
   return image;
 
 oom:
-  if (data)
+  if (plan)
     for (i = 0; i < z.n; i++)
-      free(data[i]);
-  free(data);
-  free(epass);
-  free(b.data);
-  free(b.dir);
+      free(plan[i].wad);
+  free(plan);
+  free(image);
   pk3_zip_close(&z);
   lprintf(LO_WARN, "W_TranslatePK3: %s: out of memory\n", archive_name);
   return NULL;

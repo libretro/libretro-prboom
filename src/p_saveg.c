@@ -74,16 +74,22 @@ void P_ArchivePlayers (void)
     if (playeringame[i])
       {
         int      j;
-        player_t *dest;
+        player_t tmp;
 
+        /* Fix the psprite state pointers up in an aligned local copy and
+         * memcpy the result out, instead of patching through a player_t*
+         * cast of save_p: PADSAVEP only aligns to 4 and player_t holds
+         * pointers, so the in-buffer member access was misaligned (UBSan;
+         * faults on strict-alignment targets).  Bytes written are
+         * identical, the savegame format is unchanged. */
         PADSAVEP();
-        dest = (player_t *) save_p;
-        memcpy(dest, &players[i], sizeof(player_t));
-        save_p += sizeof(player_t);
+        tmp = players[i];
         for (j=0; j<NUMPSPRITES; j++)
-          if (dest->psprites[j].state)
-            dest->psprites[j].state =
-              (state_t *)(dest->psprites[j].state-states);
+          if (tmp.psprites[j].state)
+            tmp.psprites[j].state =
+              (state_t *)(tmp.psprites[j].state-states);
+        memcpy(save_p, &tmp, sizeof(player_t));
+        save_p += sizeof(player_t);
       }
 }
 
@@ -386,11 +392,68 @@ void P_ArchiveThinkers (void)
   for (th = thinkercap.next ; th != &thinkercap ; th=th->next)
     if (th->function.arg1 == (void (*)(void *))P_MobjThinker)
       {
-        mobj_t *mobj;
+        mobj_t tmp;
 
         *save_p++ = tc_mobj;
         PADSAVEP();
-        mobj = (mobj_t *)save_p;
+
+        /* All pointer->index fixups happen in this aligned local copy,
+         * which is then memcpy'd out, instead of patching through a
+         * mobj_t* cast of save_p: PADSAVEP only aligns to 4 and mobj_t
+         * holds pointers, so the in-buffer member accesses were
+         * misaligned (UBSan; faults on strict-alignment targets).  The
+         * emitted bytes -- and therefore the savegame format -- are
+         * identical for both layouts. */
+        memcpy (&tmp, th, sizeof(tmp));
+        tmp.state = (state_t *)(tmp.state - states);
+
+        if (raven)
+        {
+          tmp.touching_sectorlist = NULL;
+          tmp.user_vars = NULL;
+          tmp.translation = NULL;
+
+          if (tmp.lastenemy)
+            tmp.lastenemy = tmp.lastenemy->thinker.function.arg1 ==
+              (void (*)(void *))P_MobjThinker ?
+              (mobj_t *) tmp.lastenemy->thinker.prev : NULL;
+        }
+
+        // killough 2/14/98: convert pointers into indices.
+        // Fixes many savegame problems, by properly saving
+        // target and tracer fields. Note: we store NULL if
+        // the thinker pointed to by these fields is not a
+        // mobj thinker.
+
+        if (tmp.target)
+          tmp.target = tmp.target->thinker.function.arg1 ==
+            (void (*)(void *))P_MobjThinker ?
+            (mobj_t *) tmp.target->thinker.prev : NULL;
+
+        if (tmp.tracer)
+          tmp.tracer = tmp.tracer->thinker.function.arg1 ==
+            (void (*)(void *))P_MobjThinker ?
+            (mobj_t *) tmp.tracer->thinker.prev : NULL;
+
+        /* pointer-valued raven specials get the same index treatment;
+         * integer-valued ones are saved verbatim by the memcpy below */
+        if (raven)
+        {
+          int psf = P_PointerSpecialFields(tmp.type);
+
+          if ((psf & PSF_SPECIAL1) && tmp.special1.m)
+            tmp.special1.m = tmp.special1.m->thinker.function.arg1 ==
+              (void (*)(void *))P_MobjThinker ?
+              (mobj_t *) tmp.special1.m->thinker.prev : NULL;
+
+          if ((psf & PSF_SPECIAL2) && tmp.special2.m)
+            tmp.special2.m = tmp.special2.m->thinker.function.arg1 ==
+              (void (*)(void *))P_MobjThinker ?
+              (mobj_t *) tmp.special2.m->thinker.prev : NULL;
+        }
+
+        if (tmp.player)
+          tmp.player = (player_t *)((tmp.player-players) + 1);
 
         if (raven)
         {
@@ -400,17 +463,8 @@ void P_ArchiveThinkers (void)
            * (losing tid, the death action special, the damage override and
            * floorclip).  Raven saves are not format-compatible with anything
            * else anyway (see the RVN tag), so store the full struct. */
-          memcpy (mobj, th, sizeof(*mobj));
-          save_p += sizeof(*mobj);
-          mobj->state = (state_t *)(mobj->state - states);
-          mobj->touching_sectorlist = NULL;
-          mobj->user_vars = NULL;
-          mobj->translation = NULL;
-
-          if (mobj->lastenemy)
-            mobj->lastenemy = mobj->lastenemy->thinker.function.arg1 ==
-              (void (*)(void *))P_MobjThinker ?
-              (mobj_t *) mobj->lastenemy->thinker.prev : NULL;
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
         }
         else
         {
@@ -424,58 +478,21 @@ void P_ArchiveThinkers (void)
 	 * to
 	 *  mobj_t* lastenemy;
 	 *  void* touching_sectorlist;
-         *  fixed_t PrevX, PrevY, PrevZ, padding;
+	 *  fixed_t PrevX, PrevY, PrevZ, padding;
 	 * at prboom 2.4.4. There is code here to preserve the savegame format.
 	 *
 	 * touching_sectorlist is reconstructed anyway, so we now leave off the
 	 * last 2 words of mobj_t, write 5 words of 0 and then write lastenemy
 	 * into the second of these.
 	 */
-        memcpy (mobj, th, sizeof(*mobj) - 2*sizeof(void*));
-        save_p += sizeof(*mobj) - 2*sizeof(void*) - 4*sizeof(fixed_t);
+        memcpy (save_p, &tmp, sizeof(tmp) - 2*sizeof(void*));
+        save_p += sizeof(tmp) - 2*sizeof(void*) - 4*sizeof(fixed_t);
         memset (save_p, 0, 5*sizeof(void*));
-        mobj->state = (state_t *)(mobj->state - states);
-        }
-
-        // killough 2/14/98: convert pointers into indices.
-        // Fixes many savegame problems, by properly saving
-        // target and tracer fields. Note: we store NULL if
-        // the thinker pointed to by these fields is not a
-        // mobj thinker.
-
-        if (mobj->target)
-          mobj->target = mobj->target->thinker.function.arg1 ==
-            (void (*)(void *))P_MobjThinker ?
-            (mobj_t *) mobj->target->thinker.prev : NULL;
-
-        if (mobj->tracer)
-          mobj->tracer = mobj->tracer->thinker.function.arg1 ==
-            (void (*)(void *))P_MobjThinker ?
-            (mobj_t *) mobj->tracer->thinker.prev : NULL;
-
-        /* pointer-valued raven specials get the same index treatment;
-         * integer-valued ones are saved verbatim by the memcpy above */
-        if (raven)
-        {
-          int psf = P_PointerSpecialFields(mobj->type);
-
-          if ((psf & PSF_SPECIAL1) && mobj->special1.m)
-            mobj->special1.m = mobj->special1.m->thinker.function.arg1 ==
-              (void (*)(void *))P_MobjThinker ?
-              (mobj_t *) mobj->special1.m->thinker.prev : NULL;
-
-          if ((psf & PSF_SPECIAL2) && mobj->special2.m)
-            mobj->special2.m = mobj->special2.m->thinker.function.arg1 ==
-              (void (*)(void *))P_MobjThinker ?
-              (mobj_t *) mobj->special2.m->thinker.prev : NULL;
-        }
 
         // killough 2/14/98: new field: save last known enemy. Prevents
         // monsters from going to sleep after killing monsters and not
         // seeing player anymore.
 
-        if (!raven)
-        {
         if (((mobj_t*)th)->lastenemy && ((mobj_t*)th)->lastenemy->thinker.function.arg1 == (void (*)(void *))P_MobjThinker) {
           memcpy (save_p + sizeof(void*), &(((mobj_t*)th)->lastenemy->thinker.prev), sizeof(void*));
 	}
@@ -484,9 +501,6 @@ void P_ArchiveThinkers (void)
 
         save_p += 5*sizeof(void*);
         }
-
-        if (mobj->player)
-          mobj->player = (player_t *)((mobj->player-players) + 1);
       }
 
   // add a terminating marker
@@ -535,21 +549,24 @@ void P_ArchiveThinkers (void)
     for (th = thinkercap.next; th != &thinkercap; th = th->next)
       if (th->function.arg1 == (void (*)(void *)) T_InterpretACS)
       {
-        acs_t *acs;
+        acs_t tmp;
 
         PADSAVEP();
-        acs = (acs_t *) save_p;
-        memcpy(acs, th, sizeof(*acs));
-        save_p += sizeof(*acs);
+        /* fixups in an aligned local, then one memcpy out (see the
+         * specials archive above) */
+        memcpy(&tmp, th, sizeof(tmp));
 
-        if (acs->activator)
-          acs->activator = acs->activator->thinker.function.arg1 ==
+        if (tmp.activator)
+          tmp.activator = tmp.activator->thinker.function.arg1 ==
             (void (*)(void *))P_MobjThinker ?
-            (mobj_t *) acs->activator->thinker.prev : NULL;
+            (mobj_t *) tmp.activator->thinker.prev : NULL;
 
         /* 0 = no line, otherwise index + 1 */
-        acs->line = acs->line ?
-          (line_t *) (uintptr_t) ((acs->line - lines) + 1) : NULL;
+        tmp.line = tmp.line ?
+          (line_t *) (uintptr_t) ((tmp.line - lines) + 1) : NULL;
+
+        memcpy(save_p, &tmp, sizeof(tmp));
+        save_p += sizeof(tmp);
       }
   }
 }
@@ -1011,115 +1028,131 @@ void P_ArchiveSpecials (void)
 
       if (th->function.arg1 == (void (*)(void *))T_MoveCeiling)
         {
-          ceiling_t *ceiling;
+          ceiling_t tmp;
         ceiling:                               // killough 2/14/98
           *save_p++ = tc_ceiling;
           PADSAVEP();
-          ceiling = (ceiling_t *)save_p;
-          memcpy (ceiling, th, sizeof(*ceiling));
-          save_p += sizeof(*ceiling);
-          ceiling->sector = (sector_t *)(ceiling->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       if (th->function.arg1 == (void (*)(void *))T_VerticalDoor)
         {
-          vldoor_t *door;
+          vldoor_t tmp;
           *save_p++ = tc_door;
           PADSAVEP();
-          door = (vldoor_t *) save_p;
-          memcpy (door, th, sizeof *door);
-          save_p += sizeof(*door);
-          door->sector = (sector_t *)(door->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
           //jff 1/31/98 archive line remembered by door as well
-          door->line = (line_t *) (door->line ? door->line-lines : -1);
+          tmp.line = (line_t *) (tmp.line ? tmp.line-lines : -1);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       if (th->function.arg1 == (void (*)(void *))T_MoveFloor)
         {
-          floormove_t *floor;
+          floormove_t tmp;
           *save_p++ = tc_floor;
           PADSAVEP();
-          floor = (floormove_t *)save_p;
-          memcpy (floor, th, sizeof(*floor));
-          save_p += sizeof(*floor);
-          floor->sector = (sector_t *)(floor->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       if (th->function.arg1 == (void (*)(void *))T_PlatRaise)
         {
-          plat_t *plat;
+          plat_t tmp;
         plat:   // killough 2/14/98: added fix for original plat height above
           *save_p++ = tc_plat;
           PADSAVEP();
-          plat = (plat_t *)save_p;
-          memcpy (plat, th, sizeof(*plat));
-          save_p += sizeof(*plat);
-          plat->sector = (sector_t *)(plat->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       if (th->function.arg1 == (void (*)(void *))T_LightFlash)
         {
-          lightflash_t *flash;
+          lightflash_t tmp;
           *save_p++ = tc_flash;
           PADSAVEP();
-          flash = (lightflash_t *)save_p;
-          memcpy (flash, th, sizeof(*flash));
-          save_p += sizeof(*flash);
-          flash->sector = (sector_t *)(flash->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       if (th->function.arg1 == (void (*)(void *))T_StrobeFlash)
         {
-          strobe_t *strobe;
+          strobe_t tmp;
           *save_p++ = tc_strobe;
           PADSAVEP();
-          strobe = (strobe_t *)save_p;
-          memcpy (strobe, th, sizeof(*strobe));
-          save_p += sizeof(*strobe);
-          strobe->sector = (sector_t *)(strobe->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       if (th->function.arg1 == (void (*)(void *))T_Glow)
         {
-          glow_t *glow;
+          glow_t tmp;
           *save_p++ = tc_glow;
           PADSAVEP();
-          glow = (glow_t *)save_p;
-          memcpy (glow, th, sizeof(*glow));
-          save_p += sizeof(*glow);
-          glow->sector = (sector_t *)(glow->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       // killough 10/4/98: save flickers
       if (th->function.arg1 == (void (*)(void *))T_FireFlicker)
         {
-          fireflicker_t *flicker;
+          fireflicker_t tmp;
           *save_p++ = tc_flicker;
           PADSAVEP();
-          flicker = (fireflicker_t *)save_p;
-          memcpy (flicker, th, sizeof(*flicker));
-          save_p += sizeof(*flicker);
-          flicker->sector = (sector_t *)(flicker->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       //jff 2/22/98 new case for elevators
       if (th->function.arg1 == (void (*)(void *))T_MoveElevator)
         {
-          elevator_t *elevator;         //jff 2/22/98
+          elevator_t tmp;               //jff 2/22/98
           *save_p++ = tc_elevator;
           PADSAVEP();
-          elevator = (elevator_t *)save_p;
-          memcpy (elevator, th, sizeof(*elevator));
-          save_p += sizeof(*elevator);
-          elevator->sector = (sector_t *)(elevator->sector - sectors);
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
@@ -1147,78 +1180,90 @@ void P_ArchiveSpecials (void)
       // and the size reserved above did not match, corrupting the stream.
       if (th->function.arg1 == (void (*)(void *))T_HexenPlatRaise)
         {
-          plat_t *plat;
+          plat_t tmp;
           *save_p++ = tc_hexenplat;
           PADSAVEP();
-          plat = (plat_t *)save_p;
-          memcpy (plat, th, sizeof(*plat));
-          save_p += sizeof(*plat);
-          plat->sector = (sector_t *)(plat->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       // ZDoom/Hexen pillar: a pillar_t driven by T_HexenBuildPillar
       if (th->function.arg1 == (void (*)(void *))T_HexenBuildPillar)
         {
-          pillar_t *pillar;
+          pillar_t tmp;
           *save_p++ = tc_pillar;
           PADSAVEP();
-          pillar = (pillar_t *)save_p;
-          memcpy (pillar, th, sizeof(*pillar));
-          save_p += sizeof(*pillar);
-          pillar->sector = (sector_t *)(pillar->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       // ZDoom/Hexen ceiling: a ceiling_t driven by T_HexenMoveCeiling
       if (th->function.arg1 == (void (*)(void *))T_HexenMoveCeiling)
         {
-          ceiling_t *ceiling;
+          ceiling_t tmp;
           *save_p++ = tc_hexenceiling;
           PADSAVEP();
-          ceiling = (ceiling_t *)save_p;
-          memcpy (ceiling, th, sizeof(*ceiling));
-          save_p += sizeof(*ceiling);
-          ceiling->sector = (sector_t *)(ceiling->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       // ZDoom/Hexen door: a vldoor_t driven by T_HexenVerticalDoor
       if (th->function.arg1 == (void (*)(void *))T_HexenVerticalDoor)
         {
-          vldoor_t *door;
+          vldoor_t tmp;
           *save_p++ = tc_hexendoor;
           PADSAVEP();
-          door = (vldoor_t *)save_p;
-          memcpy (door, th, sizeof(*door));
-          save_p += sizeof(*door);
-          door->sector = (sector_t *)(door->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       // ZDoom/Hexen sector light: a light_t driven by T_HexenLight
       if (th->function.arg1 == (void (*)(void *))T_HexenLight)
         {
-          light_t *light;
+          light_t tmp;
           *save_p++ = tc_hexenlight;
           PADSAVEP();
-          light = (light_t *)save_p;
-          memcpy (light, th, sizeof(*light));
-          save_p += sizeof(*light);
-          light->sector = (sector_t *)(light->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 
       // ZDoom/Hexen floor waggle: a planeWaggle_t driven by T_FloorWaggle
       if (th->function.arg1 == (void (*)(void *))T_FloorWaggle)
         {
-          planeWaggle_t *waggle;
+          planeWaggle_t tmp;
           *save_p++ = tc_floorwaggle;
           PADSAVEP();
-          waggle = (planeWaggle_t *)save_p;
-          memcpy (waggle, th, sizeof(*waggle));
-          save_p += sizeof(*waggle);
-          waggle->sector = (sector_t *)(waggle->sector - sectors);
+          /* fixups in an aligned local, then one memcpy out: save_p is
+           * only 4-aligned and these structs hold pointers (UBSan) */
+          memcpy (&tmp, th, sizeof(tmp));
+          tmp.sector = (sector_t *)(tmp.sector - sectors);
+          memcpy (save_p, &tmp, sizeof(tmp));
+          save_p += sizeof(tmp);
           continue;
         }
 

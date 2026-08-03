@@ -1368,7 +1368,19 @@ static void R_DoDrawPlane(visplane_t *pl)
           * Keep the raw 0..255 sector light (plus extralight, in the same
           * LIGHTSEGSHIFT units the band uses) so the Smooth path can place the
           * base darkness continuously between bands instead. */
-         pl->top[pl->minx-1] = pl->top[stop] = 0xffffffffu; // dropoff overflow
+         /* dropoff sentinels: the struct's pad members ARE the [-1] and
+          * [MAX_SCREENWIDTH] slots by layout, but indexing the arrays out
+          * of range to reach them is undefined (UBSan array-bounds fires
+          * at minx==0).  Write the pads by name at the edges and the
+          * array in range everywhere else -- identical memory, defined. */
+         if (pl->minx > 0)
+            pl->top[pl->minx-1] = 0xffffffffu;
+         else
+            pl->pad1 = 0xffffffffu;
+         if (stop < MAX_SCREENWIDTH)
+            pl->top[stop] = 0xffffffffu;
+         else
+            pl->pad2 = 0xffffffffu;
 
          if (pl->slope)
             R_TiltedPlaneSetup(pl);
@@ -1378,9 +1390,19 @@ static void R_DoDrawPlane(visplane_t *pl)
          if (pl->translucent)
             r_span_translucent = 1;
 
+         /* the x-1 / x==stop taps reach the pad slots; see the sentinel
+          * writes above.  (The bottom pads are never initialised, exactly
+          * as before: a pad's paired top value of 0xffffffff means no span
+          * ever opens or closes off it.) */
+#define PL_TOP(i)    ((i) < 0 ? pl->pad1 : (i) >= MAX_SCREENWIDTH ? pl->pad2 \
+                              : pl->top[i])
+#define PL_BOTTOM(i) ((i) < 0 ? pl->pad3 : (i) >= MAX_SCREENWIDTH ? pl->pad4 \
+                              : pl->bottom[i])
          for (x = pl->minx ; x <= stop ; x++)
-            R_MakeSpans(x,pl->top[x-1],pl->bottom[x-1],
-                  pl->top[x],pl->bottom[x], &dsvars);
+            R_MakeSpans(x,PL_TOP(x-1),PL_BOTTOM(x-1),
+                  PL_TOP(x),PL_BOTTOM(x), &dsvars);
+#undef PL_TOP
+#undef PL_BOTTOM
 
          r_span_translucent = 0;
 

@@ -243,7 +243,15 @@ static void createPatch(int id) {
    * the pixel region, in the rcolumn_t array, whose pointer bytes vary
    * per process -- the rendered pixel then differs from run to run.
    * The padding keeps that read inside deterministic 0xff bytes. */
-  dataSize = pixelDataSize + patch->height + columnsDataSize + postsDataSize;
+  /* The rcolumn_t/rpost_t arrays hold pointers and need 8-byte alignment,
+   * but they were carved at pixels + pixelDataSize + height: pixelDataSize
+   * is only 4-aligned and the trailing padding column's height is
+   * arbitrary, so for most patch heights the structs landed on odd
+   * addresses (UBSan: misaligned member access; x86 tolerated it, strict
+   * targets fault).  Round the carve offset up to 8; the pixel region and
+   * its padding column keep their exact size, only the gap grows. */
+  dataSize = ((pixelDataSize + patch->height + 7) & ~7)
+             + columnsDataSize + postsDataSize;
   /* Pass &patch->data as the user back-pointer so that when this
    * PU_CACHE block is auto-purged (Z_Malloc's cache-purge under
    * memory pressure, or an explicit Z_FreeTags(PU_CACHE)), the
@@ -279,7 +287,8 @@ static void createPatch(int id) {
 
   // set out pixel, column, and post pointers into our data array
   patch->pixels = patch->data + 8;
-  patch->columns = (rcolumn_t*)((unsigned char*)patch->pixels + pixelDataSize + patch->height);
+  patch->columns = (rcolumn_t*)((unsigned char*)patch->pixels
+                  + ((pixelDataSize + patch->height + 7) & ~7));
   patch->posts = (rpost_t*)((unsigned char*)patch->columns + columnsDataSize);
 
   memset(patch->pixels, 0xff, (patch->width*patch->height + patch->height));
@@ -472,7 +481,8 @@ static void createFlatCompositePatch(rpatch_t *composite_patch,
   /* same layout as the patch-built composite: eight bytes of 0xff lead
    * padding for the filtered drawers' frac==-1 reads, and a trailing
    * padding column for post-relative bottom-row wraps */
-  dataSize = 8 + pixelDataSize + composite_patch->height
+  /* columns offset rounded to 8 for rcolumn_t alignment; see createPatch */
+  dataSize = 8 + ((pixelDataSize + composite_patch->height + 7) & ~7)
              + columnsDataSize + postsDataSize;
   composite_patch->data = (unsigned char *)Z_Malloc(dataSize, PU_STATIC, NULL);
   memset(composite_patch->data, 0, dataSize);
@@ -480,7 +490,7 @@ static void createFlatCompositePatch(rpatch_t *composite_patch,
 
   composite_patch->pixels = composite_patch->data + 8;
   composite_patch->columns = (rcolumn_t *)((unsigned char *)composite_patch->pixels
-                             + pixelDataSize + composite_patch->height);
+                             + ((pixelDataSize + composite_patch->height + 7) & ~7));
   composite_patch->posts = (rpost_t *)((unsigned char *)composite_patch->columns
                            + columnsDataSize);
 
@@ -581,7 +591,9 @@ static void createTextureCompositePatch(int id) {
   // allocate our data chunk
   /* One extra column of 0xff padding after the pixels, for the same
    * post-relative bottom-row wrap as in the single-patch case above. */
-  dataSize = pixelDataSize + composite_patch->height + columnsDataSize + postsDataSize;
+  /* columns offset rounded to 8 for rcolumn_t alignment; see createPatch */
+  dataSize = ((pixelDataSize + composite_patch->height + 7) & ~7)
+             + columnsDataSize + postsDataSize;
   /* See r_patch.c:238 — back-pointer would point into texture_composites[],
    * unsafe at teardown.  No user back-pointer here. */
   /* Eight bytes of 0xff lead padding before the pixels: the filtered
@@ -600,7 +612,8 @@ static void createTextureCompositePatch(int id) {
 
   // set out pixel, column, and post pointers into our data array
   composite_patch->pixels = composite_patch->data + 8;
-  composite_patch->columns = (rcolumn_t*)((unsigned char*)composite_patch->pixels + pixelDataSize + composite_patch->height);
+  composite_patch->columns = (rcolumn_t*)((unsigned char*)composite_patch->pixels
+                             + ((pixelDataSize + composite_patch->height + 7) & ~7));
   composite_patch->posts = (rpost_t*)((unsigned char*)composite_patch->columns + columnsDataSize);
 
   memset(composite_patch->pixels, 0xff, (composite_patch->width*composite_patch->height + composite_patch->height));

@@ -1,7 +1,8 @@
 /* w_pk3.c: PK3/ZIP archive to in-memory WAD translation.
  *
- * The archive is walked once with miniz's in-memory ZIP reader and
- * re-emitted as a single PWAD image:
+ * The archive is walked once with a minimal in-memory ZIP reader
+ * (rinflate + encoding_crc32 below) and re-emitted as a single PWAD
+ * image:
  *
  *   - root-level files become plain global lumps; the lump name is the
  *     file name up to the first '.', uppercased, truncated to 8 chars
@@ -36,7 +37,238 @@
 #include "w_wad.h"
 #include "w_pk3.h"
 
-#include "miniz.h"
+#include <encodings/deflate.h>
+#include <encodings/crc32.h>
+
+/* ---- minimal in-memory ZIP reader ---------------------------------------
+ *
+ * Replaces miniz's mz_zip reader.  The translator only ever reads a
+ * fully-resident archive, member by member, so all that is needed is a
+ * central-directory walk and a per-member extract: stored members are a
+ * bounds-checked copy, deflated members inflate through libretro-common's
+ * clean-room rinflate (raw DEFLATE window), and every extracted member is
+ * verified against the directory's CRC-32 with encoding_crc32 -- whose
+ * PCLMUL/CRC32-instruction paths make the mandatory integrity pass far
+ * cheaper than miniz's bytewise table walk.
+ *
+ * Zip64 archives (any 0xFFFF/0xFFFFFFFF marker in the fields read here)
+ * are not supported and are rejected at open, as under miniz. */
+
+typedef struct
+{
+  const char    *name;     /* into pk3_zip_t.names, NUL-terminated  */
+  unsigned       lho;      /* local file header offset              */
+  unsigned       csize;    /* compressed size                       */
+  unsigned       usize;    /* uncompressed size                     */
+  unsigned       crc;      /* CRC-32 of the uncompressed data       */
+  unsigned short method;   /* 0 = store, 8 = deflate                */
+  unsigned char  is_dir;
+} pk3_zent_t;
+
+typedef struct
+{
+  const unsigned char *zip;
+  int                  zip_len;
+  pk3_zent_t          *ent;
+  int                  n;
+  char                *names;    /* all entry names, NUL-separated  */
+  void                *inflate;  /* reusable rinflate stream        */
+} pk3_zip_t;
+
+static unsigned pk3_rd16(const unsigned char *p)
+{
+  return (unsigned)p[0] | ((unsigned)p[1] << 8);
+}
+
+static unsigned pk3_rd32(const unsigned char *p)
+{
+  return (unsigned)p[0] | ((unsigned)p[1] << 8) |
+         ((unsigned)p[2] << 16) | ((unsigned)p[3] << 24);
+}
+
+static void pk3_zip_close(pk3_zip_t *z)
+{
+  if (z->inflate)
+    rinflate_free(z->inflate);
+  free(z->ent);
+  free(z->names);
+  memset(z, 0, sizeof(*z));
+}
+
+/* Parse the end-of-central-directory record and the central directory.
+ * Returns 1 on success. */
+static int pk3_zip_open(pk3_zip_t *z, const unsigned char *zip, int zip_len)
+{
+  int      eocd = -1, i, scan_lo;
+  unsigned n, cd_size, cd_off, pos;
+  size_t   names_len;
+  char    *np;
+
+  memset(z, 0, sizeof(*z));
+  z->zip     = zip;
+  z->zip_len = zip_len;
+
+  /* EOCD: "PK\5\6" + 18 bytes fixed + up to 65535 bytes of comment,
+   * scanned backwards from the end. */
+  scan_lo = zip_len - 22 - 65535;
+  if (scan_lo < 0)
+    scan_lo = 0;
+  for (i = zip_len - 22; i >= scan_lo; i--)
+    if (zip[i] == 'P' && zip[i+1] == 'K' && zip[i+2] == 5 && zip[i+3] == 6)
+    {
+      eocd = i;
+      break;
+    }
+  if (eocd < 0)
+    return 0;
+
+  /* Reject multi-disk archives; treat 0xFFFF/0xFFFFFFFF as zip64. */
+  if (pk3_rd16(zip + eocd + 4) != 0 || pk3_rd16(zip + eocd + 6) != 0)
+    return 0;
+  n       = pk3_rd16(zip + eocd + 10);
+  cd_size = pk3_rd32(zip + eocd + 12);
+  cd_off  = pk3_rd32(zip + eocd + 16);
+  if (n == 0xFFFFu || cd_size == 0xFFFFFFFFu || cd_off == 0xFFFFFFFFu)
+    return 0;                                          /* zip64 */
+  if ((int64_t)cd_off + cd_size > (int64_t)zip_len)
+    return 0;
+
+  z->ent = calloc(n ? n : 1, sizeof(pk3_zent_t));
+  /* names: total name bytes cannot exceed the directory size */
+  z->names = malloc((size_t)cd_size + n + 1);
+  if (!z->ent || !z->names)
+  {
+    pk3_zip_close(z);
+    return 0;
+  }
+
+  pos       = cd_off;
+  np        = z->names;
+  names_len = 0;
+  (void)names_len;
+  for (i = 0; i < (int)n; i++)
+  {
+    pk3_zent_t *e = &z->ent[i];
+    unsigned    nlen, elen, clen;
+
+    if ((int64_t)pos + 46 > (int64_t)zip_len ||
+        pk3_rd32(zip + pos) != 0x02014b50u)
+    {
+      pk3_zip_close(z);
+      return 0;
+    }
+    e->method = (unsigned short)pk3_rd16(zip + pos + 10);
+    e->crc    = pk3_rd32(zip + pos + 16);
+    e->csize  = pk3_rd32(zip + pos + 20);
+    e->usize  = pk3_rd32(zip + pos + 24);
+    nlen      = pk3_rd16(zip + pos + 28);
+    elen      = pk3_rd16(zip + pos + 30);
+    clen      = pk3_rd16(zip + pos + 32);
+    e->lho    = pk3_rd32(zip + pos + 42);
+    if (e->csize == 0xFFFFFFFFu || e->usize == 0xFFFFFFFFu ||
+        e->lho == 0xFFFFFFFFu)
+    {
+      pk3_zip_close(z);
+      return 0;                                        /* zip64 */
+    }
+    if ((int64_t)pos + 46 + nlen + elen + clen > (int64_t)zip_len)
+    {
+      pk3_zip_close(z);
+      return 0;
+    }
+    memcpy(np, zip + pos + 46, nlen);
+    np[nlen] = 0;
+    e->name  = np;
+    np      += nlen + 1;
+    e->is_dir = (nlen > 0 && (np[-2] == '/' || np[-2] == '\\'));
+    pos += 46 + nlen + elen + clen;
+  }
+  z->n = (int)n;
+  return 1;
+}
+
+/* Extract one member to a fresh malloc'd buffer of exactly usize bytes
+ * (usize 0 returns a 1-byte allocation so the pointer is non-NULL) and
+ * verify the CRC.  Returns NULL on any inconsistency. */
+static unsigned char *pk3_zip_extract(pk3_zip_t *z, const pk3_zent_t *e)
+{
+  const unsigned char *zip = z->zip;
+  unsigned             nlen, elen, doff;
+  unsigned char       *out;
+
+  if ((int64_t)e->lho + 30 > (int64_t)z->zip_len ||
+      pk3_rd32(zip + e->lho) != 0x04034b50u)
+    return NULL;
+  nlen = pk3_rd16(zip + e->lho + 26);
+  elen = pk3_rd16(zip + e->lho + 28);
+  doff = e->lho + 30 + nlen + elen;
+  if ((int64_t)doff + e->csize > (int64_t)z->zip_len)
+    return NULL;
+
+  out = malloc(e->usize ? e->usize : 1);
+  if (!out)
+    return NULL;
+
+  if (e->method == 0)                                  /* stored */
+  {
+    if (e->csize != e->usize)
+    {
+      free(out);
+      return NULL;
+    }
+    memcpy(out, zip + doff, e->usize);
+  }
+  else if (e->method == 8)                             /* deflate */
+  {
+    const unsigned char *in     = zip + doff;
+    size_t               in_len = e->csize, wrote_total = 0;
+    int                  r;
+
+    if (!z->inflate)
+      z->inflate = rinflate_new(-15);                  /* raw DEFLATE */
+    else
+      rinflate_reset(z->inflate, -15);
+    if (!z->inflate)
+    {
+      free(out);
+      return NULL;
+    }
+    rinflate_set_out(z->inflate, out, e->usize);
+    for (;;)
+    {
+      size_t rd = 0, wr = 0;
+      rinflate_set_in(z->inflate, in, in_len);
+      r            = rinflate_process(z->inflate, &rd, &wr);
+      in          += rd;
+      in_len      -= rd;
+      wrote_total += wr;
+      if (r == RDEFLATE_PROCESS_END)
+        break;
+      if (r != RDEFLATE_PROCESS_NEXT || (rd == 0 && wr == 0))
+      {
+        free(out);                    /* malformed, or truncated/overlong */
+        return NULL;
+      }
+    }
+    if (wrote_total != e->usize)
+    {
+      free(out);
+      return NULL;
+    }
+  }
+  else                                                 /* unsupported */
+  {
+    free(out);
+    return NULL;
+  }
+
+  if (encoding_crc32(0, out, e->usize) != e->crc)
+  {
+    free(out);
+    return NULL;
+  }
+  return out;
+}
 
 /* ---- full-path registry -------------------------------------------------
  *
@@ -441,21 +673,47 @@ static int pk3_pass_of(const char *path, const unsigned char *d, int len)
 unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
                               int *out_length, const char *archive_name)
 {
-  mz_zip_archive za;
-  pk3_build_t    b;
-  unsigned char *image;
-  wadinfo_t      header;
-  int            pass, n, i, image_len;
+  pk3_zip_t       z;
+  pk3_build_t     b;
+  unsigned char  *image;
+  unsigned char **data;    /* per-entry extracted bytes, NULL once emitted */
+  signed char    *epass;   /* per-entry pass, -1 = skip                    */
+  wadinfo_t       header;
+  int             pass, i, image_len;
 
-  memset(&za, 0, sizeof(za));
   memset(&b, 0, sizeof(b));
-  if (!mz_zip_reader_init_mem(&za, zip, (size_t)zip_length, 0))
+  if (!pk3_zip_open(&z, zip, zip_length))
   {
     lprintf(LO_WARN, "W_TranslatePK3: %s: not a readable ZIP archive\n",
             archive_name);
     return NULL;
   }
-  n = (int)mz_zip_reader_get_num_files(&za);
+
+  data  = calloc(z.n ? z.n : 1, sizeof(*data));
+  epass = malloc(z.n ? z.n : 1);
+  if (!data || !epass)
+    goto oom;
+
+  /* Extract and classify every member exactly once up front.  The pass of
+   * a member depends on its bytes (format sniff), so classification and
+   * extraction cannot be separated; holding all members briefly costs no
+   * more peak memory than the synthesized image itself will. */
+  for (i = 0; i < z.n; i++)
+  {
+    const pk3_zent_t *e = &z.ent[i];
+
+    epass[i] = -1;
+    if (e->is_dir || e->usize > 0x7fffffffu)
+      continue;
+    data[i] = pk3_zip_extract(&z, e);
+    if (!data[i])
+    {
+      lprintf(LO_WARN, "W_TranslatePK3: %s: failed to extract %s\n",
+              archive_name, e->name);
+      continue;
+    }
+    epass[i] = (signed char)pk3_pass_of(e->name, data[i], (int)e->usize);
+  }
 
   /* Emission order: root files + inner wads (zip order), then the
    * sprite and flat marker groups, then the deferred quarantine.
@@ -466,46 +724,25 @@ unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
   {
     int emitted = 0;
 
-    for (i = 0; i < n; i++)
+    for (i = 0; i < z.n; i++)
     {
-      mz_zip_archive_file_stat st;
-      char   name[9];
-      void  *data;
-      size_t size;
+      const pk3_zent_t *e = &z.ent[i];
+      char              name[9];
 
-      if (!mz_zip_reader_file_stat(&za, (mz_uint)i, &st))
-        continue;
-      if (mz_zip_reader_is_file_a_directory(&za, (mz_uint)i))
-        continue;
-      if (st.m_uncomp_size > 0x7fffffff)
+      if (epass[i] != pass)
         continue;
 
-      /* Pass classification needs the bytes (format sniff), so files
-       * are extracted exactly once on their matching pass: extract,
-       * classify, and either emit or drop the buffer. */
-      data = mz_zip_reader_extract_to_heap(&za, (mz_uint)i, &size, 0);
-      if (!data)
-      {
-        lprintf(LO_WARN, "W_TranslatePK3: %s: failed to extract %s\n",
-                archive_name, st.m_filename);
-        continue;
-      }
-      if (pk3_pass_of(st.m_filename, data, (int)size) != pass)
-      {
-        free(data);
-        continue;
-      }
-
-      pk3_lump_name(name, st.m_filename);
+      pk3_lump_name(name, e->name);
       if (!name[0])
       {
-        free(data);
+        free(data[i]);
+        data[i] = NULL;
         continue;
       }
 
-      if (pass == PK3_PASS_ROOT && pk3_is_wad_image(data, (int)size))
+      if (pass == PK3_PASS_ROOT && pk3_is_wad_image(data[i], (int)e->usize))
       {
-        if (!pk3_add_inner_wad(&b, st.m_filename, data, (int)size))
+        if (!pk3_add_inner_wad(&b, e->name, data[i], (int)e->usize))
           goto oom;
       }
       else
@@ -521,21 +758,13 @@ unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
         /* record this member's full archive path against the data offset it
          * is about to occupy, so a later full-path lookup can pick it out of
          * any same-basename collision (filepos mirrors pk3_add_lump). */
-        pk3_path_record(st.m_filename, b.data_len + 12);
-        if (!pk3_add_lump(&b, name, data, (int)size))
+        pk3_path_record(e->name, b.data_len + 12);
+        if (!pk3_add_lump(&b, name, data[i], (int)e->usize))
           goto oom;
         emitted = 1;
       }
-      free(data);
-      data = NULL;
-      continue;
-oom:
-      free(data);
-      free(b.data);
-      free(b.dir);
-      mz_zip_reader_end(&za);
-      lprintf(LO_WARN, "W_TranslatePK3: %s: out of memory\n", archive_name);
-      return NULL;
+      free(data[i]);
+      data[i] = NULL;
     }
 
     if (emitted)
@@ -546,15 +775,12 @@ oom:
       if (pass == PK3_PASS_TEXTURES) ok = pk3_add_lump(&b, "TX_END", NULL, 0);
       if (pass == PK3_PASS_DEFERRED) ok = pk3_add_lump(&b, "PD_END", NULL, 0);
       if (!ok)
-      {
-        free(b.data);
-        free(b.dir);
-        mz_zip_reader_end(&za);
-        return NULL;
-      }
+        goto oom;
     }
   }
-  mz_zip_reader_end(&za);
+
+  free(data);
+  free(epass);
 
   /* assemble: header + lump data + directory */
   image_len = 12 + b.data_len + b.dir_len * 16;
@@ -563,6 +789,7 @@ oom:
   {
     free(b.data);
     free(b.dir);
+    pk3_zip_close(&z);
     return NULL;
   }
   memcpy(header.identification, "PWAD", 4);
@@ -571,7 +798,8 @@ oom:
   memcpy(image, &header, 12);
   if (b.data_len)
     memcpy(image + 12, b.data, b.data_len);
-  memcpy(image + 12 + b.data_len, b.dir, b.dir_len * 16);
+  if (b.dir_len)
+    memcpy(image + 12 + b.data_len, b.dir, b.dir_len * 16);
   free(b.data);
   free(b.dir);
 
@@ -581,7 +809,20 @@ oom:
 
   lprintf(LO_INFO,
           "W_TranslatePK3: %s: %d lumps synthesized from %d archive members\n",
-          archive_name, b.dir_len, n);
+          archive_name, b.dir_len, z.n);
   *out_length = image_len;
+  pk3_zip_close(&z);
   return image;
+
+oom:
+  if (data)
+    for (i = 0; i < z.n; i++)
+      free(data[i]);
+  free(data);
+  free(epass);
+  free(b.data);
+  free(b.dir);
+  pk3_zip_close(&z);
+  lprintf(LO_WARN, "W_TranslatePK3: %s: out of memory\n", archive_name);
+  return NULL;
 }

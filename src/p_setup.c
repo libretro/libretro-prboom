@@ -66,7 +66,7 @@
 #include "p_skybox.h"
 #include "p_sectorportal.h"
 #include "p_lineportal.h"
-#include "miniz.h"
+#include <encodings/deflate.h>
 #include "p_tick.h"
 #include "p_enemy.h"
 #include "hexen/p_lightning.h"
@@ -805,10 +805,10 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver);
  * or NULL on failure. */
 static uint8_t *P_DecompressZNodes(const uint8_t *in, int inlen, int *outlen)
 {
-  mz_stream zs;
+  void    *zs;
   uint8_t *out;
-  size_t cap;
-  int err;
+  size_t   cap, used, in_left;
+  int      r;
 
   if (inlen <= 0)
     return NULL;
@@ -822,50 +822,53 @@ static uint8_t *P_DecompressZNodes(const uint8_t *in, int inlen, int *outlen)
   if (!out)
     return NULL;
 
-  memset(&zs, 0, sizeof(zs));
-  zs.next_in   = (const unsigned char *)in;
-  zs.avail_in  = (unsigned int)inlen;
-  zs.next_out  = out;
-  zs.avail_out = (unsigned int)cap;
-
-  if (mz_inflateInit(&zs) != MZ_OK)
+  zs = rinflate_new(15);                        /* zlib-wrapped stream */
+  if (!zs)
   {
     free(out);
     return NULL;
   }
 
   /* Inflate, doubling the output buffer each time it fills before the
-   * stream ends. */
-  while ((err = mz_inflate(&zs, MZ_SYNC_FLUSH)) == MZ_OK)
+   * stream ends.  rinflate suspends (NEXT) when the output window is
+   * exhausted; re-present the remaining input and a fresh window each
+   * iteration. */
+  used    = 0;
+  in_left = (size_t)inlen;
+  for (;;)
   {
-    size_t used = (size_t)zs.total_out;
-    uint8_t *grown;
+    size_t rd = 0, wr = 0;
 
-    if (zs.avail_out != 0)        /* not full yet -- keep going */
-      continue;
+    rinflate_set_in(zs, in + ((size_t)inlen - in_left), in_left);
+    rinflate_set_out(zs, out + used, cap - used);
+    r        = rinflate_process(zs, &rd, &wr);
+    in_left -= rd;
+    used    += wr;
 
-    grown = (uint8_t *)realloc(out, cap * 2);
-    if (!grown)
+    if (r == RDEFLATE_PROCESS_END)
+      break;
+    if (r != RDEFLATE_PROCESS_NEXT || (rd == 0 && wr == 0 && used < cap))
     {
-      mz_inflateEnd(&zs);
+      rinflate_free(zs);                        /* malformed or truncated */
       free(out);
       return NULL;
     }
-    out = grown;
-    cap *= 2;
-    zs.next_out  = out + used;
-    zs.avail_out = (unsigned int)(cap - used);
+    if (used == cap)
+    {
+      uint8_t *grown = (uint8_t *)realloc(out, cap * 2);
+      if (!grown)
+      {
+        rinflate_free(zs);
+        free(out);
+        return NULL;
+      }
+      out  = grown;
+      cap *= 2;
+    }
   }
 
-  if (err != MZ_STREAM_END)
-  {
-    mz_inflateEnd(&zs);
-    free(out);
-    return NULL;
-  }
-
-  *outlen = (int)zs.total_out;
-  mz_inflateEnd(&zs);
+  rinflate_free(zs);
+  *outlen = (int)used;
   return out;
 }
 

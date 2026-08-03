@@ -1321,8 +1321,8 @@ static void P_NightmareRespawn(mobj_t* mobj)
   mobj_t*      mo;
   mapthing_t*  mthing;
 
-  x = mobj->spawnpoint.x << FRACBITS;
-  y = mobj->spawnpoint.y << FRACBITS;
+  x = mobj->spawnpoint.x * FRACUNIT;
+  y = mobj->spawnpoint.y * FRACUNIT;
 
   /* haleyjd: stupid nightmare respawning bug fix
    *
@@ -1380,7 +1380,7 @@ static void P_NightmareRespawn(mobj_t* mobj)
 
   mo = P_SpawnMobj (x,y,z, mobj->type);
   mo->spawnpoint = mobj->spawnpoint;
-  mo->angle = ANG45 * (mthing->angle/45);
+  mo->angle = ANG45 * (angle_t)(mthing->angle/45);
 
   if (mthing->options & MTF_AMBUSH)
     mo->flags |= MF_AMBUSH;
@@ -1871,8 +1871,8 @@ void P_RespawnSpecials (void)
 
   mthing = &itemrespawnque[iquetail];
 
-  x = mthing->x << FRACBITS;
-  y = mthing->y << FRACBITS;
+  x = mthing->x * FRACUNIT;
+  y = mthing->y * FRACUNIT;
 
   // spawn a teleport fog at the new spot
 
@@ -1894,7 +1894,7 @@ void P_RespawnSpecials (void)
 
   mo = P_SpawnMobj (x,y,z, i);
   mo->spawnpoint = *mthing;
-  mo->angle = ANG45 * (mthing->angle/45);
+  mo->angle = ANG45 * (angle_t)(mthing->angle/45);
 
   // pull it from the queue
 
@@ -1935,8 +1935,8 @@ void P_SpawnPlayer (int n, const mapthing_t* mthing)
   if (!mthing->options)
     I_Error("P_SpawnPlayer: attempt to spawn player at unavailable start point");
   
-  x    = mthing->x << FRACBITS;
-  y    = mthing->y << FRACBITS;
+  x    = mthing->x * FRACUNIT;
+  y    = mthing->y * FRACUNIT;
   z    = ONFLOORZ;
   if (hexen)
   {
@@ -1962,7 +1962,7 @@ void P_SpawnPlayer (int n, const mapthing_t* mthing)
 
   mobj->flags |= playernumtotrans[n]<<MF_TRANSSHIFT;
 
-  mobj->angle      = ANG45 * (mthing->angle/45);
+  mobj->angle      = ANG45 * (angle_t)(mthing->angle/45);
   mobj->player     = p;
   mobj->health     = p->health;
 
@@ -2265,7 +2265,7 @@ void P_SpawnMapThing (const mapthing_t* mthing)
    * them directly, while the spot list ignores the options. */
   if (heretic && thingtype == 2002)
   {
-    P_AddMaceSpot(mthing->x << FRACBITS, mthing->y << FRACBITS);
+    P_AddMaceSpot(mthing->x * FRACUNIT, mthing->y * FRACUNIT);
     return;
   }
 
@@ -2275,8 +2275,8 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   {
     void P_AddBossSpot(fixed_t bx, fixed_t by, angle_t bangle);  /* heretic/p_action.c */
 
-    P_AddBossSpot(mthing->x << FRACBITS, mthing->y << FRACBITS,
-                  ANG45 * (mthing->angle / 45));
+    P_AddBossSpot(mthing->x * FRACUNIT, mthing->y * FRACUNIT,
+                  ANG45 * (angle_t)(mthing->angle / 45));
     return;
   }
 
@@ -2418,8 +2418,8 @@ void P_SpawnMapThing (const mapthing_t* mthing)
      * type (0-9) so its movers pick the matching door/platform sequence. */
     if (hexen)
     {
-      subsector_t *ss = R_PointInSubsector(mthing->x << FRACBITS,
-                                           mthing->y << FRACBITS);
+      subsector_t *ss = R_PointInSubsector(mthing->x * FRACUNIT,
+                                           mthing->y * FRACUNIT);
       if (ss && ss->sector)
         ss->sector->seqType = thingtype - 1400;
     }
@@ -2473,7 +2473,7 @@ void P_SpawnMapThing (const mapthing_t* mthing)
           (thingtype >= 9040 && thingtype <= 9048))
       {
         /* sector action marker: no mobj, just the registry */
-        U_ZSecActRegister(mthing->x << FRACBITS, mthing->y << FRACBITS,
+        U_ZSecActRegister(mthing->x * FRACUNIT, mthing->y * FRACUNIT,
                           thingtype, hexen_thing_special, hexen_thing_args);
         return;
       }
@@ -2483,11 +2483,11 @@ void P_SpawnMapThing (const mapthing_t* mthing)
          * camera.  Record its position and yaw so the renderer can draw the
          * sky from here (distant scenery) instead of the flat sky texture.
          * Match ZDoom: keep the camera a few units off the sector floor. */
-        fixed_t sx = mthing->x << FRACBITS;
-        fixed_t sy = mthing->y << FRACBITS;
+        fixed_t sx = mthing->x * FRACUNIT;
+        fixed_t sy = mthing->y * FRACUNIT;
         subsector_t *ss = R_PointInSubsector(sx, sy);
         fixed_t sz = ss->sector->floorheight + (41 << FRACBITS);
-        angle_t sang = ANG45 * (mthing->angle / 45);
+        angle_t sang = ANG45 * (angle_t)(mthing->angle / 45);
         if (hexen_thing_tid)
           /* tagged: a named skybox a SkyPicker can select per-sector */
           P_AddSkyboxViewpoint(hexen_thing_tid, sx, sy, sz, sang);
@@ -2506,11 +2506,11 @@ void P_SpawnMapThing (const mapthing_t* mthing)
         /* SkyCamCompat: an Eternity-style skybox camera.  Sector_SetPortal
          * type 2 names its sector rather than a tid, so record the position
          * and let the portal resolver match it by sector. */
-        fixed_t sx = mthing->x << FRACBITS;
-        fixed_t sy = mthing->y << FRACBITS;
+        fixed_t sx = mthing->x * FRACUNIT;
+        fixed_t sy = mthing->y * FRACUNIT;
         subsector_t *ss = R_PointInSubsector(sx, sy);
         P_AddSkyCam(sx, sy, ss->sector->floorheight + (41 << FRACBITS),
-                    ANG45 * (mthing->angle / 45),
+                    ANG45 * (angle_t)(mthing->angle / 45),
                     ss->sector ? (int)(ss->sector - sectors) : -1);
         return;
       }
@@ -2518,7 +2518,7 @@ void P_SpawnMapThing (const mapthing_t* mthing)
       {
         /* SkyPicker: this sector shows the skybox whose SkyViewpoint tid is
          * arg0.  Recorded now, resolved after all things load. */
-        P_AddSkyboxPicker(mthing->x << FRACBITS, mthing->y << FRACBITS,
+        P_AddSkyboxPicker(mthing->x * FRACUNIT, mthing->y * FRACUNIT,
                           hexen_thing_args[0]);
         return;
       }
@@ -2529,7 +2529,7 @@ void P_SpawnMapThing (const mapthing_t* mthing)
          * upper carries the portal alpha.  Recorded now, paired after all
          * things load. */
         P_AddStackPoint(thingtype == 9077, hexen_thing_tid,
-                        mthing->x << FRACBITS, mthing->y << FRACBITS,
+                        mthing->x * FRACUNIT, mthing->y * FRACUNIT,
                         hexen_thing_args[0]);
         return;
       }
@@ -2558,8 +2558,8 @@ void P_SpawnMapThing (const mapthing_t* mthing)
 
   // spawn it
 
-  x = mthing->x << FRACBITS;
-  y = mthing->y << FRACBITS;
+  x = mthing->x * FRACUNIT;
+  y = mthing->y * FRACUNIT;
 
   if (mobjinfo[i].flags & MF_SPAWNCEILING)
     z = ONCEILINGZ;
@@ -2586,16 +2586,16 @@ void P_SpawnMapThing (const mapthing_t* mthing)
      * ceiling spawners): apply it like vanilla so mid-air placements --
      * hanging decorations, floating items -- land where the map says. */
     if (z == ONFLOORZ)
-      mobj->z += hexen_thing_height << FRACBITS;
+      mobj->z += hexen_thing_height * FRACUNIT;
     else if (z == ONCEILINGZ)
-      mobj->z -= hexen_thing_height << FRACBITS;
+      mobj->z -= hexen_thing_height * FRACUNIT;
   }
 
   if (raven && (mobj->flags2 & MF2_FLOATBOB))
   {                             /* seed a random starting bob phase */
     mobj->health = P_Random(pr_heretic);
     if (hexen)
-      mobj->special1.i = hexen_thing_height << FRACBITS;
+      mobj->special1.i = hexen_thing_height * FRACUNIT;
   }
 
   if (mobj->tics > 0)
@@ -2624,7 +2624,7 @@ void P_SpawnMapThing (const mapthing_t* mthing)
   if (mobj->flags & MF_COUNTITEM)
     totalitems++;
 
-  mobj->angle = ANG45 * (mthing->angle/45);
+  mobj->angle = ANG45 * (angle_t)(mthing->angle/45);
   if (options & MTF_AMBUSH)
     mobj->flags |= MF_AMBUSH;
 
@@ -2691,7 +2691,7 @@ void P_SpawnPuff(fixed_t x,fixed_t y,fixed_t z)
 
   // killough 5/5/98: remove dependence on order of evaluation:
   t = P_Random(pr_spawnpuff);
-  z += (t - P_Random(pr_spawnpuff))<<10;
+  z += (t - P_Random(pr_spawnpuff)) * (1<<10);
 
   {
     /* Use the DECORATE "replaces BulletPuff" actor (the mod's laser puff) when
@@ -2752,7 +2752,7 @@ void P_BloodSplatter2(fixed_t x, fixed_t y, fixed_t z, mobj_t *originator)
 
   r1 = P_Random(pr_heretic);
   r2 = P_Random(pr_heretic);
-  mo = P_SpawnMobj(x + ((r2 - 128) << 11), y + ((r1 - 128) << 11), z,
+  mo = P_SpawnMobj(x + (r2 - 128) * (1<<11), y + (r1 - 128) * (1<<11), z,
                    HEXEN_MT_AXEBLOOD);
   P_SetTarget(&mo->target, originator);
 }
@@ -2766,7 +2766,7 @@ void P_SpawnBlood(fixed_t x,fixed_t y,fixed_t z,int damage)
   mobj_t* th;
   // killough 5/5/98: remove dependence on order of evaluation:
   int t = P_Random(pr_spawnblood);
-  z += (t - P_Random(pr_spawnblood))<<10;
+  z += (t - P_Random(pr_spawnblood)) * (1<<10);
   th = P_SpawnMobj(x,y,z, MT_BLOOD);
   th->momz = FRACUNIT*2;
   th->tics -= P_Random(pr_spawnblood)&3;
@@ -2836,7 +2836,7 @@ mobj_t* P_SpawnMissile(mobj_t* source,mobj_t* dest,mobjtype_t type)
   if (dest->flags & MF_SHADOW)
     {  // killough 5/5/98: remove dependence on order of evaluation:
     int t = P_Random(pr_shadow);
-    an += (t - P_Random(pr_shadow))<<20;
+    an += (t - P_Random(pr_shadow)) * (1<<20);
     }
 
   th->angle = an;

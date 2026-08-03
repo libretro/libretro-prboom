@@ -391,11 +391,16 @@ static void P_LoadVertexes (int lump)
   ml = (mapvertex_t*)data;
   li = vertexes;
   /* Copy and convert vertex coordinates,
-   * internal representation as fixed. */
+   * internal representation as fixed.
+   * (Here and at every SHORT()/mapthing coordinate conversion:
+   * *FRACUNIT rather than <<FRACBITS, because the operands are
+   * negative for most map geometry and left-shifting a negative
+   * value is undefined (C99 6.5.7).  The multiply compiles to the
+   * same shift with defined semantics.) */
   for (i=0; i < numvertexes; i++, li++, ml++)
   {
-     li->x = SHORT(ml->x)<<FRACBITS;
-     li->y = SHORT(ml->y)<<FRACBITS;
+     li->x = SHORT(ml->x)*FRACUNIT;
+     li->y = SHORT(ml->y)*FRACUNIT;
   }
 
   /* Free buffer memory. */
@@ -448,8 +453,8 @@ static void P_LoadVertexes2(int lump, int gllump)
 
       for (i = firstglvertex; i < numvertexes; i++)
       {
-        vertexes[i].x = SHORT(ml->x)<<FRACBITS;
-        vertexes[i].y = SHORT(ml->y)<<FRACBITS;
+        vertexes[i].x = SHORT(ml->x)*FRACUNIT;
+        vertexes[i].y = SHORT(ml->y)*FRACUNIT;
         ml++;
       }
     }
@@ -460,8 +465,8 @@ static void P_LoadVertexes2(int lump, int gllump)
 
   for (i=0; i < firstglvertex; i++)
   {
-    vertexes[i].x = SHORT(ml->x)<<FRACBITS;
-    vertexes[i].y = SHORT(ml->y)<<FRACBITS;
+    vertexes[i].x = SHORT(ml->x)*FRACUNIT;
+    vertexes[i].y = SHORT(ml->y)*FRACUNIT;
     ml++;
   }
   W_UnlockLumpNum(lump);
@@ -535,8 +540,11 @@ static void P_LoadSegs (int lump)
 
       li->miniseg = FALSE; // figgi -- there are no minisegs in classic BSP nodes
       li->length  = GetDistance(li->v2->x - li->v1->x, li->v2->y - li->v1->y);
-      li->angle = (SHORT(ml->angle))<<16;
-      li->offset =(SHORT(ml->offset))<<16;
+      /* *65536, not <<16: seg angles/offsets are negative shorts on
+       * most maps and shifting them is undefined; the multiply wraps
+       * to the identical bit pattern (-32768*65536 == INT_MIN). */
+      li->angle = (SHORT(ml->angle))*65536;
+      li->offset =(SHORT(ml->offset))*65536;
       linedef = (uint16_t)SHORT(ml->linedef);
       ldef = &lines[linedef];
       li->linedef = ldef;
@@ -700,8 +708,8 @@ static void P_LoadSectors (int lump)
 
       // [kb] for R_FixWiggle()
 		ss->cachedheight = 0;
-      ss->floorheight = SHORT(ms->floorheight)<<FRACBITS;
-      ss->ceilingheight = SHORT(ms->ceilingheight)<<FRACBITS;
+      ss->floorheight = SHORT(ms->floorheight)*FRACUNIT;
+      ss->ceilingheight = SHORT(ms->ceilingheight)*FRACUNIT;
       ss->floorpic = R_FlatNumForName(ms->floorpic);
       ss->ceilingpic = R_FlatNumForName(ms->ceilingpic);
       ss->lightlevel = SHORT(ms->lightlevel);
@@ -769,10 +777,10 @@ static void P_LoadNodes (int lump)
       const mapnode_t *mn = (const mapnode_t *) data + i;
       int j;
 
-      no->x = SHORT(mn->x)<<FRACBITS;
-      no->y = SHORT(mn->y)<<FRACBITS;
-      no->dx = SHORT(mn->dx)<<FRACBITS;
-      no->dy = SHORT(mn->dy)<<FRACBITS;
+      no->x = SHORT(mn->x)*FRACUNIT;
+      no->y = SHORT(mn->y)*FRACUNIT;
+      no->dx = SHORT(mn->dx)*FRACUNIT;
+      no->dy = SHORT(mn->dy)*FRACUNIT;
 
       for (j=0 ; j<2 ; j++)
         {
@@ -786,7 +794,7 @@ static void P_LoadNodes (int lump)
             no->children[j] = (no->children[j] &~ 0x8000) | NF_SUBSECTOR;
 
           for (k=0 ; k<4 ; k++)
-            no->bbox[j][k] = SHORT(mn->bbox[j][k])<<FRACBITS;
+            no->bbox[j][k] = SHORT(mn->bbox[j][k])*FRACUNIT;
         }
     }
 
@@ -1039,15 +1047,15 @@ static void P_LoadXNOD(const uint8_t *data, int len)
     node_t *node = nodes + i;
     int j, k;
 
-    node->x = SHORT(*(const short *)data)<<FRACBITS; data += 2; len -= 2;
-    node->y = SHORT(*(const short *)data)<<FRACBITS; data += 2; len -= 2;
-    node->dx = SHORT(*(const short *)data)<<FRACBITS; data += 2; len -= 2;
-    node->dy = SHORT(*(const short *)data)<<FRACBITS; data += 2; len -= 2;
+    node->x = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
+    node->y = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
+    node->dx = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
+    node->dy = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
 
     for (j = 0; j < 2; j++) {
       for (k = 0; k < 4; k++) {
         node->bbox[j][k] =
-          SHORT(*(const short *)data)<<FRACBITS; data += 2; len -= 2;
+          SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
       }
     }
 
@@ -1242,17 +1250,17 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
     else
     {
       /* XGLN/XGL2: 16-bit partition, shifted up to fixed_t */
-      node->x  = SHORT(*(const short *)data) << FRACBITS; data += 2; len -= 2;
-      node->y  = SHORT(*(const short *)data) << FRACBITS; data += 2; len -= 2;
-      node->dx = SHORT(*(const short *)data) << FRACBITS; data += 2; len -= 2;
-      node->dy = SHORT(*(const short *)data) << FRACBITS; data += 2; len -= 2;
+      node->x  = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
+      node->y  = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
+      node->dx = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
+      node->dy = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
     }
 
     /* bounding boxes are 16-bit in all three formats */
     for (j = 0; j < 2; j++)
       for (k = 0; k < 4; k++)
       {
-        node->bbox[j][k] = SHORT(*(const short *)data) << FRACBITS;
+        node->bbox[j][k] = SHORT(*(const short *)data)*FRACUNIT;
         data += 2; len -= 2;
       }
 
@@ -1336,10 +1344,10 @@ static void P_LoadThings (int lump)
       if (hexen_fmt && (mt.type == 1504 || mt.type == 1505))
         {
           P_AddSlopeVertex(SHORT(((const hexen_mapthing_t *)data + i)->x)
-                             << FRACBITS,
+                             * FRACUNIT,
                            SHORT(((const hexen_mapthing_t *)data + i)->y)
-                             << FRACBITS,
-                           (fixed_t)hexen_thing_height << FRACBITS,
+                             * FRACUNIT,
+                           (fixed_t)hexen_thing_height * FRACUNIT,
                            mt.type == 1505);
           continue;
         }
@@ -1559,8 +1567,8 @@ static void P_LoadSideDefs2(int lump)
       register side_t *sd = sides + i;
       register sector_t *sec;
 
-      sd->textureoffset = SHORT(msd->textureoffset)<<FRACBITS;
-      sd->rowoffset = SHORT(msd->rowoffset)<<FRACBITS;
+      sd->textureoffset = SHORT(msd->textureoffset)*FRACUNIT;
+      sd->rowoffset = SHORT(msd->rowoffset)*FRACUNIT;
 
       { /* cph 2006/09/30 - catch out-of-range sector numbers; use sector 0 instead */
         unsigned short sector_num = SHORT(msd->sector);
@@ -1948,8 +1956,8 @@ static void P_CreateBlockMap(void)
                           PU_LEVEL, 0);
   // blockmap header
 
-  blockmaplump[0] = bmaporgx = xorg << FRACBITS;
-  blockmaplump[1] = bmaporgy = yorg << FRACBITS;
+  blockmaplump[0] = bmaporgx = xorg * FRACUNIT;
+  blockmaplump[1] = bmaporgy = yorg * FRACUNIT;
   blockmaplump[2] = bmapwidth  = ncols;
   blockmaplump[3] = bmapheight = nrows;
 
@@ -2023,8 +2031,8 @@ static void P_LoadBlockMap (int lump)
 
       W_UnlockLumpNum(lump); // cph - unlock the lump
 
-      bmaporgx = blockmaplump[0]<<FRACBITS;
-      bmaporgy = blockmaplump[1]<<FRACBITS;
+      bmaporgx = blockmaplump[0]*FRACUNIT;
+      bmaporgy = blockmaplump[1]*FRACUNIT;
       bmapwidth = blockmaplump[2];
       bmapheight = blockmaplump[3];
     }
@@ -2423,8 +2431,8 @@ static void P_LoadUDMFSectors(void)
     const udmf_sector_t *ms = &udmf.sectors[i];
 
     ss->cachedheight  = 0;
-    ss->floorheight   = ms->heightfloor << FRACBITS;
-    ss->ceilingheight = ms->heightceiling << FRACBITS;
+    ss->floorheight   = ms->heightfloor * FRACUNIT;
+    ss->ceilingheight = ms->heightceiling * FRACUNIT;
     ss->floorpic      = R_FlatNumForName(ms->texturefloor);
     ss->ceilingpic    = R_FlatNumForName(ms->textureceiling);
     ss->lightlevel    = (short)ms->lightlevel;
@@ -2507,8 +2515,8 @@ static void P_LoadUDMFSideDefs(void)
     side_t *sd = sides + i;
     unsigned int sector_num;
 
-    sd->textureoffset = ms->offsetx << FRACBITS;
-    sd->rowoffset     = ms->offsety << FRACBITS;
+    sd->textureoffset = ms->offsetx * FRACUNIT;
+    sd->rowoffset     = ms->offsety * FRACUNIT;
 
     sector_num = (unsigned int)ms->sector;
     if (sector_num >= (unsigned int)numsectors)

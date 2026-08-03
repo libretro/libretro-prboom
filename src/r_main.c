@@ -579,7 +579,7 @@ void R_ExecuteSetViewSize (void)
   // planes
   for (i=0 ; i<viewheight ; i++)
     {   // killough 5/2/98: reformatted
-      fixed_t dy = D_abs(((i-viewheight/2)<<FRACBITS)+FRACUNIT/2);
+      fixed_t dy = D_abs((i-viewheight/2)*FRACUNIT+FRACUNIT/2); /* *, not <<: negative above centre */
 // proff 08/17/98: Changed for high-res
       yslope[i] = FixedDiv(projectiony, dy);
     }
@@ -778,7 +778,7 @@ void R_SetupFreelook(void)
     old_centery = centery;
     for (i=0 ; i<viewheight ; i++)
     {   // killough 5/2/98: reformatted
-      fixed_t dy = D_abs(((i-centery)<<FRACBITS)+FRACUNIT/2);
+      fixed_t dy = D_abs((i-centery)*FRACUNIT+FRACUNIT/2); /* *, not <<: negative above centre */
       // proff 08/17/98: Changed for high-res
       yslope[i] = FixedDiv(projectiony, dy);
     }

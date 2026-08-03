@@ -238,8 +238,18 @@ void R_FixWiggle (sector_t *sector)
 
 static fixed_t R_ScaleFromGlobalAngle(angle_t visangle)
 {
-   int     anglea = ANG90 + (visangle-viewangle);
-   int     angleb = ANG90 + (visangle-rw_normalangle);
+   /* The angle sums must be unsigned: with a signed int (as in vanilla),
+    * a seg whose normal deviates from the view angle by more than ANG90
+    * -- the classic long-wall / near-parallel "wiggle" geometry -- makes
+    * angleb negative, and the arithmetic shift then indexes finesine with
+    * a negative subscript (caught by ASan as a global out-of-bounds read).
+    * An unsigned full-width shift always lands in [0, FINEANGLES-1], is
+    * value-identical for every index the signed form kept in range (the
+    * table's last FINEANGLES/4 entries duplicate the first), and is the
+    * mathematically correct wraparound for the overflow cases that
+    * previously read garbage. */
+   angle_t anglea = ANG90 + (visangle-viewangle);
+   angle_t angleb = ANG90 + (visangle-rw_normalangle);
    int     den = FixedMul(rw_distance, finesine[anglea>>ANGLETOFINESHIFT]);
    // proff 11/06/98: Changed for high-res
    fixed_t num = FixedMul(projectiony, finesine[angleb>>ANGLETOFINESHIFT]);
@@ -1087,7 +1097,14 @@ static void R_RenderSegLoop (void)
       if (segtextured)
       {
          // calculate texture offset
-         angle_t angle =(rw_centerangle+xtoviewangle[rw_x])>>ANGLETOFINESHIFT;
+         /* Masking to half a revolution keeps the subscript inside the
+          * 4096-entry finetangent table when the wiggle geometry (a seg
+          * normal more than ANG90 off the view angle) pushes the sum past
+          * ANG180.  tan has period pi, so the mask is the mathematically
+          * correct wraparound and the identity for every index the
+          * vanilla expression kept in range. */
+         angle_t angle = ((rw_centerangle+xtoviewangle[rw_x])
+                          >>ANGLETOFINESHIFT) & (FINEANGLES/2 - 1);
 
          texturecolumn = rw_offset-FixedMul(finetangent[angle],rw_distance);
          if (linear_filter)
@@ -1137,8 +1154,8 @@ static void R_RenderSegLoop (void)
                int64_t denom = (int64_t)cr * seg_ldy - (int64_t)sr * seg_ldx;
                if (denom != 0)
                {
-                  int64_t num = (int64_t)(seg_l1x * seg_ldy -
-                                              seg_l1y * seg_ldx) << FRACBITS;
+                  int64_t num = ((int64_t)seg_l1x * seg_ldy -
+                                 (int64_t)seg_l1y * seg_ldx) * FRACUNIT;
                   int64_t t = num / denom;         /* map units along ray */
                   if (t > 0)
                   {

@@ -99,7 +99,7 @@ static void dd_parse_decal(u_scanner_t *s)
         }
         else if (U_CheckToken(s, TK_IntConst))
         {
-          fixed_t v = s->number << FRACBITS;
+          fixed_t v = s->number * FRACUNIT;
           if (isx) d.xscale = v; else d.yscale = v;
         }
       }

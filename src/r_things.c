@@ -1114,8 +1114,8 @@ static void R_DrawVisSprite(vissprite_t *vis, int x1, int x2)
   // make sure the player weapon is in a static position on the screen
   if(vis->mobjflags & MF_PLAYERSPRITE)
   {
-    dcvars.texturemid += FixedMul(((centery - viewheight/2)<<FRACBITS), dcvars.iscale);
-    sprtopscreen += (viewheight/2 - centery)<<FRACBITS;
+    dcvars.texturemid += FixedMul((centery - viewheight/2)*FRACUNIT, dcvars.iscale);
+    sprtopscreen += (viewheight/2 - centery)*FRACUNIT;
   }
 
   {
@@ -1501,16 +1501,16 @@ static void R_ProjectSprite (mobj_t* thing, int lightlevel)
        * cph 2003/08/1 - fraggle points out that this offset must be flipped
        * if the sprite is flipped; e.g. FreeDoom imp is messed up by this. */
       if (flip) {
-         tx -= (patch->width - patch->leftoffset) << FRACBITS;
+         tx -= (patch->width - patch->leftoffset) * FRACUNIT;
       } else {
-         tx -= patch->leftoffset << FRACBITS;
+         tx -= patch->leftoffset * FRACUNIT;
       }
       x1 = (centerxfrac + FixedMul(tx,xscale)) >> FRACBITS;
 
       tx += patch->width<<FRACBITS;
       x2 = ((centerxfrac + FixedMul (tx,xscale) ) >> FRACBITS) - 1;
 
-      gzt = fz + (patch->topoffset << FRACBITS);
+      gzt = fz + (patch->topoffset * FRACUNIT);
       width = patch->width;
       R_UnlockPatchNum(lump+firstspritelump);
    }
@@ -1731,14 +1731,14 @@ static void R_DrawPSprite (pspdef_t *psp, int lightlevel)
       fixed_t       tx;
       tx = sx-160*FRACUNIT;
 
-      tx -= patch->leftoffset<<FRACBITS;
+      tx -= patch->leftoffset*FRACUNIT;
       x1 = (centerxfrac + FixedMul (tx,pspritescale))>>FRACBITS;
 
       tx += patch->width<<FRACBITS;
       x2 = ((centerxfrac + FixedMul (tx, pspritescale) ) >>FRACBITS) - 1;
 
       width = patch->width;
-      topoffset = patch->topoffset<<FRACBITS;
+      topoffset = patch->topoffset*FRACUNIT;
       R_UnlockPatchNum(lump+firstspritelump);
    }
 

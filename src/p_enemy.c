@@ -1150,7 +1150,7 @@ void A_Chase(mobj_t *actor)
     A_FaceTarget(actor);
   else if (actor->movedir < 8)
     {
-      int delta = (actor->angle &= (7<<29)) - (actor->movedir << 29);
+      int delta = (int)((actor->angle &= (7u<<29)) - ((angle_t)actor->movedir << 29));
       if (delta > 0)
         actor->angle -= ANG90/2;
       else
@@ -1293,7 +1293,9 @@ void A_PosAttack(mobj_t *actor)
 
   // killough 5/5/98: remove dependence on order of evaluation:
   t = P_Random(pr_posattack);
-  angle += (t - P_Random(pr_posattack))<<20;
+  /* the jitter add must wrap mod 2^32 (vanilla kept angle_t bits in an
+   * int); do the wrap in angle_t -- defined, bit-identical */
+  angle = (int)((angle_t)angle + (t - P_Random(pr_posattack)) * (1<<20));
   damage = (P_Random(pr_posattack)%5 + 1)*3;
   P_LineAttack(actor, angle, MISSILERANGE, slope, damage);
 }
@@ -1313,7 +1315,7 @@ void A_SPosAttack(mobj_t* actor)
   for (i=0; i<3; i++)
     {  // killough 5/5/98: remove dependence on order of evaluation:
       int t = P_Random(pr_sposattack);
-      int angle = bangle + ((t - P_Random(pr_sposattack))<<20);
+      int angle = (int)((angle_t)bangle + (t - P_Random(pr_sposattack)) * (1<<20));
       int damage = ((P_Random(pr_sposattack)%5)+1)*3;
       P_LineAttack(actor, angle, MISSILERANGE, slope, damage);
     }
@@ -1334,7 +1336,7 @@ void A_CPosAttack(mobj_t *actor)
 
   // killough 5/5/98: remove dependence on order of evaluation:
   t = P_Random(pr_cposattack);
-  angle = bangle + ((t - P_Random(pr_cposattack))<<20);
+  angle = (int)((angle_t)bangle + (t - P_Random(pr_cposattack)) * (1<<20));
   damage = ((P_Random(pr_cposattack)%5)+1)*3;
   P_LineAttack(actor, angle, MISSILERANGE, slope, damage);
 }
@@ -2884,8 +2886,8 @@ void A_Mushroom(mobj_t *actor)
     for (j = -n; j <= n; j += 8)
       {
   mobj_t target = *actor, *mo;
-  target.x += i << FRACBITS;    // Aim in many directions from source
-  target.y += j << FRACBITS;
+  target.x += i * FRACUNIT;    // Aim in many directions from source
+  target.y += j * FRACUNIT;
   target.z += P_AproxDistance(i,j) << (FRACBITS+2); // Aim up fairly high
   mo = P_SpawnMissile(actor, &target, MT_FATSHOT);  // Launch fireball
   mo->momx >>= 1;
@@ -2908,7 +2910,7 @@ void A_Spawn(mobj_t *mo)
   if (mo->state->misc1)
     {
       /* mobj_t *newmobj = */
-      P_SpawnMobj(mo->x, mo->y, (mo->state->misc2 << FRACBITS) + mo->z,
+      P_SpawnMobj(mo->x, mo->y, (mo->state->misc2 * FRACUNIT) + mo->z,
       mo->state->misc1 - 1);
       /* CPhipps - no friendlyness (yet)
    newmobj->flags = (newmobj->flags & ~MF_FRIEND) | (mo->flags & MF_FRIEND);
@@ -3981,8 +3983,8 @@ void A_SoAExplode(mobj_t *actor)
     r1 = P_Random(pr_heretic);
     r2 = P_Random(pr_heretic);
     r3 = P_Random(pr_heretic);
-    mo = P_SpawnMobj(actor->x + ((r3 - 128) << 12),
-                     actor->y + ((r2 - 128) << 12),
+    mo = P_SpawnMobj(actor->x + (r3 - 128) * (1<<12),
+                     actor->y + (r2 - 128) * (1<<12),
                      actor->z + (r1 * actor->height / 256),
                      HEXEN_MT_ZARMORCHUNK);
     if (mo)
@@ -4338,8 +4340,8 @@ void A_WraithFX3(mobj_t *actor)
     mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_WRAITHFX3);
     if (mo)
     {
-      mo->x += (P_Random(pr_heretic) - 128) << 11;
-      mo->y += (P_Random(pr_heretic) - 128) << 11;
+      mo->x += (P_Random(pr_heretic) - 128) * 2048;
+      mo->y += (P_Random(pr_heretic) - 128) * 2048;
       mo->z += (P_Random(pr_heretic) << 10);
       P_SetTarget(&mo->target, actor);
     }
@@ -4378,8 +4380,8 @@ void A_WraithFX4(mobj_t *actor)
     mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_WRAITHFX4);
     if (mo)
     {
-      mo->x += (P_Random(pr_heretic) - 128) << 12;
-      mo->y += (P_Random(pr_heretic) - 128) << 12;
+      mo->x += (P_Random(pr_heretic) - 128) * 4096;
+      mo->y += (P_Random(pr_heretic) - 128) * 4096;
       mo->z += (P_Random(pr_heretic) << 10);
       P_SetTarget(&mo->target, actor);
     }
@@ -4389,8 +4391,8 @@ void A_WraithFX4(mobj_t *actor)
     mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_WRAITHFX5);
     if (mo)
     {
-      mo->x += (P_Random(pr_heretic) - 128) << 11;
-      mo->y += (P_Random(pr_heretic) - 128) << 11;
+      mo->x += (P_Random(pr_heretic) - 128) * 2048;
+      mo->y += (P_Random(pr_heretic) - 128) * 2048;
       mo->z += (P_Random(pr_heretic) << 10);
       P_SetTarget(&mo->target, actor);
     }
@@ -4431,9 +4433,9 @@ void A_CentaurDropStuff(mobj_t *actor)
   {
     angle = actor->angle + ANG90;
     mo->momz = FRACUNIT * 8 + (P_Random(pr_heretic) << 10);
-    mo->momx = FixedMul(((P_Random(pr_heretic) - 128) << 11) + FRACUNIT,
+    mo->momx = FixedMul(((P_Random(pr_heretic) - 128) * 2048) + FRACUNIT,
                         finecosine[angle >> ANGLETOFINESHIFT]);
-    mo->momy = FixedMul(((P_Random(pr_heretic) - 128) << 11) + FRACUNIT,
+    mo->momy = FixedMul(((P_Random(pr_heretic) - 128) * 2048) + FRACUNIT,
                         finesine[angle >> ANGLETOFINESHIFT]);
     P_SetTarget(&mo->target, actor);
   }
@@ -4443,9 +4445,9 @@ void A_CentaurDropStuff(mobj_t *actor)
   {
     angle = actor->angle - ANG90;
     mo->momz = FRACUNIT * 8 + (P_Random(pr_heretic) << 10);
-    mo->momx = FixedMul(((P_Random(pr_heretic) - 128) << 11) + FRACUNIT,
+    mo->momx = FixedMul(((P_Random(pr_heretic) - 128) * 2048) + FRACUNIT,
                         finecosine[angle >> ANGLETOFINESHIFT]);
-    mo->momy = FixedMul(((P_Random(pr_heretic) - 128) << 11) + FRACUNIT,
+    mo->momy = FixedMul(((P_Random(pr_heretic) - 128) * 2048) + FRACUNIT,
                         finesine[angle >> ANGLETOFINESHIFT]);
     P_SetTarget(&mo->target, actor);
   }
@@ -4485,8 +4487,8 @@ void A_DropMace(mobj_t *actor)
                    HEXEN_MT_ETTIN_MACE);
   if (mo)
   {
-    mo->momx = (P_Random(pr_heretic) - 128) << 11;
-    mo->momy = (P_Random(pr_heretic) - 128) << 11;
+    mo->momx = (P_Random(pr_heretic) - 128) * 2048;
+    mo->momy = (P_Random(pr_heretic) - 128) * 2048;
     mo->momz = FRACUNIT * 10 + (P_Random(pr_heretic) << 10);
     P_SetTarget(&mo->target, actor);
   }
@@ -5323,8 +5325,8 @@ void A_SorcBallPop(mobj_t *actor)
   S_StartSound(NULL, hexen_sfx_sorcerer_ballpop);
   actor->flags &= ~MF_NOGRAVITY;
   actor->flags2 |= MF2_LOGRAV;
-  actor->momx = ((P_Random(pr_heretic) % 10) - 5) << FRACBITS;
-  actor->momy = ((P_Random(pr_heretic) % 10) - 5) << FRACBITS;
+  actor->momx = ((P_Random(pr_heretic) % 10) - 5) * FRACUNIT;
+  actor->momy = ((P_Random(pr_heretic) % 10) - 5) * FRACUNIT;
   actor->momz = (2 + (P_Random(pr_heretic) % 3)) << FRACBITS;
   actor->special2.i = 4 * FRACUNIT;    /* initial bounce factor */
   actor->special_args[4] = BOUNCE_TIME_UNIT;
@@ -6109,9 +6111,9 @@ void A_DragonFX2(mobj_t *actor)
     r1 = P_Random(pr_heretic);
     r2 = P_Random(pr_heretic);
     r3 = P_Random(pr_heretic);
-    mo = P_SpawnMobj(actor->x + ((r3 - 128) << 14),
-                     actor->y + ((r2 - 128) << 14),
-                     actor->z + ((r1 - 128) << 12),
+    mo = P_SpawnMobj(actor->x + (r3 - 128) * (1<<14),
+                     actor->y + (r2 - 128) * (1<<14),
+                     actor->z + (r1 - 128) * (1<<12),
                      HEXEN_MT_DRAGON_FX2);
     if (mo)
     {
@@ -6168,7 +6170,7 @@ void A_FastChase(mobj_t *actor)
   if (actor->movedir < 8)
   {
     actor->angle &= (7u << 29);
-    delta = actor->angle - (actor->movedir << 29);
+    delta = (int)(actor->angle - ((angle_t)actor->movedir << 29));
     if (delta > 0)
       actor->angle -= ANG90 / 2;
     else if (delta < 0)
@@ -6370,8 +6372,8 @@ void A_SerpentChase(mobj_t *actor)
   /* turn towards movement direction if not there yet */
   if (actor->movedir < 8)
   {
-    actor->angle &= (7 << 29);
-    delta = actor->angle - (actor->movedir << 29);
+    actor->angle &= (7u << 29);
+    delta = (int)(actor->angle - ((angle_t)actor->movedir << 29));
     if (delta > 0)
       actor->angle -= ANG90 / 2;
     else if (delta < 0)
@@ -6444,8 +6446,8 @@ void A_SerpentWalk(mobj_t *actor)
 
   if (actor->movedir < 8)
   {
-    actor->angle &= (7 << 29);
-    delta = actor->angle - (actor->movedir << 29);
+    actor->angle &= (7u << 29);
+    delta = (int)(actor->angle - ((angle_t)actor->movedir << 29));
     if (delta > 0)
       actor->angle -= ANG90 / 2;
     else if (delta < 0)
@@ -6634,13 +6636,13 @@ void A_SerpentSpawnGibs(mobj_t *actor)
   {
     r1 = P_Random(pr_heretic);
     r2 = P_Random(pr_heretic);
-    mo = P_SpawnMobj(actor->x + ((r2 - 128) << 12),
-                     actor->y + ((r1 - 128) << 12),
+    mo = P_SpawnMobj(actor->x + (r2 - 128) * (1<<12),
+                     actor->y + (r1 - 128) * (1<<12),
                      actor->floorz + FRACUNIT, gib[i]);
     if (mo)
     {
-      mo->momx = (P_Random(pr_heretic) - 128) << 6;
-      mo->momy = (P_Random(pr_heretic) - 128) << 6;
+      mo->momx = (P_Random(pr_heretic) - 128) * 64;
+      mo->momy = (P_Random(pr_heretic) - 128) * 64;
       mo->floorclip = 6 * FRACUNIT;
     }
   }
@@ -6693,15 +6695,15 @@ void A_FiredSpawnRock(mobj_t *actor)
     case 4: rtype = HEXEN_MT_FIREDEMON_FX5; break;
   }
 
-  x = actor->x + ((P_Random(pr_heretic) - 128) << 12);
-  y = actor->y + ((P_Random(pr_heretic) - 128) << 12);
+  x = actor->x + ((P_Random(pr_heretic) - 128) * 4096);
+  y = actor->y + ((P_Random(pr_heretic) - 128) * 4096);
   z = actor->z + ((P_Random(pr_heretic)) << 11);
   mo = P_SpawnMobj(x, y, z, rtype);
   if (mo)
   {
     P_SetTarget(&mo->target, actor);
-    mo->momx = (P_Random(pr_heretic) - 128) << 10;
-    mo->momy = (P_Random(pr_heretic) - 128) << 10;
+    mo->momx = (P_Random(pr_heretic) - 128) * 1024;
+    mo->momy = (P_Random(pr_heretic) - 128) * 1024;
     mo->momz = (P_Random(pr_heretic) << 10);
     mo->special1.i = 2;        /* number of bounces */
   }
@@ -6818,15 +6820,15 @@ void A_FiredSplotch(mobj_t *actor)
   mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_FIREDEMON_SPLOTCH1);
   if (mo)
   {
-    mo->momx = (P_Random(pr_heretic) - 128) << 11;
-    mo->momy = (P_Random(pr_heretic) - 128) << 11;
+    mo->momx = (P_Random(pr_heretic) - 128) * 2048;
+    mo->momy = (P_Random(pr_heretic) - 128) * 2048;
     mo->momz = FRACUNIT * 3 + (P_Random(pr_heretic) << 10);
   }
   mo = P_SpawnMobj(actor->x, actor->y, actor->z, HEXEN_MT_FIREDEMON_SPLOTCH2);
   if (mo)
   {
-    mo->momx = (P_Random(pr_heretic) - 128) << 11;
-    mo->momy = (P_Random(pr_heretic) - 128) << 11;
+    mo->momx = (P_Random(pr_heretic) - 128) * 2048;
+    mo->momy = (P_Random(pr_heretic) - 128) * 2048;
     mo->momz = FRACUNIT * 3 + (P_Random(pr_heretic) << 10);
   }
 }

@@ -24,7 +24,7 @@ fixed_t P_PlaneZatPoint(const secplane_t *p, fixed_t x, fixed_t y)
   /* z = (-d - a*x - b*y) / c, all 16.16 */
   int64_t num = -(int64_t)p->d - (((int64_t)p->a * x) >> FRACBITS)
                               - (((int64_t)p->b * y) >> FRACBITS);
-  return (fixed_t)((num << FRACBITS) / p->c);
+  return (fixed_t)((num * FRACUNIT) / p->c);
 }
 
 fixed_t P_FloorZAtPoint(const sector_t *s, fixed_t x, fixed_t y)

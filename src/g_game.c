@@ -1416,14 +1416,14 @@ static dbool   G_CheckSpot(int playernum, mapthing_t *mthing)
   {
      /* first spawn of level, before corpses */
      for (i=0 ; i<playernum ; i++)
-        if (players[i].mo->x == mthing->x << FRACBITS
-              && players[i].mo->y == mthing->y << FRACBITS)
+        if (players[i].mo->x == mthing->x * FRACUNIT
+              && players[i].mo->y == mthing->y * FRACUNIT)
            return FALSE;
      return TRUE;
   }
 
-  x = mthing->x << FRACBITS;
-  y = mthing->y << FRACBITS;
+  x = mthing->x * FRACUNIT;
+  y = mthing->y * FRACUNIT;
 
   // killough 4/2/98: fix bug where P_CheckPosition() uses a non-solid
   // corpse to detect collisions with other players in DM starts
@@ -1471,9 +1471,38 @@ static dbool   G_CheckSpot(int playernum, mapthing_t *mthing)
 /* BUG: an can end up negative, because mthing->angle is (signed) short.
  * We have to emulate original Doom's behaviour, deferencing past the start
  * of the array, into the previous array (finetangent) */
-    an = ( ANG45 * ((signed)mthing->angle/45) ) >> ANGLETOFINESHIFT;
-    xa = finecosine[an];
-    ya = finesine[an];
+    /* the multiply must wrap (angles 225..315 overflow through bit 31 and
+     * the negative an drives the emulation switch below); do the wrap in
+     * unsigned arithmetic -- bit-identical, defined -- and reinterpret. */
+    an = (int)( ANG45 * (angle_t)((signed)mthing->angle/45) ) >> ANGLETOFINESHIFT;
+    /* A negative an (negative mthing->angle in a hostile/corrupt wad) must
+     * not index the tables directly: vanilla dereferenced past the start of
+     * finesine into finetangent, and the switch below hardcodes exactly the
+     * values that layout produced.  Read the tables only when in range and
+     * let the emulation switch supply the negative cases -- for every
+     * compatibility level, since the direct read never had defined contents
+     * to preserve (it depended on link-time array adjacency). */
+    if (an >= 0)
+    {
+      xa = finecosine[an];
+      ya = finesine[an];
+    }
+    else
+      switch (an) {
+      case -4096: xa = finetangent[2048];   // finecosine[-4096]
+          	ya = finetangent[0];      // finesine[-4096]
+          	break;
+      case -3072: xa = finetangent[3072];   // finecosine[-3072]
+          	ya = finetangent[1024];   // finesine[-3072]
+          	break;
+      case -2048: xa = finesine[0];   // finecosine[-2048]
+          	ya = finetangent[2048];   // finesine[-2048]
+          	break;
+      case -1024: xa = finesine[1024];     // finecosine[-1024]
+          	ya = finetangent[3072];  // finesine[-1024]
+          	break;
+      default:	I_Error("G_CheckSpot: unexpected angle %d\n",an);
+      }
 
     if (compatibility_level <= finaldoom_compatibility || compatibility_level == prboom_4_compatibility)
       switch (an) {

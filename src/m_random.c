@@ -164,7 +164,9 @@ int P_RandomHitscanSlope(pr_class_t pr_class, fixed_t spread)
 
   if (angle > (int)ANG90)
     return finetangent[0];
-  else if (-angle > (int)ANG90)
+  else if (-angle >= (int)ANG90)
+    /* >=: at angle == -ANG90 exactly, (ANG90 - angle) >> ANGLETOFINESHIFT
+     * is 4096 -- one past the table -- so the clamp must own that case. */
     return finetangent[FINEANGLES/2 - 1];
   else
     return finetangent[(ANG90 - angle) >> ANGLETOFINESHIFT];

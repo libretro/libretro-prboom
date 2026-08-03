@@ -495,7 +495,10 @@ static void* I_SndLoadSample(const char* sfxname, int* len, unsigned int* step,
         return 0;
     }
     for (out_i = 0; out_i < sfxlump_len; out_i++)
-        out_data[out_i] = (int16_t)(((int)sfxlump_sound[out_i] - 128) << 8);
+        /* * 256, not << 8: half the samples are negative after recentring,
+         * and left-shifting a negative int is undefined (UBSan, C99 6.5.7).
+         * The multiply compiles to the same shift with defined semantics. */
+        out_data[out_i] = (int16_t)(((int)sfxlump_sound[out_i] - 128) * 256);
     out_data[sfxlump_len] = out_data[sfxlump_len - 1];
 
     *step = STEP_FROM_RATE(orig_rate);

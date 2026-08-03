@@ -424,7 +424,10 @@ void R_DrawDecalsForSeg(struct drawseg_s *ds_, int rx1, int rx2)
 
     for (x = rx1; x <= rx2; x++, colscale += rw_scalestep)
     {
-      angle_t angle = (ds->rw_centerangle + xtoviewangle[x]) >> ANGLETOFINESHIFT;
+      /* mask as in R_RenderSegLoop: wiggle-geometry segs can push the sum
+       * past ANG180, and tan's pi period makes the mask exact. */
+      angle_t angle = ((ds->rw_centerangle + xtoviewangle[x])
+                       >> ANGLETOFINESHIFT) & (FINEANGLES/2 - 1);
       fixed_t texu  = ds->rw_offset - FixedMul(finetangent[angle], ds->rw_distance);
       fixed_t tx;
       int     col;

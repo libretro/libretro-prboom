@@ -154,8 +154,8 @@ void R_InterpolateView (player_t *player)
   if (hexen && localQuakeHappening[displayplayer])
   {
     int intensity = localQuakeHappening[displayplayer];
-    viewx += (((M_Random() % (intensity << 2)) - (intensity << 1)) << FRACBITS);
-    viewy += (((M_Random() % (intensity << 2)) - (intensity << 1)) << FRACBITS);
+    viewx += ((M_Random() % (intensity << 2)) - (intensity << 1)) * FRACUNIT;
+    viewy += ((M_Random() % (intensity << 2)) - (intensity << 1)) * FRACUNIT;
   }
 }
 

@@ -81,8 +81,12 @@ static INLINE int FixedMul(int a, int b)
 
 static INLINE int FixedDiv(int a, int b)
 {
+  /* *FRACUNIT, not <<FRACBITS: a is negative half the time and
+   * left-shifting a negative value is undefined even at 64 bits
+   * (C99 6.5.7).  The multiply is value-identical and compiles to
+   * the same shift. */
   return (D_abs(a)>>14) >= D_abs(b) ? ((a^b)>>31) ^ INT_MAX :
-    (int)(((int64_t) a << FRACBITS) / b);
+    (int)(((int64_t) a * FRACUNIT) / b);
 }
 
 /* CPhipps -

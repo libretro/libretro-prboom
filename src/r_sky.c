@@ -124,7 +124,7 @@ void R_InitSkyMap (void)
     }
     else if (skyheight > 200)
     {
-      skytexturemid = (200 - skyheight) << FRACBITS;
+      skytexturemid = (200 - skyheight) * FRACUNIT;
     }
 
     if (viewwidth != 0 && viewheight != 0)

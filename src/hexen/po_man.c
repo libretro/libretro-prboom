@@ -135,7 +135,7 @@ void ResetPolySubSector(polyobj_t *po)
   avg.x /= po->numsegs;
   avg.y /= po->numsegs;
 
-  new_sub = R_PointInSubsector(avg.x << FRACBITS, avg.y << FRACBITS);
+  new_sub = R_PointInSubsector(avg.x * FRACUNIT, avg.y * FRACUNIT);
 
   if (new_sub->poly)
   {
@@ -894,7 +894,7 @@ static void TranslateToStartSpot(int tag, int originX, int originY)
   }
   avg.x /= po->numsegs;
   avg.y /= po->numsegs;
-  sub = R_PointInSubsector(avg.x << FRACBITS, avg.y << FRACBITS);
+  sub = R_PointInSubsector(avg.x * FRACUNIT, avg.y * FRACUNIT);
   /* several polyobjs may resolve to the same render subsector (stacked
    * ZDoom geometry); chain them rather than vanilla Hexen's fatal */
   po->subsector = sub;
@@ -979,8 +979,8 @@ static void PO_LoadThings(int lump)
 
     if (PO_IsSpawnType(type, &crush, &hurt))
     { /* Polyobj StartSpot Pt. */
-      polyobjs[polyIndex].startSpot.x = x << FRACBITS;
-      polyobjs[polyIndex].startSpot.y = y << FRACBITS;
+      polyobjs[polyIndex].startSpot.x = x * FRACUNIT;
+      polyobjs[polyIndex].startSpot.y = y * FRACUNIT;
       SpawnPolyobj(polyIndex, angle, crush, hurt);
       polyIndex++;
     }
@@ -994,7 +994,7 @@ static void PO_LoadThings(int lump)
     type = SHORT(mt->type);
     if (PO_IsAnchorType(type))
     { /* Polyobj Anchor Pt. */
-      TranslateToStartSpot(angle, x << FRACBITS, y << FRACBITS);
+      TranslateToStartSpot(angle, x * FRACUNIT, y * FRACUNIT);
     }
   }
   W_UnlockLumpNum(lump);

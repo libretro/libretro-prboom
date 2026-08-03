@@ -126,15 +126,15 @@ static void P_SetPsprite(player_t *player, int position, statenum_t stnum)
       if (hexen)
       {
          if (state->misc1)
-            psp->sx = state->misc1 << FRACBITS;
+            psp->sx = state->misc1 * FRACUNIT;
          if (state->misc2)
-            psp->sy = state->misc2 << FRACBITS;
+            psp->sy = state->misc2 * FRACUNIT;
       }
       else if (state->misc1)
       {
          /* coordinate set */
-         psp->sx = state->misc1 << FRACBITS;
-         psp->sy = state->misc2 << FRACBITS;
+         psp->sx = state->misc1 * FRACUNIT;
+         psp->sy = state->misc2 * FRACUNIT;
       }
 
       // Call action routine.
@@ -229,9 +229,9 @@ void P_SetPspriteNF(player_t *player, int position, statenum_t stnum)
       psp->state = state;
       psp->tics = state->tics;   /* could be 0 */
       if (state->misc1)
-         psp->sx = state->misc1 << FRACBITS;
+         psp->sx = state->misc1 * FRACUNIT;
       if (state->misc2)
-         psp->sy = state->misc2 << FRACBITS;
+         psp->sy = state->misc2 * FRACUNIT;
       stnum = psp->state->nextstate;
    } while (!psp->tics);         /* an initial state of 0 could cycle through */
 }
@@ -851,7 +851,7 @@ void A_Punch(player_t *player, pspdef_t *psp)
 
   // killough 5/5/98: remove dependence on order of evaluation:
   t = P_Random(pr_punchangle);
-  angle += (t - P_Random(pr_punchangle))<<18;
+  angle += (t - P_Random(pr_punchangle)) * (1<<18);
 
   /* killough 8/2/98: make autoaiming prefer enemies */
   if (!mbf_features ||
@@ -885,7 +885,7 @@ void A_Saw(player_t *player, pspdef_t *psp)
   angle_t angle = player->mo->angle;
   // killough 5/5/98: remove dependence on order of evaluation:
   int t = P_Random(pr_saw);
-  angle += (t - P_Random(pr_saw))<<18;
+  angle += (t - P_Random(pr_saw)) * (1<<18);
 
   /* Use meleerange + 1 so that the puff doesn't skip the flash
    * killough 8/2/98: make autoaiming prefer enemies */
@@ -1012,7 +1012,21 @@ void A_FireOldBFG(player_t *player, pspdef_t *psp)
       }
       while (mask && (mask=0, !linetarget));     // killough 8/2/98
       an1 += an - mo->angle;
-      an2 += tantoangle[slope >> DBITS];
+      /* mbf carried a vanilla-beta bug here: P_AimLineAttack returns a
+       * signed slope, and aiming downward makes slope >> DBITS a negative
+       * tantoangle subscript (a read before the table whose value fed an2
+       * and, through finetangent, the projectile's momz).  Clamp the way
+       * SlopeDiv does at the other tantoangle sites; a downward aim now
+       * contributes tantoangle[0] == 0, where before it contributed
+       * whatever bytes preceded the table. */
+      {
+        int t = slope >> DBITS;
+        if (t < 0)
+          t = 0;
+        else if (t > SLOPERANGE)
+          t = SLOPERANGE;
+        an2 += tantoangle[t];
+      }
     }
 
     th = P_SpawnMobj(mo->x, mo->y, mo->z + 62*FRACUNIT - player->psprites[ps_weapon].sy, type);
@@ -1078,7 +1092,7 @@ static void P_GunShot(mobj_t *mo, dbool accurate)
   if (!accurate)
     {  // killough 5/5/98: remove dependence on order of evaluation:
       int t = P_Random(pr_misfire);
-      angle += (t - P_Random(pr_misfire))<<18;
+      angle += (t - P_Random(pr_misfire)) * (1<<18);
     }
 
   P_LineAttack(mo, angle, MISSILERANGE, bulletslope, damage);
@@ -1150,10 +1164,10 @@ void A_FireShotgun2(player_t *player, pspdef_t *psp)
       angle_t angle = player->mo->angle;
       // killough 5/5/98: remove dependence on order of evaluation:
       int t = P_Random(pr_shotgun);
-      angle += (t - P_Random(pr_shotgun))<<19;
+      angle += (t - P_Random(pr_shotgun)) * (1<<19);
       t = P_Random(pr_shotgun);
       P_LineAttack(player->mo, angle, MISSILERANGE, bulletslope +
-                   ((t - P_Random(pr_shotgun))<<5), damage);
+                   (t - P_Random(pr_shotgun)) * (1<<5), damage);
     }
 
   retro_set_rumble_damage(40, 120.0f);
@@ -1527,9 +1541,9 @@ void A_FSwordFlames(mobj_t *actor)
   int i;
 
   for (i = 1 + (P_Random(pr_saw) & 3); i; i--)
-    P_SpawnMobj(actor->x + ((P_Random(pr_saw) - 128) << 12),
-                actor->y + ((P_Random(pr_saw) - 128) << 12),
-                actor->z + ((P_Random(pr_saw) - 128) << 11),
+    P_SpawnMobj(actor->x + ((P_Random(pr_saw) - 128) * 4096),
+                actor->y + ((P_Random(pr_saw) - 128) * 4096),
+                actor->z + ((P_Random(pr_saw) - 128) * 2048),
                 HEXEN_MT_FSWORD_FLAME);
 }
 
@@ -2775,7 +2789,7 @@ void A_FireMacePL1B(player_t *player, pspdef_t *psp);
 /* Heretic has no free-look pitch in this core; mirror the small helpers
  * from heretic/p_action.c (they are file-static there). */
 static int p_pspr_PlayerLookDir(player_t *player) { return player->lookdir; }
-static fixed_t p_pspr_PlayerSlope(player_t *player) { return (player->lookdir << FRACBITS) / 173; }
+static fixed_t p_pspr_PlayerSlope(player_t *player) { return (player->lookdir * FRACUNIT) / 173; }
 #define dsda_PlayerLookDir p_pspr_PlayerLookDir
 #define dsda_PlayerSlope   p_pspr_PlayerSlope
 

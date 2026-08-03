@@ -959,7 +959,7 @@ static void R_DrawColumnTC_PointUV_PointZ(draw_column_vars_t *dcvars)
                unsigned blocks = (unsigned)count >> 2;
                __m128i vf  = _mm_set_epi32(frac + 3*fracstep, frac + 2*fracstep,
                                            frac + fracstep,   frac);
-               const __m128i vfs = _mm_set1_epi32(fracstep << 2);
+               const __m128i vfs = _mm_set1_epi32(fracstep * 4);
                const __m128i vm  = _mm_set1_epi32((int)fmask);
                unsigned consumed = blocks << 2;
                while (blocks--)
@@ -984,7 +984,7 @@ static void R_DrawColumnTC_PointUV_PointZ(draw_column_vars_t *dcvars)
                const int32_t fb4[4] = { frac, frac + fracstep,
                                         frac + 2*fracstep, frac + 3*fracstep };
                int32x4_t vf = vld1q_s32(fb4);
-               const int32x4_t vfs = vdupq_n_s32(fracstep << 2);
+               const int32x4_t vfs = vdupq_n_s32(fracstep * 4);
                const int32x4_t vm  = vdupq_n_s32((int)fmask);
                unsigned consumed = blocks << 2;
                while (blocks--)
@@ -5704,8 +5704,8 @@ static void R_DrawSpanTC_PointUV_PointZ(draw_span_vars_t *dsvars)
                                      xfrac + xstep,   xfrac);
          __m128i vy  = _mm_set_epi32(yfrac + 3*ystep, yfrac + 2*ystep,
                                      yfrac + ystep,   yfrac);
-         const __m128i vxs   = _mm_set1_epi32(xstep << 2);
-         const __m128i vys   = _mm_set1_epi32(ystep << 2);
+         const __m128i vxs   = _mm_set1_epi32(xstep * 4);
+         const __m128i vys   = _mm_set1_epi32(ystep * 4);
          const __m128i m63   = _mm_set1_epi32(63);
          const __m128i m4032 = _mm_set1_epi32(4032);
          unsigned consumed   = blocks << 2;
@@ -5743,8 +5743,8 @@ static void R_DrawSpanTC_PointUV_PointZ(draw_span_vars_t *dsvars)
                                     yfrac + 2*ystep, yfrac + 3*ystep };
          int32x4_t vx = vld1q_s32(xbase);
          int32x4_t vy = vld1q_s32(ybase);
-         const int32x4_t vxs   = vdupq_n_s32(xstep << 2);
-         const int32x4_t vys   = vdupq_n_s32(ystep << 2);
+         const int32x4_t vxs   = vdupq_n_s32(xstep * 4);
+         const int32x4_t vys   = vdupq_n_s32(ystep * 4);
          const int32x4_t m63   = vdupq_n_s32(63);
          const int32x4_t m4032 = vdupq_n_s32(4032);
          unsigned consumed     = blocks << 2;
@@ -5809,8 +5809,8 @@ static void R_DrawSpanTC_PointUV_PointZ(draw_span_vars_t *dsvars)
                                   xfrac + xstep,   xfrac);
       __m128i vy  = _mm_set_epi32(yfrac + 3*ystep, yfrac + 2*ystep,
                                   yfrac + ystep,   yfrac);
-      const __m128i vxs   = _mm_set1_epi32(xstep << 2);
-      const __m128i vys   = _mm_set1_epi32(ystep << 2);
+      const __m128i vxs   = _mm_set1_epi32(xstep * 4);
+      const __m128i vys   = _mm_set1_epi32(ystep * 4);
       const __m128i m63   = _mm_set1_epi32(63);
       const __m128i m4032 = _mm_set1_epi32(4032);
       unsigned consumed   = blocks << 2;
@@ -5858,8 +5858,8 @@ static void R_DrawSpanTC_PointUV_PointZ(draw_span_vars_t *dsvars)
                                  yfrac + 2*ystep, yfrac + 3*ystep };
       int32x4_t vx = vld1q_s32(xbase);
       int32x4_t vy = vld1q_s32(ybase);
-      const int32x4_t vxs   = vdupq_n_s32(xstep << 2);
-      const int32x4_t vys   = vdupq_n_s32(ystep << 2);
+      const int32x4_t vxs   = vdupq_n_s32(xstep * 4);
+      const int32x4_t vys   = vdupq_n_s32(ystep * 4);
       const int32x4_t m63   = vdupq_n_s32(63);
       const int32x4_t m4032 = vdupq_n_s32(4032);
       unsigned consumed     = blocks << 2;

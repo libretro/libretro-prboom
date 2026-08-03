@@ -317,13 +317,13 @@ void P_MovePlayer (player_t* player)
   ticcmd_t *cmd = &player->cmd;
   mobj_t *mo = player->mo;
 
-  mo->angle += cmd->angleturn << 16;
+  mo->angle += cmd->angleturn * 65536; /* *, not <<: negative on right turns */
 
   onground = mo->z <= mo->floorz;
 
   // e6y
   if (demo_smoothturns && player == &players[displayplayer])
-     R_SmoothPlaying_Add(cmd->angleturn << 16);
+     R_SmoothPlaying_Add(cmd->angleturn * 65536);
 
   // killough 10/98:
   //
@@ -886,17 +886,17 @@ static void P_ArtiTele(player_t *player)
   {
     int selections = deathmatch_p - deathmatchstarts;
     int i = P_Random(pr_heretic) % selections;
-    destX = deathmatchstarts[i].x << FRACBITS;
-    destY = deathmatchstarts[i].y << FRACBITS;
-    destAngle = ANG45 * (deathmatchstarts[i].angle / 45);
+    destX = deathmatchstarts[i].x * FRACUNIT;
+    destY = deathmatchstarts[i].y * FRACUNIT;
+    destAngle = ANG45 * (angle_t)(deathmatchstarts[i].angle / 45);
   }
   else
   {
     int pos = (hexen && RebornPosition > 0 && RebornPosition < MAX_PLAYER_STARTS &&
                playerstarts[RebornPosition][0].options) ? RebornPosition : 0;
-    destX = playerstarts[pos][0].x << FRACBITS;
-    destY = playerstarts[pos][0].y << FRACBITS;
-    destAngle = ANG45 * (playerstarts[pos][0].angle / 45);
+    destX = playerstarts[pos][0].x * FRACUNIT;
+    destY = playerstarts[pos][0].y * FRACUNIT;
+    destAngle = ANG45 * (angle_t)(playerstarts[pos][0].angle / 45);
   }
 
   oldx = player->mo->x;
@@ -943,8 +943,8 @@ static void P_TeleportToPlayerStarts(mobj_t *victim)
     return;
   i = P_Random(pr_heretic) % selections;
   start = &playerstarts[0][i];
-  TeleportMobj(victim, start->x << FRACBITS, start->y << FRACBITS,
-               ANG45 * (start->angle / 45));
+  TeleportMobj(victim, start->x * FRACUNIT, start->y * FRACUNIT,
+               ANG45 * (angle_t)(start->angle / 45));
 }
 
 static void P_TeleportToDeathmatchStarts(mobj_t *victim)
@@ -954,9 +954,9 @@ static void P_TeleportToDeathmatchStarts(mobj_t *victim)
   if (selections)
   {
     int i = P_Random(pr_heretic) % selections;
-    TeleportMobj(victim, deathmatchstarts[i].x << FRACBITS,
-                 deathmatchstarts[i].y << FRACBITS,
-                 ANG45 * (deathmatchstarts[i].angle / 45));
+    TeleportMobj(victim, deathmatchstarts[i].x * FRACUNIT,
+                 deathmatchstarts[i].y * FRACUNIT,
+                 ANG45 * (angle_t)(deathmatchstarts[i].angle / 45));
   }
   else
     P_TeleportToPlayerStarts(victim);

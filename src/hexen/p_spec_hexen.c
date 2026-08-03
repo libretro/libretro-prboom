@@ -863,7 +863,7 @@ int EV_SpawnLight(line_t *line, int *args, lighttype_t type)
       case LITE_FADE:
         think = true;
         light->value1 = arg1;       /* destination lightlevel */
-        light->value2 = FixedDiv((arg1 - sec->lightlevel) << FRACBITS,
+        light->value2 = FixedDiv((arg1 - sec->lightlevel) * FRACUNIT,
                                  arg2 << FRACBITS);  /* delta */
         light->tics2 = (sec->lightlevel <= arg1) ? 1 : -1;
         break;
@@ -871,7 +871,7 @@ int EV_SpawnLight(line_t *line, int *args, lighttype_t type)
         think = true;
         light->value1 = arg1;       /* upper */
         light->value2 = arg2;       /* lower */
-        light->tics1 = FixedDiv((arg1 - sec->lightlevel) << FRACBITS,
+        light->tics1 = FixedDiv((arg1 - sec->lightlevel) * FRACUNIT,
                                 arg3 << FRACBITS);   /* delta */
         light->tics2 = (sec->lightlevel <= arg1) ? 1 : -1;
         break;

@@ -51,6 +51,8 @@
 #include "d_think.h"
 #include "w_wad.h"
 
+#include <streams/file_stream.h>
+
 // CPhipps - modify to use logical output routine
 #include "lprintf.h"
 #include <stdarg.h>
@@ -98,26 +100,21 @@ static char* strlwr(char* str)
 
 typedef struct {
   /* cph 2006/08/06 -
-   * if lump != NULL, lump is the start of the lump,
-   * inp is the current read pos. */
+   * lump is the start of the buffer, inp is the current read pos.
+   * libretro: on-disk DEH files are slurped whole through the VFS
+   * (filestream_read_file) into the same in-memory lane wad lumps
+   * always used, so there is no FILE* lane any more.  is_file marks
+   * a buffer that must be handed back to libc's free (the VFS
+   * allocates outside the zone allocator). */
   const uint8_t *inp, *lump;
   long size;
-  /* else, !lump, and f is the file being read */
-  FILE* f;
+  int  is_file;
 } DEHFILE;
 
 // killough 10/98: emulate IO whether input really comes from a file or not
 
 static char *dehfgets(char *buf, size_t n, DEHFILE *fp)
 {
-  if (!fp->lump) {                                   // If this is a real file,
-#ifdef PSX
-    fread(buf, n, 1, fp->f);
-    return buf;
-#else
-    return (fgets)(buf, n, fp->f);                   // return regular fgets
-#endif
-  }
   if (!n || fp->size<=0 || !*fp->inp)                // If no more characters
     return NULL;
   if (n==1)
@@ -135,13 +132,12 @@ static char *dehfgets(char *buf, size_t n, DEHFILE *fp)
 
 static int dehfeof(DEHFILE *fp)
 {
-  return !fp->lump ? feof(fp->f) : fp->size<=0 || !*fp->inp;
+  return fp->size<=0 || !*fp->inp;
 }
 
 static int dehfgetc(DEHFILE *fp)
 {
-  return !fp->lump ? fgetc(fp->f) : fp->size > 0 ?
-    fp->size--, *fp->inp++ : EOF;
+  return fp->size > 0 ? (fp->size--, *fp->inp++) : EOF;
 }
 
 // haleyjd 9/22/99
@@ -1713,18 +1709,28 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
 
   if (filename)
     {
-      if (!(infile.f = fopen(filename,"rt")))
+      /* Slurp the whole file through the VFS into the in-memory lane.
+       * DEH files are tiny (tens of KB); the old FILE* lane's only
+       * distinction was fgets's CRLF translation under "rt", which is
+       * irrelevant because lfstrip already strips \r (wad lumps always
+       * took this path with raw bytes). */
+      void   *buf = NULL;
+      int64_t len = 0;
+      if (filestream_read_file(filename, &buf, &len) <= 0 || !buf)
         {
           lprintf(LO_WARN, "-deh file %s not found\n",filename);
           return;  // should be checked up front anyway
         }
-      infile.lump = NULL;
+      infile.inp = infile.lump = buf;
+      infile.size = (long)len;
+      infile.is_file = 1;
       file_or_lump = "file";
     }
   else  // DEH file comes from lump indicated by third argument
     {
       infile.size = W_LumpLength(lumpnum);
       infile.inp = infile.lump = W_CacheLumpNum(lumpnum);
+      infile.is_file = 0;
       filename = lumpinfo[lumpnum].wadfile->name;
       file_or_lump = "lump from";
     }
@@ -1762,7 +1768,7 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
           // killough 10/98: exclude if inside wads (only to discourage
           // the practice, since the code could otherwise handle it)
 
-          if (infile.lump)
+          if (!infile.is_file)
             {
               deh_log(
                         "No files may be included from wads: %s\n",inbuffer);
@@ -1801,10 +1807,11 @@ void ProcessDehFile(const char *filename, const char *outfilename, int lumpnum)
       }
     }
 
-  if (infile.lump)
-    W_UnlockLumpNum(lumpnum);                 // Mark purgable
+  if (infile.is_file)
+    (free)((void *)infile.lump);              /* VFS buffer: raw libc free,
+                                                 outside the zone macros */
   else
-    fclose(infile.f);                         // Close real file
+    W_UnlockLumpNum(lumpnum);                 // Mark purgable
 }
 
 // ====================================================================

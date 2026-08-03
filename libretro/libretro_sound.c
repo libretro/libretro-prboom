@@ -242,7 +242,7 @@ static const music_player_t *music_players[] =
   &opl_synth_player, // oplplayer.h
   &libretro_midi_player, // libretro_midiout.h (raw MIDI to the frontend)
   &mp_player, // madplayer.h (MP3 via rmp3)
-  &mod_player, // modplayer.h (ProTracker .MOD via pocketmod)
+  &mod_player, // modplayer.h (MOD/S3M/XM via rmodtracker)
   &ogg_player, // oggplayer.h (Ogg Vorbis via rvorbis)
   NULL
 };

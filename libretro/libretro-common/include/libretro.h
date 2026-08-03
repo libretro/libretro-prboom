@@ -2821,6 +2821,39 @@ enum retro_mod
 #define RETRO_ENVIRONMENT_GET_HDR_OUTPUT_MODE (91 | RETRO_ENVIRONMENT_EXPERIMENTAL)
 
 /**
+ * Queries the peak luminance the frontend is presenting to, in cd/m2 (nits).
+ *
+ * Only meaningful together with #RETRO_PIXEL_FORMAT_HDR10_2101010.  A core
+ * emitting HDR10 encodes absolute luminance itself, so it decides where its
+ * brightest content lands.  #RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS says
+ * where ordinary content sits; this says how much room there is above it.  The
+ * gap between the two is the entire headroom a core has for highlights, and
+ * without it a core has to guess - a guess that is too dark on a bright display
+ * and clips on a dim one.
+ *
+ * This is what the *display* can do, not what the content wants, so it is a
+ * ceiling to roll off toward rather than a level to target.  A core should not
+ * assume anything it emits below this value is reproduced exactly; displays
+ * tone map internally, and many report a peak they can only hold over a small
+ * window.
+ *
+ * May be lower than paper white if the user has configured it so.  A core
+ * should treat that as zero headroom and clamp to paper white rather than
+ * producing a negative range.
+ *
+ * The user can change this at any time, so a core should re-query it rather
+ * than caching it indefinitely.
+ *
+ * @param[out] data <tt>float *</tt>.
+ * Set to the peak luminance in nits.
+ * @return \c true if the call is recognised, \c false on a frontend that does
+ * not implement it; callers should then fall back to a sensible default.
+ * 1000 nits is a reasonable assumption, being both the HDR10 reference peak
+ * and roughly what mid-range HDR displays achieve.
+ */
+#define RETRO_ENVIRONMENT_GET_HDR_MAX_NITS (92 | RETRO_ENVIRONMENT_EXPERIMENTAL)
+
+/**
  * Result of \c RETRO_ENVIRONMENT_GET_MEMORY_STATUS.
  *
  * Sizes are in bytes; a field the frontend cannot determine is left at 0.
@@ -4482,6 +4515,27 @@ struct retro_log_callback
 /** Indicates CPU support for the LZCNT instruction (x86 ABM / ARM CLZ). */
 #define RETRO_SIMD_LZCNT    (1 << 23)
 
+/**
+ * Indicates CPU support for the PCLMULQDQ carry-less multiply instruction.
+ *
+ * Distinct from \c RETRO_SIMD_AES: AES-NI is CPUID.1:ECX[25] and
+ * PCLMULQDQ is CPUID.1:ECX[1]. They shipped together on most parts but
+ * hypervisors mask them independently and some early Westmere SKUs had
+ * AES fused off, so one must not be used as a proxy for the other.
+ */
+#define RETRO_SIMD_PCLMUL   (1 << 24)
+
+/**
+ * Indicates CPU support for the ARMv8 CRC32 instructions
+ * (\c crc32b / \c crc32h / \c crc32w / \c crc32x).
+ *
+ * These compute CRC-32/ISO-HDLC, the gzip and PNG polynomial, not
+ * CRC-32C. Optional in ARMv8.0 and mandatory from ARMv8.1, so a
+ * 64-bit ARM CPU does not imply their presence: Apple's A7 through
+ * A10 lack them, for instance.
+ */
+#define RETRO_SIMD_CRC32    (1 << 25)
+
 /** @} */
 
 /**
@@ -5927,7 +5981,6 @@ enum retro_pixel_format
     */
    RETRO_PIXEL_FORMAT_XRGB2101010 = 3,
 
-   /** Defined to ensure that <tt>sizeof(retro_pixel_format) == sizeof(int)</tt>. Do not use. */
    /**
     * HDR10: PQ-encoded Rec.2020, 10 bits per channel, native endian.
     *
@@ -5960,6 +6013,10 @@ enum retro_pixel_format
     */
    RETRO_PIXEL_FORMAT_HDR10_2101010 = 4,
 
+   /** 
+    * @private Defined to ensure that <tt>sizeof(retro_pixel_format) == sizeof(int)</tt>.
+	* Do not use.
+	*/
    RETRO_PIXEL_FORMAT_UNKNOWN  = INT_MAX
 };
 
@@ -7746,7 +7803,8 @@ struct retro_exec_mem_alloc
  */
 struct retro_exec_mem_free
 {
-   void *rx;  /**< The \c rx pointer returned by a previous alloc call. */
+   void *rx;  /**< The \c rx pointer returned by a previous alloc call.
+                   The matching \c rw pointer is also accepted. */
 };
 
 /** @} */

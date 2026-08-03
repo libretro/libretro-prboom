@@ -45,6 +45,7 @@
 /* $Id: dbopl.cpp,v 1.10 2009-06-10 19:54:51 harekiet Exp $ */
 
 #include <math.h>
+#include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
 #include <string.h>
@@ -578,7 +579,10 @@ static void Operator__WriteE0(Operator *self, const Chip* chip, Bit8u val ) {
   self->waveHandler = WaveHandlerTable[ waveForm ];
 #else
   self->waveBase = WaveTable + WaveBaseTable[ waveForm ];
-  self->waveStart = WaveStartTable[ waveForm ] << WAVE_SH;
+  /* Bit32u cast: WaveStartTable holds up to 512 and WAVE_SH is 22, so the
+   * promoted-int shift hits bit 31 (UBSan signed-overflow); the unsigned
+   * shift keeps the identical bit pattern. */
+  self->waveStart = (Bit32u)WaveStartTable[ waveForm ] << WAVE_SH;
   self->waveMask = WaveMaskTable[ waveForm ];
 #endif
 }
@@ -714,11 +718,13 @@ static void Channel__SetChanData(Channel *self, const Chip* chip, Bit32u data ) 
   //Since a frequency update triggered this, always update frequency
         Operator__UpdateFrequency(Channel__Op( self, 0 ));
         Operator__UpdateFrequency(Channel__Op( self, 1 ));
-  if ( change & ( 0xff << SHIFT_KSLBASE ) ) {
+  if ( change & ( 0xffu << SHIFT_KSLBASE ) ) {
                 Operator__UpdateAttenuation(Channel__Op( self, 0 ));
                 Operator__UpdateAttenuation(Channel__Op( self, 1 ));
   }
-  if ( change & ( 0xff << SHIFT_KEYCODE ) ) {
+  /* 0xffu: 0xff << 24 overflows int (UBSan); the unsigned
+   * literal makes the mask well-defined with the same bit pattern. */
+  if ( change & ( 0xffu << SHIFT_KEYCODE ) ) {
                 Operator__UpdateRates(Channel__Op( self, 0 ), chip);
                 Operator__UpdateRates(Channel__Op( self, 1 ), chip);
   }
@@ -735,7 +741,7 @@ static void Channel__UpdateFrequency(Channel *self, const Chip* chip, Bit8u four
     keyCode |= ( data & 0x200)>>9;  /* notesel == 0 */
   }
   //Add the keycode and ksl into the highest bits of chanData
-  data |= (keyCode << SHIFT_KEYCODE) | ( kslBase << SHIFT_KSLBASE );
+  data |= ((Bit32u)keyCode << SHIFT_KEYCODE) | ( (Bit32u)kslBase << SHIFT_KSLBASE );
         Channel__SetChanData( self + 0, chip, data );
   if ( fourOp & 0x3f ) {
                 Channel__SetChanData( self + 1, chip, data );
@@ -1388,12 +1394,19 @@ void Chip__Setup(Chip *self, Bit32u rate ) {
       //Below our target
       if ( diff < 0 ) {
         //Better than the last time
+        /* The guess refinement multiply can exceed 31 bits (e.g. 4159 *
+         * 524286 while solving the fastest attack rates), which is
+         * undefined as a signed multiply.  Every platform this ran on
+         * wrapped it two's-complement and the solver converged through
+         * the wrapped intermediate, so the envelope tables everyone has
+         * heard were built from that wrap: do the multiply in 64 bits
+         * and wrap to 32 explicitly, keeping the result bit-identical. */
         Bit32s mul = ((original - diff) << 12) / original;
-        guessAdd = ((guessAdd * mul) >> 12);
+        guessAdd = (Bit32s)(Bit32u)((int64_t)guessAdd * mul) >> 12;
         guessAdd++;
       } else if ( diff > 0 ) {
         Bit32s mul = ((original - diff) << 12) / original;
-        guessAdd = (guessAdd * mul) >> 12;
+        guessAdd = (Bit32s)(Bit32u)((int64_t)guessAdd * mul) >> 12;
         guessAdd--;
       }
     }
@@ -1445,7 +1458,6 @@ static int doneTables = FALSE;
 void DBOPL_InitTables( void )
 {
   int i, oct;
-  Chip *chip = NULL;
 
   if ( doneTables )
     return;
@@ -1554,13 +1566,16 @@ void DBOPL_InitTables( void )
     //Add back the bits for highest ones
     if ( i >= 16 )
       index += 9;
-    blah = (Bitu) ( &(chip->chan[ index ]) );
+    /* offsetof, not a member access through a null Chip pointer: the
+     * null-deref idiom DOSBox shipped is undefined behaviour (UBSan
+     * flags it) even though only the address is taken.  Values are
+     * identical. */
+    blah = offsetof( Chip, chan ) + index * sizeof( Channel );
     ChanOffsetTable[i] = (Bit16u) blah;
   }
   //Same for operators
   for ( i = 0; i < 64; i++ ) {
     Bitu chNum, opNum, blah;
-    Channel* chan = NULL;
     if ( i % 8 >= 6 || ( (i / 8) % 4 == 3 ) ) {
       OpOffsetTable[i] = 0;
       continue;
@@ -1570,7 +1585,7 @@ void DBOPL_InitTables( void )
     if ( chNum >= 12 )
       chNum += 16 - 12;
     opNum = ( i % 8 ) / 3;
-    blah = (Bitu) ( &(chan->op[opNum]) );
+    blah = offsetof( Channel, op ) + opNum * sizeof( Operator );
     OpOffsetTable[i] = (Bit16u) (ChanOffsetTable[ chNum ] + blah);
   }
 }

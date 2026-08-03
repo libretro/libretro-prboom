@@ -8,7 +8,9 @@ ifneq (,$(findstring msvc2003,$(platform)))
 INCFLAGS += -I$(LIBRETRO_COMM_DIR)/include/compat/msvc
 endif
 
-COREDEFINES = -DFPM_DEFAULT -DHAVE_ZLIB=1
+COREDEFINES = -DFPM_DEFAULT \
+              -DHAVE_RVORBIS -DHAVE_RMP3 -DHAVE_RMODTRACKER -DHAVE_RWAV \
+              -DHAVE_RPNG -DHAVE_RJPEG
 
 ifneq (,$(findstring msvc,$(platform)))
 COREDEFINES += -DINLINE="_inline"
@@ -32,13 +34,21 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/file/file_path_io.c \
 				 $(LIBRETRO_COMM_DIR)/time/rtime.c \
 				 $(LIBRETRO_COMM_DIR)/formats/png/rpng.c \
+				 $(LIBRETRO_COMM_DIR)/formats/png/rpng_apng.c \
 				 $(LIBRETRO_COMM_DIR)/formats/jpeg/rjpeg.c \
 				 $(LIBRETRO_COMM_DIR)/formats/wav/rwav.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream.c \
-				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_zlib.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_pipe.c \
 				 $(LIBRETRO_COMM_DIR)/streams/trans_stream_deflate.c \
-				 $(LIBRETRO_COMM_DIR)/encodings/encoding_deflate.c
+				 $(LIBRETRO_COMM_DIR)/encodings/encoding_deflate.c \
+				 $(LIBRETRO_COMM_DIR)/encodings/encoding_crc32.c \
+				 $(LIBRETRO_COMM_DIR)/formats/vorbis/rvorbis.c \
+				 $(LIBRETRO_COMM_DIR)/formats/mp3/rmp3.c \
+				 $(LIBRETRO_COMM_DIR)/formats/mod/rmodtracker.c \
+				 $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
+				 $(LIBRETRO_COMM_DIR)/formats/audio_transfer.c \
+				 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c \
+				 $(LIBRETRO_COMM_DIR)/memmap/memmap.c
 
 SOURCES_C += $(DEPS_DIR)/miniz/miniz.c \
 				 $(DEPS_DIR)/stb/stb_vorbis_impl.c \

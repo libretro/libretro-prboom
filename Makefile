@@ -82,6 +82,9 @@ ifeq ($(platform), unix)
    SHARED := -shared -Wl,--version-script=libretro/link.T -Wl,--no-undefined -Wl,--as-needed
    CFLAGS += -std=c99
    CFLAGS += -D_POSIX_C_SOURCE=199309L
+   # _DEFAULT_SOURCE: _POSIX_C_SOURCE alone hides madvise()/MADV_DONTNEED,
+   # which libretro-common's memmap.c (data_transfer's page machinery) uses.
+   CFLAGS += -D_DEFAULT_SOURCE
    CFLAGS += -DHAVE_MMAP
 else ifeq ($(platform), linux-portable)
 	EXT    ?= so

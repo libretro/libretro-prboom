@@ -30,8 +30,6 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/streams/file_stream_transforms.c \
 				 $(LIBRETRO_COMM_DIR)/string/stdstring.c \
 				 $(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.c \
-				 $(LIBRETRO_COMM_DIR)/vfs/vfs_hybrid.c \
-				 $(LIBRETRO_COMM_DIR)/file/retro_dirent.c \
 				 $(LIBRETRO_COMM_DIR)/file/file_path.c \
 				 $(LIBRETRO_COMM_DIR)/file/file_path_io.c \
 				 $(LIBRETRO_COMM_DIR)/time/rtime.c \
@@ -52,6 +50,19 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c \
 				 $(LIBRETRO_COMM_DIR)/memmap/memmap.c
 
+# The hybrid VFS only exists for dynamically loaded builds.  When the core is
+# statically linked, frontend and core share one libretro-common: griffin's
+# filestream is already local-first, and vfs_hybrid.o's reference to
+# filestream_set_mapped_ptr_cb - present in this tree's file_stream.c but not
+# in the frontend snapshot's - forces the linker to pull our file_stream.o
+# out of the archive, colliding every other filestream_* symbol with griffin.
+# The other vendored objects survive as archive members precisely because
+# nothing references symbols griffin lacks; keep the hybrid out so that
+# invariant holds.
+ifneq ($(STATIC_LINKING), 1)
+SOURCES_C += $(LIBRETRO_COMM_DIR)/vfs/vfs_hybrid.c \
+				 $(LIBRETRO_COMM_DIR)/file/retro_dirent.c
+endif
 
 SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/i_cpu_features.c \

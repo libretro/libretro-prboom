@@ -1135,7 +1135,6 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
 
 void retro_set_environment(retro_environment_t cb)
 {
-   struct retro_vfs_interface_info vfs_iface_info;
    static bool libretro_supports_option_categories = false;
    static const struct retro_controller_description port[] = {
 		{ "Doom Gamepad Modern (OG Xbox Doom 3)", RETROPAD_MODERN },
@@ -1156,6 +1155,7 @@ void retro_set_environment(retro_environment_t cb)
 
 	cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 
+#ifndef STATIC_LINKING
    /*
       Hybrid VFS replaces the wholesale v1 adoption. What changes:
       desktop drops the per-operation frontend indirection this core
@@ -1166,8 +1166,17 @@ void retro_set_environment(retro_environment_t cb)
       dirent ops now route through the same hybrid instead of always
       going local. log_cb is not yet set at set_environment time;
       the hybrid treats NULL as no-log.
+
+      Statically linked builds skip this on purpose: frontend and core
+      share one libretro-common, so the "frontend VFS" and the local
+      implementation are the same code, and rerouting the shared global
+      filestream state through the environment callback would only
+      re-add the indirection the hybrid exists to remove (it is also
+      what forced our file_stream.o into the frontend link - see
+      Makefile.common).
    */
    vfs_hybrid_init(cb, log_cb);
+#endif
 }
 
 void retro_set_controller_port_device(unsigned port, unsigned device)

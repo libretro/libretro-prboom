@@ -680,6 +680,9 @@ endif
 ifeq ($(STATIC_LINKING),1)
 SHARED=
 fpic=
+# Statically linked frontends compile their own libretro-common; the core
+# must not wire up the hybrid VFS there (see Makefile.common / libretro.c).
+CFLAGS += -DSTATIC_LINKING
 endif
 
 # rthreads uses its pthreads backend on every hosted non-Win32 target.  On

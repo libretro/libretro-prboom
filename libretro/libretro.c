@@ -16,6 +16,7 @@
 #include <libretro.h>
 #include <file/file_path.h>
 #include <streams/file_stream.h>
+#include <vfs/vfs_hybrid.h>
 #include <vfs/vfs_implementation.h>
 #include <array/rbuf.h>
 #include <compat/strl.h>
@@ -1155,10 +1156,18 @@ void retro_set_environment(retro_environment_t cb)
 
 	cb(RETRO_ENVIRONMENT_SET_CONTROLLER_INFO, (void*)ports);
 
-   vfs_iface_info.required_interface_version = 1;
-   vfs_iface_info.iface                      = NULL;
-   if (cb(RETRO_ENVIRONMENT_GET_VFS_INTERFACE, &vfs_iface_info))
-      filestream_vfs_init(&vfs_iface_info);
+   /*
+      Hybrid VFS replaces the wholesale v1 adoption. What changes:
+      desktop drops the per-operation frontend indirection this core
+      has paid on every read since the original VFS conversion (the
+      local implementation serves plain paths directly); sandboxed
+      platforms keep frontend reachability for content, and GAIN
+      stat/dirent coverage the old v1-only wiring never had - path and
+      dirent ops now route through the same hybrid instead of always
+      going local. log_cb is not yet set at set_environment time;
+      the hybrid treats NULL as no-log.
+   */
+   vfs_hybrid_init(cb, log_cb);
 }
 
 void retro_set_controller_port_device(unsigned port, unsigned device)

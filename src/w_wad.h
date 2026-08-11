@@ -35,6 +35,7 @@
 #ifndef __W_WAD__
 #define __W_WAD__
 
+#include <stdint.h>
 #include <streams/file_stream.h>
 
 //
@@ -99,7 +100,13 @@ typedef struct {
 #ifndef MEMORY_LOW
   unsigned char *data;
   int position;
-  int length;
+  /* The file's size on disk, from filestream_get_size, which returns
+   * int64_t.  This was an int, so a file at or above 2GB narrowed and
+   * the result went on to mmap(), malloc() and munmap() as a size_t -
+   * a negative value there becomes enormous.  No valid wad is that
+   * large, but "no valid input reaches it" is not the same as "the code
+   * is safe", and the assignment was silent. */
+  int64_t length;
 #ifdef HAVE_MMAP
   int mmapped;   /* data came from mmap(); munmap() it rather than free() */
 #endif

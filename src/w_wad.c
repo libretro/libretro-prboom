@@ -207,6 +207,16 @@ static void W_AddFile(wadfile_info_t *wadfile)
 #ifndef MEMORY_LOW
    // precache into memory instead of reading from disk
    wadfile->length = filestream_get_size(wadfile->handle);
+
+   /* Everything downstream - mmap, malloc, the lump directory's 32-bit
+    * size field - is bounded by what a wad can legally describe, and the
+    * format's offsets are 32-bit by specification.  A file past that is
+    * malformed rather than merely large, and refusing it here is better
+    * than narrowing it into a size_t further down, where a negative
+    * value becomes enormous. */
+   if (wadfile->length > (int64_t)0x7fffffff)
+      I_Error("W_AddFile: %s is %lld bytes; the wad format cannot describe "
+              "a file past 2GB", wadfile->name, (long long)wadfile->length);
    wadfile->data   = NULL;
 #ifdef HAVE_MMAP
    wadfile->mmapped = 0;
@@ -250,7 +260,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
     * magic, not extension, so renamed archives work too. */
    if (W_IsPK3(wadfile->data, wadfile->length))
    {
-      int newlen = 0;
+      int64_t newlen = 0;
       unsigned char *image = W_TranslatePK3(wadfile->data, wadfile->length,
                                             &newlen, wadfile->name);
       if (!image)
@@ -302,7 +312,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
 #ifdef MEMORY_LOW
       singleinfo.size = LONG(filestream_get_size(wadfile->handle));
 #else
-      singleinfo.size = wadfile->length;
+      singleinfo.size = (int)wadfile->length;   /* bounded above */
 #endif
       ExtractFileBase(wadfile->name, singleinfo.name);
       numlumps++;

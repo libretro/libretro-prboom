@@ -412,7 +412,7 @@ int W_PK3LumpForPath(const char *path)
   return -1;
 }
 
-dbool W_IsPK3(const unsigned char *data, int length)
+dbool W_IsPK3(const unsigned char *data, int64_t length)
 {
   return length >= 4 &&
          data[0] == 'P' && data[1] == 'K' &&
@@ -763,8 +763,8 @@ static void pk3_emit_walk(pk3_emit_t *c)
   }
 }
 
-unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
-                              int *out_length, const char *archive_name)
+unsigned char *W_TranslatePK3(const unsigned char *zip, int64_t zip_length,
+                              int64_t *out_length, const char *archive_name)
 {
   pk3_zip_t      z;
   pk3_plan_t    *plan;
@@ -775,7 +775,15 @@ unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
   wadinfo_t      header;
   int            i, image_len;
 
-  if (!pk3_zip_open(&z, zip, zip_length))
+  /* The zip structures this reads - central directory offsets, sizes,
+     the end-of-central-directory record - are 32-bit by specification.
+     A larger archive needs ZIP64, which this translator does not
+     implement, so it is refused here rather than passed down and
+     silently narrowed into pk3_zip_open's int. */
+  if (zip_length > (int64_t)0x7fffffff)
+    return NULL;
+
+  if (!pk3_zip_open(&z, zip, (int)zip_length))
   {
     lprintf(LO_WARN, "W_TranslatePK3: %s: not a readable ZIP archive\n",
             archive_name);

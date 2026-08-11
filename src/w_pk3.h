@@ -9,18 +9,20 @@
  * served from a memory buffer). */
 
 #ifndef __W_PK3__
+#include <stdint.h>
+
 #define __W_PK3__
 
 #include "doomtype.h"
 
 /* ZIP local-file-header magic check */
-dbool W_IsPK3(const unsigned char *data, int length);
+dbool W_IsPK3(const unsigned char *data, int64_t length);
 
 /* Translate a ZIP archive in memory into a synthesized PWAD image.
  * Returns a malloc'd buffer (caller owns) and its size in *out_length,
  * or NULL on a malformed archive. */
-unsigned char *W_TranslatePK3(const unsigned char *zip, int zip_length,
-                              int *out_length, const char *archive_name);
+unsigned char *W_TranslatePK3(const unsigned char *zip, int64_t zip_length,
+                              int64_t *out_length, const char *archive_name);
 
 /* Global lump number for an exact archive path (e.g. "decorate/monster/
  * imp.txt"), disambiguating same-basename lumps that collide in the 8-char

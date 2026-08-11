@@ -755,8 +755,9 @@ static void R_DrawMaskedColumnDirect(const rpatch_t *patch,
 
 /* One entry per run of screen columns sharing a texture column and a clip
  * pair; a run is at minimum one column wide, so the sprite's screen width
- * bounds every array.  Alongside screen_buf (SURFACE_PIXEL_DEPTH *
- * MAX_SCREENWIDTH * MAX_SCREENHEIGHT) this is noise. */
+ * bounds every array.  ~100KB in total at MAX_SCREENWIDTH, against a
+ * screen_buf that is 273KB at the smallest supported resolution and
+ * grows from there; this is noise. */
 static const rcolumn_t *spr_run_col[MAX_SCREENWIDTH];
 static int              spr_run_xa [MAX_SCREENWIDTH];
 static int              spr_run_xb [MAX_SCREENWIDTH];

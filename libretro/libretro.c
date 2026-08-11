@@ -133,6 +133,7 @@ void D_DoomDeinit(void);
 void I_SetRes(void);
 void I_SetAspectRatio(void);
 static void I_ApplyAspectRatio(void);
+int  I_MaxAspectWidth(void);
 void I_UpdateSound(void);
 void M_EndGame(int choice);
 
@@ -2652,10 +2653,15 @@ bool retro_load_game(const struct retro_game_info *info)
    myargv = (const char **) argv;
 
    /* cphipps - call to video specific startup code.
-    * Allocate the framebuffer at the worst-case widescreen size
-    * (MAX_SCREENWIDTH*MAX_SCREENHEIGHT) so the Aspect Ratio selector
-    * can widen SCREENWIDTH at runtime without ever reallocating. */
-   screen_buf = (unsigned char*)malloc(SURFACE_PIXEL_DEPTH * MAX_SCREENWIDTH * MAX_SCREENHEIGHT);
+    * Allocate the framebuffer at this session's worst-case widescreen
+    * size -- the widest the Aspect Ratio selector can reach for the
+    * chosen internal resolution -- so the selector can widen
+    * SCREENWIDTH at runtime without ever reallocating.  update_variables
+    * (true) has already run, so base_width_43 and SCREENHEIGHT are
+    * settled.  Sizing this at MAX_SCREENWIDTH*MAX_SCREENHEIGHT instead
+    * would charge every session for a resolution it did not pick: 16MB
+    * at 32bpp to hold a 320x200 frame that needs 273KB. */
+   screen_buf = (unsigned char*)malloc(SURFACE_PIXEL_DEPTH * I_MaxAspectWidth() * SCREENHEIGHT);
    if (!screen_buf)
       goto failed;
 
@@ -3637,12 +3643,11 @@ void I_StartTic(void)
  * Every stock 4:3 resolution width is already a multiple of 4, so the
  * widened width must preserve that.  At 4:3 this returns
  * base_width_43 unchanged. */
-static int I_AspectWidth(void)
+static int I_AspectWidthFor(int idx)
 {
    /* ratio = num/den, expressed against a 4:3 reference. */
    static const int num[5] = { 4, 16, 16, 32, 64 };
    static const int den[5] = { 3,  9, 10,  9, 27 };
-   int idx = render_aspect;
    int w;
 
    if (idx < 0 || idx > 4)
@@ -3660,6 +3665,30 @@ static int I_AspectWidth(void)
       w = MAX_SCREENWIDTH;
 
    return w;
+}
+
+static int I_AspectWidth(void)
+{
+   return I_AspectWidthFor(render_aspect);
+}
+
+/* Widest buffer width the Aspect Ratio selector can reach this session.
+ * The resolution option is restart-only, so base_width_43 is fixed once
+ * update_variables(true) has run and only render_aspect moves at
+ * runtime -- this bounds every width I_AspectWidth can return. */
+int I_MaxAspectWidth(void)
+{
+   int i;
+   int max = base_width_43;
+
+   for (i = 0; i < 5; i++)
+   {
+      int w = I_AspectWidthFor(i);
+      if (w > max)
+         max = w;
+   }
+
+   return max;
 }
 
 static void I_UpdateVideoMode(void)

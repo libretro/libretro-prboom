@@ -79,6 +79,13 @@ int SCREENHEIGHT = 200;
  * SCREENWIDTH relative to this so the vertical FOV stays vanilla. */
 static int base_width_43 = 320;
 
+/* Geometry cap last reported to the frontend through av_info.  Frontends
+ * size their video path from max_width/max_height, so I_ApplyAspectRatio
+ * has to know whether a widened SCREENWIDTH still fits inside what the
+ * frontend was told, or whether it needs a full av_info renegotiation. */
+static unsigned advertised_max_width  = 320;
+static unsigned advertised_max_height = 200;
+
 /* i_video */
 static unsigned char *screen_buf = NULL;
 static bool have_sw_fb           = false;
@@ -1120,8 +1127,22 @@ void retro_get_system_av_info(struct retro_system_av_info *info)
   info->timing.sample_rate    = (double)audio_sample_rate;
   info->geometry.base_width   = SCREENWIDTH;
   info->geometry.base_height  = SCREENHEIGHT;
-  info->geometry.max_width    = MAX_SCREENWIDTH;
-  info->geometry.max_height   = MAX_SCREENHEIGHT;
+  /* Report the geometry we actually render, not the compile-time ceiling.
+   * Frontends size their video path from the cap and nothing else:
+   * RetroArch takes next_pow2(MAX(max_width, max_height)) / 256 as its GL
+   * input-texture scale, so MAX_SCREENWIDTH/HEIGHT here asks for a
+   * 4096x4096 texture at every internal resolution, 320x200 included.
+   * That is over GL_MAX_TEXTURE_SIZE on GLES2 parts such as the Raspberry
+   * Pi's VC4 (2048), where glTexImage2D returns GL_INVALID_VALUE and video
+   * driver init aborts; where it does fit it still costs ~128MB of
+   * frontend-side staging buffers to carry a 320x200 frame.
+   *
+   * The aspect selector can widen SCREENWIDTH past this cap at runtime;
+   * I_ApplyAspectRatio renegotiates via SET_SYSTEM_AV_INFO when it does. */
+  info->geometry.max_width    = SCREENWIDTH;
+  info->geometry.max_height   = SCREENHEIGHT;
+  advertised_max_width        = SCREENWIDTH;
+  advertised_max_height       = SCREENHEIGHT;
   switch (render_aspect)
   {
     case 1:  info->geometry.aspect_ratio = 16.0 / 9.0;  break;
@@ -3776,13 +3797,12 @@ void I_SetAspectRatio(void)
 
 /* Perform the deferred aspect-ratio change.  Called only from a safe
  * point in retro_run (no active render, no live cached pointers).
- * screen_buf is allocated once at MAX_SCREENWIDTH*MAX_SCREENHEIGHT so
- * widening never reallocates it.  We update SCREENWIDTH/SCREENPITCH,
- * rebuild the video mode, request a view-size recalc (the renderer
- * derives the widened FOV from the new dimensions) and push the new
- * geometry with SET_GEOMETRY -- the soft variant that is guaranteed
- * not to reinitialise the frontend's video driver (max_width/height
- * were already set to MAX_SCREENWIDTH/HEIGHT at load). */
+ * screen_buf is allocated once at the session's worst-case widescreen
+ * size so widening never reallocates it.  We update SCREENWIDTH /
+ * SCREENPITCH, rebuild the video mode, request a view-size recalc (the
+ * renderer derives the widened FOV from the new dimensions) and push
+ * the new geometry to the frontend -- softly when it still fits the
+ * advertised cap, via a full av_info renegotiation when it does not. */
 static void I_ApplyAspectRatio(void)
 {
    extern int screenblocks;
@@ -3809,25 +3829,42 @@ static void I_ApplyAspectRatio(void)
    if (W_CheckNumForName("PLAYPAL") >= 0)
       V_UpdateTrueColorPalette();
 
-   /* SET_GEOMETRY may only be called from within retro_run().  At
-    * load (before the main loop) we skip it: retro_get_system_av_info
-    * already reports the correct aspect for the initial geometry. */
+   /* Both SET_GEOMETRY and SET_SYSTEM_AV_INFO may only be called from
+    * within retro_run().  At load (before the main loop) we skip both:
+    * retro_get_system_av_info already reports the correct geometry. */
    if (environ_cb && in_retro_run)
    {
-      struct retro_game_geometry geom;
-      geom.base_width   = SCREENWIDTH;
-      geom.base_height  = SCREENHEIGHT;
-      geom.max_width    = MAX_SCREENWIDTH;
-      geom.max_height   = MAX_SCREENHEIGHT;
-      switch (render_aspect)
+      if ((unsigned)SCREENWIDTH > advertised_max_width)
       {
-         case 1:  geom.aspect_ratio = 16.0f / 9.0f;  break;
-         case 2:  geom.aspect_ratio = 16.0f / 10.0f; break;
-         case 3:  geom.aspect_ratio = 32.0f / 9.0f;  break;
-         case 4:  geom.aspect_ratio = 64.0f / 27.0f; break;
-         default: geom.aspect_ratio = 4.0f / 3.0f;   break;
+         /* Widening past the cap the frontend was given.  SET_GEOMETRY
+          * cannot raise max_width -- libretro.h defines it as the soft
+          * variant that leaves the video driver alone, which is exactly
+          * why it cannot resize buffers the driver sized from the cap.
+          * Renegotiate the whole av_info instead; retro_get_system_av_info
+          * republishes the cap at the new width. */
+         struct retro_system_av_info info;
+         retro_get_system_av_info(&info);
+         environ_cb(RETRO_ENVIRONMENT_SET_SYSTEM_AV_INFO, &info);
       }
-      environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geom);
+      else
+      {
+         /* Narrowing, or widening within the cap: the soft path, no video
+          * driver reinit. */
+         struct retro_game_geometry geom;
+         geom.base_width   = SCREENWIDTH;
+         geom.base_height  = SCREENHEIGHT;
+         geom.max_width    = advertised_max_width;
+         geom.max_height   = advertised_max_height;
+         switch (render_aspect)
+         {
+            case 1:  geom.aspect_ratio = 16.0f / 9.0f;  break;
+            case 2:  geom.aspect_ratio = 16.0f / 10.0f; break;
+            case 3:  geom.aspect_ratio = 32.0f / 9.0f;  break;
+            case 4:  geom.aspect_ratio = 64.0f / 27.0f; break;
+            default: geom.aspect_ratio = 4.0f / 3.0f;   break;
+         }
+         environ_cb(RETRO_ENVIRONMENT_SET_GEOMETRY, &geom);
+      }
    }
 }
 

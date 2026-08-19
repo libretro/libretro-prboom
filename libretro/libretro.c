@@ -1828,15 +1828,19 @@ static void extract_directory(char *buf, const char *path, size_t size)
 static char* remove_extension(char *buf, const char *path, size_t size)
 {
   char *base;
-  memcpy(buf, path, size - 1);
+  strncpy(buf, path, size - 1);
   buf[size - 1] = '\0';
 
   base = strrchr(buf, '.');
 
-  if (base)
-     *base = '\0';
+  /* An extensionless name keeps buf intact and reports an empty
+   * extension, so the caller's comparisons fall through to
+   * header probing. */
+  if (!base)
+     return buf + strlen(buf);
 
-  return base+1;
+  *base = '\0';
+  return base + 1;
 }
 
 static wadinfo_t get_wadinfo(const char *path)

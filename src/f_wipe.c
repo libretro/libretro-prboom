@@ -59,6 +59,9 @@ static screeninfo_t wipe_scr;
 
 static int y_lookup[MAX_SCREENWIDTH];
 
+/* Non-zero while a melt is in progress. */
+static dbool wipe_go;
+
 static int wipe_initMelt(int ticks)
 {
   int i;
@@ -226,10 +229,9 @@ int wipe_EndScreen(void)
 // killough 3/5/98: reformatted and cleaned up
 int wipe_ScreenWipe(int ticks)
 {
-   static dbool   go;                               // when zero, stop the wipe
-   if (!go)                                         // initial stuff
+   if (!wipe_go)                                    // initial stuff
    {
-      go = 1;
+      wipe_go = 1;
       wipe_scr = screens[0];
       wipe_initMelt(ticks);
    }
@@ -245,7 +247,23 @@ int wipe_ScreenWipe(int ticks)
    if (wipe_doMelt(ticks))     // final stuff
    {
       wipe_exitMelt(ticks);
-      go = 0;
+      wipe_go = 0;
    }
-   return !go;
+   return !wipe_go;
+}
+
+/* Stops any melt still in progress and drops the references to its
+ * buffers.  Those buffers are reachable through screens[SRC_SCR] and
+ * screens[DEST_SCR], which V_FreeScreens releases, so the next session
+ * starts a wipe from screens of its own. */
+void wipe_Shutdown(void)
+{
+  wipe_go = 0;
+
+  wipe_scr_start.data   = NULL;
+  wipe_scr_start.height = 0;
+  wipe_scr_end.data     = NULL;
+  wipe_scr_end.height   = 0;
+  wipe_scr.data         = NULL;
+  wipe_scr.height       = 0;
 }

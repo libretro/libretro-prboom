@@ -1977,6 +1977,8 @@ void D_DoomDeinit(void)
    */
   oldgamestate  = -1;
   wipegamestate = GS_DEMOSCREEN;
+  in_d_wipe     = FALSE;
+  wipe_Shutdown();
   I_InitGraphicsShutdown();
 
   M_QuitDOOM(0);

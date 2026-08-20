@@ -768,6 +768,7 @@ void D_AddFile (const char *file, wad_source_t source)
   size_t gwa_filename_len;
   size_t file_len         = strlen(file);
   char *gwa_filename      = NULL;
+  char *wad_filename      = NULL;
 
   wadfiles = realloc(wadfiles, sizeof(*wadfiles)*(numwadfiles+1));
   /* Zero the fresh slot: realloc leaves it uninitialised, and a non-NULL
@@ -775,13 +776,19 @@ void D_AddFile (const char *file, wad_source_t source)
    * a baked-in one and dereference garbage.  memset also covers handle/data
    * and guards against future struct fields. */
   memset(&wadfiles[numwadfiles], 0, sizeof(wadfiles[numwadfiles]));
-  wadfiles[numwadfiles].name =
-    AddDefaultExtension(strcpy(malloc(file_len + 5), file), ".wad");
+  /* A path that already resolves is used exactly as handed over, so
+   * extensionless files -- Android SAF document URIs among them --
+   * open under the name the IWAD scan identified them by.  The
+   * default extension is for the bare stem form, `-file foo`. */
+  wad_filename = strcpy(malloc(file_len + 5), file);
+  if (!path_is_valid(wad_filename))
+    AddDefaultExtension(wad_filename, ".wad");
+  wadfiles[numwadfiles].name = wad_filename;
   wadfiles[numwadfiles].src = source; // Ty 08/29/98
   numwadfiles++;
   // proff: automatically try to add the gwa files
   // proff - moved from w_wad.c
-  gwa_filename     = AddDefaultExtension(strcpy(malloc(file_len + 5), file), ".wad");
+  gwa_filename     = strcpy(malloc(file_len + 5), wad_filename);
   gwa_filename_len = strlen(gwa_filename);
 
   if (gwa_filename_len > 4

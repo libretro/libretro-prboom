@@ -148,6 +148,7 @@ static void W_AddFile(wadfile_info_t *wadfile)
    filelump_t *fileinfo2free=NULL; //killough
    filelump_t singleinfo;
    dbool is_archive = FALSE;
+   dbool is_wad     = FALSE;
 
    /* Baked-in WAD: the bytes are a const array compiled into the core, not
     * a file.  Treat it exactly like the precached-into-memory path -- parse
@@ -292,19 +293,39 @@ static void W_AddFile(wadfile_info_t *wadfile)
    }
 #endif
 
+   /* A WAD directory is recognised by the file's own magic, as the archive
+    * check above is, so an IWAD or PWAD parses under any name -- an
+    * extensionless SAF document path included.  The .wad / .gwa suffixes
+    * still select the directory parse on their own, which keeps a
+    * malformed wad reported as such rather than swallowed as one lump. */
+   {
+      char magic[4];
+      dbool have_magic = FALSE;
+#ifdef MEMORY_LOW
+      have_magic = (rfread(magic, sizeof(magic), 1, wadfile->handle) == 1);
+      rfseek(wadfile->handle, 0, SEEK_SET);
+#else
+      if (wadfile->length >= (int64_t)sizeof(magic))
+      {
+         memcpy(magic, wadfile->data, sizeof(magic));
+         have_magic = TRUE;
+      }
+#endif
+      if (have_magic && (!strncmp(magic, "IWAD", 4) ||
+                         !strncmp(magic, "PWAD", 4)))
+         is_wad = TRUE;
+   }
+
+   if (wadfile_name_len > 4 &&
+       (!strcasecmp(wadfile->name + wadfile_name_len - 4, ".wad") ||
+        !strcasecmp(wadfile->name + wadfile_name_len - 4, ".gwa")))
+      is_wad = TRUE;
+
    //jff 8/3/98 use logical output routine
    lprintf (LO_INFO," adding %s\n",wadfile->name);
    startlump = numlumps;
 
-   if (  !is_archive &&
-         (
-          wadfile_name_len <=4 ||
-         (
-          strcasecmp(wadfile->name + wadfile_name_len - 4,".wad") &&
-          strcasecmp(wadfile->name + wadfile_name_len - 4,".gwa")
-         )
-         )
-      )
+   if (!is_archive && !is_wad)
    {
       // single lump file
       fileinfo = &singleinfo;

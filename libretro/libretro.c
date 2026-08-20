@@ -1828,8 +1828,7 @@ static void extract_directory(char *buf, const char *path, size_t size)
 static char* remove_extension(char *buf, const char *path, size_t size)
 {
   char *base;
-  strncpy(buf, path, size - 1);
-  buf[size - 1] = '\0';
+  strlcpy(buf, path, size);
 
   base = strrchr(buf, '.');
 
@@ -2307,7 +2306,7 @@ bool retro_load_game(const struct retro_game_info *info)
       }
    }
 
-   if(info->path)
+   if (info && info->path)
    {
       wadinfo_t header;
       char *deh, *extension, *baseconfig;
@@ -4032,8 +4031,10 @@ const char *I_DoomExeDir(void)
 */
 dbool HasTrailingSlash(const char* dn)
 {
-  size_t dn_len = strlen(dn);
-  return ( dn && ((dn[dn_len - 1] == '/') || (dn[dn_len - 1] == '\\')));
+  size_t dn_len = dn ? strlen(dn) : 0;
+  if (!dn_len)
+     return false;
+  return (dn[dn_len - 1] == '/') || (dn[dn_len - 1] == '\\');
 }
 
 /*

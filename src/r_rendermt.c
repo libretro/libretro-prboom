@@ -249,6 +249,7 @@ void R_RenderMTShutdown(void)
    if (mt_done) { scond_free(mt_done); mt_done = NULL; }
    if (mt_go)   { scond_free(mt_go);   mt_go   = NULL; }
    if (mt_lock) { slock_free(mt_lock); mt_lock = NULL; }
+   if (wall_tint_lock) { slock_free(wall_tint_lock); wall_tint_lock = NULL; }
 }
 
 void R_RenderMTTintLockInit(void)

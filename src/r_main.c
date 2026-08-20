@@ -698,6 +698,15 @@ void R_Deinit(void)
       flattranslation = NULL;
    }
 
+   /* translationtables: R_InitTranslationTables allocates only when the
+    * pointer is NULL, so the slot has to be cleared here for the next
+    * session to get its own table. */
+   if (translationtables)
+   {
+      Z_Free(translationtables);
+      translationtables = NULL;
+   }
+
    /* texturetranslation: small Z_Malloc'd array. */
    if (texturetranslation)
    {

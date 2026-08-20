@@ -118,6 +118,16 @@ static anim_t*  lastanim;
 static anim_t*  anims;                // new structure w/o limits -- killough
 static size_t maxanims;
 
+/* Releases the animated-texture table.  P_InitPicAnims grows it to a
+ * high-water mark, so the capacity is cleared with the pointer. */
+void P_SpecDeinit(void)
+{
+   Z_Free(anims);
+   anims    = NULL;
+   lastanim = NULL;
+   maxanims = 0;
+}
+
 // Default animation definitions for Doom
 const animdef_t doom_animdefs[] =
 {

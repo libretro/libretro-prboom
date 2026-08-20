@@ -40,6 +40,12 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill);
 void P_Init(void);               /* Called by startup code. */
 void P_Deinit(void);
 
+/* Session teardown for the play-sim tables that are grown to a
+ * high-water mark and reused.  All called by D_DoomDeinit. */
+void P_SpecDeinit(void);
+void P_SwitchDeinit(void);
+void P_EnemyDeinit(void);
+
 extern const uint8_t *rejectmatrix;   /* for fast sight rejection -  cph - const* */
 
 /* killough 3/1/98: change blockmap from "short" to "long" offsets: */

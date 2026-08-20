@@ -109,6 +109,17 @@ static int spechit_max;          // killough
 
 int numspechit;
 
+/* Releases the crossed-special-lines list.  The array is grown to a
+ * high-water mark and reused, so the capacity has to fall back to zero
+ * with the pointer for the next session to allocate its own. */
+void P_MapDeinit(void)
+{
+   Z_Free(spechit);
+   spechit     = NULL;
+   spechit_max = 0;
+   numspechit  = 0;
+}
+
 // Temporary holder for thing_sectorlist threads
 msecnode_t* sector_list = NULL;                             // phares 3/16/98
 

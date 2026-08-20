@@ -997,6 +997,17 @@ void I_ShutdownSound(void)
          S_sfx[i].data = NULL;
       }
    }
+
+   /* The per-sfx tables are grown to a high-water mark and only
+    * reallocated past it, so the mark falls back to zero with the
+    * pointers. */
+   free(lengths);
+   free(sfx_steps);
+   free(sfx_orig_rate);
+   lengths       = NULL;
+   sfx_steps     = NULL;
+   sfx_orig_rate = NULL;
+   lengths_size  = 0;
 }
 
 void I_InitSound(void)

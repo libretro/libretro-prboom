@@ -581,6 +581,13 @@ void AM_Deinit(void)
   am_lastlevel   = -1;
   am_lastepisode = -1;
   stopped        = TRUE;
+
+  /* The mark list is grown to a high-water mark and reused, so the
+   * capacity falls back to zero with the pointer. */
+  Z_Free(markpoints);
+  markpoints       = NULL;
+  markpointnum     = 0;
+  markpointnum_max = 0;
 }
 
 /*

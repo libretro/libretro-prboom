@@ -303,6 +303,21 @@ void R_UpdateInterpolations()
 
 int interpolations_max = 0;
 
+/* Releases the interpolation slot arrays.  R_SetInterpolation only grows
+ * them past the current capacity, so the mark is cleared with the
+ * pointers. */
+void R_InterpolationDeinit(void)
+{
+   Z_Free(oldipos);
+   Z_Free(bakipos);
+   Z_Free(curipos);
+   oldipos            = NULL;
+   bakipos            = NULL;
+   curipos            = NULL;
+   interpolations_max = 0;
+   numinterpolations  = 0;
+}
+
 static void R_SetInterpolation(interpolation_type_e type, void *posptr)
 {
   int i;

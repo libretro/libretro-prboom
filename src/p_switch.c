@@ -46,6 +46,17 @@ static int *switchlist;                           // killough
 static int max_numswitches;                       // killough
 static int numswitches;                           // killough
 
+/* Releases the switch-texture table.  P_InitSwitchList grows it to a
+ * high-water mark and only reallocates past that mark, so the capacity
+ * is cleared with the pointer. */
+void P_SwitchDeinit(void)
+{
+   Z_Free(switchlist);
+   switchlist      = NULL;
+   max_numswitches = 0;
+   numswitches     = 0;
+}
+
 button_t  buttonlist[MAXBUTTONS];
 
 // Default switch definitions for Doom

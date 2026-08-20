@@ -53,6 +53,7 @@ void PIT_ThrustSpike(mobj_t *actor);
 #define STEPSIZE     (24 * FRACUNIT)
 
 // killough 3/15/98: add fourth argument to P_TryMove
+void    P_MapDeinit(void);
 dbool P_TryMove(mobj_t *thing, fixed_t x, fixed_t y, dbool dropoff);
 
 // killough 8/9/98: extra argument for telefragging

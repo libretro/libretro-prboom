@@ -2667,6 +2667,16 @@ mobj_t **braintargets;
 int    numbraintargets_alloc;
 int    numbraintargets;
 
+/* Releases the icon-of-sin landing list, capacity included, so the next
+ * session grows its own array from empty. */
+void P_EnemyDeinit(void)
+{
+   Z_Free(braintargets);
+   braintargets           = NULL;
+   numbraintargets_alloc  = 0;
+   numbraintargets        = 0;
+}
+
 struct brain_s brain;   // killough 3/26/98: global state of boss brain
 
 // killough 3/26/98: initialize icon landings at level startup,

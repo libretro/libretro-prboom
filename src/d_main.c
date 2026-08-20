@@ -62,6 +62,7 @@
 #include "sounds.h"
 #include "z_zone.h"
 #include "w_wad.h"
+#include "p_map.h"
 #include "prboom_wad_data.h"
 #include "s_sound.h"
 #include "v_video.h"
@@ -200,6 +201,10 @@ static void D_Wipe(void)
 
 // wipegamestate can be set to -1 to force a wipe on the next draw
 gamestate_t    wipegamestate = GS_DEMOSCREEN;
+
+/* Tracks the previously drawn gamestate.  D_Display consults it to decide
+ * when to reinstate the base palette, so it starts each session unset. */
+static gamestate_t oldgamestate = -1;
 extern dbool setsizeneeded;
 extern int     showMessages;
 
@@ -222,7 +227,6 @@ static dbool       frozen_cache_valid = FALSE;
 void D_Display (void)
 {
   dbool wipe, viewactive;
-  static gamestate_t oldgamestate = -1;
 
   /* If the libretro MIDI player declined to register a track because the
    * frontend's MIDI output was not yet up (the title music registers on
@@ -1971,9 +1975,18 @@ void D_DoomDeinit(void)
    * D_DoomMainSetup's W_Init touches cachelump / wadfiles /
    * lumpinfo, so the full teardown is safe.
    */
+  oldgamestate  = -1;
+  wipegamestate = GS_DEMOSCREEN;
+  I_InitGraphicsShutdown();
+
   M_QuitDOOM(0);
   M_SaveDefaults();
   P_Deinit();
+  P_MapDeinit();
+  P_SpecDeinit();
+  P_SwitchDeinit();
+  P_EnemyDeinit();
+  R_InterpolationDeinit();
   R_FlushAllPatches();
   R_Deinit();
   AM_Deinit();

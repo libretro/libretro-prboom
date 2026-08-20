@@ -3782,13 +3782,21 @@ void I_FinishUpdate (void)
 
 void I_SetPalette(int pal) { }
 
+/* Guards the one-time video mode setup.  V_FreeScreens and
+ * V_DestroyTrueColorPalette run at session teardown, so the flag is
+ * cleared there and each session builds its own screens and palette. */
+static int graphics_initialized = 0;
+
+void I_InitGraphicsShutdown(void)
+{
+   graphics_initialized = 0;
+}
+
 void I_InitGraphics(void)
 {
-   static int firsttime=1;
-
-   if (firsttime)
+   if (!graphics_initialized)
    {
-      firsttime = 0;
+      graphics_initialized = 1;
 
       /* Set the video mode */
       I_UpdateVideoMode();

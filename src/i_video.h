@@ -42,6 +42,7 @@
 void I_SetRes(void); /* set resolution */
 void I_SetAspectRatio(void); /* apply display aspect ratio (resize buffer) */
 void I_InitGraphics (void);
+void I_InitGraphicsShutdown (void);
 void I_ShutdownGraphics(void);
 
 /* Takes full 8 bit values. */

@@ -3253,24 +3253,29 @@ void P_Init (void)
 
 void P_Deinit(void)
 {
-   Z_Free(vertexes);
-   numvertexes = 0;
+   /* The level geometry is PU_LEVEL, so the zone owns these blocks by
+    * tag: P_SetupLevel's Z_FreeTags reclaims them at the next level
+    * load and Z_Close reclaims whatever is still live at shutdown.
+    * Dropping the references and the counts is all that is needed for
+    * nothing to read them in between. */
+   vertexes      = NULL;
+   numvertexes   = 0;
 
-   Z_Free(segs);
-   numsegs = 0;
+   segs          = NULL;
+   numsegs       = 0;
 
-   Z_Free(sectors);
-   numsectors = 0;
+   sectors       = NULL;
+   numsectors    = 0;
 
-   Z_Free(subsectors);
+   subsectors    = NULL;
    numsubsectors = 0;
 
-   Z_Free(nodes);
-   numnodes = 0;
+   nodes         = NULL;
+   numnodes      = 0;
 
-   Z_Free(lines);
-   numlines = 0;
+   lines         = NULL;
+   numlines      = 0;
 
-   Z_Free(sides);
-   numsides = 0;
+   sides         = NULL;
+   numsides      = 0;
 }

@@ -1561,6 +1561,12 @@ void D_BuildBEXTables(void)
    deh_soundnames[0] = deh_soundnames[NUMSFX] = NULL;
 }
 
+/* Scratch for deh_procStrings' line-continuation assembly.  It lives
+ * across calls within a session and is released by D_FreeBEXTables,
+ * because the zone it comes from is torn down between sessions. */
+static char *deh_holdstring    = NULL;
+static int   deh_holdstringlen = 128;
+
 /* D_FreeBEXTables
  *
  * Frees the per-session strdup'd BEX cross-reference tables and
@@ -1596,6 +1602,10 @@ void D_FreeBEXTables(void)
       free(deh_soundnames[i]);
       deh_soundnames[i] = NULL;
    }
+
+   free(deh_holdstring);
+   deh_holdstring    = NULL;
+   deh_holdstringlen = 128;
 }
 
 // ====================================================================
@@ -3192,17 +3202,13 @@ static void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
   char inbuffer[DEH_BUFFERMAX+1];
   uint64_t value;    // All deh values are ints or longs
   char *strval;      // holds the string value of the line
-  static int maxstrlen = 128; // maximum string length, bumped 128 at
-  // a time as needed
-  // holds the final result of the string after concatenation
-  static char *holdstring = NULL;
   dbool   found = FALSE;  // looking for string continuation
 
   deh_log("Processing extended string substitution\n");
 
-  if (!holdstring) holdstring = malloc(maxstrlen*sizeof(*holdstring));
+  if (!deh_holdstring) deh_holdstring = malloc(deh_holdstringlen*sizeof(*deh_holdstring));
 
-  *holdstring = '\0';  // empty string to start with
+  *deh_holdstring = '\0';  // empty string to start with
   strncpy(inbuffer,line,DEH_BUFFERMAX);
   // Ty 04/24/98 - have to allow inbuffer to start with a blank for
   // the continuations of C1TEXT etc.
@@ -3212,7 +3218,7 @@ static void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
       if (*inbuffer == '#') continue;  // skip comment lines
       lfstrip(inbuffer);
       if (!*inbuffer) break;  // killough 11/98
-      if (!*holdstring) // first one--get the key
+      if (!*deh_holdstring) // first one--get the key
         {
           if (!deh_GetData(inbuffer,key,&value,&strval,fpout)) // returns TRUE if ok
             {
@@ -3220,38 +3226,38 @@ static void deh_procStrings(DEHFILE *fpin, FILE* fpout, char *line)
               continue;
             }
         }
-      while (strlen(holdstring) + strlen(inbuffer) > (size_t)maxstrlen) // Ty03/29/98 - fix stupid error
+      while (strlen(deh_holdstring) + strlen(inbuffer) > (size_t)deh_holdstringlen) // Ty03/29/98 - fix stupid error
         {
     // killough 11/98: allocate enough the first time
-          maxstrlen += strlen(holdstring) + strlen(inbuffer) - maxstrlen;
+          deh_holdstringlen += strlen(deh_holdstring) + strlen(inbuffer) - deh_holdstringlen;
           deh_log(
                              "* increased buffer from to %d for buffer size %d\n",
-                             maxstrlen,(int)strlen(inbuffer));
-          holdstring = realloc(holdstring,maxstrlen*sizeof(*holdstring));
+                             deh_holdstringlen,(int)strlen(inbuffer));
+          deh_holdstring = realloc(deh_holdstring,deh_holdstringlen*sizeof(*deh_holdstring));
         }
       // concatenate the whole buffer if continuation or the value iffirst
-      strcat(holdstring,ptr_lstrip(((*holdstring) ? inbuffer : strval)));
-      rstrip(holdstring);
+      strcat(deh_holdstring,ptr_lstrip(((*deh_holdstring) ? inbuffer : strval)));
+      rstrip(deh_holdstring);
       // delete any trailing blanks past the backslash
       // note that blanks before the backslash will be concatenated
       // but ones at the beginning of the next line will not, allowing
       // indentation in the file to read well without affecting the
       // string itself.
-      if (holdstring[strlen(holdstring)-1] == '\\')
+      if (deh_holdstring[strlen(deh_holdstring)-1] == '\\')
         {
-          holdstring[strlen(holdstring)-1] = '\0';
+          deh_holdstring[strlen(deh_holdstring)-1] = '\0';
           continue; // ready to concatenate
         }
-      if (*holdstring) // didn't have a backslash, trap above would catch that
+      if (*deh_holdstring) // didn't have a backslash, trap above would catch that
         {
           // go process the current string
-          found = deh_procStringSub(key, NULL, holdstring, fpout);  // supply keyand not search string
+          found = deh_procStringSub(key, NULL, deh_holdstring, fpout);  // supply keyand not search string
 
           if (!found)
             deh_log(
                                "Invalid string key '%s', substitution skipped.\n",key);
 
-          *holdstring = '\0';  // empty string for the next one
+          *deh_holdstring = '\0';  // empty string for the next one
         }
     }
   return;

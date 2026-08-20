@@ -172,7 +172,11 @@ static void R_InitTextures (void)
 
   // Load the patch names from pnames.lmp.
   name[8] = 0;
-  names = W_CacheLumpNum(names_lump = W_GetNumForName("PNAMES"));
+  names_lump = W_CheckNumForName("PNAMES");
+  if (names_lump == -1)
+    I_Error("R_InitTextures: PNAMES lump not found -- the loaded wad set "
+            "has no patch names");
+  names = W_CacheLumpNum(names_lump);
   nummappatches = LONG(*((const int *)names));
   name_p = names+4;
   patchlookup = Z_Malloc(nummappatches * sizeof(*patchlookup), PU_STATIC, 0);  // killough

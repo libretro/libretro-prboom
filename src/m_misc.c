@@ -1154,9 +1154,13 @@ void M_LoadDefaults (void)
 void M_FreeDefaults(void)
 {
    int i;
-   int n = sizeof(defaults)/sizeof(defaults[0]);
 
-   for (i = 0; i < n; i++)
+   /* numdefaults is set by M_LoadDefaults before it populates the
+    * table, so it is zero until a session has allocated anything.
+    * A load that fails before that point reaches this teardown with
+    * every location.ppsz still holding its compile-time value, which
+    * is not a zone allocation. */
+   for (i = 0; i < numdefaults; i++)
    {
       if (IS_STRING(defaults[i]) && defaults[i].location.ppsz)
       {
@@ -1169,4 +1173,5 @@ void M_FreeDefaults(void)
 
    free(defaultfile);
    defaultfile = NULL;
+   numdefaults = 0;
 }

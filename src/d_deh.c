@@ -1521,33 +1521,6 @@ void D_BuildBEXTables(void)
    for (i = 0; i < NUMSTATES; i++)  // remember what they start as for deh xref
      deh_codeptr[i] = states[i].action;
 
-   /* MBF21 thing defaults: set before any deh file is processed so deh
-    * can override them.  Groups default to their reserved "default" value
-    * (vanilla species behaviour), altspeed to "no override", and
-    * meleerange to the standard 64*FRACUNIT.  These are inert unless
-    * mbf21_features is active. */
-   for (i = 0; i < NUMMOBJTYPES; i++)
-   {
-     mobjinfo[i].infighting_group = IG_DEFAULT;
-     mobjinfo[i].projectile_group = PG_DEFAULT;
-     mobjinfo[i].splash_group     = SG_DEFAULT;
-     mobjinfo[i].altspeed         = NO_ALTSPEED;
-     mobjinfo[i].meleerange       = 64*FRACUNIT; /* MELEERANGE (p_map.h) */
-   }
-   /* Vanilla immunizes baron and hell knight projectiles against each
-    * other via a hardcoded type pair.  Under MBF21 the type pair is
-    * replaced by projectile groups, so put both in a shared group to
-    * preserve that behaviour by default. */
-   mobjinfo[MT_BRUISER].projectile_group = PG_BARON;
-   mobjinfo[MT_KNIGHT].projectile_group  = PG_BARON;
-   /* Vanilla halves the demon's run/pain frame durations under fast/
-    * nightmare.  MBF21 generalises this to the SKILL5FAST frame flag, so
-    * tag the demon's default states with it; G_SetFastParms then halves
-    * every SKILL5FAST frame, reproducing vanilla for stock content while
-    * honouring the flag on deh-modified frames. */
-   for (i = S_SARG_RUN1; i <= S_SARG_PAIN2; i++)
-     states[i].flags |= STATEF_SKILL5FAST;
-
    for(i = 0; i < NUMSPRITES; i++)
       deh_spritenames[i] = strdup(sprnames[i]);
    deh_spritenames[NUMSPRITES] = NULL;

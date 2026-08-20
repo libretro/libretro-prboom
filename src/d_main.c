@@ -1979,6 +1979,17 @@ void D_DoomDeinit(void)
   wipegamestate = GS_DEMOSCREEN;
   in_d_wipe     = FALSE;
   wipe_Shutdown();
+
+  /* Run state belongs to the session that set it, so the next session
+   * opens on its own title page with no game in progress and the demo
+   * sequence at the start. */
+  gameaction   = ga_nothing;
+  gamestate    = GS_DEMOSCREEN;
+  usergame     = FALSE;
+  paused       = FALSE;
+  advancedemo  = FALSE;
+  demosequence = -1;
+  pagetic      = 0;
   I_InitGraphicsShutdown();
 
   M_QuitDOOM(0);

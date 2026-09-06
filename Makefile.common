@@ -270,6 +270,9 @@ endif
 $(LIBRETRO_COMM_DIR)/rthreads/rthreads.o: override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
 $(CORE_DIR)/r_rendermt.o:                   override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
 
+$(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.o: \
+	override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
+
 INCFLAGS += -include z_zone.h
 endif
 

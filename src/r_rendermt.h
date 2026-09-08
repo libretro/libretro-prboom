@@ -21,13 +21,9 @@
  *      This header deliberately declares nothing but plain C functions and
  *      exposes no libretro-common type.  rthreads.h pulls in
  *      retro_miscellaneous.h, which on Windows pulls in windows.h -- and the
- *      build force-includes z_zone.h into every translation unit, which
- *      macro-redefines malloc/free/calloc/realloc/strdup.  Windows system
- *      headers do not survive that combination and the TU fails to parse
- *      (observed on MinGW).  Confining every threading include to
- *      r_rendermt.c, which is compiled with Z_ZONE_NO_ALLOC_OVERRIDE, keeps
- *      windows.h away from the hijacked allocator names and keeps the rest
- *      of the renderer free of libretro-common headers.
+ *      threading headers drag in windows.h on Win32.  Confining every
+ *      threading include to r_rendermt.c keeps the rest of the renderer
+ *      free of libretro-common and system headers.
  *
  *      All entry points are safe to call when the core is built without
  *      threads; R_RenderMTEnsure then simply reports failure and the caller

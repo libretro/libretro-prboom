@@ -2078,9 +2078,9 @@ void G_LoadGame(int slot, dbool   command)
 
 static void G_LoadGameErr(const char *msg)
 {
-  Z_Free(savebuffer);                // Free the savegame buffer
+  free(savebuffer);                  // Free the savegame buffer
   /* Null the globals here so callers (G_DoLoadGame's error paths)
-   * can fall through to their trailing Z_Free(savebuffer) without
+   * can fall through to their trailing free(savebuffer) without
    * causing a double-free.  Matches the post-save pattern in
    * G_DoSaveGame / G_DoSaveGameToBuffer where savebuffer/save_p
    * are nulled together. */
@@ -2329,7 +2329,7 @@ void G_DoLoadGame(void)
   }
 
   // done
-  Z_Free (savebuffer);
+  free(savebuffer);
   savebuffer = NULL;
   save_p     = NULL;
 }

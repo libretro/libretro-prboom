@@ -84,7 +84,7 @@ void W_DoneCache(void)
       int i;
       for (i = 0; i < numlumps; i++)
          if (cachelump[i].cache)
-            free(cachelump[i].cache);
+            Z_Free(cachelump[i].cache);
       free(cachelump);
       cachelump = NULL;
    }

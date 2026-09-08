@@ -308,9 +308,9 @@ int interpolations_max = 0;
  * pointers. */
 void R_InterpolationDeinit(void)
 {
-   Z_Free(oldipos);
-   Z_Free(bakipos);
-   Z_Free(curipos);
+   free(oldipos);
+   free(bakipos);
+   free(curipos);
    oldipos            = NULL;
    bakipos            = NULL;
    curipos            = NULL;

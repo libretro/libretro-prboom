@@ -19,11 +19,9 @@
  *      translation unit permitted to include libretro-common's threading
  *      headers; see r_rendermt.h for why that matters.
  *
- *      Built with Z_ZONE_NO_ALLOC_OVERRIDE (set in Makefile.common), so the
- *      zone's malloc/free macros are inactive here.  That is required twice
- *      over: windows.h cannot be parsed with those macros in force, and the
- *      pool's own allocations happen on, or are freed by, worker threads --
- *      the zone has one global block list and no locking.
+ *      Allocations here use the C library, never the zone: the pool's
+ *      blocks are allocated on, or freed by, worker threads, and the zone
+ *      has one global block list and no locking.
  *
  *-----------------------------------------------------------------------------
  */

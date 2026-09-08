@@ -261,18 +261,5 @@ SOURCES_C += $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
 INCFLAGS  += -DHAVE_THREADS
 endif
 
-# rthreads frees a thread's argument block on the spawned thread, and
-# rthreads.h drags in windows.h on Win32; both are incompatible with the zone
-# allocator macros that z_zone.h force-includes everywhere, so it opts out.  Applied
-# with `override` so a command-line CFLAGS (sanitizer or profiling build)
-# cannot silently drop it.  r_rendermt.c is the only prboom translation unit
-# that includes the threading headers -- see src/r_rendermt.h.
-$(LIBRETRO_COMM_DIR)/rthreads/rthreads.o: override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
-$(CORE_DIR)/r_rendermt.o:                   override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
-
-$(LIBRETRO_COMM_DIR)/vfs/vfs_implementation.o: \
-	override CFLAGS += -DZ_ZONE_NO_ALLOC_OVERRIDE
-
-INCFLAGS += -include z_zone.h
 endif
 

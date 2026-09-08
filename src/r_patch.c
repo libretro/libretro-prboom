@@ -101,7 +101,7 @@ void R_FlushAllPatches(void) {
       if (patches[i].locks > 0)
         I_Error("R_FlushAllPatches: patch number %i still locked",i);
       if (patches[i].data)
-        free(patches[i].data);
+        Z_Free(patches[i].data);
     }
     free(patches);
     patches = NULL;
@@ -110,7 +110,7 @@ void R_FlushAllPatches(void) {
   {
     for (i=0; i<numtextures; i++)
       if (texture_composites[i].data)
-        free(texture_composites[i].data);
+        Z_Free(texture_composites[i].data);
     free(texture_composites);
     texture_composites = NULL;
   }

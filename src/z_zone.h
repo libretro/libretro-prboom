@@ -78,27 +78,26 @@ void Z_SetPurgeLimit(int size);
 
 // Remove all definitions before including system definitions
 
-#undef malloc
-#undef free
-#undef realloc
-#undef calloc
-#undef strdup
 
-/* The build force-includes this header into every translation unit, which
- * routes even vendored libretro-common code through the zone allocator.
- * The zone is not thread safe -- one global block list, no locking -- so any
- * TU whose allocations can happen off the main thread must opt out and use
- * the C library directly.  rthreads does exactly that: thread_wrap frees its
- * own argument block on the spawned thread, which raced against main-thread
- * zone traffic (caught by ThreadSanitizer) before this guard existed.
- * Objects needing it set Z_ZONE_NO_ALLOC_OVERRIDE in Makefile.common. */
-#ifndef Z_ZONE_NO_ALLOC_OVERRIDE
-#define malloc(n)          Z_Malloc(n,PU_STATIC,0)
-#define free(p)            Z_Free(p)
-#define realloc(p,n)       Z_Realloc(p,n,PU_STATIC,0)
-#define calloc(n1,n2)      Z_Calloc(n1,n2,PU_STATIC,0)
-#define strdup(s)          Z_Strdup(s,PU_STATIC,0)
-#endif
+/* No malloc/free/realloc/calloc/strdup macros here.
+ *
+ * They used to be defined to the zone allocator and force-included into
+ * every translation unit, which made the spelling of an allocation say
+ * nothing about which allocator owned it: the same free(p) meant Z_Free
+ * in one object and the C library's free in the next, depending only on
+ * whether that object had been added to an opt-out list in
+ * Makefile.common. Objects had to opt out for real reasons - rthreads
+ * allocates off the main thread and the zone has no locking; windows.h
+ * and the macros do not coexist - and every opt-out silently changed the
+ * allocator for everything that object called into. encoding_utf.c
+ * allocated a wide path with the zone's calloc and vfs_implementation.c,
+ * opted out, freed it with the C library's free: a zone block handed to
+ * msvcrt free(), which the CRT heap rejects with a corruption stop at
+ * whatever unrelated allocation is freed next.
+ *
+ * Code that wants the zone now says so: Z_Malloc and friends with the
+ * tag it needs. Everything else gets the C library, which is what its
+ * source already reads as. */
 
 
 void Z_ZoneHistory(char *);

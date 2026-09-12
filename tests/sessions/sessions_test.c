@@ -14,6 +14,7 @@
 #include "libretro.h"
 
 static int  in_load        = 0;
+static int  nonblank       = 0;
 static int  frames_in_load = 0;
 static int  frames_total   = 0;
 static int  shutdowns      = 0;
@@ -33,10 +34,85 @@ static void log_cb(enum retro_log_level level, const char *fmt, ...)
 
 static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch)
 {
-   (void)data; (void)w; (void)h; (void)pitch;
    if (in_load)
       frames_in_load++;
    frames_total++;
+
+   if (data && w && h)
+   {
+      const unsigned char *p = (const unsigned char*)data;
+      size_t y, x, nz = 0;
+      for (y = 0; y < h; y += 8)
+         for (x = 0; x < pitch; x += 16)
+            if (p[y * pitch + x])
+               nz++;
+      if (nz > 16)
+         nonblank++;
+   }
+}
+
+/* Write the first DEMO lump of an iwad out as a standalone .lmp, so the
+ * -playdemo content path gets driven as well as the title screen.  The
+ * file lands beside the iwad, which is where the core looks for it. */
+static const char *make_demo(const char *iwad, char *out, size_t outlen)
+{
+   FILE *f = fopen(iwad, "rb");
+   unsigned char hdr[16], *dir, *lump;
+   unsigned long numlumps, infotable, i;
+   const char *slash;
+   size_t dlen;
+
+   if (!f)
+      return NULL;
+   if (fread(hdr, 1, 12, f) != 12)
+   { fclose(f); return NULL; }
+   numlumps  = hdr[4] | (hdr[5]<<8) | ((unsigned long)hdr[6]<<16) | ((unsigned long)hdr[7]<<24);
+   infotable = hdr[8] | (hdr[9]<<8) | ((unsigned long)hdr[10]<<16) | ((unsigned long)hdr[11]<<24);
+
+   dir = (unsigned char*)malloc(numlumps * 16);
+   if (!dir) { fclose(f); return NULL; }
+   fseek(f, (long)infotable, SEEK_SET);
+   if (fread(dir, 16, numlumps, f) != numlumps)
+   { free(dir); fclose(f); return NULL; }
+
+   for (i = 0; i < numlumps; i++)
+   {
+      unsigned char *e = dir + i * 16;
+      unsigned long pos, len;
+      FILE *o;
+
+      if (memcmp(e + 8, "DEMO1", 5) != 0)
+         continue;
+      pos = e[0] | (e[1]<<8) | ((unsigned long)e[2]<<16) | ((unsigned long)e[3]<<24);
+      len = e[4] | (e[5]<<8) | ((unsigned long)e[6]<<16) | ((unsigned long)e[7]<<24);
+      lump = (unsigned char*)malloc(len);
+      if (!lump)
+         break;
+      fseek(f, (long)pos, SEEK_SET);
+      if (fread(lump, 1, len, f) != len)
+      { free(lump); break; }
+
+      slash = strrchr(iwad, '/');
+      dlen  = slash ? (size_t)(slash - iwad) + 1 : 0;
+      if (dlen + 10 >= outlen)
+      { free(lump); break; }
+      memcpy(out, iwad, dlen);
+      strcpy(out + dlen, "demo1.lmp");
+
+      o = fopen(out, "wb");
+      if (o)
+      {
+         fwrite(lump, 1, len, o);
+         fclose(o);
+         free(lump); free(dir); fclose(f);
+         return out;
+      }
+      free(lump);
+      break;
+   }
+   free(dir);
+   fclose(f);
+   return NULL;
 }
 
 static void audio_sample(int16_t l, int16_t r) { (void)l; (void)r; }
@@ -89,7 +165,9 @@ int main(int argc, char **argv)
 {
    void *h;
    struct retro_game_info info;
-   int s, i, sessions = 3, runs = 12;
+   int s, i, sessions = 3, runs = 12, demo = 0;
+   char demopath[1024];
+   const char *content;
    void (*retro_init)(void);
    void (*retro_deinit)(void);
    void (*retro_run)(void);
@@ -105,11 +183,12 @@ int main(int argc, char **argv)
 
    if (argc < 3)
    {
-      fprintf(stderr, "usage: %s core.so iwad.wad [sessions] [runs]\n", argv[0]);
+      fprintf(stderr, "usage: %s core.so iwad.wad [sessions] [runs] [demo]\n", argv[0]);
       return 2;
    }
    if (argc > 3) sessions = atoi(argv[3]);
    if (argc > 4) runs     = atoi(argv[4]);
+   if (argc > 5 && !strcmp(argv[5], "demo")) demo = 1;
    if (getenv("PRB_VERBOSE")) verbose = 1;
 
    h = dlopen(argv[1], RTLD_NOW);
@@ -135,6 +214,18 @@ int main(int argc, char **argv)
    retro_set_input_poll(input_poll);
    retro_set_input_state(input_state);
 
+   content = argv[2];
+   if (demo)
+   {
+      content = make_demo(argv[2], demopath, sizeof(demopath));
+      if (!content)
+      {
+         fprintf(stderr, "could not extract a DEMO1 lump from %s\n", argv[2]);
+         return 2;
+      }
+      printf("content: %s (-playdemo path)\n", content);
+   }
+
    retro_init();
 
    for (s = 1; s <= sessions; s++)
@@ -143,7 +234,7 @@ int main(int argc, char **argv)
       fflush(stdout);
 
       memset(&info, 0, sizeof(info));
-      info.path = argv[2];
+      info.path = content;
 
       in_load = 1;
       if (!retro_load_game(&info))
@@ -176,6 +267,7 @@ int main(int argc, char **argv)
    printf("frames during load: %d, total %d (expected %d)\n",
          frames_in_load, frames_total, sessions * runs);
    printf("shutdown requests : %d\n", shutdowns);
+   printf("non-blank frames  : %d\n", nonblank);
 
    if (frames_in_load)
    {
@@ -190,6 +282,11 @@ int main(int argc, char **argv)
    if (frames_total != sessions * runs)
    {
       printf("FAIL: a session stopped producing frames\n");
+      return 1;
+   }
+   if (nonblank < sessions)
+   {
+      printf("FAIL: sessions rendered nothing but blank frames\n");
       return 1;
    }
    printf("PASS\n");

@@ -127,7 +127,6 @@ static char **cheats_pending_list = NULL;
 /* forward decls */
 bool D_DoomMainSetup(void);
 void D_DoomLoop(void);
-void D_DoomLoopTics(void);
 void M_QuitDOOM(int choice);
 void D_DoomDeinit(void);
 void I_SetRes(void);
@@ -2263,7 +2262,6 @@ static int parse_m3u_playlist(const char *m3u_path,
 
 bool retro_load_game(const struct retro_game_info *info)
 {
-   unsigned i;
    int argc = 0;
    char **argv = load_argv;
 
@@ -2718,13 +2716,6 @@ bool retro_load_game(const struct retro_game_info *info)
     * the buffer (no-op for 4:3) and rebuild the video mode before
     * the first frame is presented. */
    I_ApplyAspectRatio();
-
-   /* Advance a few tics so the title screen and demo sequence are
-    * live before the first frame.  Tics only -- D_Display stays out
-    * of load, so the first frame the frontend receives is the one
-    * the first retro_run draws. */
-   for (i = 0; i < 3; i++)
-     D_DoomLoopTics();
 
    cheats_enabled      = true;
    cheats_pending      = false;

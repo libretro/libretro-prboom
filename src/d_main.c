@@ -1925,10 +1925,7 @@ failed:
 // D_DoomMain
 //
 
-/* The tic half of the loop: everything that advances the game one
- * step and nothing that draws.  Startup calls this directly, so
- * finishing init never touches the video path. */
-void D_DoomLoopTics(void)
+void D_DoomLoop(void)
 {
    if (ffmap == gamemap) ffmap = 0;
 
@@ -1937,11 +1934,6 @@ void D_DoomLoopTics(void)
    // killough 3/16/98: change consoleplayer to displayplayer
    if (players[displayplayer].mo) // cph 2002/08/10
       S_UpdateSounds(players[displayplayer].mo);// move positional sounds
-}
-
-void D_DoomLoop(void)
-{
-   D_DoomLoopTics();
 
    /* Always render the next frame.  The libretro frontend drives
     * one D_Display per retro_run; there is no equivalent of the

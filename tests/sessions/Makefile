@@ -1,6 +1,8 @@
 # Regression lane: every content load has to behave like the first.
 # Session state that outlives a teardown shows up here as a session
 # that renders nothing, or one that asks the frontend to shut down.
+# Both content paths are driven: the iwad on its own (title screen and
+# demo sequence) and a DEMO1 lump extracted from it (-playdemo).
 #
 #   make -C tests/sessions check IWAD=/abs/path/to/freedoom1.wad
 #
@@ -27,8 +29,9 @@ sessions_test: sessions_test.c
 check: all
 	@test -f $(IWAD) || { echo "no IWAD at $(IWAD); pass IWAD=<path>"; exit 2; }
 	./sessions_test $(CORE) $(IWAD) $(SESSIONS) $(RUNS)
+	./sessions_test $(CORE) $(IWAD) $(SESSIONS) $(RUNS) demo
 
 clean:
-	rm -f sessions_test
+	rm -f sessions_test demo1.lmp
 
 .PHONY: all check clean

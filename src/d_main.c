@@ -460,7 +460,10 @@ void I_SafeExit(int rc)
 //  DEMO LOOP
 //
 
-static int  demosequence;         // killough 5/2/98: made static
+/* -1 is "before the first entry": D_StartTitle sets it, D_DoomDeinit
+ * restores it, and a session that goes straight to -playdemo without a
+ * title screen starts from the same place. */
+static int  demosequence = -1;    // killough 5/2/98: made static
 static int  pagetic;
 static const char *pagename; // CPhipps - const
 dbool bfgedition = 0;
@@ -2024,6 +2027,7 @@ void D_DoomDeinit(void)
   U_FreeDynLights();
   U_FreeVoxels();
   U_FreeDecalDefs();
+  ST_ResetFace();
   R_ResetComposedPalette();
   R_ResetComposedPaletteTC();
   D_FreeBEXTables();

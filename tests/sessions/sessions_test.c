@@ -18,6 +18,11 @@ static int  nonblank       = 0;
 static int  frames_in_load = 0;
 static int  frames_total   = 0;
 static int  shutdowns      = 0;
+static int  session_no     = 0;
+static int  frame_in_sess  = 0;
+static int  mismatches     = 0;
+static unsigned long *ref_hash;      /* session 1's frame sequence */
+static int  ref_len;
 static char sysdir[]       = ".";
 static int  verbose        = 0;
 
@@ -48,6 +53,32 @@ static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch
                nz++;
       if (nz > 16)
          nonblank++;
+
+      /* Every session has to draw the same thing as the first one:
+       * state left behind by a teardown shows up here as a frame that
+       * differs from its counterpart in session 1. */
+      {
+         unsigned long hsh = 2166136261UL;
+         size_t k;
+         for (k = 0; k < h * pitch; k++)
+            hsh = (hsh ^ p[k]) * 16777619UL;
+         hsh &= 0xffffffffUL;
+
+         if (session_no == 1)
+         {
+            if (frame_in_sess < ref_len)
+               ref_hash[frame_in_sess] = hsh;
+         }
+         else if (frame_in_sess < ref_len && ref_hash[frame_in_sess] != hsh)
+         {
+            if (!mismatches)
+               printf("FAIL: session %d frame %d differs from session 1 "
+                      "(%08lx vs %08lx)\n", session_no, frame_in_sess + 1,
+                      ref_hash[frame_in_sess], hsh);
+            mismatches++;
+         }
+         frame_in_sess++;
+      }
    }
 }
 
@@ -226,10 +257,17 @@ int main(int argc, char **argv)
       printf("content: %s (-playdemo path)\n", content);
    }
 
+   ref_len  = runs;
+   ref_hash = (unsigned long*)calloc((size_t)runs, sizeof(*ref_hash));
+   if (!ref_hash)
+      return 2;
+
    retro_init();
 
    for (s = 1; s <= sessions; s++)
    {
+      session_no    = s;
+      frame_in_sess = 0;
       printf("== session %d: load\n", s);
       fflush(stdout);
 
@@ -284,6 +322,10 @@ int main(int argc, char **argv)
       printf("FAIL: a session stopped producing frames\n");
       return 1;
    }
+   printf("frames differing from session 1: %d\n", mismatches);
+
+   if (mismatches)
+      return 1;
    if (nonblank < sessions)
    {
       printf("FAIL: sessions rendered nothing but blank frames\n");

@@ -2662,7 +2662,7 @@ bool retro_load_game(const struct retro_game_info *info)
     * settled.  Sizing this at MAX_SCREENWIDTH*MAX_SCREENHEIGHT instead
     * would charge every session for a resolution it did not pick: 16MB
     * at 32bpp to hold a 320x200 frame that needs 273KB. */
-   screen_buf = (unsigned char*)malloc(SURFACE_PIXEL_DEPTH * I_MaxAspectWidth() * SCREENHEIGHT);
+   screen_buf = (unsigned char*)calloc(1, SURFACE_PIXEL_DEPTH * I_MaxAspectWidth() * SCREENHEIGHT);
    if (!screen_buf)
       goto failed;
 
@@ -3700,6 +3700,10 @@ static void I_UpdateVideoMode(void)
    screens[0].data = (unsigned char *)screen_buf;
 
    V_AllocScreens();
+
+   /* The screens are new memory, so anything caching what was drawn
+    * into them has to stretch again. */
+   ST_InvalidateBackground();
 
    R_InitBuffer(SCREENWIDTH, SCREENHEIGHT);
 }

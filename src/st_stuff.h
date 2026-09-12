@@ -69,6 +69,13 @@ void ST_Start(void);
 // Called by startup code.
 void ST_Init(void);
 
+/* Drop the cached status-bar background; call after the screens are
+ * reallocated, since the cache describes buffer contents. */
+void ST_InvalidateBackground(void);
+
+/* Clear the face animation state for the next session. */
+void ST_ResetFace(void);
+
 // States for status bar code.
 typedef enum
 {

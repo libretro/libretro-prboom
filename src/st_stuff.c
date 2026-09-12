@@ -377,6 +377,11 @@ static int      keyboxes[3];
 // a random number per tick
 static int      st_randomnumber;
 
+/* Face animation state.  It carries across a level change, as the face
+ * widget expects, and is cleared by ST_ResetFace at session teardown. */
+static int      st_face_lastattackdown = -1;
+static int      st_face_priority       = 0;
+
 /* Heretic health-chain animation: HealthMarker chases the real health so the
  * life gem glides rather than snapping, and ChainWiggle bobs the chain by a
  * pixel while it is moving. Updated once per tic in ST_Ticker. */
@@ -390,6 +395,32 @@ extern char     *mapnames[];
 //
 
 static void ST_Stop(void);
+
+/* Cache keys for the stretched background held in the BG screen.  They
+ * describe what is in a buffer this module does not own, so whoever
+ * rebuilds the screens calls ST_InvalidateBackground and the next draw
+ * stretches into the new memory. */
+static int cached_w      = -1;
+static int cached_h      = -1;
+static int cached_armson = -1;
+static int cached_netface = -2;
+
+void ST_ResetFace(void)
+{
+  st_facecount           = 0;
+  st_randomnumber        = 0;
+  st_faceindex           = 0;
+  st_face_lastattackdown = -1;
+  st_face_priority       = 0;
+}
+
+void ST_InvalidateBackground(void)
+{
+  cached_w       = -1;
+  cached_h       = -1;
+  cached_armson  = -1;
+  cached_netface = -2;
+}
 
 static void ST_refreshBackground(void)
 {
@@ -406,10 +437,6 @@ static void ST_refreshBackground(void)
        * into BG once and rebuild only when something that affects the cached
        * pixels changes: the internal resolution, the arms-panel visibility, or
        * (netgame only) the displayed player's face background. */
-      static int cached_w        = -1;
-      static int cached_h        = -1;
-      static int cached_armson   = -1;
-      static int cached_netface   = -2;
       int        netface         = netgame ? displayplayer : -1;
 
       if (cached_w      != SCREENWIDTH || cached_h       != SCREENHEIGHT ||
@@ -489,22 +516,20 @@ static void ST_updateFaceWidget(void)
   int         i;
   angle_t     badguyangle;
   angle_t     diffang;
-  static int  lastattackdown = -1;
-  static int  priority = 0;
   dbool     doevilgrin;
 
-  if (priority < 10)
+  if (st_face_priority < 10)
     {
       // dead
       if (!plyr->health)
         {
-          priority = 9;
+          st_face_priority = 9;
           st_faceindex = ST_DEADFACE;
           st_facecount = 1;
         }
     }
 
-  if (priority < 9)
+  if (st_face_priority < 9)
     {
       if (plyr->bonuscount)
         {
@@ -522,7 +547,7 @@ static void ST_updateFaceWidget(void)
           if (doevilgrin)
             {
               // evil grin if just picked up weapon
-              priority = 8;
+              st_face_priority = 8;
               st_facecount = ST_EVILGRINCOUNT;
               st_faceindex = ST_calcPainOffset() + ST_EVILGRINOFFSET;
             }
@@ -530,12 +555,12 @@ static void ST_updateFaceWidget(void)
 
     }
 
-  if (priority < 8)
+  if (st_face_priority < 8)
     {
       if (plyr->damagecount && plyr->attacker && plyr->attacker != plyr->mo)
         {
           // being attacked
-          priority = 7;
+          st_face_priority = 7;
 
           // haleyjd 10/12/03: classic DOOM problem of missing OUCH face
           // was due to inversion of this test:
@@ -588,7 +613,7 @@ static void ST_updateFaceWidget(void)
         }
     }
 
-  if (priority < 7)
+  if (st_face_priority < 7)
     {
       // getting hurt because of your own damn stupidity
       if (plyr->damagecount)
@@ -598,13 +623,13 @@ static void ST_updateFaceWidget(void)
           // if(plyr->health - st_oldhealth > ST_MUCHPAIN)
           if(st_oldhealth - plyr->health > ST_MUCHPAIN)
             {
-              priority = 7;
+              st_face_priority = 7;
               st_facecount = ST_TURNCOUNT;
               st_faceindex = ST_calcPainOffset() + ST_OUCHOFFSET;
             }
           else
             {
-              priority = 6;
+              st_face_priority = 6;
               st_facecount = ST_TURNCOUNT;
               st_faceindex = ST_calcPainOffset() + ST_RAMPAGEOFFSET;
             }
@@ -613,33 +638,33 @@ static void ST_updateFaceWidget(void)
 
     }
 
-  if (priority < 6)
+  if (st_face_priority < 6)
     {
       // rapid firing
       if (plyr->attackdown)
         {
-          if (lastattackdown==-1)
-            lastattackdown = ST_RAMPAGEDELAY;
-          else if (!--lastattackdown)
+          if (st_face_lastattackdown==-1)
+            st_face_lastattackdown = ST_RAMPAGEDELAY;
+          else if (!--st_face_lastattackdown)
             {
-              priority = 5;
+              st_face_priority = 5;
               st_faceindex = ST_calcPainOffset() + ST_RAMPAGEOFFSET;
               st_facecount = 1;
-              lastattackdown = 1;
+              st_face_lastattackdown = 1;
             }
         }
       else
-        lastattackdown = -1;
+        st_face_lastattackdown = -1;
 
     }
 
-  if (priority < 5)
+  if (st_face_priority < 5)
     {
       // invulnerability
       if ((plyr->cheats & CF_GODMODE)
           || plyr->powers[pw_invulnerability])
         {
-          priority = 4;
+          st_face_priority = 4;
 
           st_faceindex = ST_GODFACE;
           st_facecount = 1;
@@ -653,7 +678,7 @@ static void ST_updateFaceWidget(void)
     {
       st_faceindex = ST_calcPainOffset() + (st_randomnumber % 3);
       st_facecount = ST_STRAIGHTFACECOUNT;
-      priority = 0;
+      st_face_priority = 0;
     }
 
   st_facecount--;

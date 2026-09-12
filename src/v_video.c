@@ -1633,7 +1633,10 @@ void V_FillRect(int x, int y, int width, int height, uint8_t colour)
 void V_AllocScreen(screeninfo_t *scrn) {
   if (!scrn->not_on_heap)
     if (( SURFACE_BYTE_PITCH * scrn->height) > 0)
-      scrn->data = malloc( SURFACE_BYTE_PITCH * scrn->height);
+      /* Zeroed: a screen is presented before every part of it has
+       * necessarily been drawn, and heap recycled from the previous
+       * session would show through as garbage. */
+      scrn->data = calloc(1, SURFACE_BYTE_PITCH * scrn->height);
 }
 
 //

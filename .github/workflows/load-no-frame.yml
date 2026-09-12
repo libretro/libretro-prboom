@@ -1,0 +1,36 @@
+name: load-no-frame
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  load-no-frame:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build core
+        run: make -j$(nproc)
+
+      - name: Fetch IWAD
+        run: |
+          curl -sL -o freedoom.zip \
+            https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip
+          unzip -j -o freedoom.zip '*/freedoom1.wad' -d tests/load_no_frame
+
+      - name: Run regression lane
+        run: make -C tests/load_no_frame check
+
+      - name: Rebuild under ASan/UBSan
+        run: |
+          make clean
+          make -j$(nproc) CC="cc -fsanitize=address,undefined -fno-omit-frame-pointer -g"
+
+      - name: Run regression lane under ASan/UBSan
+        env:
+          ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
+          UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
+        run: |
+          make -C tests/load_no_frame clean
+          make -C tests/load_no_frame check SAN=address,undefined

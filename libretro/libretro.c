@@ -103,12 +103,11 @@ static bool sw_fb_checked        = false;
 static unsigned char *direct_fb_data  = NULL;
 static unsigned int   direct_fb_pitch = 0;
 
-/* True only while we are inside retro_run.  retro_load_game
- * calls D_DoomLoop a few times during init, but the frontend's
- * video driver isn't fully wired up at that point and
- * GET_CURRENT_SOFTWARE_FRAMEBUFFER can crash with a nullptr deref
- * inside the frontend's video pipeline.  Skip SW FB acquisition
- * outside retro_run; render to screen_buf instead. */
+/* True only while we are inside retro_run.  Drawing and every
+ * frontend video call belong to retro_run and to nothing else: a
+ * frontend is free to keep its video driver torn down for the whole
+ * of retro_load_game, so both the software-framebuffer request and
+ * the refresh callback are gated on this. */
 static bool in_retro_run = false;
 
 /* Set by the in-game Aspect Ratio menu item; consumed at a safe
@@ -128,6 +127,7 @@ static char **cheats_pending_list = NULL;
 /* forward decls */
 bool D_DoomMainSetup(void);
 void D_DoomLoop(void);
+void D_DoomLoopTics(void);
 void M_QuitDOOM(int choice);
 void D_DoomDeinit(void);
 void I_SetRes(void);
@@ -2719,9 +2719,12 @@ bool retro_load_game(const struct retro_game_info *info)
     * the first frame is presented. */
    I_ApplyAspectRatio();
 
-   // Run few cycles to finish init.
+   /* Advance a few tics so the title screen and demo sequence are
+    * live before the first frame.  Tics only -- D_Display stays out
+    * of load, so the first frame the frontend receives is the one
+    * the first retro_run draws. */
    for (i = 0; i < 3; i++)
-     D_DoomLoop();
+     D_DoomLoopTics();
 
    cheats_enabled      = true;
    cheats_pending      = false;
@@ -3712,7 +3715,11 @@ static void I_UpdateVideoMode(void)
 
 void I_FinishUpdate (void)
 {
-   if (!video_cb)
+   /* The refresh callback belongs to retro_run.  Startup advances
+    * tics without drawing, so nothing should reach here outside a
+    * run; the gate keeps that true for any path that grows a
+    * D_Display call later. */
+   if (!video_cb || !in_retro_run)
      return;
 
    if (direct_fb_data)
@@ -3924,10 +3931,8 @@ dbool   I_StartDisplay(void)
    /* Direct-render acquisition.  libretro.h: the buffer returned
     * from GET_CURRENT_SOFTWARE_FRAMEBUFFER is valid only until
     * retro_run returns, so do this once per frame and unbind in
-    * I_FinishUpdate.  retro_load_game runs D_DoomLoop a few times
-    * during init before the frontend's video pipeline is fully up
-    * -- the in_retro_run gate skips acquisition during that
-    * window. */
+    * I_FinishUpdate.  The in_retro_run gate keeps the request
+    * inside the window where the frontend guarantees a buffer. */
    direct_fb_data  = NULL;
    direct_fb_pitch = 0;
 

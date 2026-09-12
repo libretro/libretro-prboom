@@ -1,11 +1,11 @@
-name: load-no-frame
+name: session-state
 
 on:
   push:
   pull_request:
 
 jobs:
-  load-no-frame:
+  session-state:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -17,20 +17,24 @@ jobs:
         run: |
           curl -sL -o freedoom.zip \
             https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip
-          unzip -j -o freedoom.zip '*/freedoom1.wad' -d tests/load_no_frame
+          unzip -j -o freedoom.zip "*/freedoom1.wad" -d tests/load_no_frame && cp tests/load_no_frame/freedoom1.wad tests/sessions/
 
-      - name: Run regression lane
-        run: make -C tests/load_no_frame check
+      - name: Run regression lanes
+        run: |
+          make -C tests/load_no_frame check
+          make -C tests/sessions check
 
       - name: Rebuild under ASan/UBSan
         run: |
           make clean
           make -j$(nproc) CC="cc -fsanitize=address,undefined -fno-omit-frame-pointer -g"
 
-      - name: Run regression lane under ASan/UBSan
+      - name: Run regression lanes under ASan/UBSan
         env:
           ASAN_OPTIONS: detect_leaks=1:abort_on_error=1
           UBSAN_OPTIONS: print_stacktrace=1:halt_on_error=1
         run: |
           make -C tests/load_no_frame clean
           make -C tests/load_no_frame check SAN=address,undefined
+          make -C tests/sessions clean
+          make -C tests/sessions check SAN=address,undefined

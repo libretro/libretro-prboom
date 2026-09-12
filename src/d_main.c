@@ -94,6 +94,11 @@
 #include "u_mapinfo.h"
 #include "u_decorate.h"
 #include "u_zmapinfo.h"
+#include "u_ztextures.h"
+#include "u_brightmap.h"
+#include "u_dynlight.h"
+#include "u_voxel.h"
+#include "u_decaldef.h"
 
 void GetFirstMap(int *ep, int *map); // Ty 08/29/98 - add "-warp x" functionality
 static void D_PageDrawer(void);
@@ -1950,6 +1955,8 @@ void D_DoomLoop(void)
 //foward decl
 void M_QuitDOOM(int choice);
 
+extern dbool quit_pressed;
+
 void D_DoomDeinit(void)
 {
   lprintf(LO_INFO,"D_DoomDeinit:\n");
@@ -2019,9 +2026,26 @@ void D_DoomDeinit(void)
   I_ShutdownSound();
   I_ShutdownMusic();
   U_FreeMapInfo();
+  U_FreeLanguage();
+  U_ZTexturesFree();
+  U_FreeBrightmaps();
+  U_FreeDynLights();
+  U_FreeVoxels();
+  U_FreeDecalDefs();
+  R_ResetComposedPalette();
+  R_ResetComposedPaletteTC();
   D_FreeBEXTables();
   M_FreeDefaults();
   W_ReleaseAllWads();
+
+  /* Latches the next session has to open with, not inherit:
+   * M_QuitDOOM above records a quit request, and the tic counters
+   * belong to the run that produced them. */
+  quit_pressed = false;
+  has_exited   = 0;
+  gametic      = 0;
+  basetic      = 0;
+  maketic      = 0;
 }
 
 //

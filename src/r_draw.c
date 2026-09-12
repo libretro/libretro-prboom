@@ -183,6 +183,14 @@ static INLINE const uint16_t *R_GetComposedPalette(void)
    return composed_nolight_lut;
 }
 
+/* The cache above is keyed on the identity of V_Palette16, so a new
+ * session whose palette allocation lands on the same address would
+ * otherwise keep the previous wad set's table.  Teardown drops the key. */
+void R_ResetComposedPalette(void)
+{
+   composed_nolight_pal = NULL;
+}
+
 const uint16_t *R_SpanComposedColormap(const draw_span_vars_t *dsvars,
                                        const lighttable_t *colormap)
 {

@@ -432,6 +432,13 @@ static INLINE const uint32_t *R_GetComposedPaletteTC(void)
    return tc_composed_nolight_lut;
 }
 
+/* Same key-on-pointer-identity cache as the 16-bit path; drop it at
+ * teardown so the next wad set builds its own table. */
+void R_ResetComposedPaletteTC(void)
+{
+   tc_composed_nolight_pal = NULL;
+}
+
 
 
 // SoM 7-28-04: Fix the fuzz problem.

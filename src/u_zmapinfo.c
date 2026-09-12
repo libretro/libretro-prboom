@@ -111,6 +111,21 @@ static void Z_ParseLanguageLump(int lump)
  * the first '.'), so a mod's per-topic tables (language.vns_aosoth, ...)
  * arrive as several lumps that all share that name.  Walk every one; later
  * lumps win on duplicate keys, which is the load order ZDoom uses too. */
+void U_FreeLanguage(void)
+{
+  int i;
+
+  for (i = 0; i < zlang_count; i++)
+  {
+    free(zlang[i].key);
+    free(zlang[i].value);
+  }
+  free(zlang);
+  zlang        = NULL;
+  zlang_count  = 0;
+  zlang_parsed = 0;
+}
+
 static void Z_ParseLanguage(void)
 {
   int lump;

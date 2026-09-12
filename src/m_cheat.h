@@ -55,4 +55,7 @@ extern struct cheat_s {
 
 dbool   M_FindCheats(int key);
 
+/* Re-arm the cheat-code compiler for the next wad set. */
+void    M_ResetCheats(void);
+
 #endif

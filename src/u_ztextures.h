@@ -42,6 +42,10 @@ extern int num_ztextures;
  * U_PNGMaterializeLumps. */
 void U_ZTexturesLoad(void);
 
+/* Drop every definition and re-arm the loader, so the next wad set
+ * parses its own TEXTURES lumps. */
+void U_ZTexturesFree(void);
+
 /* definition by texture name, NULL if none */
 const ztexture_t *U_ZTexturesFind(const char *name);
 

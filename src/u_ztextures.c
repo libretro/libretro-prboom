@@ -221,6 +221,16 @@ void U_ZTexturesLoad(void)
             num_ztextures);
 }
 
+void U_ZTexturesFree(void)
+{
+  if (ztextures)
+    Z_Free(ztextures);
+  ztextures     = NULL;
+  num_ztextures = 0;
+  cap_ztextures = 0;
+  zt_loaded     = false;
+}
+
 const ztexture_t *U_ZTexturesFind(const char *name)
 {
   int i;

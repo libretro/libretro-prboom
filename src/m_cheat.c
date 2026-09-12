@@ -723,11 +723,21 @@ static void cheat_pitch()
 
 #define CHEAT_ARGS_MAX 8  /* Maximum number of args at end of cheats */
 
+/* The aux table (code/mask per cheat) is compiled from cheat[].cheat on
+ * first use.  A DEHACKED lump can replace those sequences, so the latch
+ * is cleared at teardown and the next wad set compiles its own. */
+static int cheats_compiled;
+
+void M_ResetCheats(void)
+{
+  cheats_compiled = 0;
+}
+
 dbool   M_FindCheats(int key)
 {
   static uint64_t sr;
   static char argbuf[CHEAT_ARGS_MAX+1], *arg;
-  static int init, argsleft, cht;
+  static int argsleft, cht;
   int i, ret, matchedbefore;
 
   // If we are expecting arguments to a cheat
@@ -748,9 +758,9 @@ dbool   M_FindCheats(int key)
       return 0;
     }
 
-  if (!init)                             // initialize aux entries of table
+  if (!cheats_compiled)                  // initialize aux entries of table
     {
-      init = 1;
+      cheats_compiled = 1;
       for (i=0;cheat[i].cheat;i++)
         {
           uint64_t c=0, m=0;

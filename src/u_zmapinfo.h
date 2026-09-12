@@ -22,4 +22,7 @@ dbool U_ZMapNoInfighting(const mapentry_t *e);
 /* ZDoom MAPINFO 'sucktime' hours for the given map entry (0 = none) */
 int U_ZMapSuckTime(const mapentry_t *e);
 
+/* Drop the LANGUAGE table and re-arm the parser for the next wad set. */
+void U_FreeLanguage(void);
+
 #endif

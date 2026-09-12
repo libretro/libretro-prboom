@@ -1554,6 +1554,27 @@ static int   deh_holdstringlen = 128;
  * forever because Z_Close only runs at retro_deinit, not between
  * content loads.
  */
+/* Built-in cheat sequences displaced by a DEHACKED lump, kept so the
+ * next wad set starts from the engine's own table. */
+static const char **deh_cheat_orig;
+static int          deh_cheat_orig_count;
+
+static void deh_SaveCheatOrig(int idx)
+{
+  if (!deh_cheat_orig)
+  {
+    int n;
+    for (n = 0; cheat[n].cheat; n++)
+      ;
+    deh_cheat_orig = calloc(n, sizeof(*deh_cheat_orig));
+    if (!deh_cheat_orig)
+      return;
+    deh_cheat_orig_count = n;
+  }
+  if (idx >= 0 && idx < deh_cheat_orig_count && !deh_cheat_orig[idx])
+    deh_cheat_orig[idx] = cheat[idx].cheat;
+}
+
 void D_FreeBEXTables(void)
 {
    int i;
@@ -1579,6 +1600,32 @@ void D_FreeBEXTables(void)
    free(deh_holdstring);
    deh_holdstring    = NULL;
    deh_holdstringlen = 128;
+
+   /* Put every substituted string back to the engine's own, so a wad
+    * set that ships no DEHACKED text reads as the engine wrote it. */
+   for (i = 0; i < (int)deh_numstrlookup; i++)
+   {
+      if (!deh_strlookup[i].orig)
+         continue;
+      if (*deh_strlookup[i].ppstr != deh_strlookup[i].orig)
+         free((void *)*deh_strlookup[i].ppstr);
+      *deh_strlookup[i].ppstr = deh_strlookup[i].orig;
+      deh_strlookup[i].orig   = NULL;
+   }
+
+   for (i = 0; i < deh_cheat_orig_count; i++)
+   {
+      if (!deh_cheat_orig[i])
+         continue;
+      if (cheat[i].cheat != deh_cheat_orig[i])
+         free((void *)cheat[i].cheat);
+      cheat[i].cheat = deh_cheat_orig[i];
+   }
+   free(deh_cheat_orig);
+   deh_cheat_orig       = NULL;
+   deh_cheat_orig_count = 0;
+
+   M_ResetCheats();
 }
 
 // ====================================================================
@@ -2878,6 +2925,7 @@ static void deh_procCheat(DEHFILE *fpin, FILE* fpout, char *line) // done
           cheat[i].deh_modified = TRUE;
                 }
 #endif
+                deh_SaveCheatOrig(iy);
                 cheat[iy].cheat = strdup(p);
                 deh_log(
                                    "Assigned new cheat '%s' to cheat '%s'at index %d\n",

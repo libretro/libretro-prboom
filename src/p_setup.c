@@ -814,6 +814,18 @@ static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver);
  * end of it.  The index checks that did exist raised I_Error, which
  * only reports in this port, so the read they guarded went ahead
  * anyway. */
+/* The lump's records are not machine words -- an XNOD seg is 11 bytes --
+ * so every field after the first sits at whatever alignment the record
+ * before it left.  Casting the byte pointer to int/short and
+ * dereferencing is undefined, and on the strict-alignment targets
+ * libretro builds for it faults or returns a rotated word rather than
+ * the value.  Assemble from bytes instead, which also states the
+ * little-endian on-disk order outright instead of leaving it to
+ * LONG()/SHORT() and the host's endianness. */
+#define XNOD_U32(p) ((uint32_t)(p)[0]        | ((uint32_t)(p)[1] << 8) | \
+                    ((uint32_t)(p)[2] << 16) | ((uint32_t)(p)[3] << 24))
+#define XNOD_U16(p) ((uint16_t)((uint32_t)(p)[0] | ((uint32_t)(p)[1] << 8)))
+
 #define XNOD_NEED(n)  do { if ((int64_t)(n) > (int64_t)len) return FALSE; } while (0)
 #define XNOD_COUNT(c, recsz) \
    do { if ((c) < 0 || (int64_t)(c) * (int64_t)(recsz) > (int64_t)len) return FALSE; } while (0)
@@ -977,8 +989,8 @@ static dbool P_LoadXNOD(const uint8_t *data, int len)
   /* data points just past the 4-byte signature (the dispatcher advanced it,
    * or it is the inflated body which has no signature). */
   XNOD_NEED(8);
-  numorgvert = LONG(*(const int *)data); data += 4; len -= 4;
-  numnewvert = LONG(*(const int *)data); data += 4; len -= 4;
+  numorgvert = (int)XNOD_U32(data); data += 4; len -= 4;
+  numnewvert = (int)XNOD_U32(data); data += 4; len -= 4;
 
   /* numorgvert has to match the VERTEXES lump already loaded; the
    * builder wrote it from that same map. */
@@ -994,8 +1006,8 @@ static dbool P_LoadXNOD(const uint8_t *data, int len)
   {
     vertex_t *v = newvert + numorgvert + i;
 
-    v->x = LONG(*(const fixed_t *)data); data += 4; len -= 4;
-    v->y = LONG(*(const fixed_t *)data); data += 4; len -= 4;
+    v->x = (fixed_t)XNOD_U32(data); data += 4; len -= 4;
+    v->y = (fixed_t)XNOD_U32(data); data += 4; len -= 4;
   }
 
   if (newvert != vertexes)
@@ -1010,13 +1022,13 @@ static dbool P_LoadXNOD(const uint8_t *data, int len)
   numvertexes = numorgvert + numnewvert;
 
   XNOD_NEED(4);
-  numsubsectors = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  numsubsectors = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
   XNOD_COUNT(numsubsectors, 4);
   subsectors = Z_Calloc(numsubsectors, sizeof(*subsectors), PU_LEVEL, NULL);
 
   for (i = 0; i < numsubsectors; i++) {
     subsectors[i].firstline = first_seg;
-    subsectors[i].numlines = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+    subsectors[i].numlines = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
     if (subsectors[i].numlines < 0)
       return FALSE;
     first_seg += subsectors[i].numlines;
@@ -1025,7 +1037,7 @@ static dbool P_LoadXNOD(const uint8_t *data, int len)
   }
 
   XNOD_NEED(4);
-  numsegs = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  numsegs = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
   XNOD_COUNT(numsegs, 11);              /* v1 + v2 + linedef + side */
   segs = Z_Calloc(numsegs, sizeof(*segs), PU_LEVEL, NULL);
 
@@ -1037,9 +1049,9 @@ static dbool P_LoadXNOD(const uint8_t *data, int len)
     seg_t *seg;
     line_t *line;
 
-    v1 = LONG(*(const unsigned int *)data); data += 4; len -= 4;
-    v2 = LONG(*(const unsigned int *)data); data += 4; len -= 4;
-    ld = SHORT(*(const unsigned short *)data); data += 2; len -= 2;
+    v1 = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
+    v2 = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
+    ld = XNOD_U16(data); data += 2; len -= 2;
     side = *(const unsigned char *)data; data += 1; len -= 1;
 
     /* Indices straight out of the lump, used below to walk vertexes,
@@ -1082,7 +1094,7 @@ static dbool P_LoadXNOD(const uint8_t *data, int len)
   }
 
   XNOD_NEED(4);
-  numnodes = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  numnodes = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
   XNOD_COUNT(numnodes, 8 + 16 + 8);
   nodes = Z_Calloc(numnodes, sizeof(*nodes), PU_LEVEL, NULL);
 
@@ -1091,20 +1103,20 @@ static dbool P_LoadXNOD(const uint8_t *data, int len)
     node_t *node = nodes + i;
     int j, k;
 
-    node->x = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
-    node->y = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
-    node->dx = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
-    node->dy = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
+    node->x = (short)XNOD_U16(data)*FRACUNIT; data += 2; len -= 2;
+    node->y = (short)XNOD_U16(data)*FRACUNIT; data += 2; len -= 2;
+    node->dx = (short)XNOD_U16(data)*FRACUNIT; data += 2; len -= 2;
+    node->dy = (short)XNOD_U16(data)*FRACUNIT; data += 2; len -= 2;
 
     for (j = 0; j < 2; j++) {
       for (k = 0; k < 4; k++) {
         node->bbox[j][k] =
-          SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
+          (short)XNOD_U16(data)*FRACUNIT; data += 2; len -= 2;
       }
     }
 
     for (j = 0; j < 2; j++) {
-      node->children[j] = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+      node->children[j] = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
     }
   }
 
@@ -1141,8 +1153,8 @@ static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver)
 
   /* --- vertices: original count + builder-added vertices --- */
   XNOD_NEED(8);
-  numorgvert = LONG(*(const int *)data); data += 4; len -= 4;
-  numnewvert = LONG(*(const int *)data); data += 4; len -= 4;
+  numorgvert = (int)XNOD_U32(data); data += 4; len -= 4;
+  numnewvert = (int)XNOD_U32(data); data += 4; len -= 4;
 
   if (numorgvert != numvertexes)
     return FALSE;
@@ -1155,8 +1167,8 @@ static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver)
   for (i = 0; i < numnewvert; i++)
   {
     vertex_t *v = newvert + numorgvert + i;
-    v->x = LONG(*(const fixed_t *)data); data += 4; len -= 4;
-    v->y = LONG(*(const fixed_t *)data); data += 4; len -= 4;
+    v->x = (fixed_t)XNOD_U32(data); data += 4; len -= 4;
+    v->y = (fixed_t)XNOD_U32(data); data += 4; len -= 4;
   }
 
   if (newvert != vertexes)
@@ -1173,14 +1185,14 @@ static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver)
   /* --- subsectors: only the per-subsector seg count is stored; the first
    * seg index is accumulated (first subsector starts at seg 0) --- */
   XNOD_NEED(4);
-  numsubsectors = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  numsubsectors = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
   XNOD_COUNT(numsubsectors, 4);
   subsectors = Z_Calloc(numsubsectors, sizeof(*subsectors), PU_LEVEL, NULL);
 
   for (i = 0; i < numsubsectors; i++)
   {
     subsectors[i].firstline = first_seg;
-    subsectors[i].numlines = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+    subsectors[i].numlines = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
     if (subsectors[i].numlines < 0)
       return FALSE;
     first_seg += subsectors[i].numlines;
@@ -1190,7 +1202,7 @@ static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver)
 
   /* --- segs --- */
   XNOD_NEED(4);
-  numsegs = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  numsegs = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
   if (numsegs != first_seg)
   {
     I_Error("P_LoadXGLNodes: %d segs but subsectors total %d", numsegs, first_seg);
@@ -1214,16 +1226,16 @@ static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver)
       unsigned char side;
       seg_t *seg = segs + firstseg + j;
 
-      v1 = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+      v1 = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
       /* partner seg (the record's v2) is unused by this renderer */
       data += 4; len -= 4;
       if (line_is_32)
       {
-        line = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+        line = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
       }
       else
       {
-        line = (unsigned short)SHORT(*(const unsigned short *)data);
+        line = (unsigned short)XNOD_U16(data);
         data += 2; len -= 2;
       }
       side = *(const unsigned char *)data; data += 1; len -= 1;
@@ -1307,7 +1319,7 @@ static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver)
 
   /* --- nodes --- */
   XNOD_NEED(4);
-  numnodes = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  numnodes = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
   XNOD_COUNT(numnodes, (node_is_32 ? 16 : 8) + 16 + 8);
   nodes = Z_Calloc(numnodes, sizeof(*nodes), PU_LEVEL, NULL);
 
@@ -1319,31 +1331,31 @@ static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver)
     if (node_is_32)
     {
       /* XGL3: partition x/y/dx/dy are 32-bit fixed_t */
-      node->x  = LONG(*(const fixed_t *)data); data += 4; len -= 4;
-      node->y  = LONG(*(const fixed_t *)data); data += 4; len -= 4;
-      node->dx = LONG(*(const fixed_t *)data); data += 4; len -= 4;
-      node->dy = LONG(*(const fixed_t *)data); data += 4; len -= 4;
+      node->x  = (fixed_t)XNOD_U32(data); data += 4; len -= 4;
+      node->y  = (fixed_t)XNOD_U32(data); data += 4; len -= 4;
+      node->dx = (fixed_t)XNOD_U32(data); data += 4; len -= 4;
+      node->dy = (fixed_t)XNOD_U32(data); data += 4; len -= 4;
     }
     else
     {
       /* XGLN/XGL2: 16-bit partition, shifted up to fixed_t */
-      node->x  = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
-      node->y  = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
-      node->dx = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
-      node->dy = SHORT(*(const short *)data)*FRACUNIT; data += 2; len -= 2;
+      node->x  = (short)XNOD_U16(data)*FRACUNIT; data += 2; len -= 2;
+      node->y  = (short)XNOD_U16(data)*FRACUNIT; data += 2; len -= 2;
+      node->dx = (short)XNOD_U16(data)*FRACUNIT; data += 2; len -= 2;
+      node->dy = (short)XNOD_U16(data)*FRACUNIT; data += 2; len -= 2;
     }
 
     /* bounding boxes are 16-bit in all three formats */
     for (j = 0; j < 2; j++)
       for (k = 0; k < 4; k++)
       {
-        node->bbox[j][k] = SHORT(*(const short *)data)*FRACUNIT;
+        node->bbox[j][k] = (short)XNOD_U16(data)*FRACUNIT;
         data += 2; len -= 2;
       }
 
     for (j = 0; j < 2; j++)
     {
-      node->children[j] = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+      node->children[j] = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
     }
   }
 

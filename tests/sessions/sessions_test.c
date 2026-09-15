@@ -21,9 +21,11 @@ static int  shutdowns      = 0;
 static int  session_no     = 0;
 static int  frame_in_sess  = 0;
 static int  mismatches     = 0;
-static size_t ref_ssize    = 0;      /* session 1's post-load serialize size */
+static size_t ref_ssize[2] = { 0, 0 };  /* first post-load size per content */
 static int  ssize_bad      = 0;
-static unsigned long *ref_hash;      /* session 1's frame sequence */
+static unsigned long *ref_hash[2];   /* first frame sequence per content */
+static int  ref_seen[2]    = { 0, 0 };
+static int  content_idx    = 0;
 static int  ref_len;
 static char sysdir[]       = ".";
 static int  verbose        = 0;
@@ -66,17 +68,19 @@ static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch
             hsh = (hsh ^ p[k]) * 16777619UL;
          hsh &= 0xffffffffUL;
 
-         if (session_no == 1)
+         if (!ref_seen[content_idx])
          {
             if (frame_in_sess < ref_len)
-               ref_hash[frame_in_sess] = hsh;
+               ref_hash[content_idx][frame_in_sess] = hsh;
          }
-         else if (frame_in_sess < ref_len && ref_hash[frame_in_sess] != hsh)
+         else if (frame_in_sess < ref_len
+               && ref_hash[content_idx][frame_in_sess] != hsh)
          {
             if (!mismatches)
-               printf("FAIL: session %d frame %d differs from session 1 "
-                      "(%08lx vs %08lx)\n", session_no, frame_in_sess + 1,
-                      ref_hash[frame_in_sess], hsh);
+               printf("FAIL: session %d frame %d differs from the first "
+                      "session on this content (%08lx vs %08lx)\n",
+                      session_no, frame_in_sess + 1,
+                      ref_hash[content_idx][frame_in_sess], hsh);
             mismatches++;
          }
          frame_in_sess++;
@@ -198,7 +202,8 @@ int main(int argc, char **argv)
 {
    void *h;
    struct retro_game_info info;
-   int s, i, sessions = 3, runs = 12, demo = 0;
+   int s, i, sessions = 3, runs = 12, demo = 0, alt = 0;
+   const char *altpath = NULL;
    char demopath[1024];
    const char *content;
    void (*retro_init)(void);
@@ -216,12 +221,25 @@ int main(int argc, char **argv)
 
    if (argc < 3)
    {
-      fprintf(stderr, "usage: %s core.so iwad.wad [sessions] [runs] [demo]\n", argv[0]);
+      fprintf(stderr, "usage: %s core.so iwad.wad [sessions] [runs] [demo|alt]\n",
+            argv[0]);
       return 2;
    }
    if (argc > 3) sessions = atoi(argv[3]);
    if (argc > 4) runs     = atoi(argv[4]);
    if (argc > 5 && !strcmp(argv[5], "demo")) demo = 1;
+   /* alt alternates the iwad with a second content file, so consecutive
+    * sessions build different lump tables.  argv[6] names that file; with
+    * no argv[6] it is the DEMO1 lump extracted from the iwad, which
+    * exercises the -playdemo path but leaves the lump numbering alone. */
+   if (argc > 5 && !strcmp(argv[5], "alt"))
+   {
+      alt = 1;
+      if (argc > 6)
+         altpath = argv[6];
+      else
+         demo = 1;
+   }
    if (getenv("PRB_VERBOSE")) verbose = 1;
 
    h = dlopen(argv[1], RTLD_NOW);
@@ -259,9 +277,10 @@ int main(int argc, char **argv)
       printf("content: %s (-playdemo path)\n", content);
    }
 
-   ref_len  = runs;
-   ref_hash = (unsigned long*)calloc((size_t)runs, sizeof(*ref_hash));
-   if (!ref_hash)
+   ref_len     = runs;
+   ref_hash[0] = (unsigned long*)calloc((size_t)runs, sizeof(**ref_hash));
+   ref_hash[1] = (unsigned long*)calloc((size_t)runs, sizeof(**ref_hash));
+   if (!ref_hash[0] || !ref_hash[1])
       return 2;
 
    retro_init();
@@ -273,8 +292,14 @@ int main(int argc, char **argv)
       printf("== session %d: load\n", s);
       fflush(stdout);
 
+      /* In alt mode consecutive sessions load different files, so the
+       * next session's lump table is a different wad set with different
+       * numbering.  Indices a teardown failed to drop then address the
+       * wrong lump.  Each content keeps its own reference frames. */
+      content_idx = alt ? ((s - 1) & 1) : 0;
       memset(&info, 0, sizeof(info));
-      info.path = content;
+      info.path = alt ? (content_idx ? (altpath ? altpath : content) : argv[2])
+                      : content;
 
       in_load = 1;
       if (!retro_load_game(&info))
@@ -292,12 +317,13 @@ int main(int argc, char **argv)
          size_t ssize = retro_serialize_size();
          printf("== session %d: loaded, serialize_size %u\n",
                s, (unsigned)ssize);
-         if (s == 1)
-            ref_ssize = ssize;
-         else if (ssize != ref_ssize)
+         if (!ref_seen[content_idx])
+            ref_ssize[content_idx] = ssize;
+         else if (ssize != ref_ssize[content_idx])
          {
-            printf("FAIL: session %d serialize_size %u, session 1 reported %u\n",
-                  s, (unsigned)ssize, (unsigned)ref_ssize);
+            printf("FAIL: session %d serialize_size %u, the first session on "
+                   "this content reported %u\n",
+                  s, (unsigned)ssize, (unsigned)ref_ssize[content_idx]);
             ssize_bad++;
          }
       }
@@ -312,6 +338,8 @@ int main(int argc, char **argv)
             fflush(stdout);
          }
       }
+
+      ref_seen[content_idx] = 1;
 
       printf("== session %d: unload\n", s);
       fflush(stdout);

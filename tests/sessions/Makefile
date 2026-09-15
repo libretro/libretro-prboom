@@ -6,6 +6,14 @@
 #
 #   make -C tests/sessions check IWAD=/abs/path/to/freedoom1.wad
 #
+# A third mode, not in check because it needs a second IWAD, alternates
+# two content files across sessions so consecutive loads build different
+# lump tables -- the content switch a frontend actually performs, and the
+# case where an index a teardown failed to drop addresses the wrong lump.
+# Each content keeps its own reference frames:
+#
+#   ./sessions_test ../../prboom_libretro.so freedoom1.wad 4 300 alt freedoom2.wad
+#
 # Any IWAD the core accepts will do; CI fetches Freedoom.  SAN= builds
 # the harness under a sanitizer, to be paired with a core built the
 # same way (make CC="cc -fsanitize=address,undefined -g").

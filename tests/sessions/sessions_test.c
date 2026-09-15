@@ -28,6 +28,8 @@ static unsigned long long snd_frames;
 static unsigned long long ref_snd_frames[2] = { 0, 0 };
 static int  snd_bad        = 0;
 static int  accepted_bad   = 0;
+static unsigned long agg_hash;       /* whole-session frame hash */
+static int  nodes_bad      = 0;
 static int  ssize_bad      = 0;
 static unsigned long *ref_hash[2];   /* first frame sequence per content */
 static int  ref_seen[2]    = { 0, 0 };
@@ -73,6 +75,9 @@ static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch
          for (k = 0; k < h * pitch; k++)
             hsh = (hsh ^ p[k]) * 16777619UL;
          hsh &= 0xffffffffUL;
+
+         agg_hash = (agg_hash ^ hsh) * 16777619UL;
+         agg_hash &= 0xffffffffUL;
 
          if (!ref_seen[content_idx])
          {
@@ -211,6 +216,202 @@ static const char *make_bad(int which)
    return names[which];
 }
 
+/* --- node-lump test content ------------------------------------------
+ *
+ * The extended-node parsers only run when a level is built, and nothing
+ * the harness can do makes the core enter one: autostart needs -warp /
+ * -skill / -episode and the core stages none of them.  What does enter a
+ * level is the title screen's own demo sequence, so these PWADs replace
+ * the map DEMO1 plays with a minimal square room whose NODES lump is a
+ * ZDBSP XNOD image.  The map is read out of the demo header rather than
+ * assumed: DEMO1 in a given IWAD need not be ExM1 (in Freedoom it is
+ * E1M6), and a lane that replaced the wrong map would pass while
+ * exercising nothing.
+ */
+static int demo1_episode = 0, demo1_map = 0;
+
+static void put32(unsigned char *p, unsigned long v)
+{
+   p[0] = (unsigned char)(v);       p[1] = (unsigned char)(v >> 8);
+   p[2] = (unsigned char)(v >> 16); p[3] = (unsigned char)(v >> 24);
+}
+static void put16(unsigned char *p, unsigned v)
+{
+   p[0] = (unsigned char)(v); p[1] = (unsigned char)(v >> 8);
+}
+
+/* Read DEMO1's episode/map so the PWAD replaces the level that actually
+ * gets played.  Returns 0 if the iwad has no DEMO1. */
+static int find_demo1_map(const char *iwad)
+{
+   FILE *f = fopen(iwad, "rb");
+   unsigned char hdr[16], *dir;
+   unsigned long numlumps, infotable, i;
+   int found = 0;
+
+   if (!f)
+      return 0;
+   if (fread(hdr, 1, 12, f) != 12) { fclose(f); return 0; }
+   numlumps  = hdr[4] | (hdr[5]<<8) | ((unsigned long)hdr[6]<<16) | ((unsigned long)hdr[7]<<24);
+   infotable = hdr[8] | (hdr[9]<<8) | ((unsigned long)hdr[10]<<16) | ((unsigned long)hdr[11]<<24);
+   dir = (unsigned char*)malloc(numlumps * 16);
+   if (!dir) { fclose(f); return 0; }
+   fseek(f, (long)infotable, SEEK_SET);
+   if (fread(dir, 16, numlumps, f) != numlumps) { free(dir); fclose(f); return 0; }
+
+   for (i = 0; i < numlumps && !found; i++)
+   {
+      unsigned char *e = dir + i * 16;
+      unsigned long pos;
+      unsigned char db[8];
+
+      if (memcmp(e + 8, "DEMO1", 5) != 0)
+         continue;
+      pos = e[0] | (e[1]<<8) | ((unsigned long)e[2]<<16) | ((unsigned long)e[3]<<24);
+      fseek(f, (long)pos, SEEK_SET);
+      if (fread(db, 1, 8, f) == 8)
+      {
+         demo1_episode = db[2];
+         demo1_map     = db[3];
+         found = 1;
+      }
+   }
+   free(dir);
+   fclose(f);
+   return found;
+}
+
+/* One square room, four linedefs, one sector, plus a NODES lump built to
+ * order.  which selects the defect: 0 none, 1 truncated mid-record,
+ * 2 a subsector count the lump cannot hold, 3 a seg naming a linedef
+ * that does not exist, 4 a seg naming a vertex that does not exist. */
+static const char *make_node_wad(int which)
+{
+   static const char *names[5] =
+      { "nodes_good.wad", "nodes_trunc.wad", "nodes_count.wad",
+        "nodes_line.wad", "nodes_vert.wad" };
+   static const short vx[4][2] = { {0,0}, {256,0}, {256,256}, {0,256} };
+   static const int   sg[4][4] = { {0,1,0,0}, {1,2,1,0}, {2,3,2,0}, {3,0,3,0} };
+   unsigned char nodes[256], map_marker[9];
+   unsigned char verts[16], lines[4*14], sides[4*30], sectors[26], things[10];
+   unsigned char reject[1];
+   int nlen = 0, i;
+   FILE *o;
+
+   if (which < 0 || which > 4)
+      return NULL;
+
+   /* geometry */
+   for (i = 0; i < 4; i++)
+   {
+      put16(verts + i*4,     (unsigned)vx[i][0]);
+      put16(verts + i*4 + 2, (unsigned)vx[i][1]);
+   }
+   memset(sides, 0, sizeof(sides));
+   for (i = 0; i < 4; i++)
+   {
+      memset(sides + i*30 + 4,  '-', 1);
+      memset(sides + i*30 + 12, '-', 1);
+      memcpy(sides + i*30 + 20, "STARTAN2", 8);
+   }
+   memset(lines, 0, sizeof(lines));
+   for (i = 0; i < 4; i++)
+   {
+      put16(lines + i*14,      (unsigned)i);
+      put16(lines + i*14 + 2,  (unsigned)((i+1) & 3));
+      put16(lines + i*14 + 4,  1);            /* impassable */
+      put16(lines + i*14 + 10, (unsigned)i);  /* front sidedef */
+      put16(lines + i*14 + 12, 0xFFFF);       /* no back side */
+   }
+   memset(sectors, 0, sizeof(sectors));
+   put16(sectors,     0);
+   put16(sectors + 2, 128);
+   memcpy(sectors + 4,  "FLOOR4_8", 8);
+   memcpy(sectors + 12, "CEIL3_5 ", 8);
+   put16(sectors + 20, 160);
+   memset(things, 0, sizeof(things));
+   put16(things,     128); put16(things + 2, 128);
+   put16(things + 4, 90);  put16(things + 6, 1); put16(things + 8, 7);
+   /* BLOCKMAP is left empty on purpose: P_LoadBlockMap rebuilds any lump
+    * shorter than 8 bytes, which gives the map a correct one.  Writing a
+    * minimal blockmap by hand instead gives P_BlockLinesIterator
+    * something to walk off the end of, and the crash that produces has
+    * nothing to do with what this lane is testing. */
+   reject[0] = 0;
+
+   /* NODES: XNOD image */
+   memcpy(nodes, "XNOD", 4);                         nlen = 4;
+   put32(nodes + nlen, 4);  nlen += 4;               /* original vertices */
+   put32(nodes + nlen, 0);  nlen += 4;               /* new vertices */
+   put32(nodes + nlen, which == 2 ? 0x0FFFFFFFUL : 2); nlen += 4;  /* subsectors */
+   put32(nodes + nlen, 2);  nlen += 4;
+   put32(nodes + nlen, 2);  nlen += 4;
+   put32(nodes + nlen, 4);  nlen += 4;               /* segs */
+   for (i = 0; i < 4; i++)
+   {
+      unsigned long v1 = (unsigned long)sg[i][0];
+      unsigned long ld = (unsigned long)sg[i][2];
+      if (which == 3 && i == 0) ld = 9999;
+      if (which == 4 && i == 0) v1 = 99999;
+      put32(nodes + nlen, v1); nlen += 4;
+      put32(nodes + nlen, (unsigned long)sg[i][1]); nlen += 4;
+      put16(nodes + nlen, (unsigned)ld); nlen += 2;
+      nodes[nlen++] = (unsigned char)sg[i][3];
+   }
+   put32(nodes + nlen, 1); nlen += 4;                /* one node */
+   put16(nodes + nlen, 128);  nlen += 2;
+   put16(nodes + nlen, 0);    nlen += 2;
+   put16(nodes + nlen, 0);    nlen += 2;
+   put16(nodes + nlen, 256);  nlen += 2;
+   for (i = 0; i < 8; i++) { put16(nodes + nlen, 256); nlen += 2; }
+   put32(nodes + nlen, 0x80000000UL); nlen += 4;
+   put32(nodes + nlen, 0x80000001UL); nlen += 4;
+   if (which == 1)
+      nlen = 30;                                     /* cut mid-record */
+
+   sprintf((char*)map_marker, "E%dM%d", demo1_episode, demo1_map);
+
+   o = fopen(names[which], "wb");
+   if (!o)
+      return NULL;
+   {
+      struct { const char *name; const unsigned char *d; int len; } L[11];
+      unsigned char dirent[11*16], hdr[12];
+      int n = 0, off = 12, k;
+
+      L[n].name = (const char*)map_marker; L[n].d = NULL;     L[n].len = 0;               n++;
+      L[n].name = "THINGS";   L[n].d = things;  L[n].len = (int)sizeof(things);  n++;
+      L[n].name = "LINEDEFS"; L[n].d = lines;   L[n].len = (int)sizeof(lines);   n++;
+      L[n].name = "SIDEDEFS"; L[n].d = sides;   L[n].len = (int)sizeof(sides);   n++;
+      L[n].name = "VERTEXES"; L[n].d = verts;   L[n].len = (int)sizeof(verts);   n++;
+      L[n].name = "SEGS";     L[n].d = NULL;    L[n].len = 0;                    n++;
+      L[n].name = "SSECTORS"; L[n].d = NULL;    L[n].len = 0;                    n++;
+      L[n].name = "NODES";    L[n].d = nodes;   L[n].len = nlen;                 n++;
+      L[n].name = "SECTORS";  L[n].d = sectors; L[n].len = (int)sizeof(sectors); n++;
+      L[n].name = "REJECT";   L[n].d = reject;  L[n].len = 1;                    n++;
+      L[n].name = "BLOCKMAP"; L[n].d = NULL;    L[n].len = 0;                    n++;
+
+      memset(dirent, 0, sizeof(dirent));
+      for (k = 0; k < n; k++)
+      {
+         put32(dirent + k*16, (unsigned long)off);
+         put32(dirent + k*16 + 4, (unsigned long)L[k].len);
+         strncpy((char*)dirent + k*16 + 8, L[k].name, 8);
+         off += L[k].len;
+      }
+      memcpy(hdr, "PWAD", 4);
+      put32(hdr + 4, (unsigned long)n);
+      put32(hdr + 8, (unsigned long)off);
+      fwrite(hdr, 1, 12, o);
+      for (k = 0; k < n; k++)
+         if (L[k].len)
+            fwrite(L[k].d, 1, (size_t)L[k].len, o);
+      fwrite(dirent, 1, (size_t)n * 16, o);
+   }
+   fclose(o);
+   return names[which];
+}
+
 static void audio_sample(int16_t l, int16_t r) { mix_sample(l, r); }
 
 static size_t audio_batch(const int16_t *d, size_t f)
@@ -269,7 +470,7 @@ int main(int argc, char **argv)
 {
    void *h;
    struct retro_game_info info;
-   int s, i, sessions = 3, runs = 12, demo = 0, alt = 0, failmode = 0;
+   int s, i, sessions = 3, runs = 12, demo = 0, alt = 0, failmode = 0, nodesmode = 0;
    const char *altpath = NULL;
    char demopath[1024];
    const char *content;
@@ -289,7 +490,7 @@ int main(int argc, char **argv)
    if (argc < 3)
    {
       fprintf(stderr, "usage: %s core.so iwad.wad [sessions] [runs] "
-                      "[demo|alt|fail]\n",
+                      "[demo|alt|fail|nodes]\n",
             argv[0]);
       return 2;
    }
@@ -301,6 +502,7 @@ int main(int argc, char **argv)
     * only teardown a failed load ever gets is its own, and the session
     * that follows has to come up as if it had not happened. */
    if (argc > 5 && !strcmp(argv[5], "fail")) failmode = 1;
+   if (argc > 5 && !strcmp(argv[5], "nodes")) nodesmode = 1;
    /* alt alternates the iwad with a second content file, so consecutive
     * sessions build different lump tables.  argv[6] names that file; with
     * no argv[6] it is the DEMO1 lump extracted from the iwad, which
@@ -348,6 +550,93 @@ int main(int argc, char **argv)
          return 2;
       }
       printf("content: %s (-playdemo path)\n", content);
+   }
+
+   if (nodesmode)
+   {
+      /* Drive the extended-node parser: a baseline run on the iwad alone,
+       * then one run per PWAD that replaces the demo's map with a square
+       * room whose NODES lump is XNOD -- sound, then one defect each.
+       *
+       * Two things are required of the core.  It must survive every
+       * malformed lump: before the parsers were bounded these crashed or
+       * hung rather than declining the level.  And the sound PWAD must
+       * render differently from the iwad alone, which is what proves the
+       * replacement map is reached at all -- replace a map the demo does
+       * not play and every other check here passes while testing
+       * nothing. */
+      static const char *label[5] =
+         { "sound", "truncated", "bad subsector count",
+           "seg names a missing linedef", "seg names a missing vertex" };
+      unsigned long base_hash = 0;
+      int w;
+
+      if (!find_demo1_map(argv[2]))
+      {
+         fprintf(stderr, "%s has no DEMO1; nodes mode needs an iwad whose "
+                         "title screen plays a demo\n", argv[2]);
+         return 2;
+      }
+      printf("DEMO1 plays E%dM%d; PWADs replace that map\n",
+            demo1_episode, demo1_map);
+
+      retro_init();
+
+      for (w = -1; w < 5; w++)
+      {
+         const char *path = (w < 0) ? argv[2] : make_node_wad(w);
+
+         if (!path)
+         {
+            fprintf(stderr, "could not write node test content\n");
+            return 2;
+         }
+         agg_hash      = 2166136261UL;
+         frames_total  = 0;
+         frame_in_sess = 0;
+
+         memset(&info, 0, sizeof(info));
+         info.path = path;
+         in_load = 1;
+         if (!retro_load_game(&info))
+         {
+            printf("FAIL: %s did not load\n", path);
+            return 1;
+         }
+         in_load = 0;
+
+         for (i = 0; i < runs; i++)
+            retro_run();
+         retro_unload_game();
+
+         if (w < 0)
+         {
+            base_hash = agg_hash;
+            printf("== iwad alone            : %08lx\n", base_hash);
+         }
+         else
+         {
+            printf("== %-24s: %08lx (%s)\n", path, agg_hash, label[w]);
+            if (frames_total != runs)
+            {
+               printf("FAIL: %s stopped producing frames\n", path);
+               nodes_bad++;
+            }
+            if (w == 0 && agg_hash == base_hash)
+            {
+               printf("FAIL: %s renders exactly as the iwad alone -- the "
+                      "replacement map is never reached, so nothing here "
+                      "tests the node parser\n", path);
+               nodes_bad++;
+            }
+         }
+      }
+
+      retro_deinit();
+      if (nodes_bad)
+         return 1;
+      printf("PASS\n");
+      return 0;
    }
 
    ref_len     = runs;

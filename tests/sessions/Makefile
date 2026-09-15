@@ -19,6 +19,12 @@
 # same way (make CC="cc -fsanitize=address,undefined -g").
 
 CORE     ?= ../../prboom_libretro.so
+# The nodes lane needs the title screen's demo to have reached its map
+# before the run ends; the replacement map is not loaded until then, and
+# the lane fails rather than passing vacuously if it has not.  That takes
+# somewhere under 300 runs with Freedoom, so this carries real margin
+# instead of sitting on the boundary.
+NODERUNS ?= 600
 SESSIONS ?= 3
 RUNS     ?= 300
 IWAD   ?= freedoom1.wad
@@ -38,8 +44,11 @@ check: all
 	@test -f $(IWAD) || { echo "no IWAD at $(IWAD); pass IWAD=<path>"; exit 2; }
 	./sessions_test $(CORE) $(IWAD) $(SESSIONS) $(RUNS)
 	./sessions_test $(CORE) $(IWAD) $(SESSIONS) $(RUNS) demo
+	./sessions_test $(CORE) $(IWAD) 1 $(NODERUNS) nodes
 
 clean:
-	rm -f sessions_test demo1.lmp
+	rm -f sessions_test demo1.lmp bad_short.wad bad_magic.wad bad_dir.wad
+	rm -f nodes_good.wad nodes_trunc.wad nodes_count.wad nodes_line.wad
+	rm -f nodes_vert.wad
 
 .PHONY: all check clean

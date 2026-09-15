@@ -2770,6 +2770,8 @@ failed:
       free(screen_buf);
       screen_buf = NULL;
    }
+   wipe_src_valid = 0;
+   wipe_src_hold  = 0;
    /* Roll back any partial init D_DoomMainSetup did before
     * failing.  Critically: if IdentifyVersion ran (D_AddFile
     * appended an entry to wadfiles[]) but a later step failed,
@@ -2825,6 +2827,16 @@ void retro_unload_game(void)
    if (screen_buf)
       free(screen_buf);
    screen_buf = NULL;
+
+   /* The latch describes screen_buf's contents, so it has to go down
+    * with the buffer: the next session allocates a fresh screen_buf
+    * holding no frame anyone has seen, and its opening gamestate
+    * differs from the wipegamestate D_DoomDeinit resets to, so
+    * D_Display asks on the very first frame whether a melt source
+    * exists.  Left set, the answer is yes and the session melts from
+    * whatever the new allocation happens to contain. */
+   wipe_src_valid = 0;
+   wipe_src_hold  = 0;
 
    /* Release the strdup'd argv slots from retro_load_game.
     * Without this, every content load leaks ~8-12 strdups

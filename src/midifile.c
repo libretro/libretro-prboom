@@ -729,7 +729,26 @@ midi_event_t **MIDI_GenerateFlatList (midi_file_t *file)
   for (i = 0; i < file->num_tracks; i++)
     totalevents += file->tracks[i].num_events;
 
+  /* A file with no tracks leaves trackactive at zero, so the walk below
+   * never runs and the end-of-track fixup at the bottom writes through
+   * epos[-1] -- one element before the allocation.  A file whose tracks
+   * are all empty is the same story one level in: the walk reads
+   * events[0] of a track that has none.  Neither is a list this can
+   * flatten, and the caller already handles NULL. */
+  if (file->num_tracks == 0 || totalevents <= 0)
+  {
+    free (trackpos);
+    free (tracktime);
+    return NULL;
+  }
+
   ret = malloc (totalevents * sizeof (midi_event_t **));
+  if (!ret)
+  {
+    free (trackpos);
+    free (tracktime);
+    return NULL;
+  }
 
   epos = ret;
 

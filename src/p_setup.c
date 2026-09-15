@@ -3257,6 +3257,18 @@ void P_Deinit(void)
     * drop them before the references below. */
    P_DeinitThinkers();
 
+   /* rejectlump is a lump index into the wad set this session opened.
+    * A session that ends with a level still loaded leaves it set, and
+    * both P_LoadReject and P_SetupLevel unlock whatever it holds before
+    * caching their own -- so the next session, whose lump table is a
+    * different wad set with different numbering, decrements the lock
+    * count of an unrelated lump.  Same reasoning as demolumpnum in
+    * G_Deinit, including why there is no unlock here: the index may
+    * already be stale, and W_ReleaseAllWads tears the whole lump table
+    * and cache down a few steps later.
+    */
+   rejectlump = -1;
+
    /* The level geometry is PU_LEVEL, so the zone owns these blocks by
     * tag: P_SetupLevel's Z_FreeTags reclaims them at the next level
     * load and Z_Close reclaims whatever is still live at shutdown.

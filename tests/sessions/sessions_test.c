@@ -660,10 +660,10 @@ int main(int argc, char **argv)
     * that follows has to come up as if it had not happened. */
    if (argc > 5 && !strcmp(argv[5], "fail")) failmode = 1;
    if (argc > 5 && !strcmp(argv[5], "nodes")) nodesmode = 1;
-   /* The replay check is its own mode rather than part of every lane: it
-    * passes on a plain build and fails, deterministically, on a threaded
-    * sanitizer build, and until that is understood it has no business
-    * deciding whether master is green. */
+   /* The replay check is its own mode rather than part of every lane:
+    * it needs the demo content, it runs the middle of the session
+    * twice, and what it reports still depends on where in the run the
+    * state is taken (see the Makefile). */
    if (argc > 5 && !strcmp(argv[5], "state")) { statemode = 1; demo = 1; }
    /* alt alternates the iwad with a second content file, so consecutive
     * sessions build different lump tables.  argv[6] names that file; with

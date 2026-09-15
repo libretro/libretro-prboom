@@ -14,11 +14,14 @@
 #
 #   ./sessions_test ../../prboom_libretro.so freedoom1.wad 4 300 alt freedoom2.wad
 #
-# And a fourth, also out of check: state mode saves the state mid-run,
-# plays on, restores, and replays the same stretch, which is what
-# run-ahead and rewind do to every frame.  It passes on a plain build
-# and fails on a threaded sanitizer build, so it stays by-hand until
-# that is understood:
+# And state mode, also out of check: it saves the state mid-run, plays
+# on, restores, and replays the same stretch, which is what run-ahead
+# and rewind do to every frame.  Whether it passes depends on where in
+# the run the state is taken -- with the demo content, saving at frame
+# 120 replays exactly, 130 diverges six frames later, 150 differs only
+# on the first frame, and 100 differs throughout.  Something about the
+# restore is still tied to the point it was taken at, and until that is
+# understood the mode is a diagnostic rather than a verdict:
 #
 #   ./sessions_test ../../prboom_libretro.so freedoom1.wad 3 300 state
 #

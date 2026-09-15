@@ -21,6 +21,8 @@ static int  shutdowns      = 0;
 static int  session_no     = 0;
 static int  frame_in_sess  = 0;
 static int  mismatches     = 0;
+static size_t ref_ssize    = 0;      /* session 1's post-load serialize size */
+static int  ssize_bad      = 0;
 static unsigned long *ref_hash;      /* session 1's frame sequence */
 static int  ref_len;
 static char sysdir[]       = ".";
@@ -281,8 +283,24 @@ int main(int argc, char **argv)
          return 1;
       }
       in_load = 0;
-      printf("== session %d: loaded, serialize_size %u\n",
-            s, (unsigned)retro_serialize_size());
+      /* The size is derived from the live world, so a session that
+       * starts with no level has to report the same figure as the
+       * first one.  A larger number here means a teardown left a list
+       * head pointing into freed level memory and the estimator is
+       * walking it. */
+      {
+         size_t ssize = retro_serialize_size();
+         printf("== session %d: loaded, serialize_size %u\n",
+               s, (unsigned)ssize);
+         if (s == 1)
+            ref_ssize = ssize;
+         else if (ssize != ref_ssize)
+         {
+            printf("FAIL: session %d serialize_size %u, session 1 reported %u\n",
+                  s, (unsigned)ssize, (unsigned)ref_ssize);
+            ssize_bad++;
+         }
+      }
       fflush(stdout);
 
       for (i = 0; i < runs; i++)
@@ -325,6 +343,8 @@ int main(int argc, char **argv)
    printf("frames differing from session 1: %d\n", mismatches);
 
    if (mismatches)
+      return 1;
+   if (ssize_bad)
       return 1;
    if (nonblank < sessions)
    {

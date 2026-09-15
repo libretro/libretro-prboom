@@ -3253,6 +3253,10 @@ void P_Init (void)
 
 void P_Deinit(void)
 {
+   /* The thinker list heads outlive the PU_LEVEL blocks they link, so
+    * drop them before the references below. */
+   P_DeinitThinkers();
+
    /* The level geometry is PU_LEVEL, so the zone owns these blocks by
     * tag: P_SetupLevel's Z_FreeTags reclaims them at the next level
     * load and Z_Close reclaims whatever is still live at shutdown.

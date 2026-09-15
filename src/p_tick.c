@@ -31,6 +31,8 @@
  *
  *-----------------------------------------------------------------------------*/
 
+#include <string.h>
+
 #include "doomstat.h"
 #include "hexen/sn_sonix.h"
 #include "p_user.h"
@@ -72,6 +74,25 @@ void P_InitThinkers(void)
       thinkerclasscap[i].cprev = thinkerclasscap[i].cnext = &thinkerclasscap[i];
 
    thinkercap.prev = thinkercap.next  = &thinkercap;
+}
+
+/* P_DeinitThinkers
+ *
+ * Every thinker is PU_LEVEL, so a session teardown reclaims the
+ * thinkers themselves but leaves the list heads -- which are statics,
+ * not zone memory -- pointing into the freed blocks.  Anything that
+ * walks a list before the next P_SetupLevel then reads freed memory,
+ * and the "thinkercap.next == NULL" test that retro_serialize_size and
+ * G_DoSaveGameToBuffer use to mean "no level loaded" reads as loaded.
+ *
+ * Restore the state the statics have at process start rather than
+ * relinking to self: the NULL heads are what those two tests were
+ * written against, and matching the pristine state is what makes a
+ * second session behave like the first.
+ */
+void P_DeinitThinkers(void)
+{
+   memset(thinkerclasscap, 0, sizeof(thinkerclasscap));
 }
 
 //

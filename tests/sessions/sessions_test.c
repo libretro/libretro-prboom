@@ -287,9 +287,9 @@ static int find_demo1_map(const char *iwad)
  * that does not exist, 4 a seg naming a vertex that does not exist. */
 static const char *make_node_wad(int which)
 {
-   static const char *names[5] =
+   static const char *names[6] =
       { "nodes_good.wad", "nodes_trunc.wad", "nodes_count.wad",
-        "nodes_line.wad", "nodes_vert.wad" };
+        "nodes_line.wad", "nodes_vert.wad", "nodes_child.wad" };
    static const short vx[4][2] = { {0,0}, {256,0}, {256,256}, {0,256} };
    static const int   sg[4][4] = { {0,1,0,0}, {1,2,1,0}, {2,3,2,0}, {3,0,3,0} };
    unsigned char nodes[256], map_marker[9];
@@ -298,7 +298,7 @@ static const char *make_node_wad(int which)
    int nlen = 0, i;
    FILE *o;
 
-   if (which < 0 || which > 4)
+   if (which < 0 || which > 5)
       return NULL;
 
    /* geometry */
@@ -365,7 +365,9 @@ static const char *make_node_wad(int which)
    put16(nodes + nlen, 256);  nlen += 2;
    for (i = 0; i < 8; i++) { put16(nodes + nlen, 256); nlen += 2; }
    put32(nodes + nlen, 0x80000000UL); nlen += 4;
-   put32(nodes + nlen, 0x80000001UL); nlen += 4;
+   /* Variant 5 names a subsector that does not exist.  R_PointInSubsector
+    * walks these before anything else touches the level. */
+   put32(nodes + nlen, which == 5 ? 0x8000BEEFUL : 0x80000001UL); nlen += 4;
    if (which == 1)
       nlen = 30;                                     /* cut mid-record */
 
@@ -565,9 +567,10 @@ int main(int argc, char **argv)
        * replacement map is reached at all -- replace a map the demo does
        * not play and every other check here passes while testing
        * nothing. */
-      static const char *label[5] =
+      static const char *label[6] =
          { "sound", "truncated", "bad subsector count",
-           "seg names a missing linedef", "seg names a missing vertex" };
+           "seg names a missing linedef", "seg names a missing vertex",
+           "node child names a missing subsector" };
       unsigned long base_hash = 0;
       int w;
 
@@ -582,7 +585,7 @@ int main(int argc, char **argv)
 
       retro_init();
 
-      for (w = -1; w < 5; w++)
+      for (w = -1; w < 6; w++)
       {
          const char *path = (w < 0) ? argv[2] : make_node_wad(w);
 

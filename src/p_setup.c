@@ -805,6 +805,7 @@ static void P_LoadNodes (int lump)
  * P_LoadUDMFNodes then declines the level. */
 static dbool P_LoadXNOD(const uint8_t *data, int len);
 static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver);
+static dbool P_NodeChildrenInRange(const node_t *node, int nnodes);
 
 /* Every read below is preceded by a check that the bytes are there, and
  * every count by a check that the records it promises fit in what is
@@ -1118,8 +1119,32 @@ static dbool P_LoadXNOD(const uint8_t *data, int len)
     for (j = 0; j < 2; j++) {
       node->children[j] = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
     }
+    if (!P_NodeChildrenInRange(node, numnodes))
+      return FALSE;
   }
 
+  return TRUE;
+}
+
+
+/* A node's children are indices too: the high bit marks a subsector,
+ * otherwise it is another node.  R_PointInSubsector walks these before
+ * anything else touches the level, so an out-of-range one is dereferenced
+ * long before a renderer could notice. */
+static dbool P_NodeChildrenInRange(const node_t *node, int nnodes)
+{
+  int j;
+  for (j = 0; j < 2; j++)
+  {
+    unsigned int c = node->children[j];
+    if (c & NF_SUBSECTOR)
+    {
+      if ((int)(c & ~NF_SUBSECTOR) >= numsubsectors)
+        return FALSE;
+    }
+    else if ((int)c >= nnodes)
+      return FALSE;
+  }
   return TRUE;
 }
 
@@ -1357,6 +1382,8 @@ static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver)
     {
       node->children[j] = (unsigned int)XNOD_U32(data); data += 4; len -= 4;
     }
+    if (!P_NodeChildrenInRange(node, numnodes))
+      return FALSE;
   }
 
   return TRUE;

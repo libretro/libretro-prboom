@@ -27,6 +27,7 @@ static unsigned long ref_snd[2]      = { 0, 0 };
 static unsigned long long snd_frames;
 static unsigned long long ref_snd_frames[2] = { 0, 0 };
 static int  snd_bad        = 0;
+static int  accepted_bad   = 0;
 static int  ssize_bad      = 0;
 static unsigned long *ref_hash[2];   /* first frame sequence per content */
 static int  ref_seen[2]    = { 0, 0 };
@@ -169,6 +170,47 @@ static void mix_sample(int16_t l, int16_t r)
    snd_frames++;
 }
 
+/* Content the core has to reject, one file per failure branch in
+ * retro_load_game, ordered by how far into init each one gets before it
+ * gives up.  The last reaches D_DoomMainSetup, which means a session's
+ * worth of subsystems are up when the teardown runs. */
+static const char *make_bad(int which)
+{
+   static const char *names[3] =
+      { "bad_short.wad", "bad_magic.wad", "bad_dir.wad" };
+   unsigned char buf[16];
+   FILE *o;
+
+   if (which < 0 || which > 2)
+      return NULL;
+   o = fopen(names[which], "wb");
+   if (!o)
+      return NULL;
+
+   switch (which)
+   {
+      case 0:   /* shorter than a header: "couldn't read WAD header" */
+         fwrite("XX", 1, 2, o);
+         break;
+      case 1:   /* full header, magic neither IWAD nor PWAD */
+         memset(buf, 0, sizeof(buf));
+         memcpy(buf, "JUNK", 4);
+         fwrite(buf, 1, 12, o);
+         break;
+      case 2:   /* PWAD magic, lump directory pointing past EOF: the core
+                 * steers it alongside the real IWAD and fails inside
+                 * D_DoomMainSetup, with most of init already done */
+         memset(buf, 0, sizeof(buf));
+         memcpy(buf, "PWAD", 4);
+         buf[4] = 0x10;                       /* numlumps    = 16 */
+         buf[8] = 0x00; buf[9] = 0x10;        /* infotable   = 4096 */
+         fwrite(buf, 1, 12, o);
+         break;
+   }
+   fclose(o);
+   return names[which];
+}
+
 static void audio_sample(int16_t l, int16_t r) { mix_sample(l, r); }
 
 static size_t audio_batch(const int16_t *d, size_t f)
@@ -227,7 +269,7 @@ int main(int argc, char **argv)
 {
    void *h;
    struct retro_game_info info;
-   int s, i, sessions = 3, runs = 12, demo = 0, alt = 0;
+   int s, i, sessions = 3, runs = 12, demo = 0, alt = 0, failmode = 0;
    const char *altpath = NULL;
    char demopath[1024];
    const char *content;
@@ -246,13 +288,19 @@ int main(int argc, char **argv)
 
    if (argc < 3)
    {
-      fprintf(stderr, "usage: %s core.so iwad.wad [sessions] [runs] [demo|alt]\n",
+      fprintf(stderr, "usage: %s core.so iwad.wad [sessions] [runs] "
+                      "[demo|alt|fail]\n",
             argv[0]);
       return 2;
    }
    if (argc > 3) sessions = atoi(argv[3]);
    if (argc > 4) runs     = atoi(argv[4]);
    if (argc > 5 && !strcmp(argv[5], "demo")) demo = 1;
+   /* fail mode drives a rejected load between good sessions.  RetroArch
+    * does not call retro_unload_game after a load returns false, so the
+    * only teardown a failed load ever gets is its own, and the session
+    * that follows has to come up as if it had not happened. */
+   if (argc > 5 && !strcmp(argv[5], "fail")) failmode = 1;
    /* alt alternates the iwad with a second content file, so consecutive
     * sessions build different lump tables.  argv[6] names that file; with
     * no argv[6] it is the DEMO1 lump extracted from the iwad, which
@@ -321,6 +369,33 @@ int main(int argc, char **argv)
        * next session's lump table is a different wad set with different
        * numbering.  Indices a teardown failed to drop then address the
        * wrong lump.  Each content keeps its own reference frames. */
+      if (failmode && s > 1)
+      {
+         int w;
+         for (w = 0; w < 3; w++)
+         {
+            const char *bad = make_bad(w);
+            struct retro_game_info binfo;
+
+            if (!bad)
+               continue;
+            printf("== before session %d: rejecting %s\n", s, bad);
+            fflush(stdout);
+
+            memset(&binfo, 0, sizeof(binfo));
+            binfo.path = bad;
+
+            in_load = 1;
+            if (retro_load_game(&binfo))
+            {
+               printf("FAIL: core accepted malformed content %s\n", bad);
+               accepted_bad++;
+               retro_unload_game();
+            }
+            in_load = 0;
+         }
+      }
+
       content_idx = alt ? ((s - 1) & 1) : 0;
       snd_hash    = 2166136261UL;
       snd_frames  = 0;
@@ -418,6 +493,8 @@ int main(int argc, char **argv)
    if (ssize_bad)
       return 1;
    if (snd_bad)
+      return 1;
+   if (accepted_bad)
       return 1;
    if (nonblank < sessions)
    {

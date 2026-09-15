@@ -2118,6 +2118,46 @@ static void P_CreateBlockMap(void)
 // though current algorithm is brute-force and unoptimal.
 //
 
+/* Is the expanded blockmap self-consistent?
+ *
+ * P_BlockLinesIterator indexes the offset table by cell, then walks from
+ * that offset until it meets -1, using each entry as a linedef index.
+ * None of that was checked against the lump: a lump under 8 bytes was
+ * rebuilt and anything above it was believed, so an offset past the end,
+ * a list with no terminator, or an entry naming a linedef that does not
+ * exist all became a read off the end of the map or of lines[].
+ *
+ * Rather than test each walk, which a hostile lump can make quadratic by
+ * pointing every cell at one long list, this establishes the property
+ * once: every offset lands inside the list area, and every entry in that
+ * area is a linedef index or a terminator, with a terminator last.  A
+ * walk from any valid offset then reads only checked entries and stops
+ * no later than the final one.  Linear in the lump.
+ */
+static dbool P_BlockMapConsistent(long count)
+{
+  long i, ncells;
+
+  if (blockmaplump[2] <= 0 || blockmaplump[3] <= 0)
+    return FALSE;
+  ncells = blockmaplump[2] * blockmaplump[3];
+  if (ncells > count - 4)
+    return FALSE;
+
+  /* The iterator skips the leading delimiter, so an offset also has to
+   * leave one entry after it inside the lump. */
+  for (i = 0; i < ncells; i++)
+    if (blockmaplump[4 + i] < 4 + ncells || blockmaplump[4 + i] > count - 2)
+      return FALSE;
+
+  for (i = 4 + ncells; i < count; i++)
+    if (blockmaplump[i] != -1
+        && (blockmaplump[i] < 0 || blockmaplump[i] >= numlines))
+      return FALSE;
+
+  return blockmaplump[count - 1] == -1;
+}
+
 static void P_LoadBlockMap (int lump)
 {
   long count;
@@ -2149,10 +2189,24 @@ static void P_LoadBlockMap (int lump)
 
       W_UnlockLumpNum(lump); // cph - unlock the lump
 
-      bmaporgx = blockmaplump[0]*FRACUNIT;
-      bmaporgy = blockmaplump[1]*FRACUNIT;
-      bmapwidth = blockmaplump[2];
-      bmapheight = blockmaplump[3];
+      /* A lump that does not describe a usable blockmap is treated like
+       * a missing one: build the map's own.  The level stays playable,
+       * which is what the short-lump path above already does. */
+      if (!P_BlockMapConsistent(count))
+      {
+        lprintf(LO_WARN, "P_LoadBlockMap: blockmap lump is inconsistent; "
+                         "building one instead\n");
+        Z_Free(blockmaplump);
+        blockmaplump = NULL;
+        P_CreateBlockMap();
+      }
+      else
+      {
+        bmaporgx = blockmaplump[0]*FRACUNIT;
+        bmaporgy = blockmaplump[1]*FRACUNIT;
+        bmapwidth = blockmaplump[2];
+        bmapheight = blockmaplump[3];
+      }
     }
 
   // clear out mobj chains - CPhipps - use calloc

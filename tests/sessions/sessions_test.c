@@ -287,18 +287,20 @@ static int find_demo1_map(const char *iwad)
  * that does not exist, 4 a seg naming a vertex that does not exist. */
 static const char *make_node_wad(int which)
 {
-   static const char *names[6] =
+   static const char *names[7] =
       { "nodes_good.wad", "nodes_trunc.wad", "nodes_count.wad",
-        "nodes_line.wad", "nodes_vert.wad", "nodes_child.wad" };
+        "nodes_line.wad", "nodes_vert.wad", "nodes_child.wad",
+        "nodes_blockmap.wad" };
    static const short vx[4][2] = { {0,0}, {256,0}, {256,256}, {0,256} };
    static const int   sg[4][4] = { {0,1,0,0}, {1,2,1,0}, {2,3,2,0}, {3,0,3,0} };
    unsigned char nodes[256], map_marker[9];
    unsigned char verts[16], lines[4*14], sides[4*30], sectors[26], things[10];
-   unsigned char reject[1];
+   unsigned char reject[1], block[24];
+   int blocklen = 0;
    int nlen = 0, i;
    FILE *o;
 
-   if (which < 0 || which > 5)
+   if (which < 0 || which > 6)
       return NULL;
 
    /* geometry */
@@ -338,6 +340,21 @@ static const char *make_node_wad(int which)
     * something to walk off the end of, and the crash that produces has
     * nothing to do with what this lane is testing. */
    reject[0] = 0;
+
+   /* Variant 6 supplies a blockmap instead: big enough that
+    * P_LoadBlockMap believes it rather than rebuilding, with a cell
+    * offset pointing past the end of the lump and no terminator
+    * anywhere.  P_BlockLinesIterator walks from that offset. */
+   if (which == 6)
+   {
+      put16(block + 0, 0);      put16(block + 2, 0);      /* origin */
+      put16(block + 4, 2);      put16(block + 6, 2);      /* 2x2 cells */
+      put16(block + 8,  8);     put16(block + 10, 9);
+      put16(block + 12, 10);    put16(block + 14, 0x7FFF);/* past the end */
+      put16(block + 16, 0);     put16(block + 18, 0);
+      put16(block + 20, 0);     put16(block + 22, 0);     /* no -1 */
+      blocklen = 24;
+   }
 
    /* NODES: XNOD image */
    memcpy(nodes, "XNOD", 4);                         nlen = 4;
@@ -391,7 +408,7 @@ static const char *make_node_wad(int which)
       L[n].name = "NODES";    L[n].d = nodes;   L[n].len = nlen;                 n++;
       L[n].name = "SECTORS";  L[n].d = sectors; L[n].len = (int)sizeof(sectors); n++;
       L[n].name = "REJECT";   L[n].d = reject;  L[n].len = 1;                    n++;
-      L[n].name = "BLOCKMAP"; L[n].d = NULL;    L[n].len = 0;                    n++;
+      L[n].name = "BLOCKMAP"; L[n].d = block;   L[n].len = blocklen;             n++;
 
       memset(dirent, 0, sizeof(dirent));
       for (k = 0; k < n; k++)
@@ -567,10 +584,11 @@ int main(int argc, char **argv)
        * replacement map is reached at all -- replace a map the demo does
        * not play and every other check here passes while testing
        * nothing. */
-      static const char *label[6] =
+      static const char *label[7] =
          { "sound", "truncated", "bad subsector count",
            "seg names a missing linedef", "seg names a missing vertex",
-           "node child names a missing subsector" };
+           "node child names a missing subsector",
+           "blockmap offset past the end, no terminator" };
       unsigned long base_hash = 0;
       int w;
 
@@ -585,7 +603,7 @@ int main(int argc, char **argv)
 
       retro_init();
 
-      for (w = -1; w < 6; w++)
+      for (w = -1; w < 7; w++)
       {
          const char *path = (w < 0) ? argv[2] : make_node_wad(w);
 

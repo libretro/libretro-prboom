@@ -287,10 +287,10 @@ static int find_demo1_map(const char *iwad)
  * that does not exist, 4 a seg naming a vertex that does not exist. */
 static const char *make_node_wad(int which)
 {
-   static const char *names[7] =
+   static const char *names[8] =
       { "nodes_good.wad", "nodes_trunc.wad", "nodes_count.wad",
         "nodes_line.wad", "nodes_vert.wad", "nodes_child.wad",
-        "nodes_blockmap.wad" };
+        "nodes_blockmap.wad", "nodes_glunsup.wad" };
    static const short vx[4][2] = { {0,0}, {256,0}, {256,256}, {0,256} };
    static const int   sg[4][4] = { {0,1,0,0}, {1,2,1,0}, {2,3,2,0}, {3,0,3,0} };
    unsigned char nodes[256], map_marker[9];
@@ -300,7 +300,7 @@ static const char *make_node_wad(int which)
    int nlen = 0, i;
    FILE *o;
 
-   if (which < 0 || which > 6)
+   if (which < 0 || which > 7)
       return NULL;
 
    /* geometry */
@@ -388,6 +388,35 @@ static const char *make_node_wad(int which)
    if (which == 1)
       nlen = 30;                                     /* cut mid-record */
 
+   /* Variant 7 carries ZDBSP GL nodes, whose signature lives in SSECTORS
+    * rather than NODES.  Binary maps with those are not supported, and
+    * the point is that saying so has to decline the level: the classic
+    * loaders would otherwise read this image as vanilla subsectors. */
+   if (which == 7)
+   {
+      memcpy(nodes, "XGLN", 4);                      nlen = 4;
+      put32(nodes + nlen, 4);  nlen += 4;
+      put32(nodes + nlen, 0);  nlen += 4;
+      put32(nodes + nlen, 1);  nlen += 4;
+      put32(nodes + nlen, 4);  nlen += 4;
+      put32(nodes + nlen, 4);  nlen += 4;
+      for (i = 0; i < 4; i++)
+      {
+         put32(nodes + nlen, (unsigned long)sg[i][0]); nlen += 4;
+         put32(nodes + nlen, 0xFFFFFFFFUL); nlen += 4;
+         put16(nodes + nlen, (unsigned)sg[i][2]); nlen += 2;
+         nodes[nlen++] = (unsigned char)sg[i][3];
+      }
+      put32(nodes + nlen, 1); nlen += 4;
+      put16(nodes + nlen, 128); nlen += 2;
+      put16(nodes + nlen, 0);   nlen += 2;
+      put16(nodes + nlen, 0);   nlen += 2;
+      put16(nodes + nlen, 256); nlen += 2;
+      for (i = 0; i < 8; i++) { put16(nodes + nlen, 256); nlen += 2; }
+      put32(nodes + nlen, 0x80000000UL); nlen += 4;
+      put32(nodes + nlen, 0x80000000UL); nlen += 4;
+   }
+
    sprintf((char*)map_marker, "E%dM%d", demo1_episode, demo1_map);
 
    o = fopen(names[which], "wb");
@@ -404,8 +433,10 @@ static const char *make_node_wad(int which)
       L[n].name = "SIDEDEFS"; L[n].d = sides;   L[n].len = (int)sizeof(sides);   n++;
       L[n].name = "VERTEXES"; L[n].d = verts;   L[n].len = (int)sizeof(verts);   n++;
       L[n].name = "SEGS";     L[n].d = NULL;    L[n].len = 0;                    n++;
-      L[n].name = "SSECTORS"; L[n].d = NULL;    L[n].len = 0;                    n++;
-      L[n].name = "NODES";    L[n].d = nodes;   L[n].len = nlen;                 n++;
+      L[n].name = "SSECTORS"; L[n].d = (which == 7) ? nodes : NULL;
+                              L[n].len  = (which == 7) ? nlen : 0;               n++;
+      L[n].name = "NODES";    L[n].d = (which == 7) ? NULL : nodes;
+                              L[n].len  = (which == 7) ? 0 : nlen;               n++;
       L[n].name = "SECTORS";  L[n].d = sectors; L[n].len = (int)sizeof(sectors); n++;
       L[n].name = "REJECT";   L[n].d = reject;  L[n].len = 1;                    n++;
       L[n].name = "BLOCKMAP"; L[n].d = block;   L[n].len = blocklen;             n++;
@@ -584,11 +615,12 @@ int main(int argc, char **argv)
        * replacement map is reached at all -- replace a map the demo does
        * not play and every other check here passes while testing
        * nothing. */
-      static const char *label[7] =
+      static const char *label[8] =
          { "sound", "truncated", "bad subsector count",
            "seg names a missing linedef", "seg names a missing vertex",
            "node child names a missing subsector",
-           "blockmap offset past the end, no terminator" };
+           "blockmap offset past the end, no terminator",
+           "GL nodes on a binary map (unsupported)" };
       unsigned long base_hash = 0;
       int w;
 
@@ -603,7 +635,7 @@ int main(int argc, char **argv)
 
       retro_init();
 
-      for (w = -1; w < 7; w++)
+      for (w = -1; w < 8; w++)
       {
          const char *path = (w < 0) ? argv[2] : make_node_wad(w);
 

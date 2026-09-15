@@ -321,8 +321,17 @@ static void P_GetNodesVersion(int lumpnum, int gl_lumpnum)
     break;
   }
 
+  /* Nothing usable.  I_Error only reports here, so saying so and
+   * carrying on left P_SetupLevel to run the classic subsector / node /
+   * seg loaders over lumps the switches above have just identified as
+   * something else -- a ZDBSP GL image parsed as vanilla subsectors,
+   * which is a crash rather than a bad render.  Decline the level
+   * instead; G_DoLoadLevel already acts on the flag. */
   if (!valid_gl && !valid_bsp)
+  {
     I_Error("P_GetNodesVersion: cannot find supported nodes");
+    level_setup_failed = TRUE;
+  }
 }
 
 ////////////////////////////////////////////////////////////////////////////////////////////
@@ -3143,6 +3152,8 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    else
    {
    P_GetNodesVersion(lumpnum,gl_lumpnum);
+   if (level_setup_failed)
+      return;
 
    if (nodes_glbsp > 0)
       P_LoadVertexes2 (lumpnum+ML_VERTEXES,gl_lumpnum+ML_GL_VERTS);

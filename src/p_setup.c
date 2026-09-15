@@ -544,6 +544,28 @@ static void P_LoadSegs (int lump)
       int side, linedef;
       line_t *ldef;
 
+      /* Every index below comes out of the lump.  The extended-node
+       * parsers check theirs; this path, which every vanilla map takes,
+       * checked none -- and side indexes sidenum[], a two-element array,
+       * so a seg claiming side 5000 reads well past the linedef. */
+      {
+        unsigned int sv1 = (uint16_t)SHORT(ml->v1);
+        unsigned int sv2 = (uint16_t)SHORT(ml->v2);
+        unsigned int sld = (uint16_t)SHORT(ml->linedef);
+        int          ssd = SHORT(ml->side);
+
+        if (   sv1 >= (unsigned int)numvertexes
+            || sv2 >= (unsigned int)numvertexes
+            || sld >= (unsigned int)numlines
+            || ssd < 0 || ssd > 1)
+        {
+          I_Error("P_LoadSegs: seg %i names vertex/linedef/side outside the "
+                  "map", i);
+          level_setup_failed = TRUE;
+          return;
+        }
+      }
+
       li->v1 = &vertexes[(uint16_t)SHORT(ml->v1)];
       li->v2 = &vertexes[(uint16_t)SHORT(ml->v2)];
 
@@ -761,6 +783,8 @@ static void P_LoadSectors (int lump)
 =================
 */
 
+static dbool P_NodeChildrenInRange(const node_t *node, int nnodes);
+
 static void P_LoadNodes (int lump)
 {
   const uint8_t *data; // cph - const*
@@ -805,6 +829,15 @@ static void P_LoadNodes (int lump)
           for (k=0 ; k<4 ; k++)
             no->bbox[j][k] = SHORT(mn->bbox[j][k])*FRACUNIT;
         }
+
+      /* R_PointInSubsector walks these before anything else touches the
+       * level; the extended parsers check them, this one did not. */
+      if (!P_NodeChildrenInRange(no, numnodes))
+      {
+        I_Error("P_LoadNodes: node %i names a missing child", i);
+        level_setup_failed = TRUE;
+        return;
+      }
     }
 
   W_UnlockLumpNum(lump); // cph - release the data
@@ -814,7 +847,6 @@ static void P_LoadNodes (int lump)
  * P_LoadUDMFNodes then declines the level. */
 static dbool P_LoadXNOD(const uint8_t *data, int len);
 static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver);
-static dbool P_NodeChildrenInRange(const node_t *node, int nnodes);
 
 /* Every read below is preceded by a check that the bytes are there, and
  * every count by a check that the records it promises fit in what is
@@ -3191,9 +3223,30 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    else
    {
       P_LoadSubsectors(lumpnum + ML_SSECTORS);
-      P_LoadNodes(lumpnum + ML_NODES);
-      P_LoadSegs(lumpnum + ML_SEGS);
+      if (!level_setup_failed)
+         P_LoadNodes(lumpnum + ML_NODES);
+      if (!level_setup_failed)
+         P_LoadSegs(lumpnum + ML_SEGS);
+
+      /* Subsectors name a run of segs, but they load before the segs do,
+       * so the range can only be held against numsegs here.  P_GroupLines
+       * indexes segs[] by it immediately below. */
+      if (!level_setup_failed)
+      {
+         int i;
+         for (i = 0; i < numsubsectors; i++)
+            if (   subsectors[i].firstline < 0
+                || subsectors[i].numlines  < 0
+                || subsectors[i].firstline + subsectors[i].numlines > numsegs)
+            {
+               I_Error("P_SetupLevel: subsector %d names segs outside the map", i);
+               level_setup_failed = TRUE;
+               break;
+            }
+      }
    }
+   if (level_setup_failed)
+      return;
    }
 
    // reject loading and underflow padding separated out into new function

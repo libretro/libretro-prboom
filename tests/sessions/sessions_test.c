@@ -287,20 +287,21 @@ static int find_demo1_map(const char *iwad)
  * that does not exist, 4 a seg naming a vertex that does not exist. */
 static const char *make_node_wad(int which)
 {
-   static const char *names[8] =
+   static const char *names[9] =
       { "nodes_good.wad", "nodes_trunc.wad", "nodes_count.wad",
         "nodes_line.wad", "nodes_vert.wad", "nodes_child.wad",
-        "nodes_blockmap.wad", "nodes_glunsup.wad" };
+        "nodes_blockmap.wad", "nodes_glunsup.wad", "nodes_classic.wad" };
    static const short vx[4][2] = { {0,0}, {256,0}, {256,256}, {0,256} };
    static const int   sg[4][4] = { {0,1,0,0}, {1,2,1,0}, {2,3,2,0}, {3,0,3,0} };
    unsigned char nodes[256], map_marker[9];
    unsigned char verts[16], lines[4*14], sides[4*30], sectors[26], things[10];
    unsigned char reject[1], block[24];
-   int blocklen = 0;
+   unsigned char cseg[4*12], cssec[2*4], cnode[28];
+   int blocklen = 0, cseglen = 0, csseclen = 0, cnodelen = 0;
    int nlen = 0, i;
    FILE *o;
 
-   if (which < 0 || which > 7)
+   if (which < 0 || which > 8)
       return NULL;
 
    /* geometry */
@@ -417,6 +418,34 @@ static const char *make_node_wad(int which)
       put32(nodes + nlen, 0x80000000UL); nlen += 4;
    }
 
+   /* Variant 8 uses the vanilla SEGS / SSECTORS / NODES lumps instead of
+    * an extended-node image, so the classic loaders run.  Its first seg
+    * names a linedef that is not in the map -- the same defect variant 3
+    * puts in an XNOD seg, on the path every ordinary map takes. */
+   if (which == 8)
+   {
+      nlen = 0;                         /* no extended-node lump */
+      for (i = 0; i < 4; i++)
+      {
+         unsigned ld = (i == 0) ? 9999u : (unsigned)sg[i][2];
+         put16(cseg + i*12,     (unsigned)sg[i][0]);   /* v1 */
+         put16(cseg + i*12 + 2, (unsigned)sg[i][1]);   /* v2 */
+         put16(cseg + i*12 + 4, 0);                    /* angle */
+         put16(cseg + i*12 + 6, ld);                   /* linedef */
+         put16(cseg + i*12 + 8, 0);                    /* side */
+         put16(cseg + i*12 + 10, 0);                   /* offset */
+      }
+      cseglen = 4*12;
+      put16(cssec + 0, 2); put16(cssec + 2, 0);        /* 2 segs from 0 */
+      put16(cssec + 4, 2); put16(cssec + 6, 2);        /* 2 segs from 2 */
+      csseclen = 2*4;
+      put16(cnode + 0, 128); put16(cnode + 2, 0);
+      put16(cnode + 4, 0);   put16(cnode + 6, 256);
+      for (i = 0; i < 8; i++) put16(cnode + 8 + i*2, 256);
+      put16(cnode + 24, 0x8000); put16(cnode + 26, 0x8001);
+      cnodelen = 28;
+   }
+
    sprintf((char*)map_marker, "E%dM%d", demo1_episode, demo1_map);
 
    o = fopen(names[which], "wb");
@@ -432,11 +461,13 @@ static const char *make_node_wad(int which)
       L[n].name = "LINEDEFS"; L[n].d = lines;   L[n].len = (int)sizeof(lines);   n++;
       L[n].name = "SIDEDEFS"; L[n].d = sides;   L[n].len = (int)sizeof(sides);   n++;
       L[n].name = "VERTEXES"; L[n].d = verts;   L[n].len = (int)sizeof(verts);   n++;
-      L[n].name = "SEGS";     L[n].d = NULL;    L[n].len = 0;                    n++;
-      L[n].name = "SSECTORS"; L[n].d = (which == 7) ? nodes : NULL;
-                              L[n].len  = (which == 7) ? nlen : 0;               n++;
-      L[n].name = "NODES";    L[n].d = (which == 7) ? NULL : nodes;
-                              L[n].len  = (which == 7) ? 0 : nlen;               n++;
+      L[n].name = "SEGS";     L[n].d = cseg;    L[n].len = cseglen;              n++;
+      L[n].name = "SSECTORS"; L[n].d = (which == 7) ? nodes : cssec;
+                              L[n].len  = (which == 7) ? nlen : csseclen;        n++;
+      L[n].name = "NODES";    L[n].d = (which == 8) ? cnode :
+                                       (which == 7) ? NULL  : nodes;
+                              L[n].len  = (which == 8) ? cnodelen :
+                                          (which == 7) ? 0    : nlen;            n++;
       L[n].name = "SECTORS";  L[n].d = sectors; L[n].len = (int)sizeof(sectors); n++;
       L[n].name = "REJECT";   L[n].d = reject;  L[n].len = 1;                    n++;
       L[n].name = "BLOCKMAP"; L[n].d = block;   L[n].len = blocklen;             n++;
@@ -615,12 +646,13 @@ int main(int argc, char **argv)
        * replacement map is reached at all -- replace a map the demo does
        * not play and every other check here passes while testing
        * nothing. */
-      static const char *label[8] =
+      static const char *label[9] =
          { "sound", "truncated", "bad subsector count",
            "seg names a missing linedef", "seg names a missing vertex",
            "node child names a missing subsector",
            "blockmap offset past the end, no terminator",
-           "GL nodes on a binary map (unsupported)" };
+           "GL nodes on a binary map (unsupported)",
+           "classic seg names a missing linedef" };
       unsigned long base_hash = 0;
       int w;
 
@@ -635,7 +667,7 @@ int main(int argc, char **argv)
 
       retro_init();
 
-      for (w = -1; w < 8; w++)
+      for (w = -1; w < 9; w++)
       {
          const char *path = (w < 0) ? argv[2] : make_node_wad(w);
 

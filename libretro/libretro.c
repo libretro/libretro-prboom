@@ -18,6 +18,7 @@
 #include <streams/file_stream.h>
 #include <vfs/vfs_hybrid.h>
 #include <vfs/vfs_implementation.h>
+#include <retro_dirent.h>
 #include <array/rbuf.h>
 #include <compat/strl.h>
 
@@ -686,21 +687,28 @@ void retro_set_rumble_touch(unsigned intensity, float duration)
  *
  * On Windows the literal-name path_is_valid() succeeds regardless
  * of casing (NTFS / FAT are case-insensitive at the OS layer), so
- * the fallback never fires there.  retro_vfs_opendir_impl handles
- * platform differences internally; this code path is
- * platform-portable. */
+ * the fallback never fires there.
+ *
+ * The walk goes through retro_dirent, not the local implementation
+ * behind it.  vfs_hybrid installs itself over dirent at
+ * retro_set_environment, and on a sandboxed platform the content the
+ * user picked is reachable only through the frontend's VFS -- called
+ * directly, the local implementation opens nothing there and this
+ * fallback silently does not happen on exactly the platform whose
+ * users need it.  Plain paths still go local-first through the hybrid,
+ * so desktop behaviour and cost are unchanged. */
 static char *find_in_dir_case_insensitive(const char *dir,
                                           const char *wfname,
                                           const char *ext)
 {
-   libretro_vfs_implementation_dir *dh;
+   struct RDIR *dh;
    char *want;
    char *match = NULL;
    size_t want_len;
 
    if (!dir || !wfname)
       return NULL;
-   dh = retro_vfs_opendir_impl(dir, false);
+   dh = retro_opendir(dir);
    if (!dh)
       return NULL;
 
@@ -708,16 +716,16 @@ static char *find_in_dir_case_insensitive(const char *dir,
    want = malloc(want_len + 1);
    if (!want)
    {
-      retro_vfs_closedir_impl(dh);
+      retro_closedir(dh);
       return NULL;
    }
    strcpy(want, wfname);
    if (ext && *ext)
       strcat(want, ext);
 
-   while (retro_vfs_readdir_impl(dh))
+   while (retro_readdir(dh))
    {
-      const char *de = retro_vfs_dirent_get_name_impl(dh);
+      const char *de = retro_dirent_get_name(dh);
       if (de && !strcasecmp(de, want))
       {
          match = malloc(strlen(dir) + 1 + strlen(de) + 1);
@@ -727,7 +735,7 @@ static char *find_in_dir_case_insensitive(const char *dir,
       }
    }
    free(want);
-   retro_vfs_closedir_impl(dh);
+   retro_closedir(dh);
    return match;
 }
 
@@ -1855,21 +1863,50 @@ static char* remove_extension(char *buf, const char *path, size_t size)
   return base + 1;
 }
 
-static wadinfo_t get_wadinfo(const char *path)
+/* Reads the wad header, and reports the file's size through *size so the
+ * caller can hold the header's claims against it.  I_Error only reports,
+ * so a short read has to leave a zeroed header behind rather than the
+ * stack it started on: the caller's "identification[0] == 0" test reads
+ * uninitialised bytes otherwise, and passes on most of them. */
+static wadinfo_t get_wadinfo(const char *path, int64_t *size)
 {
    wadinfo_t header;
    RFILE* fp = filestream_open(path,
 		   RETRO_VFS_FILE_ACCESS_READ,
 		   RETRO_VFS_FILE_ACCESS_HINT_NONE);
+
+   memset(&header, 0, sizeof(header));
+   if (size)
+      *size = 0;
+
    if (fp)
    {
+      if (size)
+         *size = filestream_get_size(fp);
       if(rfread(&header, sizeof(header), 1, fp) != 1)
+      {
          I_Error("get_wadinfo: error reading file header");
+         memset(&header, 0, sizeof(header));
+      }
       filestream_close(fp);
    }
-   else
-      memset(&header, 0, sizeof(header));
    return header;
+}
+
+/* Does the lump directory the header describes lie inside the file?
+ * Rejecting a malformed one at load time matters because W_AddFile runs
+ * after the wad has been paired with an IWAD: left to it, the broken
+ * file contributes no lumps, the paired IWAD supplies everything, and
+ * the core reports success for content it never read. */
+static bool wad_directory_fits(const wadinfo_t *header, int64_t size)
+{
+   int numlumps    = LONG(header->numlumps);
+   int infotableofs = LONG(header->infotableofs);
+
+   if (numlumps < 0 || infotableofs < (int)sizeof(*header))
+      return false;
+   return (int64_t)infotableofs
+        + (int64_t)numlumps * (int64_t)sizeof(filelump_t) <= size;
 }
 
 /* True if the WAD at `path` contains a PLAYPAL lump.  PLAYPAL is the
@@ -2160,7 +2197,7 @@ static entry_kind_t classify_entry(const char *path)
       if (!strcasecmp(ext, "deh") || !strcasecmp(ext, "bex"))
          return ENTRY_DEH;
    }
-   header = get_wadinfo(path);
+   header = get_wadinfo(path, NULL);
    if (header.identification[0] == 0)
       return ENTRY_INVALID;
    if (header.identification[0] == 'P' && header.identification[1] == 'K' &&
@@ -2321,6 +2358,7 @@ bool retro_load_game(const struct retro_game_info *info)
    if (info && info->path)
    {
       wadinfo_t header;
+      int64_t wad_size = 0;
       char *deh, *extension, *baseconfig;
 
       char name_without_ext[1023];
@@ -2430,11 +2468,21 @@ bool retro_load_game(const struct retro_game_info *info)
       }
       else
       {
-         header = get_wadinfo(info->path);
+         header = get_wadinfo(info->path, &wad_size);
          // header.identification is static array, always non-NULL, but it might be empty if it couldn't be read
          if(header.identification[0] == 0)
          {
             I_Error("retro_load_game: couldn't read WAD header from '%s'", info->path);
+            goto failed;
+         }
+         if((!strncmp(header.identification, "IWAD", 4)
+          || !strncmp(header.identification, "PWAD", 4))
+          && !wad_directory_fits(&header, wad_size))
+         {
+            I_Error("retro_load_game: '%s' claims %d lumps at offset %d, "
+                    "which its %lld bytes cannot hold", info->path,
+                    LONG(header.numlumps), LONG(header.infotableofs),
+                    (long long)wad_size);
             goto failed;
          }
          if(!strncmp(header.identification, "IWAD", 4))

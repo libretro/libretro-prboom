@@ -3004,6 +3004,10 @@ struct extra_serialize {
   uint8_t  gamekeydown[NUMKEYS];
   uint32_t music_state_size;
   uint8_t  music_state[MUSIC_STATE_RESERVED];
+  /* How far the demo has been read, when one is playing.  Without it a
+   * load restores the world and leaves the read head alone, so playback
+   * resumes from the wrong place. */
+  uint32_t demo_offset;
 };
 
 size_t retro_serialize_size(void)
@@ -3097,6 +3101,7 @@ bool retro_serialize(void *data_, size_t size)
     size_t n = I_MusicSerialize(extra->music_state, sizeof extra->music_state);
     extra->music_state_size = (uint32_t)n;
   }
+  extra->demo_offset = G_DemoReadOffset();
   return true;
 }
 
@@ -3152,6 +3157,8 @@ bool retro_unserialize(const void *data_, size_t size)
      if (extra->music_state_size > 0 &&
          extra->music_state_size <= sizeof extra->music_state)
         (void)I_MusicUnserialize(extra->music_state, extra->music_state_size);
+
+     G_SetDemoReadOffset(extra->demo_offset);
   }
 
   return true;

@@ -84,6 +84,10 @@ void G_ReloadDefaults(void);     // killough 3/1/98: loads game defaults
 void G_SaveGameName(char *, size_t, int, dbool); /* killough 3/22/98: sets savegame filename */
 void G_SetFastParms(int);        // killough 4/10/98: sets -fast parameters
 void G_ScaleMovementToFramerate (void);
+
+/* Demo read position, saved and restored with the rest of the state. */
+uint32_t G_DemoReadOffset(void);
+void G_SetDemoReadOffset(uint32_t offset);
 void G_DoNewGame(void);
 void G_DoReborn(int playernum);
 void G_DoPlayDemo(void);

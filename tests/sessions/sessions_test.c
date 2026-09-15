@@ -285,12 +285,36 @@ static int find_demo1_map(const char *iwad)
  * order.  which selects the defect: 0 none, 1 truncated mid-record,
  * 2 a subsector count the lump cannot hold, 3 a seg naming a linedef
  * that does not exist, 4 a seg naming a vertex that does not exist. */
+/* The GL parser is unreachable on a binary map -- P_GetNodesVersion
+ * declines those -- so the only way to drive it is UDMF, which keeps its
+ * geometry in TEXTMAP and its nodes in a named ZNODES lump. */
+static const char udmf_textmap[] =
+   "namespace = \"zdoom\";\n"
+   "vertex { x = 0.0; y = 0.0; }\n"
+   "vertex { x = 256.0; y = 0.0; }\n"
+   "vertex { x = 256.0; y = 256.0; }\n"
+   "vertex { x = 0.0; y = 256.0; }\n"
+   "sector { heightfloor = 0; heightceiling = 128; "
+      "texturefloor = \"FLOOR4_8\"; textureceiling = \"CEIL3_5\"; "
+      "lightlevel = 160; }\n"
+   "sidedef { sector = 0; texturemiddle = \"STARTAN2\"; }\n"
+   "sidedef { sector = 0; texturemiddle = \"STARTAN2\"; }\n"
+   "sidedef { sector = 0; texturemiddle = \"STARTAN2\"; }\n"
+   "sidedef { sector = 0; texturemiddle = \"STARTAN2\"; }\n"
+   "linedef { v1 = 0; v2 = 1; sidefront = 0; blocking = true; }\n"
+   "linedef { v1 = 1; v2 = 2; sidefront = 1; blocking = true; }\n"
+   "linedef { v1 = 2; v2 = 3; sidefront = 2; blocking = true; }\n"
+   "linedef { v1 = 3; v2 = 0; sidefront = 3; blocking = true; }\n"
+   "thing { x = 128.0; y = 128.0; type = 1; skill1 = true; skill2 = true; "
+      "skill3 = true; skill4 = true; skill5 = true; single = true; }\n";
+
 static const char *make_node_wad(int which)
 {
-   static const char *names[9] =
+   static const char *names[11] =
       { "nodes_good.wad", "nodes_trunc.wad", "nodes_count.wad",
         "nodes_line.wad", "nodes_vert.wad", "nodes_child.wad",
-        "nodes_blockmap.wad", "nodes_glunsup.wad", "nodes_classic.wad" };
+        "nodes_blockmap.wad", "nodes_glunsup.wad", "nodes_classic.wad",
+        "nodes_udmf_good.wad", "nodes_udmf_trunc.wad" };
    static const short vx[4][2] = { {0,0}, {256,0}, {256,256}, {0,256} };
    static const int   sg[4][4] = { {0,1,0,0}, {1,2,1,0}, {2,3,2,0}, {3,0,3,0} };
    unsigned char nodes[256], map_marker[9];
@@ -301,7 +325,7 @@ static const char *make_node_wad(int which)
    int nlen = 0, i;
    FILE *o;
 
-   if (which < 0 || which > 8)
+   if (which < 0 || which > 10)
       return NULL;
 
    /* geometry */
@@ -393,7 +417,7 @@ static const char *make_node_wad(int which)
     * rather than NODES.  Binary maps with those are not supported, and
     * the point is that saying so has to decline the level: the classic
     * loaders would otherwise read this image as vanilla subsectors. */
-   if (which == 7)
+   if (which == 7 || which >= 9)
    {
       memcpy(nodes, "XGLN", 4);                      nlen = 4;
       put32(nodes + nlen, 4);  nlen += 4;
@@ -416,6 +440,8 @@ static const char *make_node_wad(int which)
       for (i = 0; i < 8; i++) { put16(nodes + nlen, 256); nlen += 2; }
       put32(nodes + nlen, 0x80000000UL); nlen += 4;
       put32(nodes + nlen, 0x80000000UL); nlen += 4;
+      if (which == 10)
+         nlen = 30;                                  /* cut mid-record */
    }
 
    /* Variant 8 uses the vanilla SEGS / SSECTORS / NODES lumps instead of
@@ -451,6 +477,37 @@ static const char *make_node_wad(int which)
    o = fopen(names[which], "wb");
    if (!o)
       return NULL;
+   if (which >= 9)
+   {
+      struct { const char *name; const unsigned char *d; int len; } U[4];
+      unsigned char dirent[4*16], hdr[12];
+      int n = 0, off = 12, k;
+
+      U[n].name = (const char*)map_marker; U[n].d = NULL; U[n].len = 0; n++;
+      U[n].name = "TEXTMAP"; U[n].d = (const unsigned char*)udmf_textmap;
+      U[n].len  = (int)(sizeof(udmf_textmap) - 1);                      n++;
+      U[n].name = "ZNODES";  U[n].d = nodes; U[n].len = nlen;           n++;
+      U[n].name = "ENDMAP";  U[n].d = NULL;  U[n].len = 0;              n++;
+
+      memset(dirent, 0, sizeof(dirent));
+      for (k = 0; k < n; k++)
+      {
+         put32(dirent + k*16, (unsigned long)off);
+         put32(dirent + k*16 + 4, (unsigned long)U[k].len);
+         strncpy((char*)dirent + k*16 + 8, U[k].name, 8);
+         off += U[k].len;
+      }
+      memcpy(hdr, "PWAD", 4);
+      put32(hdr + 4, (unsigned long)n);
+      put32(hdr + 8, (unsigned long)off);
+      fwrite(hdr, 1, 12, o);
+      for (k = 0; k < n; k++)
+         if (U[k].len)
+            fwrite(U[k].d, 1, (size_t)U[k].len, o);
+      fwrite(dirent, 1, (size_t)n * 16, o);
+      fclose(o);
+      return names[which];
+   }
    {
       struct { const char *name; const unsigned char *d; int len; } L[11];
       unsigned char dirent[11*16], hdr[12];
@@ -646,13 +703,14 @@ int main(int argc, char **argv)
        * replacement map is reached at all -- replace a map the demo does
        * not play and every other check here passes while testing
        * nothing. */
-      static const char *label[9] =
+      static const char *label[11] =
          { "sound", "truncated", "bad subsector count",
            "seg names a missing linedef", "seg names a missing vertex",
            "node child names a missing subsector",
            "blockmap offset past the end, no terminator",
            "GL nodes on a binary map (unsupported)",
-           "classic seg names a missing linedef" };
+           "classic seg names a missing linedef",
+           "UDMF with GL nodes", "UDMF GL nodes truncated" };
       unsigned long base_hash = 0;
       int w;
 
@@ -667,7 +725,7 @@ int main(int argc, char **argv)
 
       retro_init();
 
-      for (w = -1; w < 9; w++)
+      for (w = -1; w < 11; w++)
       {
          const char *path = (w < 0) ? argv[2] : make_node_wad(w);
 

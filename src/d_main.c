@@ -272,11 +272,12 @@ void D_Display (void)
    *
    * Running wipe_StartScreen here, between the previous frame's
    * I_FinishUpdate (which restored screens[0].data to the
-   * persistent screen_buf and -- as part of the same #183 fix --
-   * snapshotted the just-presented frame into screen_buf) and this
-   * frame's I_StartDisplay, means screens[0] still points at
-   * screen_buf with the previous frame's pixels in it.  Capturing
-   * from there yields the correct wipe-start content.
+   * persistent screen_buf, and carries the just-presented frame
+   * into it on the frames a melt can follow) and this frame's
+   * I_StartDisplay, means screens[0] still points at screen_buf
+   * with the previous frame's pixels in it.  Capturing from there
+   * yields the correct wipe-start content, and I_WipeSourceValid
+   * reports whether that content is there to capture.
    *
    * The fallback (non-direct-render) path is unaffected: there
    * screens[0].data is always screen_buf, and screen_buf is the
@@ -284,7 +285,12 @@ void D_Display (void)
    * I_StartDisplay and after-I_StartDisplay readings return the
    * same content. */
   if ((wipe = gamestate != wipegamestate))
-    wipe_StartScreen();
+  {
+    if (I_WipeSourceValid())
+      wipe_StartScreen();
+    else
+      wipe = 0;
+  }
 
   if (!I_StartDisplay())
     return;

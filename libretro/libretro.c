@@ -103,6 +103,20 @@ static bool sw_fb_checked        = false;
 static unsigned char *direct_fb_data  = NULL;
 static unsigned int   direct_fb_pitch = 0;
 
+/* Wipe source state.  A melt reads the previously presented frame, which
+ * under direct render lives in a frontend buffer we no longer own, so it
+ * is snapshotted into screen_buf -- a whole-frame read out of memory the
+ * frontend picked, 16 MB a frame at 2560x1600 in a 32-bit format.  Taking
+ * it only when a melt can actually follow keeps the direct path's point,
+ * which is that the frame is never copied at all.
+ *
+ * wipe_src_hold frames of snapshotting are armed by anything that can
+ * lead to a gamestate change; wipe_src_valid says whether screen_buf
+ * currently holds the last presented frame, and D_Display asks before it
+ * starts a melt. */
+static int            wipe_src_hold   = 0;
+static int            wipe_src_valid  = 0;
+
 /* True only while we are inside retro_run.  Drawing and every
  * frontend video call belong to retro_run and to nothing else: a
  * frontend is free to keep its video driver torn down for the whole
@@ -3708,6 +3722,42 @@ static void I_UpdateVideoMode(void)
    R_InitBuffer(SCREENWIDTH, SCREENHEIGHT);
 }
 
+/* Is a melt close enough to be worth carrying a start screen for?
+ *
+ * TryRunTics steps at most one G_Ticker per retro_run, so the gamestate
+ * flip that makes the next frame melt is processed from a gameaction that
+ * is already pending by the time this frame finishes -- or from the
+ * advancedemo step, which sets one before the ticker runs.  Reading those
+ * here therefore sees every transition one frame ahead of the melt that
+ * follows it, which is exactly the frame whose pixels the melt wants.
+ *
+ * A few frames of hold follow each trigger so a transition that settles
+ * over more than one ticker still finds its source, and I_WipeSourceValid
+ * keeps a miss from melting stale pixels.  Snapshotting a frame nothing
+ * ends up asking for costs one copy; that is the cheap direction. */
+static int I_WipeSnapshotWanted(void)
+{
+   if (   gameaction != ga_nothing
+       || advancedemo
+       || gamestate  != wipegamestate)
+      wipe_src_hold = 3;
+   else if (wipe_src_hold > 0)
+      wipe_src_hold--;
+
+   return wipe_src_hold > 0;
+}
+
+/* Does screen_buf hold the last presented frame?  Always true while the
+ * renderer draws into it; under direct render, true only on the frames
+ * the snapshot above was taken.  D_Display asks before starting a melt
+ * and draws the transition plainly when the answer is no, which is the
+ * right failure: a missing melt reads as a cut, melting from a frame the
+ * player never saw reads as corruption. */
+dbool I_WipeSourceValid(void)
+{
+   return wipe_src_valid ? true : false;
+}
+
 void I_FinishUpdate (void)
 {
    /* The refresh callback belongs to retro_run.  Startup advances
@@ -3719,42 +3769,44 @@ void I_FinishUpdate (void)
 
    if (direct_fb_data)
    {
-      /* Issue #183: snapshot the finished frame into the
-       * persistent screen_buf.  D_Display's wipe_StartScreen runs
-       * BEFORE the next I_StartDisplay rebinds screens[0] to a
-       * fresh frontend FB; at that point screens[0].data is
-       * screen_buf, so capturing from it gives the wipe the
-       * correct previous-frame source.  Without this copy, under
-       * direct-render screen_buf is never written -- the renderer
-       * is bypassing it on every frame -- and wipe_StartScreen
-       * (whether called here or after I_StartDisplay) sees
-       * uninitialised buffer content.
+      /* Issue #183: the melt's start screen is the previously presented
+       * frame, and under direct render the renderer wrote that frame into
+       * a frontend buffer which is invalid once retro_run returns, so it
+       * is snapshotted into the persistent screen_buf.  D_Display's
+       * wipe_StartScreen runs BEFORE the next I_StartDisplay rebinds
+       * screens[0] to a fresh frontend FB; at that point screens[0].data
+       * is screen_buf, so capturing from there gives the melt the right
+       * source.
        *
-       * The snapshot MUST happen before video_cb.  Here the
-       * mapping is provably live (the renderer just wrote the
-       * frame through it); after video_cb it may not be.
-       * RetroArch's Vulkan driver services deferred swapchain
-       * work inside the frame call (vulkan_frame ->
-       * vulkan_check_swapchain -> vulkan_deinit_textures), which
-       * unmaps and frees the per-frame staging texture backing
-       * this very pointer whenever a resize / swapchain
-       * invalidation is pending (rotation, split view, menu
-       * driver churn).  Desktop drivers typically keep the freed
-       * suballocation's pages resident so a stale read only
-       * returns garbage, but MoltenVK backs each VkDeviceMemory
-       * with its own MTLBuffer and vkFreeMemory really unmaps:
-       * reading direct_fb_data after video_cb segfaults inside
-       * memcpy on iOS (five identical TestFlight crash reports,
-       * _platform_memmove reading SCREENPITCH*SCREENHEIGHT =
-       * 0x1f400 bytes from an unmapped source under retro_run).
+       * The snapshot MUST happen before video_cb.  Here the mapping is
+       * provably live (the renderer just wrote the frame through it);
+       * after video_cb it may not be.  RetroArch's Vulkan driver services
+       * deferred swapchain work inside the frame call (vulkan_frame ->
+       * vulkan_check_swapchain -> vulkan_deinit_textures), which unmaps
+       * and frees the per-frame staging texture backing this very pointer
+       * whenever a resize / swapchain invalidation is pending (rotation,
+       * split view, menu driver churn).  Desktop drivers typically keep
+       * the freed suballocation's pages resident so a stale read only
+       * returns garbage, but MoltenVK backs each VkDeviceMemory with its
+       * own MTLBuffer and vkFreeMemory really unmaps: reading
+       * direct_fb_data after video_cb segfaults inside memcpy on iOS
+       * (five identical TestFlight crash reports, _platform_memmove
+       * reading SCREENPITCH*SCREENHEIGHT = 0x1f400 bytes from an unmapped
+       * source under retro_run).
        *
-       * Cost: one read + one write of SCREENPITCH*SCREENHEIGHT
-       * bytes per frame.  ~128 KB at 320x200 RGB565.  At 35 Hz
-       * that's ~4.5 MB/s of cache-friendly streaming memcpy;
-       * trivial on any platform that can run a software Doom
-       * renderer at all. */
-      memcpy(screen_buf, direct_fb_data,
-             SCREENPITCH * SCREENHEIGHT);
+       * Cost when taken: one read + one write of SCREENPITCH*SCREENHEIGHT
+       * bytes, 128 KB at 320x200 RGB565 and 16 MB at 2560x1600 in a
+       * 32-bit format, and the read side comes out of whatever memory the
+       * frontend handed back.  I_WipeSnapshotWanted keeps that off the
+       * frames where no melt can follow. */
+      if (I_WipeSnapshotWanted())
+      {
+         memcpy(screen_buf, direct_fb_data,
+                SCREENPITCH * SCREENHEIGHT);
+         wipe_src_valid = 1;
+      }
+      else
+         wipe_src_valid = 0;
       /* Direct-render: the renderer wrote pixels straight into
        * the frontend's buffer in place; just hand it back.  Per
        * libretro.h the pointer must match exactly what
@@ -3778,7 +3830,10 @@ void I_FinishUpdate (void)
    /* Fallback path: frontend doesn't support the SW FB API, or
     * returned a non-RGB565 buffer or a mismatched pitch this
     * frame.  Hand video_cb our heap buffer; the frontend will
-    * copy/convert internally. */
+    * copy/convert internally.  screen_buf is the render target
+    * here, so it holds this frame the moment it is presented and
+    * a melt starting next frame needs no snapshot at all. */
+   wipe_src_valid = 1;
    video_cb(screen_buf, SCREENWIDTH, SCREENHEIGHT, SCREENPITCH);
 }
 

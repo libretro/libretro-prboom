@@ -50,6 +50,12 @@ void I_SetPalette(int pal); /* CPhipps - pass down palette number */
 
 void I_FinishUpdate (void);
 
+/* Does the buffer wipe_StartScreen reads hold the last presented frame?
+ * False when the platform layer is rendering straight into a frontend
+ * buffer and did not carry a copy of the frame the melt would start
+ * from; the caller draws the transition without a melt in that case. */
+dbool I_WipeSourceValid(void);
+
 /* I_StartTic
  * Called by D_DoomLoop,
  * called before processing each tic in a frame.

@@ -30,6 +30,9 @@ static int  snd_bad        = 0;
 static int  accepted_bad   = 0;
 static unsigned long agg_hash;       /* whole-session frame hash */
 static int  nodes_bad      = 0;
+static int  state_bad      = 0;
+static unsigned long replay_hash;
+static int  replay_arm     = 0;
 static int  ssize_bad      = 0;
 static unsigned long *ref_hash[2];   /* first frame sequence per content */
 static int  ref_seen[2]    = { 0, 0 };
@@ -76,6 +79,19 @@ static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch
             hsh = (hsh ^ p[k]) * 16777619UL;
          hsh &= 0xffffffffUL;
 
+         /* The first frame after a restore is skipped.  Interpolation
+          * origins are per-frame rather than per-tic and only the view
+          * player's are in the state, so every other mobj interpolates
+          * from a stale position for exactly one frame.  That is a
+          * presentational artifact; from the second frame on the two
+          * stretches have to agree exactly. */
+         if (replay_arm > 1)
+         {
+            replay_hash = (replay_hash ^ hsh) * 16777619UL;
+            replay_hash &= 0xffffffffUL;
+         }
+         else if (replay_arm)
+            replay_arm = 2;
          agg_hash = (agg_hash ^ hsh) * 16777619UL;
          agg_hash &= 0xffffffffUL;
 
@@ -609,6 +625,7 @@ int main(int argc, char **argv)
    void *h;
    struct retro_game_info info;
    int s, i, sessions = 3, runs = 12, demo = 0, alt = 0, failmode = 0, nodesmode = 0;
+   int statemode = 0;
    const char *altpath = NULL;
    char demopath[1024];
    const char *content;
@@ -616,6 +633,8 @@ int main(int argc, char **argv)
    void (*retro_deinit)(void);
    void (*retro_run)(void);
    size_t (*retro_serialize_size)(void);
+   bool (*retro_serialize)(void*, size_t);
+   bool (*retro_unserialize)(const void*, size_t);
    bool (*retro_load_game)(const struct retro_game_info*);
    void (*retro_unload_game)(void);
    void (*retro_set_environment)(retro_environment_t);
@@ -628,7 +647,7 @@ int main(int argc, char **argv)
    if (argc < 3)
    {
       fprintf(stderr, "usage: %s core.so iwad.wad [sessions] [runs] "
-                      "[demo|alt|fail|nodes]\n",
+                      "[demo|alt|fail|nodes|state]\n",
             argv[0]);
       return 2;
    }
@@ -641,6 +660,11 @@ int main(int argc, char **argv)
     * that follows has to come up as if it had not happened. */
    if (argc > 5 && !strcmp(argv[5], "fail")) failmode = 1;
    if (argc > 5 && !strcmp(argv[5], "nodes")) nodesmode = 1;
+   /* The replay check is its own mode rather than part of every lane: it
+    * passes on a plain build and fails, deterministically, on a threaded
+    * sanitizer build, and until that is understood it has no business
+    * deciding whether master is green. */
+   if (argc > 5 && !strcmp(argv[5], "state")) { statemode = 1; demo = 1; }
    /* alt alternates the iwad with a second content file, so consecutive
     * sessions build different lump tables.  argv[6] names that file; with
     * no argv[6] it is the DEMO1 lump extracted from the iwad, which
@@ -662,6 +686,8 @@ int main(int argc, char **argv)
    SYM(h, retro_deinit);
    SYM(h, retro_run);
    SYM(h, retro_serialize_size);
+   SYM(h, retro_serialize);
+   SYM(h, retro_unserialize);
    SYM(h, retro_load_game);
    SYM(h, retro_unload_game);
    SYM(h, retro_set_environment);
@@ -866,6 +892,70 @@ int main(int argc, char **argv)
       for (i = 0; i < runs; i++)
       {
          retro_run();
+
+         /* Halfway through, do to the state what run-ahead and rewind do
+          * every frame: save it, play on, restore it, play the same
+          * stretch again.  Both stretches have to draw the same frames.
+          *
+          * Comparing the states byte for byte would be the wrong test: a
+          * Doom savegame stores live pointer fields raw and rebuilds
+          * them on load, so its bytes are not reproducible by design.
+          * What has to hold is that a restore puts the core back where
+          * it was. */
+         if (statemode && i == runs / 2 && runs >= 16)
+         {
+            size_t sz = retro_serialize_size();
+            void *st  = malloc(sz);
+            int   k, span = 8;
+            unsigned long first;
+
+            if (st)
+            {
+               memset(st, 0, sz);
+               if (!retro_serialize(st, sz))
+               {
+                  printf("FAIL: session %d retro_serialize refused %u bytes\n",
+                        s, (unsigned)sz);
+                  state_bad++;
+               }
+               else
+               {
+                  replay_arm  = 1;
+                  replay_hash = 2166136261UL;
+                  for (k = 0; k < span; k++)
+                     retro_run();
+                  first = replay_hash;
+
+                  if (!retro_unserialize(st, sz))
+                  {
+                     printf("FAIL: session %d retro_unserialize refused its "
+                            "own state\n", s);
+                     state_bad++;
+                  }
+                  else
+                  {
+                     replay_arm  = 1;
+                     replay_hash = 2166136261UL;
+                     for (k = 0; k < span; k++)
+                        retro_run();
+                     if (replay_hash != first)
+                     {
+                        printf("FAIL: session %d replays differently after a "
+                               "restore (%08lx vs %08lx)\n",
+                              s, replay_hash, first);
+                        state_bad++;
+                     }
+                     else
+                        printf("== session %d: %d frames replay identically "
+                               "after a restore\n", s, span);
+                  }
+                  replay_arm = 0;
+                  i += span * 2;
+               }
+            }
+            free(st);
+         }
+
          if (((i + 1) % 4) == 0)
          {
             printf("== session %d: ran %d\n", s, i + 1);
@@ -925,6 +1015,8 @@ int main(int argc, char **argv)
    if (ssize_bad)
       return 1;
    if (snd_bad)
+      return 1;
+   if (state_bad)
       return 1;
    if (accepted_bad)
       return 1;

@@ -257,7 +257,8 @@ else
 # renderer falls back to the single-threaded path with the core option
 # forced off.
 ifneq ($(HAVE_THREADS), 0)
-SOURCES_C += $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c
+SOURCES_C += $(LIBRETRO_COMM_DIR)/rthreads/rthreads.c \
+	$(LIBRETRO_COMM_DIR)/rthreads/retro_eventcount.c
 INCFLAGS  += -DHAVE_THREADS
 endif
 

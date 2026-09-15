@@ -33,6 +33,7 @@
 #ifdef HAVE_THREADS
 
 #include <rthreads/rthreads.h>
+#include <rthreads/retro_eventcount.h>
 #include <retro_atomic.h>
 
 /* tpool was the first implementation and it did not survive measurement.
@@ -47,10 +48,16 @@
  *
  * Slots are fixed instead: worker i always runs item i, so there is no
  * queue to guard, nothing to allocate, and no lock to take in order to find
- * work.  A dispatch is one broadcast; a completion is one atomic decrement.
- * The join spins briefly before parking, because at these frame times the
- * workers are still running when the caller arrives and a condition
- * variable round trip costs more than the wait itself. */
+ * work.  A dispatch publishes the generation with a release store and
+ * notifies an eventcount; a completion is one atomic decrement, and the
+ * decrement that lands on zero notifies a second one.  Neither side holds a
+ * lock: a worker wakes straight onto the generation word rather than into a
+ * mutex the other workers are queued on, and a notify with nobody parked
+ * costs one read-modify-write and one load.  The join spins briefly before
+ * parking, because at these frame times the workers are still running when
+ * the caller arrives and a trip through the kernel costs more than the wait
+ * itself; the spin is confined to builds whose atomics are lock-free, since
+ * elsewhere spinning only keeps the thread being waited on from running. */
 
 /* Eight, not sixteen.  Measured on a 16-core 9950X3D at 1920x1200: four
  * threads gave 1.97x and eight 1.92x, while sixteen came in at 0.74x with
@@ -91,49 +98,64 @@
 #endif
 
 static sthread_t         *mt_thread[RENDERMT_MAX];
-static slock_t           *mt_lock;
-static scond_t           *mt_go;
-static scond_t           *mt_done;
+static retro_eventcount_t mt_go;
+static retro_eventcount_t mt_done;
+static int                mt_ec_ready;
 static slock_t           *wall_tint_lock;
 
 static int                mt_nthreads;
 static int                mt_nactive;
-static int                mt_quit;
-static unsigned           mt_generation;
 static rendermt_fn          mt_fn;
 static char              *mt_base;
 static size_t             mt_elem;
+/* Written by the dispatching thread only; the release store of
+ * mt_generation is what publishes it and the four fields above to the
+ * workers, so they are read only after an acquire load of that word. */
+static int                mt_gen;
+static retro_atomic_int_t mt_generation;
+static retro_atomic_int_t mt_quit;
 static retro_atomic_int_t mt_pending;
 
 static void rendermt_worker(void *arg)
 {
-   int      me   = (int)(intptr_t)arg;
-   unsigned seen = 0;
+   int me   = (int)(intptr_t)arg;
+   int seen = 0;
+   int gen  = 0;
+
+   sthread_setname("prboom-render");
 
    for (;;)
    {
-      slock_lock(mt_lock);
-      while (!mt_quit && mt_generation == seen)
-         scond_wait(mt_go, mt_lock);
-      if (mt_quit)
+      for (;;)
       {
-         slock_unlock(mt_lock);
-         return;
+         int key;
+
+         gen = retro_atomic_load_acquire_int(&mt_generation);
+         if (gen != seen || retro_atomic_load_acquire_int(&mt_quit))
+            break;
+
+         /* Re-read inside the wait window: a dispatch that lands from
+          * here on either shows up in this second read or makes the
+          * commit return without sleeping. */
+         key = retro_eventcount_prepare_wait(&mt_go);
+         gen = retro_atomic_load_acquire_int(&mt_generation);
+         if (gen != seen || retro_atomic_load_acquire_int(&mt_quit))
+         {
+            retro_eventcount_cancel_wait(&mt_go);
+            break;
+         }
+         retro_eventcount_commit_wait(&mt_go, key);
       }
-      seen = mt_generation;
-      slock_unlock(mt_lock);
+
+      if (retro_atomic_load_acquire_int(&mt_quit))
+         return;
+      seen = gen;
 
       if (me < mt_nactive)
          mt_fn(mt_base + (size_t)me * mt_elem);
 
-      /* Signal under the lock so a caller that has already checked the
-       * count and is about to wait cannot miss the wakeup. */
       if (retro_atomic_fetch_sub_int(&mt_pending, 1) == 1)
-      {
-         slock_lock(mt_lock);
-         scond_signal(mt_done);
-         slock_unlock(mt_lock);
-      }
+         retro_eventcount_notify(&mt_done);
    }
 }
 
@@ -143,11 +165,9 @@ static void rendermt_teardown(void)
 
    if (mt_nthreads > 0)
    {
-      slock_lock(mt_lock);
-      mt_quit = 1;
-      mt_generation++;
-      scond_broadcast(mt_go);
-      slock_unlock(mt_lock);
+      retro_atomic_store_release_int(&mt_quit, 1);
+      retro_atomic_store_release_int(&mt_generation, ++mt_gen);
+      retro_eventcount_notify(&mt_go);
 
       for (i = 0; i < mt_nthreads; i++)
          if (mt_thread[i])
@@ -157,7 +177,7 @@ static void rendermt_teardown(void)
          }
       mt_nthreads = 0;
    }
-   mt_quit = 0;
+   retro_atomic_store_release_int(&mt_quit, 0);
 }
 
 int R_RenderMTEnsure(int workers)
@@ -173,15 +193,25 @@ int R_RenderMTEnsure(int workers)
 
    rendermt_teardown();
 
-   if (!mt_lock && !(mt_lock = slock_new()))
-      return 0;
-   if (!mt_go   && !(mt_go   = scond_new()))
-      return 0;
-   if (!mt_done && !(mt_done = scond_new()))
-      return 0;
+   if (!mt_ec_ready)
+   {
+      if (!retro_eventcount_init(&mt_go))
+      {
+         retro_eventcount_free(&mt_go);
+         return 0;
+      }
+      if (!retro_eventcount_init(&mt_done))
+      {
+         retro_eventcount_free(&mt_done);
+         retro_eventcount_free(&mt_go);
+         return 0;
+      }
+      mt_ec_ready = 1;
+   }
 
    retro_atomic_store_release_int(&mt_pending, 0);
-   mt_generation = 0;
+   mt_gen = 0;
+   retro_atomic_store_release_int(&mt_generation, 0);
 
    for (i = 0; i < workers; i++)
    {
@@ -202,7 +232,6 @@ void R_RenderMTRun(rendermt_fn fn, void *base, size_t elemsize, int n)
    if (!fn || n < 1 || n > mt_nthreads)
       return;
 
-   slock_lock(mt_lock);
    mt_fn      = fn;
    mt_base    = (char *)base;
    mt_elem    = elemsize;
@@ -210,43 +239,66 @@ void R_RenderMTRun(rendermt_fn fn, void *base, size_t elemsize, int n)
    /* Every worker wakes and decrements; those at or above n simply have no
     * item to run.  Counting all of them keeps the join a single compare. */
    retro_atomic_store_release_int(&mt_pending, mt_nthreads);
-   mt_generation++;
-   scond_broadcast(mt_go);
-   slock_unlock(mt_lock);
+   /* Publishes the four fields above and the count: a worker reads them
+    * only after acquire-loading this word. */
+   retro_atomic_store_release_int(&mt_generation, ++mt_gen);
+   retro_eventcount_notify(&mt_go);
 }
 
 void R_RenderMTWait(void)
 {
-   int spins   = RENDERMT_SPIN;
-   int backoff = 1;
-
    if (mt_nthreads < 1)
       return;
 
-   while (spins > 0)
+#if defined(RETRO_ATOMIC_LOCK_FREE)
+   /* Only where the atomics are real instructions.  Where they are not --
+    * the volatile fallback, and the EE, which masks interrupts around a
+    * read-modify-write and reschedules out of one -- a spinning thread is
+    * taking time from the very workers it is waiting on. */
    {
-      int k;
+      int spins   = RENDERMT_SPIN;
+      int backoff = 1;
+
+      while (spins > 0)
+      {
+         int k;
+         if (retro_atomic_load_acquire_int(&mt_pending) == 0)
+            return;
+         for (k = 0; k < backoff; k++)
+            RENDERMT_RELAX();
+         spins -= backoff;
+         if (backoff < RENDERMT_BACKOFF_MAX)
+            backoff <<= 1;
+      }
+   }
+#endif
+
+   for (;;)
+   {
+      int key;
+
       if (retro_atomic_load_acquire_int(&mt_pending) == 0)
          return;
-      for (k = 0; k < backoff; k++)
-         RENDERMT_RELAX();
-      spins -= backoff;
-      if (backoff < RENDERMT_BACKOFF_MAX)
-         backoff <<= 1;
-   }
 
-   slock_lock(mt_lock);
-   while (retro_atomic_load_acquire_int(&mt_pending) != 0)
-      scond_wait(mt_done, mt_lock);
-   slock_unlock(mt_lock);
+      key = retro_eventcount_prepare_wait(&mt_done);
+      if (retro_atomic_load_acquire_int(&mt_pending) == 0)
+      {
+         retro_eventcount_cancel_wait(&mt_done);
+         return;
+      }
+      retro_eventcount_commit_wait(&mt_done, key);
+   }
 }
 
 void R_RenderMTShutdown(void)
 {
    rendermt_teardown();
-   if (mt_done) { scond_free(mt_done); mt_done = NULL; }
-   if (mt_go)   { scond_free(mt_go);   mt_go   = NULL; }
-   if (mt_lock) { slock_free(mt_lock); mt_lock = NULL; }
+   if (mt_ec_ready)
+   {
+      retro_eventcount_free(&mt_done);
+      retro_eventcount_free(&mt_go);
+      mt_ec_ready = 0;
+   }
    if (wall_tint_lock) { slock_free(wall_tint_lock); wall_tint_lock = NULL; }
 }
 

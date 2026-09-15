@@ -2006,6 +2006,12 @@ void D_DoomDeinit(void)
   advancedemo  = FALSE;
   demosequence = -1;
   pagetic      = 0;
+  /* -playdemo sets singledemo so the demo it was given is the only one
+   * that plays.  Nothing clears it, so once a session loads a .lmp,
+   * D_AdvanceDemo is a no-op for the rest of the process and every later
+   * session's title screen sits on its first page instead of running the
+   * demo sequence. */
+  singledemo   = FALSE;
   I_InitGraphicsShutdown();
 
   M_QuitDOOM(0);

@@ -4123,11 +4123,26 @@ static void M_ResetDefaults(void)
 // array entry. var.name becomes converted to var.def.
 //
 
+/* The conversion is destructive and one-way: var.name and var.def are a
+ * union, so once an entry holds its default_t* the name is gone.  A
+ * second session re-reading var.name therefore hands M_LookupDefault a
+ * pointer reinterpreted as a string -- an out-of-bounds read that ends
+ * in a lookup failure for every entry, drowning any real failure in
+ * ~130 spurious I_Error lines.  The setup_menu_t tables and defaults[]
+ * are both compile-time statics, so the pointers stay valid for the
+ * life of the process and converting once is all that is ever needed.
+ */
+static dbool defaults_converted;
+
 static void M_InitDefaults(void)
 {
   setup_menu_t *const *p, *t;
   default_t *dp;
   int i;
+
+  if (defaults_converted)
+    return;
+  defaults_converted = TRUE;
   for (i = 0; i < ss_max-1; i++)
     for (p = setup_screens[i]; *p; p++)
       for (t = *p; !(t->m_flags & S_END); t++)

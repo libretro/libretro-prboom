@@ -22,6 +22,11 @@ static int  session_no     = 0;
 static int  frame_in_sess  = 0;
 static int  mismatches     = 0;
 static size_t ref_ssize[2] = { 0, 0 };  /* first post-load size per content */
+static unsigned long snd_hash;       /* running hash of this session's audio */
+static unsigned long ref_snd[2]      = { 0, 0 };
+static unsigned long long snd_frames;
+static unsigned long long ref_snd_frames[2] = { 0, 0 };
+static int  snd_bad        = 0;
 static int  ssize_bad      = 0;
 static unsigned long *ref_hash[2];   /* first frame sequence per content */
 static int  ref_seen[2]    = { 0, 0 };
@@ -152,8 +157,28 @@ static const char *make_demo(const char *iwad, char *out, size_t outlen)
    return NULL;
 }
 
-static void audio_sample(int16_t l, int16_t r) { (void)l; (void)r; }
-static size_t audio_batch(const int16_t *d, size_t f) { (void)d; return f; }
+/* A session that leaves sound or music state behind renders the same
+ * pixels but plays something else, so the audio stream gets the same
+ * treatment as the frame sequence: hash it and hold every later session
+ * on this content to what the first one produced. */
+static void mix_sample(int16_t l, int16_t r)
+{
+   snd_hash = (snd_hash ^ (unsigned long)(unsigned short)l) * 16777619UL;
+   snd_hash = (snd_hash ^ (unsigned long)(unsigned short)r) * 16777619UL;
+   snd_hash &= 0xffffffffUL;
+   snd_frames++;
+}
+
+static void audio_sample(int16_t l, int16_t r) { mix_sample(l, r); }
+
+static size_t audio_batch(const int16_t *d, size_t f)
+{
+   size_t i;
+   if (d)
+      for (i = 0; i < f; i++)
+         mix_sample(d[i * 2], d[i * 2 + 1]);
+   return f;
+}
 static void input_poll(void) { }
 static int16_t input_state(unsigned p, unsigned d, unsigned i, unsigned id)
 {
@@ -297,6 +322,8 @@ int main(int argc, char **argv)
        * numbering.  Indices a teardown failed to drop then address the
        * wrong lump.  Each content keeps its own reference frames. */
       content_idx = alt ? ((s - 1) & 1) : 0;
+      snd_hash    = 2166136261UL;
+      snd_frames  = 0;
       memset(&info, 0, sizeof(info));
       info.path = alt ? (content_idx ? (altpath ? altpath : content) : argv[2])
                       : content;
@@ -339,8 +366,24 @@ int main(int argc, char **argv)
          }
       }
 
+      if (!ref_seen[content_idx])
+      {
+         ref_snd[content_idx]        = snd_hash;
+         ref_snd_frames[content_idx] = snd_frames;
+      }
+      else if (snd_frames != ref_snd_frames[content_idx]
+            || snd_hash   != ref_snd[content_idx])
+      {
+         printf("FAIL: session %d audio differs from the first session on "
+                "this content (%llu frames/%08lx vs %llu/%08lx)\n",
+               s, snd_frames, snd_hash,
+               ref_snd_frames[content_idx], ref_snd[content_idx]);
+         snd_bad++;
+      }
       ref_seen[content_idx] = 1;
 
+      printf("== session %d: audio %llu frames, hash %08lx\n",
+            s, snd_frames, snd_hash);
       printf("== session %d: unload\n", s);
       fflush(stdout);
       retro_unload_game();
@@ -373,6 +416,8 @@ int main(int argc, char **argv)
    if (mismatches)
       return 1;
    if (ssize_bad)
+      return 1;
+   if (snd_bad)
       return 1;
    if (nonblank < sessions)
    {

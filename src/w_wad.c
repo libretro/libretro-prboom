@@ -340,24 +340,65 @@ static void W_AddFile(wadfile_info_t *wadfile)
    }
    else
    {
-      // WAD file
+      /* WAD file.  Everything below indexes the file by what its own
+       * header claims, so the claims are checked against the file's real
+       * size first.  I_Error only reports here, so each check returns:
+       * left to run on, a directory offset past the end reads off the
+       * end of the mapping (a fault, not a caught error), and a negative
+       * lump count sizes the malloc below by a negative number.
+       *
+       * The bound has to come from the stream rather than
+       * wadfile->length, which only the non-MEMORY_LOW branch fills in.
+       */
+      int64_t wadlen = filestream_get_size(wadfile->handle);
+
+      if (wadlen < (int64_t)sizeof(header))
+      {
+         I_Error("W_AddFile: %s is %lld bytes, too short to hold a wad "
+                 "header", wadfile->name, (long long)wadlen);
+         return;
+      }
 #ifdef MEMORY_LOW
+      rfseek(wadfile->handle, 0, SEEK_SET);
       if (rfread(&header, sizeof(header), 1, wadfile->handle) <= 0)
+      {
          I_Error("W_AddFile: read failed");
+         return;
+      }
 #else
       memcpy(&header, wadfile->data, sizeof(header));
 #endif
       if (strncmp(header.identification,"IWAD",4) &&
             strncmp(header.identification,"PWAD",4))
+      {
          I_Error("W_AddFile: Wad file %s doesn't have IWAD or PWAD id", wadfile->name);
+         return;
+      }
       header.numlumps = LONG(header.numlumps);
       header.infotableofs = LONG(header.infotableofs);
+
+      if (   header.numlumps     < 0
+          || header.infotableofs < (int)sizeof(header)
+          || (int64_t)header.infotableofs
+             + (int64_t)header.numlumps * (int64_t)sizeof(filelump_t)
+             > wadlen)
+      {
+         I_Error("W_AddFile: %s claims %d lumps at offset %d, which its "
+                 "%lld bytes cannot hold", wadfile->name, header.numlumps,
+                 header.infotableofs, (long long)wadlen);
+         return;
+      }
+
       length = header.numlumps*sizeof(filelump_t);
       fileinfo2free = fileinfo = malloc(length);    // killough
 #ifdef MEMORY_LOW
       rfseek(wadfile->handle, header.infotableofs, SEEK_SET);
       if (rfread(fileinfo, length, 1, wadfile->handle) <= 0)
+      {
          I_Error("W_AddFile: read failed");
+         free(fileinfo2free);
+         return;
+      }
 #else
       memcpy(fileinfo, &wadfile->data[header.infotableofs], length);
 #endif

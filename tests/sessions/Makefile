@@ -16,12 +16,26 @@
 #
 # And state mode, also out of check: it saves the state mid-run, plays
 # on, restores, and replays the same stretch, which is what run-ahead
-# and rewind do to every frame.  Whether it passes depends on where in
-# the run the state is taken -- with the demo content, saving at frame
-# 120 replays exactly, 130 diverges six frames later, 150 differs only
-# on the first frame, and 100 differs throughout.  Something about the
-# restore is still tied to the point it was taken at, and until that is
-# understood the mode is a diagnostic rather than a verdict:
+# and rewind do to every frame.
+#
+# It compares frames, and frames are an imperfect proxy here.  The
+# simulation across a restore is exact -- gametic, leveltime, the tic
+# fraction and the player's position and angle come back identical at
+# every save point tested.  What differs is interpolation: PrevX/PrevY/
+# PrevZ sit at the end of mobj_t and are left out of the savegame on
+# purpose, to keep the prboom 2.4.4 format, so every mobj except the
+# view player (whose values extra_serialize carries separately)
+# interpolates from a stale origin until its next tic.  How many frames
+# that shows for depends on the sub-tic phase when the state was taken
+# and on how much is moving, which is why the verdict moves with the run
+# count: on the demo content, saving at frame 120 replays exactly, 130
+# diverges six frames later, 150 differs only on the first frame, and
+# 100 differs throughout.
+#
+# So it stays a diagnostic.  It is worth running against a change to the
+# state format -- it is what caught the demo read position going missing,
+# where the simulation really did diverge -- but a frame difference here
+# is not by itself a fault:
 #
 #   ./sessions_test ../../prboom_libretro.so freedoom1.wad 3 300 state
 #

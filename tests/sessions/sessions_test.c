@@ -79,12 +79,13 @@ static void video_refresh(const void *data, unsigned w, unsigned h, size_t pitch
             hsh = (hsh ^ p[k]) * 16777619UL;
          hsh &= 0xffffffffUL;
 
-         /* The first frame after a restore is skipped.  Interpolation
-          * origins are per-frame rather than per-tic and only the view
-          * player's are in the state, so every other mobj interpolates
-          * from a stale position for exactly one frame.  That is a
-          * presentational artifact; from the second frame on the two
-          * stretches have to agree exactly. */
+         /* The first frame after a restore is skipped: every mobj but
+          * the view player interpolates from a stale origin, because
+          * PrevX/PrevY/PrevZ are left out of the savegame to keep the
+          * prboom 2.4.4 format.  Skipping one frame covers the common
+          * case; depending on the sub-tic phase when the state was
+          * taken it can show for longer, which is presentational rather
+          * than a divergence -- the simulation itself comes back exact. */
          if (replay_arm > 1)
          {
             replay_hash = (replay_hash ^ hsh) * 16777619UL;
@@ -662,8 +663,8 @@ int main(int argc, char **argv)
    if (argc > 5 && !strcmp(argv[5], "nodes")) nodesmode = 1;
    /* The replay check is its own mode rather than part of every lane:
     * it needs the demo content, it runs the middle of the session
-    * twice, and what it reports still depends on where in the run the
-    * state is taken (see the Makefile). */
+    * twice, and a frame difference it reports is not by itself a fault
+    * -- see the Makefile on what it does and does not establish. */
    if (argc > 5 && !strcmp(argv[5], "state")) { statemode = 1; demo = 1; }
    /* alt alternates the iwad with a second content file, so consecutive
     * sessions build different lump tables.  argv[6] names that file; with

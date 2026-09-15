@@ -801,8 +801,22 @@ static void P_LoadNodes (int lump)
   W_UnlockLumpNum(lump); // cph - release the data
 }
 
-static void P_LoadXNOD(const uint8_t *data, int len);
-static void P_LoadXGLNodes(const uint8_t *data, int len, int glver);
+/* Both return FALSE on a lump that does not describe what it claims;
+ * P_LoadUDMFNodes then declines the level. */
+static dbool P_LoadXNOD(const uint8_t *data, int len);
+static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver);
+
+/* Every read below is preceded by a check that the bytes are there, and
+ * every count by a check that the records it promises fit in what is
+ * left.  The node lump is content: its counts and indices are supplied
+ * by whoever built the wad, and until now len was decremented on each
+ * read and never tested, so a truncated or hostile lump walked off the
+ * end of it.  The index checks that did exist raised I_Error, which
+ * only reports in this port, so the read they guarded went ahead
+ * anyway. */
+#define XNOD_NEED(n)  do { if ((int64_t)(n) > (int64_t)len) return FALSE; } while (0)
+#define XNOD_COUNT(c, recsz) \
+   do { if ((c) < 0 || (int64_t)(c) * (int64_t)(recsz) > (int64_t)len) return FALSE; } while (0)
 
 /* P_DecompressZNodes -- inflate a zlib-compressed (Z*) extended-node lump
  * into a freshly allocated buffer.  The compressed ZDBSP node formats are
@@ -941,29 +955,36 @@ static dbool P_LoadUDMFNodes(int lump)
     len  = lumplen - 4;
   }
 
-  if (glver < 0)
-    P_LoadXNOD(data, len);
-  else
-    P_LoadXGLNodes(data, len, glver);
+  {
+    dbool ok = (glver < 0) ? P_LoadXNOD(data, len)
+                           : P_LoadXGLNodes(data, len, glver);
 
-  if (decomp)
-    free(decomp);
-  W_UnlockLumpNum(lump);
-  return TRUE;
+    if (decomp)
+      free(decomp);
+    W_UnlockLumpNum(lump);
+    return ok;
+  }
 }
 
 //
 // P_LoadXNOD - load uncompressed ZDBSP nodes
 //
-static void P_LoadXNOD(const uint8_t *data, int len)
+static dbool P_LoadXNOD(const uint8_t *data, int len)
 {
   int i, numorgvert, numnewvert, first_seg = 0;
   vertex_t *newvert;
 
   /* data points just past the 4-byte signature (the dispatcher advanced it,
    * or it is the inflated body which has no signature). */
+  XNOD_NEED(8);
   numorgvert = LONG(*(const int *)data); data += 4; len -= 4;
   numnewvert = LONG(*(const int *)data); data += 4; len -= 4;
+
+  /* numorgvert has to match the VERTEXES lump already loaded; the
+   * builder wrote it from that same map. */
+  if (numorgvert != numvertexes)
+    return FALSE;
+  XNOD_COUNT(numnewvert, 8);
 
   newvert = Z_Realloc(vertexes,
                       (numorgvert+numnewvert)*sizeof(*newvert),
@@ -988,16 +1009,24 @@ static void P_LoadXNOD(const uint8_t *data, int len)
   newvert = vertexes + numorgvert;
   numvertexes = numorgvert + numnewvert;
 
+  XNOD_NEED(4);
   numsubsectors = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  XNOD_COUNT(numsubsectors, 4);
   subsectors = Z_Calloc(numsubsectors, sizeof(*subsectors), PU_LEVEL, NULL);
 
   for (i = 0; i < numsubsectors; i++) {
     subsectors[i].firstline = first_seg;
     subsectors[i].numlines = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+    if (subsectors[i].numlines < 0)
+      return FALSE;
     first_seg += subsectors[i].numlines;
+    if (first_seg < 0)                  /* the counts summed past INT_MAX */
+      return FALSE;
   }
 
+  XNOD_NEED(4);
   numsegs = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  XNOD_COUNT(numsegs, 11);              /* v1 + v2 + linedef + side */
   segs = Z_Calloc(numsegs, sizeof(*segs), PU_LEVEL, NULL);
 
   for (i = 0; i < numsegs; i++)
@@ -1013,8 +1042,21 @@ static void P_LoadXNOD(const uint8_t *data, int len)
     ld = SHORT(*(const unsigned short *)data); data += 2; len -= 2;
     side = *(const unsigned char *)data; data += 1; len -= 1;
 
+    /* Indices straight out of the lump, used below to walk vertexes,
+     * lines and sides.  XGL nodes checked the linedef and side (through
+     * an I_Error that does not stop); the plain XNOD path checked
+     * nothing at all. */
+    if (v1 >= (unsigned int)numvertexes || v2 >= (unsigned int)numvertexes)
+      return FALSE;
+    if (ld >= (unsigned short)numlines || side > 1)
+      return FALSE;
+
     seg = segs + i;
     line = lines + ld;
+
+    if (line->sidenum[side] == NO_INDEX
+        || line->sidenum[side] >= (unsigned short)numsides)
+      return FALSE;
 
     seg->v1 = vertexes + v1;
     seg->v2 = vertexes + v2;
@@ -1039,7 +1081,9 @@ static void P_LoadXNOD(const uint8_t *data, int len)
       ));
   }
 
+  XNOD_NEED(4);
   numnodes = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  XNOD_COUNT(numnodes, 8 + 16 + 8);
   nodes = Z_Calloc(numnodes, sizeof(*nodes), PU_LEVEL, NULL);
 
   for (i = 0; i < numnodes; i++)
@@ -1063,6 +1107,8 @@ static void P_LoadXNOD(const uint8_t *data, int len)
       node->children[j] = LONG(*(const unsigned int *)data); data += 4; len -= 4;
     }
   }
+
+  return TRUE;
 }
 
 /* P_LoadXGLNodes -- load uncompressed ZDoom GL extended nodes.
@@ -1082,7 +1128,7 @@ static void P_LoadXNOD(const uint8_t *data, int len)
  * Byte-stepped rather than cast through packed structs, to stay portable
  * under MSVC C89 (matching P_LoadXNOD).
  */
-static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
+static dbool P_LoadXGLNodes(const uint8_t *data, int len, int glver)
 {
   int i, j;
   int numorgvert, numnewvert, first_seg = 0;
@@ -1094,8 +1140,13 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
   /* data points just past the 4-byte signature (see P_LoadXNOD note). */
 
   /* --- vertices: original count + builder-added vertices --- */
+  XNOD_NEED(8);
   numorgvert = LONG(*(const int *)data); data += 4; len -= 4;
   numnewvert = LONG(*(const int *)data); data += 4; len -= 4;
+
+  if (numorgvert != numvertexes)
+    return FALSE;
+  XNOD_COUNT(numnewvert, 8);
 
   newvert = Z_Realloc(vertexes,
                       (numorgvert + numnewvert) * sizeof(*newvert),
@@ -1121,20 +1172,32 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
 
   /* --- subsectors: only the per-subsector seg count is stored; the first
    * seg index is accumulated (first subsector starts at seg 0) --- */
+  XNOD_NEED(4);
   numsubsectors = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  XNOD_COUNT(numsubsectors, 4);
   subsectors = Z_Calloc(numsubsectors, sizeof(*subsectors), PU_LEVEL, NULL);
 
   for (i = 0; i < numsubsectors; i++)
   {
     subsectors[i].firstline = first_seg;
     subsectors[i].numlines = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+    if (subsectors[i].numlines < 0)
+      return FALSE;
     first_seg += subsectors[i].numlines;
+    if (first_seg < 0)                  /* the counts summed past INT_MAX */
+      return FALSE;
   }
 
   /* --- segs --- */
+  XNOD_NEED(4);
   numsegs = LONG(*(const unsigned int *)data); data += 4; len -= 4;
   if (numsegs != first_seg)
+  {
     I_Error("P_LoadXGLNodes: %d segs but subsectors total %d", numsegs, first_seg);
+    return FALSE;
+  }
+  /* v1 + partner + linedef (2 or 4) + side */
+  XNOD_COUNT(numsegs, line_is_32 ? 13 : 11);
   segs = Z_Calloc(numsegs, sizeof(*segs), PU_LEVEL, NULL);
 
   /* First pass: read v1 (and linedef/side), wiring each subsector's segs
@@ -1165,6 +1228,9 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
       }
       side = *(const unsigned char *)data; data += 1; len -= 1;
 
+      if (v1 >= (unsigned int)numvertexes)
+        return FALSE;
+
       seg->v1 = vertexes + v1;
       /* close the polygon: this seg's v2 is the next seg's v1 (wrap last) */
       if (j == 0)
@@ -1177,11 +1243,20 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
         line_t *ldef;
 
         if (line >= (unsigned int)numlines)
+        {
           I_Error("P_LoadXGLNodes: seg references bad linedef %u", line);
+          return FALSE;
+        }
         ldef = lines + line;
 
         if (side != 0 && side != 1)
+        {
           I_Error("P_LoadXGLNodes: seg references bad side %u", (unsigned int)side);
+          return FALSE;
+        }
+        if (ldef->sidenum[side] != NO_INDEX
+            && ldef->sidenum[side] >= (unsigned short)numsides)
+          return FALSE;
 
         seg->miniseg = FALSE;
         seg->linedef = ldef;
@@ -1231,7 +1306,9 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
   }
 
   /* --- nodes --- */
+  XNOD_NEED(4);
   numnodes = LONG(*(const unsigned int *)data); data += 4; len -= 4;
+  XNOD_COUNT(numnodes, (node_is_32 ? 16 : 8) + 16 + 8);
   nodes = Z_Calloc(numnodes, sizeof(*nodes), PU_LEVEL, NULL);
 
   for (i = 0; i < numnodes; i++)
@@ -1269,6 +1346,8 @@ static void P_LoadXGLNodes(const uint8_t *data, int len, int glver)
       node->children[j] = LONG(*(const unsigned int *)data); data += 4; len -= 4;
     }
   }
+
+  return TRUE;
 }
 
 /*
@@ -2994,7 +3073,16 @@ void P_SetupLevel(int episode, int map, int playermask, skill_t skill)
    }
    else if (nodes_zdbsp == 1)
    {
-      P_LoadUDMFNodes(lumpnum + ML_NODES);
+      /* Binary map with a ZDBSP extended-node lump.  The UDMF path above
+       * already declines the level when the lump does not parse; this one
+       * discarded the answer and carried on into P_GroupLines with
+       * whatever partial geometry the parser had built. */
+      if (!P_LoadUDMFNodes(lumpnum + ML_NODES))
+      {
+         I_Error("P_SetupLevel: extended nodes are missing or corrupt");
+         level_setup_failed = TRUE;
+         return;
+      }
    }
    else
    {

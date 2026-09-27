@@ -77,6 +77,7 @@ int R_CollectPortalSpan(int portal, short *out_top, short *out_bot);
 extern int sky_reveal_active;
 extern int sky_row_min, sky_row_max;
 void R_SkyRevealBuild(void);
+void R_PlaneBuffersFree(void);
 void R_SkyRevealCoverCol(int x, int y1, int y2);
 int  R_SkyRevealExtents(short *out_top, short *out_bot);
 int  R_SkyRevealTest(int x, int y);

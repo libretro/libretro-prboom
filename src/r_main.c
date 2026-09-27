@@ -707,6 +707,11 @@ void R_Deinit(void)
       translationtables = NULL;
    }
 
+   /* Lazily allocated skybox/portal buffers: the plane pass's reveal mask
+    * and worker scratches (r_plane.c) and the span snapshot pairs above. */
+   R_PlaneBuffersFree();
+   R_PortalCapsFree();
+
    /* texturetranslation: small Z_Malloc'd array. */
    if (texturetranslation)
    {
@@ -972,8 +977,36 @@ static fixed_t portal_cap_dx[PORTAL_CAP_MAX];
 static fixed_t portal_cap_dy[PORTAL_CAP_MAX];
 static fixed_t portal_cap_dz[PORTAL_CAP_MAX];
 static int     portal_cap_alpha[PORTAL_CAP_MAX];
-static short portal_cap_top[PORTAL_CAP_MAX][MAX_SCREENWIDTH];
-static short portal_cap_bot[PORTAL_CAP_MAX][MAX_SCREENWIDTH];
+/* Portal and tagged-skybox span snapshots, allocated on the first frame
+ * the respective feature is active.  Static arrays here were 320 KB of
+ * resident BSS that vanilla maps never touch; the ensure helpers gate the
+ * capture blocks, so a failed allocation just skips the portal / skybox
+ * composite for the frame (the scene renders without them, exactly as it
+ * does for a map that has none). */
+static short (*portal_cap_top)[MAX_SCREENWIDTH];
+static short (*portal_cap_bot)[MAX_SCREENWIDTH];
+static short (*skybox_cap_top)[MAX_SCREENWIDTH];
+static short (*skybox_cap_bot)[MAX_SCREENWIDTH];
+
+static int R_EnsureCapPair(short (**top)[MAX_SCREENWIDTH],
+                           short (**bot)[MAX_SCREENWIDTH], int n)
+{
+  if (!*top)
+    *top = (short (*)[MAX_SCREENWIDTH])
+          malloc(sizeof(short) * (size_t)n * MAX_SCREENWIDTH);
+  if (!*bot)
+    *bot = (short (*)[MAX_SCREENWIDTH])
+          malloc(sizeof(short) * (size_t)n * MAX_SCREENWIDTH);
+  return (*top && *bot) ? 1 : 0;
+}
+
+void R_PortalCapsFree(void)
+{
+  free(portal_cap_top);  portal_cap_top = NULL;
+  free(portal_cap_bot);  portal_cap_bot = NULL;
+  free(skybox_cap_top);  skybox_cap_top = NULL;
+  free(skybox_cap_bot);  skybox_cap_bot = NULL;
+}
 static int   n_portal_caps;
 
 /* render skybox camera `sb` into scratch, then copy its owned sky pixels. */
@@ -1319,7 +1352,8 @@ void R_RenderPlayerView (player_t* player)
      * skybox block snapshots its spans.  The renders happen after the
      * skybox composites. */
     n_portal_caps = 0;
-    if (sector_portals_active && (floorportals || ceilingportals))
+    if (sector_portals_active && (floorportals || ceilingportals) &&
+        R_EnsureCapPair(&portal_cap_top, &portal_cap_bot, PORTAL_CAP_MAX))
     {
       int pids[PORTAL_ID_MAX];
       int npids = R_CollectPortalIds(pids, PORTAL_ID_MAX);
@@ -1421,10 +1455,9 @@ void R_RenderPlayerView (player_t* player)
      * entirely overdrawn.)  Spans for all skyboxes are captured before any
      * render because each render clears the planes (destroying the main
      * scene's sky visplanes). */
-    if (numskyboxes > 0)
+    if (numskyboxes > 0 &&
+        R_EnsureCapPair(&skybox_cap_top, &skybox_cap_bot, 16))
     {
-      static short cap_top[16][MAX_SCREENWIDTH];
-      static short cap_bot[16][MAX_SCREENWIDTH];
       int used[16], nused = 0, k, x;
       int nb = numskyboxes < 16 ? numskyboxes : 16;
       /* which tagged skyboxes appear, and capture their spans */
@@ -1432,8 +1465,8 @@ void R_RenderPlayerView (player_t* player)
       {
         if (R_CollectSkyboxSpan(k, sb_top, sb_bot))
         {
-          memcpy(cap_top[nused], sb_top, sizeof(short) * viewwidth);
-          memcpy(cap_bot[nused], sb_bot, sizeof(short) * viewwidth);
+          memcpy(skybox_cap_top[nused], sb_top, sizeof(short) * viewwidth);
+          memcpy(skybox_cap_bot[nused], sb_bot, sizeof(short) * viewwidth);
           used[nused++] = k;
         }
       }
@@ -1441,8 +1474,8 @@ void R_RenderPlayerView (player_t* player)
       {
         for (x = 0; x < viewwidth; x++)
         {
-          sb_top[x] = cap_top[k][x];
-          sb_bot[x] = cap_bot[k][x];
+          sb_top[x] = skybox_cap_top[k][x];
+          sb_bot[x] = skybox_cap_bot[k][x];
         }
         R_RenderTaggedSkybox(&skyboxes[used[k]]);
       }

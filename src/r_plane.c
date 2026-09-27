@@ -251,7 +251,21 @@ static int               span_recording = 0;
 static long              span_row_px[MAX_SCREENHEIGHT];
 static long              span_total_px = 0;
 static planeslice_t      plane_slices[PLANE_MAX_SLICES];
-static wallscratch_t     plane_scratch[PLANE_MAX_SLICES];
+/* Slice 0's scratch stays static so the single-threaded plane pass never
+ * depends on an allocation; the extra worker slices' scratches (16.5 KB
+ * each) are allocated on first multi-threaded use.  A static array of all
+ * eight was 132 KB of resident BSS that single-core targets never touch. */
+static wallscratch_t     plane_scratch0;
+static wallscratch_t    *plane_scratch_mt[PLANE_MAX_SLICES - 1];
+
+static wallscratch_t *plane_scratch_slot(int n)
+{
+  if (n == 0)
+    return &plane_scratch0;
+  if (!plane_scratch_mt[n - 1])
+    plane_scratch_mt[n - 1] = (wallscratch_t *)calloc(1, sizeof(wallscratch_t));
+  return plane_scratch_mt[n - 1];
+}
 /* Span indices grouped by row band.  Without this each worker scanned the
  * whole list to find its own spans, which is O(spans x workers): at eight
  * workers and ~3200 spans that is 25000 wasted compares a frame, and it
@@ -410,6 +424,16 @@ static int R_PlaneBuildSlices(int want)
       want = (int)affordable;
   }
 
+  if (want > 1)
+  {
+    /* Only split across slices whose scratch actually allocated; on
+     * failure the plane pass just runs on fewer slices this frame. */
+    int w2 = 1;
+    while (w2 < want && plane_scratch_slot(w2))
+      w2++;
+    want = w2;
+  }
+
   if (want > 1 && span_total_px > 0)
   {
     target = span_total_px / want;
@@ -420,7 +444,7 @@ static int R_PlaneBuildSlices(int want)
       {
         plane_slices[n].ylo = start;
         plane_slices[n].yhi = y;
-        plane_slices[n].ws  = &plane_scratch[n];
+        plane_slices[n].ws  = plane_scratch_slot(n);
         n++;
         start = y + 1;
         acc = 0;
@@ -429,7 +453,7 @@ static int R_PlaneBuildSlices(int want)
   }
   plane_slices[n].ylo = start;
   plane_slices[n].yhi = viewheight - 1;
-  plane_slices[n].ws  = &plane_scratch[n];
+  plane_slices[n].ws  = plane_scratch_slot(n);
   return n + 1;
 }
 
@@ -1462,7 +1486,12 @@ static void R_DoDrawPlane(visplane_t *pl)
  * class the clip arrays do not order against planes.  Column-major so
  * per-column span ops are contiguous bytes. */
 #define SKY_REVEAL_STRIDE (MAX_SCREENHEIGHT / 8)
-static uint8_t sky_reveal[MAX_SCREENWIDTH * SKY_REVEAL_STRIDE];
+/* Allocated on the first frame a skybox or portal is active: vanilla maps
+ * never touch the reveal machinery, and the static mask was 500 KB of
+ * resident BSS paid by every session.  The public reveal entry points
+ * (cover/extents/test) NULL-check it, so a failed allocation degrades to
+ * "no skybox composite this frame" via the cleared sky_reveal_active. */
+static uint8_t *sky_reveal;
 int sky_reveal_active;   /* set for the main pass while skyview.active */
 int sky_row_min, sky_row_max;   /* row band containing any sky claim */
 
@@ -1481,9 +1510,12 @@ static void R_SkyRevealSetCol(int x, int y1, int y2)
 /* Column-range clear: pixels in [y1,y2] at column x are covered. */
 void R_SkyRevealCoverCol(int x, int y1, int y2)
 {
-  uint8_t *col = sky_reveal + (size_t)x * SKY_REVEAL_STRIDE;
+  uint8_t *col;
   int b1, b2, i;
   uint8_t m1, m2;
+  if (!sky_reveal)
+    return;
+  col = sky_reveal + (size_t)x * SKY_REVEAL_STRIDE;
   if (y1 < sky_row_min) y1 = sky_row_min;
   if (y2 > sky_row_max) y2 = sky_row_max;
   if (y2 < y1)
@@ -1502,6 +1534,15 @@ void R_SkyRevealBuild(void)
 {
   int i, x;
   visplane_t *pl;
+  if (!sky_reveal)
+    sky_reveal = (uint8_t *)malloc((size_t)MAX_SCREENWIDTH * SKY_REVEAL_STRIDE);
+  if (!sky_reveal)
+  {
+    sky_reveal_active = 0;
+    sky_row_min = viewheight;
+    sky_row_max = -1;
+    return;
+  }
   memset(sky_reveal, 0, (size_t)viewwidth * SKY_REVEAL_STRIDE);
   sky_row_min = viewheight; sky_row_max = -1;
   /* pass 1: union of the skipped windows -- sky plane spans (when the
@@ -1649,6 +1690,8 @@ int R_LinePortalIds(int *out_ids, int maxids)
 int R_SkyRevealExtents(short *out_top, short *out_bot)
 {
   int x, any = 0;
+  if (!sky_reveal)
+    return 0;
   for (x = 0; x < viewwidth; x++)
   {
     const uint8_t *col = sky_reveal + (size_t)x * SKY_REVEAL_STRIDE;
@@ -1664,8 +1707,25 @@ int R_SkyRevealExtents(short *out_top, short *out_bot)
   return any;
 }
 
+/* Free the lazily allocated reveal mask and worker plane scratches.
+ * Called from R_Deinit so a session that used skyboxes or threaded plane
+ * rendering hands the memory back at teardown. */
+void R_PlaneBuffersFree(void)
+{
+  int i;
+  free(sky_reveal);
+  sky_reveal = NULL;
+  for (i = 0; i < PLANE_MAX_SLICES - 1; i++)
+  {
+    free(plane_scratch_mt[i]);
+    plane_scratch_mt[i] = NULL;
+  }
+}
+
 int R_SkyRevealTest(int x, int y)
 {
+  if (!sky_reveal)
+    return 0;
   return sky_reveal[(size_t)x * SKY_REVEAL_STRIDE + (y >> 3)] & (1 << (y & 7));
 }
 

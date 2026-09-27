@@ -2039,6 +2039,7 @@ void D_DoomDeinit(void)
   U_FreeDynLights();
   U_FreeVoxels();
   U_FreeDecalDefs();
+  U_FreeDecorate();
   ST_ResetFace();
   R_ResetComposedPalette();
   R_ResetComposedPaletteTC();

@@ -187,7 +187,15 @@ typedef struct
                                 * before the table is built at registration */
 } decorate_actor_t;
 
-static decorate_actor_t actors[MAX_DECORATE_ACTORS];
+/* Actor definitions are allocated per entry as headers are parsed, so a
+ * session only pays for the actors its wads actually declare.  A static
+ * actors[MAX_DECORATE_ACTORS] table cost 7.6 KB per slot (MEMORY_LOW) or
+ * 47 KB per slot (full frame budget) -- 7.8 MB / 48 MB of resident BSS on
+ * every session, DECORATE lump or not, which alone consumed a third of a
+ * GameCube's 24 MB MEM1.  The pointer table pins each entry for the
+ * session (statemaps[] and the parser hold decorate_actor_t pointers), and
+ * U_FreeDecorate releases everything between sessions. */
+static decorate_actor_t *actors[MAX_DECORATE_ACTORS];
 static int num_actors;
 
 /* Built DECORATE colour-remap tables.  Each entry is a 256-byte palette
@@ -292,15 +300,44 @@ typedef struct {
   struct { char name[28]; short base; short len; } var[MAX_USERVARS];
 } uvarmap_t;
 #define MAX_UVARMAPS MAX_DECORATE_ACTORS
-static uvarmap_t uvarmaps[MAX_UVARMAPS];
+/* Allocated per entry at registration for the same reason as actors[]:
+ * the static table was 524 KB of resident BSS keyed to a cap, not to the
+ * handful of actors a wad really declares. */
+static uvarmap_t *uvarmaps[MAX_UVARMAPS];
 static int num_uvarmaps;
+
+/* Allocate and publish the user-variable map for a registered mobjtype.
+ * Both registration paths (decoration/monster clones and the SexActor
+ * registrar) publish identically, so the fill lives here once.  A failed
+ * allocation just leaves the type unmapped: the ACS user-variable
+ * builtins already treat an unknown type as slotless. */
+static void decorate_publish_uvarmap(int mt, const decorate_actor_t *a)
+{
+  uvarmap_t *m;
+  int u;
+  if (a->num_uvars <= 0 || num_uvarmaps == MAX_UVARMAPS)
+    return;
+  m = (uvarmap_t *)calloc(1, sizeof(*m));
+  if (!m)
+    return;
+  m->type  = mt;
+  m->slots = a->uvar_slots;
+  m->num   = a->num_uvars;
+  for (u = 0; u < a->num_uvars; u++)
+  {
+    memcpy(m->var[u].name, a->uvar[u].name, sizeof(m->var[u].name));
+    m->var[u].base = a->uvar[u].base;
+    m->var[u].len  = a->uvar[u].len;
+  }
+  uvarmaps[num_uvarmaps++] = m;
+}
 
 static uvarmap_t *uvarmap_for_type(int type)
 {
   int i;
   for (i = 0; i < num_uvarmaps; i++)
-    if (uvarmaps[i].type == type)
-      return &uvarmaps[i];
+    if (uvarmaps[i]->type == type)
+      return uvarmaps[i];
   return NULL;
 }
 
@@ -1422,8 +1459,12 @@ static void parse_header(const char *p, const char *end)
 
   if (num_actors == MAX_DECORATE_ACTORS)
     return;
-  a = &actors[num_actors];
-  memset(a, 0, sizeof(*a));
+  /* calloc gives the zeroed state the static table used to provide; the
+   * entry is only published into actors[] once the header commits, so an
+   * aborted header (empty name) never leaves a half-filled slot behind. */
+  a = (decorate_actor_t *)calloc(1, sizeof(*a));
+  if (!a)
+    return;
   a->doomednum = -1;
   a->radius = a->height = -1;
   a->health = a->speed = a->painchance = a->mass = a->meleedamage = -1;
@@ -1435,7 +1476,10 @@ static void parse_header(const char *p, const char *end)
   p = skip_space(p, end);
   p = read_word(p, end, a->name, sizeof(a->name));
   if (!a->name[0])
+  {
+    free(a);
     return;
+  }
 
   while (p < end && *p != '\n' && *p != '{')
   {
@@ -1468,7 +1512,7 @@ static void parse_header(const char *p, const char *end)
   if (a->wpn_slot < 0 && a->parent[0])
     a->wpn_slot = weapon_base_slot(a->parent);
 
-  num_actors++;
+  actors[num_actors++] = a;
 }
 
 /* Lump name a pk3 gives an included file: basename after the last slash, up
@@ -1643,7 +1687,7 @@ static void parse_decorate_lump(int lump, int incdepth)
         bend++;
       }
       if (num_actors > 0 && body < len && bend > body)
-        parse_body(&actors[num_actors - 1], txt + body + 1, txt + bend);
+        parse_body(actors[num_actors - 1], txt + body + 1, txt + bend);
       i = bend;
       depth = 0;
       continue;
@@ -1661,8 +1705,8 @@ static decorate_actor_t *find_actor_mut(const char *name)
 {
   int i;
   for (i = 0; i < num_actors; i++)
-    if (!strcasecmp(actors[i].name, name))
-      return &actors[i];
+    if (!strcasecmp(actors[i]->name, name))
+      return actors[i];
   return NULL;
 }
 
@@ -1844,8 +1888,8 @@ static void inherit_from_parents(void)
 {
   int i;
   for (i = 0; i < num_actors; i++)
-    if (actors[i].parent[0] && !actors[i].inherited)
-      inherit_one(&actors[i]);
+    if (actors[i]->parent[0] && !actors[i]->inherited)
+      inherit_one(actors[i]);
 }
 
 static void parse_decorate(void)
@@ -1870,8 +1914,8 @@ static const decorate_actor_t *find_actor(const char *name)
 {
   int i;
   for (i = 0; i < num_actors; i++)
-    if (!strcasecmp(actors[i].name, name))
-      return &actors[i];
+    if (!strcasecmp(actors[i]->name, name))
+      return actors[i];
   return NULL;
 }
 
@@ -3621,7 +3665,7 @@ void U_RegisterDecorateThings(void)
 
   for (i = 0; i < num_actors; i++)
   {
-    decorate_actor_t *a = &actors[i];
+    decorate_actor_t *a = actors[i];
     int st, mt, sp, k;
     mobjinfo_t *info;
     int nframes;
@@ -3670,27 +3714,11 @@ void U_RegisterDecorateThings(void)
      * scripts spawn by name -- e.g. an objective marker or a portal effect --
      * fails to resolve and silently never appears. */
     if (a->name[0] && !info->actorname)
-    {
-      char *nm = malloc(strlen(a->name) + 1);
-      if (nm) { strcpy(nm, a->name); info->actorname = nm; }
-    }
+      info->actorname = a->name;
 
     /* publish this actor's user-variable map under its mobjtype so the ACS
      * user-variable builtins can resolve names to slots at runtime */
-    if (a->num_uvars > 0 && num_uvarmaps < MAX_UVARMAPS)
-    {
-      uvarmap_t *m = &uvarmaps[num_uvarmaps++];
-      int u;
-      m->type  = mt;
-      m->slots = a->uvar_slots;
-      m->num   = a->num_uvars;
-      for (u = 0; u < a->num_uvars; u++)
-      {
-        memcpy(m->var[u].name, a->uvar[u].name, sizeof(m->var[u].name));
-        m->var[u].base = a->uvar[u].base;
-        m->var[u].len  = a->uvar[u].len;
-      }
-    }
+    decorate_publish_uvarmap(mt, a);
 
     /* +USESPECIAL: record the state its "Active" label resolves to, so the
      * use-trace can switch a used thing of this type into it. */
@@ -3886,12 +3914,12 @@ static void register_one_monster_repl(decorate_actor_t *a, int *sp_next,
   info->flags &= ~MF_SOLID;
   /* carry the replacement's own class name so ACS GetActorClass reports the
    * custom name (the death system builds "<Name>_Sex" from it), not the stock
-   * class the clone was copied from.  Names are interned in the actor table,
-   * which outlives registration, so a borrowed pointer is safe. */
-  {
-    char *nm = malloc(strlen(a->name) + 1);
-    if (nm) { strcpy(nm, a->name); info->actorname = nm; }
-  }
+   * class the clone was copied from.  The actor entry outlives every
+   * actorname reader (cheat summon, ACS name resolution): it is freed only
+   * by U_FreeDecorate in D_DoomDeinit, and dsda_InitTables re-seeds
+   * mobjinfo before the next session, so the borrowed pointer never
+   * dangles and nothing is left to leak at teardown. */
+  info->actorname = a->name;
 
   /* property overrides the header captured (others stay at stock values) */
   if (a->radius >= 0) info->radius = a->radius * FRACUNIT;
@@ -4047,7 +4075,7 @@ void U_RegisterDecorateMonsters(void)
   num_decorate_repls = 0;
   for (i = 0; i < num_actors; i++)
   {
-    decorate_actor_t *a = &actors[i];
+    decorate_actor_t *a = actors[i];
     int basedn, basemt;
     if (!a->replaces[0])
       continue;
@@ -4108,7 +4136,6 @@ static int register_spawnonly_actor(decorate_actor_t *a, int *st_cursor,
 {
   int mt, sp, base, spawn_label;
   mobjinfo_t *info;
-  char *nm;
 
   if (a->seq_len <= 0)
     return -1;
@@ -4144,23 +4171,9 @@ static int register_spawnonly_actor(decorate_actor_t *a, int *st_cursor,
                                  ? MF_TRANSLUCENT : 0);
   decorate_set_render_style(info, a);
 
-  nm = malloc(strlen(a->name) + 1);
-  if (nm) { strcpy(nm, a->name); info->actorname = nm; }
+  info->actorname = a->name;
 
-  if (a->num_uvars > 0 && num_uvarmaps < MAX_UVARMAPS)
-  {
-    uvarmap_t *m = &uvarmaps[num_uvarmaps++];
-    int u;
-    m->type  = mt;
-    m->slots = a->uvar_slots;
-    m->num   = a->num_uvars;
-    for (u = 0; u < a->num_uvars; u++)
-    {
-      memcpy(m->var[u].name, a->uvar[u].name, sizeof(m->var[u].name));
-      m->var[u].base = a->uvar[u].base;
-      m->var[u].len  = a->uvar[u].len;
-    }
-  }
+  decorate_publish_uvarmap(mt, a);
 
   /* +USESPECIAL: record the state its "Active" label resolves to so the
    * use-trace can switch a used actor of this type into it (the follow-on
@@ -4202,7 +4215,7 @@ void U_RegisterDecorateSexActors(void)
 
   for (i = 0; i < num_actors; i++)
   {
-    decorate_actor_t *a = &actors[i];
+    decorate_actor_t *a = actors[i];
     if (!is_sexactor_derived(a) || a->seq_len <= 0)
       continue;
     if (register_spawnonly_actor(a, &st_cursor, &mt_cursor, &sp_next) >= 0)
@@ -4218,7 +4231,7 @@ void U_RegisterDecorateSexActors(void)
    * separately; the weapon-fire path selects it when a frame asked for it. */
   for (i = 0; i < num_actors; i++)
   {
-    decorate_actor_t *a = &actors[i];
+    decorate_actor_t *a = actors[i];
     if (a->seq_len <= 0)
       continue;
     if (a->replaces[0] && !strcasecmp(a->replaces, "BulletPuff"))
@@ -4244,7 +4257,7 @@ void U_RegisterDecorateSexActors(void)
    * stock states (2 flight + 6 land) line up with the replacement's frames. */
   for (i = 0; i < num_actors; i++)
   {
-    decorate_actor_t *a = &actors[i];
+    decorate_actor_t *a = actors[i];
     if (a->seq_len <= 0 || !a->replaces[0] ||
         strcasecmp(a->replaces, "BFGBall"))
       continue;
@@ -4296,7 +4309,7 @@ void U_RegisterDecorateSexActors(void)
    * see their targets unregistered. */
   for (i = 0; i < num_actors; i++)
   {
-    decorate_actor_t *a = &actors[i];
+    decorate_actor_t *a = actors[i];
     if (!a->name[0] || a->seq_len <= 0 || a->is_monster)
       continue;
     if (decorate_type_by_name(a->name) >= 0)
@@ -4412,7 +4425,7 @@ void U_RegisterDecorateWeapons(void)
 
   for (i = 0; i < num_actors; i++)
   {
-    decorate_actor_t *a = &actors[i];
+    decorate_actor_t *a = actors[i];
     int slot = a->wpn_slot;
     int ready, up, down, atk, flash;
     int first_of[WST_COUNT];
@@ -4507,12 +4520,12 @@ int U_DecorateAliasDoomedNum(int doomednum)
     parse_decorate();
 
   for (i = 0; i < num_actors; i++)
-    if (actors[i].doomednum == doomednum)
+    if (actors[i]->doomednum == doomednum)
     {
-      int dn = resolve_class(actors[i].name, &actors[i], 0);
+      int dn = resolve_class(actors[i]->name, actors[i], 0);
       if (dn >= 0 && dn != doomednum)
         lprintf(LO_INFO, "U_DecorateAliasDoomedNum: %s %d -> %d\n",
-                actors[i].name, doomednum, dn);
+                actors[i]->name, doomednum, dn);
       return (dn != doomednum) ? dn : -1;
     }
   return -1;
@@ -4560,4 +4573,55 @@ void U_RegisterZDoomUtilityThings(void)
     info->doomednum = spots[i].ednum;
     info->actorname = spots[i].name;
   }
+}
+
+/* Release all DECORATE session state.  Called from D_DoomDeinit alongside
+ * the other U_Free* teardowns so the next retro_load_game re-parses the
+ * new session's DECORATE lump from a clean slate.  Before this existed the
+ * one-shot 'parsed' guard survived the session: a content reload kept the
+ * previous wad's actors and re-registered them into the fresh dsda tables,
+ * and every registration pass appended duplicate statemap/useact/uvarmap
+ * entries on top of the stale ones. */
+void U_FreeDecorate(void)
+{
+  int i;
+
+  for (i = 0; i < num_actors; i++)
+  {
+    free(actors[i]);
+    actors[i] = NULL;
+  }
+  num_actors = 0;
+
+  for (i = 0; i < num_uvarmaps; i++)
+  {
+    free(uvarmaps[i]);
+    uvarmaps[i] = NULL;
+  }
+  num_uvarmaps = 0;
+
+  free(snd_aliases);
+  snd_aliases        = NULL;
+  snd_num_aliases    = 0;
+  snd_aliases_parsed = 0;
+
+  num_statemaps         = 0;
+  num_useacts           = 0;
+  num_decorate_xlats    = 0;
+  num_decorate_sounds   = 0;
+  num_decorate_wsnd     = 0;
+  num_decorate_cmiss    = 0;
+  num_decorate_spawns   = 0;
+  num_decorate_acsnames = 0;
+  num_interned_acsnames = 0;
+  num_sprite_names      = 0;
+  num_decorate_repls    = 0;
+  num_sfxrandom         = 0;
+  num_parsed_lumps      = 0;
+
+  decorate_bulletpuff_type = -1;
+  decorate_bluepuff_type   = -1;
+  decorate_puff_override   = -1;
+
+  parsed = 0;
 }

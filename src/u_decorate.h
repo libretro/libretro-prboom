@@ -83,4 +83,8 @@ int U_DecorateUserVarSlot(int type, const char *name, int *base, int *len);
 int U_DecorateActiveState(int type);
 int U_DecorateStateForType(int type, const char *label);
 
+/* Session teardown: free the parsed actor definitions and reset every
+ * DECORATE table so the next session re-parses its own lump. */
+void U_FreeDecorate(void);
+
 #endif

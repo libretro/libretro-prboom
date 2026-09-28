@@ -48,8 +48,7 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/formats/mod/rmodtracker.c \
 				 $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
 				 $(LIBRETRO_COMM_DIR)/formats/audio_transfer.c \
-				 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c \
-				 $(LIBRETRO_COMM_DIR)/memmap/memmap.c
+				 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c
 
 # The hybrid VFS only exists for dynamically loaded builds.  When the core is
 # statically linked, frontend and core share one libretro-common: griffin's
@@ -63,6 +62,21 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 ifneq ($(STATIC_LINKING), 1)
 SOURCES_C += $(LIBRETRO_COMM_DIR)/vfs/vfs_hybrid.c \
 				 $(LIBRETRO_COMM_DIR)/file/retro_dirent.c
+endif
+
+# memmap.c is here for data_transfer.c's page machinery, which a dynamically
+# loaded core has to bring along itself. A statically linked one does not:
+# RetroArch builds memmap.o unconditionally - it is in Makefile.common's plain
+# OBJ list and in griffin.c - and defines exactly the same eight symbols, so
+# compiling ours too only gives wasm-ld two of each and it refuses the link:
+#
+#   wasm-ld: error: duplicate symbol: memsync
+#   >>> defined in obj-emscripten/./libretro-common/memmap/memmap.o
+#   >>> defined in libretro_emscripten.a(memmap.o)
+#
+# Same reasoning as the hybrid VFS above, and the same fix.
+ifneq ($(STATIC_LINKING), 1)
+SOURCES_C += $(LIBRETRO_COMM_DIR)/memmap/memmap.c
 endif
 
 SOURCES_C += $(CORE_DIR)/am_map.c \

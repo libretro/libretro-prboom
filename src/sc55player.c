@@ -154,6 +154,10 @@ static uint32_t       sp_song_hash;   /* identifies the registered song */
 static uint32_t       sp_song_id;     /* identifies this playing of it */
 static uint32_t       sp_plays;
 static size_t         sp_tail;        /* frames left to ring out after the last event */
+static float          sp_fade = 0.0f; /* 0..1: how far the unit's audio has faded back in */
+static float          sp_carry[2];    /* what was sounding when the audio stopped, dying away */
+static float          sp_last[2];     /* the last frame handed out */
+static float          sp_gain_now = -1.0f; /* the gain the last block ended on */
 
 /* Queued at power-on: a GS reset, which the mkII needs once because its
  * firmware does not initialise everything by itself, then a note the
@@ -1418,13 +1422,85 @@ static unsigned sp_pull_new(float *dest, unsigned n)
  * before: the same frames again, until the game is back where the unit
  * is.  The music then comes out exactly as it would have without the
  * load. */
+/* The unit's audio stops dead in several places: a song is stopped or
+ * changed, the game pauses, a state is loaded, a song runs out, or the
+ * worker is late.  Cutting a waveform off at whatever value it has is a
+ * click, and so is starting it there.  So where the audio stops, its
+ * last value is carried on and dies away over a few milliseconds, and
+ * where it starts it fades in over the same time.
+ *
+ * `real` frames at the start of `buf` are the unit's; the rest are a
+ * gap, zero on entry.  With no gap about, a frame passes through
+ * untouched. */
+#define SC55_DECLICK_MS 4
+
+static void sp_declick(float *buf, unsigned n, unsigned real)
+{
+   const float step  = 1000.0f / ((float)sp_rate * SC55_DECLICK_MS);
+   /* down 60 dB over the same span */
+   const float decay = (float)pow(0.001, (double)step);
+   unsigned k;
+
+   if (real == n && sp_fade >= 1.0f && sp_carry[0] == 0.0f && sp_carry[1] == 0.0f)
+   {
+      if (n)
+      {
+         sp_last[0] = buf[(n - 1) * 2];
+         sp_last[1] = buf[(n - 1) * 2 + 1];
+      }
+      return;
+   }
+   for (k = 0; k < n; k++)
+   {
+      float l = buf[k * 2], r = buf[k * 2 + 1];
+      if (k < real)
+      {
+         if (sp_fade < 1.0f)
+         {
+            l *= sp_fade;
+            r *= sp_fade;
+            sp_fade += step;
+            if (sp_fade > 1.0f)
+               sp_fade = 1.0f;
+         }
+      }
+      else
+      {
+         if (sp_fade > 0.0f)
+         {
+            /* the audio has just stopped: carry on from where it was */
+            sp_carry[0] = sp_last[0];
+            sp_carry[1] = sp_last[1];
+            sp_fade     = 0.0f;
+         }
+         l = r = 0.0f;
+      }
+      sp_carry[0] *= decay;
+      sp_carry[1] *= decay;
+      if (sp_carry[0] > -1e-7f && sp_carry[0] < 1e-7f)
+         sp_carry[0] = 0.0f;
+      if (sp_carry[1] > -1e-7f && sp_carry[1] < 1e-7f)
+         sp_carry[1] = 0.0f;
+      l += sp_carry[0];
+      r += sp_carry[1];
+      buf[k * 2]     = l;
+      buf[k * 2 + 1] = r;
+      sp_last[0]     = l;
+      sp_last[1]     = r;
+   }
+}
+
 static void sp_pull(float *dest, unsigned n)
 {
    unsigned i = 0;
 
    memset(dest, 0, (size_t)n * 2 * sizeof(float));
    if (!sp_open_ok || !sp_playing || sp_paused || !sp_events)
+   {
+      if (sp_rate > 0)
+         sp_declick(dest, n, 0);
       return;
+   }
 
    while (i < n && sp_clock < sp_clock_max)
    {
@@ -1437,7 +1513,8 @@ static void sp_pull(float *dest, unsigned n)
    if (i < n)
    {
       unsigned k;
-      sp_pull_new(dest + i * 2, n - i);
+      unsigned got = sp_pull_new(dest + i * 2, n - i);
+      sp_declick(dest + i * 2, n - i, got);
       for (k = i; k < n; k++)
       {
          float *dst = sp_hist + (size_t)(sp_clock_max & (SC55_HISTORY - 1)) * 2;
@@ -1458,29 +1535,61 @@ static float sp_gain(void)
    return 2.0f * (float)pow((double)sp_volume / 15.0, 1.75);
 }
 
-static void sp_render_float(void *vdest, unsigned nsamp)
+/* Apply the volume to `n` frames.  A change of volume is spread over
+ * the block; applied at once it is a step in the waveform, and dragging
+ * the slider is a run of them. */
+static void sp_apply_gain(float *buf, unsigned n, float scale)
 {
-   float   *dest = (float*)vdest;
-   float    gain = sp_gain();
+   float    target = sp_gain();
+   float    from   = sp_gain_now < 0.0f ? target : sp_gain_now;
    unsigned i;
 
+   if (from == target)
+   {
+      float g = target * scale;
+      for (i = 0; i < n * 2; i++)
+         buf[i] *= g;
+   }
+   else
+   {
+      float inc = (target - from) / (float)n;
+      for (i = 0; i < n; i++)
+      {
+         float g = (from + inc * (float)(i + 1)) * scale;
+         buf[i * 2]     *= g;
+         buf[i * 2 + 1] *= g;
+      }
+   }
+   sp_gain_now = target;
+}
+
+static void sp_render_float(void *vdest, unsigned nsamp)
+{
+   float *dest = (float*)vdest;
+
    sp_pull(dest, nsamp);
-   for (i = 0; i < nsamp * 2; i++)
-      dest[i] *= gain;
+   sp_apply_gain(dest, nsamp, 1.0f);
 }
 
 static void sp_render(void *vdest, unsigned nsamp)
 {
    int16_t *dest = (int16_t*)vdest;
-   float    gain = sp_gain() * 32768.0f;
    float    tmp[256 * 2];
 
    while (nsamp)
    {
       unsigned n = nsamp < 256 ? nsamp : 256;
       unsigned i;
+      int      silent = 1;
       sp_pull(tmp, n);
-      for (i = 0; i < n * 2; i++)
+      sp_apply_gain(tmp, n, 32768.0f);
+      for (i = 0; i < n * 2 && silent; i++)
+         if (tmp[i] != 0.0f)
+            silent = 0;
+      /* Nothing playing is exact silence, not dither noise. */
+      for (i = 0; silent && i < n * 2; i++)
+         dest[i] = 0;
+      for (i = 0; !silent && i < n * 2; i++)
       {
          /* TPDF dither of one step peak to peak each way, then round
           * to nearest: the only quantization on this path. */
@@ -1490,7 +1599,7 @@ static void sp_render(void *vdest, unsigned nsamp)
          d  = (float)(sp_dither >> 16) * (1.0f / 65536.0f);
          sp_dither = sp_dither * 1664525u + 1013904223u;
          d -= (float)(sp_dither >> 16) * (1.0f / 65536.0f);
-         v  = tmp[i] * gain + d;
+         v  = tmp[i] + d;
          q  = (int)floor((double)v + 0.5);
          if (q > 32767)  q = 32767;
          if (q < -32768) q = -32768;

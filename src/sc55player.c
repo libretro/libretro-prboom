@@ -84,6 +84,7 @@ typedef int    sp_int_t;
 #endif
 #define SC55_SETTLE_MS   100                 /* after the firmware answers */
 #define SC55_RESET_MS    100                 /* for a song's channel reset to be taken in */
+#define SC55_TAIL_MS     2500                /* a song that does not loop rings out this long */
 
 typedef struct
 {
@@ -152,6 +153,7 @@ static uint64_t       sp_clock_max;   /* frames ever produced for this song */
 static uint32_t       sp_song_hash;   /* identifies the registered song */
 static uint32_t       sp_song_id;     /* identifies this playing of it */
 static uint32_t       sp_plays;
+static size_t         sp_tail;        /* frames left to ring out after the last event */
 
 /* Queued at power-on: a GS reset, which the mkII needs once because its
  * firmware does not initialise everything by itself, then a note the
@@ -1064,18 +1066,32 @@ static void sp_all_notes_off(size_t time)
    }
 }
 
+/* Release every note but let it ring: the end of the track. */
+static void sp_release_notes(size_t time)
+{
+   int ch;
+   for (ch = 0; ch < 16; ch++)
+      sp_post3(time, 0xb0 | ch, 123, 0);
+}
+
 /* Put every channel back to its power-on state for a new song.  A GS
  * reset would do it in one message, but the unit stops listening for
  * seconds after one. */
 static void sp_reset_channels(size_t time)
 {
    int ch;
+   /* Silence first, on every channel, and the rest a moment later: the
+    * firmware does not get round to cutting the voices until it has
+    * worked through everything it was sent, and the rest is 300 bytes,
+    * which kept the old notes sounding for another 55 ms. */
+   for (ch = 0; ch < 16; ch++)
+      sp_post3(time, 0xb0 | ch, 120, 0);
+   time += (size_t)sp_rate / 50;
    for (ch = 0; ch < 16; ch++)
    {
-      unsigned char m[23];
+      unsigned char m[21];
       size_t n = 0;
       m[n++] = (unsigned char)(0xb0 | ch);
-      m[n++] = 120; m[n++] = 0;    /* all sound off */
       m[n++] = 121; m[n++] = 0;    /* reset all controllers */
       m[n++] = 0;   m[n++] = 0;    /* bank */
       m[n++] = 7;   m[n++] = 100;  /* volume */
@@ -1178,7 +1194,7 @@ static void sp_apply_event(midi_event_t *ev, size_t time)
 /* Queue every event that falls before output frame `until`. */
 static void sp_sequence(size_t until)
 {
-   while (sp_playing && sp_next_time < (double)until)
+   while (sp_playing && !sp_tail && sp_next_time < (double)until)
    {
       midi_event_t *ev   = sp_events[sp_eventpos];
       size_t        time = (size_t)sp_next_time;
@@ -1187,10 +1203,12 @@ static void sp_sequence(size_t until)
       if (ev->event_type == MIDI_EVENT_META
             && ev->data.meta.type == MIDI_META_END_OF_TRACK)
       {
-         sp_all_notes_off(time);
+         sp_release_notes(time);
          if (!sp_looping)
          {
-            sp_playing = 0;
+            /* No more events; sp_pull_new stops the song once the
+             * last notes and the reverb have had time to die away. */
+            sp_tail = (size_t)sp_rate * SC55_TAIL_MS / 1000;
             break;
          }
          sp_eventpos = 0;
@@ -1211,6 +1229,7 @@ static void sp_begin(void)
 {
    sp_flush();
    sp_reset_channels(0);
+   sp_tail      = 0;
    sp_clock     = 0;
    sp_clock_max = 0;
    sp_song_id   = sp_song_hash + (++sp_plays) * 0x9e3779b9u;
@@ -1378,6 +1397,16 @@ static unsigned sp_pull_new(float *dest, unsigned n)
    if (sp_consumed)   /* the first read of a song finds the queue still filling */
       sp_short += n - got;
    sp_consumed += got;
+   if (sp_tail)
+   {
+      if (sp_tail > got)
+         sp_tail -= got;
+      else
+      {
+         sp_tail    = 0;
+         sp_playing = 0;
+      }
+   }
    sp_wake();
    return (unsigned)got;
 }
@@ -1473,10 +1502,13 @@ static void sp_render(void *vdest, unsigned nsamp)
 }
 
 /* State: where the sequencer is, and which frame of which playing the
- * game had reached.  The unit itself is not saved.  A load that steps a
- * short way back is absorbed by sp_pull; any other load starts the
- * song's channels afresh and replays its program and controller state
- * up to the saved event. */
+ * game had reached.  The core keeps 512 bytes for a music player's
+ * state, so the unit itself (about 80 KB of machine state, plus what
+ * is in flight between the two threads) is not saved.  A load that
+ * steps a short way back is absorbed by sp_pull.  Any other load
+ * starts the channels afresh, restores what the song had set on them
+ * by the saved event, starts the notes that were held there again and
+ * carries on from that event. */
 #define SP_STATE_MAGIC 0x53433535u  /* 'SC55' */
 
 typedef struct
@@ -1533,15 +1565,97 @@ static int sp_unserialize(const void *src, size_t size)
    sp_eventpos = 0;
    sp_spmc     = MIDI_spmc(sp_midifile, NULL, (unsigned)sp_rate);
    sp_begin();
-   for (i = 0; i < s.eventpos; i++)
+   /* Work out what the song had set up by the saved event (programs,
+    * controllers, bend, bend range) and which notes were still held,
+    * and send only that.  Sending every event again would overrun the
+    * queue on a long song. */
    {
-      midi_event_t *ev = sp_events[i];
-      if (ev->event_type == MIDI_EVENT_META
-            && ev->data.meta.type == MIDI_META_END_OF_TRACK)
-         break;
-      if (ev->event_type != MIDI_EVENT_NOTE_ON
-            && ev->event_type != MIDI_EVENT_NOTE_OFF)
-         sp_apply_event(ev, (size_t)((double)sp_rate * SC55_RESET_MS / 1000.0));
+      static short         cc[16][128];
+      static unsigned char held[16][128];
+      short  prog[16], bend_l[16], bend_m[16], range[16];
+      size_t t0 = (size_t)((double)sp_rate * SC55_RESET_MS / 1000.0);
+      int    ch, c;
+
+      memset(held, 0, sizeof(held));
+      for (ch = 0; ch < 16; ch++)
+      {
+         prog[ch] = bend_l[ch] = bend_m[ch] = range[ch] = -1;
+         for (c = 0; c < 128; c++)
+            cc[ch][c] = -1;
+      }
+      for (i = 0; i < s.eventpos; i++)
+      {
+         midi_event_t *ev = sp_events[i];
+         int p1, p2;
+         if (ev->event_type == MIDI_EVENT_META
+               && ev->data.meta.type == MIDI_META_END_OF_TRACK)
+            break;
+         ch = (int)(ev->data.channel.channel & 15);
+         p1 = (int)(ev->data.channel.param1 & 127);
+         p2 = (int)(ev->data.channel.param2 & 127);
+         switch (ev->event_type)
+         {
+            case MIDI_EVENT_NOTE_ON:
+               held[ch][p1] = (unsigned char)p2;
+               break;
+            case MIDI_EVENT_NOTE_OFF:
+               held[ch][p1] = 0;
+               break;
+            case MIDI_EVENT_CONTROLLER:
+               if (p1 == 6 && cc[ch][101] == 0 && cc[ch][100] == 0)
+                  range[ch] = (short)p2;
+               if (p1 == 120 || p1 == 123)
+                  memset(held[ch], 0, sizeof(held[ch]));
+               cc[ch][p1] = (short)p2;
+               break;
+            case MIDI_EVENT_PROGRAM_CHANGE:
+               prog[ch] = (short)p1;
+               break;
+            case MIDI_EVENT_PITCH_BEND:
+               bend_l[ch] = (short)p1;
+               bend_m[ch] = (short)p2;
+               break;
+            case MIDI_EVENT_META:
+            case MIDI_EVENT_SYSEX:
+            case MIDI_EVENT_SYSEX_SPLIT:
+               sp_apply_event(ev, t0);
+               break;
+            default:
+               break;
+         }
+      }
+      for (ch = 0; ch < 16; ch++)
+      {
+         if (cc[ch][0] >= 0)
+            sp_post3(t0, 0xb0 | ch, 0, cc[ch][0]);
+         if (cc[ch][32] >= 0)
+            sp_post3(t0, 0xb0 | ch, 32, cc[ch][32]);
+         if (prog[ch] >= 0)
+         {
+            unsigned char m[2];
+            m[0] = (unsigned char)(0xc0 | ch);
+            m[1] = (unsigned char)prog[ch];
+            sp_post(t0, m, 2);
+         }
+         if (range[ch] >= 0)
+         {
+            sp_post3(t0, 0xb0 | ch, 101, 0);
+            sp_post3(t0, 0xb0 | ch, 100, 0);
+            sp_post3(t0, 0xb0 | ch, 6, range[ch]);
+         }
+         for (c = 1; c < 120; c++)
+            if (cc[ch][c] >= 0 && c != 32 && c != 6 && c != 38
+                  && (c < 96 || c > 101))
+               sp_post3(t0, 0xb0 | ch, c, cc[ch][c]);
+         if (bend_l[ch] >= 0)
+            sp_post3(t0, 0xe0 | ch, bend_l[ch], bend_m[ch]);
+      }
+      /* Notes held across the saved point start again; percussion is
+       * left out, a drum hit from before the save is not wanted back. */
+      for (ch = 0; ch < 16; ch++)
+         for (c = 0; ch != 9 && c < 128; c++)
+            if (held[ch][c])
+               sp_post3(t0, 0x90 | ch, c, held[ch][c]);
    }
    sp_eventpos  = i;
    sp_spmc      = s.spmc;

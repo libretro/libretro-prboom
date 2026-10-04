@@ -2210,34 +2210,42 @@ static void deh_procThing(DEHFILE *fpin, FILE* fpout, char *line)
             }
           }
 
-          // the MF_COUNTKILL flag used to be indicative of the Mobj being a
-          // monster, but this is no longer true after the logic for monsters_infight
-          // that don't count towards limit was dehardcoded.
-          // Let's make sure that any actor that has MF_COUNTKILL is considered
-          // a monster, avoid incompatibility with older DEH files
-          if (value & MF_COUNTKILL)
-            value |= MF_ISMONSTER;
-
-          deh_log(
-#ifdef PSX
-                    "Result  =  0x%016llx\n"
-                    "Current    0x%016llx\n",
-#else
-                    "Result  =  0x%016"PRIX64"\n"
-                    "Current    0x%016"PRIX64"\n",
-#endif
-                    value, mobjinfo[indexnum].flags);
-
-          // Each "Bits" field can use any mnemonic, but it won't overwrite the values
-          // from fields outside of the corresponding ones, this way a wad can keep using "Bits"
-          // for setting values in "Bits2" without affecting the default values that might be
-          // configured in the future.
-          if (key[4] == '2')
-            value = (mobjinfo[indexnum].flags & 0x00000000FFFFFFFF)|value; // Bits2
-          else
-            value = (mobjinfo[indexnum].flags & 0xFFFFFFFF00000000)|value; // Bits
         }
+
+        /* Both forms end the same way.  A numeric value names only its
+         * own half of the flags, exactly as a mnemonic list does, so the
+         * other half -- where the behaviours vanilla ties to a thing's
+         * type live (splash immunity, full-volume sounds, the lost
+         * soul's rules) -- has to survive it. */
+
+        // the MF_COUNTKILL flag used to be indicative of the Mobj being a
+        // monster, but this is no longer true after the logic for monsters_infight
+        // that don't count towards limit was dehardcoded.
+        // Let's make sure that any actor that has MF_COUNTKILL is considered
+        // a monster, avoid incompatibility with older DEH files
+        if (value & MF_COUNTKILL)
+          value |= MF_ISMONSTER;
+
+        deh_log(
+#ifdef PSX
+                  "Result  =  0x%016llx\n"
+                  "Current    0x%016llx\n",
+#else
+                  "Result  =  0x%016"PRIX64"\n"
+                  "Current    0x%016"PRIX64"\n",
+#endif
+                  value, mobjinfo[indexnum].flags);
+
+        // Each "Bits" field can use any mnemonic, but it won't overwrite the values
+        // from fields outside of the corresponding ones, this way a wad can keep using "Bits"
+        // for setting values in "Bits2" without affecting the default values that might be
+        // configured in the future.
+        if (key[4] == '2')
+          value = (mobjinfo[indexnum].flags & 0x00000000FFFFFFFF)|value; // Bits2
+        else
+          value = (mobjinfo[indexnum].flags & 0xFFFFFFFF00000000)|value; // Bits
       }
+
       setMobjInfoValue(indexnum, ix, value);
       {
         deh_log(

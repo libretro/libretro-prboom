@@ -1976,6 +1976,90 @@ static void PCM_GetConfig(PCM_Config *config, uint8_t config_byte)
     }
 }
 
+/* A slot whose voice is not keyed contributes nothing to the mix; what
+ * the full path leaves behind for it is done here directly.  Not for
+ * the very first sample (nfs clear), nor for slots 28 to 31, whose rows
+ * double as the effect registers; those take the full path. */
+static void PCM_IdleSlot(pcm_t *pcm, int slot, const int *rcadd, const int *rcadd2)
+{
+    uint32_t *ram1 = pcm->ram1[slot];
+    uint16_t *ram2 = pcm->ram2[slot];
+    const int last = slot == pcm->config.reg_slots - 1;
+    const int slot2 = last ? 31 : slot + 1;
+    int32_t suml;
+    int32_t sumr;
+
+    calc_tv(pcm, 2, ram2[5], &ram2[11], 0, NULL);
+
+    switch (slot2)
+    {
+        case 17:
+            pcm->ram1[31][1] = (uint32_t)addclip20((int32_t)pcm->ram1[31][1], rcadd[0] >> 1, rcadd[0] & 1);
+            break;
+        case 18:
+            pcm->ram1[31][3] = (uint32_t)addclip20((int32_t)pcm->ram1[31][3], rcadd[1] >> 1, rcadd[1] & 1);
+            break;
+        case 21:
+            pcm->ram1[31][1] = (uint32_t)addclip20((int32_t)pcm->ram1[31][1], rcadd[2] >> 1, rcadd[2] & 1);
+            break;
+        case 22:
+            pcm->ram1[31][3] = (uint32_t)addclip20((int32_t)pcm->ram1[31][3], rcadd[3] >> 1, rcadd[3] & 1);
+            break;
+        case 23:
+            pcm->ram1[31][1] = (uint32_t)addclip20((int32_t)pcm->ram1[31][1], rcadd[4] >> 1, rcadd[4] & 1);
+            break;
+        case 31:
+            pcm->ram1[31][3] = (uint32_t)addclip20((int32_t)pcm->ram1[31][3], rcadd[5] >> 1, rcadd[5] & 1);
+            break;
+    }
+
+    suml = addclip20((int32_t)pcm->ram1[31][1], 0, 0);
+    sumr = addclip20((int32_t)pcm->ram1[31][3], 0, 0);
+
+    switch (slot2)
+    {
+        case 17:
+            pcm->rcsum[1] = addclip20(pcm->rcsum[1], rcadd2[0] >> 1, rcadd2[0] & 1);
+            break;
+        case 18:
+            pcm->rcsum[1] = addclip20(pcm->rcsum[1], rcadd2[1] >> 1, rcadd2[1] & 1);
+            break;
+        case 21:
+            pcm->rcsum[0] = addclip20(pcm->rcsum[0], rcadd2[2] >> 1, rcadd2[2] & 1);
+            break;
+        case 22:
+            pcm->rcsum[1] = addclip20(pcm->rcsum[1], rcadd2[3] >> 1, rcadd2[3] & 1);
+            break;
+        case 23:
+            pcm->rcsum[0] = addclip20(pcm->rcsum[0], rcadd2[4] >> 1, rcadd2[4] & 1);
+            break;
+        case 31:
+            pcm->rcsum[1] = addclip20(pcm->rcsum[1], rcadd2[5] >> 1, rcadd2[5] & 1);
+            break;
+    }
+
+    pcm->rcsum[0] = addclip20(pcm->rcsum[0], 0, 0);
+    pcm->rcsum[1] = addclip20(pcm->rcsum[1], 0, 0);
+
+    if (!last)
+    {
+        pcm->ram1[31][1] = (uint32_t)suml;
+        pcm->ram1[31][3] = (uint32_t)sumr;
+    }
+    else
+    {
+        pcm->accum_l = suml;
+        pcm->accum_r = sumr;
+    }
+
+    ram1[1] = 0;
+    ram1[3] = 0;
+    ram1[5] = 0;
+    ram2[8] = 0;
+    ram2[9] = 0;
+    ram2[10] = 0;
+}
+
 static void PCM_Update(pcm_t *pcm, uint64_t cycles)
 {
     while (pcm->cycles < cycles)
@@ -2530,6 +2614,12 @@ static void PCM_Update(pcm_t *pcm, uint64_t cycles)
 
         for (slot = 0; slot < pcm->config.reg_slots; slot++)
         {
+            if (slot < 28 && pcm->nfs && !((voice_active >> slot) & 1))
+            {
+                PCM_IdleSlot(pcm, slot, rcadd, rcadd2);
+                continue;
+            }
+            {
             int nibble_address;
             int address_b4;
             int wave_address;
@@ -3053,6 +3143,7 @@ static void PCM_Update(pcm_t *pcm, uint64_t cycles)
                 ram2[8] = 0;
                 ram2[9] = 0;
                 ram2[10] = 0;
+            }
             }
         }
 

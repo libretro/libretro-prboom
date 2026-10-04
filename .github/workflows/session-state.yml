@@ -24,6 +24,7 @@ jobs:
           make -C tests/load_no_frame check
           make -C tests/sessions check
           make -C tests/same_frames check
+          make -C tests/sc55 check
 
       - name: Rebuild under ASan/UBSan
         run: |
@@ -41,3 +42,5 @@ jobs:
           make -C tests/sessions check SAN=address,undefined
           make -C tests/same_frames clean
           make -C tests/same_frames check SAN=address,undefined
+          make -C tests/sc55 clean
+          make -C tests/sc55 check SAN=address,undefined

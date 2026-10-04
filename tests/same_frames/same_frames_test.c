@@ -9,6 +9,11 @@
  *            if the core has lost that record every frame gets a null
  *            action and nothing acts.
  *
+ *   mapinfo  the IWAD, against the IWAD with a PWAD holding a ZDoom
+ *            MAPINFO for a map the demo never visits.  The core
+ *            translates that lump into UMAPINFO entries; the IWAD's
+ *            demos were recorded without it and must still play.
+ *
  *   bits     a no-monsters demo, against the same demo behind a patch
  *            restating the monsters' stock numeric Bits.  A numeric
  *            value names one half of the flags; if applying it loses
@@ -168,6 +173,9 @@ static const char bits_patch[] =
    "Thing 16 (Baron of Hell)\nBits = 4194310\n\n"
    "Thing 19 (Lost soul)\nBits = 16902\n\n";
 
+static const char zmapinfo[] =
+   "map E3M9 \"Somewhere the demo does not go\"\n{\n\tnext = \"E3M1\"\n}\n";
+
 /* Fills a[] and b[] with the two content paths for `mode`. */
 static int write_content(const char *mode, const char *iwad,
       char *a, char *b, size_t len)
@@ -192,6 +200,20 @@ static int write_content(const char *mode, const char *iwad,
       fclose(f);
       snprintf(a, len, "%s", iwad_abs);
       return write_m3u(b, len, cwd, "identity", iwad_abs, "identity.deh");
+   }
+
+   if (!strcmp(mode, "mapinfo"))
+   {
+      const char *names[1];
+      const unsigned char *data[1];
+      size_t lens[1];
+      names[0] = "MAPINFO";
+      data[0]  = (const unsigned char*)zmapinfo;
+      lens[0]  = sizeof(zmapinfo) - 1;
+      if (!write_pwad("zmapinfo.wad", 1, names, data, lens))
+         return 0;
+      snprintf(a, len, "%s", iwad_abs);
+      return write_m3u(b, len, cwd, "zmapinfo", iwad_abs, "zmapinfo.wad");
    }
 
    if (!strcmp(mode, "bits"))
@@ -306,7 +328,7 @@ int main(int argc, char **argv)
 
    if (argc < 3)
    {
-      fprintf(stderr, "usage: %s core.so iwad.wad [pointer|bits]\n",
+      fprintf(stderr, "usage: %s core.so iwad.wad [pointer|mapinfo|bits]\n",
             argv[0]);
       return 2;
    }

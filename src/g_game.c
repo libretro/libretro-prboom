@@ -3468,7 +3468,9 @@ static const uint8_t* G_ReadDemoHeader(const uint8_t *demo_p, size_t size, dbool
        return NULL;
      }
    }
-   else if (U_mapinfo.mapcount)
+   /* A translated ZDoom MAPINFO is not a UMAPINFO lump: the wad's own
+    * demos were recorded on engines that never read it. */
+   else if (U_mapinfo.mapcount && !U_mapinfo.translated)
    {
      I_Error("UMAPINFO loaded but trying to play a demo recorded without it");
      return NULL;

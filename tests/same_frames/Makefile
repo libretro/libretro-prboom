@@ -27,9 +27,10 @@ same_frames_test: same_frames_test.c
 check: all
 	@test -f $(IWAD) || { echo "no IWAD at $(IWAD); pass IWAD=<path>"; exit 2; }
 	./same_frames_test $(CORE) $(IWAD) pointer
+	./same_frames_test $(CORE) $(IWAD) mapinfo
 	./same_frames_test $(CORE) $(IWAD) bits
 
 clean:
-	rm -f same_frames_test identity.deh *.m3u nomonsters.wad nomonsters_bits.wad
+	rm -f same_frames_test identity.deh *.m3u zmapinfo.wad nomonsters.wad nomonsters_bits.wad
 
 .PHONY: all check clean

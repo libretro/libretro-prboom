@@ -1801,6 +1801,7 @@ bool D_DoomMainSetup(void)
       lprintf(LO_INFO,"U_ParseZMapInfo: Translating ZDoom MAPINFO.\n");
       data = (const char *)W_CacheLumpNum(p);
       U_ParseZMapInfo(data, W_LumpLength(p));
+      U_mapinfo.translated = 1;
     }
   }
 

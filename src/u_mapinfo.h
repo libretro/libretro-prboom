@@ -55,6 +55,7 @@ typedef struct
 {
   unsigned int mapcount;
   mapentry_t *maps;
+  int translated;   /* entries came from a ZDoom MAPINFO, not a UMAPINFO lump */
 } umapinfo_t;
 
 extern umapinfo_t U_mapinfo;

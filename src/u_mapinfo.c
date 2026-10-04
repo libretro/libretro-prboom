@@ -380,4 +380,5 @@ void U_FreeMapInfo()
   free(U_mapinfo.maps);
   U_mapinfo.maps = NULL;
   U_mapinfo.mapcount = 0;
+  U_mapinfo.translated = 0;
 }

@@ -668,6 +668,7 @@ void image_transfer_set_want_10bit(void *data, enum image_type_enum type,
    }
 }
 
+
 /* Report whether the last processed frame was actually written as
  * packed XRGB2101010 rather than 8-bit RGBA, i.e. 10-bit was requested
  * and the source could supply it.  False for every type that cannot
@@ -988,6 +989,101 @@ void image_transfer_anim_stream_complete_scan(void *stream,
       default:
          break;
    }
+}
+
+void *image_transfer_anim_stream_h265(void *stream, enum image_type_enum type)
+{
+#ifdef HAVE_RMP4
+   if (stream && type == IMAGE_TYPE_MP4)
+      return rmp4_video_stream_h265((rmp4_video_stream_t*)stream);
+#endif
+   (void)stream; (void)type;
+   return NULL;
+}
+
+void *image_transfer_anim_stream_h264(void *stream, enum image_type_enum type)
+{
+#ifdef HAVE_RMP4
+   if (stream && type == IMAGE_TYPE_MP4)
+      return rmp4_video_stream_h264((rmp4_video_stream_t*)stream);
+#endif
+   (void)stream; (void)type;
+   return NULL;
+}
+
+void image_transfer_anim_stream_set_catchup(void *stream,
+      enum image_type_enum type, int behind)
+{
+   if (!stream)
+      return;
+   switch (type)
+   {
+#ifdef HAVE_RMP4
+      case IMAGE_TYPE_MP4:
+         rmp4_video_stream_set_catchup((rmp4_video_stream_t*)stream, behind);
+         break;
+#endif
+      default:
+         /* WEBM (VP8/VP9), APNG, WEBP: every frame here is a
+          * reference for the next, so there is nothing to drop. */
+         (void)behind;
+         break;
+   }
+}
+
+bool image_transfer_anim_stream_set_output(void *stream,
+      enum image_type_enum type, uint32_t *out)
+{
+   switch (type)
+   {
+      case IMAGE_TYPE_WEBM:
+#ifdef HAVE_RWEBM
+         rwebm_video_stream_set_output((rwebm_video_stream_t*)stream, out);
+         return true;
+#else
+         break;
+#endif
+      case IMAGE_TYPE_MP4:
+#ifdef HAVE_RMP4
+         rmp4_video_stream_set_output((rmp4_video_stream_t*)stream, out);
+         return true;
+#else
+         break;
+#endif
+      default:
+         /* APNG and WEBP compose each frame on a persistent canvas
+          * that the next frame is built from: their frames come out
+          * of the canvas. */
+         break;
+   }
+   return false;
+}
+
+bool image_transfer_anim_stream_set_blit_pool(void *stream,
+      enum image_type_enum type, void *pool, unsigned bands)
+{
+   switch (type)
+   {
+      case IMAGE_TYPE_WEBM:
+#ifdef HAVE_RWEBM
+         rwebm_video_stream_set_blit_pool((rwebm_video_stream_t*)stream,
+               pool, bands);
+         return true;
+#else
+         break;
+#endif
+      case IMAGE_TYPE_MP4:
+#ifdef HAVE_RMP4
+         rmp4_video_stream_set_blit_pool((rmp4_video_stream_t*)stream,
+               pool, bands);
+         return true;
+#else
+         break;
+#endif
+      default:
+         break;
+   }
+   return false;
 }
 
 bool image_transfer_anim_stream_set_argb(void *stream,

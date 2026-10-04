@@ -1843,6 +1843,11 @@ static const int interp_lut[3][128] = {
     },
 };
 
+/* The four-bit values with their bits reversed. */
+static const uint8_t tv_rev4[16] = {
+    0, 8, 4, 12, 2, 10, 6, 14, 1, 9, 5, 13, 3, 11, 7, 15
+};
+
 SC55_INLINE void calc_tv(pcm_t *pcm, int e, int adjust, uint16_t *levelcur, int active, int *volmul)
 {
     int speed;
@@ -1870,69 +1875,21 @@ SC55_INLINE void calc_tv(pcm_t *pcm, int e, int adjust, uint16_t *levelcur, int 
     if ((speed & 0x80) == 0 || (speed & 0x40) == 0)
         type |= 4;
 
+    /* The low bits come from four bits of the global counter, taken in
+     * reverse order; which four, and how often the level is written
+     * back, depends on the envelope's speed class. */
     write = !active;
-    addlow = 0;
     if (type & 4)
     {
-        if (pcm->tv_counter & 8)
-            addlow |= 1;
-        if (pcm->tv_counter & 4)
-            addlow |= 2;
-        if (pcm->tv_counter & 2)
-            addlow |= 4;
-        if (pcm->tv_counter & 1)
-            addlow |= 8;
+        addlow = tv_rev4[pcm->tv_counter & 15];
         write |= 1;
     }
     else
     {
-        switch (type & 3)
-        {
-        case 0:
-            if (pcm->tv_counter & 0x20)
-                addlow |= 1;
-            if (pcm->tv_counter & 0x10)
-                addlow |= 2;
-            if (pcm->tv_counter & 8)
-                addlow |= 4;
-            if (pcm->tv_counter & 4)
-                addlow |= 8;
-            write |= (pcm->tv_counter & 3) == 0;
-            break;
-        case 1:
-            if (pcm->tv_counter & 0x80)
-                addlow |= 1;
-            if (pcm->tv_counter & 0x40)
-                addlow |= 2;
-            if (pcm->tv_counter & 0x20)
-                addlow |= 4;
-            if (pcm->tv_counter & 0x10)
-                addlow |= 8;
-            write |= (pcm->tv_counter & 15) == 0;
-            break;
-        case 2:
-            if (pcm->tv_counter & 0x200)
-                addlow |= 1;
-            if (pcm->tv_counter & 0x100)
-                addlow |= 2;
-            if (pcm->tv_counter & 0x80)
-                addlow |= 4;
-            if (pcm->tv_counter & 0x40)
-                addlow |= 8;
-            write |= (pcm->tv_counter & 63) == 0;
-            break;
-        case 3:
-            if (pcm->tv_counter & 0x800)
-                addlow |= 1;
-            if (pcm->tv_counter & 0x400)
-                addlow |= 2;
-            if (pcm->tv_counter & 0x200)
-                addlow |= 4;
-            if (pcm->tv_counter & 0x100)
-                addlow |= 8;
-            write |= (pcm->tv_counter & 127) == 0;
-            break;
-        }
+        static const uint8_t shift[4] = {2, 4, 6, 8};
+        static const uint8_t mask[4] = {3, 15, 63, 127};
+        addlow = tv_rev4[(pcm->tv_counter >> shift[type & 3]) & 15];
+        write |= (pcm->tv_counter & mask[type & 3]) == 0;
     }
 
     if ((type & 8) == 0)

@@ -123,6 +123,7 @@ enum {
 typedef struct
 {
     uint64_t deadline;
+    uint64_t event;     /* deadline of the first tick that does more than count */
     uint8_t  tcr;
     uint8_t  tcsr;
     uint16_t frc;
@@ -137,6 +138,7 @@ typedef struct
 typedef struct
 {
     uint64_t deadline;
+    uint64_t event;     /* deadline of the first tick that does more than count */
     uint16_t stride;
     uint8_t  tcr;
     uint8_t  tcsr;
@@ -1124,10 +1126,13 @@ static void TIMER_Reset(mcu_timer_t *timer)
     timer->tmr.tcorb    = 0xff;
 }
 
+static void TIMER_Sync(mcu_timer_t *timer);
+
 static void TIMER_WriteFRT(mcu_timer_t *timer, uint32_t address, uint8_t data)
 {
     frt_t *frt;
     uint32_t t = (address >> 4) - 1;
+    TIMER_Sync(timer);
     if (t > 2)
         return;
     frt = &timer->frt[t];
@@ -1193,6 +1198,7 @@ static uint8_t TIMER_ReadFRT(mcu_timer_t *timer, uint32_t address)
 {
     frt_t *frt;
     uint32_t t = (address >> 4) - 1;
+    TIMER_Sync(timer);
     if (t > 2)
         return 0xff;
     frt = &timer->frt[t];
@@ -1233,6 +1239,7 @@ static void TIMER_WriteTMR(mcu_timer_t *timer, uint32_t address, uint8_t data)
 {
     tmr_t *tmr = &timer->tmr;
 
+    TIMER_Sync(timer);
     switch (address)
     {
     case DEV_TMR_TCR: {
@@ -1292,6 +1299,7 @@ static uint8_t TIMER_ReadTMR(mcu_timer_t *timer, uint32_t address)
 {
     tmr_t *tmr = &timer->tmr;
 
+    TIMER_Sync(timer);
     switch (address)
     {
     case DEV_TMR_TCR:
@@ -1381,6 +1389,159 @@ SC55_INLINE void TIMER_ClockTmr(mcu_timer_t *timer)
         MCU_Interrupt_SetRequest(timer->mcu, INTERRUPT_SOURCE_TIMER_CMIB, 1);
 }
 
+/* The timers used to be stepped one tick at a time, several ticks per
+ * instruction.  Most ticks only count: no compare match, no overflow,
+ * no interrupt request to raise.  A run of those is now taken in one
+ * step, and not taken at all until something looks: `event` is the
+ * deadline of the first tick that does more than count, and until the
+ * clock passes it the counter is left behind and caught up on demand
+ * (TIMER_Sync, called before every register access). */
+SC55_INLINE uint32_t TIMER_FrtQuiet(mcu_timer_t *timer, int id)
+{
+    const frt_t *frt = &timer->frt[id];
+    uint32_t want = 0;
+    uint32_t q;
+    uint32_t d;
+    if ((frt->tcr & FRT_TCR_OVIE) != 0 && (frt->tcsr & FRT_TCSR_OVF) != 0)
+        want |= (uint32_t)1 << (INTERRUPT_SOURCE_FRT0_FOVI + id * 4);
+    if ((frt->tcr & FRT_TCR_OCIEA) != 0 && (frt->tcsr & FRT_TCSR_OCFA) != 0)
+        want |= (uint32_t)1 << (INTERRUPT_SOURCE_FRT0_OCIA + id * 4);
+    if ((frt->tcr & FRT_TCR_OCIEB) != 0 && (frt->tcsr & FRT_TCSR_OCFB) != 0)
+        want |= (uint32_t)1 << (INTERRUPT_SOURCE_FRT0_OCIB + id * 4);
+    if (want & ~timer->mcu->interrupt_pending)
+        return 0;
+    q = (uint16_t)(0xffff - frt->frc);
+    d = (uint16_t)(frt->ocra - frt->frc);
+    if (d < q)
+        q = d;
+    d = (uint16_t)(frt->ocrb - frt->frc);
+    if (d < q)
+        q = d;
+    return q;
+}
+
+static void TIMER_RunFrt(mcu_timer_t *timer, int id, uint64_t target)
+{
+    frt_t *frt = &timer->frt[id];
+    while (frt->deadline < target)
+    {
+        uint64_t due = (target - frt->deadline - 1) / frt->stride + 1;
+        uint64_t q = TIMER_FrtQuiet(timer, id);
+        if (q)
+        {
+            if (q > due)
+                q = due;
+            frt->frc = (uint16_t)(frt->frc + q);
+            frt->deadline += q * frt->stride;
+        }
+        else
+        {
+            TIMER_ClockFrt(timer, id);
+            frt->deadline += frt->stride;
+        }
+    }
+    frt->event = frt->deadline + (uint64_t)TIMER_FrtQuiet(timer, id) * frt->stride;
+}
+
+SC55_INLINE uint32_t TIMER_TmrQuiet(mcu_timer_t *timer)
+{
+    const tmr_t *tmr = &timer->tmr;
+    uint32_t want = 0;
+    uint32_t q;
+    uint32_t d;
+    if ((tmr->tcr & TMR_TCR_OVIE) != 0 && (tmr->tcsr & TMR_TCSR_OVF) != 0)
+        want |= (uint32_t)1 << INTERRUPT_SOURCE_TIMER_OVI;
+    if ((tmr->tcr & TMR_TCR_CMIEA) != 0 && (tmr->tcsr & TMR_TCSR_CMFA) != 0)
+        want |= (uint32_t)1 << INTERRUPT_SOURCE_TIMER_CMIA;
+    if ((tmr->tcr & TMR_TCR_CMIEB) != 0 && (tmr->tcsr & TMR_TCSR_CMFB) != 0)
+        want |= (uint32_t)1 << INTERRUPT_SOURCE_TIMER_CMIB;
+    if (want & ~timer->mcu->interrupt_pending)
+        return 0;
+    q = (uint8_t)(0xff - tmr->tcnt);
+    d = (uint8_t)(tmr->tcora - tmr->tcnt);
+    if (d < q)
+        q = d;
+    d = (uint8_t)(tmr->tcorb - tmr->tcnt);
+    if (d < q)
+        q = d;
+    return q;
+}
+
+/* The 8-bit timer left running as a free cycle: it clears on compare
+ * match A, both the flags its matches set are set already, and no
+ * interrupt is waiting to be raised.  Every tick then changes the count
+ * and nothing else, the count going round 0..TCORA; the period is
+ * returned, or 0 when the timer is not in that state. */
+SC55_INLINE uint32_t TIMER_TmrCyclic(mcu_timer_t *timer)
+{
+    const tmr_t *tmr = &timer->tmr;
+    if ((tmr->tcr & (TMR_TCR_CCLR0 | TMR_TCR_CCLR1)) != TMR_TCR_CCLR0)
+        return 0;
+    if (tmr->tcnt > tmr->tcora || (tmr->tcsr & TMR_TCSR_CMFA) == 0)
+        return 0;
+    if (tmr->tcorb <= tmr->tcora && (tmr->tcsr & TMR_TCSR_CMFB) == 0)
+        return 0;
+    if ((tmr->tcr & TMR_TCR_OVIE) != 0 && (tmr->tcsr & TMR_TCSR_OVF) != 0
+        && (timer->mcu->interrupt_pending & ((uint32_t)1 << INTERRUPT_SOURCE_TIMER_OVI)) == 0)
+        return 0;
+    if ((tmr->tcr & TMR_TCR_CMIEA) != 0
+        && (timer->mcu->interrupt_pending & ((uint32_t)1 << INTERRUPT_SOURCE_TIMER_CMIA)) == 0)
+        return 0;
+    if ((tmr->tcr & TMR_TCR_CMIEB) != 0 && (tmr->tcsr & TMR_TCSR_CMFB) != 0
+        && (timer->mcu->interrupt_pending & ((uint32_t)1 << INTERRUPT_SOURCE_TIMER_CMIB)) == 0)
+        return 0;
+    return (uint32_t)tmr->tcora + 1;
+}
+
+static void TIMER_RunTmr(mcu_timer_t *timer, uint64_t target)
+{
+    tmr_t *tmr = &timer->tmr;
+    uint32_t period;
+    while (tmr->deadline < target)
+    {
+        uint64_t due = (target - tmr->deadline - 1) / tmr->stride + 1;
+        uint64_t q;
+        period = TIMER_TmrCyclic(timer);
+        if (period)
+        {
+            tmr->tcnt = (uint8_t)((tmr->tcnt + due) % period);
+            tmr->deadline += due * tmr->stride;
+            break;
+        }
+        q = TIMER_TmrQuiet(timer);
+        if (q)
+        {
+            if (q > due)
+                q = due;
+            tmr->tcnt = (uint8_t)(tmr->tcnt + q);
+            tmr->deadline += q * tmr->stride;
+        }
+        else
+        {
+            TIMER_ClockTmr(timer);
+            tmr->deadline += tmr->stride;
+        }
+    }
+    if (TIMER_TmrCyclic(timer))
+        tmr->event = ~(uint64_t)0;   /* nothing to do until a register is touched */
+    else
+        tmr->event = tmr->deadline + (uint64_t)TIMER_TmrQuiet(timer) * tmr->stride;
+}
+
+/* Bring every counter up to the present, and make the next clock look
+ * again: the caller is about to read or change a register. */
+static void TIMER_Sync(mcu_timer_t *timer)
+{
+    int i;
+    for (i = 0; i < 3; i++)
+    {
+        TIMER_RunFrt(timer, i, timer->cycles);
+        timer->frt[i].event = 0;
+    }
+    TIMER_RunTmr(timer, timer->cycles);
+    timer->tmr.event = 0;
+}
+
 static void TIMER_Clock(mcu_timer_t *timer, uint64_t cycles)
 {
     int i;
@@ -1390,18 +1551,12 @@ static void TIMER_Clock(mcu_timer_t *timer, uint64_t cycles)
 
     for (i = 0; i < 3; i++)
     {
-        while (timer->frt[i].deadline < target_cycles)
-        {
-            TIMER_ClockFrt(timer, i);
-            timer->frt[i].deadline += timer->frt[i].stride;
-        }
+        if (timer->frt[i].event < target_cycles)
+            TIMER_RunFrt(timer, i, target_cycles);
     }
 
-    while (timer->tmr.deadline < target_cycles)
-    {
-        TIMER_ClockTmr(timer);
-        timer->tmr.deadline += timer->tmr.stride;
-    }
+    if (timer->tmr.event < target_cycles)
+        TIMER_RunTmr(timer, target_cycles);
 }
 
 static void TIMER_NotifyRomsetChange(mcu_timer_t *timer)
@@ -4461,6 +4616,13 @@ static void SM_HandleInterrupt(submcu_t *sm)
     if (sm->sr & SM_STATUS_I)
         return;
 
+    /* Every source below needs its request and its enable bit, the
+     * collision one its own two; with none of them there is nothing to
+     * look through. */
+    if ((sm->device_mode[SM_DEV_INT_ENABLE] & sm->device_mode[SM_DEV_INT_REQUEST]) == 0
+        && (sm->device_mode[SM_DEV_COLLISION] & 0xc0) != 0xc0)
+        return;
+
     if ((sm->device_mode[SM_DEV_UART1_CTRL] & 0x8) != 0
         && (sm->device_mode[SM_DEV_INT_ENABLE] & 0x80) != 0
         && (sm->device_mode[SM_DEV_INT_REQUEST] & 0x80) != 0)
@@ -4540,24 +4702,33 @@ static void SM_UpdateTimer(submcu_t *sm)
 {
     while (sm->timer_cycles < sm->cycles)
     {
-        if ((sm->device_mode[SM_DEV_TIMER_CTRL] & 0x20) == 0 && !sm->sleep)
+        /* Steps that are due, 16 cycles each. */
+        uint64_t due = (sm->cycles - sm->timer_cycles - 1) / 16 + 1;
+        if ((sm->device_mode[SM_DEV_TIMER_CTRL] & 0x20) != 0 || sm->sleep)
         {
-            if (sm->timer_prescaler == 0)
-            {
-                sm->timer_prescaler = sm->device_mode[SM_DEV_PRESCALER];
+            /* stopped: nothing counts */
+            sm->timer_cycles += 16 * due;
+        }
+        else if (sm->timer_prescaler != 0)
+        {
+            /* the prescaler counts down; take the due steps in one go */
+            uint64_t k = sm->timer_prescaler < due ? sm->timer_prescaler : due;
+            sm->timer_prescaler = (uint8_t)(sm->timer_prescaler - k);
+            sm->timer_cycles += 16 * k;
+        }
+        else
+        {
+            sm->timer_prescaler = sm->device_mode[SM_DEV_PRESCALER];
 
-                if (sm->timer_counter == 0)
-                {
-                    sm->timer_counter = sm->device_mode[SM_DEV_TIMER];
-                    sm->device_mode[SM_DEV_INT_REQUEST] |= 0x8;
-                }
-                else
-                    sm->timer_counter--;
+            if (sm->timer_counter == 0)
+            {
+                sm->timer_counter = sm->device_mode[SM_DEV_TIMER];
+                sm->device_mode[SM_DEV_INT_REQUEST] |= 0x8;
             }
             else
-                sm->timer_prescaler--;
+                sm->timer_counter--;
+            sm->timer_cycles += 16;
         }
-        sm->timer_cycles += 16;
     }
 }
 
@@ -7727,6 +7898,8 @@ uint32_t sc55_test_hash(const sc55_t *s)
 {
     uint32_t h = 2166136261u;
     int i;
+    /* The timers are brought up to date lazily; do it before looking. */
+    TIMER_Sync((mcu_timer_t*)&s->timer);
     SC55_HF(s->mcu.r); SC55_HF(s->mcu.pc); SC55_HF(s->mcu.sr);
     SC55_HF(s->mcu.cp); SC55_HF(s->mcu.dp); SC55_HF(s->mcu.ep); SC55_HF(s->mcu.tp); SC55_HF(s->mcu.br);
     SC55_HF(s->mcu.sleep); SC55_HF(s->mcu.ex_ignore); SC55_HF(s->mcu.exception_pending);

@@ -64,5 +64,6 @@ void R_DrawPlayerSprites(void);
 void R_InitSprites(const char * const * namelist);
 void R_ClearSprites(void);
 void R_DrawMasked(void);
+void R_DrawsegRangesFree(void);  /* session teardown */
 
 #endif

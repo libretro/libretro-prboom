@@ -626,7 +626,7 @@ int main(int argc, char **argv)
    void *h;
    struct retro_game_info info;
    int s, i, sessions = 3, runs = 12, demo = 0, alt = 0, failmode = 0, nodesmode = 0;
-   int statemode = 0;
+   int statemode = 0, reinit = 0;
    const char *altpath = NULL;
    char demopath[1024];
    const char *content;
@@ -648,7 +648,7 @@ int main(int argc, char **argv)
    if (argc < 3)
    {
       fprintf(stderr, "usage: %s core.so iwad.wad [sessions] [runs] "
-                      "[demo|alt|fail|nodes|state]\n",
+                      "[demo|alt|fail|nodes|state|reinit]\n",
             argv[0]);
       return 2;
    }
@@ -661,6 +661,11 @@ int main(int argc, char **argv)
     * that follows has to come up as if it had not happened. */
    if (argc > 5 && !strcmp(argv[5], "fail")) failmode = 1;
    if (argc > 5 && !strcmp(argv[5], "nodes")) nodesmode = 1;
+   /* reinit takes the core through retro_deinit and retro_init between
+    * sessions, as a frontend that keeps the library loaded does.  The
+    * zone goes with retro_deinit, so a pointer into it that a static
+    * still holds is only stale on this path. */
+   if (argc > 5 && !strcmp(argv[5], "reinit")) reinit = 1;
    /* The replay check is its own mode rather than part of every lane:
     * it needs the demo content, it runs the middle of the session
     * twice, and a frame difference it reports is not by itself a fault
@@ -985,6 +990,11 @@ int main(int argc, char **argv)
       printf("== session %d: unload\n", s);
       fflush(stdout);
       retro_unload_game();
+      if (reinit && s < sessions)
+      {
+         retro_deinit();
+         retro_init();
+      }
    }
 
    retro_deinit();

@@ -450,6 +450,24 @@ static drawseg_xrange_item_t *drawsegs_xrange;
 static unsigned int drawsegs_xrange_size = 0;
 static int drawsegs_xrange_count = 0;
 
+/* The range lists are zone blocks, gone with the session's zone.  Drop
+ * them here so the next session sizes its own instead of writing into
+ * freed memory. */
+void R_DrawsegRangesFree(void)
+{
+   int i;
+   for (i = 0; i < DS_RANGES_COUNT; i++)
+   {
+      if (drawsegs_xranges[i].items)
+         Z_Free(drawsegs_xranges[i].items);
+      drawsegs_xranges[i].items = NULL;
+      drawsegs_xranges[i].count = 0;
+   }
+   drawsegs_xrange       = NULL;
+   drawsegs_xrange_size  = 0;
+   drawsegs_xrange_count = 0;
+}
+
 //
 // R_InitSprites
 // Called at program start.

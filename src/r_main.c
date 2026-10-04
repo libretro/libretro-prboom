@@ -711,6 +711,7 @@ void R_Deinit(void)
     * and worker scratches (r_plane.c) and the span snapshot pairs above. */
    R_PlaneBuffersFree();
    R_PortalCapsFree();
+   R_DrawsegRangesFree();
 
    /* texturetranslation: small Z_Malloc'd array. */
    if (texturetranslation)

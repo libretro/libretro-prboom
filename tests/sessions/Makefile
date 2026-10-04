@@ -52,6 +52,10 @@ CORE     ?= ../../prboom_libretro.so
 NODERUNS ?= 600
 SESSIONS ?= 3
 RUNS     ?= 300
+# The reinit lane (retro_deinit and retro_init between sessions) runs
+# long enough for the title screen's demo to be drawing sprites: state
+# a session leaves behind in the renderer only shows once it is.
+REINITRUNS ?= 600
 IWAD   ?= freedoom1.wad
 RA     := ../..
 CFLAGS ?= -O1 -g -Wall -W
@@ -69,6 +73,7 @@ check: all
 	@test -f $(IWAD) || { echo "no IWAD at $(IWAD); pass IWAD=<path>"; exit 2; }
 	./sessions_test $(CORE) $(IWAD) $(SESSIONS) $(RUNS)
 	./sessions_test $(CORE) $(IWAD) $(SESSIONS) $(RUNS) demo
+	./sessions_test $(CORE) $(IWAD) $(SESSIONS) $(REINITRUNS) reinit
 	./sessions_test $(CORE) $(IWAD) 1 $(NODERUNS) nodes
 
 clean:

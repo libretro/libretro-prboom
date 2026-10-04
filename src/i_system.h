@@ -55,4 +55,9 @@ const char *I_DoomExeDir(void); // killough 2/16/98: path to executable's dir
 dbool   HasTrailingSlash(const char* dn);
 char* I_FindFile(const char* wfname, const char* ext);
 
+/* The folders I_FindFile looks in, in its order: 0 the content's, 1 the
+ * system directory's prboom subfolder, 2 the system directory.  Returns
+ * 0 when there is no such folder. */
+int I_SearchDir(int index, char *out, size_t len);
+
 #endif

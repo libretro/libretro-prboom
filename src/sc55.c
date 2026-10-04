@@ -7494,6 +7494,7 @@ static void sc55_unscramble(const uint8_t *src, uint8_t *dst, size_t len)
 
 sc55_t *sc55_new(int model)
 {
+    Romset  romset;
     sc55_t *s = (sc55_t*)calloc(1, sizeof(*s));
     if (!s)
         return NULL;
@@ -7508,7 +7509,17 @@ sc55_t *sc55_new(int model)
     PCM_Init(&s->pcm, &s->mcu);
     TIMER_Init(&s->timer, &s->mcu);
     TIMER_Reset(&s->timer);
-    MCU_SetRomset(&s->mcu, model == SC55_MODEL_MK1 ? ROMSET_MK1 : ROMSET_MK2);
+    switch (model)
+    {
+        case SC55_MODEL_MK1:     romset = ROMSET_MK1;     break;
+        case SC55_MODEL_ST:      romset = ROMSET_ST;      break;
+        case SC55_MODEL_SC155:   romset = ROMSET_SC155;   break;
+        case SC55_MODEL_CM300:   romset = ROMSET_CM300;   break;
+        case SC55_MODEL_SCB55:   romset = ROMSET_SCB55;   break;
+        case SC55_MODEL_RLP3237: romset = ROMSET_RLP3237; break;
+        default:                 romset = ROMSET_MK2;     break;
+    }
+    MCU_SetRomset(&s->mcu, romset);
 
     s->mcu.spill = s->spill;
     return s;

@@ -21,6 +21,8 @@
  *
  * Without HAVE_THREADS the same code runs inline from render.
  *
+ * ROM files are found by content: see sp_find_unit.
+ *
  * This program is free software; you can redistribute it and/or
  * modify it under the terms of the GNU General Public License
  * as published by the Free Software Foundation; either version 2
@@ -32,12 +34,15 @@
 #include <math.h>
 
 #include <streams/file_stream.h>
+#include <file/file_path.h>
+#include <retro_dirent.h>
 
 #include "sc55player.h"
 #include "sc55.h"
 #include "midifile.h"
 #include "lprintf.h"
 #include "i_system.h"
+#include "g_game.h"
 
 #if defined(HAVE_THREADS)
 #include <rthreads/rthreads.h>
@@ -403,23 +408,354 @@ static void sp_wake(void)
 
 /* ---- device --------------------------------------------------------- */
 
-static int sp_load_rom(sc55_t *dev, int slot, const char *name)
-{
-   char   *path = I_FindFile(name, NULL);
-   void   *buf  = NULL;
-   int64_t len  = 0;
-   int     ok   = 0;
+/* ---- finding the ROMs ----------------------------------------------- */
 
-   if (!path)
-      return 0;
+/* ROM dumps are recognised by SHA-256, as the Nuked-SC55 fork does, so
+ * it does not matter what the files are called.  The list is the
+ * fork's (standard_romsets.cpp) without the JV-880. */
+typedef struct
+{
+   int         model;
+   const char *label;
+   const char *rom[SC55_ROM_COUNT];   /* hex digests; NULL = not used */
+} sp_romset_t;
+
+static const sp_romset_t sp_romsets[] =
+{
+#ifdef SC55_TEST_ROMSET
+   SC55_TEST_ROMSET
+#endif
+   { SC55_MODEL_MK2, "SC-55mkII",
+     { "8a1eb33c7599b746c0c50283e4349a1bb1773b5c0ec0e9661219bf6c067d2042",
+       "a4c9fd821059054c7e7681d61f49ce6f42ed2fe407a7ec1ba0dfdc9722582ce0",
+       "b0b5f865a403f7308b4be8d0ed3ba2ed1c22db881b8a8326769dea222f6431d8",
+       "c6429e21b9b3a02fbd68ef0b2053668433bee0bccd537a71841bc70b8874243b",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491",
+       NULL } },
+   { SC55_MODEL_MK2, "SC-55mkII (CTF-patched)",
+     { "8a1eb33c7599b746c0c50283e4349a1bb1773b5c0ec0e9661219bf6c067d2042",
+       "64f8c9daf1021cf86ea4ddf03a29b81b5ea0c18e74f462833023436388bb9dc4",
+       "b0b5f865a403f7308b4be8d0ed3ba2ed1c22db881b8a8326769dea222f6431d8",
+       "c6429e21b9b3a02fbd68ef0b2053668433bee0bccd537a71841bc70b8874243b",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491",
+       NULL } },
+   { SC55_MODEL_MK2, "SC-55mkII (CTF-patched)",
+     { "8a1eb33c7599b746c0c50283e4349a1bb1773b5c0ec0e9661219bf6c067d2042",
+       "14d14778caf46ffa9e3d608aa8e9c1a60c32bd4a536c26af3b2e1d81784c60f9",
+       "b0b5f865a403f7308b4be8d0ed3ba2ed1c22db881b8a8326769dea222f6431d8",
+       "c6429e21b9b3a02fbd68ef0b2053668433bee0bccd537a71841bc70b8874243b",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491",
+       NULL } },
+   { SC55_MODEL_MK2, "SC-55mkII (CTF-patched)",
+     { "8a1eb33c7599b746c0c50283e4349a1bb1773b5c0ec0e9661219bf6c067d2042",
+       "10b3f09485a74bb014f1a940d5c67f380c7979b62891d540d788154c83f17430",
+       "b0b5f865a403f7308b4be8d0ed3ba2ed1c22db881b8a8326769dea222f6431d8",
+       "c6429e21b9b3a02fbd68ef0b2053668433bee0bccd537a71841bc70b8874243b",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491",
+       NULL } },
+   { SC55_MODEL_MK2, "SC-55mkII (CTF-patched)",
+     { "8a1eb33c7599b746c0c50283e4349a1bb1773b5c0ec0e9661219bf6c067d2042",
+       "a2c720be1ab9115930d27f821a413c0366b7bf0c4ddfe0dadc5086136a1a4345",
+       "b0b5f865a403f7308b4be8d0ed3ba2ed1c22db881b8a8326769dea222f6431d8",
+       "c6429e21b9b3a02fbd68ef0b2053668433bee0bccd537a71841bc70b8874243b",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491",
+       NULL } },
+   { SC55_MODEL_MK2, "SC-55mkII (CTF-patched)",
+     { "8a1eb33c7599b746c0c50283e4349a1bb1773b5c0ec0e9661219bf6c067d2042",
+       "16cec615da10089beffe6de5129ba8ba33fa1bf017a5e6b78ad1d6d15cf4708e",
+       "b0b5f865a403f7308b4be8d0ed3ba2ed1c22db881b8a8326769dea222f6431d8",
+       "c6429e21b9b3a02fbd68ef0b2053668433bee0bccd537a71841bc70b8874243b",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491",
+       NULL } },
+   { SC55_MODEL_MK2, "SC-55mkII (CTF-patched)",
+     { "8a1eb33c7599b746c0c50283e4349a1bb1773b5c0ec0e9661219bf6c067d2042",
+       "c22bf7d34a3406530924d750b007bbdb470f3216c65086edb6e53023383ee907",
+       "b0b5f865a403f7308b4be8d0ed3ba2ed1c22db881b8a8326769dea222f6431d8",
+       "c6429e21b9b3a02fbd68ef0b2053668433bee0bccd537a71841bc70b8874243b",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491",
+       NULL } },
+   { SC55_MODEL_ST, "SC-55ST",
+     { "8a1eb33c7599b746c0c50283e4349a1bb1773b5c0ec0e9661219bf6c067d2042",
+       "03517ac0a3b1ad8b69a1a4ee045e0c21da0170027bd1ba1bd3cf72cd017bbe6a",
+       "b0b5f865a403f7308b4be8d0ed3ba2ed1c22db881b8a8326769dea222f6431d8",
+       "c6429e21b9b3a02fbd68ef0b2053668433bee0bccd537a71841bc70b8874243b",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491",
+       NULL } },
+   { SC55_MODEL_MK1, "SC-55",
+     { "b4ecf44bc0520322b0d114d397951d3bf92ca6fa51d0d27b2407df58a6be2efe",
+       "014e2e21ea30de7a1e4f1cdea14dd9a719960535e257a9e40e98dbb1a5870226",
+       NULL,
+       "5655509a531804f97ea2d7ef05b8fec20ebf46216b389a84c44169257a4d2007",
+       "c655b159792d999b90df9e4fa782cf56411ba1eaa0bb3ac2bdaf09e1391006b1",
+       "334b2d16be3c2362210fdbec1c866ad58badeb0f84fd9bf5d0ac599baf077cc2" } },
+   { SC55_MODEL_MK1, "SC-55",
+     { "2fe88ec39f3ef4b1de8cdf74527419467975c47f7aacfcd07605e01d54bd89b5",
+       "ec064d6c4fc70ec990911089d966043cb819fba0e26e6f6afdd0a05e5301b91b",
+       NULL,
+       "5655509a531804f97ea2d7ef05b8fec20ebf46216b389a84c44169257a4d2007",
+       "c655b159792d999b90df9e4fa782cf56411ba1eaa0bb3ac2bdaf09e1391006b1",
+       "334b2d16be3c2362210fdbec1c866ad58badeb0f84fd9bf5d0ac599baf077cc2" } },
+   { SC55_MODEL_MK1, "SC-55",
+     { "7e1bacd1d7c62ed66e465ba05597dcd60dfc13fc23de0287fdbce6cf906c6544",
+       "22ce6ca59e6332143b335525e81fab501ea6fccce4b7e2f3bfc2cc8bf6612ff6",
+       NULL,
+       "5655509a531804f97ea2d7ef05b8fec20ebf46216b389a84c44169257a4d2007",
+       "c655b159792d999b90df9e4fa782cf56411ba1eaa0bb3ac2bdaf09e1391006b1",
+       "334b2d16be3c2362210fdbec1c866ad58badeb0f84fd9bf5d0ac599baf077cc2" } },
+   { SC55_MODEL_MK1, "SC-55",
+     { "7e1bacd1d7c62ed66e465ba05597dcd60dfc13fc23de0287fdbce6cf906c6544",
+       "effc6132d68f7e300aaef915ccdd08aba93606c22d23e580daf9ea6617913af1",
+       NULL,
+       "5655509a531804f97ea2d7ef05b8fec20ebf46216b389a84c44169257a4d2007",
+       "c655b159792d999b90df9e4fa782cf56411ba1eaa0bb3ac2bdaf09e1391006b1",
+       "334b2d16be3c2362210fdbec1c866ad58badeb0f84fd9bf5d0ac599baf077cc2" } },
+   { SC55_MODEL_MK1, "SC-55",
+     { "24a65c97cdbaa847d6f59193523ce63c73394b4b693a6517ee79441f2fb8a3ee",
+       "f5dac35d450ab986570a209dff3816eec75cee669e161f54b51224b467dd0bcc",
+       NULL,
+       "5655509a531804f97ea2d7ef05b8fec20ebf46216b389a84c44169257a4d2007",
+       "c655b159792d999b90df9e4fa782cf56411ba1eaa0bb3ac2bdaf09e1391006b1",
+       "334b2d16be3c2362210fdbec1c866ad58badeb0f84fd9bf5d0ac599baf077cc2" } },
+   { SC55_MODEL_SC155, "SC-155",
+     { "24a65c97cdbaa847d6f59193523ce63c73394b4b693a6517ee79441f2fb8a3ee",
+       "ceb7b9d3d9d264efe5dc3ba992b94f3be35eb6d0451abc574b6f6b5dc3db237b",
+       NULL,
+       "5655509a531804f97ea2d7ef05b8fec20ebf46216b389a84c44169257a4d2007",
+       "c655b159792d999b90df9e4fa782cf56411ba1eaa0bb3ac2bdaf09e1391006b1",
+       "334b2d16be3c2362210fdbec1c866ad58badeb0f84fd9bf5d0ac599baf077cc2" } },
+   { SC55_MODEL_CM300, "CM-300/SCC-1",
+     { "72ed35481efbf25b3c492b83183655d17a3b266ecb30ffbc6dc977e6a8d261b2",
+       "0283d32e6993a0265710c4206463deb937b0c3a4819b69f471a0eca5865719f9",
+       NULL,
+       "40c093cbfb4441a5c884e623f882a80b96b2527f9fd431e074398d206c0f073d",
+       "9bbbcac747bd6f7a2693f4ef10633db8ab626f17d3d9c47c83c3839d4dd2f613",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491" } },
+   { SC55_MODEL_CM300, "CM-300/SCC-1",
+     { "72ed35481efbf25b3c492b83183655d17a3b266ecb30ffbc6dc977e6a8d261b2",
+       "fef1acb1969525d66238be5e7811108919b07a4df5fbab656ad084966373483f",
+       NULL,
+       "40c093cbfb4441a5c884e623f882a80b96b2527f9fd431e074398d206c0f073d",
+       "9bbbcac747bd6f7a2693f4ef10633db8ab626f17d3d9c47c83c3839d4dd2f613",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491" } },
+   { SC55_MODEL_CM300, "CM-300/SCC-1",
+     { "9ec66abb5231b6c6f46f48b33d5412703041037d69a6803626ac402f25552af2",
+       "f89442734fdebacae87c7707c01b2d7fdbf5940abae738987aee912d34b5882e",
+       NULL,
+       "40c093cbfb4441a5c884e623f882a80b96b2527f9fd431e074398d206c0f073d",
+       "9bbbcac747bd6f7a2693f4ef10633db8ab626f17d3d9c47c83c3839d4dd2f613",
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491" } },
+   { SC55_MODEL_SCB55, "SCB-55",
+     { "00df835d3f97fc8b0059db63f36d608eec2bfd1f51ad54eb5af52c868c1111b1",
+       "541be4d0b1ef0d07bb042ba67ffd099c8a5d746aac4cd24ce8842c034379f213",
+       NULL,
+       "c6429e21b9b3a02fbd68ef0b2053668433bee0bccd537a71841bc70b8874243b",
+       NULL,
+       "5b753f6cef4cfc7fcafe1430fecbb94a739b874e55356246a46abe24097ee491" } },
+   { SC55_MODEL_RLP3237, "RLP-3237",
+     { "00df835d3f97fc8b0059db63f36d608eec2bfd1f51ad54eb5af52c868c1111b1",
+       "e0a3d6d9b05e82374a0d289901273ce560ce1ead86459c75f844158b32d204a9",
+       NULL,
+       "dae2a8bc0fd3bcaf3f5e3ab6c4c6fd30e2663bf26ca17afe52924874c0afc4e2",
+       NULL,
+       NULL } },
+};
+#define SP_ROMSETS ((int)(sizeof(sp_romsets) / sizeof(sp_romsets[0])))
+
+static const char *const sp_slot_name[SC55_ROM_COUNT] =
+{
+   "ROM1 (32K)", "ROM2", "sub-MCU ROM (4K)", "wave ROM 1", "wave ROM 2", "wave ROM 3"
+};
+
+#define SP_MAX_FOUND 48
+typedef struct
+{
+   char  hex[65];
+   char *path;
+} sp_found_t;
+
+static sp_found_t sp_found[SP_MAX_FOUND];
+static int        sp_nfound;
+
+#define SP_ROR(x, n) (((x) >> (n)) | ((x) << (32 - (n))))
+
+static void sp_sha256_block(uint32_t *h, const unsigned char *p)
+{
+   static const uint32_t k[64] = {
+      0x428a2f98u, 0x71374491u, 0xb5c0fbcfu, 0xe9b5dba5u, 0x3956c25bu, 0x59f111f1u, 0x923f82a4u, 0xab1c5ed5u,
+      0xd807aa98u, 0x12835b01u, 0x243185beu, 0x550c7dc3u, 0x72be5d74u, 0x80deb1feu, 0x9bdc06a7u, 0xc19bf174u,
+      0xe49b69c1u, 0xefbe4786u, 0x0fc19dc6u, 0x240ca1ccu, 0x2de92c6fu, 0x4a7484aau, 0x5cb0a9dcu, 0x76f988dau,
+      0x983e5152u, 0xa831c66du, 0xb00327c8u, 0xbf597fc7u, 0xc6e00bf3u, 0xd5a79147u, 0x06ca6351u, 0x14292967u,
+      0x27b70a85u, 0x2e1b2138u, 0x4d2c6dfcu, 0x53380d13u, 0x650a7354u, 0x766a0abbu, 0x81c2c92eu, 0x92722c85u,
+      0xa2bfe8a1u, 0xa81a664bu, 0xc24b8b70u, 0xc76c51a3u, 0xd192e819u, 0xd6990624u, 0xf40e3585u, 0x106aa070u,
+      0x19a4c116u, 0x1e376c08u, 0x2748774cu, 0x34b0bcb5u, 0x391c0cb3u, 0x4ed8aa4au, 0x5b9cca4fu, 0x682e6ff3u,
+      0x748f82eeu, 0x78a5636fu, 0x84c87814u, 0x8cc70208u, 0x90befffau, 0xa4506cebu, 0xbef9a3f7u, 0xc67178f2u
+   };
+   uint32_t w[64], v[8], t1, t2;
+   int i;
+
+   for (i = 0; i < 16; i++)
+      w[i] = ((uint32_t)p[i * 4] << 24) | ((uint32_t)p[i * 4 + 1] << 16)
+           | ((uint32_t)p[i * 4 + 2] << 8) | p[i * 4 + 3];
+   for (; i < 64; i++)
+   {
+      uint32_t s0 = SP_ROR(w[i - 15], 7) ^ SP_ROR(w[i - 15], 18) ^ (w[i - 15] >> 3);
+      uint32_t s1 = SP_ROR(w[i - 2], 17) ^ SP_ROR(w[i - 2], 19) ^ (w[i - 2] >> 10);
+      w[i] = w[i - 16] + s0 + w[i - 7] + s1;
+   }
+   memcpy(v, h, sizeof(v));
+   for (i = 0; i < 64; i++)
+   {
+      t1 = v[7] + (SP_ROR(v[4], 6) ^ SP_ROR(v[4], 11) ^ SP_ROR(v[4], 25))
+         + ((v[4] & v[5]) ^ (~v[4] & v[6])) + k[i] + w[i];
+      t2 = (SP_ROR(v[0], 2) ^ SP_ROR(v[0], 13) ^ SP_ROR(v[0], 22))
+         + ((v[0] & v[1]) ^ (v[0] & v[2]) ^ (v[1] & v[2]));
+      v[7] = v[6]; v[6] = v[5]; v[5] = v[4]; v[4] = v[3] + t1;
+      v[3] = v[2]; v[2] = v[1]; v[1] = v[0]; v[0] = t1 + t2;
+   }
+   for (i = 0; i < 8; i++)
+      h[i] += v[i];
+}
+
+static void sp_sha256(const unsigned char *data, size_t len, char *hex)
+{
+   static const char digits[] = "0123456789abcdef";
+   uint32_t h[8] = {
+      0x6a09e667u, 0xbb67ae85u, 0x3c6ef372u, 0xa54ff53au,
+      0x510e527fu, 0x9b05688cu, 0x1f83d9abu, 0x5be0cd19u
+   };
+   unsigned char tail[128];
+   size_t full = len / 64, rem = len % 64, tail_len, i;
+
+   for (i = 0; i < full; i++)
+      sp_sha256_block(h, data + i * 64);
+   memset(tail, 0, sizeof(tail));
+   memcpy(tail, data + full * 64, rem);
+   tail[rem] = 0x80;
+   tail_len  = (rem < 56) ? 64 : 128;
+   for (i = 0; i < 8; i++)
+      tail[tail_len - 1 - i] = (unsigned char)(((uint64_t)len * 8) >> (i * 8));
+   sp_sha256_block(h, tail);
+   if (tail_len == 128)
+      sp_sha256_block(h, tail + 64);
+   for (i = 0; i < 32; i++)
+   {
+      unsigned char b = (unsigned char)(h[i / 4] >> (24 - (i % 4) * 8));
+      hex[i * 2]     = digits[b >> 4];
+      hex[i * 2 + 1] = digits[b & 15];
+   }
+   hex[64] = '\0';
+}
+
+static int sp_known_digest(const char *hex)
+{
+   int r, k;
+   for (r = 0; r < SP_ROMSETS; r++)
+      for (k = 0; k < SC55_ROM_COUNT; k++)
+         if (sp_romsets[r].rom[k] && !strcmp(sp_romsets[r].rom[k], hex))
+            return 1;
+   return 0;
+}
+
+static const char *sp_found_path(const char *hex)
+{
+   int i;
+   for (i = 0; i < sp_nfound; i++)
+      if (!strcmp(sp_found[i].hex, hex))
+         return sp_found[i].path;
+   return NULL;
+}
+
+/* A folder a ROM set is likely kept in. */
+static int sp_rom_folder(const char *name)
+{
+   char low[64];
+   size_t i;
+   for (i = 0; name[i] && i < sizeof(low) - 1; i++)
+      low[i] = (char)((name[i] >= 'A' && name[i] <= 'Z') ? name[i] + 32 : name[i]);
+   low[i] = '\0';
+   return strstr(low, "sc55") || strstr(low, "sc-55")
+       || strstr(low, "roland") || strstr(low, "nuked");
+}
+
+/* Hash every file in `dir` that has the size of a ROM and keep the ones
+ * on the list.  One level of likely-named subfolders is looked into. */
+static void sp_scan_dir(const char *dir, int depth)
+{
+   struct RDIR *d = retro_opendir(dir);
+   char path[2048];
+
+   if (!d)
+      return;
+   if (retro_dirent_error(d))
+   {
+      retro_closedir(d);
+      return;
+   }
+   while (retro_readdir(d))
+   {
+      const char *name = retro_dirent_get_name(d);
+      void       *buf  = NULL;
+      int64_t     len  = 0;
+      int64_t     size;
+      char        hex[65];
+
+      size_t      dl   = strlen(dir);
+      size_t      nl   = name ? strlen(name) : 0;
+
+      if (!nl || name[0] == '.' || dl + nl + 2 > sizeof(path))
+         continue;
+      memcpy(path, dir, dl);
+      path[dl] = '/';
+      memcpy(path + dl + 1, name, nl + 1);
+      if (retro_dirent_is_dir(d, NULL))
+      {
+         if (depth == 0 && sp_rom_folder(name))
+            sp_scan_dir(path, 1);
+         continue;
+      }
+      size = path_get_size(path);
+      if (size != 0x1000 && size != 0x8000 && size != 0x40000
+            && size != 0x80000 && size != 0x100000 && size != 0x200000)
+         continue;
+      if (sp_nfound == SP_MAX_FOUND)
+         break;
+      if (!filestream_read_file(path, &buf, &len) || !buf || len != size)
+      {
+         free(buf);
+         continue;
+      }
+      sp_sha256((const unsigned char*)buf, (size_t)len, hex);
+      free(buf);
+      if (sp_known_digest(hex) && !sp_found_path(hex))
+      {
+         size_t n = strlen(path) + 1;
+         char  *copy = (char*)malloc(n);
+         if (copy)
+         {
+            memcpy(copy, path, n);
+            memcpy(sp_found[sp_nfound].hex, hex, sizeof(hex));
+            sp_found[sp_nfound].path = copy;
+            sp_nfound++;
+         }
+      }
+   }
+   retro_closedir(d);
+}
+
+static int sp_load_path(sc55_t *dev, int slot, const char *path)
+{
+   void   *buf = NULL;
+   int64_t len = 0;
+   int     ok  = 0;
+
    if (filestream_read_file(path, &buf, &len) && buf && len > 0)
       ok = sc55_load_rom(dev, slot, (const unsigned char*)buf, (size_t)len);
    free(buf);
-   free(path);
    return ok;
 }
 
-static sc55_t *sp_load_model(int model)
+/* The classic file names, for a dump that is not on the list. */
+static sc55_t *sp_load_by_name(int model)
 {
    static const char *mk2[SC55_ROM_COUNT] =
       { "rom1.bin", "rom2.bin", "rom_sm.bin", "waverom1.bin", "waverom2.bin", NULL };
@@ -433,12 +769,100 @@ static sc55_t *sp_load_model(int model)
    if (!dev)
       return NULL;
    for (i = 0; i < SC55_ROM_COUNT; i++)
-      if (names[i] && !sp_load_rom(dev, i, names[i]))
+   {
+      char *path;
+      int   ok;
+      if (!names[i])
+         continue;
+      path = I_FindFile(names[i], NULL);
+      ok   = path && sp_load_path(dev, i, path);
+      free(path);
+      if (!ok)
       {
          sc55_free(dev);
          return NULL;
       }
+   }
    sc55_reset(dev);
+   return dev;
+}
+
+/* Find a ROM set and build the unit, or say what is missing. */
+static sc55_t *sp_find_unit(void)
+{
+   char    dirs[3][1024];
+   int     ndirs = 0, r, k, best = -1, best_have = 0;
+   sc55_t *dev = NULL;
+
+   sp_nfound = 0;
+   for (k = 0; k < 3; k++)
+      if (I_SearchDir(k, dirs[ndirs], sizeof(dirs[ndirs])))
+      {
+         sp_scan_dir(dirs[ndirs], 0);
+         ndirs++;
+      }
+
+   for (r = 0; r < SP_ROMSETS && !dev; r++)
+   {
+      int need = 0, have = 0;
+      for (k = 0; k < SC55_ROM_COUNT; k++)
+         if (sp_romsets[r].rom[k])
+         {
+            need++;
+            if (sp_found_path(sp_romsets[r].rom[k]))
+               have++;
+         }
+      if (have > best_have)
+      {
+         best      = r;
+         best_have = have;
+      }
+      if (have != need)
+         continue;
+      dev = sc55_new(sp_romsets[r].model);
+      for (k = 0; dev && k < SC55_ROM_COUNT; k++)
+         if (sp_romsets[r].rom[k]
+               && !sp_load_path(dev, k, sp_found_path(sp_romsets[r].rom[k])))
+         {
+            sc55_free(dev);
+            dev = NULL;
+         }
+      if (dev)
+      {
+         sc55_reset(dev);
+         lprintf(LO_INFO, "SC55: using the %s ROM set.\n", sp_romsets[r].label);
+      }
+   }
+
+   if (!dev)
+      dev = sp_load_by_name(SC55_MODEL_MK2);
+   if (!dev)
+      dev = sp_load_by_name(SC55_MODEL_MK1);
+
+   if (!dev)
+   {
+      lprintf(LO_WARN, "SC55: no complete ROM set, playing Adlib instead.  "
+            "ROM files are recognised by content, whatever they are called, "
+            "in these folders (and subfolders named sc55, roland or nuked):\n");
+      for (k = 0; k < ndirs; k++)
+         lprintf(LO_WARN, "SC55:   %s\n", dirs[k]);
+      if (best >= 0)
+      {
+         lprintf(LO_WARN, "SC55: closest is the %s set, still missing:\n",
+               sp_romsets[best].label);
+         for (k = 0; k < SC55_ROM_COUNT; k++)
+            if (sp_romsets[best].rom[k] && !sp_found_path(sp_romsets[best].rom[k]))
+               lprintf(LO_WARN, "SC55:   %s, sha256 %s\n",
+                     sp_slot_name[k], sp_romsets[best].rom[k]);
+      }
+      else
+         lprintf(LO_WARN, "SC55: none of the files there is a known SC-55 ROM.\n");
+      doom_printf("SC55: no ROM set found, playing Adlib");
+   }
+
+   for (k = 0; k < sp_nfound; k++)
+      free(sp_found[k].path);
+   sp_nfound = 0;
    return dev;
 }
 
@@ -483,16 +907,9 @@ static int sp_open(void)
       return sp_open_ok;
    sp_tried = 1;
 
-   eng_dev = sp_load_model(SC55_MODEL_MK2);
+   eng_dev = sp_find_unit();
    if (!eng_dev)
-      eng_dev = sp_load_model(SC55_MODEL_MK1);
-   if (!eng_dev)
-   {
-      lprintf(LO_WARN, "SC55: no complete ROM set found (mkII: rom1.bin, "
-            "rom2.bin, rom_sm.bin, waverom1.bin, waverom2.bin; mk1: "
-            "sc55_rom1.bin, sc55_rom2.bin, sc55_waverom1-3.bin).\n");
       return 0;
-   }
 
    eng_native_rate = sc55_rate(eng_dev);
    eng_step        = (double)eng_native_rate / (double)sp_rate;
@@ -511,6 +928,7 @@ static int sp_open(void)
    au_ring    = (float*)calloc(SC55_AUDIO_RING * 2, sizeof(float));
    if (!eng_native || !eng_hist || !ev_ring || !au_ring || !eng_build_kernel())
    {
+      lprintf(LO_WARN, "SC55: could not start the unit, playing Adlib instead.\n");
       sp_close();
       return 0;
    }
@@ -529,12 +947,14 @@ static int sp_open(void)
 #ifdef SC55_THREADED
    if (!retro_eventcount_init(&sp_ec_work))
    {
+      lprintf(LO_WARN, "SC55: could not start the unit, playing Adlib instead.\n");
       sp_close();
       return 0;
    }
    if (!retro_eventcount_init(&sp_ec_ack))
    {
       retro_eventcount_free(&sp_ec_work);
+      lprintf(LO_WARN, "SC55: could not start the unit, playing Adlib instead.\n");
       sp_close();
       return 0;
    }
@@ -542,6 +962,7 @@ static int sp_open(void)
    sp_thread = sthread_create(sp_worker, NULL);
    if (!sp_thread)
    {
+      lprintf(LO_WARN, "SC55: could not start the unit, playing Adlib instead.\n");
       sp_close();
       return 0;
    }

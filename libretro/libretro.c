@@ -4173,6 +4173,29 @@ dbool HasTrailingSlash(const char* dn)
  * Given a file name, search for it in g_wad_dir first, then the system folder
  * and then scan the parent folders of g_wad_dir.
  */
+int I_SearchDir(int index, char *out, size_t len)
+{
+   const char *system_dir = NULL;
+
+   if (index == 0)
+   {
+      if (!g_wad_dir[0] || strlen(g_wad_dir) + 1 > len)
+         return 0;
+      strcpy(out, g_wad_dir);
+      return 1;
+   }
+   if (index > 2
+         || !environ_cb(RETRO_ENVIRONMENT_GET_SYSTEM_DIRECTORY, &system_dir)
+         || !system_dir || !system_dir[0]
+         || strlen(system_dir) + 8 > len)
+      return 0;
+   if (index == 1)
+      sprintf(out, "%s%c%s", system_dir, DIR_SLASH, "prboom");
+   else
+      strcpy(out, system_dir);
+   return 1;
+}
+
 char* I_FindFile(const char* wfname, const char* ext)
 {
    char *p, *dir, *system_dir, *prboom_system_dir;

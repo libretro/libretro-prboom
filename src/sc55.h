@@ -17,18 +17,24 @@ typedef struct sc55 sc55_t;
 
 enum
 {
-    SC55_MODEL_MK2, /* SC-55mkII */
-    SC55_MODEL_MK1  /* SC-55 */
+    SC55_MODEL_MK2,     /* SC-55mkII */
+    SC55_MODEL_MK1,     /* SC-55 */
+    SC55_MODEL_ST,      /* SC-55ST */
+    SC55_MODEL_SC155,   /* SC-155 */
+    SC55_MODEL_CM300,   /* CM-300, SCC-1 */
+    SC55_MODEL_SCB55,   /* SCB-55 */
+    SC55_MODEL_RLP3237, /* RLP-3237 */
+    SC55_MODEL_COUNT
 };
 
 enum
 {
     SC55_ROM_ROM1,
     SC55_ROM_ROM2,
-    SC55_ROM_SMROM,     /* sub-MCU, mkII only */
+    SC55_ROM_SMROM,     /* sub-MCU: mkII and ST */
     SC55_ROM_WAVEROM1,
     SC55_ROM_WAVEROM2,
-    SC55_ROM_WAVEROM3,  /* mk1 only */
+    SC55_ROM_WAVEROM3,
     SC55_ROM_COUNT
 };
 

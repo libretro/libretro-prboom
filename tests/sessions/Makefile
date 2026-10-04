@@ -39,6 +39,9 @@
 #
 #   ./sessions_test ../../prboom_libretro.so freedoom1.wad 3 300 state
 #
+# And savegame mode, in check: it starts a game, saves it from the menu
+# into a savegame slot, plays on and loads it back from the menu.
+#   ./sessions_test ../../prboom_libretro.so freedoom1.wad 1 600 savegame
 # Any IWAD the core accepts will do; CI fetches Freedoom.  SAN= builds
 # the harness under a sanitizer, to be paired with a core built the
 # same way (make CC="cc -fsanitize=address,undefined -g").
@@ -56,6 +59,10 @@ RUNS     ?= 300
 # long enough for the title screen's demo to be drawing sprites: state
 # a session leaves behind in the renderer only shows once it is.
 REINITRUNS ?= 600
+# The savegame lane starts a game, saves it from the menu, and loads it
+# back from the menu; the load is done by run 470 and the game then has
+# to keep running.
+SAVERUNS ?= 600
 IWAD   ?= freedoom1.wad
 RA     := ../..
 CFLAGS ?= -O1 -g -Wall -W
@@ -75,6 +82,7 @@ check: all
 	./sessions_test $(CORE) $(IWAD) $(SESSIONS) $(RUNS) demo
 	./sessions_test $(CORE) $(IWAD) $(SESSIONS) $(REINITRUNS) reinit
 	./sessions_test $(CORE) $(IWAD) 1 $(NODERUNS) nodes
+	./sessions_test $(CORE) $(IWAD) 1 $(SAVERUNS) savegame
 
 clean:
 	rm -f sessions_test demo1.lmp bad_short.wad bad_magic.wad bad_dir.wad

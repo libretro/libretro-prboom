@@ -578,9 +578,24 @@ static size_t audio_batch(const int16_t *d, size_t f)
    return f;
 }
 static void input_poll(void) { }
+
+/* Savegame mode presses buttons on a schedule: run numbers and the
+ * joypad button held for that run.  Doom's menus act on the press, so
+ * each press is one run long with gaps between. */
+struct press { int run; unsigned id; };
+static const struct press *script;
+static int cur_run = -1;
+
 static int16_t input_state(unsigned p, unsigned d, unsigned i, unsigned id)
 {
-   (void)p; (void)d; (void)i; (void)id; return 0;
+   const struct press *k;
+   (void)i;
+   if (!script || p != 0 || d != RETRO_DEVICE_JOYPAD)
+      return 0;
+   for (k = script; k->run >= 0; k++)
+      if (k->run == cur_run && k->id == id)
+         return 1;
+   return 0;
 }
 
 static bool environ_cb(unsigned cmd, void *data)
@@ -626,7 +641,7 @@ int main(int argc, char **argv)
    void *h;
    struct retro_game_info info;
    int s, i, sessions = 3, runs = 12, demo = 0, alt = 0, failmode = 0, nodesmode = 0;
-   int statemode = 0, reinit = 0;
+   int statemode = 0, reinit = 0, savemode = 0;
    const char *altpath = NULL;
    char demopath[1024];
    const char *content;
@@ -671,6 +686,12 @@ int main(int argc, char **argv)
     * twice, and a frame difference it reports is not by itself a fault
     * -- see the Makefile on what it does and does not establish. */
    if (argc > 5 && !strcmp(argv[5], "state")) { statemode = 1; demo = 1; }
+   /* Savegame mode: start a game, save it from the menu into slot 0,
+    * play on, and load it back from the menu - a savegame file, not a
+    * savestate.  The load reads the file into a buffer and frees it
+    * when done; a buffer freed with the wrong allocator aborts here
+    * (glibc) or is reported (ASan). */
+   if (argc > 5 && !strcmp(argv[5], "savegame")) savemode = 1;
    /* alt alternates the iwad with a second content file, so consecutive
     * sessions build different lump tables.  argv[6] names that file; with
     * no argv[6] it is the DEMO1 lump extracted from the iwad, which
@@ -894,6 +915,55 @@ int main(int argc, char **argv)
          }
       }
       fflush(stdout);
+
+      if (savemode)
+      {
+         static const struct press save_load[] = {
+            {  60, RETRO_DEVICE_ID_JOYPAD_START },  /* menu */
+            {  80, RETRO_DEVICE_ID_JOYPAD_A },      /* New Game */
+            { 100, RETRO_DEVICE_ID_JOYPAD_A },      /* episode */
+            { 120, RETRO_DEVICE_ID_JOYPAD_A },      /* skill: the game starts */
+            { 200, RETRO_DEVICE_ID_JOYPAD_START },  /* menu */
+            { 220, RETRO_DEVICE_ID_JOYPAD_DOWN },
+            { 235, RETRO_DEVICE_ID_JOYPAD_DOWN },
+            { 250, RETRO_DEVICE_ID_JOYPAD_DOWN },   /* Save Game */
+            { 270, RETRO_DEVICE_ID_JOYPAD_A },      /* slot 0 */
+            { 290, RETRO_DEVICE_ID_JOYPAD_A },      /* edit the name */
+            { 310, RETRO_DEVICE_ID_JOYPAD_A },      /* and save */
+            { 400, RETRO_DEVICE_ID_JOYPAD_START },  /* menu */
+            { 420, RETRO_DEVICE_ID_JOYPAD_UP },     /* Load Game */
+            { 440, RETRO_DEVICE_ID_JOYPAD_A },      /* slot list */
+            { 460, RETRO_DEVICE_ID_JOYPAD_A },      /* load slot 0 */
+            { -1, 0 }
+         };
+         char sav[64];
+         const char *base = strrchr(info.path, '/');
+         size_t n;
+         base = base ? base + 1 : info.path;
+         n    = strcspn(base, ".");
+         snprintf(sav, sizeof(sav), "%s/%.*s/prbmsav0.dsg", sysdir, (int)n, base);
+         remove(sav);
+         script = save_load;
+         for (i = 0; i < runs; i++)
+         {
+            cur_run = i;
+            retro_run();
+         }
+         script  = NULL;
+         cur_run = -1;
+         {
+            FILE *f = fopen(sav, "rb");
+            if (!f)
+            {
+               printf("FAIL: session %d: the menu save wrote no %s\n", s, sav);
+               return 1;
+            }
+            fclose(f);
+         }
+         printf("PASS: session %d saved a game from the menu and loaded it back\n", s);
+         retro_unload_game();
+         continue;
+      }
 
       for (i = 0; i < runs; i++)
       {

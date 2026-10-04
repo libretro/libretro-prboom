@@ -37,6 +37,7 @@
 
 #include <stdarg.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <errno.h>
 #ifdef _MSC_VER
 #include <io.h>
@@ -94,6 +95,8 @@ extern dbool   r_wigglefix;
  * M_WriteFile
  *
  * killough 9/98: rewritten to use filestream and to flash disk icon
+ *
+ * The buffer comes from malloc() and is the caller's to free().
  */
 
 dbool   M_WriteFile(char const *name, void *source, int length)
@@ -123,16 +126,25 @@ int M_ReadFile(char const *name, uint8_t **buffer)
 {
    RFILE *fp;
 
+   *buffer = NULL;
    if ((fp = filestream_open(name,
 				   RETRO_VFS_FILE_ACCESS_READ,
 				   RETRO_VFS_FILE_ACCESS_HINT_NONE)))
    {
       int64_t length = filestream_get_size(fp);
-      *buffer = Z_Malloc(length, PU_STATIC, 0);
-      if (filestream_read(fp, *buffer, length) >= 0)
+      /* C library, not the zone: every caller releases the buffer with
+       * free().  At least one byte, so an empty file still hands back a
+       * buffer the caller may free. */
+      if (length >= 0 && length < INT_MAX
+            && (*buffer = (uint8_t*)malloc(length ? (size_t)length : 1)))
       {
-         filestream_close(fp);
-         return length;
+         if (filestream_read(fp, *buffer, length) == length)
+         {
+            filestream_close(fp);
+            return (int)length;
+         }
+         free(*buffer);
+         *buffer = NULL;
       }
       filestream_close(fp);
    }

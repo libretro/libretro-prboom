@@ -17,12 +17,13 @@ jobs:
         run: |
           curl -sL -o freedoom.zip \
             https://github.com/freedoom/freedoom/releases/download/v0.13.0/freedoom-0.13.0.zip
-          unzip -j -o freedoom.zip "*/freedoom1.wad" -d tests/load_no_frame && cp tests/load_no_frame/freedoom1.wad tests/sessions/
+          unzip -j -o freedoom.zip "*/freedoom1.wad" -d tests/load_no_frame && cp tests/load_no_frame/freedoom1.wad tests/sessions/ && cp tests/load_no_frame/freedoom1.wad tests/deh_pointer/
 
       - name: Run regression lanes
         run: |
           make -C tests/load_no_frame check
           make -C tests/sessions check
+          make -C tests/deh_pointer check
 
       - name: Rebuild under ASan/UBSan
         run: |
@@ -38,3 +39,5 @@ jobs:
           make -C tests/load_no_frame check SAN=address,undefined
           make -C tests/sessions clean
           make -C tests/sessions check SAN=address,undefined
+          make -C tests/deh_pointer clean
+          make -C tests/deh_pointer check SAN=address,undefined

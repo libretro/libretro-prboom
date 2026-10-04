@@ -571,7 +571,11 @@ void dsda_InitTables(void)
   memcpy(S_music, S_music_seed, num_music * sizeof(*S_music));
   memset(S_music + num_music, 0, MUSIC_EXTRA * sizeof(*S_music));
 
-  deh_codeptr = calloc(num_states, sizeof(*deh_codeptr));
+  /* Remember each frame's stock action for deh "Pointer" blocks.  Done
+   * here so every re-seed carries it. */
+  deh_codeptr = malloc(num_states * sizeof(*deh_codeptr));
+  for (i = 0; i < num_states; i++)
+    deh_codeptr[i] = states[i].action;
 
   /* MBF21 thing defaults, applied here so that every re-seed carries them
    * and any deh file processed afterwards can override them.  The seed

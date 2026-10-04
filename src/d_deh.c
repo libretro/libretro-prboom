@@ -1517,10 +1517,6 @@ void D_BuildBEXTables(void)
     * before anything reads or edits them. */
    dsda_InitTables();
 
-   // moved from ProcessDehFile, then we don't need the static int i
-   for (i = 0; i < NUMSTATES; i++)  // remember what they start as for deh xref
-     deh_codeptr[i] = states[i].action;
-
    for(i = 0; i < NUMSPRITES; i++)
       deh_spritenames[i] = strdup(sprnames[i]);
    deh_spritenames[NUMSPRITES] = NULL;

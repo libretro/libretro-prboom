@@ -303,8 +303,8 @@ default_t defaults[] =
   {"Sound settings",{NULL},{0},UL,UL,def_none,ss_none, NULL, NULL},
   {"pitched_sounds",{&pitched_sounds, NULL},{0, NULL},0,1, // killough 2/21/98
    def_bool,ss_gen, NULL, NULL}, // enables variable pitch in sound effects (from id's original code)
-  {"sfx_volume",{&snd_SfxVolume, NULL},{8, NULL},0,15, def_int,ss_none, NULL, NULL},
-  {"music_volume",{&snd_MusicVolume, NULL},{8, NULL},0,15, def_int,ss_none, NULL, NULL},
+  {"sfx_volume",{&snd_SfxVolume, NULL},{15, NULL},0,15, def_int,ss_none, NULL, NULL},
+  {"music_volume",{&snd_MusicVolume, NULL},{15, NULL},0,15, def_int,ss_none, NULL, NULL},
   {"mus_pause_opt",{&mus_pause_opt, NULL},{2, NULL},0,2, // CPhipps - music pausing
    def_int, ss_none, NULL, NULL}, // 0 = kill music when paused, 1 = pause music, 2 = let music continue
   {"mus_load_external", {&mus_load_external, NULL},  {2, NULL},0,2,

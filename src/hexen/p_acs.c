@@ -852,26 +852,24 @@ static int CmdSectorSound(void)
   if (ACScript->line)
     mobj = (mobj_t *) &ACScript->line->frontsector->soundorg;
   volume = Pop();
-  (void) volume;
-  S_StartSound(mobj, ACS_GetSoundID(StringLookup(Pop())));
+  S_StartSoundVolume(mobj, ACS_GetSoundID(StringLookup(Pop())), volume);
   return SCRIPT_CONTINUE;
 }
 static int CmdThingSound(void)
 {
-  int tid, sound, searcher = -1;
+  int tid, sound, volume, searcher = -1;
   mobj_t *mobj;
-  Pop();                        /* volume: sounds play at default volume */
+  volume = Pop();
   sound = ACS_GetSoundID(StringLookup(Pop()));
   tid = Pop();
   while ((mobj = P_FindMobjFromTID(tid, &searcher)) != NULL)
-    S_StartSound(mobj, sound);
+    S_StartSoundVolume(mobj, sound, volume);
   return SCRIPT_CONTINUE;
 }
 static int CmdAmbientSound(void)
 {
   int volume = Pop();
-  (void) volume;
-  S_StartSound(NULL, ACS_GetSoundID(StringLookup(Pop())));
+  S_StartSoundVolume(NULL, ACS_GetSoundID(StringLookup(Pop())), volume);
   return SCRIPT_CONTINUE;
 }
 static int CmdSoundSequence(void)

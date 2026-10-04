@@ -75,6 +75,7 @@ typedef struct
   int handle;          // handle of the sound being played
   int is_pickup;       // killough 4/25/98: whether sound is a player's weapon
   int priority;        // heretic: for the per-sound channel cap
+  int volscale;        // 0..127: a volume the game chose, 127 = as loud as any sound
 } channel_t;
 
 // the set of channels available
@@ -115,7 +116,7 @@ int idmusnum;
 void S_StopChannel(int cnum);
 
 // Will start a sound at a given volume.
-static void S_StartSoundAtVolume(degenmobj_t *origin, int sound_id, int volume);
+static void S_StartSoundAtVolume(degenmobj_t *origin, int sound_id, int volume, int volscale);
 
 int S_AdjustSoundParams(mobj_t *listener, degenmobj_t *source,
                         int *vol, int *sep, int *pitch);
@@ -393,7 +394,12 @@ void S_Start(void)
   S_ChangeMusic(mnum, TRUE);
 }
 
-static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
+/* `volume` is the sfx slider (0..15), as every sound plays at.  `volscale`
+ * (0..127) is a volume the game itself chose for this one sound - Heretic's
+ * ambient sequences, Hexen's sound sequences and scripts - and scales the
+ * result after the distance and the slider are applied, as Raven's own
+ * S_StartSoundAtVolume does.  127 leaves the sound as it is. */
+static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume, int volscale)
 {
   int sep, pitch, priority, cnum, is_pickup;
   sfxinfo_t *sfx;
@@ -464,6 +470,9 @@ static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
       if ( origin->x == players[displayplayer].mo->x &&
            origin->y == players[displayplayer].mo->y)
         sep = NORM_SEP;
+
+  if (volscale < 127)
+    volume = volume * volscale / 127;
 
   /* hacks to vary the sfx pitches */
   if (raven)
@@ -541,6 +550,7 @@ static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
     return;
 
   channels[cnum].priority = priority;
+  channels[cnum].volscale = volscale;
 
   // get lumpnum if necessary
   // killough 2/28/98: make missing sounds non-fatal
@@ -560,16 +570,30 @@ static void S_StartSoundAtVolume(degenmobj_t *origin, int sfx_id, int volume)
 
 void S_StartSound(void *origin, int sfx_id)
 {
-  S_StartSoundAtVolume(origin, sfx_id, snd_SfxVolume);
+  S_StartSoundAtVolume(origin, sfx_id, snd_SfxVolume, 127);
 }
 
-/* Heretic ambient sound sequences play at a script-chosen volume rather
- * than the global sfx volume. */
+/* A sound at a volume the game chose, 0..127 (127 = as loud as any other
+ * sound), on top of the sfx slider and the distance: Heretic's ambient
+ * sequences, Hexen's sound sequences, and the volume argument of Hexen's
+ * script sound commands.  That volume used to be passed in place of the
+ * slider value, which is 0..15, so a typical ambient volume of 60 came
+ * out about seven times louder than an ordinary sound and past what the
+ * mixer takes; from a positioned source it was dropped altogether. */
+void S_StartSoundVolume(void *origin, int sfx_id, int volume)
+{
+  if (volume <= 0)
+    return;
+  if (volume > 127)
+    volume = 127;
+  S_StartSoundAtVolume((degenmobj_t *)origin, sfx_id, snd_SfxVolume, volume);
+}
+
 void S_StartAmbientSound(void *origin, int sfx_id, int volume)
 {
-  if (sfx_id == heretic_sfx_None || volume <= 0)
+  if (sfx_id == heretic_sfx_None)
     return;
-  S_StartSoundAtVolume((degenmobj_t *)origin, sfx_id, volume);
+  S_StartSoundVolume(origin, sfx_id, volume);
 }
 
 /* Hexen sound sequences need to know whether a particular sound is still
@@ -690,7 +714,11 @@ void S_UpdateSounds(void* listener_p)
                                          &volume, &sep, &pitch))
                   S_StopChannel(cnum);
                 else
+                {
+                  if (c->volscale < 127)
+                    volume = volume * c->volscale / 127;
                   I_UpdateSoundParams(c->handle, volume, sep, pitch);
+                }
         }
             }
           else   // if channel is allocated but sound has stopped, free it

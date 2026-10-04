@@ -37,13 +37,6 @@
 #include <file/file_path.h>
 #include <retro_dirent.h>
 
-#include "sc55player.h"
-#include "sc55.h"
-#include "midifile.h"
-#include "lprintf.h"
-#include "i_system.h"
-#include "g_game.h"
-
 #if defined(HAVE_THREADS) && !defined(SC55_NO_THREAD)
 #include <rthreads/rthreads.h>
 #include <rthreads/retro_eventcount.h>
@@ -52,6 +45,15 @@
 #define SC55_THREADED 1
 #endif
 #endif
+
+/* The game's headers come last: m_swap.h defines LONG() and SHORT(),
+ * which the Windows headers the ones above pull in use as type names. */
+#include "sc55player.h"
+#include "sc55.h"
+#include "midifile.h"
+#include "lprintf.h"
+#include "i_system.h"
+#include "g_game.h"
 
 #ifdef SC55_THREADED
 typedef retro_atomic_size_t sp_size_t;

@@ -75,6 +75,7 @@ typedef int    sp_int_t;
 #define SC55_EVENT_RING  4096                /* events, power of two */
 #define SC55_BLOCK       64                  /* output frames per worker pass */
 #define SC55_LEAD_MS     80
+#define SC55_HISTORY     32768               /* frames kept for a state load to step back over */
 #define SC55_TAPS        32
 #define SC55_PHASES      128
 #define SC55_NATIVE_MAX  2048                /* native frames per device call */
@@ -145,6 +146,12 @@ static size_t         sp_lead;
 static uint32_t       sp_dither = 0x9e3779b9u;
 static int            sp_announced;   /* "ready" has been logged */
 static size_t         sp_short;       /* frames the worker was late with */
+static float         *sp_hist;        /* the last SC55_HISTORY frames handed out */
+static uint64_t       sp_clock;       /* frames handed out for this song, as the game counts them */
+static uint64_t       sp_clock_max;   /* frames ever produced for this song */
+static uint32_t       sp_song_hash;   /* identifies the registered song */
+static uint32_t       sp_song_id;     /* identifies this playing of it */
+static uint32_t       sp_plays;
 
 /* Queued at power-on: a GS reset, which the mkII needs once because its
  * firmware does not initialise everything by itself, then a note the
@@ -917,6 +924,8 @@ static void sp_close(void)
    free(eng_native);
    free(ev_ring);
    free(au_ring);
+   free(sp_hist);
+   sp_hist    = NULL;
    eng_dev    = NULL;
    eng_kernel = NULL;
    eng_hist   = NULL;
@@ -954,7 +963,9 @@ static int sp_open(void)
                + SC55_NATIVE_MAX + 16) * 2 * sizeof(float));
    ev_ring    = (sp_event_t*)calloc(SC55_EVENT_RING, sizeof(sp_event_t));
    au_ring    = (float*)calloc(SC55_AUDIO_RING * 2, sizeof(float));
-   if (!eng_native || !eng_hist || !ev_ring || !au_ring || !eng_build_kernel())
+   sp_hist    = (float*)calloc(SC55_HISTORY * 2, sizeof(float));
+   if (!eng_native || !eng_hist || !ev_ring || !au_ring || !sp_hist
+         || !eng_build_kernel())
    {
       lprintf(LO_WARN, "SC55: could not start the unit, playing Adlib instead.\n");
       sp_close();
@@ -1200,6 +1211,9 @@ static void sp_begin(void)
 {
    sp_flush();
    sp_reset_channels(0);
+   sp_clock     = 0;
+   sp_clock_max = 0;
+   sp_song_id   = sp_song_hash + (++sp_plays) * 0x9e3779b9u;
    sp_next_time = (double)sp_rate * SC55_RESET_MS / 1000.0;
    if (sp_events)
       sp_next_time += (double)sp_events[sp_eventpos]->delta_time * sp_spmc;
@@ -1267,6 +1281,13 @@ static const void *sp_registersong(const void *data, unsigned len)
    }
    sp_eventpos = 0;
    sp_spmc     = MIDI_spmc(sp_midifile, NULL, (unsigned)sp_rate);
+   {
+      const unsigned char *b = (const unsigned char*)data;
+      unsigned i;
+      sp_song_hash = 2166136261u ^ len;
+      for (i = 0; i < len && i < 256; i++)
+         sp_song_hash = (sp_song_hash ^ b[i]) * 16777619u;
+   }
    return data;
 }
 
@@ -1314,15 +1335,11 @@ static void sp_play(const void *handle, int looping)
    sp_begin();
 }
 
-/* Fill `dest` with `n` frames of float audio; returns how many are
- * real, the rest being silence. */
-static unsigned sp_pull(float *dest, unsigned n)
+/* Fill `dest`, already zeroed, with `n` frames of new audio from the
+ * unit; returns how many are real, the rest staying silence. */
+static unsigned sp_pull_new(float *dest, unsigned n)
 {
    size_t w, r, got, i;
-
-   memset(dest, 0, (size_t)n * 2 * sizeof(float));
-   if (!sp_open_ok || !sp_playing || sp_paused || !sp_events)
-      return 0;
 
 #ifndef SC55_THREADED
    /* Inline: boot at up to twice real time, then produce on demand. */
@@ -1365,10 +1382,57 @@ static unsigned sp_pull(float *dest, unsigned n)
    return (unsigned)got;
 }
 
+/* Fill `dest` with `n` frames of float audio.
+ *
+ * The unit cannot be wound back, so a state load that steps back a
+ * short way (run-ahead, rewind) is served from what was handed out
+ * before: the same frames again, until the game is back where the unit
+ * is.  The music then comes out exactly as it would have without the
+ * load. */
+static void sp_pull(float *dest, unsigned n)
+{
+   unsigned i = 0;
+
+   memset(dest, 0, (size_t)n * 2 * sizeof(float));
+   if (!sp_open_ok || !sp_playing || sp_paused || !sp_events)
+      return;
+
+   while (i < n && sp_clock < sp_clock_max)
+   {
+      const float *src = sp_hist + (size_t)(sp_clock & (SC55_HISTORY - 1)) * 2;
+      dest[i * 2]     = src[0];
+      dest[i * 2 + 1] = src[1];
+      sp_clock++;
+      i++;
+   }
+   if (i < n)
+   {
+      unsigned k;
+      sp_pull_new(dest + i * 2, n - i);
+      for (k = i; k < n; k++)
+      {
+         float *dst = sp_hist + (size_t)(sp_clock_max & (SC55_HISTORY - 1)) * 2;
+         dst[0] = dest[k * 2];
+         dst[1] = dest[k * 2 + 1];
+         sp_clock_max++;
+      }
+      sp_clock = sp_clock_max;
+   }
+}
+
+/* The game's music volume, 0 to 15, as a gain.  The curve and the
+ * factor are fitted to the Adlib player, measured on the same song at
+ * the same settings, so that changing MIDI Hardware does not change how
+ * loud the music is or what the volume slider does to it. */
+static float sp_gain(void)
+{
+   return 2.0f * (float)pow((double)sp_volume / 15.0, 1.75);
+}
+
 static void sp_render_float(void *vdest, unsigned nsamp)
 {
    float   *dest = (float*)vdest;
-   float    gain = (float)sp_volume / 15.0f;
+   float    gain = sp_gain();
    unsigned i;
 
    sp_pull(dest, nsamp);
@@ -1379,7 +1443,7 @@ static void sp_render_float(void *vdest, unsigned nsamp)
 static void sp_render(void *vdest, unsigned nsamp)
 {
    int16_t *dest = (int16_t*)vdest;
-   float    gain = (float)sp_volume / 15.0f * 32767.0f;
+   float    gain = sp_gain() * 32768.0f;
    float    tmp[256 * 2];
 
    while (nsamp)
@@ -1408,9 +1472,11 @@ static void sp_render(void *vdest, unsigned nsamp)
    }
 }
 
-/* State: where the sequencer is.  The unit itself is not saved; on
- * restore it is reset and the song's program and controller state is
- * replayed up to the saved event. */
+/* State: where the sequencer is, and which frame of which playing the
+ * game had reached.  The unit itself is not saved.  A load that steps a
+ * short way back is absorbed by sp_pull; any other load starts the
+ * song's channels afresh and replays its program and controller state
+ * up to the saved event. */
 #define SP_STATE_MAGIC 0x53433535u  /* 'SC55' */
 
 typedef struct
@@ -1418,6 +1484,8 @@ typedef struct
    uint32_t magic;
    uint32_t eventpos;
    uint32_t flags;
+   uint32_t song_id;
+   uint64_t clock;
    double   spmc;
 } sp_state_t;
 
@@ -1433,6 +1501,8 @@ static size_t sp_serialize(void *dest, size_t cap)
    s.magic    = SP_STATE_MAGIC;
    s.eventpos = (uint32_t)sp_eventpos;
    s.flags    = (sp_looping ? 1u : 0u) | (sp_paused ? 2u : 0u);
+   s.song_id  = sp_song_id;
+   s.clock    = sp_clock;
    s.spmc     = sp_spmc;
    memcpy(dest, &s, sizeof(s));
    return sizeof(s);
@@ -1448,6 +1518,17 @@ static int sp_unserialize(const void *src, size_t size)
    memcpy(&s, src, sizeof(s));
    if (s.magic != SP_STATE_MAGIC)
       return 0;
+
+   /* The same playing of the same song, a short way back: step back
+    * and let sp_pull hand that stretch out again. */
+   if (sp_playing && s.song_id == sp_song_id
+         && s.clock <= sp_clock_max
+         && sp_clock_max - s.clock <= SC55_HISTORY)
+   {
+      sp_clock  = s.clock;
+      sp_paused = (s.flags & 2u) != 0;
+      return 1;
+   }
 
    sp_eventpos = 0;
    sp_spmc     = MIDI_spmc(sp_midifile, NULL, (unsigned)sp_rate);
@@ -1469,6 +1550,8 @@ static int sp_unserialize(const void *src, size_t size)
    sp_playing   = 1;
    sp_next_time = (double)sp_rate * SC55_RESET_MS / 1000.0
                 + (double)sp_events[sp_eventpos]->delta_time * sp_spmc;
+   sp_clock     = s.clock;
+   sp_clock_max = s.clock;
    return 1;
 }
 

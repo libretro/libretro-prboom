@@ -992,7 +992,11 @@ static const sp88_romset_t sp88_romsets[] =
    { SC88_MODEL_SC88VL, "SC-88VL 1.04",
      { "25e016e93c8a44ba3c35584462b56d72", SP88_IC325, SP88_IC326, SP88_IC327, SP88_IC328 } },
    { SC88_MODEL_SC88, "SC-88 1.01",
-     { "0ac771782ea58a53af590ebdf140d517", SP88_IC325, SP88_IC326, SP88_IC327, SP88_IC328 } }
+     { "0ac771782ea58a53af590ebdf140d517", SP88_IC325, SP88_IC326, SP88_IC327, SP88_IC328 } },
+   /* A second SC-88 control ROM, circulated as "v1.0.2 (HN27C4096H)"
+    * and byte-swapped; it boots and plays as the 1.01 does. */
+   { SC88_MODEL_SC88, "SC-88 (HN27C4096H)",
+     { "680a25ccfe193393c4b2d43ff78bfc10", SP88_IC325, SP88_IC326, SP88_IC327, SP88_IC328 } }
 };
 #define SP88_ROMSETS ((int)(sizeof(sp88_romsets) / sizeof(sp88_romsets[0])))
 

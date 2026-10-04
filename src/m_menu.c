@@ -3329,6 +3329,7 @@ static const char *midi_player_opts[] = {
   "Off",
   "Adlib",
   "SC55",
+  "SC88",
 #ifdef HAVE_LIBFLUIDSYNTH
   "Fluidsynth",
 #endif

@@ -1,7 +1,8 @@
-/* Roland SC-55 music player.
+/* Roland Sound Canvas music player: SC-55 (sc55.c) and SC-88 family
+ * (sc88.c).  One of the two is in use at a time; sp_unit says which.
  *
- * sc55.c runs the unit's own firmware, so unlike the OPL player this
- * one has a machine to boot and a real cost per sample.  The emulator
+ * The emulators run the units' own firmware, so unlike the OPL player
+ * this one has a machine to boot and a real cost per sample.  The emulator
  * therefore lives on a worker thread.  The caller's thread keeps the
  * sequencer: it stamps each MIDI event with the output frame it belongs
  * to and queues it, tells the worker how far it may run, and takes
@@ -50,6 +51,7 @@
  * which the Windows headers the ones above pull in use as type names. */
 #include "sc55player.h"
 #include "sc55.h"
+#include "sc88.h"
 #include "midifile.h"
 #include "lprintf.h"
 #include "i_system.h"
@@ -82,9 +84,29 @@ typedef int    sp_int_t;
 #ifndef SC55_BOOT_CAP_S
 #define SC55_BOOT_CAP_S  12                  /* give up waiting for the firmware */
 #endif
+#ifndef SC88_BOOT_CAP_S
+#define SC88_BOOT_CAP_S  30                  /* SC-88: its factory reset alone is ~11 s */
+#endif
 #define SC55_SETTLE_MS   100                 /* after the firmware answers */
 #define SC55_RESET_MS    100                 /* for a song's channel reset to be taken in */
 #define SC55_TAIL_MS     2500                /* a song that does not loop rings out this long */
+
+/* What the player needs of an emulator. */
+typedef struct
+{
+   const char *tag;                 /* in messages */
+   const char *thread;
+   void     *(*find)(void);         /* find the ROMs and build the unit, or say what is missing */
+   void      (*destroy)(void *dev);
+   void      (*midi)(void *dev, const unsigned char *data, size_t len);
+   uint32_t  (*voices)(const void *dev);
+   unsigned  (*rate)(const void *dev);
+   size_t    (*run)(void *dev, int32_t *frames, size_t count);
+   float       scale;               /* 1 / full scale of its frames */
+   unsigned    boot_cap_s;
+} sp_unit_t;
+
+static const sp_unit_t *sp_unit;
 
 typedef struct
 {
@@ -115,7 +137,7 @@ static int                sp_ec_up;
 
 /* ---- worker side ---------------------------------------------------- */
 
-static sc55_t  *eng_dev;
+static void    *eng_dev;
 static unsigned eng_native_rate;
 static size_t   eng_out_pos;          /* output frames produced this epoch */
 static size_t   eng_boot_frames;      /* native frames run while booting */
@@ -237,15 +259,13 @@ static int eng_build_kernel(void)
 /* Run the device for `n` native frames and append them to the history. */
 static void eng_pull_native(size_t n)
 {
-   /* The chip's samples are 20 bits shifted up by 12; upstream's integer
-    * paths play them one bit hotter still, so full scale is 2^30. */
-   const float scale = 1.0f / 1073741824.0f;
+   const float scale = sp_unit->scale;
    while (n)
    {
       size_t chunk = n < SC55_NATIVE_MAX ? n : SC55_NATIVE_MAX;
       size_t i;
       float *dst = eng_hist + eng_hist_len * 2;
-      sc55_run(eng_dev, eng_native, chunk);
+      sp_unit->run(eng_dev, eng_native, chunk);
       for (i = 0; i < chunk * 2; i++)
          dst[i] = (float)eng_native[i] * scale;
       eng_hist_len += chunk;
@@ -305,7 +325,7 @@ static int eng_boot_slice(size_t native_frames)
    while (native_frames)
    {
       size_t chunk = native_frames < SC55_NATIVE_MAX ? native_frames : SC55_NATIVE_MAX;
-      sc55_run(eng_dev, eng_native, chunk);
+      sp_unit->run(eng_dev, eng_native, chunk);
       native_frames   -= chunk;
       eng_boot_frames += chunk;
       if (eng_settle_left)
@@ -317,10 +337,10 @@ static int eng_boot_slice(size_t native_frames)
          }
          eng_settle_left -= chunk;
       }
-      else if (sc55_voices(eng_dev)
-            || eng_boot_frames >= (size_t)eng_native_rate * SC55_BOOT_CAP_S)
+      else if (sp_unit->voices(eng_dev)
+            || eng_boot_frames >= (size_t)eng_native_rate * sp_unit->boot_cap_s)
       {
-         sc55_midi(eng_dev, sp_probe_end, sizeof(sp_probe_end));
+         sp_unit->midi(eng_dev, sp_probe_end, sizeof(sp_probe_end));
          eng_settle_left = (size_t)eng_native_rate * SC55_SETTLE_MS / 1000;
       }
    }
@@ -385,7 +405,7 @@ static int eng_produce(void)
                n = ev->time - eng_out_pos;
             break;
          }
-         sc55_midi(eng_dev, ev->data, ev->len);
+         sp_unit->midi(eng_dev, ev->data, ev->len);
          er++;
       }
       SP_STORE_SIZE(&ev_r, er);
@@ -408,7 +428,7 @@ static int eng_produce(void)
 static void sp_worker(void *unused)
 {
    (void)unused;
-   sthread_setname("prboom-sc55");
+   sthread_setname(sp_unit->thread);
    for (;;)
    {
       int key;
@@ -681,6 +701,22 @@ static void sp_sha256(const unsigned char *data, size_t len, char *hex)
    hex[64] = '\0';
 }
 
+/* What the directory scan keeps: set by the unit's finder. */
+static int  (*sp_scan_size)(int64_t size);
+static void (*sp_scan_hash)(unsigned char *data, size_t len, char *hex);
+static int  (*sp_scan_known)(const char *hex);
+
+static int sp_sc55_size(int64_t size)
+{
+   return size == 0x1000 || size == 0x8000 || size == 0x40000
+       || size == 0x80000 || size == 0x100000 || size == 0x200000;
+}
+
+static void sp_sc55_hash(unsigned char *data, size_t len, char *hex)
+{
+   sp_sha256(data, len, hex);
+}
+
 static int sp_known_digest(const char *hex)
 {
    int r, k;
@@ -709,11 +745,13 @@ static int sp_rom_folder(const char *name)
       low[i] = (char)((name[i] >= 'A' && name[i] <= 'Z') ? name[i] + 32 : name[i]);
    low[i] = '\0';
    return strstr(low, "sc55") || strstr(low, "sc-55")
-       || strstr(low, "roland") || strstr(low, "nuked");
+       || strstr(low, "sc88") || strstr(low, "sc-88")
+       || strstr(low, "roland") || strstr(low, "nuked")
+       || strstr(low, "88emu") || strstr(low, "gearmulator");
 }
 
 /* Hash every file in `dir` that has the size of a ROM and keep the ones
- * on the list.  One level of likely-named subfolders is looked into. */
+ * on the unit's list.  One level of likely-named subfolders is looked into. */
 static void sp_scan_dir(const char *dir, int depth)
 {
    struct RDIR *d = retro_opendir(dir);
@@ -749,8 +787,7 @@ static void sp_scan_dir(const char *dir, int depth)
          continue;
       }
       size = path_get_size(path);
-      if (size != 0x1000 && size != 0x8000 && size != 0x40000
-            && size != 0x80000 && size != 0x100000 && size != 0x200000)
+      if (!sp_scan_size(size))
          continue;
       if (sp_nfound == SP_MAX_FOUND)
          break;
@@ -759,9 +796,9 @@ static void sp_scan_dir(const char *dir, int depth)
          free(buf);
          continue;
       }
-      sp_sha256((const unsigned char*)buf, (size_t)len, hex);
+      sp_scan_hash((unsigned char*)buf, (size_t)len, hex);
       free(buf);
-      if (sp_known_digest(hex) && !sp_found_path(hex))
+      if (sp_scan_known(hex) && !sp_found_path(hex))
       {
          size_t n = strlen(path) + 1;
          char  *copy = (char*)malloc(n);
@@ -829,7 +866,10 @@ static sc55_t *sp_find_unit(void)
    int     ndirs = 0, r, k, best = -1, best_have = 0;
    sc55_t *dev = NULL;
 
-   sp_nfound = 0;
+   sp_nfound     = 0;
+   sp_scan_size  = sp_sc55_size;
+   sp_scan_hash  = sp_sc55_hash;
+   sp_scan_known = sp_known_digest;
    for (k = 0; k < 3; k++)
       if (I_SearchDir(k, dirs[ndirs], sizeof(dirs[ndirs])))
       {
@@ -901,12 +941,318 @@ static sc55_t *sp_find_unit(void)
    return dev;
 }
 
+/* ---- the SC-55 as a unit -------------------------------------------- */
+
+static void *sp_sc55_find(void)                  { return sp_find_unit(); }
+static void  sp_sc55_destroy(void *d)            { sc55_free((sc55_t*)d); }
+static void  sp_sc55_midi(void *d, const unsigned char *b, size_t n) { sc55_midi((sc55_t*)d, b, n); }
+static uint32_t sp_sc55_voices(const void *d)    { return sc55_voices((const sc55_t*)d); }
+static unsigned sp_sc55_rate(const void *d)      { return sc55_rate((const sc55_t*)d); }
+static size_t sp_sc55_run(void *d, int32_t *f, size_t n) { return sc55_run((sc55_t*)d, f, n); }
+
+/* The chip's samples are 20 bits shifted up by 12; upstream's integer
+ * paths play them one bit hotter still, so full scale is 2^30. */
+static const sp_unit_t sp_sc55 =
+{
+   "SC55", "prboom-sc55", sp_sc55_find, sp_sc55_destroy, sp_sc55_midi,
+   sp_sc55_voices, sp_sc55_rate, sp_sc55_run, 1.0f / 1073741824.0f, SC55_BOOT_CAP_S
+};
+
+/* ---- the SC-88 family ----------------------------------------------- */
+
+/* 88emu identifies dumps by MD5, the control ROM's taken in the CPU's
+ * byte order (sc88_normalize_firmware); these are its digests. */
+typedef struct
+{
+   int         model;
+   const char *label;
+   const char *rom[SC88_ROM_COUNT];
+} sp88_romset_t;
+
+#define SP88_IC325 "6a92b7de3ac7b8205d29ec4497644beb"
+#define SP88_IC326 "d98f4b255d3a7dc830d92c71c25ce2eb"
+#define SP88_IC327 "c05b103d4db110b3962431173cc72967"
+#define SP88_IC328 "bccc26c34cac0d5509e8efb645043b5b"
+#define SP88_PRO_A "bd33b20bb5e8f51e436e141f81a75c14"   /* R01567167, 8 MB */
+#define SP88_PRO_B "125ea2056dc208f04a141b3dcdffdb1b"   /* R01567178, 8 MB */
+#define SP88_PRO_C "48c3887c9a2a574b907242640fa0a320"   /* R01233667, 4 MB */
+
+/* In order of preference. */
+static const sp88_romset_t sp88_romsets[] =
+{
+#ifdef SC88_TEST_ROMSET
+   SC88_TEST_ROMSET
+#endif
+   { SC88_MODEL_SC88PRO, "SC-88Pro 1.02",
+     { "9d4c2f123b4451d8ee75c3b982760f28", SP88_PRO_A, SP88_PRO_B, SP88_PRO_C, NULL } },
+   { SC88_MODEL_SC88PRO, "SC-88Pro (SC-GS A '96)",
+     { "784b3ea762b5f96cabdceb33d121d5e4", SP88_PRO_A, SP88_PRO_B, SP88_PRO_C, NULL } },
+   { SC88_MODEL_SC88PRO, "VE-GS Pro",
+     { "f836d9491075c28c1c0587d4876cec65", SP88_PRO_A, SP88_PRO_B, SP88_PRO_C, NULL } },
+   { SC88_MODEL_SC88VL, "SC-88VL 1.04",
+     { "25e016e93c8a44ba3c35584462b56d72", SP88_IC325, SP88_IC326, SP88_IC327, SP88_IC328 } },
+   { SC88_MODEL_SC88, "SC-88 1.01",
+     { "0ac771782ea58a53af590ebdf140d517", SP88_IC325, SP88_IC326, SP88_IC327, SP88_IC328 } }
+};
+#define SP88_ROMSETS ((int)(sizeof(sp88_romsets) / sizeof(sp88_romsets[0])))
+
+/* The SC-88Pro board's own 4 MB mask ROMs: each 8 MB part as two
+ * halves, joined when the whole is not there. */
+typedef struct { const char *whole, *first, *second; } sp88_halves_t;
+
+static const sp88_halves_t sp88_halves[] =
+{
+   { SP88_PRO_A, "decc8a499b69e68ee8b121d73410c36b", "69933f0a2a3f6f4ab53932f40ba63f74" },
+   { SP88_PRO_B, "bda725bd1cf8c3911f906314ca162bed", "94e94038993600555b738e8ccc24d8b8" }
+};
+
+static const char *const sp88_slot_name[SC88_ROM_COUNT] =
+{
+   "control ROM", "wave ROM 1", "wave ROM 2", "wave ROM 3", "wave ROM 4"
+};
+
+#define SP_ROL(x, n) (((x) << (n)) | ((x) >> (32 - (n))))
+
+static void sp_md5_block(uint32_t *h, const unsigned char *p)
+{
+   static const uint32_t k[64] = {
+      0xd76aa478u, 0xe8c7b756u, 0x242070dbu, 0xc1bdceeeu, 0xf57c0fafu, 0x4787c62au, 0xa8304613u, 0xfd469501u,
+      0x698098d8u, 0x8b44f7afu, 0xffff5bb1u, 0x895cd7beu, 0x6b901122u, 0xfd987193u, 0xa679438eu, 0x49b40821u,
+      0xf61e2562u, 0xc040b340u, 0x265e5a51u, 0xe9b6c7aau, 0xd62f105du, 0x02441453u, 0xd8a1e681u, 0xe7d3fbc8u,
+      0x21e1cde6u, 0xc33707d6u, 0xf4d50d87u, 0x455a14edu, 0xa9e3e905u, 0xfcefa3f8u, 0x676f02d9u, 0x8d2a4c8au,
+      0xfffa3942u, 0x8771f681u, 0x6d9d6122u, 0xfde5380cu, 0xa4beea44u, 0x4bdecfa9u, 0xf6bb4b60u, 0xbebfbc70u,
+      0x289b7ec6u, 0xeaa127fau, 0xd4ef3085u, 0x04881d05u, 0xd9d4d039u, 0xe6db99e5u, 0x1fa27cf8u, 0xc4ac5665u,
+      0xf4292244u, 0x432aff97u, 0xab9423a7u, 0xfc93a039u, 0x655b59c3u, 0x8f0ccc92u, 0xffeff47du, 0x85845dd1u,
+      0x6fa87e4fu, 0xfe2ce6e0u, 0xa3014314u, 0x4e0811a1u, 0xf7537e82u, 0xbd3af235u, 0x2ad7d2bbu, 0xeb86d391u
+   };
+   static const unsigned char r[64] = {
+      7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22, 7, 12, 17, 22,
+      5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20, 5, 9, 14, 20,
+      4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23, 4, 11, 16, 23,
+      6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21, 6, 10, 15, 21
+   };
+   uint32_t w[16], a = h[0], b = h[1], c = h[2], d = h[3];
+   int i;
+   for (i = 0; i < 16; i++)
+      w[i] = (uint32_t)p[i * 4] | ((uint32_t)p[i * 4 + 1] << 8)
+           | ((uint32_t)p[i * 4 + 2] << 16) | ((uint32_t)p[i * 4 + 3] << 24);
+   for (i = 0; i < 64; i++)
+   {
+      uint32_t f, t;
+      int g;
+      if (i < 16)      { f = (b & c) | (~b & d); g = i; }
+      else if (i < 32) { f = (d & b) | (~d & c); g = (5 * i + 1) & 15; }
+      else if (i < 48) { f = b ^ c ^ d;          g = (3 * i + 5) & 15; }
+      else             { f = c ^ (b | ~d);       g = (7 * i) & 15; }
+      t = d;
+      d = c;
+      c = b;
+      b = b + SP_ROL(a + f + k[i] + w[g], r[i]);
+      a = t;
+   }
+   h[0] += a; h[1] += b; h[2] += c; h[3] += d;
+}
+
+static void sp_md5(const unsigned char *data, size_t len, char *hex)
+{
+   static const char digits[] = "0123456789abcdef";
+   uint32_t h[4] = { 0x67452301u, 0xefcdab89u, 0x98badcfeu, 0x10325476u };
+   unsigned char tail[128];
+   size_t full = len / 64, rem = len % 64, tail_len, i;
+
+   for (i = 0; i < full; i++)
+      sp_md5_block(h, data + i * 64);
+   memset(tail, 0, sizeof(tail));
+   memcpy(tail, data + full * 64, rem);
+   tail[rem] = 0x80;
+   tail_len  = (rem < 56) ? 64 : 128;
+   for (i = 0; i < 8; i++)
+      tail[tail_len - 8 + i] = (unsigned char)(((uint64_t)len * 8) >> (i * 8));
+   sp_md5_block(h, tail);
+   if (tail_len == 128)
+      sp_md5_block(h, tail + 64);
+   for (i = 0; i < 16; i++)
+   {
+      unsigned char v = (unsigned char)(h[i / 4] >> ((i % 4) * 8));
+      hex[i * 2]     = digits[v >> 4];
+      hex[i * 2 + 1] = digits[v & 15];
+   }
+   hex[32] = '\0';
+}
+
+static int sp88_size(int64_t size)
+{
+   return size == 0x80000 || size == 0x100000 || size == 0x200000
+       || size == 0x400000 || size == 0x800000;
+}
+
+/* A control ROM is digested in the CPU's byte order. */
+static void sp88_hash(unsigned char *data, size_t len, char *hex)
+{
+   if (len == 0x80000 || len == 0x100000)
+      sc88_normalize_firmware(data, len);
+   sp_md5(data, len, hex);
+}
+
+static int sp88_known(const char *hex)
+{
+   int r, k;
+   for (r = 0; r < SP88_ROMSETS; r++)
+      for (k = 0; k < SC88_ROM_COUNT; k++)
+         if (sp88_romsets[r].rom[k] && !strcmp(sp88_romsets[r].rom[k], hex))
+            return 1;
+   for (r = 0; r < (int)(sizeof(sp88_halves) / sizeof(sp88_halves[0])); r++)
+      if (!strcmp(sp88_halves[r].first, hex) || !strcmp(sp88_halves[r].second, hex))
+         return 1;
+   return 0;
+}
+
+static const sp88_halves_t *sp88_halves_of(const char *whole)
+{
+   int i;
+   for (i = 0; i < (int)(sizeof(sp88_halves) / sizeof(sp88_halves[0])); i++)
+      if (!strcmp(sp88_halves[i].whole, whole))
+         return &sp88_halves[i];
+   return NULL;
+}
+
+/* Whether a ROM of the set is there, whole or as its two halves. */
+static int sp88_have(const char *hex)
+{
+   const sp88_halves_t *h;
+   if (sp_found_path(hex))
+      return 1;
+   h = sp88_halves_of(hex);
+   return h && sp_found_path(h->first) && sp_found_path(h->second);
+}
+
+static int sp88_load(sc88_t *dev, int slot, const char *hex)
+{
+   const char *path = sp_found_path(hex);
+   const sp88_halves_t *h;
+   void   *a = NULL, *b = NULL;
+   int64_t la = 0, lb = 0;
+   int     ok = 0;
+
+   if (path)
+   {
+      if (filestream_read_file(path, &a, &la) && a && la > 0)
+         ok = sc88_load_rom(dev, slot, (const unsigned char*)a, (size_t)la);
+      free(a);
+      return ok;
+   }
+   h = sp88_halves_of(hex);
+   if (h && filestream_read_file(sp_found_path(h->first), &a, &la) && a
+         && filestream_read_file(sp_found_path(h->second), &b, &lb) && b)
+   {
+      unsigned char *whole = (unsigned char*)malloc((size_t)(la + lb));
+      if (whole)
+      {
+         memcpy(whole, a, (size_t)la);
+         memcpy(whole + la, b, (size_t)lb);
+         ok = sc88_load_rom(dev, slot, whole, (size_t)(la + lb));
+         free(whole);
+      }
+   }
+   free(a);
+   free(b);
+   return ok;
+}
+
+static void *sp88_find(void)
+{
+   char    dirs[3][1024];
+   int     ndirs = 0, r, k, best = -1, best_have = 0;
+   sc88_t *dev = NULL;
+
+   sp_nfound     = 0;
+   sp_scan_size  = sp88_size;
+   sp_scan_hash  = sp88_hash;
+   sp_scan_known = sp88_known;
+   for (k = 0; k < 3; k++)
+      if (I_SearchDir(k, dirs[ndirs], sizeof(dirs[ndirs])))
+      {
+         sp_scan_dir(dirs[ndirs], 0);
+         ndirs++;
+      }
+
+   for (r = 0; r < SP88_ROMSETS && !dev; r++)
+   {
+      int need = 0, have = 0;
+      for (k = 0; k < SC88_ROM_COUNT; k++)
+         if (sp88_romsets[r].rom[k])
+         {
+            need++;
+            if (sp88_have(sp88_romsets[r].rom[k]))
+               have++;
+         }
+      if (have > best_have)
+      {
+         best      = r;
+         best_have = have;
+      }
+      if (have != need)
+         continue;
+      dev = sc88_new(sp88_romsets[r].model);
+      for (k = 0; dev && k < SC88_ROM_COUNT; k++)
+         if (sp88_romsets[r].rom[k] && !sp88_load(dev, k, sp88_romsets[r].rom[k]))
+         {
+            sc88_free(dev);
+            dev = NULL;
+         }
+      if (dev)
+      {
+         sc88_reset(dev);
+         lprintf(LO_INFO, "SC88: using the %s ROM set.\n", sp88_romsets[r].label);
+      }
+   }
+
+   if (!dev)
+   {
+      lprintf(LO_WARN, "SC88: no complete ROM set, playing Adlib instead.  "
+            "ROM files are recognised by content, whatever they are called, "
+            "in these folders (and subfolders named sc88, roland, 88emu or gearmulator):\n");
+      for (k = 0; k < ndirs; k++)
+         lprintf(LO_WARN, "SC88:   %s\n", dirs[k]);
+      if (best >= 0)
+      {
+         lprintf(LO_WARN, "SC88: closest is the %s set, still missing:\n",
+               sp88_romsets[best].label);
+         for (k = 0; k < SC88_ROM_COUNT; k++)
+            if (sp88_romsets[best].rom[k] && !sp88_have(sp88_romsets[best].rom[k]))
+               lprintf(LO_WARN, "SC88:   %s, md5 %s\n",
+                     sp88_slot_name[k], sp88_romsets[best].rom[k]);
+      }
+      else
+         lprintf(LO_WARN, "SC88: none of the files there is a known SC-88 ROM.\n");
+      doom_printf("SC88: no ROM set found, playing Adlib");
+   }
+
+   for (k = 0; k < sp_nfound; k++)
+      free(sp_found[k].path);
+   sp_nfound = 0;
+   return dev;
+}
+
+static void  sp88_destroy(void *d)            { sc88_free((sc88_t*)d); }
+static void  sp88_midi(void *d, const unsigned char *b, size_t n) { sc88_midi((sc88_t*)d, b, n); }
+static uint32_t sp88_voices(const void *d)    { return sc88_voices((const sc88_t*)d); }
+static unsigned sp88_rate(const void *d)      { return sc88_rate((const sc88_t*)d); }
+static size_t sp88_run(void *d, int32_t *f, size_t n) { return sc88_run((sc88_t*)d, f, n); }
+
+/* The XP's output words are 24 bits. */
+static const sp_unit_t sp_sc88 =
+{
+   "SC88", "prboom-sc88", sp88_find, sp88_destroy, sp88_midi,
+   sp88_voices, sp88_rate, sp88_run, 1.0f / 8388608.0f, SC88_BOOT_CAP_S
+};
+
 static void sp_close(void)
 {
-   if (sp_short && sp_rate)
-      lprintf(LO_WARN, "SC55: the emulation fell behind by %lu ms in all; "
+   if (sp_short && sp_rate && sp_unit)
+      lprintf(LO_WARN, "%s: the emulation fell behind by %lu ms in all; "
             "the music was stretched by that much.\n",
-            (unsigned long)(sp_short * 1000 / (size_t)sp_rate));
+            sp_unit->tag, (unsigned long)(sp_short * 1000 / (size_t)sp_rate));
    sp_short = 0;
 #ifdef SC55_THREADED
    if (sp_thread)
@@ -924,7 +1270,7 @@ static void sp_close(void)
    }
 #endif
    if (eng_dev)
-      sc55_free(eng_dev);
+      sp_unit->destroy(eng_dev);
    free(eng_kernel);
    free(eng_hist);
    free(eng_native);
@@ -949,12 +1295,12 @@ static int sp_open(void)
       return sp_open_ok;
    sp_tried = 1;
 
-   eng_dev = sp_find_unit();
+   eng_dev = sp_unit->find();
    if (!eng_dev)
       return 0;
 
-   sc55_midi(eng_dev, sp_power_on, sizeof(sp_power_on));
-   eng_native_rate = sc55_rate(eng_dev);
+   sp_unit->midi(eng_dev, sp_power_on, sizeof(sp_power_on));
+   eng_native_rate = sp_unit->rate(eng_dev);
    eng_step        = (double)eng_native_rate / (double)sp_rate;
    eng_pos         = 0.0;
    eng_hist_len    = 0;
@@ -973,7 +1319,7 @@ static int sp_open(void)
    if (!eng_native || !eng_hist || !ev_ring || !au_ring || !sp_hist
          || !eng_build_kernel())
    {
-      lprintf(LO_WARN, "SC55: could not start the unit, playing Adlib instead.\n");
+      lprintf(LO_WARN, "%s: could not start the unit, playing Adlib instead.\n", sp_unit->tag);
       sp_close();
       return 0;
    }
@@ -992,14 +1338,14 @@ static int sp_open(void)
 #ifdef SC55_THREADED
    if (!retro_eventcount_init(&sp_ec_work))
    {
-      lprintf(LO_WARN, "SC55: could not start the unit, playing Adlib instead.\n");
+      lprintf(LO_WARN, "%s: could not start the unit, playing Adlib instead.\n", sp_unit->tag);
       sp_close();
       return 0;
    }
    if (!retro_eventcount_init(&sp_ec_ack))
    {
       retro_eventcount_free(&sp_ec_work);
-      lprintf(LO_WARN, "SC55: could not start the unit, playing Adlib instead.\n");
+      lprintf(LO_WARN, "%s: could not start the unit, playing Adlib instead.\n", sp_unit->tag);
       sp_close();
       return 0;
    }
@@ -1007,19 +1353,37 @@ static int sp_open(void)
    sp_thread = sthread_create(sp_worker, NULL);
    if (!sp_thread)
    {
-      lprintf(LO_WARN, "SC55: could not start the unit, playing Adlib instead.\n");
+      lprintf(LO_WARN, "%s: could not start the unit, playing Adlib instead.\n", sp_unit->tag);
       sp_close();
       return 0;
    }
 #endif
-   lprintf(LO_INFO, "SC55: unit up at %u Hz, resampled to %d Hz.\n",
-         eng_native_rate, sp_rate);
+   lprintf(LO_INFO, "%s: unit up at %u Hz, resampled to %d Hz.\n",
+         sp_unit->tag, eng_native_rate, sp_rate);
    sp_open_ok = 1;
    return 1;
 }
 
+/* Make `unit` the one in use, putting the other one away. */
+static void sp_select(const sp_unit_t *unit)
+{
+   if (sp_unit == unit)
+      return;
+   sp_playing = 0;
+   sp_close();
+   sp_tried = 0;
+   sp_unit  = unit;
+}
+
 int I_SC55Available(void)
 {
+   sp_select(&sp_sc55);
+   return sp_open();
+}
+
+int I_SC88Available(void)
+{
+   sp_select(&sp_sc88);
    return sp_open();
 }
 
@@ -1374,7 +1738,7 @@ static unsigned sp_pull_new(float *dest, unsigned n)
    if (!sp_announced)
    {
       sp_announced = 1;
-      lprintf(LO_INFO, "SC55: firmware ready, music starts.\n");
+      lprintf(LO_INFO, "%s: firmware ready, music starts.\n", sp_unit->tag);
    }
 
    sp_sequence(sp_consumed + n + sp_lead);
@@ -1778,6 +2142,23 @@ static int sp_unserialize(const void *src, size_t size)
    return 1;
 }
 
+static const void *sp_sc55_registersong(const void *data, unsigned len)
+{
+   sp_select(&sp_sc55);
+   return sp_registersong(data, len);
+}
+
+static const char *sp88_name(void)
+{
+   return "sc88 emulation";
+}
+
+static const void *sp88_registersong(const void *data, unsigned len)
+{
+   sp_select(&sp_sc88);
+   return sp_registersong(data, len);
+}
+
 const music_player_t sc55_player =
 {
    sp_name,
@@ -1786,7 +2167,25 @@ const music_player_t sc55_player =
    sp_setvolume,
    sp_pause,
    sp_resume,
-   sp_registersong,
+   sp_sc55_registersong,
+   sp_unregistersong,
+   sp_play,
+   sp_stop,
+   sp_render,
+   sp_serialize,
+   sp_unserialize,
+   sp_render_float
+};
+
+const music_player_t sc88_player =
+{
+   sp88_name,
+   sp_init,
+   sp_shutdown,
+   sp_setvolume,
+   sp_pause,
+   sp_resume,
+   sp88_registersong,
    sp_unregistersong,
    sp_play,
    sp_stop,

@@ -242,6 +242,7 @@ static const music_player_t *music_players[] =
 #endif
   &opl_synth_player, // oplplayer.h
   &sc55_player, // sc55player.h (Roland SC-55 emulation)
+  &sc88_player, // sc55player.h (Roland SC-88 family emulation)
   &libretro_midi_player, // libretro_midiout.h (raw MIDI to the frontend)
   &mp_player, // madplayer.h (MP3 via rmp3)
   &mod_player, // modplayer.h (MOD/S3M/XM via rmodtracker)
@@ -1325,6 +1326,11 @@ int I_RegisterSong(const void* data, size_t len)
                     ? (music_player_t *)&sc55_player
                     : (music_player_t *)&opl_synth_player;
         break;
+     case MIDI_PLAYER_SC88:
+        chosen_midi = I_SC88Available()
+                    ? (music_player_t *)&sc88_player
+                    : (music_player_t *)&opl_synth_player;
+        break;
 #ifdef HAVE_LIBFLUIDSYNTH
      case MIDI_PLAYER_FLUID:
         chosen_midi = (music_player_t *)&fl_player;
@@ -1364,6 +1370,8 @@ int I_RegisterSong(const void* data, size_t len)
         if (p == &libretro_midi_player && chosen_midi != (music_player_t *)&libretro_midi_player)
            continue;
         if (p == &sc55_player && chosen_midi != (music_player_t *)&sc55_player)
+           continue;
+        if (p == &sc88_player && chosen_midi != (music_player_t *)&sc88_player)
            continue;
 
         music_handle = p->registersong(data, len);

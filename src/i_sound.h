@@ -49,12 +49,14 @@ extern int mus_opl_gain; // NSM  fine tune OPL output level
 /* User-selected MIDI playback hardware:
  *   0 = Off (no MIDI playback at all)
  *   1 = Adlib (OPL2/OPL3 emulation, opl_synth_player)
- *   2 = Fluidsynth (only valid if HAVE_LIBFLUIDSYNTH; falls back
+ *   2 = SC55 (Roland SC-55 emulation, sc55player.c; Adlib if no ROMs)
+ *   3 = SC88 (Roland SC-88 family emulation, same player; Adlib if no ROMs)
+ *   4 = Fluidsynth (only valid if HAVE_LIBFLUIDSYNTH; falls back
  *       to silence if the build doesn't include fluidsynth)
  *   last = libretro raw MIDI output (libretro_midi_player): streams
  *       MIDI events to the frontend's MIDI interface for host-side
  *       synthesis; declines (silence) if the frontend exposes none.
- *       The numeric value is 3 when fluidsynth is built, 2 otherwise,
+ *       The numeric value is 5 when fluidsynth is built, 4 otherwise,
  *       since the Fluidsynth entry is compiled in conditionally -- see
  *       midi_player_opts[] in m_menu.c and the dispatch in
  *       libretro_sound.c, which use matching #ifdefs. */
@@ -64,11 +66,12 @@ extern int midi_player;
 #define MIDI_PLAYER_OFF      0
 #define MIDI_PLAYER_ADLIB    1
 #define MIDI_PLAYER_SC55     2
+#define MIDI_PLAYER_SC88     3
 #ifdef HAVE_LIBFLUIDSYNTH
-#define MIDI_PLAYER_FLUID    3
-#define MIDI_PLAYER_LIBRETRO 4
+#define MIDI_PLAYER_FLUID    4
+#define MIDI_PLAYER_LIBRETRO 5
 #else
-#define MIDI_PLAYER_LIBRETRO 3
+#define MIDI_PLAYER_LIBRETRO 4
 #endif
 
 /* Active audio output rate in Hz (one of 32000/44100/48000/96000).  Set

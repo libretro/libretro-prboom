@@ -163,6 +163,8 @@ SOURCES_C += $(CORE_DIR)/am_map.c \
 				 $(CORE_DIR)/oplplayer.c \
 				 $(CORE_DIR)/flplayer.c \
 				 $(CORE_DIR)/libretro_midiout.c \
+				 $(CORE_DIR)/sc55.c \
+				 $(CORE_DIR)/sc55player.c \
 				 $(CORE_DIR)/midifile.c \
 				 $(CORE_DIR)/madplayer.c \
 				 $(CORE_DIR)/modplayer.c \

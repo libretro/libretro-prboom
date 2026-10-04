@@ -60,6 +60,17 @@ extern int mus_opl_gain; // NSM  fine tune OPL output level
  *       libretro_sound.c, which use matching #ifdefs. */
 extern int midi_player;
 
+/* Values of midi_player, in menu order. */
+#define MIDI_PLAYER_OFF      0
+#define MIDI_PLAYER_ADLIB    1
+#define MIDI_PLAYER_SC55     2
+#ifdef HAVE_LIBFLUIDSYNTH
+#define MIDI_PLAYER_FLUID    3
+#define MIDI_PLAYER_LIBRETRO 4
+#else
+#define MIDI_PLAYER_LIBRETRO 3
+#endif
+
 /* Active audio output rate in Hz (one of 32000/44100/48000/96000).  Set
  * from the "Sound Samplerate (Hint)" core option before I_InitSound /
  * I_InitMusic so the SFX loaders, mixer step tables and music synths are

@@ -3328,6 +3328,7 @@ static const char *mus_external_opts[] = {"Never", "Always", "Only IWAD", NULL};
 static const char *midi_player_opts[] = {
   "Off",
   "Adlib",
+  "SC55",
 #ifdef HAVE_LIBFLUIDSYNTH
   "Fluidsynth",
 #endif

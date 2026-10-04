@@ -97,6 +97,7 @@ static int I_OggDecodeMemory(const unsigned char *mem, int len,
 #include "../src/modplayer.h"
 #include "../src/oggplayer.h"
 #include "../src/libretro_midiout.h"
+#include "../src/sc55player.h"
 
 #include "../src/lprintf.h"
 #include "../src/doomdef.h"
@@ -240,6 +241,7 @@ static const music_player_t *music_players[] =
   &fl_player, // flplayer.h
 #endif
   &opl_synth_player, // oplplayer.h
+  &sc55_player, // sc55player.h (Roland SC-55 emulation)
   &libretro_midi_player, // libretro_midiout.h (raw MIDI to the frontend)
   &mp_player, // madplayer.h (MP3 via rmp3)
   &mod_player, // modplayer.h (MOD/S3M/XM via rmodtracker)
@@ -1310,24 +1312,27 @@ int I_RegisterSong(const void* data, size_t len)
    * regardless of the MIDI choice. */
   switch (midi_player)
   {
-     case 0: /* Off: no MIDI playback */
+     case MIDI_PLAYER_OFF:
         chosen_midi = NULL;
         break;
-     case 1: /* Adlib (OPL) */
+     case MIDI_PLAYER_ADLIB:
         chosen_midi = (music_player_t *)&opl_synth_player;
         break;
+     case MIDI_PLAYER_SC55:
+        /* No ROM set, no SC-55: Adlib stands in so the choice (or a
+         * config written before SC55 took this number) is not silence. */
+        chosen_midi = I_SC55Available()
+                    ? (music_player_t *)&sc55_player
+                    : (music_player_t *)&opl_synth_player;
+        break;
 #ifdef HAVE_LIBFLUIDSYNTH
-     case 2: /* Fluidsynth */
+     case MIDI_PLAYER_FLUID:
         chosen_midi = (music_player_t *)&fl_player;
         break;
-     case 3: /* libretro raw MIDI out */
-        chosen_midi = (music_player_t *)&libretro_midi_player;
-        break;
-#else
-     case 2: /* libretro raw MIDI out (Fluidsynth not built) */
-        chosen_midi = (music_player_t *)&libretro_midi_player;
-        break;
 #endif
+     case MIDI_PLAYER_LIBRETRO: /* raw MIDI out to the frontend */
+        chosen_midi = (music_player_t *)&libretro_midi_player;
+        break;
      default:
         chosen_midi = (music_player_t *)&opl_synth_player;
         break;
@@ -1357,6 +1362,8 @@ int I_RegisterSong(const void* data, size_t len)
            continue;
 #endif
         if (p == &libretro_midi_player && chosen_midi != (music_player_t *)&libretro_midi_player)
+           continue;
+        if (p == &sc55_player && chosen_midi != (music_player_t *)&sc55_player)
            continue;
 
         music_handle = p->registersong(data, len);
@@ -1459,11 +1466,7 @@ int I_MusicIsMP3(void)
  * the libretro player is the chosen MIDI backend and it is ready now. */
 int I_MidiLibretroReady(void)
 {
-#ifdef HAVE_LIBFLUIDSYNTH
-   int is_libretro_selected = (midi_player == 3);
-#else
-   int is_libretro_selected = (midi_player == 2);
-#endif
+   int is_libretro_selected = (midi_player == MIDI_PLAYER_LIBRETRO);
    if (is_libretro_selected)
       return I_LibretroMidiAvailable();
    return 0;

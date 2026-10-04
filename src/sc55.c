@@ -1846,7 +1846,7 @@ SC55_INLINE void calc_tv(pcm_t *pcm, int e, int adjust, uint16_t *levelcur, int 
 
         sum2_l = (sum2 >> 4);
 
-        sum3 = (target << 11) - (sum2_l << 4);
+        sum3 = (target << 11) - SC55_SHL(sum2_l, 4);
 
         neg2 = (sum3 & 0x80000) != 0;
         xnor = !(neg2 ^ neg);
@@ -7581,13 +7581,9 @@ size_t sc55_midi_room(const sc55_t *s)
     return (size_t)(uart_buffer_size - 1 - used);
 }
 
-int sc55_ready(const sc55_t *s)
+uint32_t sc55_voices(const sc55_t *s)
 {
-    /* The firmware turns the serial receiver on once it is up: on the
-     * mkII that is the sub-MCU's UART, on the mk1 the main one. */
-    if (!s->mcu.is_mk1 && !s->mcu.is_scb55)
-        return (s->sm.device_mode[SM_DEV_UART1_CTRL] & 4) != 0;
-    return (s->mcu.dev_register[DEV_SCR] & 16) != 0;
+    return s->pcm.voice_mask & s->pcm.voice_mask_pending;
 }
 
 unsigned sc55_rate(const sc55_t *s)

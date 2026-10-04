@@ -11,8 +11,8 @@
  *
  * The worker runs SC55_LEAD frames ahead of what has been played, which
  * is how late the music is against the sequencer.  Until the firmware
- * has enabled its MIDI input the sequencer does not start, so the first
- * song begins late instead of losing its opening.
+ * is taking input (see sp_power_on) the sequencer does not start, so
+ * the first song begins late instead of losing its opening.
  *
  * The chip's frames stay in float from the emulator to the mixer.  The
  * 16-bit path quantizes once, at the very end, with rounding and TPDF
@@ -44,7 +44,7 @@
 #include "i_system.h"
 #include "g_game.h"
 
-#if defined(HAVE_THREADS)
+#if defined(HAVE_THREADS) && !defined(SC55_NO_THREAD)
 #include <rthreads/rthreads.h>
 #include <rthreads/retro_eventcount.h>
 #include <retro_atomic.h>
@@ -79,8 +79,8 @@ typedef int    sp_int_t;
 #ifndef SC55_BOOT_CAP_S
 #define SC55_BOOT_CAP_S  12                  /* give up waiting for the firmware */
 #endif
-#define SC55_SETTLE_MS   250                 /* after the firmware is listening */
-#define SC55_RESET_MS    60                  /* the unit ignores input after a GS reset */
+#define SC55_SETTLE_MS   100                 /* after the firmware answers */
+#define SC55_RESET_MS    100                 /* for a song's channel reset to be taken in */
 
 typedef struct
 {
@@ -142,9 +142,26 @@ static size_t         sp_consumed;    /* frames handed to the mixer this epoch *
 static size_t         sp_lead;
 static uint32_t       sp_dither = 0x9e3779b9u;
 static int            sp_announced;   /* "ready" has been logged */
+static size_t         sp_short;       /* frames the worker was late with */
 
-static const unsigned char gs_reset[11] =
-   { 0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7 };
+/* Queued at power-on: a GS reset, which the mkII needs once because its
+ * firmware does not initialise everything by itself, then a note the
+ * unit cannot be heard playing (channel 16 at volume 0).  The firmware
+ * works through its MIDI input in order and is busy with the reset for
+ * several seconds, so the moment that note's voice is keyed is the
+ * moment the unit will act on what it is sent. */
+static const unsigned char sp_power_on[] =
+{
+   0xf0, 0x41, 0x10, 0x42, 0x12, 0x40, 0x00, 0x7f, 0x00, 0x41, 0xf7,
+   0xbf, 7, 0,
+   0x9f, 60, 1
+};
+/* Sent once the probe has answered: end it and put channel 16 back. */
+static const unsigned char sp_probe_end[] =
+{
+   0x8f, 60, 0,
+   0xbf, 120, 0, 121, 0, 7, 100
+};
 
 /* ---- resampler ------------------------------------------------------ */
 
@@ -285,9 +302,12 @@ static int eng_boot_slice(size_t native_frames)
          }
          eng_settle_left -= chunk;
       }
-      else if (sc55_ready(eng_dev)
+      else if (sc55_voices(eng_dev)
             || eng_boot_frames >= (size_t)eng_native_rate * SC55_BOOT_CAP_S)
+      {
+         sc55_midi(eng_dev, sp_probe_end, sizeof(sp_probe_end));
          eng_settle_left = (size_t)eng_native_rate * SC55_SETTLE_MS / 1000;
+      }
    }
    return 0;
 }
@@ -868,6 +888,11 @@ static sc55_t *sp_find_unit(void)
 
 static void sp_close(void)
 {
+   if (sp_short && sp_rate)
+      lprintf(LO_WARN, "SC55: the emulation fell behind by %lu ms in all; "
+            "the music was stretched by that much.\n",
+            (unsigned long)(sp_short * 1000 / (size_t)sp_rate));
+   sp_short = 0;
 #ifdef SC55_THREADED
    if (sp_thread)
    {
@@ -911,6 +936,7 @@ static int sp_open(void)
    if (!eng_dev)
       return 0;
 
+   sc55_midi(eng_dev, sp_power_on, sizeof(sp_power_on));
    eng_native_rate = sc55_rate(eng_dev);
    eng_step        = (double)eng_native_rate / (double)sp_rate;
    eng_pos         = 0.0;
@@ -1014,7 +1040,42 @@ static void sp_all_notes_off(size_t time)
 {
    int ch;
    for (ch = 0; ch < 16; ch++)
-      sp_post3(time, 0xb0 | ch, 123, 0);
+   {
+      unsigned char m[5];
+      m[0] = (unsigned char)(0xb0 | ch);
+      m[1] = 123;  /* all notes off */
+      m[2] = 0;
+      m[3] = 120;  /* all sound off, so nothing rings on */
+      m[4] = 0;
+      sp_post(time, m, sizeof(m));
+   }
+}
+
+/* Put every channel back to its power-on state for a new song.  A GS
+ * reset would do it in one message, but the unit stops listening for
+ * seconds after one. */
+static void sp_reset_channels(size_t time)
+{
+   int ch;
+   for (ch = 0; ch < 16; ch++)
+   {
+      unsigned char m[23];
+      size_t n = 0;
+      m[n++] = (unsigned char)(0xb0 | ch);
+      m[n++] = 120; m[n++] = 0;    /* all sound off */
+      m[n++] = 121; m[n++] = 0;    /* reset all controllers */
+      m[n++] = 0;   m[n++] = 0;    /* bank */
+      m[n++] = 7;   m[n++] = 100;  /* volume */
+      m[n++] = 10;  m[n++] = 64;   /* pan */
+      m[n++] = 91;  m[n++] = 40;   /* reverb send */
+      m[n++] = 93;  m[n++] = 0;    /* chorus send */
+      m[n++] = 101; m[n++] = 0;    /* pitch bend range: two semitones */
+      m[n++] = 100; m[n++] = 0;
+      m[n++] = 6;   m[n++] = 2;
+      m[n++] = (unsigned char)(0xc0 | ch);
+      m[n++] = 0;                  /* program */
+      sp_post(time, m, n);
+   }
 }
 
 /* Empty both queues and start the frame count again.  The worker is
@@ -1132,12 +1193,11 @@ static void sp_sequence(size_t until)
    }
 }
 
-/* Start a clean epoch with the unit reset to its power-on sound set. */
+/* Start a clean epoch with every channel back to its defaults. */
 static void sp_begin(void)
 {
    sp_flush();
-   sp_all_notes_off(0);
-   sp_post(0, gs_reset, sizeof(gs_reset));
+   sp_reset_channels(0);
    sp_next_time = (double)sp_rate * SC55_RESET_MS / 1000.0;
    if (sp_events)
       sp_next_time += (double)sp_events[sp_eventpos]->delta_time * sp_spmc;
@@ -1296,6 +1356,8 @@ static unsigned sp_pull(float *dest, unsigned n)
    SP_STORE_SIZE(&au_r, r + got);
    /* A short read is not counted: the song stretches by the gap
     * instead of dropping what the worker had not finished. */
+   if (sp_consumed)   /* the first read of a song finds the queue still filling */
+      sp_short += n - got;
    sp_consumed += got;
    sp_wake();
    return (unsigned)got;

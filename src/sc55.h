@@ -55,9 +55,8 @@ void    sc55_reset(sc55_t *s);
 void    sc55_midi(sc55_t *s, const unsigned char *data, size_t len);
 size_t  sc55_midi_room(const sc55_t *s);
 
-/* Non-zero once the firmware has enabled its MIDI input, which is when
- * the unit has finished starting up. */
-int     sc55_ready(const sc55_t *s);
+/* One bit per voice the firmware has keyed on in the PCM chip. */
+uint32_t sc55_voices(const sc55_t *s);
 
 /* Native output rate in Hz: 66207 for the mkII, 64000 for the mk1. */
 unsigned sc55_rate(const sc55_t *s);

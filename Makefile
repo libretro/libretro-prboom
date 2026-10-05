@@ -711,6 +711,16 @@ endif
 endif
 endif
 
+# memmap.c's shared-memory regions call shm_open and shm_unlink, which glibc
+# before 2.34 and uClibc keep in librt; with --no-undefined the shared-object
+# link has to request it.  Bionic and Darwin carry them in libc and have no
+# librt, so only the glibc and uClibc targets ask for it.
+ifneq ($(STATIC_LINKING), 1)
+ifneq (,$(filter $(platform),unix gcw0))
+LIBS += -lrt
+endif
+endif
+
 LDFLAGS += $(LIBS)
 
 

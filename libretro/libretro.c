@@ -1589,6 +1589,42 @@ static void update_variables(bool startup)
             SCREENHEIGHT = strtoul(sep + 1, NULL, 0);
 #endif
 
+         /* The menu only offers sizes the renderer supports, but an options
+          * file can hold anything.  Above MAX_SCREENWIDTH x MAX_SCREENHEIGHT
+          * the renderer's fixed-size tables overflow (3840x2160 crashed on
+          * load), so scale an oversized request down to fit, keeping its
+          * shape; anything unreadable or below 320x200 gets 320x200. */
+         if (SCREENWIDTH < 320 || SCREENHEIGHT < 200)
+         {
+            if (log_cb)
+               log_cb(RETRO_LOG_WARN, "Resolution \"%s\" not usable, using 320x200.\n", var.value);
+            SCREENWIDTH  = 320;
+            SCREENHEIGHT = 200;
+         }
+         else if (SCREENWIDTH > MAX_SCREENWIDTH || SCREENHEIGHT > MAX_SCREENHEIGHT)
+         {
+            unsigned long w = SCREENWIDTH, h = SCREENHEIGHT;
+            /* the tighter of the two limits decides the scale */
+            if ((unsigned long)MAX_SCREENWIDTH * h <= (unsigned long)MAX_SCREENHEIGHT * w)
+            {
+               SCREENWIDTH  = MAX_SCREENWIDTH;
+               SCREENHEIGHT = (int)((h * MAX_SCREENWIDTH / w) & ~1UL);
+            }
+            else
+            {
+               SCREENHEIGHT = MAX_SCREENHEIGHT;
+               SCREENWIDTH  = (int)((w * MAX_SCREENHEIGHT / h) & ~1UL);
+            }
+            if (SCREENWIDTH < 320)
+               SCREENWIDTH = 320;
+            if (SCREENHEIGHT < 200)
+               SCREENHEIGHT = 200;
+            if (log_cb)
+               log_cb(RETRO_LOG_WARN, "Resolution \"%s\" is above the %dx%d maximum, using %ux%u.\n",
+                     var.value, MAX_SCREENWIDTH, MAX_SCREENHEIGHT, SCREENWIDTH, SCREENHEIGHT);
+         }
+         SCREENPITCH = (SCREENWIDTH * SURFACE_PIXEL_DEPTH);
+
          if (log_cb)
             log_cb(RETRO_LOG_DEBUG, "Got size: %u x %u.\n", SCREENWIDTH, SCREENHEIGHT);
       }

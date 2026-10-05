@@ -4247,8 +4247,13 @@ char* I_FindFile(const char* wfname, const char* ext)
     * routes them through I_FindFile when it locates the IWAD.
     * Mirror what FindFileInDir does with the optional extension:
     * append `ext` if supplied. */
+   /* The same holds for a relative path that already names its folder
+    * ("nerve/doom2.wad" when content was loaded as nerve/nerve.wad from
+    * the command line): it is relative to the working directory, and
+    * prefixing g_wad_dir ("nerve") doubles the folder. */
    if (wfname && (wfname[0] == '/' || wfname[0] == '\\' ||
-                  (wfname[0] && wfname[1] == ':')))
+                  (wfname[0] && wfname[1] == ':') ||
+                  strchr(wfname, '/') || strchr(wfname, '\\')))
    {
       size_t need = strlen(wfname) + (ext ? strlen(ext) : 0) + 1;
       char *abs = malloc(need);
@@ -4260,7 +4265,7 @@ char* I_FindFile(const char* wfname, const char* ext)
          if (path_is_valid(abs))
          {
             if (log_cb)
-               log_cb(RETRO_LOG_DEBUG, "I_FindFile: using absolute path %s\n", abs);
+               log_cb(RETRO_LOG_DEBUG, "I_FindFile: using path as given %s\n", abs);
             return abs;
          }
          free(abs);

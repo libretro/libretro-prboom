@@ -788,7 +788,9 @@ static uint16_t         spr_row16  [MAX_SCREENWIDTH];
 static uint32_t         spr_row32  [MAX_SCREENWIDTH];
 
 /* Screen band [*y0,*y1] covered by post `pi` of `column`, clipped exactly as
- * R_DrawMaskedColumnDirect clips it for screen column `xa`.
+ * R_DrawMaskedColumnDirect clips it for screen column `xa`.  *ys is the
+ * first row the row sweep may paint: rows *y0..*ys-1 (normally none) sample
+ * before the post's first texel and are R_SpriteFixRows' to paint.
  *
  * Returns 1 with the band set; 0 when the post contributes no pixels at all
  * (the column path draws nothing for it either, so skipping is exact); or
@@ -797,7 +799,7 @@ static uint32_t         spr_row32  [MAX_SCREENWIDTH];
  * declines outright. */
 static int R_SpritePostBand(const rcolumn_t *column, int pi, int xa,
                             fixed_t texmid, fixed_t iscale, int spr_th,
-                            int *y0, int *y1)
+                            int *y0, int *y1, int *ys)
 {
   const rpost_t *post         = &column->posts[pi];
   int            topscreen    = sprtopscreen + spryscale * post->topdelta;
@@ -820,6 +822,20 @@ static int R_SpritePostBand(const rcolumn_t *column, int pi, int xa,
   count = yh - yl + 1;
   i0    = frac >> FRACBITS;
   iN    = (frac + (count - 1) * iscale) >> FRACBITS;
+  /* The post's first row can land a rounding error before its first texel
+   * (yl is the ceiling of topscreen, frac comes the long way round through
+   * texmid and the truncated iscale).  The column path then reads a wrapped
+   * texel for that row.  Those rows -- one, in practice -- are left to
+   * R_SpriteFixRows, which paints them exactly as the column path does, and
+   * the sweep starts below them; without this a close sprite with one such
+   * post fell back to the column path entirely (2560 wide: 3x the frame). */
+  *ys = yl;
+  if (i0 < 0 && iN >= 0)
+  {
+    while (((frac + (*ys - yl) * iscale) >> FRACBITS) < 0)
+      (*ys)++;
+    i0 = 0;
+  }
   if (i0 < 0 || i0 >= spr_th || iN < 0 || iN >= spr_th)
     return -1;
   /* The sweep indexes patch->pixels absolutely (by texel row), where the
@@ -831,6 +847,46 @@ static int R_SpritePostBand(const rcolumn_t *column, int pi, int xa,
   *y0 = yl;
   *y1 = yh;
   return 1;
+}
+
+/* Rows ya..yb of a post, across screen columns xa..xb, painted as the
+ * column path paints them: texel index taken relative to the post and
+ * wrapped by the patch height (R_DrawMaskedColumnDirect's fallback loop). */
+static void R_SpriteFixRows(const rcolumn_t *column, int pi, int xa, int xb,
+                            fixed_t texmid, fixed_t iscale, int spr_th,
+                            int ya, int yb,
+                            const uint16_t *lut, const uint32_t *lutTC)
+{
+  const rpost_t *post   = &column->posts[pi];
+  const uint8_t *source = column->pixels + post->topdelta;
+  fixed_t        frac   = (texmid - (post->topdelta << FRACBITS))
+                        + (ya - centery) * iscale;
+  int            y, x;
+
+  for (y = ya; y <= yb; y++, frac += iscale)
+  {
+    int idx = frac >> FRACBITS;
+    while (idx < 0)
+      idx += spr_th;
+    while (idx >= spr_th)
+      idx -= spr_th;
+    if (lutTC)
+    {
+      const uint32_t c   = lutTC[source[idx]];
+      uint32_t      *row = ((uint32_t *)drawvars.int_topleft)
+                         + (size_t)y * SURFACE_SHORT_PITCH;
+      for (x = xa; x <= xb; x++)
+        row[x] = c;
+    }
+    else
+    {
+      const uint16_t c   = lut[source[idx]];
+      uint16_t      *row = drawvars.short_topleft
+                         + (size_t)y * SURFACE_SHORT_PITCH;
+      for (x = xa; x <= xb; x++)
+        row[x] = c;
+    }
+  }
 }
 
 /* Returns 1 when the sprite was drawn here, 0 when the caller should fall
@@ -850,7 +906,8 @@ static int R_DrawSpriteMagnified(const rpatch_t *patch,
   int           nrun    = 0;
   int           ymin    = viewheight;
   int           ymax    = -1;
-  int           x, r, y, pi, y0, y1;
+  int           x, r, y, pi, y0, y1, ys;
+  int           fixrows = 0;
   fixed_t       xfrac;
 
   /* Gate: at least two screen pixels per texel on both axes. */
@@ -907,16 +964,20 @@ static int R_DrawSpriteMagnified(const rpatch_t *patch,
     {
       int ok;
       ok = R_SpritePostBand(column, pi, spr_run_xa[r], texmid, iscale,
-                                spr_th, &y0, &y1);
+                                spr_th, &y0, &y1, &ys);
       if (ok < 0)
         return 0;
       if (!ok)
         continue;
-      if (y0 < ymin) ymin = y0;
+      if (ys > y0)
+        fixrows = 1;
+      if (ys > y1)
+        continue;
+      if (ys < ymin) ymin = ys;
       if (y1 > ymax) ymax = y1;
     }
   }
-  if (ymax < ymin)
+  if (ymax < ymin && !fixrows)
     return 0;
 
   /* 3. Skybox reveal mask: the column path covers per post per column, so
@@ -927,7 +988,7 @@ static int R_DrawSpriteMagnified(const rpatch_t *patch,
       const rcolumn_t *column = spr_run_col[r];
       for (pi = 0; pi < column->numPosts; pi++)
         if (R_SpritePostBand(column, pi, spr_run_xa[r], texmid, iscale,
-                             spr_th, &y0, &y1) == 1)
+                             spr_th, &y0, &y1, &ys) == 1)
         {
           for (x = spr_run_xa[r]; x <= spr_run_xb[r]; x++)
             R_SkyRevealCoverCol(x, y0, y1);
@@ -973,7 +1034,7 @@ static int R_DrawSpriteMagnified(const rpatch_t *patch,
       while (spr_run_y1[r] < y && spr_run_pi[r] < column->numPosts)
       {
         if (R_SpritePostBand(column, spr_run_pi[r], xa, texmid, iscale,
-                             spr_th, &spr_run_y0[r], &spr_run_y1[r]) != 1)
+                             spr_th, &y0, &spr_run_y1[r], &spr_run_y0[r]) != 1)
           spr_run_y1[r] = -1;
         spr_run_pi[r]++;
       }
@@ -1043,6 +1104,17 @@ static int R_DrawSpriteMagnified(const rpatch_t *patch,
 
     y = ynext;
   }
+
+  if (fixrows)
+    for (r = 0; r < nrun; r++)
+    {
+      const rcolumn_t *column = spr_run_col[r];
+      for (pi = 0; pi < column->numPosts; pi++)
+        if (R_SpritePostBand(column, pi, spr_run_xa[r], texmid, iscale,
+                             spr_th, &y0, &y1, &ys) == 1 && ys > y0)
+          R_SpriteFixRows(column, pi, spr_run_xa[r], spr_run_xb[r],
+                          texmid, iscale, spr_th, y0, ys - 1, lut, lutTC);
+    }
 
   return 1;
 }

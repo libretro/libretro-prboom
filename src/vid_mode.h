@@ -77,7 +77,7 @@ extern uint16_t vid_sdr_to_pq[1024];    /* 10-bit gamma -> PQ code at paper whit
 extern uint16_t vid_pq_boost[1024];     /* PQ code -> same colour, N x brighter  */
 extern int      vid_emit_class;         /* strength of the emissive boost        */
 
-/* Frontend "Colour Boost".  Mirrors RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT;
+/* Frontend "Colour Boost".  Mirrors retro_hdr_metadata.expand_gamut;
  * the core must apply the same rotation the frontend applies to SDR content
  * or saturation changes when switching between an SDR format and HDR10. */
 #define VID_GAMUT_ACCURATE 0

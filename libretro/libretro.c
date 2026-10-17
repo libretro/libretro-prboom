@@ -1359,6 +1359,31 @@ static void update_audio_samplerate(void)
    I_SetSoundRate(chosen);
 }
 
+/* Version-1 HDR presentation query.  The caller-zeroed, versioned struct
+ * is the contract, so every field is set before the call. */
+static bool I_QueryHDRMetadata(struct retro_hdr_metadata *m)
+{
+   unsigned i;
+   m->version           = 1;
+   m->size              = sizeof(*m);
+   m->output_mode       = 0;
+   m->screen_10bpc      = false;
+   m->paper_white_nits  = 0.0f;
+   m->max_nits          = 0.0f;
+   m->min_nits          = 0.0f;
+   m->expand_gamut      = 0;
+   m->max_cll           = 0.0f;
+   m->max_fall          = 0.0f;
+   m->color_primaries   = 0;
+   m->transfer_function = 0;
+   m->passthrough       = false;
+   m->tonemap_operator  = 0;
+   for (i = 0; i < sizeof(m->reserved) / sizeof(m->reserved[0]); i++)
+      m->reserved[i] = 0;
+   return environ_cb
+       && environ_cb(RETRO_ENVIRONMENT_GET_HDR_METADATA, m);
+}
+
 /*
  * I_NegotiatePixelFormat
  *
@@ -1367,8 +1392,8 @@ static void update_audio_samplerate(void)
  * SCREENPITCH and before any surface, palette or lookup table is built --
  * SURFACE_PIXEL_DEPTH is derived from the result.
  *
- * The 30-bit path is gated on RETRO_ENVIRONMENT_GET_SCREEN_10BPC_CAPABLE
- * rather than on SET_PIXEL_FORMAT alone.  SET_PIXEL_FORMAT accepts
+ * The 30-bit path is gated on the screen_10bpc field of
+ * RETRO_ENVIRONMENT_GET_HDR_METADATA rather than on SET_PIXEL_FORMAT alone.  SET_PIXEL_FORMAT accepts
  * XRGB2101010 unconditionally and the frontend silently narrows the frame
  * to 8 bits when the active video driver cannot present a 10-bit surface,
  * so acceptance says nothing about what reaches the display.  Worse, that
@@ -1377,9 +1402,9 @@ static void update_audio_samplerate(void)
  * measurably worse output than just rendering 24-bit.  Query the real
  * capability and drop to 24-bit when it is not there.
  *
- * An older frontend that does not recognise the call returns false, which
- * the libretro contract defines as "no guarantee of native 10-bit" -- the
- * safe default, and the same branch we take for a non-capable driver.
+ * A frontend that does not recognise the call returns false, which is
+ * treated as "no guarantee of native 10-bit" -- the safe default, and the
+ * same branch we take for a non-capable driver.
  */
 static void I_NegotiatePixelFormat(void)
 {
@@ -1402,9 +1427,8 @@ static void I_NegotiatePixelFormat(void)
       /* HDR10 output is only worth attempting when the frontend can present
        * a 10-bit source end to end; PQ samples narrowed to 8 bits, or shown
        * on an SDR path, look badly wrong rather than merely coarse. */
-      bool tenbit = false;
-      if (!environ_cb(RETRO_ENVIRONMENT_GET_SCREEN_10BPC_CAPABLE, &tenbit)
-            || !tenbit)
+      struct retro_hdr_metadata hdr;
+      if (!I_QueryHDRMetadata(&hdr) || !hdr.screen_10bpc)
       {
          want = VID_MODE8888;
          if (log_cb)
@@ -1417,19 +1441,9 @@ static void I_NegotiatePixelFormat(void)
       {
          /* Absolute luminance means the core has to know where the user
           * puts SDR white; everything ordinary is mapped there. */
-         float nits = 0.0f;
-         if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &nits)
-               && nits > 0.0f)
-            vid_paper_white_nits = nits;
-         else
-            vid_paper_white_nits = 200.0f;
-         {
-            unsigned gamut = VID_GAMUT_ACCURATE;
-            if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut))
-               vid_expand_gamut = (int)gamut;
-            else
-               vid_expand_gamut = VID_GAMUT_ACCURATE;
-         }
+         vid_paper_white_nits = (hdr.paper_white_nits > 0.0f)
+                              ? hdr.paper_white_nits : 200.0f;
+         vid_expand_gamut     = (int)hdr.expand_gamut;
 
          var.key   = "prboom-hdr_emissive";
          var.value = NULL;
@@ -1731,8 +1745,7 @@ void I_SafeExit(int rc);
 static void I_PollHDRPaperWhite(void)
 {
    static unsigned counter = 0;
-   float    nits  = 0.0f;
-   unsigned gamut = (unsigned)vid_expand_gamut;
+   struct retro_hdr_metadata hdr;
    int      dirty = 0;
 
    if (!VID_HDR)
@@ -1741,25 +1754,28 @@ static void I_PollHDRPaperWhite(void)
       return;
    counter = 0;
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_PAPER_WHITE_NITS, &nits)
-         && nits > 0.0f && nits != vid_paper_white_nits)
+   if (!I_QueryHDRMetadata(&hdr))
+      return;
+
+   if (hdr.paper_white_nits > 0.0f
+         && hdr.paper_white_nits != vid_paper_white_nits)
    {
       if (log_cb)
          log_cb(RETRO_LOG_INFO,
                 "HDR paper white changed: %.0f -> %.0f nits; rebuilding "
-                "colour tables.\n", vid_paper_white_nits, nits);
-      vid_paper_white_nits = nits;
+                "colour tables.\n", vid_paper_white_nits,
+                hdr.paper_white_nits);
+      vid_paper_white_nits = hdr.paper_white_nits;
       dirty = 1;
    }
 
-   if (environ_cb(RETRO_ENVIRONMENT_GET_HDR_EXPAND_GAMUT, &gamut)
-         && (int)gamut != vid_expand_gamut)
+   if ((int)hdr.expand_gamut != vid_expand_gamut)
    {
       if (log_cb)
          log_cb(RETRO_LOG_INFO,
                 "HDR colour boost changed: %d -> %u; rebuilding colour "
-                "tables.\n", vid_expand_gamut, gamut);
-      vid_expand_gamut = (int)gamut;
+                "tables.\n", vid_expand_gamut, hdr.expand_gamut);
+      vid_expand_gamut = (int)hdr.expand_gamut;
       dirty = 1;
    }
 

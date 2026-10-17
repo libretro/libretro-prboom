@@ -192,40 +192,26 @@ static size_t audio_transfer_ogg_page(const uint8_t *buf, size_t size,
  *     they do on a .flac file - none of what made the Vorbis arm's old
  *     Ogg synthesis wrong applies, that having had to invent framing
  *     and granules this does not.  Nor is the stream reassembled: it
- *     is served to the decoder through its own read callback, a block
- *     at a time out of the demuxer, so nothing beyond the frame being
- *     read is copied.
+ *     is handed to the decoder a block at a time where the demuxer
+ *     finds it, so nothing is copied.
  *     Ogg FLAC (RFC 5334) as well, and by the same means: an Ogg page
  *     body is packet bytes with no framing of its own, so the bodies
  *     end to end past the nine-byte mapping header on the first
- *     packet are the native stream, served through the same
- *     callbacks.
+ *     packet are the native stream, handed over the same way.
  *     And demuxed input: the fLaC header as setup and the frames as
  *     delimited packets, which is what the containers above are
- *     reduced to anyway, so it is the same callbacks again.  The
+ *     reduced to anyway, so it is the same feed again.  The
  *     packet set may be grown mid-stream - the bases are read fresh
  *     at every read rather than kept, so a realloc between reads is
  *     no obstacle.
- *   Does not: resume the demuxed path after it has run out of
- *     packets, which is where it falls short of the growth contract
- *     the other demuxed arms meet.  Those decode a packet at a time
- *     and can carry on; this one hands rflac a byte stream and lets
- *     it pull, and a short read is an end of stream to a decoder that
- *     pulls, which it will not take back.
- *
- *     Staying ahead is not simply a matter of growing before each
- *     read.  rflac reads ahead of what it has decoded, by an amount
- *     that is its own business, so a feeder adding one packet a read
- *     still starves - measured, stopping at 9216 frames of 88200 -
- *     while five a read completes.  Driving it from buffer_tell,
- *     three packets of headroom past the cursor was enough on the
- *     same file and two was not.  A feeder should keep a margin and
- *     measure it, which the cursor now permits: it reported nothing
- *     for any of the callback paths until this was looked into, the
- *     arm having read the memory reader's position, which is not the
- *     live source on any of them.
- *
- *     Nor report a length where the STREAMINFO does not state one:
+ *     Running dry is not the end of the stream on any of them: a
+ *     demuxed packet set that grows, or a windowed WebM whose wall is
+ *     raised, resumes at the next read, a frame split across the
+ *     boundary being held by the decoder until the rest arrives.  A
+ *     windowed WebM stalls at its wall (NEXT, nothing produced); the
+ *     demuxed arm, which cannot tell a pause from the end, returns END
+ *     unlatched, as the other demuxed arms do.
+ *   Does not: report a length where the STREAMINFO does not state one:
  *     Ogg FLAC never states one, and neither does a native file piped
  *     rather than seeked.  Seeking still works on those - it is only
  *     the total that is missing, and info() answers 0.
@@ -560,12 +546,11 @@ struct audio_transfer_flac
    size_t      size;
    rflac_t    *handle;  /* opened decoder, NULL until start() succeeds      */
    int         fed_hdr; /* setup bytes handed over                          */
-   int         drained; /* feeder reported end of input                     */
    size_t      cursor;  /* bytes of the logical stream handed to the decoder*/
    /* FLAC inside a container.  rflac wants a native fLaC stream; a
-    * container holds one taken apart, so it is served back to the
-    * decoder a read at a time rather than reassembled into a buffer.
-    * Nothing is copied but the bytes being read.
+    * container holds one taken apart, so it is handed to the decoder a
+    * span at a time where it lies rather than reassembled into a
+    * buffer.  Nothing is copied.
     *
     * Two containers, one shape.  Matroska keeps the header in
     * CodecPrivate and a frame per block.  Ogg (RFC 5334) needs even
@@ -594,6 +579,10 @@ struct audio_transfer_flac
 #ifdef HAVE_RWEBM
    rwebm_t       *demux;
    int            track_idx;
+   /* A windowed caller's resident prefix, given before start() so the
+    * demuxer opens behind it rather than walking the whole buffer; 0
+    * is the whole buffer, as for the other WebM arms. */
+   size_t         avail;
 #endif
    const uint8_t *hdr;
    size_t         hdr_size;
@@ -723,12 +712,7 @@ struct audio_transfer_mod
  * the s16 pipeline below never touches float. */
 
 #ifdef HAVE_RLPCM
-/* Linear PCM: the samples are the file, so the state is where in it
- * the reader is. What the caller handed over may be raw - a shape it
- * knows from somewhere else - or may open with a DVD or Blu-ray
- * header, which rlpcm reads; either way the samples start at
- * header_bytes and every frame after that is the same size, which is
- * what makes seeking exact rather than approximate. */
+/* Raw PCM advances by bytes; DVD packing also retains a partial block. */
 struct audio_transfer_lpcm
 {
    const uint8_t  *buf;
@@ -737,6 +721,10 @@ struct audio_transfer_lpcm
    size_t          pos;          /* the next frame's byte offset */
    rlpcm_format_t  fmt;
    size_t          total_frames;
+   float           pending[32];
+   unsigned        pending_n;
+   unsigned        pending_off;
+   unsigned        skip;
    bool            ready;
 };
 
@@ -756,6 +744,66 @@ static size_t audio_transfer_lpcm_frames_left(const struct audio_transfer_lpcm *
       return 0;
    return (size_t)(((uint64_t)(end - at) * 8) / rlpcm_frame_bits(&l->fmt));
 }
+static int audio_transfer_dvd_lpcm_read(struct audio_transfer_lpcm *l,
+      float *f32, int16_t *s16, size_t frames, size_t *frames_out)
+{
+   size_t block, end, done = 0;
+   unsigned count;
+   if (frames_out) *frames_out = 0;
+   if ((!f32 && !s16) || !rlpcm_dvd_block_shape(&l->fmt, &block, &count))
+      return AUDIO_PROCESS_ERROR;
+   end = audio_transfer_lpcm_end(l);
+   while (done < frames)
+   {
+      size_t take, i, samples;
+      if (l->pending_off < l->pending_n)
+      {
+         take = l->pending_n - l->pending_off;
+         if (take > frames - done) take = frames - done;
+         samples = take * l->fmt.channels;
+         for (i = 0; i < samples; i++)
+         {
+            float value = l->pending[l->pending_off * l->fmt.channels + i];
+            if (f32) f32[done * l->fmt.channels + i] = value;
+            else
+            {
+               int32_t v = (int32_t)((double)value * 32768.0 + 32768.5) - 32768;
+               if (v > 32767) v = 32767;
+               if (v < -32768) v = -32768;
+               s16[done * l->fmt.channels + i] = (int16_t)v;
+            }
+         }
+         l->pending_off += (unsigned)take;
+         done += take;
+         continue;
+      }
+      l->pending_n = l->pending_off = 0;
+      if (l->pos > end || end - l->pos < block) break;
+      take = (end - l->pos) / block;
+      if (take > (frames - done) / count) take = (frames - done) / count;
+      if (take && !l->skip)
+      {
+         size_t decoded = f32 ? rlpcm_decode_f32(&l->fmt, l->buf + l->pos,
+               end - l->pos, f32 + done * l->fmt.channels, take * count)
+            : rlpcm_decode_s16(&l->fmt, l->buf + l->pos,
+               end - l->pos, s16 + done * l->fmt.channels, take * count);
+         if (decoded != take * count) return AUDIO_PROCESS_ERROR;
+         l->pos += take * block;
+         done += decoded;
+         continue;
+      }
+      if (rlpcm_decode_f32(&l->fmt, l->buf + l->pos, block,
+               l->pending, count) != count)
+         return AUDIO_PROCESS_ERROR;
+      l->pos += block;
+      l->pending_n = count;
+      l->pending_off = l->skip;
+      l->skip = 0;
+   }
+   if (frames_out) *frames_out = done;
+   return done || !frames ? AUDIO_PROCESS_NEXT : AUDIO_PROCESS_END;
+}
+
 #endif
 
 void *audio_transfer_lpcm_format(void *data)
@@ -1963,14 +2011,11 @@ void audio_transfer_set_avail(void *data, enum audio_type_enum type,
 #ifdef HAVE_RFLAC
       case AUDIO_TYPE_FLAC:
       {
-         /* The FLAC arm was absent from this switch entirely, so the
-          * mixer's FLAC lane in voice_set_avail called through to a
-          * default: break - a windowed WEBA-FLAC voice kept whatever
-          * bound its demuxer captured at open, forever. */
          struct audio_transfer_flac *fl = (struct audio_transfer_flac*)data;
          if (!fl)
             return;
 #ifdef HAVE_RWEBM
+         fl->avail = avail;
          if (fl->demux)
             rwebm_set_avail(fl->demux, avail);
 #endif
@@ -2448,9 +2493,6 @@ static int audio_transfer_flac_next(struct audio_transfer_flac *fl)
    return 0;
 }
 
-/* The stream rflac reads: the CodecPrivate header, then every block
- * of the track end to end.  That is exactly a native fLaC stream, so
- * the decoder needs to know nothing about the container. */
 /* Hands the decoder its next span.  The decoder owns no reader of its
  * own, so this is the only thing that moves the stream forward: the
  * setup bytes first, then whatever the container yields, and for a
@@ -2521,16 +2563,12 @@ static size_t audio_transfer_flac_pull(struct audio_transfer_flac *fl,
 
       if (e == RFLAC_PROCESS_ERROR || e == RFLAC_PROCESS_END)
          break;
-      if (wr == 0)
-      {
-         if (fl->drained)
-            break;
-         if (!audio_transfer_flac_feed(fl))
-         {
-            fl->drained = 1;
-            break;
-         }
-      }
+      /* Nothing to give is not the end of the stream: a demuxed
+       * packet set may grow and a windowed WebM may raise its wall, and
+       * the next read picks up there. Every source answers this again
+       * cheaply, so nothing is latched. */
+      if (wr == 0 && !audio_transfer_flac_feed(fl))
+         break;
    }
 
    return produced;
@@ -2568,7 +2606,6 @@ static uint32_t audio_transfer_flac_seek_to(struct audio_transfer_flac *fl,
          rflac_set_in(fl->handle, (const uint8_t*)fl->data + at,
                fl->size - (size_t)at);
          fl->fed_hdr = 1;
-         fl->drained = 0;
          fl->cursor  = (size_t)at;
          /* The table names the boundary, not the frame; close the
           * remainder by decoding. */
@@ -2593,7 +2630,6 @@ static uint32_t audio_transfer_flac_seek_to(struct audio_transfer_flac *fl,
    /* Rewind every source this arm can have. */
    rflac_reset(fl->handle);
    fl->fed_hdr = 0;
-   fl->drained = 0;
    fl->cursor  = 0;
    fl->pg_off  = 0;
    fl->cur     = NULL;
@@ -2944,8 +2980,8 @@ bool audio_transfer_start(void *data, enum audio_type_enum type)
           * mapping header - 0x7F, "FLAC", a version and a packet
           * count - and the native stream follows it, so the page
           * bodies laid end to end past those nine bytes are what
-          * rflac reads.  Served through the same callbacks as the
-          * Matroska path, and nothing is reassembled. */
+          * rflac reads.  Fed the same way as the Matroska path, and
+          * nothing is reassembled. */
          if (fl->data && fl->size >= 28
                && !memcmp(fl->data, "OggS", 4))
          {
@@ -2992,7 +3028,7 @@ bool audio_transfer_start(void *data, enum audio_type_enum type)
             const rwebm_track *at = NULL;
             int                i;
             if (!(fl->demux = audio_transfer_webm_open(
-                        (const uint8_t*)fl->data, fl->size, 0)))
+                        (const uint8_t*)fl->data, fl->size, fl->avail)))
                return false;
             fl->track_idx = -1;
             for (i = 0; i < rwebm_num_tracks(fl->demux); i++)
@@ -3661,19 +3697,34 @@ bool audio_transfer_start(void *data, enum audio_type_enum type)
       case AUDIO_TYPE_LPCM:
       {
          struct audio_transfer_lpcm *l = (struct audio_transfer_lpcm*)data;
-         size_t end;
+         size_t end, block;
+         unsigned count;
          if (!l || !l->buf || !l->buf_size)
             return false;
+         l->ready = false;
+         l->pending_n = l->pending_off = l->skip = 0;
          /* A caller that filled in a shape before starting keeps it -
           * that is the raw case, where nothing in the bytes says what
           * they are. Otherwise the disc headers are tried, Blu-ray's
           * first: its four bytes carry a payload length that has to
           * agree with the buffer, which a DVD header does not, so it
           * is the one that can be told apart. */
-         if (l->fmt.bits && l->fmt.channels && l->fmt.sample_rate)
+         if (l->fmt.bits && l->fmt.channels && l->fmt.sample_rate
+               && !l->fmt.header_bytes)
          {
+            enum rlpcm_kind kind = l->fmt.kind;
             if (rlpcm_parse_format(RLPCM_KIND_RAW, NULL, 0, &l->fmt) != RLPCM_OK)
                return false;
+            if (kind == RLPCM_KIND_DVD)
+            {
+               l->fmt.kind = kind;
+               if (!rlpcm_dvd_block_shape(&l->fmt, &block, &count)) return false;
+            }
+         }
+         else if (l->fmt.kind == RLPCM_KIND_DVD)
+         {
+            if (rlpcm_parse_format(RLPCM_KIND_DVD, l->buf, l->buf_size,
+                     &l->fmt) != RLPCM_OK) return false;
          }
          else if (rlpcm_parse_format(RLPCM_KIND_BLURAY, l->buf, l->buf_size,
                   &l->fmt) == RLPCM_OK
@@ -3693,8 +3744,15 @@ bool audio_transfer_start(void *data, enum audio_type_enum type)
          if (l->fmt.payload_bytes
                && l->fmt.header_bytes + l->fmt.payload_bytes < end)
             end = l->fmt.header_bytes + l->fmt.payload_bytes;
-         l->total_frames = (size_t)(((uint64_t)(end - l->fmt.header_bytes) * 8)
-               / rlpcm_frame_bits(&l->fmt));
+         if (end < l->fmt.header_bytes) return false;
+         if (l->fmt.kind == RLPCM_KIND_DVD)
+         {
+            if (!rlpcm_dvd_block_shape(&l->fmt, &block, &count)) return false;
+            l->total_frames = ((end - l->fmt.header_bytes) / block) * count;
+         }
+         else
+            l->total_frames = (size_t)(((uint64_t)(end - l->fmt.header_bytes) * 8)
+                  / rlpcm_frame_bits(&l->fmt));
          l->ready        = true;
          return true;
       }
@@ -4925,6 +4983,8 @@ int audio_transfer_read_s16(void *data, enum audio_type_enum type,
          size_t take;
          if (!l || !l->ready)
             return AUDIO_PROCESS_ERROR;
+         if (l->fmt.kind == RLPCM_KIND_DVD)
+            return audio_transfer_dvd_lpcm_read(l, NULL, out, frames, frames_out);
          take = audio_transfer_lpcm_frames_left(l, l->pos);
          if (take > frames)
             take = frames;
@@ -5254,6 +5314,8 @@ int audio_transfer_read_f32(void *data, enum audio_type_enum type,
          size_t take;
          if (!l || !l->ready)
             return AUDIO_PROCESS_ERROR;
+         if (l->fmt.kind == RLPCM_KIND_DVD)
+            return audio_transfer_dvd_lpcm_read(l, out, NULL, frames, frames_out);
          take = audio_transfer_lpcm_frames_left(l, l->pos);
          if (take > frames)
             take = frames;
@@ -5766,13 +5828,21 @@ bool audio_transfer_seek(void *data, enum audio_type_enum type,
          size_t at;
          if (!l || !l->ready)
             return false;
-         /* Every frame is the same size, so the offset is arithmetic
-          * and the seek is exact - there is nothing to decode up to
-          * and no state to carry across it. */
          if (frame > l->total_frames)
             return false;
-         at = l->fmt.header_bytes
-            + (size_t)(((uint64_t)frame * rlpcm_frame_bits(&l->fmt)) / 8);
+         if (l->fmt.kind == RLPCM_KIND_DVD)
+         {
+            size_t block;
+            unsigned count;
+            if (!rlpcm_dvd_block_shape(&l->fmt, &block, &count)) return false;
+            at = l->fmt.header_bytes + (size_t)(frame / count) * block;
+            if (at > audio_transfer_lpcm_end(l)) return false;
+            l->pending_n = l->pending_off = 0;
+            l->skip = (unsigned)(frame % count);
+         }
+         else
+            at = l->fmt.header_bytes
+               + (size_t)(((uint64_t)frame * rlpcm_frame_bits(&l->fmt)) / 8);
          if (at > audio_transfer_lpcm_end(l))
             return false;
          l->pos = at;

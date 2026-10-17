@@ -1367,7 +1367,7 @@ static void I_InitHDRMetadata(struct retro_hdr_metadata *m)
    m->version           = 1;
    m->size              = sizeof(*m);
    m->output_mode       = 0;
-   m->screen_10bpc      = false;
+   m->source_formats    = 0;
    m->paper_white_nits  = 0.0f;
    m->max_nits          = 0.0f;
    m->min_nits          = 0.0f;
@@ -1441,7 +1441,7 @@ static bool I_AutoResolution(unsigned *w, unsigned *h)
  * SCREENPITCH and before any surface, palette or lookup table is built --
  * SURFACE_PIXEL_DEPTH is derived from the result.
  *
- * The 30-bit path is gated on the screen_10bpc field of
+ * The 30-bit path is gated on the HDR10 bit of source_formats from
  * RETRO_ENVIRONMENT_GET_HDR_METADATA rather than on SET_PIXEL_FORMAT alone.  SET_PIXEL_FORMAT accepts
  * XRGB2101010 unconditionally and the frontend silently narrows the frame
  * to 8 bits when the active video driver cannot present a 10-bit surface,
@@ -1477,7 +1477,8 @@ static void I_NegotiatePixelFormat(void)
        * a 10-bit source end to end; PQ samples narrowed to 8 bits, or shown
        * on an SDR path, look badly wrong rather than merely coarse. */
       struct retro_hdr_metadata hdr;
-      if (!I_QueryHDRMetadata(&hdr) || !hdr.screen_10bpc)
+      if (!I_QueryHDRMetadata(&hdr)
+            || !(hdr.source_formats & RETRO_HDR_SOURCE_FORMAT_HDR10_2101010))
       {
          want = VID_MODE8888;
          if (log_cb)

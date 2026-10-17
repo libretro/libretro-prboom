@@ -3,7 +3,8 @@
  *
  * With the Color Format option at "30bits (HDR)" the core must
  *  - send GET_HDR_METADATA with version 1 and size == sizeof the struct,
- *  - pick HDR10_2101010 only when screen_10bpc is set, XRGB8888 when it
+ *  - pick HDR10_2101010 only when source_formats has the HDR10 bit
+ *    (ignoring bits it does not know), XRGB8888 when it
  *    is clear or the query is refused,
  *  - re-query during retro_run so paper-white changes are picked up,
  *  - never send the retired experimental commands 88-92,
@@ -92,7 +93,11 @@ static bool answer_hdr(struct retro_hdr_metadata *m)
    if (mode == MODE_REFUSE)
       return false;
    m->output_mode      = 1;
-   m->screen_10bpc     = (mode == MODE_YES);
+   /* yes: HDR10 plus a bit the core must ignore; no: only the
+    * reserved scRGB input, which is not HDR10 */
+   m->source_formats   = (mode == MODE_YES)
+      ? (RETRO_HDR_SOURCE_FORMAT_HDR10_2101010 | 0x80000000u)
+      : RETRO_HDR_SOURCE_FORMAT_SCRGB_RGBA16F;
    m->paper_white_nits = paper_white;
    m->max_nits         = 1000.0f;
    m->expand_gamut     = 0;

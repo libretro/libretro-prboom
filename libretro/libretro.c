@@ -1359,9 +1359,9 @@ static void update_audio_samplerate(void)
    I_SetSoundRate(chosen);
 }
 
-/* Version-1 HDR presentation query.  The caller-zeroed, versioned struct
+/* Version-1 HDR presentation block.  The caller-zeroed, versioned struct
  * is the contract, so every field is set before the call. */
-static bool I_QueryHDRMetadata(struct retro_hdr_metadata *m)
+static void I_InitHDRMetadata(struct retro_hdr_metadata *m)
 {
    unsigned i;
    m->version           = 1;
@@ -1380,8 +1380,57 @@ static bool I_QueryHDRMetadata(struct retro_hdr_metadata *m)
    m->tonemap_operator  = 0;
    for (i = 0; i < sizeof(m->reserved) / sizeof(m->reserved[0]); i++)
       m->reserved[i] = 0;
+}
+
+static bool I_QueryHDRMetadata(struct retro_hdr_metadata *m)
+{
+   I_InitHDRMetadata(m);
    return environ_cb
        && environ_cb(RETRO_ENVIRONMENT_GET_HDR_METADATA, m);
+}
+
+/* Internal resolution that fills the display: the panel's native size from
+ * GET_DISPLAY_METADATA, mapped onto the 320x200 grid in steps of 32x20.
+ * A 320x200 frame is shown 4:3, so n steps cover 32n x 24n panel pixels;
+ * the larger n that fits both panel axes wins, and the aspect-ratio
+ * selector widens from that 4:3 reference as for any listed size.  False
+ * when the frontend does not report the geometry. */
+static bool I_AutoResolution(unsigned *w, unsigned *h)
+{
+   struct retro_display_metadata d;
+   unsigned i, n;
+
+   d.version              = 1;
+   d.size                 = sizeof(d);
+   d.geo.native_width     = 0;
+   d.geo.native_height    = 0;
+   d.geo.width_mm         = 0;
+   d.geo.height_mm        = 0;
+   d.geo.refresh_min_mHz  = 0;
+   d.geo.refresh_max_mHz  = 0;
+   I_InitHDRMetadata(&d.hdr);
+   d.caps.peak_nits          = 0.0f;
+   d.caps.min_nits           = 0.0f;
+   d.caps.max_frame_avg_nits = 0.0f;
+   for (i = 0; i < sizeof(d.caps.primaries_xy) / sizeof(d.caps.primaries_xy[0]); i++)
+      d.caps.primaries_xy[i] = 0;
+   d.caps.supported_eotf_mask = 0;
+   d.caps.edid_gamma_x100     = 0;
+   d.caps.capability_source   = 0;
+
+   if (!environ_cb
+         || !environ_cb(RETRO_ENVIRONMENT_GET_DISPLAY_METADATA, &d)
+         || !d.geo.native_width || !d.geo.native_height)
+      return false;
+
+   n = d.geo.native_height / 24;
+   if (d.geo.native_width / 32 < n)
+      n = d.geo.native_width / 32;
+   if (n < 10)
+      n = 10;
+   *w = 32 * n;
+   *h = 20 * n;
+   return true;
 }
 
 /*
@@ -1579,7 +1628,23 @@ static void update_variables(bool startup)
       var.key = "prboom-resolution";
       var.value = NULL;
 
-      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value)
+      if (environ_cb(RETRO_ENVIRONMENT_GET_VARIABLE, &var) && var.value
+            && !strcmp(var.value, "auto"))
+      {
+         unsigned aw = 320, ah = 200;
+         if (I_AutoResolution(&aw, &ah))
+         {
+            if (log_cb)
+               log_cb(RETRO_LOG_INFO, "Resolution: auto, %ux%u from the "
+                     "display.\n", aw, ah);
+         }
+         else if (log_cb)
+            log_cb(RETRO_LOG_INFO, "Resolution: auto, display size not "
+                  "reported, using 320x200.\n");
+         SCREENWIDTH  = aw;
+         SCREENHEIGHT = ah;
+      }
+      else if (var.value)
       {
          char str[100];
          char *sep;
@@ -1604,7 +1669,10 @@ static void update_variables(bool startup)
          if (sep)
             SCREENHEIGHT = strtoul(sep + 1, NULL, 0);
 #endif
+      }
 
+      if (var.value)
+      {
          /* The menu only offers sizes the renderer supports, but an options
           * file can hold anything.  Above MAX_SCREENWIDTH x MAX_SCREENHEIGHT
           * the renderer's fixed-size tables overflow (3840x2160 crashed on

@@ -45,7 +45,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "prboom-resolution",
       "Internal resolution (Restart Required)",
       NULL,
-      "Configure the resolution.",
+      "Configure the resolution. 'Auto' fills the display at its native size when the frontend reports it, and uses 320x200 when it does not.",
       NULL,
       NULL,
       {
@@ -57,6 +57,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "1920x1200", NULL },
          { "2240x1400", NULL },
          { "2560x1600", NULL },
+         { "auto",      "Auto (display size)" },
          { NULL, NULL },
       },
       "320x200"

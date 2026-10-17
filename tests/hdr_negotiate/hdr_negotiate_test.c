@@ -8,6 +8,7 @@
  *    is clear or the query is refused,
  *  - re-query during retro_run so paper-white changes are picked up,
  *  - never send the retired experimental commands 88-92,
+ *  - never ask for SCRGB_RGBA16F, even when it is advertised,
  *  - push one non-blank frame per retro_run.
  *
  *   ./hdr_negotiate_test <core> <iwad> <yes|no|refuse>
@@ -44,6 +45,7 @@ static int  in_run              = 0;
 static int  frames_in_run       = 0;
 static int  nonblank_frames     = 0;
 static int  fmt_set             = 0;
+static int  fp16_asks           = 0;
 static enum retro_pixel_format pix_fmt = RETRO_PIXEL_FORMAT_0RGB1555;
 static float paper_white        = 300.0f;
 static char sysdir[]            = ".";
@@ -93,10 +95,11 @@ static bool answer_hdr(struct retro_hdr_metadata *m)
    if (mode == MODE_REFUSE)
       return false;
    m->output_mode      = 1;
-   /* yes: HDR10 plus a bit the core must ignore; no: only the
-    * reserved scRGB input, which is not HDR10 */
+   /* yes: HDR10 with scRGB and a bit the core must ignore; no: scRGB
+    * alone, which is not HDR10 */
    m->source_formats   = (mode == MODE_YES)
-      ? (RETRO_HDR_SOURCE_FORMAT_HDR10_2101010 | 0x80000000u)
+      ? (RETRO_HDR_SOURCE_FORMAT_HDR10_2101010
+            | RETRO_HDR_SOURCE_FORMAT_SCRGB_RGBA16F | 0x80000000u)
       : RETRO_HDR_SOURCE_FORMAT_SCRGB_RGBA16F;
    m->paper_white_nits = paper_white;
    m->max_nits         = 1000.0f;
@@ -119,6 +122,12 @@ static bool environ_cb(unsigned cmd, void *data)
          ((struct retro_log_callback*)data)->log = log_cb;
          return true;
       case RETRO_ENVIRONMENT_SET_PIXEL_FORMAT:
+         if (*(const enum retro_pixel_format*)data
+               == RETRO_PIXEL_FORMAT_SCRGB_RGBA16F)
+         {
+            fp16_asks++;
+            return false;
+         }
          pix_fmt = *(const enum retro_pixel_format*)data;
          fmt_set = 1;
          return true;
@@ -247,6 +256,11 @@ int main(int argc, char **argv)
    if (!fmt_set || pix_fmt != want)
    {
       printf("FAIL: expected pixel format %d\n", (int)want);
+      rc = 1;
+   }
+   if (fp16_asks)
+   {
+      printf("FAIL: %d requests for SCRGB_RGBA16F\n", fp16_asks);
       rc = 1;
    }
    if (retired_cmds)

@@ -97,7 +97,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
       "prboom-hdr_emissive",
       "HDR Emissive Boost",
       NULL,
-      "How far above SDR white self-illuminated content (muzzle flashes, plasma, rockets, explosions, powerups and brightmapped texels) is rendered when the Color Format is 30bits. Higher values glow harder. Only affects HDR10 output; ignored in 16- and 24-bit modes.",
+      "How far above SDR white self-illuminated content (muzzle flashes, plasma, rockets, explosions, powerups and brightmapped texels) is rendered when the Color Format is 30bits. Higher values glow harder; highlights roll off smoothly toward the frontend's HDR peak instead of clipping. 'Auto' sets the boost from paper white and the peak so the brightest effects land just under the peak. Only affects HDR10 output; ignored in 16- and 24-bit modes.",
       NULL,
       NULL,
       {
@@ -105,6 +105,7 @@ struct retro_core_option_v2_definition option_defs_us[] = {
          { "2x",  "2x" },
          { "4x",  "4x" },
          { "8x",  "8x" },
+         { "auto", "Auto (display peak)" },
          { NULL, NULL },
       },
       "2x"

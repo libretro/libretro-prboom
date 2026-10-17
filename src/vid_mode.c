@@ -32,8 +32,7 @@
 int   vid_mode              = VID_MODE565;
 int   vid_pixelbytes        = 2;
 float vid_paper_white_nits  = 200.0f;
-
-const float vid_emit_scale[4] = { 1.0f, 2.0f, 4.0f, 8.0f };
+float vid_max_nits          = 0.0f;
 
 uint16_t vid_pq_to_sdr[1024];
 uint16_t vid_sdr_to_pq[1024];
@@ -146,6 +145,59 @@ void VID_709To2020(double *r, double *g, double *b)
   }
 }
 
+/* Highlight rolloff toward the frontend's peak, vid_max_nits.
+ *
+ * The frontend presents HDR10 samples as they are, so luminance above what
+ * the display reaches is clipped there and an emissive highlight turns into
+ * a flat patch.  Below the knee, halfway between paper white and the peak,
+ * light passes unchanged; above it the curve approaches the peak
+ * asymptotically with unit slope at the knee, so gradation survives all the
+ * way up.  Ordinary content never exceeds paper white and is never touched.
+ * With no headroom above paper white, or an unknown peak, it is identity. */
+double VID_RollOff(double nits)
+{
+  double pw = vid_paper_white_nits;
+  double m  = vid_max_nits;
+  double s, r;
+  if (m <= pw)
+    return nits;
+  s = 0.5 * (pw + m);
+  if (nits <= s)
+    return nits;
+  r = m - s;
+  return s + r * (1.0 - exp(-(nits - s) / r));
+}
+
+/* Emissive multiplier for the active class.  Auto puts the brightest
+ * emissive texel (a paper-white colour) at 95% of the frontend's peak after
+ * the rolloff: with the knee at s and range r = m - s, that input is
+ * s + r * ln(r / (0.05 * m)).  An unknown peak gives the 2x default. */
+double VID_EmitScale(void)
+{
+  switch (vid_emit_class)
+  {
+    case VID_EMIT_NONE: return 1.0;
+    case VID_EMIT_4X:   return 4.0;
+    case VID_EMIT_8X:   return 8.0;
+    case VID_EMIT_AUTO:
+      {
+        double pw = vid_paper_white_nits;
+        double m  = vid_max_nits;
+        double s, r, k;
+        if (pw <= 0.0 || m <= 0.0)
+          return 2.0;
+        if (m <= pw)
+          return 1.0;
+        s = 0.5 * (pw + m);
+        r = m - s;
+        k = (s + r * log(r / (0.05 * m))) / pw;
+        return k < 1.0 ? 1.0 : (k > 16.0 ? 16.0 : k);
+      }
+    case VID_EMIT_2X:
+    default:            return 2.0;
+  }
+}
+
 /* Encode one gamma-encoded Rec.709 channel triple, scaled by `emit`, into
  * PQ Rec.2020 10-bit samples.  `emit` is the emissive multiplier: 1.0 puts
  * the colour exactly at paper white, higher values push it above. */
@@ -158,6 +210,9 @@ void VID_EncodeHDR10(double r, double g, double b, double emit,
   int    v;
 
   VID_709To2020(&lr, &lg, &lb);
+  lr = VID_RollOff(lr);
+  lg = VID_RollOff(lg);
+  lb = VID_RollOff(lb);
 
   v = (int)(VID_PQEncode(lr) * 1023.0 + 0.5); *or_ = v < 0 ? 0 : (v > 1023 ? 1023 : v);
   v = (int)(VID_PQEncode(lg) * 1023.0 + 0.5); *og  = v < 0 ? 0 : (v > 1023 ? 1023 : v);
@@ -198,16 +253,15 @@ void VID_BuildHDRTables(void)
   }
 
   /* Emissive boost: take a PQ code and return the code for the same colour
-   * at `vid_emit_scale[vid_emit_class]` times the luminance.  Working on the
-   * encoded value keeps this a single table lookup per entry, so making a
-   * colour table emissive costs one pass over its 256 entries rather than a
-   * second palette. */
+   * at VID_EmitScale() times the luminance, rolled off toward the peak.
+   * Working on the encoded value keeps this a single table lookup per
+   * entry, so making a colour table emissive costs one pass over its 256
+   * entries rather than a second palette. */
   {
-    double k = vid_emit_scale[vid_emit_class < 0 ? 0
-                              : (vid_emit_class > 3 ? 3 : vid_emit_class)];
+    double k = VID_EmitScale();
     for (i = 0; i < 1024; i++)
     {
-      double nits = VID_PQDecode((double)i / 1023.0) * k;
+      double nits = VID_RollOff(VID_PQDecode((double)i / 1023.0) * k);
       int    v    = (int)(VID_PQEncode(nits) * 1023.0 + 0.5);
       vid_pq_boost[i] = (uint16_t)(v < 0 ? 0 : (v > 1023 ? 1023 : v));
     }

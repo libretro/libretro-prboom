@@ -1444,6 +1444,7 @@ static void I_NegotiatePixelFormat(void)
          vid_paper_white_nits = (hdr.paper_white_nits > 0.0f)
                               ? hdr.paper_white_nits : 200.0f;
          vid_expand_gamut     = (int)hdr.expand_gamut;
+         vid_max_nits         = (hdr.max_nits > 0.0f) ? hdr.max_nits : 0.0f;
 
          var.key   = "prboom-hdr_emissive";
          var.value = NULL;
@@ -1453,6 +1454,7 @@ static void I_NegotiatePixelFormat(void)
             if      (!strcmp(var.value, "off")) vid_emit_class = VID_EMIT_NONE;
             else if (!strcmp(var.value, "4x"))  vid_emit_class = VID_EMIT_4X;
             else if (!strcmp(var.value, "8x"))  vid_emit_class = VID_EMIT_8X;
+            else if (!strcmp(var.value, "auto")) vid_emit_class = VID_EMIT_AUTO;
             else                                vid_emit_class = VID_EMIT_2X;
          }
          if (log_cb)
@@ -1464,9 +1466,9 @@ static void I_NegotiatePixelFormat(void)
              * the log there is no way to tell a core that read the setting
              * from one built before the setting existed. */
             log_cb(RETRO_LOG_INFO,
-                   "Color Format: HDR10, paper white %.0f nits, emissive "
-                   "%.0fx, colour boost %s.\n",
-                   vid_paper_white_nits, vid_emit_scale[vid_emit_class],
+                   "Color Format: HDR10, paper white %.0f nits, peak %.0f "
+                   "nits, emissive %.1fx, colour boost %s.\n",
+                   vid_paper_white_nits, vid_max_nits, VID_EmitScale(),
                    gamut_name[vid_expand_gamut & 3]);
          }
       }
@@ -1766,6 +1768,16 @@ static void I_PollHDRPaperWhite(void)
                 "colour tables.\n", vid_paper_white_nits,
                 hdr.paper_white_nits);
       vid_paper_white_nits = hdr.paper_white_nits;
+      dirty = 1;
+   }
+
+   if (hdr.max_nits > 0.0f && hdr.max_nits != vid_max_nits)
+   {
+      if (log_cb)
+         log_cb(RETRO_LOG_INFO,
+                "HDR peak changed: %.0f -> %.0f nits; rebuilding colour "
+                "tables.\n", vid_max_nits, hdr.max_nits);
+      vid_max_nits = hdr.max_nits;
       dirty = 1;
    }
 

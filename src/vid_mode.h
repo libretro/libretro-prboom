@@ -72,6 +72,7 @@ extern int vid_pixelbytes;  /* 2 for VID_MODE565, else 4 */
  * which is what you want -- a highlight seen through glass is no longer a
  * highlight. */
 extern float vid_paper_white_nits;      /* frontend's SDR white, default 200 */
+extern float vid_max_nits;              /* frontend's peak, 0 when unknown    */
 extern uint16_t vid_pq_to_sdr[1024];    /* PQ code -> 10-bit gamma (clamped)  */
 extern uint16_t vid_sdr_to_pq[1024];    /* 10-bit gamma -> PQ code at paper white */
 extern uint16_t vid_pq_boost[1024];     /* PQ code -> same colour, N x brighter  */
@@ -93,7 +94,7 @@ extern int      vid_expand_gamut;
 #define VID_EMIT_2X    1
 #define VID_EMIT_4X    2
 #define VID_EMIT_8X    3
-extern const float vid_emit_scale[4];
+#define VID_EMIT_AUTO  4               /* from paper white and peak */
 
 /* Colour-space helpers (vid_mode.c).  Build-time only -- no per-pixel use. */
 double VID_PQEncode(double nits);
@@ -101,6 +102,8 @@ double VID_PQDecode(double signal);
 double VID_SRGBToLinear(double c);
 double VID_LinearToSRGB(double l);
 void   VID_709To2020(double *r, double *g, double *b);
+double VID_RollOff(double nits);
+double VID_EmitScale(void);
 void   VID_EncodeHDR10(double r, double g, double b, double emit,
                        int *or_, int *og, int *ob);
 void   VID_BuildHDRTables(void);

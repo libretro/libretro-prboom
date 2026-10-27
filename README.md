@@ -69,6 +69,8 @@ You still need a valid IWAD — the engine provides the code, not the game data.
   a quantization-free path from every synth/decoder that has one
 - **MUS→MIDI** conversion, selectable output sample rate, and per-backend
   music position save/restore so runahead and rewind stay seamless
+- **Roland MIDI** canvas emulation for a range of Roland MIDI sound canvas devices,
+  covering both the SC-55 family and the SC-88 family.
 - Full detail in [Sound system](#sound-system) below
 
 ### Input
@@ -158,6 +160,30 @@ autodetected by decode attempt.
   bit-for-bit across platforms.
 - **Raw MIDI out** — event stream handed to the frontend's MIDI
   interface for external hardware/soft synths.
+
+### Roland MIDI canvas emulation
+
+The core also includes emulation for a range of Roland MIDI sound canvas devices, covering both the SC-55 family and the SC-88 family.
+
+Supported models:
+- SC-55 mkII
+- SC-55
+- SC-55ST
+- SC-155
+- CM-300 / SCC-1
+- SCB-55
+- RLP-3237
+- SC-88
+- SC-88VL
+- SC-88Pro / VE-GS Pro
+
+These are not bundled ROMs; they are hardware dumps that must be supplied by the user. The emulated unit loads the firmware and wave data by slot, with the model-specific ROM layout being:
+- SC-55 family: ROM1, ROM2, sub-MCU ROM (mkII/ST), and wave ROMs 1–3
+- SC-88 family: control ROM plus wave ROMs; SC-88 / SC-88VL use one control ROM and four wave ROMs, while SC-88Pro uses one control ROM and three wave ROMs
+
+Place the matching dumps in the frontend’s system directory for the core (for example, in a device-specific folder under the system path used by the libretro frontend), with the appropriate files for each ROM slot. The core expects the original hardware dumps in their native form and loads them into the corresponding emulated slots at startup.
+
+This gives the core authentic Roland MIDI synth behavior for the supported models, including the hardware-style waveform playback and MIDI control path that those units use.
 
 ### Sound effects
 

@@ -47,6 +47,7 @@ SOURCES_C := $(LIBRETRO_DIR)/libretro.c \
 				 $(LIBRETRO_COMM_DIR)/formats/mp3/rmp3.c \
 				 $(LIBRETRO_COMM_DIR)/formats/mod/rmodtracker.c \
 				 $(LIBRETRO_COMM_DIR)/formats/data_transfer.c \
+				 $(LIBRETRO_COMM_DIR)/streams/data_transfer_file.c \
 				 $(LIBRETRO_COMM_DIR)/formats/audio_transfer.c \
 				 $(LIBRETRO_COMM_DIR)/formats/image_transfer.c \
 				 $(LIBRETRO_COMM_DIR)/memmap/memmap.c

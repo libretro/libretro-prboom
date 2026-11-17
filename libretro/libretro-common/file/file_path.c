@@ -204,6 +204,9 @@ const char *path_get_archive_delim(const char *path)
                /* Check ".rar" */
                else if (c3 == 'r' && c2 == 'a' && c1 == 'r')
                   return delim;
+               /* Check ".bz2" */
+               else if (c3 == 'b' && c2 == 'z' && delim[-1] == '2')
+                  return delim;
             }
          }
       }
@@ -295,7 +298,11 @@ bool path_is_compressed_file(const char *path)
    switch (tolower((unsigned char)ext[0]))
    {
       case '7':
-         return ext[1] == 'z' && ext[2] == '\0';
+         return tolower((unsigned char)ext[1]) == 'z' && ext[2] == '\0';
+      case 'b':
+         return tolower((unsigned char)ext[1]) == 'z'
+             && ext[2] == '2'
+             && ext[3] == '\0';
       case 'a':
          return tolower((unsigned char)ext[1]) == 'p'
              && tolower((unsigned char)ext[2]) == 'k'
@@ -584,6 +591,7 @@ size_t fill_pathname_parent_dir(char *s,
    return path_parent_dir(s, _len);
 }
 
+#ifndef RETRO_DISABLE_HOST_CLOCK
 /**
  * fill_dated_filename:
  * @s                  : output filename
@@ -642,6 +650,8 @@ size_t fill_str_dated_filename(char *s,
    return _len;
 }
 
+#endif /* RETRO_DISABLE_HOST_CLOCK */
+
 /**
  * path_basedir:
  * @s                  : path
@@ -687,12 +697,24 @@ size_t path_parent_dir(char *s, size_t len)
    if (len && PATH_CHAR_IS_SLASH(s[len - 1]))
    {
       char *last_slash;
+      const char *scheme = strstr(s, "://");
+      const char *q;
       bool was_absolute = path_is_absolute(s);
+
+      /* A scheme is only the path's first component: "://" in a
+       * folder name of a local path is not one. */
+      for (q = s; scheme && q < scheme; q++)
+         if (PATH_CHAR_IS_SLASH(*q))
+            scheme = NULL;
+      if (scheme == s)
+         scheme = NULL;
 
       s[len - 1]        = '\0';
       last_slash        = find_last_slash(s);
 
-      if (was_absolute && !last_slash)
+      /* The slashes of "scheme://" belong to the root. */
+      if (was_absolute && (!last_slash
+            || (scheme && last_slash <= scheme + 2)))
       {
          /* We removed the only slash from what used 
           * to be an absolute path.
@@ -828,14 +850,11 @@ char *path_resolve_realpath(char *s, size_t len, bool resolve_symlinks)
    const char *buf_end;
    if (resolve_symlinks)
    {
-      char *real_path;
-      strlcpy(tmp, s, sizeof(tmp));
-      real_path = realpath(tmp, NULL);
+      /* realpath() reads @s and answers in its own buffer: @s is left
+       * as it was when it fails */
+      char *real_path = realpath(s, NULL);
       if (!real_path)
-      {
-         strlcpy(s, tmp, len);
          return NULL;
-      }
       strlcpy(s, real_path, len);
       free(real_path);
       return s;
@@ -1113,6 +1132,7 @@ size_t fill_pathname_join_delim(char *s, const char *dir,
 size_t fill_pathname_expand_special(char *s, const char *in_path, size_t len)
 {
 #if !defined(RARCH_CONSOLE) && defined(RARCH_INTERNAL)
+   char *start = s;
    if (in_path[0] == '~' || in_path[0] == ':')
    {
       char app_dir[DIR_MAX_LENGTH];
@@ -1127,8 +1147,13 @@ size_t fill_pathname_expand_special(char *s, const char *in_path, size_t len)
 
       if (*app_dir)
       {
+         /* strlcpy() reports the source's length whether or not it
+          * fit: a directory longer than @s leaves the result cut
+          * there, with nothing appended past the end. */
          size_t _len  = strlcpy(s, app_dir, len);
 
+         if (_len >= len)
+            return len ? len - 1 : 0;
          s           += _len;
          len         -= _len;
 
@@ -1136,15 +1161,21 @@ size_t fill_pathname_expand_special(char *s, const char *in_path, size_t len)
          {
             _len      = strlcpy(s, PATH_DEFAULT_SLASH(), len);
 
+            if (_len >= len)
+               return (size_t)(s - start) + (len ? len - 1 : 0);
             s        += _len;
             len      -= _len;
          }
 
-         in_path += 2;
+         in_path++;
+         if (PATH_CHAR_IS_SLASH(*in_path))
+            in_path++;
       }
    }
-#endif
+   return (size_t)(s - start) + strlcpy(s, in_path, len);
+#else
    return strlcpy(s, in_path, len);
+#endif
 }
 
 size_t fill_pathname_abbreviate_special(char *s,
@@ -1326,14 +1357,24 @@ size_t fill_pathname_abbreviated_or_relative(char *s,
    size_t _len;
    int rel_slashes;
    const char *trimmed_path, *trimmed_base;
-   char abs_path[PATH_MAX_LENGTH];
-   char ref_path[PATH_MAX_LENGTH];
+   /* Both working paths on the heap, to keep the frame within the
+    * 2 KiB thread-stack budget. */
+   char *abs_path = (char*)malloc(2 * PATH_MAX_LENGTH);
+   char *ref_path;
+
+   if (!abs_path)
+   {
+      if (len)
+         *s = '\0';
+      return 0;
+   }
+   ref_path = abs_path + PATH_MAX_LENGTH;
 
    /* Expand paths which start with :\ to an absolute path */
-   fill_pathname_expand_special(abs_path, in_path, sizeof(abs_path));
+   fill_pathname_expand_special(abs_path, in_path, PATH_MAX_LENGTH);
    pathname_conform_slashes_to_os(abs_path);
 
-   strlcpy(ref_path, in_refpath, sizeof(ref_path));
+   strlcpy(ref_path, in_refpath, PATH_MAX_LENGTH);
    pathname_conform_slashes_to_os(ref_path);
 
    /* Resolve a relative path against the referencing file's directory.
@@ -1342,12 +1383,12 @@ size_t fill_pathname_abbreviated_or_relative(char *s,
     * (only its directory is needed for the join) and never in @s. */
    if (!path_is_absolute(abs_path))
    {
-      _len = fill_pathname_basedir(ref_path, ref_path, sizeof(ref_path));
-      strlcpy(ref_path + _len, abs_path, sizeof(ref_path) - _len);
-      path_resolve_realpath(ref_path, sizeof(ref_path), false);
-      strlcpy(abs_path, ref_path, sizeof(abs_path));
+      _len = fill_pathname_basedir(ref_path, ref_path, PATH_MAX_LENGTH);
+      strlcpy(ref_path + _len, abs_path, PATH_MAX_LENGTH - _len);
+      path_resolve_realpath(ref_path, PATH_MAX_LENGTH, false);
+      strlcpy(abs_path, ref_path, PATH_MAX_LENGTH);
       pathname_conform_slashes_to_os(abs_path);
-      strlcpy(ref_path, in_refpath, sizeof(ref_path));
+      strlcpy(ref_path, in_refpath, PATH_MAX_LENGTH);
       pathname_conform_slashes_to_os(ref_path);
    }
 
@@ -1363,7 +1404,8 @@ size_t fill_pathname_abbreviated_or_relative(char *s,
 
    /* Use the shortest path, preferring the relative path */
    if (rel_slashes <= get_pathname_num_slashes(s))
-      return path_relative_to(s, abs_path, ref_path, len);
+      _len = path_relative_to(s, abs_path, ref_path, len);
+   free(abs_path);
    return _len;
 }
 

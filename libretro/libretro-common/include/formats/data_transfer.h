@@ -158,7 +158,22 @@ data_transfer_t *data_transfer_open_source(size_t len,
  * NULL unless the transfer completed successfully. */
 uint8_t *data_transfer_source_detach(data_transfer_t *dt, size_t *len);
 
-data_transfer_t *data_transfer_open_window(const char *path, size_t keep);
+/* Borrow a seekable source for the window's lifetime. The callback writes
+ * directly into final window storage, returning bytes read or -1 on error.
+ * A short read fails the operation. Closing the window does not close ud
+ * unless data_transfer_set_release() said how.
+ * data_transfer_open_window(path), which opens a file for it, is in
+ * <streams/data_transfer_file.h>. */
+typedef int64_t (*data_transfer_read_at_t)(void *ud, uint64_t offset,
+      uint8_t *dst, size_t bytes);
+data_transfer_t *data_transfer_open_window_reader(size_t length, size_t keep,
+      data_transfer_read_at_t read_at, void *ud);
+
+/* What frees a reader's ud when the transfer is freed */
+typedef void (*data_transfer_release_t)(void *ud);
+void data_transfer_set_release(data_transfer_t *dt,
+      data_transfer_release_t release);
+
 const uint8_t *data_transfer_window_base(data_transfer_t *dt, size_t *len);
 /* True when the transfer is genuinely windowed - address space was
  * reserved and only the window is committed.  False when the platform
@@ -202,6 +217,9 @@ bool data_transfer_window_ensure(data_transfer_t *dt, size_t lo,
  * No-op when pos does not lie past the frontier, so front-moov files
  * are unaffected. */
 void data_transfer_window_rebase(data_transfer_t *dt, size_t pos);
+/* Skip forward without reading the gap or the new page's prefix.
+ * Consumers must not read below pos outside the head or pinned range. */
+void data_transfer_window_skip(data_transfer_t *dt, size_t pos);
 void data_transfer_window_advance(data_transfer_t *dt, size_t lo);
 void data_transfer_window_rewind(data_transfer_t *dt);
 /* Raise the permanently-resident head.  For codecs whose loop
@@ -241,8 +259,10 @@ bool data_transfer_window_feed(data_transfer_t *dt, size_t tell,
  * behind the consumer.  There the bytes at tell itself are what is
  * missing - a lap that landed past the head, an open that rebased -
  * and leaving them for a later tick leaves the consumer's very next
- * read on unresident pages; that catch-up is one unbudgeted extend,
- * exactly what window_feed has always done.  budget == 0 disables
+ * read on unresident pages; that catch-up is one unbudgeted extend
+ * from margin bytes behind tell, never from further back: a frontier
+ * further behind than that moves up first, so a gap the consumer has
+ * passed is never read in.  budget == 0 disables
  * the ceiling entirely, making this window_feed by another name.
  *
  * *resident_hi (may be NULL) reports the sequential bound this call
@@ -252,6 +272,12 @@ bool data_transfer_window_feed(data_transfer_t *dt, size_t tell,
  * valid between this call and the owner's next feed, for the one
  * consumer the window serves; it is not the shared-frontier accessor
  * the single-owner contract above declines to provide. */
+/* Owner-thread retention of one already-readable encoded span across
+ * moving-window advance/rewind/rebase. No read, allocation or copy. The
+ * owner clears it with (0,0) after use; resident() includes pinned pages
+ * outside the normal window. The permanent head is always retained. */
+bool data_transfer_window_pin(data_transfer_t *dt, size_t lo, size_t hi);
+
 bool data_transfer_window_feed_budget(data_transfer_t *dt, size_t tell,
       size_t lookahead, size_t margin, size_t budget,
       size_t *resident_hi);
@@ -278,8 +304,10 @@ void data_transfer_arena_release(data_transfer_arena_t *a);
  * when commit_cap is 0.  There is no built-in ceiling: a caller that
  * asks for no cap gets no cap, and a file too large for memory is
  * refused at open rather than presented as a capped prefix. */
-data_transfer_t *data_transfer_open_prefix(const char *path,
-      size_t commit_cap);
+data_transfer_t *data_transfer_open_prefix_reader(size_t length,
+      size_t commit_cap, data_transfer_read_at_t read_at, void *ud);
+/* data_transfer_open_prefix(path, commit_cap), which opens a file for
+ * it, is in <streams/data_transfer_file.h>. */
 
 /* The fill stopped at commit_cap with the file continuing beyond it.
  * Terminal: iterate() will not advance further. */
@@ -299,6 +327,15 @@ bool data_transfer_capped(data_transfer_t *dt);
  * test can catch. */
 void data_transfer_discard(data_transfer_t *dt, size_t up_to);
 
+/* Exclusive prefix owner: declare file bytes permanently inert. Whole
+ * pages strictly inside the range may remain unread/uncommitted even
+ * below avail(), including after refill(). Every consumer must promise
+ * never to inspect those pages (e.g. a parsed container Void payload).
+ * File position and avail() do not change until iterate(). Intervals
+ * persist until free; source/window handles refuse the operation.
+ * No-reservation and small pooled fallbacks retain normal reads. */
+bool data_transfer_prefix_inert(data_transfer_t *dt, size_t from, size_t to);
+
 /* Make [from, avail) readable again after discards, re-reading any
  * released span from the file (the transfer keeps it open).  The cost
  * of a backward seek, paid honestly: false only if the re-read fails
@@ -313,7 +350,8 @@ bool data_transfer_refill(data_transfer_t *dt, size_t from);
  * over. */
 size_t data_transfer_iterate(data_transfer_t *dt, size_t max_bytes);
 
-/* Consulted between the fill's internal reads, which is a far finer
+/* Consulted before the fill's internal reads and opt-in inert skips,
+ * which is a far finer
  * grain than a byte budget can express: returning false stops the
  * fill where it stands.  'avail' and 'len' are the position and the
  * total, so a caller has what it needs to report progress without
@@ -337,17 +375,21 @@ typedef bool (*data_transfer_continue_t)(void *ud, size_t avail,
  * Consulted here it lands between the fill's own reads instead, and
  * no timing dependency enters this module.
  *
- * Both budgets apply; whichever comes first stops the fill.  Pass 0
+ * Both budgets apply; whichever comes first stops the fill. Inert
+ * skips advance logical avail without spending the read-byte budget.
+ * Pass 0
  * for max_bytes to let the hook govern alone. */
 size_t data_transfer_iterate_while(data_transfer_t *dt, size_t max_bytes,
       data_transfer_continue_t should_continue, void *ud);
 
 /* The buffer.  Valid and stable from open; its leading
  * data_transfer_avail() bytes are file content, the rest not yet.
+ * Explicitly discarded or permanently inert pages are excluded.
  * *len receives the full file length. */
 const uint8_t *data_transfer_ptr(data_transfer_t *dt, size_t *len);
 
-/* Bytes valid at the front of the buffer.  Monotonic. */
+/* Logical prefix frontier, monotonic. Discarded/permanently inert pages
+ * below it remain outside the reader's contract. */
 size_t data_transfer_avail(data_transfer_t *dt);
 
 /* The whole file arrived. */

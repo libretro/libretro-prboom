@@ -29,8 +29,8 @@
  * avail() for the buffer and how much of it is real, and the
  * complete()/failed()/capped() terminals.
  *
- *  - prefix (data_transfer_open_prefix): a file whose length is known
- *    at open.  Address space for the whole length is reserved up
+ *  - prefix (data_transfer_open_prefix_reader): a source whose length
+ *    is known at open, read at offsets through a callback.  Address space for the whole length is reserved up
  *    front so the base never moves, and physical pages are committed
  *    DT_COMMIT_STEP at a time as the fill advances, in DT_READ_CHUNK
  *    reads.  commit_cap bounds the committed bytes and turns overrun
@@ -39,7 +39,7 @@
  *    sequential consumer holds a constant window over a file of any
  *    size.
  *
- *  - window (data_transfer_open_window): the same reservation used
+ *  - window (data_transfer_open_window_reader): the same reservation used
  *    cyclically, for sequential consumers that loop.  A permanent
  *    head of 'keep' bytes plus a moving [wlo, whi) that feed()
  *    advances behind the consumer and extends ahead of it;
@@ -59,8 +59,11 @@
  * growable buffer that shares this file and header but touches no
  * data_transfer_t and no page machinery.
  *
- * File access goes through filestream/VFS throughout, so 64-bit
- * offsets and VFS-only paths work.  Where the platform cannot reserve
+ * No file I/O here: every read is the reader's. streams/
+ * data_transfer_file.c opens paths through filestream/VFS - 64-bit
+ * offsets, VFS-only paths - and hands the reader in, keeping the
+ * data_transfer_open_prefix/_window names.  Where the platform cannot
+ * reserve
  * address space, every mode degrades to a plain allocation of
  * min(len, commit_cap) - the whole file when there is no cap - and a
  * window simply holds the whole file; reserve_supported() and
@@ -68,8 +71,8 @@
  *
  * NOT IMPLEMENTED
  *
- *  - Asynchrony.  Every read is a synchronous filestream_read on the
- *    calling thread: iterate() blocks for the length of its budget,
+ *  - Asynchrony.  Every read is a synchronous call of the reader on
+ *    the calling thread: iterate() blocks for the length of its budget,
  *    and there is nothing in flight for free() to cancel.  Pacing is
  *    by byte budget and the caller does the time-slicing.  The module
  *    began as a wrapper over nbio, which is where its vocabulary came
@@ -162,7 +165,6 @@
 #include <stdlib.h>
 
 #include <memmap.h>
-#include <streams/file_stream.h>
 #include <string.h>
 #include <formats/data_transfer.h>
 
@@ -298,17 +300,25 @@ void data_transfer_pool_flush(void) { }
 #endif
 
 
+struct data_transfer_inert { size_t lo, hi; };
+
 struct data_transfer
 {
-   /* file-backed reader (open_prefix, and open_window over it)      */
-   RFILE  *f;
+   /* the reader every prefix and window fills from, and what frees
+    * its user data with the transfer, if anything                    */
+   data_transfer_read_at_t read_at;
+   data_transfer_release_t release;
+   void *read_ud;
    uint8_t *map;     /* reserved (or fallback-allocated) buffer      */
    size_t  map_len;  /* reserved bytes (page-rounded), 0 = fallback  */
-   size_t  committed;/* bytes with physical backing                  */
+   size_t  committed;/* commit high-water mark; discards/inert holes
+                       * may have released pages below it             */
    size_t  cap;      /* commit ceiling (buffer size in fallback)     */
    size_t  len;      /* full file length, fixed at open              */
    size_t  avail;    /* bytes valid at the front; monotonic          */
    size_t  low;      /* lowest readable offset after discards       */
+   struct data_transfer_inert *inert;
+   size_t inert_count, inert_cap;
    size_t  page;     /* page size for the discard granularity        */
    uint8_t done;     /* the operation is over                        */
    uint8_t failed;   /* ...but delivered less than the file          */
@@ -321,6 +331,7 @@ struct data_transfer
    size_t  wtell;    /* last consumer position seen by feed()        */
    data_transfer_source_read_t src_cb; /* producer-backed transfer   */
    void   *src_ud;
+   size_t  pin_lo, pin_hi; /* one borrowed coded packet, page aligned */
    size_t  wfreed;   /* page-aligned decommit frontier: everything in
                         [keep-page-ceil, wfreed) is released.  Kept
                         across calls because the feeder advances in
@@ -384,11 +395,12 @@ void data_transfer_arena_release(data_transfer_arena_t *a)
 
 static int data_transfer_read_at(data_transfer_t *dt, size_t off,
       uint8_t *dst, size_t n);
-/* open_prefix's body.  allow_pool is 0 for open_window, which builds
- * on a prefix handle but reads map_len in punch/peek and so needs it
- * to be the file's own rounded length rather than a pool slot's. */
-static data_transfer_t *data_transfer_open_prefix_ex(const char *path,
-      size_t commit_cap, int allow_pool);
+/* The prefix body.  allow_pool is 0 for a window, which builds on a
+ * prefix handle but reads map_len in punch/peek and so needs it to be
+ * the source's own rounded length rather than a pool slot's. */
+static data_transfer_t *data_transfer_open_reader_ex(size_t commit_cap,
+      int allow_pool, data_transfer_read_at_t read_at, size_t length,
+      void *ud);
 /* The fill proper.  data_transfer_iterate() refuses to run it on a
  * window; open_window's no-reservation path genuinely needs it and
  * calls it here directly. */
@@ -398,6 +410,24 @@ static size_t data_transfer_prefix_iterate(data_transfer_t *dt,
 /* Release whole pages from the decommit frontier up to (not
  * including) the page containing 'to'.  The frontier survives calls,
  * so sub-page feeder steps accumulate into page releases. */
+static void data_transfer_wrelease(data_transfer_t *dt, size_t lo, size_t hi)
+{
+   if (lo >= hi) return;
+#ifdef DT_STRICT
+   memdecommit(dt->map + lo, hi - lo, true);
+#else
+   memdecommit(dt->map + lo, hi - lo, false);
+#endif
+}
+
+static void data_transfer_wrelease_except(data_transfer_t *dt,
+      size_t lo, size_t hi, size_t pin_lo, size_t pin_hi)
+{
+   if (pin_lo >= pin_hi) { data_transfer_wrelease(dt, lo, hi); return; }
+   if (lo < pin_lo) data_transfer_wrelease(dt, lo, hi < pin_lo ? hi : pin_lo);
+   if (hi > pin_hi) data_transfer_wrelease(dt, lo > pin_hi ? lo : pin_hi, hi);
+}
+
 static void data_transfer_wdecommit_to(data_transfer_t *dt, size_t to)
 {
    size_t from = dt->wfreed;
@@ -405,11 +435,7 @@ static void data_transfer_wdecommit_to(data_transfer_t *dt, size_t to)
    if (to <= from || !dt->map_len)
       return;
    dt->wfreed = to;
-#ifdef DT_STRICT
-   memdecommit(dt->map + from, to - from, true);
-#else
-   memdecommit(dt->map + from, to - from, false);
-#endif
+   data_transfer_wrelease_except(dt, from, to, dt->pin_lo, dt->pin_hi);
 }
 
 /* Settle a window into the same terminal the fill uses: failed() true,
@@ -510,9 +536,8 @@ uint8_t *data_transfer_source_detach(data_transfer_t *dt, size_t *len)
    return out;
 }
 
-data_transfer_t *data_transfer_open_window(const char *path, size_t keep)
+static data_transfer_t *data_transfer_start_window(data_transfer_t *dt, size_t keep)
 {
-   data_transfer_t *dt = data_transfer_open_prefix_ex(path, 0, 0);
    if (!dt)
       return NULL;
    dt->window = 1;
@@ -548,6 +573,21 @@ data_transfer_t *data_transfer_open_window(const char *path, size_t keep)
    return dt;
 }
 
+data_transfer_t *data_transfer_open_window_reader(size_t length,size_t keep,
+      data_transfer_read_at_t read_at,void *ud)
+{
+   if (!read_at) return NULL;
+   return data_transfer_start_window(
+         data_transfer_open_reader_ex(0,0,read_at,length,ud),keep);
+}
+
+void data_transfer_set_release(data_transfer_t *dt,
+      data_transfer_release_t release)
+{
+   if (dt)
+      dt->release = release;
+}
+
 bool data_transfer_reserve_supported(void)
 {
 #if defined(MEMMAP_TEST_NO_RESERVE)
@@ -566,14 +606,49 @@ bool data_transfer_reserve_supported(void)
 
 size_t data_transfer_window_resident(data_transfer_t *dt)
 {
-   size_t head, moving;
+   size_t head, moving, pinned = 0, end;
    if (!dt || !dt->window)
       return 0;
    if (dt->map_len == 0)     /* settled into a whole-file commit */
       return dt->len;
    head   = dt->wfreed < dt->keep ? dt->wfreed : dt->keep;
    moving = dt->whi > dt->wfreed ? dt->whi - dt->wfreed : 0;
-   return head + moving;
+   end = (dt->whi + dt->page - 1) & ~(dt->page - 1);
+   if (dt->pin_lo < dt->pin_hi)
+   {
+      size_t stop = dt->pin_hi < dt->wfreed ? dt->pin_hi : dt->wfreed;
+      size_t start = dt->pin_lo > end ? dt->pin_lo : end;
+      if (stop > dt->pin_lo) pinned += stop - dt->pin_lo;
+      if (dt->pin_hi > start) pinned += dt->pin_hi - start;
+   }
+   return head + moving + pinned;
+}
+
+bool data_transfer_window_pin(data_transfer_t *dt, size_t lo, size_t hi)
+{
+   size_t pin_lo = 0, pin_hi = 0, end, stop, start, head;
+   if (!dt || !dt->window || dt->failed || lo > hi || hi > dt->len) return false;
+   if (!dt->map_len) return true;
+   head = (dt->keep + dt->page - 1) & ~(dt->page - 1);
+   if (lo < hi && hi > head)
+   {
+      pin_lo = lo & ~(dt->page - 1);
+      if (pin_lo < head) pin_lo = head;
+      pin_hi = (hi + dt->page - 1) & ~(dt->page - 1);
+   }
+   if (pin_lo == dt->pin_lo && pin_hi == dt->pin_hi) return true;
+   /* Retired pin pages that remain inside the moving window continue
+    * to belong to it. Release only the remainder, excluding a new pin. */
+   end = (dt->whi + dt->page - 1) & ~(dt->page - 1);
+   stop = dt->pin_hi < dt->wfreed ? dt->pin_hi : dt->wfreed;
+   start = dt->pin_lo > end ? dt->pin_lo : end;
+   if (stop > dt->pin_lo)
+      data_transfer_wrelease_except(dt, dt->pin_lo, stop, pin_lo, pin_hi);
+   if (dt->pin_hi > start)
+      data_transfer_wrelease_except(dt, start, dt->pin_hi, pin_lo, pin_hi);
+   dt->pin_lo = pin_lo;
+   dt->pin_hi = pin_hi;
+   return true;
 }
 
 bool data_transfer_window_is_reserved(data_transfer_t *dt)
@@ -663,6 +738,16 @@ void data_transfer_window_rebase(data_transfer_t *dt, size_t pos)
    return;
 }
 
+void data_transfer_window_skip(data_transfer_t *dt, size_t pos)
+{
+   if (!dt || !dt->window || !dt->map_len || dt->failed)
+      return;
+   if (pos > dt->len) pos = dt->len;
+   if (pos <= dt->whi) return;
+   data_transfer_wdecommit_to(dt, pos);
+   dt->wlo = dt->whi = pos;
+}
+
 void data_transfer_window_advance(data_transfer_t *dt, size_t lo)
 {
    if (!dt || !dt->window || !dt->map_len || dt->failed)
@@ -684,6 +769,7 @@ void data_transfer_window_rewind(data_transfer_t *dt)
     * frontier at the head boundary for the next lap */
    data_transfer_wdecommit_to(dt,
          (dt->whi + dt->page - 1) & ~(dt->page - 1));
+   dt->wtell  = 0;
    dt->wlo    = dt->keep;
    dt->whi    = dt->keep;
    dt->wfreed = (dt->keep + dt->page - 1) & ~(dt->page - 1);
@@ -714,6 +800,12 @@ bool data_transfer_window_grow_keep(data_transfer_t *dt, size_t keep)
       }
    }
    dt->keep = keep;
+   if (dt->pin_lo < dt->pin_hi)
+   {
+      size_t head = (keep + dt->page - 1) & ~(dt->page - 1);
+      if (dt->pin_hi <= head) dt->pin_lo = dt->pin_hi = 0;
+      else if (dt->pin_lo < head) dt->pin_lo = head;
+   }
    if (dt->wlo < keep)
       dt->wlo = keep;
    if (dt->whi < keep)
@@ -783,6 +875,13 @@ bool data_transfer_window_feed_budget(data_transfer_t *dt, size_t tell,
    dt->wtell = tell;
    if (tell > margin && tell - margin > dt->wlo)
       data_transfer_window_advance(dt, tell - margin);
+   /* A frontier short of the margin behind the consumer moves up to it:
+    * the bytes between are behind the consumer and outside its margin,
+    * never read, and filling them in would make a gap of any size
+    * resident - a consumer that starts or jumps far into a large file,
+    * or one left there by the rewind above. */
+   if (dt->map_len && tell > margin && tell - margin > dt->whi)
+      data_transfer_window_rebase(dt, tell - margin);
    hi = tell + lookahead;
    /* The ceiling applies only while the frontier covers the consumer.
     * A frontier behind tell means the consumer's next read lands on
@@ -810,33 +909,18 @@ bool data_transfer_window_feed(data_transfer_t *dt, size_t tell,
          margin, 0, NULL);
 }
 
-static data_transfer_t *data_transfer_open_prefix_ex(const char *path,
-      size_t commit_cap, int allow_pool)
+static data_transfer_t *data_transfer_open_reader_ex(size_t commit_cap,
+      int allow_pool, data_transfer_read_at_t read_at, size_t length,
+      void *ud)
 {
    data_transfer_t *dt;
-   RFILE *f;
-   int64_t l;
-   /* filestream: 64-bit lengths and offsets everywhere (a plain long
-    * ftell caps at 2 GB on LLP64 and 32-bit targets), and the read
-    * routes through the VFS interface when one is registered, so
-    * paths only the VFS can open - archive members, Android
-    * content:// documents, frontend overrides - work like any
-    * other. */
-   if (!(f = filestream_open(path, RETRO_VFS_FILE_ACCESS_READ,
-         RETRO_VFS_FILE_ACCESS_HINT_NONE)))
+   if (!read_at || !length || (uint64_t)length > INT64_MAX)
       return NULL;
-   if ((l = filestream_get_size(f)) <= 0)
-   {
-      filestream_close(f);
-      return NULL;
-   }
    if (!(dt = (data_transfer_t*)calloc(1, sizeof(*dt))))
-   {
-      filestream_close(f);
       return NULL;
-   }
-   dt->f   = f;
-   dt->len = (size_t)l;
+   dt->read_at = read_at;
+   dt->read_ud = ud;
+   dt->len = length;
    dt->cap = commit_cap;
 
    {
@@ -848,6 +932,11 @@ static data_transfer_t *data_transfer_open_prefix_ex(const char *path,
        * mempagesize() reports 0 there; 4096 is the conventional
        * stand-in and only affects arithmetic, since without map_len
        * nothing is committed or decommitted. */
+      if (pg && dt->len > SIZE_MAX - (pg - 1))
+      {
+         data_transfer_free(dt);
+         return NULL;
+      }
       dt->page = pg ? pg : 4096;
 
       if (pg)
@@ -912,7 +1001,6 @@ static data_transfer_t *data_transfer_open_prefix_ex(const char *path,
       dt->cap = w;
       if (!(dt->map = (uint8_t*)malloc(w ? w : 1)))
       {
-         filestream_close(f);
          free(dt);
          return NULL;
       }
@@ -921,10 +1009,10 @@ static data_transfer_t *data_transfer_open_prefix_ex(const char *path,
    return dt;
 }
 
-data_transfer_t *data_transfer_open_prefix(const char *path,
-      size_t commit_cap)
+data_transfer_t *data_transfer_open_prefix_reader(size_t length,
+      size_t commit_cap, data_transfer_read_at_t read_at, void *ud)
 {
-   return data_transfer_open_prefix_ex(path, commit_cap, 1);
+   return data_transfer_open_reader_ex(commit_cap, 1, read_at, length, ud);
 }
 
 /* Grow the physical backing to cover at least 'need' bytes.
@@ -1021,7 +1109,7 @@ static void data_transfer_pool_scrub(data_transfer_t *dt)
 static size_t data_transfer_prefix_iterate(data_transfer_t *dt,
       size_t max_bytes, data_transfer_continue_t cb, void *ud)
 {
-   size_t start = dt->avail;
+   size_t spent = 0;
    while (!dt->done && !dt->capped)
    {
       size_t chunk = DT_READ_CHUNK, got;
@@ -1035,12 +1123,41 @@ static size_t data_transfer_prefix_iterate(data_transfer_t *dt,
          dt->capped = 1;
          break;
       }
-      /* Asked before each read, the first one included: a caller
-       * already out of budget does no work at all.  A stop here
-       * settles nothing - the fill simply pauses and the next
-       * iterate carries on from the same place. */
-      if (cb && !cb(ud, dt->avail, dt->len))
-         break;
+      /* A caller out of time must not seek across an inert range
+       * either. With no inert ranges this is the ordinary read hook. */
+      if (cb && !cb(ud, dt->avail, dt->len)) break;
+      if (dt->inert_count)
+      {
+         size_t lo = 0, hi = dt->inert_count;
+         while (lo < hi)
+         {
+            size_t mid = lo + (hi - lo) / 2;
+            if (dt->inert[mid].hi <= dt->avail) lo = mid + 1;
+            else hi = mid;
+         }
+         if (lo < dt->inert_count)
+         {
+            if (dt->avail >= dt->inert[lo].lo)
+            {
+               size_t end = dt->inert[lo].hi;
+               size_t release_end;
+               if (dt->cap && end > dt->cap) end = dt->cap;
+               /* Commit growth may have armed pages past the preceding
+                * read. Keep an inert interval unreadable after crossing
+                * it, including in strict builds and after refill. */
+               release_end = end < dt->committed ? end : dt->committed;
+               release_end = release_end / dt->page * dt->page;
+               if (release_end > dt->inert[lo].lo)
+                  memdecommit(dt->map + dt->inert[lo].lo,
+                        release_end - dt->inert[lo].lo, true);
+               dt->avail = end;
+               if (dt->committed < end) dt->committed = end;
+               continue;
+            }
+            if (chunk > dt->inert[lo].lo - dt->avail)
+               chunk = dt->inert[lo].lo - dt->avail;
+         }
+      }
       if (chunk > dt->len - dt->avail)
          chunk = dt->len - dt->avail;
       if (dt->cap && chunk > dt->cap - dt->avail)
@@ -1071,6 +1188,7 @@ static size_t data_transfer_prefix_iterate(data_transfer_t *dt,
             break;
          }
          dt->avail += got;
+         spent += got;
          if (got == 0)
          {
             if (dt->avail < dt->len)
@@ -1080,16 +1198,17 @@ static size_t data_transfer_prefix_iterate(data_transfer_t *dt,
             }
             break;
          }
-         if (max_bytes && dt->avail - start >= max_bytes)
+         if (max_bytes && spent >= max_bytes)
             break;
          continue;
       }
       {
-         int64_t r = filestream_read(dt->f, dt->map + dt->avail,
-               (int64_t)chunk);
-         got = r > 0 ? (size_t)r : 0;
+         int64_t r = dt->read_at(dt->read_ud, dt->avail,
+               dt->map + dt->avail, chunk);
+         got = r > 0 && (uint64_t)r <= chunk ? (size_t)r : 0;
       }
       dt->avail += got;
+      spent += got;
       if (got < chunk)
       {
          /* The file ended short of its opening length (I/O error,
@@ -1098,7 +1217,7 @@ static size_t data_transfer_prefix_iterate(data_transfer_t *dt,
          dt->failed = 1;
          break;
       }
-      if (max_bytes && dt->avail - start >= max_bytes)
+      if (max_bytes && spent >= max_bytes)
          break;
    }
    if (dt->avail >= dt->len && !dt->failed)
@@ -1111,25 +1230,60 @@ static size_t data_transfer_prefix_iterate(data_transfer_t *dt,
    return dt->avail;
 }
 
-/* Positioned read that leaves the fill's own file cursor alone. */
+/* Prefix fills retain their cursor; reserved windows own it outright. */
 static int data_transfer_read_at(data_transfer_t *dt, size_t off,
       uint8_t *dst, size_t n)
 {
-   int64_t save = filestream_tell(dt->f);
-   int64_t r;
-   if (save < 0
-         || filestream_seek(dt->f, (int64_t)off,
-               RETRO_VFS_SEEK_POSITION_START) < 0)
-      return 0;
-   r = filestream_read(dt->f, dst, (int64_t)n);
-   filestream_seek(dt->f, save, RETRO_VFS_SEEK_POSITION_START);
-   return r == (int64_t)n;
+   return dt->read_at(dt->read_ud, off, dst, n) == (int64_t)n;
+}
+
+bool data_transfer_prefix_inert(data_transfer_t *dt, size_t from, size_t to)
+{
+   size_t lo, hi, first, last, count;
+   if (!dt || !dt->read_at || dt->window || dt->failed || from > to
+         || to > dt->len)
+      return false;
+   if (!dt->map_len || dt->pooled) return true;
+   lo = (from / dt->page + (from % dt->page != 0)) * dt->page;
+   hi = to / dt->page * dt->page;
+   if (lo >= hi) return true;
+   first = 0;
+   while (first < dt->inert_count && dt->inert[first].hi < lo) first++;
+   last = first;
+   while (last < dt->inert_count && dt->inert[last].lo <= hi)
+   {
+      if (dt->inert[last].lo < lo) lo = dt->inert[last].lo;
+      if (dt->inert[last].hi > hi) hi = dt->inert[last].hi;
+      last++;
+   }
+   count = dt->inert_count - (last - first) + 1;
+   if (count > dt->inert_cap)
+   {
+      size_t cap = dt->inert_cap ? dt->inert_cap : 8;
+      struct data_transfer_inert *ranges;
+      if (cap > (size_t)-1 / 2 / sizeof(*ranges))
+      { dt->done = dt->failed = 1; return false; }
+      if (cap < count) cap *= 2;
+      ranges = (struct data_transfer_inert*)realloc(dt->inert, cap * sizeof(*ranges));
+      if (!ranges) { dt->done = dt->failed = 1; return false; }
+      dt->inert = ranges; dt->inert_cap = cap;
+   }
+   memmove(dt->inert + first + 1, dt->inert + last,
+         (dt->inert_count - last) * sizeof(*dt->inert));
+   dt->inert[first].lo = lo; dt->inert[first].hi = hi;
+   dt->inert_count = count;
+   if (hi > dt->committed) hi = dt->committed / dt->page * dt->page;
+   /* Permanent holes must remain inaccessible even in non-strict builds.
+    * Otherwise Linux can back them again with a transparent huge page
+    * when a neighbouring live interval is refilled. */
+   if (hi > lo) memdecommit(dt->map + lo, hi - lo, true);
+   return true;
 }
 
 void data_transfer_discard(data_transfer_t *dt, size_t up_to)
 {
    size_t lo;
-   if (!dt || !dt->f || !dt->map_len || !dt->page)
+   if (!dt || !dt->read_at || !dt->map_len || !dt->page)
       return;                     /* source or fallback: bytes stay */
    if (dt->window)
       return;                     /* not this surface - see below */
@@ -1148,10 +1302,10 @@ void data_transfer_discard(data_transfer_t *dt, size_t up_to)
 
 bool data_transfer_refill(data_transfer_t *dt, size_t from)
 {
-   size_t lo, end;
+   size_t lo, end, at, i;
    if (!dt)
       return false;
-   if (!dt->f || !dt->map_len || dt->window || from >= dt->low)
+   if (!dt->read_at || !dt->map_len || dt->window || from >= dt->low)
       return !dt->failed;         /* nothing was released there */
    lo  = (from / dt->page) * dt->page;
    end = dt->low;
@@ -1162,15 +1316,24 @@ bool data_transfer_refill(data_transfer_t *dt, size_t from)
     * unreadable.  Only on POSIX without DT_STRICT is this a cheap
     * no-op: MADV_DONTNEED alone leaves them committed to refault as
     * zeros. */
-   if (!memcommit(dt->map + lo, end - lo))
-      return false;
-   if (end > lo && !data_transfer_read_at(dt, lo, dt->map + lo, end - lo))
+   at = lo;
+   for (i = 0; at < end; i++)
    {
-      /* the file shrank or errored underneath a re-read: the honest
-       * frozen-short state, same as a fill ending early */
-      dt->done   = 1;
-      dt->failed = 1;
-      return false;
+      size_t stop = end;
+      if (i < dt->inert_count)
+      {
+         if (dt->inert[i].hi <= at) continue;
+         if (dt->inert[i].lo < stop) stop = dt->inert[i].lo;
+      }
+      if (stop > at)
+      {
+         if (!memcommit(dt->map + at, stop - at)) return false;
+         if (!data_transfer_read_at(dt, at, dt->map + at, stop - at))
+         { dt->done = dt->failed = 1; return false; }
+         at = stop;
+      }
+      if (i < dt->inert_count && dt->inert[i].hi > at)
+         at = dt->inert[i].hi < end ? dt->inert[i].hi : end;
    }
    dt->low = lo;
    return true;
@@ -1178,7 +1341,7 @@ bool data_transfer_refill(data_transfer_t *dt, size_t from)
 
 /* The prefix surface is inert on a window handle.
  *
- * A window keeps a live RFILE and a reservation, so these three would
+ * A window keeps a live reader and a reservation, so these three would
  * otherwise pass their own guards on one and then disagree with the
  * window's bookkeeping.  discard() is the dangerous one: its 'low'
  * frontier knows nothing of keep/wlo/whi/wfreed, so it releases from
@@ -1199,7 +1362,7 @@ size_t data_transfer_iterate_while(data_transfer_t *dt, size_t max_bytes,
       return 0;
    if (dt->window)
       return dt->avail;           /* not this surface - see above */
-   if (dt->f || dt->src_cb)
+   if (dt->read_at || dt->src_cb)
       return data_transfer_prefix_iterate(dt, max_bytes,
             should_continue, ud);
    return dt->avail;
@@ -1247,8 +1410,9 @@ void data_transfer_free(data_transfer_t *dt)
 {
    if (!dt)
       return;
-   if (dt->f)
-      filestream_close(dt->f);
+   if (dt->release)
+      dt->release(dt->read_ud);
+   free(dt->inert);
    if (dt->map)
    {
       if (dt->map_len)
